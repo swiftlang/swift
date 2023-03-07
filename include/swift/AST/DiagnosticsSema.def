@@ -2733,6 +2733,9 @@ ERROR(requires_not_suitable_archetype,none,
 ERROR(invalid_shape_requirement,none,
       "invalid same-shape requirement between %0 and %1",
       (Type, Type))
+ERROR(unsupported_same_element,none,
+      "same-element requirements are not yet supported",
+      ())
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",

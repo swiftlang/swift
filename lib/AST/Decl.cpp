@@ -4670,8 +4670,12 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       // the generic parameter list directly instead of looking
       // at the signature.
       SmallVector<Type, 4> args;
-      for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredInterfaceType());
+      for (auto param : decl->getGenericParams()->getParams()) {
+        auto argTy = param->getDeclaredInterfaceType();
+        if (param->isParameterPack())
+          argTy = PackType::getSingletonPackExpansion(argTy);
+        args.push_back(argTy);
+      }
 
       return BoundGenericType::get(decl, ParentTy, args);
     }

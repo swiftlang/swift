@@ -5147,6 +5147,7 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   if (found != openedElementEnvironments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
+    assert(existingEnv->getOpenedElementShapeClass()->isEqual(shapeClass));
     assert(existingEnv->getOpenedElementUUID() == uuid);
 
     return existingEnv;

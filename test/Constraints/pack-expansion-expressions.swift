@@ -56,12 +56,20 @@ func outerArchetype<each T, U>(t: repeat each T, u: U) where each T: P {
 }
 
 func sameElement<each T, U>(t: repeat each T, u: U) where each T: P, each T == U {
+// expected-error@-1{{same-element requirements are not yet supported}}
+
+  // FIXME: Opened element archetypes in diagnostics
   let _: repeat each T = repeat (each t).f(u)
+  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'τ_1_0'}}
 }
 
 func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     where each C: Collection, each C.Element == U {
+    // expected-error@-1{{same-element requirements are not yet supported}}
+
+  // FIXME: Opened element archetypes in diagnostics
   _ = repeat (each c).forEach(function)
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntegerLiteral {

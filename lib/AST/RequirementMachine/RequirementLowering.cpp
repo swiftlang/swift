@@ -194,6 +194,15 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
+      // If one side is a parameter pack, this is a same-element requirement, which
+      // is not yet supported.
+      if (firstType->isParameterPack() != secondType->isParameterPack()) {
+        errors.push_back(RequirementError::forSameElement(
+            {RequirementKind::SameType, sugaredFirstType, secondType}, loc));
+        recordedErrors = true;
+        return true;
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             sugaredFirstType, secondType);
