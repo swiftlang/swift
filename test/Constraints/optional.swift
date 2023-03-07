@@ -592,8 +592,8 @@ do {
 
 // Diagnose extraneous force unwrap in ambiguous context
 do {
-  func test(_: Int) {} // expected-note {{found this candidate}}
-  func test(_: String) {} // expected-note {{found this candidate}}
+  func test(_: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
 
   var x: Double = 42
   test(x!) // expected-error {{no exact matches in call to local function 'test'}}

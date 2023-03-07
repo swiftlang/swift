@@ -4673,10 +4673,16 @@ static bool diagnoseAmbiguity(
       auto noteLoc =
           decl->getLoc().isInvalid() ? getLoc(commonAnchor) : decl->getLoc();
 
-      if (solution.Fixes.size() == 1) {
-        diagnosed &=
-            solution.Fixes.front()->diagnose(solution, /*asNote*/ true);
-      } else if (llvm::all_of(solution.Fixes, [&](ConstraintFix *fix) {
+      SmallVector<const ConstraintFix *, 4> fixes;
+      for (const auto &entry : aggregateFix) {
+        if (entry.first == &solution)
+          fixes.push_back(entry.second);
+      }
+
+      if (fixes.size() == 1) {
+        diagnosed &= fixes.front()->diagnose(solution, /*asNote*/ true);
+      } else if (!fixes.empty() &&
+                 llvm::all_of(fixes, [&](const ConstraintFix *fix) {
                    return fix->getLocator()
                        ->findLast<LocatorPathElt::ApplyArgument>()
                        .has_value();
@@ -4690,8 +4696,7 @@ static bool diagnoseAmbiguity(
             type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
         assert(fn);
 
-        auto *argList =
-            solution.getArgumentList(solution.Fixes.front()->getLocator());
+        auto *argList = solution.getArgumentList(fixes.front()->getLocator());
         assert(argList);
 
         if (fn->getNumParams() == 1 && argList->isUnary()) {

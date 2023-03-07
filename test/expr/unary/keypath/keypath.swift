@@ -1067,8 +1067,8 @@ func f_56996() {
 // https://github.com/apple/swift/issues/55805
 // Key-path missing optional crashes compiler: Inactive constraints left over?
 func f_55805() {
-  let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{no exact matches in reference to property 'count'}}
-  // expected-note@-1 {{found candidate with type 'Int'}}
+  let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{value of optional type 'String.UTF8View?' must be unwrapped to refer to member 'count' of wrapped base type 'String.UTF8View'}}
+  // expected-note@-1 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}
 }
 
 // rdar://74711236 - crash due to incorrect member access in key path
