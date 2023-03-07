@@ -600,7 +600,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     using namespace constraints;
     auto dc = var->getInnermostDeclContext();
     ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
-    auto target = SolutionApplicationTarget::forUninitializedWrappedVar(var);
+    auto target = SyntacticElementTarget::forUninitializedWrappedVar(var);
     auto solutions = cs.solve(target, FreeTypeVariableBinding::Disallow);
 
     if (!solutions || !cs.applySolution(solutions->front(), target)) {

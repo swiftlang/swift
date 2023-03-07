@@ -2769,7 +2769,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
 
   // Type-check the initialization.
   using namespace constraints;
-  auto target = SolutionApplicationTarget::forPropertyWrapperInitializer(
+  auto target = SyntacticElementTarget::forPropertyWrapperInitializer(
       wrappedVar, initContext, initializer);
   auto result = TypeChecker::typeCheckExpression(target);
   if (!result)

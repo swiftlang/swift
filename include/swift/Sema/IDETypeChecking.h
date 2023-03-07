@@ -53,7 +53,7 @@ namespace swift {
   namespace constraints {
   class ConstraintSystem;
   class Solution;
-  class SolutionApplicationTarget;
+  class SyntacticElementTarget;
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
@@ -161,7 +161,7 @@ namespace swift {
   /// \returns `true` if target was applicable and it was possible to infer
   /// types for code completion, `false` otherwise.
   bool typeCheckForCodeCompletion(
-      constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+      constraints::SyntacticElementTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
 
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to

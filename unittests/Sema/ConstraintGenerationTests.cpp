@@ -20,8 +20,8 @@ using namespace swift::constraints;
 
 static Expr *applySolution(ConstraintSystem &cs, Expr *expr,
                            Solution &solution) {
-  SolutionApplicationTarget target(expr, cs.DC, CTP_Unused, Type(),
-                                   /*isDiscarded=*/false);
+  SyntacticElementTarget target(expr, cs.DC, CTP_Unused, Type(),
+                                /*isDiscarded=*/false);
   auto result = cs.applySolution(solution, target);
   return result ? result->getAsExpr() : nullptr;
 }
