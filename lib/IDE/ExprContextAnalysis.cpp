@@ -1185,11 +1185,15 @@ class ExprContextAnalyzer {
     switch (P->getKind()) {
     case PatternKind::Expr: {
       auto ExprPat = cast<ExprPattern>(P);
-      if (auto D = ExprPat->getMatchVar()) {
-        if (D->hasInterfaceType())
-          recordPossibleType(
-              D->getDeclContext()->mapTypeIntoContext(D->getInterfaceType()));
-      }
+      if (!ExprPat->isResolved())
+        break;
+
+      auto D = ExprPat->getMatchVar();
+      if (!D || !D->hasInterfaceType())
+        break;
+
+      auto *DC = D->getDeclContext();
+      recordPossibleType(DC->mapTypeIntoContext(D->getInterfaceType()));
       break;
     }
     default:

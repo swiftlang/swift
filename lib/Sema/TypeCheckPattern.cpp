@@ -244,7 +244,7 @@ public:
     if (Pattern *p = visit(E))
       return p;
 
-    return ExprPattern::createResolved(Context, E);
+    return ExprPattern::createResolved(Context, E, DC);
   }
 
   /// Turn an argument list into a matching tuple or paren pattern.
@@ -759,6 +759,40 @@ static TypeResolutionOptions applyContextualPatternOptions(
   }
 
   return options;
+}
+
+ExprPatternMatchResult
+ExprPatternMatchRequest::evaluate(Evaluator &evaluator,
+                                  const ExprPattern *EP) const {
+  assert(EP->isResolved() && "Must only be queried once resolved");
+
+  auto *DC = EP->getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  // Create a 'let' binding to stand in for the RHS value.
+  auto *matchVar =
+      new (ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                        EP->getLoc(), ctx.Id_PatternMatchVar, DC);
+  matchVar->setImplicit();
+
+  // Build the 'expr ~= var' expression.
+  auto *matchOp = new (ctx) UnresolvedDeclRefExpr(
+      DeclNameRef(ctx.Id_MatchOperator), DeclRefKind::BinaryOperator,
+      DeclNameLoc(EP->getLoc()));
+  matchOp->setImplicit();
+
+  // FIXME: This matches what the previous code had, but it doesn't seems like
+  // it should be set to this.
+  matchOp->setFunctionRefKind(FunctionRefKind::Compound);
+
+  // Note we use getEndLoc here to have the BinaryExpr source range be the same
+  // as the expr pattern source range.
+  auto *matchVarRef =
+      new (ctx) DeclRefExpr(matchVar, DeclNameLoc(EP->getEndLoc()),
+                            /*Implicit=*/true);
+  auto *matchCall = BinaryExpr::create(ctx, EP->getSubExpr(), matchOp,
+                                       matchVarRef, /*implicit*/ true);
+  return {matchVar, matchCall};
 }
 
 Type PatternTypeRequest::evaluate(Evaluator &evaluator,
@@ -1429,8 +1463,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             // If we have the original expression parse tree, try reinterpreting
             // it as an expr-pattern if enum element lookup failed, since `.foo`
             // could also refer to a static member of the context type.
-            P = ExprPattern::createResolved(Context,
-                                            EEP->getUnresolvedOriginalExpr());
+            P = ExprPattern::createResolved(
+                Context, EEP->getUnresolvedOriginalExpr(), dc);
             return coercePatternToType(
                 pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                 options);

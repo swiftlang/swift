@@ -2219,6 +2219,52 @@ public:
   void cacheResult(NamedPattern *P) const;
 };
 
+class ExprPatternMatchResult {
+  VarDecl *MatchVar;
+  Expr *MatchExpr;
+
+  friend class ExprPattern;
+
+  // Should only be used as the default value for the request, as the caching
+  // logic assumes the request always produces a non-null result.
+  ExprPatternMatchResult(llvm::NoneType)
+      : MatchVar(nullptr), MatchExpr(nullptr) {}
+
+public:
+  ExprPatternMatchResult(VarDecl *matchVar, Expr *matchExpr)
+      : MatchVar(matchVar), MatchExpr(matchExpr) {
+    // Note the caching logic currently requires the request to produce a
+    // non-null result.
+    assert(matchVar && matchExpr);
+  }
+
+  VarDecl *getMatchVar() const { return MatchVar; }
+  Expr *getMatchExpr() const { return MatchExpr; }
+};
+
+/// Compute the match VarDecl and expression for an ExprPattern, which applies
+/// the \c ~= operator.
+class ExprPatternMatchRequest
+    : public SimpleRequest<ExprPatternMatchRequest,
+                           ExprPatternMatchResult(const ExprPattern *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExprPatternMatchResult evaluate(Evaluator &evaluator,
+                                  const ExprPattern *EP) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ExprPatternMatchResult> getCachedResult() const;
+  void cacheResult(ExprPatternMatchResult result) const;
+};
+
 class InterfaceTypeRequest :
     public SimpleRequest<InterfaceTypeRequest,
                          Type (ValueDecl *),

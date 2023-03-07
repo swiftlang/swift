@@ -1980,8 +1980,8 @@ Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
 Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   // If the pattern has been type-checked, walk the match expression, which
   // includes the explicit subexpression.
-  if (P->getMatchExpr()) {
-    if (Expr *newMatch = doIt(P->getMatchExpr())) {
+  if (auto *match = P->getCachedMatchExpr()) {
+    if (Expr *newMatch = doIt(match)) {
       P->setMatchExpr(newMatch);
       return P;
     }

@@ -9933,24 +9933,11 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   // Slots for expression and variable are going to be filled via
   // synthesizing ~= operator application.
-  auto *EP =
-      ExprPattern::createResolved(ctx, pattern->getUnresolvedOriginalExpr());
-
-  auto tildeEqualsApplication =
-      TypeChecker::synthesizeTildeEqualsOperatorApplication(EP, DC, enumTy);
-
-  if (!tildeEqualsApplication)
-    return true;
-
-  VarDecl *matchVar;
-  Expr *matchCall;
-
-  std::tie(matchVar, matchCall) = *tildeEqualsApplication;
-
-  cs.setType(matchVar, enumTy);
-  cs.setType(EP, enumTy);
+  auto *EP = ExprPattern::createResolved(
+      ctx, pattern->getUnresolvedOriginalExpr(), DC);
 
   // result of ~= operator is always a `Bool`.
+  auto *matchCall = EP->getMatchExpr();
   auto target = SyntacticElementTarget::forExprPattern(
       matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
 
@@ -9967,6 +9954,8 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
       return true;
     }
   }
+  cs.setType(EP->getMatchVar(), enumTy);
+  cs.setType(EP, enumTy);
 
   if (cs.generateConstraints(target))
     return true;
@@ -9976,12 +9965,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   cs.addConstraint(ConstraintKind::Conversion, cs.getType(EP->getSubExpr()),
                    elementTy, cs.getConstraintLocator(EP));
 
-  // Store the $match variable and binary expression for solution application.
-  EP->setMatchVar(matchVar);
-  EP->setMatchExpr(matchCall);
-
   cs.setTargetFor(pattern, target);
-
   return false;
 }
 
