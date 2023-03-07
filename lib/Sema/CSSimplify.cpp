@@ -9928,13 +9928,12 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   if (!pattern->hasUnresolvedOriginalExpr())
     return true;
 
-  auto &DC = cs.DC;
+  auto *DC = pattern->getDeclContext();
   auto &ctx = cs.getASTContext();
 
-  // Slots for expression and variable are going to be filled via
-  // synthesizing ~= operator application.
-  auto *EP = ExprPattern::createResolved(
-      ctx, pattern->getUnresolvedOriginalExpr(), DC);
+  // Retrieve a corresponding ExprPattern which we can solve with ~=.
+  auto *EP =
+      llvm::cantFail(ctx.evaluator(EnumElementExprPatternRequest{pattern}));
 
   // result of ~= operator is always a `Bool`.
   auto *matchCall = EP->getMatchExpr();

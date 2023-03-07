@@ -508,25 +508,29 @@ class EnumElementPattern : public Pattern {
   DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
+  DeclContext *DC;
 
 public:
   EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
                      DeclNameLoc NameLoc, DeclNameRef Name,
-                     EnumElementDecl *Element, Pattern *SubPattern)
+                     EnumElementDecl *Element, Pattern *SubPattern,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(ParentType),
         DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern),
+        DC(DC) {
     assert(ParentType && "Missing parent type?");
   }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
-                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr)
+                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
         NameLoc(NameLoc), Name(Name),
         ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-        SubPattern(SubPattern) {}
+        SubPattern(SubPattern), DC(DC) {}
 
   bool hasSubPattern() const { return SubPattern; }
 
@@ -539,6 +543,8 @@ public:
   }
 
   void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  DeclContext *getDeclContext() const { return DC; }
 
   DeclNameRef getName() const { return Name; }
 

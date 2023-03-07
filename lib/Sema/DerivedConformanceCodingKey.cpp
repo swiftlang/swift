@@ -214,7 +214,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     for (auto *elt : elements) {
       auto *baseTE = TypeExpr::createImplicit(enumType, C);
       auto *pat = new (C) EnumElementPattern(baseTE, SourceLoc(), DeclNameLoc(),
-                                             DeclNameRef(), elt, nullptr);
+                                             DeclNameRef(), elt, nullptr,
+                                             /*DC*/ strValDecl);
       pat->setImplicit();
 
       auto labelItem = CaseLabelItem(pat);

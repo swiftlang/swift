@@ -439,9 +439,8 @@ public:
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
-    return new (Context)
-        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
-                           nullptr, ume);
+    return new (Context) EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(),
+                                            ume->getName(), nullptr, ume, DC);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -483,7 +482,7 @@ public:
     base->setType(MetatypeType::get(ty));
     return new (Context)
         EnumElementPattern(base, ude->getDotLoc(), ude->getNameLoc(),
-                           ude->getName(), referencedElement, nullptr);
+                           ude->getName(), referencedElement, nullptr, DC);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -496,8 +495,9 @@ public:
     auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
     auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-    return new (Context) EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
-                                            elt->createNameRef(), elt, nullptr);
+    return new (Context)
+        EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
+                           elt->createNameRef(), elt, nullptr, DC);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
     // FIXME: This shouldn't be needed.  It is only necessary because of the
@@ -514,7 +514,7 @@ public:
 
       return new (Context)
           EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
-                             ude->getName(), referencedElement, nullptr);
+                             ude->getName(), referencedElement, nullptr, DC);
     }
       
     
@@ -614,7 +614,7 @@ public:
     auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
     return new (Context) EnumElementPattern(
         baseTE, SourceLoc(), tailComponent->getNameLoc(),
-        tailComponent->getNameRef(), referencedElement, subPattern);
+        tailComponent->getNameRef(), referencedElement, subPattern, DC);
   }
 };
 
@@ -789,6 +789,15 @@ ExprPatternMatchRequest::evaluate(Evaluator &evaluator,
   auto *matchCall = BinaryExpr::create(ctx, EP->getSubExpr(), matchOp,
                                        matchVarRef, /*implicit*/ true);
   return {matchVar, matchCall};
+}
+
+ExprPattern *
+EnumElementExprPatternRequest::evaluate(Evaluator &evaluator,
+                                        const EnumElementPattern *EEP) const {
+  assert(EEP->hasUnresolvedOriginalExpr());
+  auto *DC = EEP->getDeclContext();
+  return ExprPattern::createResolved(DC->getASTContext(),
+                                     EEP->getUnresolvedOriginalExpr(), DC);
 }
 
 Type PatternTypeRequest::evaluate(Evaluator &evaluator,
@@ -1300,7 +1309,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         auto *BaseTE = TypeExpr::createImplicit(type, Context);
         P = new (Context) EnumElementPattern(
             BaseTE, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
-            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
+            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr, dc);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       } else {
@@ -1355,7 +1364,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
         sub = new (Context) EnumElementPattern(
             base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
-            some->createNameRef(), nullptr, sub);
+            some->createNameRef(), nullptr, sub, dc);
         sub->setImplicit();
       }
 

@@ -116,9 +116,9 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
     auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat =
-        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, lhsSubpattern);
+    auto lhsElemPat = new (C)
+        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, lhsSubpattern, /*DC*/ ltDecl);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
@@ -126,9 +126,9 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
     auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat =
-        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, rhsSubpattern);
+    auto rhsElemPat = new (C)
+        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, rhsSubpattern, /*DC*/ ltDecl);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
