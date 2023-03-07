@@ -2455,3 +2455,15 @@ func inoutCaptureTest() -> (() -> ()) {
 
     return f
 }
+
+////////////////
+// Misc Tests //
+////////////////
+
+func borrowAndConsumeAtSameTime(_: __shared NonTrivialStruct, consume _: __owned NonTrivialStruct) {}
+
+func borrowAndConsumeAtSameTimeTest(x: __owned NonTrivialStruct) { // expected-error {{'x' used after consume}}
+    borrowAndConsumeAtSameTime(x, consume: x)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{non-consuming use here}}
+}

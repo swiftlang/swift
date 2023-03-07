@@ -261,3 +261,21 @@ bb0(%0 : @owned $NonTrivialStruct):
   %27 = tuple ()
   return %27 : $()
 }
+
+sil @borrow_and_consume : $@convention(thin) (@guaranteed NonTrivialStruct, @owned NonTrivialStruct) -> ()
+
+sil hidden [ossa] @$s4test1d1xyAA1NonTrivialStructVn_tF : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct, let, name "x", argno 1
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct // expected-error {{'x' used after consume}}
+  store %0 to [init] %2 : $*NonTrivialStruct
+  %4 = load_borrow %2 : $*NonTrivialStruct
+  %5 = load [copy] %2 : $*NonTrivialStruct // expected-note {{consuming use here}}
+  %6 = function_ref @borrow_and_consume : $@convention(thin) (@guaranteed NonTrivialStruct, @owned NonTrivialStruct) -> ()
+  %7 = apply %6(%4, %5) : $@convention(thin) (@guaranteed NonTrivialStruct, @owned NonTrivialStruct) -> ()
+  end_borrow %4 : $NonTrivialStruct // expected-note {{non-consuming use here}}
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %11 = tuple ()
+  return %11 : $()
+}
