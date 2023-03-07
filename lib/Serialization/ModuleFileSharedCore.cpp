@@ -544,7 +544,7 @@ ValidationInfo serialization::validateSerializedAST(
           requiresOSSAModules, requiresRevisionMatch,
           requiredSDK,
           extendedInfo, localObfuscator);
-      if (result.status == Status::Malformed)
+      if (result.status != Status::Valid)
         return result;
     } else if ((dependencies || searchPaths) &&
                result.status == Status::Valid &&
