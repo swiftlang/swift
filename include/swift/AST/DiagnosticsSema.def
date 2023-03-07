@@ -6800,6 +6800,8 @@ ERROR(moveonly_cast,none,
       "move-only types cannot be conditionally cast", ())
 ERROR(moveonly_failable_init,none,
       "move-only types cannot have failable initializers yet", ())
+ERROR(moveonly_objc_enum_banned, none,
+      "@objc enums cannot be marked as move-only", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
