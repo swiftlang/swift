@@ -666,8 +666,8 @@ def enable_experimental_cxx_interop :
   Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
-def cxx_compatibility_mode :
-  Joined<["-"], "cxx-compatibility-mode=">,
+def cxx_interoperability_mode :
+  Joined<["-"], "cxx-interoperability-mode=">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enables C++ interoperability; requires compatbility version to be"
   "specified.">;

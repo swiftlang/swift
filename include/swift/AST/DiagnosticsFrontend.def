@@ -516,10 +516,10 @@ WARNING(compiler_plugin_not_loaded,none,
         
 ERROR(dont_enable_interop_and_compat,none,
       "do not pass both -enable-experimental-cxx-interop and "
-      "-cxx-compatibility-mode. Remove -enable-experimental-cxx-interop.", ())
+      "-cxx-interoperability-mode. Remove -enable-experimental-cxx-interop.", ())
       
 ERROR(invalid_interop_compat_mode,none,
-      "invalid option passed to -cxx-compatibility-mode. Please select either "
+      "invalid option passed to -cxx-interoperability-mode. Please select either "
       "'off' or 'swift-5.7'.", ())
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
@@ -527,7 +527,7 @@ NOTE(swift_will_maintain_compat,none,
      "change how APIs are imported.", ())
 WARNING(enable_interop_flag_deprecated,none,
         "the -enable-experimental-cxx-interop flag is deprecated. Please pass "
-        "'-cxx-compatibility-mode=' instead.", ())
+        "'-cxx-interoperability-mode=' instead.", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

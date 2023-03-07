@@ -913,7 +913,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  if (Arg *A = Args.getLastArg(OPT_cxx_compatibility_mode)) {    
+  if (Arg *A = Args.getLastArg(OPT_cxx_interoperability_mode)) {
     if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
       Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
     }
