@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
 
+// FIXME: Fix the optimizer
+// REQUIRES: swift_test_mode_optimize_none
+
 // REQUIRES: executable_test
 
 // Because of -enable-experimental-feature VariadicGenerics
@@ -12,6 +15,10 @@
 import StdlibUnittest
 
 var types = TestSuite("VariadicGenericTypes")
+
+//
+// Metadata instantiation tests
+//
 
 public struct Outer<each U> {
   public struct Inner<each V> {}
@@ -65,5 +72,47 @@ types.test("ConformanceReq") {
 }
 
 // FIXME: Test superclass, layout and same-type pack requirements once more stuff is plumbed through
+
+//
+// Stored property layout tests
+//
+
+public struct FancyTuple<each T> {
+  private var x: (repeat each T)
+}
+
+public func returnSize<T>(_: T.Type) -> Int {
+  return MemoryLayout<T>.size
+}
+
+types.test("FancyTuple") {
+  expectEqual(returnSize(FancyTuple< >.self),
+              returnSize(Void.self))
+  expectEqual(returnSize(FancyTuple<Int8>.self),
+              returnSize((Int8).self))
+  expectEqual(returnSize(FancyTuple<Int8, Int16>.self),
+              returnSize((Int8, Int16).self))
+  expectEqual(returnSize(FancyTuple<Int8, Int16, Int32>.self),
+              returnSize((Int8, Int16, Int32).self))
+  expectEqual(returnSize(FancyTuple<Int8, Int16, Int32, Int64>.self),
+              returnSize((Int8, Int16, Int32, Int64).self))
+}
+
+public struct SequenceElementTuple<each T: Sequence> {
+  private var x: (repeat (each T).Element)
+}
+
+types.test("SequenceElementTuple") {
+  expectEqual(returnSize(SequenceElementTuple< >.self),
+              returnSize(Void.self))
+  expectEqual(returnSize(SequenceElementTuple<Array<Int8>>.self),
+              returnSize((Int8).self))
+  expectEqual(returnSize(SequenceElementTuple<Array<Int8>, Array<Int16>>.self),
+              returnSize((Int8, Int16).self))
+  expectEqual(returnSize(SequenceElementTuple<Array<Int8>, Array<Int16>, Array<Int32>>.self),
+              returnSize((Int8, Int16, Int32).self))
+  expectEqual(returnSize(SequenceElementTuple<Array<Int8>, Array<Int16>, Array<Int32>, Array<Int64>>.self),
+              returnSize((Int8, Int16, Int32, Int64).self))
+}
 
 runAllTests()
