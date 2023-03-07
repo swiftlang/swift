@@ -163,7 +163,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    pack_element_set [[ELT_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[RESULT_PACK]] : $*Pack{repeat each T}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
@@ -181,7 +181,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb6, bb5
 // CHECK:       bb5:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <T>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[DEST_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[ARG_TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    [[SRC_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
 // CHECK-NEXT:    copy_addr [[SRC_ADDR]] to [init] [[DEST_ADDR]] : $*@pack_element([[UUID]]) T
