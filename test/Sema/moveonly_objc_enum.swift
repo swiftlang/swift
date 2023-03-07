@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-move-only
 
+// REQUIRES: objc_interop
+
 // Validate that we can't mark an objc enum as move only.
 
 @_moveOnly
