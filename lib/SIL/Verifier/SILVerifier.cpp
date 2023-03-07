@@ -969,10 +969,11 @@ public:
     return numInsts;
   }
 
-  SILVerifier(const SILFunction &F, bool SingleFunction = true)
+  SILVerifier(const SILFunction &F, bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
         SingleFunction(SingleFunction),
+        checkLinearLifetime(checkLinearLifetime),
         Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)),
         loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
@@ -6423,7 +6424,7 @@ public:
     }
   }
 
-  void verify(bool isCompleteOSSA, bool checkLinearLifetimes) {
+  void verify(bool isCompleteOSSA) {
     if (!isCompleteOSSA || !F.getModule().getOptions().OSSACompleteLifetimes) {
       DEBlocks = std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
@@ -6467,14 +6468,15 @@ void SILFunction::verify(bool SingleFunction, bool isCompleteOSSA,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction).verify(isCompleteOSSA, checkLinearLifetime);
+  SILVerifier(*this, SingleFunction, checkLinearLifetime).verify(isCompleteOSSA);
 }
 
 void SILFunction::verifyCriticalEdges() const {
   if (!verificationEnabled(getModule()))
     return;
 
-  SILVerifier(*this, /*SingleFunction=*/true).verifyBranches(this);
+  SILVerifier(*this, /*SingleFunction=*/true,
+                     /*checkLinearLifetime=*/ false).verifyBranches(this);
 }
 
 /// Verify that a property descriptor follows invariants.
@@ -6591,7 +6593,8 @@ void SILVTable::verify(const SILModule &M) const {
     }
 
     if (M.getStage() != SILStage::Lowered) {
-      SILVerifier(*entry.getImplementation())
+      SILVerifier(*entry.getImplementation(), /*SingleFunction=*/true,
+                                              /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
               entry.getImplementation()->getLoweredFunctionType(),
