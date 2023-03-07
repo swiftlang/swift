@@ -52,11 +52,9 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
     // the contextual type might have a global actor attribute but because no
     // methods from that global actor are called in the closure, the closure has
     // a non-actor type.
-    auto target = S.targets.find(dyn_cast<ClosureExpr>(E));
-    if (target != S.targets.end()) {
-      if (auto Ty = target->second.getClosureContextualType()) {
+    if (auto target = S.getTargetFor(dyn_cast<ClosureExpr>(E))) {
+      if (auto Ty = target->getClosureContextualType())
         return Ty;
-      }
     }
     if (!S.hasType(E)) {
       return Type();
