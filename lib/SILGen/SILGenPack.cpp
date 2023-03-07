@@ -573,7 +573,7 @@ TuplePackExpansionInitialization::create(SILGenFunction &SGF,
 
 CanPackExpansionType
 TuplePackExpansionInitialization::getLoweredExpansionType() const {
-  auto loweredTupleTy = TupleAddr->getType().castTo<SILPackType>();
+  auto loweredTupleTy = TupleAddr->getType().castTo<TupleType>();
   auto loweredComponentTy = loweredTupleTy.getElementType(ComponentIndex);
   return cast<PackExpansionType>(loweredComponentTy);
 }
