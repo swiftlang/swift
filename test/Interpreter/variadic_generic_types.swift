@@ -7,6 +7,9 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 
 var types = TestSuite("VariadicGenericTypes")
