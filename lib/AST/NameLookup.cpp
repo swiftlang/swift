@@ -1255,6 +1255,7 @@ public:
   }
 
   bool isLazilyCompleteForMacroExpansion(DeclName name) const {
+    assert(!MacroDecl::isUniqueMacroName(name.getBaseName()));
     // If we've already expanded macros for a simple name, we must have expanded
     // all macros that produce names with the same base identifier.
     bool isBaseNameComplete = name.isCompoundName() &&
@@ -1264,6 +1265,7 @@ public:
   }
 
   void markLazilyCompleteForMacroExpansion(DeclName name) {
+    assert(!MacroDecl::isUniqueMacroName(name.getBaseName()));
     LazilyCompleteNamesForMacroExpansion.insert(name);
   }
 
@@ -1521,6 +1523,17 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   }
 }
 
+/// Adjust the given name to make it a proper key for the lazy macro expansion
+/// cache, which maps all uniquely-generated names down to a single placeholder
+/// key.
+static DeclName adjustLazyMacroExpansionNameKey(
+    ASTContext &ctx, DeclName name) {
+  if (MacroDecl::isUniqueMacroName(name.getBaseName()))
+    return MacroDecl::getUniqueNamePlaceholder(ctx);
+
+  return name;
+}
+
 static void
 populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
                                             MemberLookupTable &table,
@@ -1756,9 +1769,11 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     Table.markLazilyComplete(baseName);
   }
 
-  if (!Table.isLazilyCompleteForMacroExpansion(name)) {
-    populateLookupTableEntryFromMacroExpansions(ctx, Table, name, decl);
-    Table.markLazilyCompleteForMacroExpansion(name);
+  DeclName macroExpansionKey = adjustLazyMacroExpansionNameKey(ctx, name);
+  if (!Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
+    populateLookupTableEntryFromMacroExpansions(
+        ctx, Table, macroExpansionKey, decl);
+    Table.markLazilyCompleteForMacroExpansion(macroExpansionKey);
   }
 
   // Look for a declaration with this name.
