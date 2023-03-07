@@ -438,7 +438,7 @@ enum class CxxCompatMode {
 static CxxCompatMode validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return CxxCompatMode::off;
-  if (mode == "swift-5.7")
+  if (mode == "swift-5.9")
     return CxxCompatMode::enabled;
   return CxxCompatMode::invalid;
 }
