@@ -10,7 +10,6 @@
 // RUN: %target-run %t/paths-test | %FileCheck %s
 // RUN: env %env-SWIFT_ROOT=%t/swift-root %target-run %t/paths-test | %FileCheck %s --check-prefix CHECK-FR
 // REQUIRES: executable_test
-// UNSUPPORTED: remote_run
 
 // This can't be done in unittests, because that statically links the runtime
 // so we get the wrong paths.  We explicitly want to test that we get the
