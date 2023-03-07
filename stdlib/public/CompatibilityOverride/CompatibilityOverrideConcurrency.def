@@ -124,6 +124,14 @@ OVERRIDE_ACTOR(task_isCurrentExecutor, bool,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, (ExecutorRef executor), (executor))
 
+OVERRIDE_ACTOR(task_getExecutorRefTypeName, TypeNamePair,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (ExecutorRef executor), (executor))
+
+OVERRIDE_ACTOR(task_getCurrentActiveExecutorRef, ExecutorActiveAndRef,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, ,)
+
 OVERRIDE_ACTOR(task_switch, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
                swift::, (SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,

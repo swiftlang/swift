@@ -296,12 +296,44 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 }
 
 SWIFT_CC(swift)
+static TypeNamePair swift_task_getExecutorRefTypeNameImpl(ExecutorRef ref) {
+  TypeNamePair executorName;
+  if (ref.isDefaultActor()) {
+    auto defaultActorExecutorName = "DefaultActorExecutor";
+    executorName = TypeNamePair{defaultActorExecutorName, strlen(defaultActorExecutorName)};
+  } else if (ref.isMainExecutor()) {
+    auto mainActorExecutorName = "MainActorExecutor";
+    executorName = TypeNamePair{mainActorExecutorName, strlen(mainActorExecutorName)};
+  } else if (ref.isGeneric()) {
+    auto genericExecutorName = "GenericExecutor"; // TODO: what's a better name for it?
+    executorName = TypeNamePair{genericExecutorName, strlen(genericExecutorName)};
+  } else {
+    HeapObject * identity = ref.getIdentity();
+    assert(identity);
+    auto *metadata = identity->metadata;
+    executorName = swift_getTypeName(metadata, /*qualified=*/true);
+  }
+
+  return executorName;
+}
+
+SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
   if (auto currentTracking = ExecutorTrackingInfo::current()) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
+  // TODO(ktoso): wrong assumption; we can be on the main queue without being on main thread
   return executor.isMainExecutor() && isExecutingOnMainThread();
+}
+
+SWIFT_CC(swift)
+static ExecutorActiveAndRef swift_task_getCurrentActiveExecutorRefImpl() {
+  if (auto currentTracking = ExecutorTrackingInfo::current()) {
+    return ExecutorActiveAndRef{true, currentTracking->getActiveExecutor()}; // FIXME; special case main and default
+  }
+
+  return ExecutorActiveAndRef{false, ExecutorRef::generic()};
 }
 
 /// Logging level for unexpected executors:

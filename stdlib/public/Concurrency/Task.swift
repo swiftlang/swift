@@ -978,6 +978,30 @@ func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawU
 @_silgen_name("swift_task_isCurrentExecutor")
 func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
+@available(SwiftStdlib 5.9, *)
+@usableFromInline
+@_silgen_name("swift_task_getExecutorRefTypeName")
+func _executorGetTypeNameRaw(_ executor: Builtin.Executor) -> (UnsafePointer<UInt8>?, Int)
+
+@available(SwiftStdlib 5.9, *)
+@usableFromInline
+func _executorGetTypeName(_ executor: Builtin.Executor) -> String {
+  let (stringPtr, count) = _executorGetTypeNameRaw(executor)
+  guard let stringPtr else {
+    return "<unknown>"
+  }
+
+  // FIXME: can't use this since it is internal in stdlib and we're in concurrency
+  //  return String._fromUTF8Repairing(
+  //      UnsafeBufferPointer(start: stringPtr, count: count)).0
+  return String(cString: stringPtr)
+}
+
+@available(SwiftStdlib 5.9, *)
+@usableFromInline
+@_silgen_name("swift_task_getCurrentActiveExecutorRef")
+func _executorGetCurrentActiveExecutorRef() -> (Bool, Builtin.Executor)
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_reportUnexpectedExecutor")

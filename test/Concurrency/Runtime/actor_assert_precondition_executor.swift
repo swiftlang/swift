@@ -73,7 +73,7 @@ actor Someone {
       }
 
       tests.test("preconditionTaskOnActorExecutor(main): wrongly assume the main executor, from actor on other executor") {
-        expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
+        expectCrashLater(withMessage: "Expected same executor as actor 'Swift.MainActor' ('MainActorExecutor'), but was executing on 'DefaultActorExecutor'.")
         await Someone().callCheckMainActor()
       }
 

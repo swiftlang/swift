@@ -892,6 +892,19 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(ExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TypeNamePair swift_task_getExecutorRefTypeName(ExecutorRef executor);
+
+/// Since the `nullptr, 0` executor ref is a valid "generic executor" reference,
+/// when we need to know "was the generic one actually set, or are we just defaulting to it
+struct ExecutorActiveAndRef {
+  bool active;
+  ExecutorRef ref;
+};
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ExecutorActiveAndRef swift_task_getCurrentActiveExecutorRef();
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, ExecutorRef executor);
