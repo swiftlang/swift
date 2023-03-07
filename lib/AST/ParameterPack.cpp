@@ -478,13 +478,6 @@ bool SILPackType::containsPackExpansionType() const {
 CanPackType
 CanTupleType::getInducedPackTypeImpl(CanTupleType tuple, unsigned start, unsigned count) {
   assert(start + count <= tuple->getNumElements() && "range out of range");
-
   auto &ctx = tuple->getASTContext();
-  if (count == 0) return CanPackType::get(ctx, {});
-
-  SmallVector<CanType, 4> eltTypes;
-  eltTypes.reserve(count);
-  for (unsigned i = start, e = start + count; i != e; ++i)
-    eltTypes.push_back(tuple.getElementType(i));
-  return CanPackType::get(ctx, eltTypes);
+  return CanPackType::get(ctx, tuple.getElementTypes().slice(start, count));
 }

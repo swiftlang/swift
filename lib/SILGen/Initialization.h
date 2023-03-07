@@ -122,6 +122,31 @@ public:
     llvm_unreachable("Must implement if canPerformPackExpansionInitialization"
                      "returns true");
   }
+
+  /// Given that this supports pack expansion initialization, can it
+  /// perform *in place* pack expansion initialization by producing
+  /// a pack element of the given type?
+  ///
+  /// The dominance relationship gets a little screwed up here; only
+  /// return true if it's okay for the address to be written into a
+  /// pack and then initialized later.
+  virtual bool
+  canPerformInPlacePackInitialization(GenericEnvironment *env,
+                                      SILType eltAddrTy) const {
+    return false;
+  }
+
+  /// Given that this supports in-place pack expansion initialization,
+  /// return the address of the storage.
+  ///
+  /// For convenience, the same element type that was accepted before
+  /// is passed again.
+  virtual SILValue getAddressForInPlacePackInitialization(SILGenFunction &SGF,
+                                                          SILLocation loc,
+                                                          SILType eltAddrTy) {
+    llvm_unreachable("Must implement if canPerformInPlacePackInitialization"
+                     "returns true");
+  }
   
   /// Return true if we can get the addresses of elements with the
   /// 'splitIntoTupleElements' method.  Subclasses can override this to
@@ -364,6 +389,13 @@ public:
                                           SILLocation loc,
                                           SILValue indexWithinComponent,
                   llvm::function_ref<void(Initialization *into)> fn) override;
+
+  bool canPerformInPlacePackInitialization(GenericEnvironment *env,
+                                           SILType eltAddrTy) const override;
+
+  SILValue getAddressForInPlacePackInitialization(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  SILType eltAddrTy) override;
 
   virtual CanPackExpansionType getLoweredExpansionType() const = 0;
   virtual CleanupHandle enterPartialDestroyCleanup(SILGenFunction &SGF,
