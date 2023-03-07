@@ -1646,6 +1646,28 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
           break;
         }
 
+        // Check if we have a non-consuming liveness use.
+        //
+        // DISCUSSION: In certain cases, we only represent uses like end_borrow
+        // in liveness and not in address use state. This ensures that we
+        // properly emit a diagnostic in these cases.
+        //
+        // TODO: We should include liveness uses of the load_borrow itself in an
+        // array and emit an error on those instead since it would be a better
+        // error than using end_borrow here.
+        {
+          auto pair = liveness.isInterestingUser(&*ii);
+          if (pair.first == FieldSensitivePrunedLiveness::NonLifetimeEndingUse &&
+              pair.second->contains(errorSpan)) {
+            diagnosticEmitter.emitAddressDiagnostic(
+                addressUseState.address, &*ii, errorUser, false /*is consuming*/,
+                addressUseState.isInOutTermUser(&*ii));
+            foundSingleBlockError = true;
+            emittedDiagnostic = true;
+            break;
+          }
+        }
+
         if (addressUseState.isInitUse(&*ii, errorSpan)) {
           llvm::errs() << "Should not have errored if we see an init?! Init: "
                        << *ii;
