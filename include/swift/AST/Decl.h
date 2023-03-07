@@ -8476,6 +8476,22 @@ public:
     return DeclName();
   }
 
+  /// Returns a DeclName that acts as a stand-in for all unique names that
+  /// are manufactured by the macro expansion context's `makeUniqueName`.
+  static DeclName getUniqueNamePlaceholder(ASTContext &ctx);
+
+  /// Determine whether the given name is the unique-name placeholder
+  /// produced by `getUniqueNamePlaceholder`.
+  static bool isUniqueNamePlaceholder(DeclName name);
+
+  /// Determine whether the given name is one of the unique names manufactured
+  /// by the macro expansion context's `makeUniqueName`.
+  static bool isUniqueMacroName(StringRef name);
+
+  /// Determine whether the given name is one of the unique names manufactured
+  /// by the macro expansion context's `makeUniqueName`.
+  static bool isUniqueMacroName(DeclBaseName name);
+
   /// Retrieve the definition of this macro.
   MacroDefinition getDefinition() const;
 

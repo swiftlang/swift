@@ -456,6 +456,8 @@ public struct AddMembers: MemberMacro {
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
+    let uniqueClassName = context.createUniqueName("uniqueClass")
+
     let storageStruct: DeclSyntax =
       """
       struct Storage {}
@@ -481,7 +483,12 @@ public struct AddMembers: MemberMacro {
 
     let initDecl: DeclSyntax =
       """
-      init() {}
+      init() { _ = \(uniqueClassName)() }
+      """
+
+    let classDecl: DeclSyntax =
+      """
+      class \(uniqueClassName) { }
       """
 
     return [
@@ -490,6 +497,7 @@ public struct AddMembers: MemberMacro {
       instanceMethod,
       staticMethod,
       initDecl,
+      classDecl,
     ]
   }
 }

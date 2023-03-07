@@ -160,6 +160,7 @@ class swift::SourceLookupCache {
   ValueDeclMap TopLevelValues;
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+  DeclName UniqueMacroNamePlaceholder;
 
   template<typename T>
   using OperatorMap = llvm::DenseMap<Identifier, TinyPtrVector<T *>>;
@@ -178,6 +179,8 @@ class swift::SourceLookupCache {
   AuxiliaryDeclMap TopLevelAuxiliaryDecls;
   SmallVector<Decl *, 4> MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
+
+  SourceLookupCache(ASTContext &ctx);
 
 public:
   SourceLookupCache(const SourceFile &SF);
@@ -392,15 +395,22 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
   MayHaveAuxiliaryDecls.clear();
 }
 
+SourceLookupCache::SourceLookupCache(ASTContext &ctx)
+  : UniqueMacroNamePlaceholder(MacroDecl::getUniqueNamePlaceholder(ctx)) { }
+
 /// Populate our cache on the first name lookup.
-SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
+SourceLookupCache::SourceLookupCache(const SourceFile &SF)
+    : SourceLookupCache(SF.getASTContext())
+{
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
   addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   addToUnqualifiedLookupCache(SF.getHoistedDecls(), false);
 }
 
-SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
+SourceLookupCache::SourceLookupCache(const ModuleDecl &M)
+  : SourceLookupCache(M.getASTContext())
+{
   FrontendStatsTracer tracer(M.getASTContext().Stats,
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
@@ -428,7 +438,10 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   // FIXME: We need to not consider auxiliary decls if we're doing lookup
   // from inside a macro argument at module scope.
   populateAuxiliaryDeclCache();
-  auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
+  DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
+    ? UniqueMacroNamePlaceholder
+    : Name;
+  auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
   if (auxDecls == TopLevelAuxiliaryDecls.end())
     return;
 
