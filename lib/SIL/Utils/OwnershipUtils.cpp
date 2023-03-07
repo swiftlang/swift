@@ -83,6 +83,44 @@ bool swift::hasPointerEscape(BorrowedValue value) {
   return false;
 }
 
+bool swift::hasPointerEscape(SILValue original) {
+  if (auto borrowedValue = BorrowedValue(original)) {
+    return hasPointerEscape(borrowedValue);
+  }
+  assert(original->getOwnershipKind() == OwnershipKind::Owned);
+
+  ValueWorklist worklist(original->getFunction());
+  worklist.push(original);
+  if (auto *phi = SILArgument::asPhi(original)) {
+    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
+      worklist.pushIfNotVisited(operand->get());
+      return true;
+    });
+  }
+  while (auto value = worklist.popAndForget()) {
+    for (auto use : value->getUses()) {
+      switch (use->getOperandOwnership()) {
+      case OperandOwnership::PointerEscape:
+      case OperandOwnership::ForwardingUnowned:
+        return true;
+      case OperandOwnership::ForwardingConsume: {
+        auto *branch = dyn_cast<BranchInst>(use->getUser());
+        if (!branch) {
+          // Non-phi forwarding consumes end the lifetime of an owned value.
+          break;
+        }
+        auto *phi = branch->getDestBB()->getArgument(use->getOperandNumber());
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+      default:
+        break;
+      }
+    }
+  }
+  return false;
+}
+
 bool swift::canOpcodeForwardInnerGuaranteedValues(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
