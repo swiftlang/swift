@@ -9,6 +9,7 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
+// UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 import _Backtracing

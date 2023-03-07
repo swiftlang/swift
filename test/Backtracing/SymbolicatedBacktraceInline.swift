@@ -3,6 +3,8 @@
 // RUN: %target-codesign %t/SymbolicatedBacktraceInline
 // RUN: %target-run %t/SymbolicatedBacktraceInline | %FileCheck %s
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
