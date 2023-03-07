@@ -13,6 +13,8 @@
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt || true) | %FileCheck %s --check-prefix OPTIMIZED
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug || true) | %FileCheck %s --check-prefix OPTNODEBUG
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
@@ -50,13 +52,13 @@ struct Crash {
 
 // CHECK: Thread 0 crashed:
 
-// CHECK: 0               0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:39:15
-// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:33:3
-// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:29:3
-// CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:25:3
-// CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:21:3
-// CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:45:5
-// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:42:1
+// CHECK: 0               0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:41:15
+// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:35:3
+// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:31:3
+// CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:27:3
+// CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:23:3
+// CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:47:5
+// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:44:1
 // CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash at {{.*}}/Crash.swift
 
 // CHECK: Registers:
@@ -69,59 +71,59 @@ struct Crash {
 
 // FRIENDLY: Thread 0 crashed:
 
-// FRIENDLY: 0 level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:39:15
+// FRIENDLY: 0 level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:41:15
 
-// FRIENDLY: 37|   print("About to crash")
-// FRIENDLY-NEXT: 38|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
-// FRIENDLY-NEXT: 39|   ptr.pointee = 42
+// FRIENDLY: 39|   print("About to crash")
+// FRIENDLY-NEXT: 40|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
+// FRIENDLY-NEXT: 41|   ptr.pointee = 42
 // FRIENDLY-NEXT:   |               ^
-// FRIENDLY-NEXT: 40| }
-// FRIENDLY-NEXT: 41|
+// FRIENDLY-NEXT: 42| }
+// FRIENDLY-NEXT: 43|
 
-// FRIENDLY: 1 level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:33:3
+// FRIENDLY: 1 level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:35:3
 
-// FRIENDLY: 31|
-// FRIENDLY-NEXT: 32| func level4() {
-// FRIENDLY-NEXT: 33|   level5()
+// FRIENDLY: 33|
+// FRIENDLY-NEXT: 34| func level4() {
+// FRIENDLY-NEXT: 35|   level5()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 34| }
-// FRIENDLY-NEXT: 35|
+// FRIENDLY-NEXT: 36| }
+// FRIENDLY-NEXT: 37|
 
-// FRIENDLY: 2 level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:29:3
+// FRIENDLY: 2 level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:31:3
 
-// FRIENDLY: 27|
-// FRIENDLY-NEXT: 28| func level3() {
-// FRIENDLY-NEXT: 29|   level4()
+// FRIENDLY: 29|
+// FRIENDLY-NEXT: 30| func level3() {
+// FRIENDLY-NEXT: 31|   level4()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 30| }
-// FRIENDLY-NEXT: 31|
+// FRIENDLY-NEXT: 32| }
+// FRIENDLY-NEXT: 33|
 
-// FRIENDLY: 3 level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:25:3
+// FRIENDLY: 3 level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:27:3
 
-// FRIENDLY: 23|
-// FRIENDLY-NEXT: 24| func level2() {
-// FRIENDLY-NEXT: 25|   level3()
+// FRIENDLY: 25|
+// FRIENDLY-NEXT: 26| func level2() {
+// FRIENDLY-NEXT: 27|   level3()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 26| }
-// FRIENDLY-NEXT: 27|
+// FRIENDLY-NEXT: 28| }
+// FRIENDLY-NEXT: 29|
 
-// FRIENDLY: 4 level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:21:3
+// FRIENDLY: 4 level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:23:3
 
-// FRIENDLY:  19|
-// FRIENDLY-NEXT: 20| func level1() {
-// FRIENDLY-NEXT: 21|   level2()
+// FRIENDLY:  21|
+// FRIENDLY-NEXT: 22| func level1() {
+// FRIENDLY-NEXT: 23|   level2()
 // FRIENDLY-NEXT:   |   ^
-// FRIENDLY-NEXT: 22| }
-// FRIENDLY-NEXT: 23|
+// FRIENDLY-NEXT: 24| }
+// FRIENDLY-NEXT: 25|
 
-// FRIENDLY: 5 static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:45:5
+// FRIENDLY: 5 static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:47:5
 
-// FRIENDLY: 43| struct Crash {
-// FRIENDLY-NEXT: 44|   static func main() {
-// FRIENDLY-NEXT: 45|     level1()
+// FRIENDLY: 45| struct Crash {
+// FRIENDLY-NEXT: 46|   static func main() {
+// FRIENDLY-NEXT: 47|     level1()
 // FRIENDLY-NEXT:   |     ^
-// FRIENDLY-NEXT: 46|   }
-// FRIENDLY-NEXT: 47| }
+// FRIENDLY-NEXT: 48|   }
+// FRIENDLY-NEXT: 49| }
 
 // NODEBUG: *** Program crashed: Bad pointer dereference at 0x{{0*}}4 ***
 
@@ -146,13 +148,13 @@ struct Crash {
 
 // OPTIMIZED: Thread 0 crashed:
 
-// OPTIMIZED: 0 [inlined]          0x{{[0-9a-f]+}} level5() in CrashOpt at {{.*}}/Crash.swift:39:15
-// OPTIMIZED-NEXT: 1 [inlined]          0x{{[0-9a-f]+}} level4() in CrashOpt at {{.*}}/Crash.swift:33:3
-// OPTIMIZED-NEXT: 2 [inlined]          0x{{[0-9a-f]+}} level3() in CrashOpt at {{.*}}/Crash.swift:29:3
-// OPTIMIZED-NEXT: 3 [inlined]          0x{{[0-9a-f]+}} level2() in CrashOpt at {{.*}}/Crash.swift:25:3
-// OPTIMIZED-NEXT: 4 [inlined]          0x{{[0-9a-f]+}} level1() in CrashOpt at {{.*}}/Crash.swift:21:3
-// OPTIMIZED-NEXT: 5 [inlined]          0x{{[0-9a-f]+}} static Crash.main() in CrashOpt at {{.*}}/Crash.swift:45:5
-// OPTIMIZED-NEXT: 6 [inlined] [system] 0x{{[0-9a-f]+}} static Crash.$main() in CrashOpt at {{.*}}/Crash.swift:42:1
+// OPTIMIZED: 0 [inlined]          0x{{[0-9a-f]+}} level5() in CrashOpt at {{.*}}/Crash.swift:41:15
+// OPTIMIZED-NEXT: 1 [inlined]          0x{{[0-9a-f]+}} level4() in CrashOpt at {{.*}}/Crash.swift:35:3
+// OPTIMIZED-NEXT: 2 [inlined]          0x{{[0-9a-f]+}} level3() in CrashOpt at {{.*}}/Crash.swift:31:3
+// OPTIMIZED-NEXT: 3 [inlined]          0x{{[0-9a-f]+}} level2() in CrashOpt at {{.*}}/Crash.swift:27:3
+// OPTIMIZED-NEXT: 4 [inlined]          0x{{[0-9a-f]+}} level1() in CrashOpt at {{.*}}/Crash.swift:23:3
+// OPTIMIZED-NEXT: 5 [inlined]          0x{{[0-9a-f]+}} static Crash.main() in CrashOpt at {{.*}}/Crash.swift:47:5
+// OPTIMIZED-NEXT: 6 [inlined] [system] 0x{{[0-9a-f]+}} static Crash.$main() in CrashOpt at {{.*}}/Crash.swift:44:1
 // OPTIMIZED-NEXT: 7 [system]           0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOpt at {{.*}}/Crash.swift
 
 // OPTIMIZED: Registers:
