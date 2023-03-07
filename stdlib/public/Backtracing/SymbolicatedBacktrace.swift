@@ -148,11 +148,17 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       if rawName == "start" && imageName == "dyld" {
         return true
       }
-      if let location = sourceLocation,
-         location.line == 0 && location.column == 0 {
+      if rawName.hasSuffix("5$mainyyFZ")
+           || rawName.hasSuffix("5$mainyyYaFZTQ0_")
+           || rawName == "_async_MainTQ0_" {
         return true
       }
-      if rawName.hasSuffix("5$mainyyFZ") {
+      if rawName == "__ZL23completeTaskWithClosurePN5swift12AsyncContextEPNS_10SwiftErrorE" && imageName == "libswift_Concurrency.dylib" {
+        return true
+      }
+      if let location = sourceLocation,
+         location.line == 0 && location.column == 0
+           && !_swift_isThunkFunction(rawName) {
         return true
       }
       #endif
