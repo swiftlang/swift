@@ -669,7 +669,7 @@ def enable_experimental_cxx_interop :
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Enables C++ interoperability; requires compatbility version to be"
+  HelpText<"Enables C++ interoperability; requires compatbility version to be "
   "specified.">;
 
 def experimental_c_foreign_reference_types :
