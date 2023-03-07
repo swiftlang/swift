@@ -31,9 +31,9 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   if (!fallback)
     return;
 
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+  SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
+                                          Type(),
+                                          /*isDiscared=*/true);
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
                              [&](const Solution &S) { sawSolution(S); });
 }
@@ -165,8 +165,8 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    closure that doesn't contain any async calles. Thus the closure is
   //    type-checked as non-async, but it might get converted to an async
   //    closure based on its contextual type
-  auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
-  if (target != S.solutionApplicationTargets.end()) {
+  auto target = S.targets.find(dyn_cast<ClosureExpr>(DC));
+  if (target != S.targets.end()) {
     if (auto ContextTy = target->second.getClosureContextualType()) {
       if (auto ContextFuncTy =
               S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {

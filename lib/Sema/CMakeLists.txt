@@ -41,6 +41,7 @@ add_swift_host_library(swiftSema STATIC
   PreCheckExpr.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
+  SyntacticElementTarget.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp

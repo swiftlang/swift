@@ -358,7 +358,7 @@ protected:
     // If there is a constraint system, generate constraints for the pattern
     // binding.
     if (cs) {
-      SolutionApplicationTarget target(patternBinding);
+      SyntacticElementTarget target(patternBinding);
       if (cs->generateConstraints(target))
         hadError = true;
     }
@@ -660,14 +660,14 @@ protected:
       subjectExpr = new (ctx) OneWayExpr(subjectExpr);
 
       // FIXME: Add contextual type purpose for switch subjects?
-      SolutionApplicationTarget target(subjectExpr, dc, CTP_Unused, Type(),
-                                       /*isDiscarded=*/false);
+      SyntacticElementTarget target(subjectExpr, dc, CTP_Unused, Type(),
+                                    /*isDiscarded=*/false);
       if (cs->generateConstraints(target)) {
         hadError = true;
         return nullptr;
       }
 
-      cs->setSolutionApplicationTarget(switchStmt, target);
+      cs->setTargetFor(switchStmt, target);
       subjectExpr = target.getAsExpr();
       assert(subjectExpr && "Must have a subject expression here");
     }
@@ -787,7 +787,7 @@ protected:
 
     // Generate constraints for the loop header. This also wires up the
     // types for the patterns.
-    auto target = SolutionApplicationTarget::forForEachStmt(
+    auto target = SyntacticElementTarget::forForEachStmt(
         forEachStmt, dc, /*bindPatternVarsOneWay=*/true);
     if (cs) {
       if (cs->generateConstraints(target)) {
@@ -795,7 +795,7 @@ protected:
         return nullptr;
       }
 
-      cs->setSolutionApplicationTarget(forEachStmt, target);
+      cs->setTargetFor(forEachStmt, target);
     }
 
     // Visit the loop body itself.
@@ -887,14 +887,13 @@ protected:
     }
 
     if (cs) {
-      SolutionApplicationTarget target(throwStmt->getSubExpr(), dc,
-                                       CTP_ThrowStmt,
-                                       ctx.getErrorExistentialType(),
-                                       /*isDiscarded=*/false);
+      SyntacticElementTarget target(throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
+                                    ctx.getErrorExistentialType(),
+                                    /*isDiscarded=*/false);
       if (cs->generateConstraints(target))
         hadError = true;
 
-      cs->setSolutionApplicationTarget(throwStmt, target);
+      cs->setTargetFor(throwStmt, target);
     }
 
     return nullptr;
@@ -1642,9 +1641,8 @@ class BuilderClosureRewriter
   const Solution &solution;
   DeclContext *dc;
   AppliedBuilderTransform builderTransform;
-  std::function<
-      Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
-        rewriteTarget;
+  std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+      rewriteTarget;
 
   /// Retrieve the temporary variable that will be used to capture the
   /// value of the given expression.
@@ -1666,9 +1664,9 @@ class BuilderClosureRewriter
 
   /// Rewrite an expression without any particularly special context.
   Expr *rewriteExpr(Expr *expr) {
-    auto result = rewriteTarget(
-      SolutionApplicationTarget(expr, dc, CTP_Unused, Type(),
-                                /*isDiscarded=*/false));
+    auto result =
+        rewriteTarget(SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
+                                             /*isDiscarded=*/false));
     if (result)
       return result->getAsExpr();
 
@@ -1707,9 +1705,9 @@ private:
       Type bodyResultInterfaceType =
           solution.simplifyType(builderTransform.bodyResultType);
 
-      SolutionApplicationTarget returnTarget(capturedExpr, dc, CTP_ReturnStmt,
-                                             bodyResultInterfaceType,
-                                             /*isDiscarded=*/false);
+      SyntacticElementTarget returnTarget(capturedExpr, dc, CTP_ReturnStmt,
+                                          bodyResultInterfaceType,
+                                          /*isDiscarded=*/false);
       Expr *resultExpr = nullptr;
       if (auto resultTarget = rewriteTarget(returnTarget))
         resultExpr = resultTarget->getAsExpr();
@@ -1768,15 +1766,13 @@ private:
 
 public:
   BuilderClosureRewriter(
-      const Solution &solution,
-      DeclContext *dc,
+      const Solution &solution, DeclContext *dc,
       const AppliedBuilderTransform &builderTransform,
-      std::function<
-          Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
-            rewriteTarget
-    ) : ctx(solution.getConstraintSystem().getASTContext()),
-        solution(solution), dc(dc), builderTransform(builderTransform),
-        rewriteTarget(rewriteTarget) { }
+      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+          rewriteTarget)
+      : ctx(solution.getConstraintSystem().getASTContext()), solution(solution),
+        dc(dc), builderTransform(builderTransform),
+        rewriteTarget(rewriteTarget) {}
 
   /// Visit the element of a brace statement, returning \c false if the element
   /// was rewritten successfully, or \c true if there was an error.
@@ -1865,8 +1861,7 @@ public:
 
     // Handle pattern bindings.
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-      auto resultTarget =
-          rewriteTarget(SolutionApplicationTarget{patternBinding});
+      auto resultTarget = rewriteTarget(SyntacticElementTarget{patternBinding});
       assert(resultTarget.has_value() &&
              "Could not rewrite pattern binding entries!");
       TypeChecker::typeCheckDecl(resultTarget->getAsPatternBinding());
@@ -1908,8 +1903,8 @@ public:
 
   NullablePtr<Stmt> visitIfStmt(IfStmt *ifStmt, ResultBuilderTarget target) {
     // Rewrite the condition.
-    if (auto condition = rewriteTarget(
-            SolutionApplicationTarget(ifStmt->getCond(), dc)))
+    if (auto condition =
+            rewriteTarget(SyntacticElementTarget(ifStmt->getCond(), dc)))
       ifStmt->setCond(*condition->getAsStmtCondition());
 
     assert(target.kind == ResultBuilderTarget::TemporaryVar);
@@ -2063,8 +2058,7 @@ public:
                                     ResultBuilderTarget target) {
     // Translate the subject expression.
     ConstraintSystem &cs = solution.getConstraintSystem();
-    auto subjectTarget =
-        rewriteTarget(*cs.getSolutionApplicationTarget(switchStmt));
+    auto subjectTarget = rewriteTarget(*cs.getTargetFor(switchStmt));
     if (!subjectTarget)
       return nullptr;
 
@@ -2109,7 +2103,7 @@ public:
                                   ResultBuilderTarget target) {
     // Translate the patterns and guard expressions for each case label item.
     for (auto &caseLabelItem : caseStmt->getMutableCaseLabelItems()) {
-      SolutionApplicationTarget caseLabelTarget(&caseLabelItem, dc);
+      SyntacticElementTarget caseLabelTarget(&caseLabelItem, dc);
       if (!rewriteTarget(caseLabelTarget))
         return nullptr;
     }
@@ -2141,8 +2135,7 @@ public:
                                      ResultBuilderTarget target) {
     // Translate the for-each loop header.
     ConstraintSystem &cs = solution.getConstraintSystem();
-    auto forEachTarget =
-        rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+    auto forEachTarget = rewriteTarget(*cs.getTargetFor(forEachStmt));
     if (!forEachTarget)
       return nullptr;
 
@@ -2193,8 +2186,7 @@ public:
 
   NullablePtr<Stmt> visitThrowStmt(ThrowStmt *throwStmt) {
     // Rewrite the error.
-    auto target = *solution.getConstraintSystem()
-        .getSolutionApplicationTarget(throwStmt);
+    auto target = *solution.getConstraintSystem().getTargetFor(throwStmt);
     if (auto result = rewriteTarget(target))
       throwStmt->setSubExpr(result->getAsExpr());
     else
@@ -2234,13 +2226,10 @@ public:
 } // end anonymous namespace
 
 BraceStmt *swift::applyResultBuilderTransform(
-    const Solution &solution,
-    AppliedBuilderTransform applied,
-    BraceStmt *body,
+    const Solution &solution, AppliedBuilderTransform applied, BraceStmt *body,
     DeclContext *dc,
-    std::function<
-        Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
-          rewriteTarget) {
+    std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+        rewriteTarget) {
   BuilderClosureRewriter rewriter(solution, dc, applied, rewriteTarget);
   auto captured = rewriter.takeCapturedStmt(body);
   auto result = rewriter.visitBraceStmt(
@@ -2402,7 +2391,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
 
     case SolutionResult::Kind::UndiagnosedError:
       reportSolutionsToSolutionCallback(salvagedResult);
-      cs.diagnoseFailureFor(SolutionApplicationTarget(func));
+      cs.diagnoseFailureFor(SyntacticElementTarget(func));
       salvagedResult.markAsDiagnosed();
       return nullptr;
 
@@ -2436,9 +2425,8 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   cs.applySolution(solutions.front());
 
   // Apply the solution to the function body.
-  if (auto result = cs.applySolution(
-          solutions.front(),
-          SolutionApplicationTarget(func))) {
+  if (auto result =
+          cs.applySolution(solutions.front(), SyntacticElementTarget(func))) {
     performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
     auto *body = result->getFunctionBody();
 

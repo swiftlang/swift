@@ -331,8 +331,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  SolutionApplicationTarget target(
-      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
+  SyntacticElementTarget target(expr, dc, CTP_Unused, Type(),
+                                /*isDiscarded=*/false);
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
@@ -561,7 +561,7 @@ void TypeChecker::filterSolutionsForCodeCompletion(
 }
 
 bool TypeChecker::typeCheckForCodeCompletion(
-    SolutionApplicationTarget &target, bool needsPrecheck,
+    SyntacticElementTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
@@ -613,7 +613,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   enum class CompletionResult { Ok, NotApplicable, Fallback };
 
   auto solveForCodeCompletion =
-      [&](SolutionApplicationTarget &target) -> CompletionResult {
+      [&](SyntacticElementTarget &target) -> CompletionResult {
     ConstraintSystemOptions options;
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
@@ -628,7 +628,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
     // If solve failed to generate constraints or with some other
     // issue, we need to fallback to type-checking a sub-expression.
-    cs.setSolutionApplicationTarget(target.getAsExpr(), target);
+    cs.setTargetFor(target.getAsExpr(), target);
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
@@ -664,10 +664,10 @@ bool TypeChecker::typeCheckForCodeCompletion(
       assert(fallback->E != expr);
       (void)expr;
     }
-    SolutionApplicationTarget completionTarget(fallback->E,
-                                               fallback->DC, CTP_Unused,
-                                               /*contextualType=*/Type(),
-                                               /*isDiscarded=*/true);
+    SyntacticElementTarget completionTarget(fallback->E, fallback->DC,
+                                            CTP_Unused,
+                                            /*contextualType=*/Type(),
+                                            /*isDiscarded=*/true);
     typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
                                callback);
   }

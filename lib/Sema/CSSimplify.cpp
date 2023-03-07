@@ -9951,7 +9951,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   cs.setType(EP, enumTy);
 
   // result of ~= operator is always a `Bool`.
-  auto target = SolutionApplicationTarget::forExprPattern(
+  auto target = SyntacticElementTarget::forExprPattern(
       matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
 
   DiagnosticTransaction diagnostics(ctx.Diags);
@@ -9980,7 +9980,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   EP->setMatchVar(matchVar);
   EP->setMatchExpr(matchCall);
 
-  cs.setSolutionApplicationTarget(pattern, target);
+  cs.setTargetFor(pattern, target);
 
   return false;
 }
@@ -11141,8 +11141,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  SolutionApplicationTarget target(closure, contextualType);
-  setSolutionApplicationTarget(closure, target);
+  SyntacticElementTarget target(closure, contextualType);
+  setTargetFor(closure, target);
 
   // Generate constraints from the body of this closure.
   return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());

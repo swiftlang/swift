@@ -95,12 +95,12 @@ static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
       return true;
     }
   }
-  auto targetIt = S.solutionApplicationTargets.find(E);
-  if (targetIt == S.solutionApplicationTargets.end()) {
+  auto targetIt = S.targets.find(E);
+  if (targetIt == S.targets.end()) {
     return false;
   }
   auto target = targetIt->second;
-  assert(target.kind == SolutionApplicationTarget::Kind::expression);
+  assert(target.kind == SyntacticElementTarget::Kind::expression);
   switch (target.getExprContextualTypePurpose()) {
   case CTP_Unused:
     // If we aren't using the contextual type, its unconstrained by definition.
