@@ -3000,7 +3000,8 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  Type IntTy = IGM.Context.getIntType();
+  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(0),
+                                       IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
   emitVariableDeclaration(

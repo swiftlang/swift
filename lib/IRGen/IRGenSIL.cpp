@@ -1105,7 +1105,7 @@ public:
           if (PackShapeExpressions.insert(Shape).second) {
               llvm::SmallString<8> Buf;
               llvm::raw_svector_ostream OS(Buf);
-              unsigned Position = PackShapeExpressions.size();
+              unsigned Position = PackShapeExpressions.size() - 1;
               OS << "$pack_count_" << Position;
               SILDebugVariable Var(OS.str(), true, 0);
               Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
