@@ -200,8 +200,8 @@ public struct AsyncStream<Element> {
     /// nil, which signifies the end of the iteration.
     ///
     /// Calling this function more than once has no effect. After calling
-    /// finish, the stream enters a terminal state and doesn't produces any additional
-    /// elements.
+    /// finish, the stream enters a terminal state and doesn't produce any
+    /// additional elements.
     public func finish() {
       storage.finish()
     }
