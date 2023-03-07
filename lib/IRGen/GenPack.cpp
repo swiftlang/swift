@@ -177,7 +177,7 @@ irgen::emitPackArchetypeMetadataRef(IRGenFunction &IGF,
   if (auto result = IGF.tryGetLocalTypeMetadata(type, request))
     return result;
 
-  auto packType = type->getSingletonPackType();
+  auto packType = CanPackType::getSingletonPackExpansion(type);
   auto response = emitTypeMetadataPackRef(IGF, packType, request);
 
   IGF.setScopedLocalTypeMetadata(type, response);
