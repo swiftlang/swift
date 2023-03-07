@@ -270,9 +270,10 @@ static bool isPatternInvariantToExpansion(CanType patternType,
   });
 }
 
-static std::pair<GenericEnvironment*, SILType>
-deriveOpenedElementTypeForPackExpansion(SILGenModule &SGM,
-                                        CanPackExpansionType expansion) {
+std::pair<GenericEnvironment*, SILType>
+SILGenFunction::createOpenedElementValueEnvironment(SILType expansionTy) {
+  auto expansion = expansionTy.castTo<PackExpansionType>();
+
   // If the pattern type is invariant to the expansion, we don't need
   // to open anything.
   auto countArchetype = cast<PackArchetypeType>(expansion.getCountType());
@@ -300,10 +301,9 @@ void SILGenFunction::emitPartialDestroyPack(SILLocation loc, SILValue packAddr,
                                             unsigned componentIndex,
                                             SILValue limitWithinComponent) {
   auto packTy = packAddr->getType().castTo<SILPackType>();
-  auto packExpansionTy =
-    cast<PackExpansionType>(packTy->getElementType(componentIndex));
 
-  auto result = deriveOpenedElementTypeForPackExpansion(SGM, packExpansionTy);
+  auto result = createOpenedElementValueEnvironment(
+                                  packTy->getSILElementType(componentIndex));
   auto elementEnv = result.first;
   auto elementTy = result.second;
 
@@ -322,11 +322,8 @@ void SILGenFunction::emitPartialDestroyTuple(SILLocation loc,
                                              CanPackType inducedPackType,
                                              unsigned componentIndex,
                                              SILValue limitWithinComponent) {
-  auto tupleTy = tupleAddr->getType().castTo<TupleType>();
-  auto packExpansionTy =
-    cast<PackExpansionType>(tupleTy.getElementType(componentIndex));
-
-  auto result = deriveOpenedElementTypeForPackExpansion(SGM, packExpansionTy);
+  auto result = createOpenedElementValueEnvironment(
+                    tupleAddr->getType().getTupleElementType(componentIndex));
   auto elementEnv = result.first;
   auto elementTy = result.second;
 
