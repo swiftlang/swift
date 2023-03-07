@@ -15,6 +15,7 @@ add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDL
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -Xfrontend -enable-experimental-cxx-interop
+    -Xfrontend -disable-implicit-string-processing-module-import
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
