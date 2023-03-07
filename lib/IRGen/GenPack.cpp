@@ -328,8 +328,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
       context.environment
-          ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
-          ->getCanonicalType();
+          ->mapContextualPackTypeIntoElementContext(patternTy);
 
   // Emit the element metadata.
   auto element = IGF.emitTypeMetadataRef(instantiatedPatternTy, request)
@@ -505,9 +504,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
 
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
-      context.environment
-          ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
-          ->getCanonicalType();
+      context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
       context.environment->getGenericSignature()->lookupConformance(
           instantiatedPatternTy, conformance.getRequirement());

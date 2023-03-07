@@ -3837,8 +3837,8 @@ private:
         auto loweredPatternType =
           expectedParamType.castTo<PackExpansionType>().getPatternType();
         auto loweredElementType =
-          openedElementEnv->mapPackTypeIntoElementContext(
-            loweredPatternType->mapTypeOutOfContext())->getCanonicalType();
+          openedElementEnv->mapContextualPackTypeIntoElementContext(
+            loweredPatternType);
         return SILType::getPrimitiveAddressType(loweredElementType);
       }();
 

@@ -277,9 +277,17 @@ public:
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
-  /// Map a type containing parameter packs to a contextual type
-  /// in the opened element generic context.
+  /// Map an interface type containing parameter packs to a contextual
+  /// type in the opened element generic context.
   Type mapPackTypeIntoElementContext(Type type) const;
+
+  /// Map a contextual type containing parameter packs to a contextual
+  /// type in the opened element generic context.
+  Type mapContextualPackTypeIntoElementContext(Type type) const;
+
+  /// Map a contextual type containing parameter packs to a contextual
+  /// type in the opened element generic context.
+  CanType mapContextualPackTypeIntoElementContext(CanType type) const;
 
   /// Map a type containing pack element type parameters to a contextual
   /// type in the pack generic context.

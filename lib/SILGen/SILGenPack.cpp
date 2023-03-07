@@ -290,9 +290,7 @@ deriveOpenedElementTypeForPackExpansion(SILGenModule &SGM,
     OpenedElementContext::createForContextualExpansion(SGM.getASTContext(),
                                                        expansion);
   auto elementType =
-    context.environment->mapPackTypeIntoElementContext(
-                           patternType->mapTypeOutOfContext())
-                       ->getCanonicalType();
+    context.environment->mapContextualPackTypeIntoElementContext(patternType);
   return std::make_pair(context.environment,
                         SILType::getPrimitiveAddressType(elementType));
 }
@@ -485,8 +483,7 @@ void InPlacePackExpansionInitialization::
     // This AST-level transformation is fine on lowered types because
     // we're just replacing pack archetypes with element archetypes.
     loweredPatternTy =
-      env->mapPackTypeIntoElementContext(
-        loweredPatternTy->mapTypeOutOfContext())->getCanonicalType();
+      env->mapContextualPackTypeIntoElementContext(loweredPatternTy);
   }
   auto eltAddrTy = SILType::getPrimitiveAddressType(loweredPatternTy);
 
