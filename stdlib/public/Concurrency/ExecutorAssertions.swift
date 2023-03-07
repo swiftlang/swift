@@ -34,7 +34,8 @@ import SwiftShims
 ///   programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
+@_transparent
 public
 func preconditionTaskOnExecutor(
     _ executor: some SerialExecutor,
@@ -47,10 +48,9 @@ func preconditionTaskOnExecutor(
 
   let expectationCheck = _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor)
 
-  /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
   precondition(expectationCheck,
-      // TODO: offer information which executor we actually got
-      "Incorrect actor executor assumption; Expected '\(executor)' executor. \(message())",
+      "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
+      "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
       file: file, line: line) // short-cut so we get the exact same failure reporting semantics
 }
 
@@ -71,7 +71,8 @@ func preconditionTaskOnExecutor(
 ///   programming error.
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
+@_transparent
 public
 func preconditionTaskOnActorExecutor(
     _ actor: some Actor,
@@ -84,10 +85,10 @@ func preconditionTaskOnActorExecutor(
 
   let expectationCheck = _taskIsCurrentExecutor(actor.unownedExecutor.executor)
 
-  // TODO: offer information which executor we actually got
   precondition(expectationCheck,
-      // TODO: figure out a way to get the typed repr out of the unowned executor
-      "Incorrect actor executor assumption; Expected '\(actor.unownedExecutor)' executor. \(message())",
+      "Expected same executor as actor '\(actor)' " +
+      "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
+      "but was executing on '\(_executorGetCurrentActiveExecutorName())'. \(message())",
       file: file, line: line)
 }
 
@@ -108,7 +109,8 @@ func preconditionTaskOnActorExecutor(
 ///   assumption is a serious programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
+@_transparent
 public
 func assertTaskOnExecutor(
     _ executor: some SerialExecutor,
@@ -120,10 +122,10 @@ func assertTaskOnExecutor(
   }
 
   guard _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor) else {
-    // TODO: offer information which executor we actually got
-    let msg = "Incorrect actor executor assumption; Expected '\(executor)' executor. \(message())"
-    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
-    assertionFailure(msg, file: file, line: line)
+    assertionFailure(
+        "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
+        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        file: file, line: line)
     return
   }
 }
@@ -143,7 +145,8 @@ func assertTaskOnExecutor(
 ///
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
+@_transparent
 public
 func assertTaskOnActorExecutor(
     _ actor: some Actor,
@@ -155,10 +158,11 @@ func assertTaskOnActorExecutor(
   }
 
   guard _taskIsCurrentExecutor(actor.unownedExecutor.executor) else {
-    // TODO: offer information which executor we actually got
-    // TODO: figure out a way to get the typed repr out of the unowned executor
-    let msg = "Incorrect actor executor assumption; Expected '\(actor.unownedExecutor)' executor. \(message())"
-    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
+    let msg =
+        "Expected same executor as actor '\(actor)' " +
+        "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
+        "but was executing on '\(_executorGetCurrentActiveExecutorName())'. " +
+        "\(message())";
     assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
     return
   }
@@ -180,7 +184,7 @@ func assertTaskOnActorExecutor(
 /// if another actor uses the same serial executor--by using ``MainActor/sharedUnownedExecutor``
 /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
 public
 func assumeOnMainActorExecutor<T>(
@@ -192,9 +196,13 @@ func assumeOnMainActorExecutor<T>(
 
   /// This is guaranteed to be fatal if the check fails,
   /// as this is our "safe" version of this API.
-  guard _taskIsCurrentExecutor(Builtin.buildMainActorExecutorRef()) else {
-    // TODO: offer information which executor we actually got
-    fatalError("Incorrect actor executor assumption; Expected 'MainActor' executor.", file: file, line: line)
+  let mainExecutor = Builtin.buildMainActorExecutorRef()
+
+  guard _taskIsCurrentExecutor(mainExecutor) else {
+    fatalError(
+        "Expected '\(_executorGetTypeName(mainExecutor))' executor, " +
+        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        file: file, line: line)
   }
 
   // To do the unsafe cast, we have to pretend it's @escaping.
@@ -218,7 +226,7 @@ func assumeOnMainActorExecutor<T>(
 /// if another actor uses the same serial executor--by using that actor's ``Actor/unownedExecutor``
 /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
 public
 func assumeOnActorExecutor<Act: Actor, T>(
@@ -233,8 +241,11 @@ func assumeOnActorExecutor<Act: Actor, T>(
   /// as this is our "safe" version of this API.
   let executor: Builtin.Executor = actor.unownedExecutor.executor
   guard _taskIsCurrentExecutor(executor) else {
-    // TODO: offer information which executor we actually got
-    fatalError("Incorrect actor executor assumption; Expected same executor as \(actor).", file: file, line: line)
+    fatalError(
+        "Expected same executor as actor '\(actor)' " +
+        "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
+        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        file: file, line: line)
   }
 
   // To do the unsafe cast, we have to pretend it's @escaping.
@@ -243,6 +254,19 @@ func assumeOnActorExecutor<Act: Actor, T>(
     let rawFn = unsafeBitCast(fn, to: NoActor.self)
     return try rawFn(actor)
   }
+}
+
+/// Specifically get the name of the current *active* executor, without falling back to assuming the generic one.
+/// I.e. if we're not executing within a task, we expect to have `<unknown>` executor rather than the generic one.
+@usableFromInline
+@available(SwiftStdlib 5.9, *)
+func _executorGetCurrentActiveExecutorName() -> String {
+  let (wasActive, ref) = _executorGetCurrentActiveExecutorRef()
+  guard wasActive else {
+    return "<unknown>"
+  }
+
+  return _executorGetTypeName(ref)
 }
 
 // TODO(ktoso): implement assume for distributed actors as well

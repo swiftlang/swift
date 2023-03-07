@@ -632,7 +632,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     } catch {
   ///         // other errors though we print and cancel the group,
   ///         // and all of the remaining child tasks within it.
-  ///         print("Error: \(error)")
   ///         group.cancelAll()
   ///     }
   /// }
