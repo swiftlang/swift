@@ -1825,6 +1825,16 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
 }
 
 const TypeInfo &
+TypeConverter::getDynamicTupleTypeInfo(IsCopyable_t isCopyable) {
+  auto &cache = DynamicTupleTI[(unsigned)isCopyable];
+  if (cache) return *cache;
+  cache = convertDynamicTupleType(isCopyable);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
+}
+
+const TypeInfo &
 TypeConverter::getResilientStructTypeInfo(IsCopyable_t isCopyable,
                                           IsABIAccessible_t isAccessible) {
   auto &cache = ResilientStructTI[(unsigned)isCopyable][(unsigned)isAccessible];

@@ -460,10 +460,13 @@ PackType *PackType::get(const ASTContext &C,
   return get(C, wrappedArgs)->flattenPackTypes();
 }
 
-CanPackType PackArchetypeType::getSingletonPackType() {
-  SmallVector<Type, 1> types;
-  types.push_back(PackExpansionType::get(this, getReducedShape()));
-  return CanPackType(PackType::get(getASTContext(), types));
+PackType *PackType::getSingletonPackExpansion(Type param) {
+  assert(param->isParameterPack() || param->is<PackArchetypeType>());
+  return get(param->getASTContext(), {PackExpansionType::get(param, param)});
+}
+
+CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
+  return CanPackType(PackType::getSingletonPackExpansion(param));
 }
 
 bool SILPackType::containsPackExpansionType() const {

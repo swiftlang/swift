@@ -444,8 +444,8 @@ void RuleBuilder::addReferencedProtocol(const ProtocolDecl *proto) {
 }
 
 /// Compute the transitive closure of the set of all protocols referenced from
-/// the right hand sides of conformance requirements, and convert their
-/// requirements to rewrite rules.
+/// the right hand sides of conformance requirements, and import the rewrite
+/// rules from the requirement machine for each protocol component.
 void RuleBuilder::collectRulesFromReferencedProtocols() {
   // Compute the transitive closure.
   unsigned i = 0;
@@ -462,12 +462,9 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
   // if this is a rewrite system for a connected component of the protocol
   // dependency graph, add rewrite rules for each referenced protocol not part
   // of this connected component.
-
-  // First, collect all unique requirement machines, one for each connected
-  // component of each referenced protocol.
   llvm::DenseSet<RequirementMachine *> machines;
 
-  // Now visit each subordinate requirement machine pull in its rules.
+  // Now visit each protocol component requirement machine and pull in its rules.
   for (auto *proto : ProtocolsToImport) {
     // This will trigger requirement signature computation for this protocol,
     // if necessary, which will cause us to re-enter into a new RuleBuilder
@@ -478,13 +475,13 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
 
     auto *machine = Context.getRequirementMachine(proto);
     if (!machines.insert(machine).second) {
-      // We've already seen this connected component.
+      // We've already seen this protocol component.
       continue;
     }
 
     // We grab the machine's local rules, not *all* of its rules, to avoid
     // duplicates in case multiple machines share a dependency on a downstream
-    // protocol connected component.
+    // protocol component.
     auto localRules = machine->getLocalRules();
     ImportedRules.insert(ImportedRules.end(),
                          localRules.begin(),

@@ -542,7 +542,6 @@ public:
   }
 
 private:
-  /// Scan the given field info
   static unsigned findUniqueNonEmptyField(ArrayRef<FieldImpl> fields) {
     unsigned result = 0;
     for (auto &field : fields) {
