@@ -38,10 +38,13 @@ public struct ObservationTracking {
     }
   }
   
-  struct AccessList {
-    var entries = [ObjectIdentifier : Entry]()
+  @_spi(SwiftUI)
+  public struct _AccessList: Sendable {
+    internal var entries = [ObjectIdentifier : Entry]()
+
+    internal init() { }
     
-    mutating func addAccess<Subject: Observable>(
+    internal mutating func addAccess<Subject: Observable>(
       keyPath: PartialKeyPath<Subject>, 
       context: ObservationRegistrar<Subject>.Context
     ) {
@@ -53,13 +56,13 @@ public struct ObservationTracking {
     _ apply: () -> T, 
     onChange: @autoclosure () -> @Sendable () -> Void
   ) -> T {
-    var accessList: AccessList?
-    let result = withUnsafeMutablePointer(to: &accessList) { ptr in
+    var _AccessList: _AccessList?
+    let result = withUnsafeMutablePointer(to: &_AccessList) { ptr in
       _ThreadLocal.value = UnsafeMutableRawPointer(ptr)
       defer { _ThreadLocal.value = nil }
       return apply()
     }
-    if let list = accessList {
+    if let list = _AccessList {
       let state = _ManagedCriticalState([ObjectIdentifier: Int]())
       let onChange = onChange()
       let values = list.entries.mapValues { $0.addObserver {
@@ -74,11 +77,11 @@ public struct ObservationTracking {
     return result
   }
 
+  @_spi(SwiftUI)
   public static func _installTracking(
-    _ storage: UnsafeRawPointer, 
+    _ list: _AccessList, 
     onChange: @escaping @Sendable () -> Void
   ) {
-    let list = unsafeBitCast(storage, to: AccessList.self)
     let state = _ManagedCriticalState([ObjectIdentifier: Int]())
     let values = list.entries.mapValues { $0.addObserver {
       onChange()

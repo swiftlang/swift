@@ -139,10 +139,6 @@ protocol AsyncDefaultConstructable {
   init() async
 }
 
-protocol DefaultConstructable {
-  init() // expected-note {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}} {{43-43=\n    init() {\n        <#code#>\n    \}\n}}
-}
-
 struct Location {
   var x : Int
   var y : Int
@@ -152,6 +148,9 @@ struct Location {
   }
 }
 
+protocol DefaultConstructable {
+  init() // expected-note {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}} {{+2:43-43=\n    init() {\n        <#code#>\n    \}\n}}
+}
 extension Location: DefaultConstructable {} // expected-error {{type 'Location' does not conform to protocol 'DefaultConstructable'}}
 
 extension Location: AsyncDefaultConstructable {}

@@ -44,7 +44,7 @@ public struct UnavailableStruct {
 public func foo() { bar() } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
 
 @usableFromInline
-func bar() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
+func bar() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{-1:1-1=@available(macOS 10.10, *)\n}}
 
 @available(macOS 10.1, *)
 public func ok() { }
@@ -53,10 +53,10 @@ public func ok() { }
 public func unavailableOk() { }
 
 @available(macOS, deprecated: 10.10)
-public func missingIntro() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
+public func missingIntro() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{-1:1-1=@available(macOS 10.10, *)\n}}
 
 @available(iOS 9.0, *)
-public func missingTargetPlatform() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
+public func missingTargetPlatform() { } // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{-1:1-1=@available(macOS 10.10, *)\n}}
 
 func privateFunc() { }
 

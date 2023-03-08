@@ -122,8 +122,8 @@ class G {
   func f6(_: Int, int: Int) { }
   func f7(_: Int, int: Int) { }
 
-  func g1(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g1(_:string:)' here}} {{28-28=string }}
-  func g1(_: Int, path: String) { } // expected-note{{potential overridden instance method 'g1(_:path:)' here}} {{28-28=path }}
+  func g1(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g1(_:string:)' here}} {{152:28-28=string }}
+  func g1(_: Int, path: String) { } // expected-note{{potential overridden instance method 'g1(_:path:)' here}} {{152:28-28=path }}
 
   func g2(_: Int, string: String) { } // expected-note{{potential overridden instance method 'g2(_:string:)' here}} {{none}}
   func g2(_: Int, path: String) { }
@@ -135,8 +135,8 @@ class G {
   func g4(_: Int, path: String) { }
 
   init(a: Int) {} // expected-note {{potential overridden initializer 'init(a:)' here}} {{none}}
-  init(a: String) {} // expected-note {{potential overridden initializer 'init(a:)' here}} {{17-17=a }} expected-note {{potential overridden initializer 'init(a:)' here}} {{none}}
-  init(b: String) {} // expected-note {{potential overridden initializer 'init(b:)' here}} {{17-17=b }} expected-note {{potential overridden initializer 'init(b:)' here}} {{none}}
+  init(a: String) {} // expected-note {{potential overridden initializer 'init(a:)' here}} {{158:17-17=a }} expected-note {{potential overridden initializer 'init(a:)' here}} {{none}}
+  init(b: String) {} // expected-note {{potential overridden initializer 'init(b:)' here}} {{158:17-17=b }} expected-note {{potential overridden initializer 'init(b:)' here}} {{none}}
 }
 
 class H : G {

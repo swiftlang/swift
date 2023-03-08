@@ -54,12 +54,13 @@ public struct ObservationRegistrar<Subject: Observable>: Sendable {
   fileprivate struct Next {
     enum Kind {
       case transaction(TrackedProperties<Subject>)
+      case pendingTransaction(TrackedProperties<Subject>, UnsafeContinuation<TrackedProperties<Subject>?, Never>)
       case change(TrackedProperties<Subject>, UnsafeContinuation<Subject?, Never>)
       case tracking(TrackedProperties<Subject>, @Sendable () -> Void)
       case cancelled
     }
     
-    fileprivate let kind: Kind
+    fileprivate var kind: Kind
     fileprivate var collected: TrackedProperties<Subject>?
   }
   
@@ -80,9 +81,9 @@ extension ObservationRegistrar {
     keyPath: KeyPath<Subject, Member>
   ) {
     if let trackingPtr = _ThreadLocal.value?
-      .assumingMemoryBound(to: ObservationTracking.AccessList?.self) {
+      .assumingMemoryBound(to: ObservationTracking._AccessList?.self) {
       if trackingPtr.pointee == nil {
-        trackingPtr.pointee = ObservationTracking.AccessList()
+        trackingPtr.pointee = ObservationTracking._AccessList()
       }
       trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
     }
@@ -139,8 +140,10 @@ extension ObservationRegistrar.Context {
     _ generation: Int, 
     isolation: isolated Delivery
   ) async -> TrackedProperties<Subject>? {
-    return state.withCriticalRegion { state in
-      state.complete(generation)
+    return await withUnsafeContinuation { continuation in
+      state.withCriticalRegion { state in
+        state.complete(generation, continuation: continuation)
+      }
     }
   }
   
@@ -218,8 +221,8 @@ extension ObservationRegistrar.Next {
 
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar.Next.Kind {
-  fileprivate func resume(
-    keyPath: PartialKeyPath<Subject>, 
+  fileprivate mutating func resume(
+    keyPath: PartialKeyPath<Subject>,
     phase: ObservationRegistrar.Phase, 
     collected: inout TrackedProperties<Subject>?
   ) -> ObservationRegistrar.ResumeAction? {
@@ -235,6 +238,20 @@ extension ObservationRegistrar.Next.Kind {
           collected = properties
         }
       }
+      return nil
+    case (.pendingTransaction(let observedTrackedProperties, let continuation), .willSet):
+      if observedTrackedProperties.contains(keyPath) {
+        if var properties = collected {
+          properties.insert(keyPath)
+          continuation.resume(returning: properties)
+        } else {
+          var properties = TrackedProperties<Subject>()
+          properties.insert(keyPath)
+          continuation.resume(returning: properties)
+        }
+        self = .transaction(observedTrackedProperties)
+      }
+      
       return nil
     case (.change(let observedTrackedProperties, let continuation), .didSet):
       if observedTrackedProperties.contains(keyPath) {
@@ -292,6 +309,8 @@ extension ObservationRegistrar.Next.Kind {
     switch self {
     case .transaction(let properties):
       invalidate(properties: properties, from: &lookup, generation: generation)
+    case .pendingTransaction(let properties, _):
+      invalidate(properties: properties, from: &lookup, generation: generation)
     case .change(let properties, _):
       invalidate(properties: properties, from: &lookup, generation: generation)
     case .tracking(let properties, _):
@@ -303,6 +322,8 @@ extension ObservationRegistrar.Next.Kind {
   
   fileprivate func deinitialize() {
     switch self {
+    case .pendingTransaction(_, let continuation):
+      continuation.resume(returning: nil)
     case .change(_, let continuation):
       continuation.resume(returning: nil)
     default:
@@ -383,17 +404,21 @@ extension ObservationRegistrar.State {
   }
   
   fileprivate mutating func complete(
-    _ generation: Int
-  ) -> TrackedProperties<Subject>? {
+    _ generation: Int,
+    continuation: UnsafeContinuation<TrackedProperties<Subject>?, Never>
+  ){
     if let existing = nexts.removeValue(forKey: generation) {
       switch existing.kind {
-      case .transaction:
-        return existing.collected
+      case .transaction(let properties):
+        if let collected = existing.collected {
+          continuation.resume(returning: collected)
+        } else {
+          nexts[generation] = ObservationRegistrar.Next(kind: .pendingTransaction(properties, continuation))
+        }
       default:
-        return nil
+        continuation.resume(returning: nil)
       }
     }
-    return nil
   }
   
   fileprivate mutating func willSet<Member>(

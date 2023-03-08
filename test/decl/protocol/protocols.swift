@@ -498,7 +498,7 @@ class C1_53813 {
 
   func conform() {
     c0.foo1 = self // expected-error {{cannot assign value of type 'C1_53813' to type '(any P1_53813)?'}}
-    // expected-note@-1 {{add missing conformance to 'P1_53813' to class 'C1_53813'}}{{15-15=: P1_53813}}
+    // expected-note@-1 {{add missing conformance to 'P1_53813' to class 'C1_53813'}}{{-4:15-15=: P1_53813}}
   }
 }
 
@@ -509,7 +509,7 @@ class C2_53813 {
 
   func conform() {
     c0.foo2 = self // expected-error {{cannot assign value of type 'C2_53813' to type '(any P1_53813 & P2_53813)?'}}
-    // expected-note@-1 {{add missing conformance to 'P1_53813 & P2_53813' to class 'C2_53813'}}{{15-15=: P1_53813 & P2_53813}}
+    // expected-note@-1 {{add missing conformance to 'P1_53813 & P2_53813' to class 'C2_53813'}}{{-4:15-15=: P1_53813 & P2_53813}}
   }
 }
 
@@ -520,7 +520,7 @@ class C3_53813: P3_53813 {
 
   func conform() {
     c0.foo1 = self // expected-error {{cannot assign value of type 'C3_53813' to type '(any P1_53813)?'}}
-    // expected-note@-1 {{add missing conformance to 'P1_53813' to class 'C3_53813'}}{{25-25=, P1_53813}}
+    // expected-note@-1 {{add missing conformance to 'P1_53813' to class 'C3_53813'}}{{-4:25-25=, P1_53813}}
   }
 }
 
@@ -531,7 +531,7 @@ class C4_53813: P1_53813 {
 
   func conform() {
     c0.foo2 = self // expected-error {{cannot assign value of type 'C4_53813' to type '(any P1_53813 & P2_53813)?'}}
-    // expected-note@-1 {{add missing conformance to 'P1_53813 & P2_53813' to class 'C4_53813'}}{{25-25=, P2_53813}}
+    // expected-note@-1 {{add missing conformance to 'P1_53813 & P2_53813' to class 'C4_53813'}}{{-4:25-25=, P2_53813}}
   }
 }
 
