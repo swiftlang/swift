@@ -429,6 +429,20 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   }
 }
 
+enum class CxxCompatMode {
+  invalid,
+  enabled,
+  off
+};
+
+static CxxCompatMode validateCxxInteropCompatibilityMode(StringRef mode) {
+  if (mode == "off")
+    return CxxCompatMode::off;
+  if (mode == "swift-5.9")
+    return CxxCompatMode::enabled;
+  return CxxCompatMode::invalid;
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -899,7 +913,26 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
-  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop);
+  if (Arg *A = Args.getLastArg(OPT_cxx_interoperability_mode)) {
+    if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
+      Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
+    }
+    
+    auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
+    Opts.EnableCXXInterop |= (interopCompatMode == CxxCompatMode::enabled);
+
+    if (interopCompatMode == CxxCompatMode::invalid) {
+      Diags.diagnose(SourceLoc(), diag::invalid_interop_compat_mode);
+      Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
+    }
+  }
+  
+  if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
+    Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
+    Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
+    Opts.EnableCXXInterop |= true;
+  }
+
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());

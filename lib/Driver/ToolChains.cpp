@@ -305,6 +305,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
+  inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_load_plugin_library);
   inputArgs.AddLastArg(arguments, options::OPT_load_plugin_executable);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
