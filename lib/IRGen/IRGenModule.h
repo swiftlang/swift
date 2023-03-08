@@ -1243,8 +1243,12 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
-  /// List of types to generate runtime-resolvable metadata records for.
+  /// List of types to generate runtime-resolvable metadata records for that
+  /// are consumable for any Swift runtime.
   SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
+  /// List of types to generate runtime-resolvable metadata records for that
+  /// are consumable for any Swift runtime aware of noncopyable types.
+  SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes2;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
