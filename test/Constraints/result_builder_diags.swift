@@ -299,8 +299,8 @@ struct MyTuplifiedStruct {
 
   @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the result builder}}{{3-17=}}
     if condition {
+      // expected-note@+1 {{remove 'return' statements to apply the result builder}}{{7-14=}}{{+2:12-19=}}
       return 17 // expected-warning{{application of result builder 'TupleBuilder' disabled by explicit 'return' statement}}
-      // expected-note@-1{{remove 'return' statements to apply the result builder}}{{7-14=}}{{12-19=}}
     } else {
            return 42
     }

@@ -112,12 +112,12 @@ func friend ship<T>(x: T) {} // expected-error {{found an unexpected second iden
 // expected-note@-2 {{join the identifiers together with camel-case}} {{6-17=friendShip}}
 func were
 wolf() {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
-// expected-note@-1 {{join the identifiers together}} {{6-5=werewolf}}
-// expected-note@-2 {{join the identifiers together with camel-case}} {{6-5=wereWolf}}
+// expected-note@-1 {{join the identifiers together}} {{-1:6-+0:5=werewolf}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{-1:6-+0:5=wereWolf}}
 func hammer
 leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier in function declaration; is there an accidental break?}}
-// expected-note@-1 {{join the identifiers together}} {{6-9=hammerleavings}}
-// expected-note@-2 {{join the identifiers together with camel-case}} {{6-9=hammerLeavings}}
+// expected-note@-1 {{join the identifiers together}} {{-1:6-+0:9=hammerleavings}}
+// expected-note@-2 {{join the identifiers together with camel-case}} {{-1:6-+0:9=hammerLeavings}}
 
 prefix operator %
 prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
