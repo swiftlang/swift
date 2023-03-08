@@ -162,7 +162,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(Backtracing)
 endif()
 
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
+if(SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(RemoteInspection)
   add_subdirectory(SwiftRemoteMirror)
 endif()
