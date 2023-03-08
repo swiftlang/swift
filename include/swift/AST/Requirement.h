@@ -18,7 +18,7 @@
 #define SWIFT_AST_REQUIREMENT_H
 
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/RequirementBase.h"
+#include "swift/AST/RequirementKind.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
@@ -29,18 +29,97 @@ namespace swift {
 
 /// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
-class Requirement
-    : public RequirementBase<Type,
-                             llvm::PointerIntPair<Type, 3, RequirementKind>,
-                             LayoutConstraint> {
+class Requirement {
+  llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
+  /// The second element of the requirement. Its content is dependent
+  /// on the requirement kind.
+  /// The payload of the following enum should always match the kind!
+  /// Any access to the fields of this enum should first check if the
+  /// requested access matches the kind of the requirement.
+  union {
+    Type SecondType;
+    LayoutConstraint SecondLayout;
+  };
+
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
-      : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondType(second) {
+    assert(first);
+    assert(second);
+    assert(kind != RequirementKind::Layout);
+  }
 
   /// Create a layout constraint requirement.
   Requirement(RequirementKind kind, Type first, LayoutConstraint second)
-    : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondLayout(second) {
+    assert(first);
+    assert(second);
+    assert(kind == RequirementKind::Layout);
+  }
+
+
+  /// Determine the kind of requirement.
+  RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
+
+  /// Retrieve the first type.
+  Type getFirstType() const {
+    return FirstTypeAndKind.getPointer();
+  }
+
+  /// Retrieve the second type.
+  Type getSecondType() const {
+    assert(getKind() != RequirementKind::Layout);
+    return SecondType;
+  }
+
+  /// Retrieve the layout constraint.
+  LayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementKind::Layout);
+    return SecondLayout;
+  }
+
+  friend llvm::hash_code hash_value(const Requirement &requirement) {
+    using llvm::hash_value;
+
+    llvm::hash_code first =
+        hash_value(requirement.FirstTypeAndKind.getOpaqueValue());
+    llvm::hash_code second;
+    switch (requirement.getKind()) {
+    case RequirementKind::SameShape:
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      second = hash_value(requirement.getSecondType());
+      break;
+
+    case RequirementKind::Layout:
+      second = hash_value(requirement.getLayoutConstraint());
+      break;
+    }
+
+    return llvm::hash_combine(first, second);
+  }
+
+  friend bool operator==(const Requirement &lhs,
+                         const Requirement &rhs) {
+    if (lhs.FirstTypeAndKind.getOpaqueValue()
+          != rhs.FirstTypeAndKind.getOpaqueValue())
+      return false;
+
+    switch (lhs.getKind()) {
+    case RequirementKind::SameShape:
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      return lhs.getSecondType().getPointer() ==
+          rhs.getSecondType().getPointer();
+
+    case RequirementKind::Layout:
+      return lhs.getLayoutConstraint() == rhs.getLayoutConstraint();
+    }
+    llvm_unreachable("Unhandled RequirementKind in switch");
+  }
 
   /// Whether this requirement's types contain ErrorTypes.
   bool hasError() const;

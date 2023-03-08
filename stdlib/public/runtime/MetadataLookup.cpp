@@ -1404,54 +1404,67 @@ public:
     operator bool() const { return true; }
   };
   using BuiltLayoutConstraint = BuiltLayoutConstraint;
-#if LLVM_PTR_SIZE == 4
-  /// Unfortunately the alignment of TypeRef is too large to squeeze in 3 extra
-  /// bits on (some?) 32-bit systems.
-  class BigBuiltTypeIntPair {
-    BuiltType Ptr;
-    RequirementKind Int;
-
-  public:
-    BigBuiltTypeIntPair(BuiltType ptr, RequirementKind i) : Ptr(ptr), Int(i) {}
-    RequirementKind getInt() const { return Int; }
-    BuiltType getPointer() const { return Ptr; }
-    uint64_t getOpaqueValue() const {
-      return (uint64_t)Ptr | ((uint64_t)Int << 32);
-    }
-  };
-#endif
-
-public:
-  DecodedMetadataBuilder(Demangler &demangler,
-                         SubstGenericParameterFn substGenericParameter,
-                         SubstDependentWitnessTableFn substWitnessTable)
-    : demangler(demangler),
-      substGenericParameter(substGenericParameter),
-      substWitnessTable(substWitnessTable) { }
-
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
   using BuiltGenericSignature = const Metadata *;
   using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
   using BuiltSubstitutionMap = llvm::ArrayRef<BuiltSubstitution>;
   using BuiltGenericTypeParam = const Metadata *;
-  struct Requirement : public RequirementBase<BuiltType,
-#if LLVM_PTR_SIZE == 4
-                                              BigBuiltTypeIntPair,
-#else
-                                              llvm::PointerIntPair<
-                                                  BuiltType, 3,
-                                                  RequirementKind>,
 
-#endif
-                                              BuiltLayoutConstraint> {
-    Requirement(RequirementKind kind, BuiltType first, BuiltType second)
-        : RequirementBase(kind, first, second) {}
-    Requirement(RequirementKind kind, BuiltType first,
-                BuiltLayoutConstraint second)
-        : RequirementBase(kind, first, second) {}
+  struct BuiltRequirement {
+    RequirementKind Kind;
+    BuiltType FirstType;
+
+    union {
+      BuiltType SecondType;
+      BuiltLayoutConstraint SecondLayout;
+    };
+
+    BuiltRequirement(RequirementKind kind, BuiltType first,
+                     BuiltType second)
+        : Kind(kind), FirstType(first), SecondType(second) {
+      assert(first);
+      assert(second);
+      assert(kind != RequirementKind::Layout);
+    }
+
+    BuiltRequirement(RequirementKind kind, BuiltType first,
+                     BuiltLayoutConstraint second)
+        : Kind(kind), FirstType(first), SecondLayout(second) {
+      assert(first);
+      assert(second);
+      assert(kind == RequirementKind::Layout);
+    }
+
+    /// Determine the kind of requirement.
+    RequirementKind getKind() const {
+      return Kind;
+    }
+
+    /// Retrieve the first type.
+    BuiltType getFirstType() const {
+      return FirstType;
+    }
+
+    /// Retrieve the second type.
+    BuiltType getSecondType() const {
+      assert(getKind() != RequirementKind::Layout);
+      return SecondType;
+    }
+
+    /// Retrieve the layout constraint.
+    BuiltLayoutConstraint getLayoutConstraint() const {
+      assert(getKind() == RequirementKind::Layout);
+      return SecondLayout;
+    }
   };
-  using BuiltRequirement = Requirement;
+
+  DecodedMetadataBuilder(Demangler &demangler,
+                         SubstGenericParameterFn substGenericParameter,
+                         SubstDependentWitnessTableFn substWitnessTable)
+    : demangler(demangler),
+      substGenericParameter(substGenericParameter),
+      substWitnessTable(substWitnessTable) { }
 
   BuiltType decodeMangledType(NodePointer node,
                               bool forRequirement = true) {
