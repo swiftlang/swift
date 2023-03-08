@@ -1905,7 +1905,9 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 static void
 swift_actor_escalate(DefaultActorImpl *actor, AsyncTask *task, JobPriority newPriority)
 {
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   return actor->enqueueStealer(task, newPriority);
+#endif
 }
 
 SWIFT_CC(swift)
