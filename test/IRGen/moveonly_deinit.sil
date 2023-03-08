@@ -15,6 +15,7 @@ sil_stage canonical
 class C {}
 
 // CHECK-LABEL: @{{.*}}8MOStructVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
@@ -27,6 +28,7 @@ struct MOStruct {
 }
 
 // CHECK-LABEL: @{{.*}}6MOEnumOWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, enum, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0xA1_0007>
 // CHECK-32-SAME: <i32 0xA1_0003>
@@ -39,6 +41,7 @@ enum MOEnum {
 }
 
 // CHECK-LABEL: @{{.*}}13MOComboStructVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, non-inline, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x83_0007>
 // CHECK-32-SAME: <i32 0x83_0003>
@@ -50,6 +53,7 @@ struct MOComboStruct {
 }
 
 // CHECK-LABEL: @{{.*}}11MOComboEnumOWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, enum, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0xA1_0007>
 // CHECK-32-SAME: <i32 0xA1_0003>
@@ -64,6 +68,7 @@ enum MOComboEnum {
 // common layout types.
 
 // CHECK-LABEL: @{{.*}}13MOEmptyStructVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, byte aligned
 // CHECK-SAME: <i32 0x81_0000>
 @_moveOnly
@@ -72,6 +77,7 @@ struct MOEmptyStruct {
 }
 
 // CHECK-LABEL: @{{.*}}15MOIntLikeStructVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
@@ -83,6 +89,7 @@ struct MOIntLikeStruct {
 }
 
 // CHECK-LABEL: @{{.*}}26MOSingleRefcountLikeStructVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
@@ -96,6 +103,7 @@ struct MOSingleRefcountLikeStruct {
 // Even if they don't have deinits, we shouldn't share a vwt.
 
 // CHECK-LABEL: @{{.*}}21MOEmptyStructNoDeinitVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, trivial deinit, byte aligned
 // CHECK-SAME: <i32 0x80_0000>
 @_moveOnly
@@ -103,6 +111,7 @@ struct MOEmptyStructNoDeinit {
 }
 
 // CHECK-LABEL: @{{.*}}23MOIntLikeStructNoDeinitVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, trivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x80_0007>
 // CHECK-32-SAME: <i32 0x80_0003>
@@ -112,6 +121,7 @@ struct MOIntLikeStructNoDeinit {
 }
 
 // CHECK-LABEL: @{{.*}}34MOSingleRefcountLikeStructNoDeinitVWV" =
+// CHECK-SAME: @__swift_cannot_copy_noncopyable_type
 // noncopyable, nontrivial deinit, pointer aligned
 // CHECK-64-SAME: <i32 0x81_0007>
 // CHECK-32-SAME: <i32 0x81_0003>
@@ -319,7 +329,7 @@ sil_moveonlydeinit MOGenericDeinit { @destroy_generic }
 // CHECK-LABEL: define {{.*}} @"{{.*}}13MOComboStructVwxx"
 // CHECK:         call {{.*}} @destroy_struct(
 // CHECK:         call {{.*}} @destroy_enum(
-// CHECK:         call {{.*}} @swift_retain(
+// CHECK:         call {{.*}} @swift_release
 // CHECK-LABEL: define {{.*}} @"{{.*}}11MOComboEnumOwxx"
 // CHECK:         call {{.*}} @[[COMBO_ENUM_OUTLINED_DESTROY]]
 
