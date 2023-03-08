@@ -10,6 +10,8 @@
 // This test is specific to libstdc++ and only runs on platforms where libstdc++ is used.
 // REQUIRES: OS=linux-gnu
 
+// CHECK-STD: import std.compat
+
 // CHECK-STD: enum std {
 // CHECK-STRING:   struct basic_string<Int8, char_traits<Int8>, allocator<Int8>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = std.char_traits<Int8>.char_type
