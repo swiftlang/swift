@@ -113,6 +113,22 @@ SourceManager &CursorInfoResolver::getSourceMgr() const
   return SrcFile.getASTContext().SourceMgr;
 }
 
+static bool locationMatches(SourceLoc currentLoc, SourceLoc toResolveLoc,
+                            SourceManager &SM) {
+  if (currentLoc == toResolveLoc)
+    return true;
+
+  if (currentLoc.getAdvancedLoc(-1) != toResolveLoc)
+    return false;
+
+  // Check if the location to resolve is a '@' or '#' and accept if so (to
+  // allow clients to send either the name location or the start of the
+  // attribute/expansion).
+  unsigned bufferID = SM.findBufferContainingLoc(toResolveLoc);
+  StringRef initialChar = SM.extractText({toResolveLoc, 1}, bufferID);
+  return initialChar == "@" || initialChar == "#";
+}
+
 bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
                                     ExtensionDecl *ExtTyRef, SourceLoc Loc,
                                     bool IsRef, Type Ty,
@@ -120,7 +136,7 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
   if (!D->hasName())
     return false;
 
-  if (Loc != LocToResolve)
+  if (!locationMatches(Loc, LocToResolve, getSourceMgr()))
     return false;
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {

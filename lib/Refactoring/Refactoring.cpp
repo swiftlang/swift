@@ -8566,50 +8566,49 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
 /// macro reference here.
 static llvm::SmallVector<unsigned, 2>
 getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
-  // Handle '#' position in '#macroName(...)'.
-  if (auto exprInfo = dyn_cast<ResolvedExprStartCursorInfo>(Info)) {
-    if (auto target =
-          dyn_cast_or_null<MacroExpansionExpr>(exprInfo->getTrailingExpr())) {
-      if (auto bufferID = getMacroExpansionBuffer(sourceMgr, target))
-        return { *bufferID };
-    }
+  auto *refInfo = dyn_cast<ResolvedValueRefCursorInfo>(Info);
+  if (!refInfo || !refInfo->isRef())
+    return {};
 
-    return { };
+  auto *macro = dyn_cast_or_null<MacroDecl>(refInfo->getValueD());
+  if (!macro)
+    return {};
+
+  // Attached macros
+  if (auto customAttrRef = refInfo->getCustomAttrRef()) {
+    auto macro = cast<MacroDecl>(refInfo->getValueD());
+    return getMacroExpansionBuffers(macro, customAttrRef->first,
+                                    customAttrRef->second);
   }
 
-  if (auto refInfo = dyn_cast<ResolvedValueRefCursorInfo>(Info)) {
-    if (refInfo->isRef() && isa_and_nonnull<MacroDecl>(refInfo->getValueD())) {
-      // Handle 'macroName' position in '@macroName(...)'.
-      if (auto customAttrRef = refInfo->getCustomAttrRef()) {
-        auto macro = cast<MacroDecl>(refInfo->getValueD());
-        return getMacroExpansionBuffers(
-            macro, customAttrRef->first, customAttrRef->second);
-      }
+  // FIXME: A resolved cursor should contain a slice up to its reference.
+  // We shouldn't need to find it again.
+  ContextFinder Finder(*Info->getSourceFile(), Info->getLoc(), [&](ASTNode N) {
+    if (N.getStartLoc() == Info->getLoc())
+      return true;
 
-      // Handle 'macroName' position in '#macroName(...)'.
-      ContextFinder Finder(
-          *Info->getSourceFile(), Info->getLoc(), [&](ASTNode N) {
-            auto *expr =
-                dyn_cast_or_null<MacroExpansionExpr>(N.dyn_cast<Expr *>());
-            return expr &&
-                   (expr->getMacroNameLoc().getBaseNameLoc() == Info->getLoc());
-          });
-      Finder.resolve();
-      if (!Finder.getContexts().empty()) {
-        auto *target =
-            dyn_cast<MacroExpansionExpr>(Finder.getContexts()[0].get<Expr *>());
-        if (target) {
-          if (auto bufferID = getMacroExpansionBuffer(sourceMgr, target))
-            return { *bufferID };
-        }
-      }
+    // TODO: Handle MacroExpansionDecl
+    if (auto *expr =
+            dyn_cast_or_null<MacroExpansionExpr>(N.dyn_cast<Expr *>())) {
+      return expr->getMacroNameLoc().getBaseNameLoc() == Info->getLoc();
     }
 
-    return { };
+    return false;
+  });
+  Finder.resolve();
+
+  if (!Finder.getContexts().empty()) {
+    Optional<unsigned> bufferID;
+    if (auto *target = dyn_cast<MacroExpansionExpr>(
+            Finder.getContexts()[0].get<Expr *>())) {
+      bufferID = getMacroExpansionBuffer(sourceMgr, target);
+    }
+
+    if (bufferID)
+      return {*bufferID};
   }
 
-  // TODO: handle MacroExpansionDecl.
-  return { };
+  return {};
 }
 
 bool RefactoringActionExpandMacro::isApplicable(ResolvedCursorInfoPtr Info,
