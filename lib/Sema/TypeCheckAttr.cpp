@@ -3938,19 +3938,22 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
   auto *nominal = dyn_cast<NominalTypeDecl>(D);
   auto &ctx = D->getASTContext();
-  SmallVector<ValueDecl *, 4> potentialMatches;
+  SmallVector<ValueDecl *, 4> buildBlockMatches;
+  SmallVector<ValueDecl *, 4> buildPartialBlockFirstMatches;
+  SmallVector<ValueDecl *, 4> buildPartialBlockAccumulatedMatches;
+
   bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
       nominal->getDeclaredType(), nominal, ctx.Id_buildBlock,
-      /*argLabels=*/{}, &potentialMatches);
+      /*argLabels=*/{}, &buildBlockMatches);
+
   bool supportsBuildPartialBlock =
       TypeChecker::typeSupportsBuilderOp(
-          nominal->getDeclaredType(), nominal,
-          ctx.Id_buildPartialBlock,
-          /*argLabels=*/{ctx.Id_first}, &potentialMatches) &&
+          nominal->getDeclaredType(), nominal, ctx.Id_buildPartialBlock,
+          /*argLabels=*/{ctx.Id_first}, &buildPartialBlockFirstMatches) &&
       TypeChecker::typeSupportsBuilderOp(
-          nominal->getDeclaredType(), nominal,
-          ctx.Id_buildPartialBlock,
-          /*argLabels=*/{ctx.Id_accumulated, ctx.Id_next}, &potentialMatches);
+          nominal->getDeclaredType(), nominal, ctx.Id_buildPartialBlock,
+          /*argLabels=*/{ctx.Id_accumulated, ctx.Id_next},
+          &buildPartialBlockAccumulatedMatches);
 
   if (!supportsBuildBlock && !supportsBuildPartialBlock) {
     {
@@ -3964,7 +3967,7 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
       Type componentType;
       std::tie(buildInsertionLoc, stubIndent, componentType) =
           determineResultBuilderBuildFixItInfo(nominal);
-      if (buildInsertionLoc.isValid() && potentialMatches.empty()) {
+      if (buildInsertionLoc.isValid() && buildBlockMatches.empty()) {
         std::string fixItString;
         {
           llvm::raw_string_ostream out(fixItString);
@@ -3980,7 +3983,7 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
     // For any close matches, attempt to explain to the user why they aren't
     // valid.
-    for (auto *member : potentialMatches) {
+    for (auto *member : buildBlockMatches) {
       if (member->isStatic() && isa<FuncDecl>(member))
         continue;
 
