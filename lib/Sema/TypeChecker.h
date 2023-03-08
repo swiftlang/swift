@@ -734,12 +734,6 @@ Pattern *coercePatternToType(ContextualPattern pattern, Type type,
                              TypeResolutionOptions options);
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
-/// Synthesize ~= operator application used to infer enum members
-/// in `case` patterns.
-Optional<std::pair<VarDecl *, BinaryExpr *>>
-synthesizeTildeEqualsOperatorApplication(ExprPattern *EP, DeclContext *DC,
-                                         Type enumType);
-
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
 void coerceParameterListToType(ParameterList *P, AnyFunctionType *FN);

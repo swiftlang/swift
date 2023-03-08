@@ -976,7 +976,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
               DC->mapTypeIntoContext(
                   targetElt->getParentEnum()->getDeclaredInterfaceType()),
               C),
-          SourceLoc(), DeclNameLoc(), DeclNameRef(), targetElt, subpattern);
+          SourceLoc(), DeclNameLoc(), DeclNameRef(), targetElt, subpattern, DC);
       pat->setImplicit();
 
       auto labelItem = CaseLabelItem(pat);

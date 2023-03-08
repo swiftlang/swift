@@ -228,6 +228,12 @@ SWIFT_REQUEST(TypeChecker, ModuleImplicitImportsRequest,
               ImplicitImportList(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, NamingPatternRequest,
               NamedPattern *(VarDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExprPatternMatchRequest,
+              ExprPatternMatchResult(const ExprPattern *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EnumElementExprPatternRequest,
+              ExprPattern *(const EnumElementPattern *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)

@@ -928,20 +928,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  auto tildeEqualsApplication =
-      synthesizeTildeEqualsOperatorApplication(EP, DC, rhsType);
-
-  if (!tildeEqualsApplication)
-    return true;
-
-  VarDecl *matchVar;
-  Expr *matchCall;
-
-  std::tie(matchVar, matchCall) = *tildeEqualsApplication;
-
-  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   // Result of `~=` should always be a boolean.
+  auto *matchCall = EP->getMatchExpr();
   auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
   auto target =
       SyntacticElementTarget::forExprPattern(matchCall, DC, EP, contextualTy);
@@ -951,63 +941,11 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   if (!result)
     return true;
 
-  // Save the synthesized $match variable in the pattern.
-  EP->setMatchVar(matchVar);
   // Save the type-checked expression in the pattern.
   EP->setMatchExpr(result->getAsExpr());
   // Set the type on the pattern.
   EP->setType(rhsType);
   return false;
-}
-
-Optional<std::pair<VarDecl *, BinaryExpr *>>
-TypeChecker::synthesizeTildeEqualsOperatorApplication(ExprPattern *EP,
-                                                      DeclContext *DC,
-                                                      Type enumType) {
-  auto &Context = DC->getASTContext();
-  // Create a 'let' binding to stand in for the RHS value.
-  auto *matchVar =
-      new (Context) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
-                            EP->getLoc(), Context.Id_PatternMatchVar, DC);
-
-  matchVar->setImplicit();
-
-  // Find '~=' operators for the match.
-  auto matchLookup =
-      lookupUnqualified(DC->getModuleScopeContext(),
-                        DeclNameRef(Context.Id_MatchOperator),
-                        SourceLoc(), defaultUnqualifiedLookupOptions);
-  auto &diags = DC->getASTContext().Diags;
-  if (!matchLookup) {
-    diags.diagnose(EP->getLoc(), diag::no_match_operator);
-    return None;
-  }
-
-  SmallVector<ValueDecl*, 4> choices;
-  for (auto &result : matchLookup) {
-    choices.push_back(result.getValueDecl());
-  }
-
-  if (choices.empty()) {
-    diags.diagnose(EP->getLoc(), diag::no_match_operator);
-    return None;
-  }
-
-  // Build the 'expr ~= var' expression.
-  // FIXME: Compound name locations.
-  auto *matchOp =
-      TypeChecker::buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
-                                /*Implicit=*/true, FunctionRefKind::Compound);
-
-  // Note we use getEndLoc here to have the BinaryExpr source range be the same
-  // as the expr pattern source range.
-  auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                DeclNameLoc(EP->getEndLoc()),
-                                                /*Implicit=*/true);
-  auto *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
-                                       matchVarRef, /*implicit*/ true);
-
-  return std::make_pair(matchVar, matchCall);
 }
 
 static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,

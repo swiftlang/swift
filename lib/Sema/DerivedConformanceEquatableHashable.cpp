@@ -181,9 +181,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat =
-        new (C) EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, lhsSubpattern);
+    auto lhsElemPat = new (C)
+        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, lhsSubpattern, /*DC*/ eqDecl);
     lhsElemPat->setImplicit();
 
     // .<elt>(let r0, let r1, ...)
@@ -191,9 +191,9 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat =
-        new (C) EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(),
-                                   DeclNameRef(), elt, rhsSubpattern);
+    auto rhsElemPat = new (C)
+        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
+                           elt, rhsSubpattern, /*DC*/ eqDecl);
     rhsElemPat->setImplicit();
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
@@ -702,9 +702,10 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumType, C), SourceLoc(), DeclNameLoc(),
-        DeclNameRef(elt->getBaseIdentifier()), elt, payloadPattern);
+    auto pat = new (C)
+        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
+                           DeclNameLoc(), DeclNameRef(elt->getBaseIdentifier()),
+                           elt, payloadPattern, /*DC*/ hashIntoDecl);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);

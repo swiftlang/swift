@@ -508,25 +508,29 @@ class EnumElementPattern : public Pattern {
   DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
+  DeclContext *DC;
 
 public:
   EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
                      DeclNameLoc NameLoc, DeclNameRef Name,
-                     EnumElementDecl *Element, Pattern *SubPattern)
+                     EnumElementDecl *Element, Pattern *SubPattern,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(ParentType),
         DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern),
+        DC(DC) {
     assert(ParentType && "Missing parent type?");
   }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
-                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr)
+                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
         NameLoc(NameLoc), Name(Name),
         ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-        SubPattern(SubPattern) {}
+        SubPattern(SubPattern), DC(DC) {}
 
   bool hasSubPattern() const { return SubPattern; }
 
@@ -539,6 +543,8 @@ public:
   }
 
   void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  DeclContext *getDeclContext() const { return DC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -647,41 +653,57 @@ public:
 class ExprPattern : public Pattern {
   llvm::PointerIntPair<Expr *, 1, bool> SubExprAndIsResolved;
 
-  /// An expression constructed during type-checking that produces a call to the
-  /// '~=' operator comparing the match expression on the left to the matched
-  /// value on the right.
-  Expr *MatchExpr = nullptr;
+  DeclContext *DC;
 
-  /// An implicit variable used to represent the RHS value of the match.
-  VarDecl *MatchVar = nullptr;
+  /// A synthesized call to the '~=' operator comparing the match expression
+  /// on the left to the matched value on the right.
+  mutable Expr *MatchExpr = nullptr;
 
-  ExprPattern(Expr *E, bool isResolved)
-      : Pattern(PatternKind::Expr), SubExprAndIsResolved(E, isResolved) {}
+  /// An implicit variable used to represent the RHS value of the synthesized
+  /// match expression.
+  mutable VarDecl *MatchVar = nullptr;
+
+  ExprPattern(Expr *E, DeclContext *DC, bool isResolved)
+      : Pattern(PatternKind::Expr), SubExprAndIsResolved(E, isResolved),
+        DC(DC) {}
+
+  friend class ExprPatternMatchRequest;
 
 public:
   /// Create a new parsed unresolved ExprPattern.
-  static ExprPattern *createParsed(ASTContext &ctx, Expr *E);
+  static ExprPattern *createParsed(ASTContext &ctx, Expr *E, DeclContext *DC);
 
   /// Create a new resolved ExprPattern. This should be used in cases
   /// where a user-written expression should be treated as an ExprPattern.
-  static ExprPattern *createResolved(ASTContext &ctx, Expr *E);
+  static ExprPattern *createResolved(ASTContext &ctx, Expr *E, DeclContext *DC);
 
   /// Create a new implicit resolved ExprPattern.
-  static ExprPattern *createImplicit(ASTContext &ctx, Expr *E);
+  static ExprPattern *createImplicit(ASTContext &ctx, Expr *E, DeclContext *DC);
 
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
 
-  Expr *getMatchExpr() const { return MatchExpr; }
-  void setMatchExpr(Expr *e) {
-    assert(isResolved() && "cannot set match fn for unresolved expr patter");
-    MatchExpr = e;
-  }
+  DeclContext *getDeclContext() const { return DC; }
 
-  VarDecl *getMatchVar() const { return MatchVar; }
-  void setMatchVar(VarDecl *v) {
-    assert(isResolved() && "cannot set match var for unresolved expr patter");
-    MatchVar = v;
+  /// The match expression if it has been computed, \c nullptr otherwise.
+  /// Should only be used by the ASTDumper and ASTWalker.
+  Expr *getCachedMatchExpr() const { return MatchExpr; }
+
+  /// The match variable if it has been computed, \c nullptr otherwise.
+  /// Should only be used by the ASTDumper and ASTWalker.
+  VarDecl *getCachedMatchVar() const { return MatchVar; }
+
+  /// A synthesized call to the '~=' operator comparing the match expression
+  /// on the left to the matched value on the right.
+  Expr *getMatchExpr() const;
+
+  /// An implicit variable used to represent the RHS value of the synthesized
+  /// match expression.
+  VarDecl *getMatchVar() const;
+
+  void setMatchExpr(Expr *e) {
+    assert(MatchExpr && "Should only update an existing MatchExpr");
+    MatchExpr = e;
   }
 
   SourceLoc getLoc() const;
@@ -851,6 +873,9 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const ContextualPattern &pattern);
+void simple_display(llvm::raw_ostream &out, const Pattern *pattern);
+
+SourceLoc extractNearestSourceLoc(const Pattern *pattern);
 
 } // end namespace swift
 

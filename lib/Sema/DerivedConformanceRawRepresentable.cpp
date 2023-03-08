@@ -114,7 +114,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C)
         EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
+                           /*DC*/ toRawDecl);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -323,7 +324,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
       stringExprs.push_back(litExpr);
       litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx, SourceLoc()); 
     }
-    auto *litPat = ExprPattern::createImplicit(C, litExpr);
+    auto *litPat = ExprPattern::createImplicit(C, litExpr, /*DC*/ initDecl);
 
     /// Statements in the body of this case.
     SmallVector<ASTNode, 2> stmts;
