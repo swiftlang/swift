@@ -5867,8 +5867,6 @@ instantiateRelativeWitnessTable(const Metadata *Type,
           : conformance->getConditionalRequirements()) {
       if (conditionalRequirement.Flags.hasKeyArgument())
         copyNextInstantiationArg();
-      if (conditionalRequirement.Flags.hasExtraArgument())
-        copyNextInstantiationArg();
     }
   }
 
