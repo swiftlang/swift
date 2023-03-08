@@ -3997,6 +3997,69 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
         diagnose(member->getLoc(),
                  diag::result_builder_buildblock_not_static_method);
     }
+
+    return;
+  }
+
+  // Let's check whether one or more overloads of buildBlock or
+  // buildPartialBlock are as accessible as the builder type itself.
+  {
+    auto isBuildMethodAsAccessibleAsType = [&](ValueDecl *member) {
+      return !isMemberLessAccessibleThanType(nominal, member);
+    };
+
+    bool hasAccessibleBuildBlock =
+        llvm::any_of(buildBlockMatches, isBuildMethodAsAccessibleAsType);
+
+    bool hasAccessibleBuildPartialBlockFirst = false;
+    bool hasAccessibleBuildPartialBlockAccumulated = false;
+
+    if (supportsBuildPartialBlock) {
+      DeclName buildPartialBlockFirst(ctx, ctx.Id_buildPartialBlock,
+                                      /*argLabels=*/{ctx.Id_first});
+      DeclName buildPartialBlockAccumulated(
+          ctx, ctx.Id_buildPartialBlock,
+          /*argLabels=*/{ctx.Id_accumulated, ctx.Id_next});
+
+      buildPartialBlockFirstMatches.clear();
+      buildPartialBlockAccumulatedMatches.clear();
+
+      auto builderType = nominal->getDeclaredType();
+      nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
+                               NL_QualifiedDefault,
+                               buildPartialBlockFirstMatches);
+      nominal->lookupQualified(
+          builderType, DeclNameRef(buildPartialBlockAccumulated),
+          NL_QualifiedDefault, buildPartialBlockAccumulatedMatches);
+
+      hasAccessibleBuildPartialBlockFirst = llvm::any_of(
+          buildPartialBlockFirstMatches, isBuildMethodAsAccessibleAsType);
+      hasAccessibleBuildPartialBlockAccumulated = llvm::any_of(
+          buildPartialBlockAccumulatedMatches, isBuildMethodAsAccessibleAsType);
+    }
+
+    if (!hasAccessibleBuildBlock) {
+      // No or incomplete `buildPartialBlock` and all overloads of
+      // `buildBlock(_:)` are less accessible than the type.
+      if (!supportsBuildPartialBlock) {
+        diagnose(nominal->getLoc(),
+                 diag::result_builder_buildblock_not_accessible,
+                 nominal->getName(), nominal->getFormalAccess());
+      } else {
+        if (!hasAccessibleBuildPartialBlockFirst) {
+          diagnose(nominal->getLoc(),
+                   diag::result_builder_buildpartialblock_first_not_accessible,
+                   nominal->getName(), nominal->getFormalAccess());
+        }
+
+        if (!hasAccessibleBuildPartialBlockAccumulated) {
+          diagnose(
+              nominal->getLoc(),
+              diag::result_builder_buildpartialblock_accumulated_not_accessible,
+              nominal->getName(), nominal->getFormalAccess());
+        }
+      }
+    }
   }
 }
 
