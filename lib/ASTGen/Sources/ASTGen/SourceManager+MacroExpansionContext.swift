@@ -52,6 +52,10 @@ extension String {
 }
 
 extension SourceManager.MacroExpansionContext: MacroExpansionContext {
+  public func makeUniqueName(_ providedName: String) -> TokenSyntax {
+    return createUniqueName(providedName)
+  }
+
   /// Generate a unique name for use in the macro.
   public func createUniqueName(_ providedName: String) -> TokenSyntax {
     // If provided with an empty name, substitute in something.
