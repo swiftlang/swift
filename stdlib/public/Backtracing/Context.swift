@@ -272,9 +272,11 @@ extension arm_gprs {
     throw NotImplemented()
   }
   #elseif arch(x86_64)
+  @usableFromInline
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> X86_64Context
 
+  @_transparent
   public static func withCurrentContext<T>(fn: (X86_64Context) throws -> T) rethrows -> T {
     return try fn(_swift_get_cpu_context())
   }
@@ -427,9 +429,11 @@ extension arm_gprs {
     throw NotImplemented()
   }
   #elseif arch(i386)
+  @usableFromInline
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> I386Context
 
+  @_transparent
   public static func withCurrentContext<T>(fn: (I386Context) throws -> T) rethrows -> T {
     return try fn(_swift_get_cpu_context())
   }
@@ -630,9 +634,11 @@ extension arm_gprs {
     throw NotImplemented()
   }
   #elseif arch(arm64) || arch(arm64_32)
+  @usableFromInline
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> ARM64Context
 
+  @_transparent
   public static func withCurrentContext<T>(fn: (ARM64Context) throws -> T) rethrows -> T {
     return try fn(_swift_get_cpu_context())
   }
@@ -769,9 +775,11 @@ extension arm_gprs {
     throw NotImplemented()
   }
   #elseif arch(arm)
+  @usableFromInline
   @_silgen_name("_swift_get_cpu_context")
   static func _swift_get_cpu_context() -> ARMContext
 
+  @_transparent
   public static func withCurrentContext<T>(fn: (ARMContext) throws -> T) rethrows -> T {
     return try fn(_swift_get_cpu_context())
   }
