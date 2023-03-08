@@ -1119,11 +1119,11 @@ public:
   
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(
-      StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
-      const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      IndirectionKind Indirection,
-      AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
+  void emitDebugVariableDeclaration(StorageType Storage, DebugTypeInfo Ty,
+                                    SILType SILTy, const SILDebugScope *DS,
+                                    SILLocation VarLoc,
+                                    SILDebugVariable VarInfo,
+                                    IndirectionKind Indirection) {
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
@@ -1133,15 +1133,15 @@ public:
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
-      IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
-          ArtificialKind::RealValue, DbgInstrKind);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
+                                             VarInfo, Indirection,
+                                             ArtificialKind::RealValue);
       return;
     }
 
-    IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
-        ArtificialKind::RealValue, DbgInstrKind);
+    IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
+                                           VarInfo, Indirection,
+                                           ArtificialKind::RealValue);
   }
 
   void emitFailBB() {
@@ -5148,8 +5148,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getLoc(), *VarInfo, Indirection,
-                               AddrDbgInstrKind(i->getWasMoved()));
+                               i->getLoc(), *VarInfo, Indirection);
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -5519,8 +5518,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo) {
     emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo,
-                                 Indirection,
-                                 AddrDbgInstrKind(i->getWasMoved()));
+                                 Indirection);
   }
 }
 

@@ -46,15 +46,6 @@ enum IndirectionKind {
 };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
-/// Used to signal to emitDbgIntrinsic that we actually want to emit dbg.declare
-/// instead of dbg.addr. By default, we now emit llvm.dbg.addr instead of
-/// llvm.dbg.declare for normal variables. This is not true for metadata which
-/// truly are function wide and should be llvm.dbg.declare.
-enum class AddrDbgInstrKind : bool {
-  DbgDeclare,
-  DbgAddr,
-};
-
 /// Helper object that keeps track of the current CompileUnit, File,
 /// LexicalScope, and knows how to translate a \c SILLocation into an
 /// \c llvm::DebugLoc.
@@ -163,8 +154,7 @@ public:
                                Optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind Indirection = DirectValue,
-                               ArtificialKind Artificial = RealValue,
-                               AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
+                               ArtificialKind Artificial = RealValue);
 
   /// Emit a dbg.addr or dbg.value intrinsic, depending on Storage. If \p
   /// ForceDbgDeclare is set to Yes, then instead of emitting a dbg.addr, we
@@ -174,8 +164,7 @@ public:
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext = false,
-                        AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
+                        const SILDebugScope *DS, bool InCoroContext = false);
 
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
