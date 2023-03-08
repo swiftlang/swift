@@ -2741,6 +2741,12 @@ namespace {
         if (notInstantiated)
           return nullptr;
       }
+      if (!decl->isUnconditionallyVisible()) {
+        // Skip declarations present in imported clang modules
+        // which might be not visible in this context, as Clang might report
+        // a missing 'include' error.
+        return nullptr;
+      }
       if (!clangSema.isCompleteType(
               decl->getLocation(),
               Impl.getClangASTContext().getRecordType(decl))) {
