@@ -165,9 +165,8 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    closure that doesn't contain any async calles. Thus the closure is
   //    type-checked as non-async, but it might get converted to an async
   //    closure based on its contextual type
-  auto target = S.targets.find(dyn_cast<ClosureExpr>(DC));
-  if (target != S.targets.end()) {
-    if (auto ContextTy = target->second.getClosureContextualType()) {
+  if (auto target = S.getTargetFor(dyn_cast<ClosureExpr>(DC))) {
+    if (auto ContextTy = target->getClosureContextualType()) {
       if (auto ContextFuncTy =
               S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
         return ContextFuncTy->isAsync();

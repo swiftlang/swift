@@ -1012,6 +1012,25 @@ void NamingPatternRequest::cacheResult(NamedPattern *value) const {
 }
 
 //----------------------------------------------------------------------------//
+// ExprPatternMatchRequest caching.
+//----------------------------------------------------------------------------//
+
+Optional<ExprPatternMatchResult>
+ExprPatternMatchRequest::getCachedResult() const {
+  auto *EP = std::get<0>(getStorage());
+  if (!EP->MatchVar)
+    return None;
+
+  return ExprPatternMatchResult(EP->MatchVar, EP->MatchExpr);
+}
+
+void ExprPatternMatchRequest::cacheResult(ExprPatternMatchResult result) const {
+  auto *EP = std::get<0>(getStorage());
+  EP->MatchVar = result.getMatchVar();
+  EP->MatchExpr = result.getMatchExpr();
+}
+
+//----------------------------------------------------------------------------//
 // InterfaceTypeRequest computation.
 //----------------------------------------------------------------------------//
 

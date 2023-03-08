@@ -1095,7 +1095,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
     auto CCE = new (P.Context) CodeCompletionExpr(P.Tok.getLoc());
-    result.ThePattern = ExprPattern::createParsed(P.Context, CCE);
+    result.ThePattern =
+        ExprPattern::createParsed(P.Context, CCE, P.CurDeclContext);
     if (P.IDECallbacks) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:

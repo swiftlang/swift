@@ -472,7 +472,7 @@ namespace {
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';
-      if (auto m = P->getMatchExpr())
+      if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
         printRec(P->getSubExpr());

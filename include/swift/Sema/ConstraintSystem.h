@@ -1630,6 +1630,14 @@ public:
     return None;
   }
 
+  Optional<SyntacticElementTarget>
+  getTargetFor(SyntacticElementTargetKey key) const {
+    auto known = targets.find(key);
+    if (known == targets.end())
+      return None;
+    return known->second;
+  }
+
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) const;
 

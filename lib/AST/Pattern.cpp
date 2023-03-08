@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
@@ -333,9 +334,8 @@ EnumElementDecl *OptionalSomePattern::getElementDecl() const {
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {
-  // If the pattern has a registered match expression, it's
-  // a type-checked ExprPattern.
-  if (EP->getMatchExpr()) return false;
+  // If the pattern is resolved, it must be irrefutable.
+  if (EP->isResolved()) return false;
 
   auto expr = EP->getSubExpr();
   while (true) {
@@ -501,18 +501,33 @@ void IsPattern::setCastType(Type type) {
 
 TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
 
-ExprPattern *ExprPattern::createParsed(ASTContext &ctx, Expr *E) {
-  return new (ctx) ExprPattern(E, /*isResolved*/ false);
+ExprPattern *ExprPattern::createParsed(ASTContext &ctx, Expr *E,
+                                       DeclContext *DC) {
+  return new (ctx) ExprPattern(E, DC, /*isResolved*/ false);
 }
 
-ExprPattern *ExprPattern::createResolved(ASTContext &ctx, Expr *E) {
-  return new (ctx) ExprPattern(E, /*isResolved*/ true);
+ExprPattern *ExprPattern::createResolved(ASTContext &ctx, Expr *E,
+                                         DeclContext *DC) {
+  return new (ctx) ExprPattern(E, DC, /*isResolved*/ true);
 }
 
-ExprPattern *ExprPattern::createImplicit(ASTContext &ctx, Expr *E) {
-  auto *EP = ExprPattern::createResolved(ctx, E);
+ExprPattern *ExprPattern::createImplicit(ASTContext &ctx, Expr *E,
+                                         DeclContext *DC) {
+  auto *EP = ExprPattern::createResolved(ctx, E, DC);
   EP->setImplicit();
   return EP;
+}
+
+Expr *ExprPattern::getMatchExpr() const {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, None)
+      .getMatchExpr();
+}
+
+VarDecl *ExprPattern::getMatchVar() const {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, None)
+      .getMatchVar();
 }
 
 SourceLoc EnumElementPattern::getStartLoc() const {
@@ -616,5 +631,13 @@ bool ContextualPattern::allowsInference() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ContextualPattern &pattern) {
-  out << "(pattern @ " << pattern.getPattern() << ")";
+  simple_display(out, pattern.getPattern());
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const Pattern *pattern) {
+  out << "(pattern @ " << pattern << ")";
+}
+
+SourceLoc swift::extractNearestSourceLoc(const Pattern *pattern) {
+  return pattern->getLoc();
 }

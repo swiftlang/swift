@@ -244,7 +244,7 @@ public:
     if (Pattern *p = visit(E))
       return p;
 
-    return ExprPattern::createResolved(Context, E);
+    return ExprPattern::createResolved(Context, E, DC);
   }
 
   /// Turn an argument list into a matching tuple or paren pattern.
@@ -439,9 +439,8 @@ public:
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
-    return new (Context)
-        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
-                           nullptr, ume);
+    return new (Context) EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(),
+                                            ume->getName(), nullptr, ume, DC);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -483,7 +482,7 @@ public:
     base->setType(MetatypeType::get(ty));
     return new (Context)
         EnumElementPattern(base, ude->getDotLoc(), ude->getNameLoc(),
-                           ude->getName(), referencedElement, nullptr);
+                           ude->getName(), referencedElement, nullptr, DC);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -496,8 +495,9 @@ public:
     auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
     auto *base = TypeExpr::createImplicit(enumTy, Context);
 
-    return new (Context) EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
-                                            elt->createNameRef(), elt, nullptr);
+    return new (Context)
+        EnumElementPattern(base, SourceLoc(), de->getNameLoc(),
+                           elt->createNameRef(), elt, nullptr, DC);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
     // FIXME: This shouldn't be needed.  It is only necessary because of the
@@ -514,7 +514,7 @@ public:
 
       return new (Context)
           EnumElementPattern(base, SourceLoc(), ude->getNameLoc(),
-                             ude->getName(), referencedElement, nullptr);
+                             ude->getName(), referencedElement, nullptr, DC);
     }
       
     
@@ -614,7 +614,7 @@ public:
     auto *subPattern = composeTupleOrParenPattern(ce->getArgs());
     return new (Context) EnumElementPattern(
         baseTE, SourceLoc(), tailComponent->getNameLoc(),
-        tailComponent->getNameRef(), referencedElement, subPattern);
+        tailComponent->getNameRef(), referencedElement, subPattern, DC);
   }
 };
 
@@ -759,6 +759,45 @@ static TypeResolutionOptions applyContextualPatternOptions(
   }
 
   return options;
+}
+
+ExprPatternMatchResult
+ExprPatternMatchRequest::evaluate(Evaluator &evaluator,
+                                  const ExprPattern *EP) const {
+  assert(EP->isResolved() && "Must only be queried once resolved");
+
+  auto *DC = EP->getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  // Create a 'let' binding to stand in for the RHS value.
+  auto *matchVar =
+      new (ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                        EP->getLoc(), ctx.Id_PatternMatchVar, DC);
+  matchVar->setImplicit();
+
+  // Build the 'expr ~= var' expression.
+  auto *matchOp = new (ctx) UnresolvedDeclRefExpr(
+      DeclNameRef(ctx.Id_MatchOperator), DeclRefKind::BinaryOperator,
+      DeclNameLoc(EP->getLoc()));
+  matchOp->setImplicit();
+
+  // Note we use getEndLoc here to have the BinaryExpr source range be the same
+  // as the expr pattern source range.
+  auto *matchVarRef =
+      new (ctx) DeclRefExpr(matchVar, DeclNameLoc(EP->getEndLoc()),
+                            /*Implicit=*/true);
+  auto *matchCall = BinaryExpr::create(ctx, EP->getSubExpr(), matchOp,
+                                       matchVarRef, /*implicit*/ true);
+  return {matchVar, matchCall};
+}
+
+ExprPattern *
+EnumElementExprPatternRequest::evaluate(Evaluator &evaluator,
+                                        const EnumElementPattern *EEP) const {
+  assert(EEP->hasUnresolvedOriginalExpr());
+  auto *DC = EEP->getDeclContext();
+  return ExprPattern::createResolved(DC->getASTContext(),
+                                     EEP->getUnresolvedOriginalExpr(), DC);
 }
 
 Type PatternTypeRequest::evaluate(Evaluator &evaluator,
@@ -1270,7 +1309,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         auto *BaseTE = TypeExpr::createImplicit(type, Context);
         P = new (Context) EnumElementPattern(
             BaseTE, NLE->getLoc(), DeclNameLoc(NLE->getLoc()),
-            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr);
+            NoneEnumElement->createNameRef(), NoneEnumElement, nullptr, dc);
         return TypeChecker::coercePatternToType(
             pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       } else {
@@ -1325,7 +1364,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
         sub = new (Context) EnumElementPattern(
             base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),
-            some->createNameRef(), nullptr, sub);
+            some->createNameRef(), nullptr, sub, dc);
         sub->setImplicit();
       }
 
@@ -1429,8 +1468,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
             // If we have the original expression parse tree, try reinterpreting
             // it as an expr-pattern if enum element lookup failed, since `.foo`
             // could also refer to a static member of the context type.
-            P = ExprPattern::createResolved(Context,
-                                            EEP->getUnresolvedOriginalExpr());
+            P = ExprPattern::createResolved(
+                Context, EEP->getUnresolvedOriginalExpr(), dc);
             return coercePatternToType(
                 pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                 options);
