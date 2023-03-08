@@ -901,8 +901,11 @@ struct ExecutorActiveAndRef {
   ExecutorRef ref;
 };
 
+/// Different than `swift_task_getCurrentExecutor` in that it does not default to the generic executor.
+/// This method is to be used if we are interested specifically IF we have an executor set in this context,
+/// and if so, which one it is. If no executor is available in the current context, the `active` bool will be false.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorActiveAndRef swift_task_getCurrentActiveExecutorRef();
+ExecutorActiveAndRef swift_task_getCurrentActiveExecutorRef(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
