@@ -1819,10 +1819,7 @@ function(add_swift_target_library name)
   list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
 
   # Turn off implicit import of _StringProcessing when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
-                      "-Xfrontend;-disable-implicit-string-processing-module-import")
-  endif()
+  list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-string-processing-module-import")
 
   # Turn off implicit import of _Backtracing when building libraries
   if(SWIFT_COMPILER_SUPPORTS_BACKTRACING)
