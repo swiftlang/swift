@@ -731,6 +731,17 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
   });
 }
 
+/// Return a function that traps because of an attempt to copy a noncopyable
+/// type.
+static llvm::Constant *getNoncopyableTrapFunction(IRGenModule &IGM) {
+  return IGM.getOrCreateHelperFunction("__swift_cannot_copy_noncopyable_type",
+                                       IGM.VoidTy, {},
+                                       [&](IRGenFunction &IGF) {
+    IGF.Builder.CreateNonMergeableTrap(IGM, "attempt to copy a value of a type that cannot be copied");
+    IGF.Builder.CreateUnreachable();
+  });
+}
+
 /// Return a function which takes three pointer arguments and does a
 /// retaining assignWithCopy on the first two: it loads a pointer from
 /// the second, retains it, loads a pointer from the first, stores the
@@ -918,6 +929,33 @@ bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
   return false;
 }
 
+static bool
+valueWitnessRequiresCopyability(ValueWitness index) {
+  switch (index) {
+  case ValueWitness::InitializeBufferWithCopyOfBuffer:
+  case ValueWitness::InitializeWithCopy:
+  case ValueWitness::AssignWithCopy:
+    return true;
+  
+  case ValueWitness::Destroy:
+  case ValueWitness::InitializeWithTake:
+  case ValueWitness::AssignWithTake:
+  case ValueWitness::GetEnumTagSinglePayload:
+  case ValueWitness::StoreEnumTagSinglePayload:
+  case ValueWitness::Size:
+  case ValueWitness::Stride:
+  case ValueWitness::Flags:
+  case ValueWitness::ExtraInhabitantCount:
+  case ValueWitness::GetEnumTag:
+  case ValueWitness::DestructiveProjectEnumData:
+  case ValueWitness::DestructiveInjectEnumTag:
+    return false;
+  }
+  llvm_unreachable("not all value witnesses covered");
+}
+
+
+
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
@@ -930,6 +968,16 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
   };
+
+  // Copyable and noncopyable types share a value witness table layout. It
+  // should normally be statically impossible to generate a call to a copy
+  // value witness, but if somebody manages to dynamically get hold of metadata
+  // for a noncopyable type, and tries to use it to copy values of that type,
+  // we should trap to prevent the attempt.
+  if (!concreteTI.isCopyable(ResilienceExpansion::Maximal)
+      && valueWitnessRequiresCopyability(index)) {
+    return addFunction(getNoncopyableTrapFunction(IGM));
+  }
 
   // Try to use a standard function.
   switch (index) {
