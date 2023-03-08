@@ -496,3 +496,16 @@ func testCompleteInMatchOfAssociatedValueInSwitchCase() {
 }
 
 }
+
+func testReferenceToVariableDefinedInClosure() {
+  func takeClosure(_ x: () -> Void) {}
+
+  takeClosure {
+    let item = "\(1)"
+    #^VARIABLE_DEFINED_IN_CLOSURE^#
+  }
+  // VARIABLE_DEFINED_IN_CLOSURE: Begin completions
+  // VARIABLE_DEFINED_IN_CLOSURE: Decl[LocalVar]/Local:               item[#String#]; name=item
+  // VARIABLE_DEFINED_IN_CLOSURE: End completions
+}
+
