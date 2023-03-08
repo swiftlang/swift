@@ -3532,11 +3532,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  auto resultMatchKind = subKind;
+  // Performance optimization: Propagate fully or partially resolved contextual
+  // type down into the body of result builder transformed closure by eagerly
+  // binding intermediate body result type to the contextual one. This helps to
+  // determine when closure body could be solved early.
+  //
+  // TODO: This could be extended to cover all multi-statement closures.
+  //
+  // See \c BindingSet::favoredOverConjunction for more details.
+  if (resultMatchKind >= ConstraintKind::Subtype &&
+      !func2->getResult()->isTypeVariableOrMember()) {
+    if (auto *closure = getAsExpr<ClosureExpr>(locator.trySimplifyToExpr())) {
+      if (!closure->hasExplicitResultType() &&
+          getAppliedResultBuilderTransform(closure)) {
+        resultMatchKind = ConstraintKind::Equal;
+      }
+    }
+  }
+
   // Result type can be covariant (or equal).
-  return matchTypes(func1->getResult(), func2->getResult(), subKind,
-                     subflags,
-                     locator.withPathElement(
-                       ConstraintLocator::FunctionResult));
+  return matchTypes(func1->getResult(), func2->getResult(), resultMatchKind,
+                    subflags,
+                    locator.withPathElement(ConstraintLocator::FunctionResult));
 }
 
 ConstraintSystem::TypeMatchResult
