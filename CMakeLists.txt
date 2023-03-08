@@ -1262,7 +1262,7 @@ else()
   if(SWIFT_BUILD_REMOTE_MIRROR)
     add_subdirectory(stdlib/public/LLVMSupport)
     add_subdirectory(stdlib/public/Demangling)
-    add_subdirectory(stdlib/public/Reflection)
+    add_subdirectory(stdlib/public/RemoteInspection)
     add_subdirectory(stdlib/public/SwiftRemoteMirror)
   endif()
 
