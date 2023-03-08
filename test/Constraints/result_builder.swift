@@ -1383,3 +1383,22 @@ testOptionalIfElseSequences()
 // CHECK-NEXT: second(Optional(main.B()), nil)
 // CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.first(main.C())))
 // CHECK-NEXT: second(nil, Optional(main.Either<main.C, main.D>.second(main.D())))
+
+// rdar://106364495 - ambiguous use of `buildFinalResult`
+func testBuildFinalResultDependentOnContextualType() {
+  @resultBuilder
+  struct MyBuilder {
+    static func buildBlock(_ v: Int) -> Int { v }
+    static func buildFinalResult(_ v: Int) -> Int { v }
+    static func buildFinalResult(_ v: Int) -> String { "" }
+  }
+
+  func test(@MyBuilder _ fn: () -> Int?) { print(fn()) }
+
+  test {
+    42
+  }
+}
+
+testBuildFinalResultDependentOnContextualType()
+// CHECK: Optional(42)
