@@ -6289,18 +6289,6 @@ public:
   }
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
-    // Make sure that each of the successors/predecessors of this basic block
-    // have this basic block in its predecessor/successor list.
-    for (const auto *SuccBB : BB->getSuccessorBlocks()) {
-      require(SuccBB->isPredecessorBlock(BB),
-              "Must be a predecessor of each successor.");
-    }
-
-    for (const SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
-      require(PredBB->isSuccessorBlock(BB),
-              "Must be a successor of each predecessor.");
-    }
-    
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
   }
@@ -6330,6 +6318,33 @@ public:
       if (VisitedBBs.contains(&BB))
         continue;
       visitSILBasicBlock(&BB);
+    }
+
+    verifyPredecessorSucessorStructure(F);
+  }
+
+  // Make sure that each of the successors/predecessors of a basic block
+  // have this basic block in its predecessor/successor list.
+  void verifyPredecessorSucessorStructure(SILFunction *f) {
+    using PredSuccPair = std::pair<SILBasicBlock *, SILBasicBlock *>;
+    llvm::DenseSet<PredSuccPair> foundSuccessors;
+    llvm::DenseSet<PredSuccPair> foundPredecessors;
+
+    for (auto &block : *f) {
+      for (SILBasicBlock *succ : block.getSuccessorBlocks()) {
+        foundSuccessors.insert({&block, succ});
+      }
+      for (SILBasicBlock *pred : block.getPredecessorBlocks()) {
+        foundPredecessors.insert({pred, &block});
+      }
+    }
+    for (PredSuccPair predSucc : foundSuccessors) {
+      require(foundPredecessors.contains(predSucc),
+              "block is not predecessor of its successor");
+    }
+    for (PredSuccPair predSucc : foundPredecessors) {
+      require(foundSuccessors.contains(predSucc),
+              "block is not successor of its predecessor");
     }
   }
 
