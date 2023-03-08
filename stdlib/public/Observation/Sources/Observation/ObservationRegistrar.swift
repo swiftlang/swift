@@ -80,9 +80,9 @@ extension ObservationRegistrar {
     keyPath: KeyPath<Subject, Member>
   ) {
     if let trackingPtr = _ThreadLocal.value?
-      .assumingMemoryBound(to: ObservationTracking.AccessList?.self) {
+      .assumingMemoryBound(to: ObservationTracking._AccessList?.self) {
       if trackingPtr.pointee == nil {
-        trackingPtr.pointee = ObservationTracking.AccessList()
+        trackingPtr.pointee = ObservationTracking._AccessList()
       }
       trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
     }
