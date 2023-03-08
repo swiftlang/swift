@@ -1172,11 +1172,11 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
 static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
                                                         CanTupleType type,
                                                         DynamicMetadataRequest request) {
-  SmallVector<Type, 2> types;
+  SmallVector<CanType, 2> types;
   types.append(type.getElementTypes().begin(),
                type.getElementTypes().end());
 
-  CanPackType packType = CanPackType(PackType::get(IGF.IGM.Context, types));
+  CanPackType packType = CanPackType::get(IGF.IGM.Context, types);
 
   auto *shapeExpression = IGF.emitPackShapeExpression(packType);
   auto addr = emitTypeMetadataPack(IGF, packType, MetadataState::Abstract);
