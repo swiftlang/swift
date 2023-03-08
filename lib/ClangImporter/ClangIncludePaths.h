@@ -17,12 +17,6 @@
 
 namespace swift {
 
-/// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
-/// We inject modulemaps for those libraries into their include directories
-/// to allow using them from Swift.
-SmallVector<std::pair<std::string, std::string>, 2>
-getClangInvocationFileMapping(ASTContext &ctx);
-
 Optional<SmallString<128>> getCxxShimModuleMapPath(SearchPathOptions &opts,
                                                    const llvm::Triple &triple);
 
