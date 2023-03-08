@@ -17,7 +17,7 @@
 // RUN: %target-swift-frontend -typecheck %t/MinimalClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify
-// RUN: %target-swift-frontend -typecheck %t/CompletnessClient.swift -I %t \
+// RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify
 
@@ -26,7 +26,7 @@
 // RUN:   -package-name TestPackage -swift-version 5 \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify
-// RUN: %target-swift-frontend -typecheck %t/CompletnessClient.swift -I %t \
+// RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify
@@ -121,8 +121,8 @@ public struct PrivateLibWrapper<T> {
 //--- MinimalClient.swift
 public import PublicLib
 package import PackageLib
-internal import InternalLib // expected-note@:1 {{module 'InternalLib' imported as 'internal' here}}
-fileprivate import FileprivateLib // expected-note@:1 1 {{module 'FileprivateLib' imported as 'fileprivate' here}}
+internal import InternalLib // expected-note@:1 {{type 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
+fileprivate import FileprivateLib // expected-note@:1 {{type 'FileprivateImportClass' imported as 'fileprivate' from 'FileprivateLib' here}}
 private import PrivateLib
 
 public func PublicFuncUsesInternal(_: InternalImportType) { // expected-error {{function cannot be declared public because its parameter uses an internal type}}
@@ -132,12 +132,16 @@ public func PublicFuncUsesInternal(_: InternalImportType) { // expected-error {{
 public class PublicSubclassFilepriovate : FileprivateImportClass {} // expected-error {{class cannot be declared public because its superclass is fileprivate}}
 
 /// More complete test.
-//--- CompletnessClient.swift
+//--- CompletenessClient.swift
 public import PublicLib
 package import PackageLib // expected-note * {{module 'PackageLib' imported as 'package' here}}
+// expected-note@-1 * {{imported as 'package' from 'PackageLib' here}}
 internal import InternalLib // expected-note * {{module 'InternalLib' imported as 'internal' here}}
+// expected-note@-1 * {{imported as 'internal' from 'InternalLib' here}}
 fileprivate import FileprivateLib // expected-note * {{module 'FileprivateLib' imported as 'fileprivate' here}}
+// expected-note@-1 * {{imported as 'fileprivate' from 'FileprivateLib' here}}
 private import PrivateLib // expected-note * {{module 'PrivateLib' imported as 'private' here}}
+// expected-note@-1 * {{imported as 'private' from 'PrivateLib' here}}
 
 // Public use sites
 public func PublicFuncUsesPublic(_: PublicImportType) {

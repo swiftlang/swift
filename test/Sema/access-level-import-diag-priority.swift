@@ -33,10 +33,10 @@ public struct PrivateImportType {}
 
 //--- Client.swift
 public import PublicLib
-package import PackageLib // expected-note {{module 'PackageLib' imported as 'package' here}}
-internal import InternalLib // expected-note {{module 'InternalLib' imported as 'internal' here}}
-fileprivate import FileprivateLib // expected-note 2 {{module 'FileprivateLib' imported as 'fileprivate' here}}
-private import PrivateLib // expected-note 2 {{module 'PrivateLib' imported as 'private' here}}
+package import PackageLib // expected-note {{type 'PackageImportType' imported as 'package' from 'PackageLib' here}}
+internal import InternalLib // expected-note {{type 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
+fileprivate import FileprivateLib // expected-note 2 {{type 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
+private import PrivateLib // expected-note 2 {{type 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
 
 /// Simple ordering
 public func publicFuncUsesPrivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType, e: PrivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a private type}}
@@ -64,7 +64,7 @@ public func publicFuncUsesPrivateScambled(_ a: PublicImportType, d: FileprivateI
 //--- LocalVsImportClient.swift
 public import PublicLib
 internal import InternalLib
-fileprivate import FileprivateLib // expected-note 1 {{module 'FileprivateLib' imported as 'fileprivate' here}}
+fileprivate import FileprivateLib // expected-note {{type 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
 
 fileprivate struct LocalType {} // expected-note 3 {{type declared here}}
 public func localVsImportedType1(a: LocalType, b: InternalImportType) {} // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}

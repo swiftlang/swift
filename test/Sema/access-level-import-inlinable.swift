@@ -71,10 +71,23 @@ public struct PrivateImportType {
 
 //--- Client.swift
 public import PublicLib
-package import PackageLib // expected-note 2 {{module 'PackageLib' imported as 'package' here}}
-internal import InternalLib // expected-note 12 {{module 'InternalLib' imported as 'internal' here}}
-fileprivate import FileprivateLib // expected-note 6 {{module 'FileprivateLib' imported as 'fileprivate' here}}
-private import PrivateLib // expected-note 6 {{module 'PrivateLib' imported as 'private' here}}
+
+package import PackageLib
+// expected-note@-1 2 {{struct 'PackageImportType' imported as 'package' from 'PackageLib' here}}
+
+internal import InternalLib
+// expected-note@-1 6 {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
+// expected-note@-2 4 {{protocol 'InternalImportProto' imported as 'internal' from 'InternalLib' here}}
+// expected-note@-3 2 {{global function 'InternalFunc()' imported as 'internal' from 'InternalLib' here}}
+
+fileprivate import FileprivateLib
+// expected-note@-1 2 {{generic struct 'FileprivateImportWrapper' imported as 'fileprivate' from 'FileprivateLib' here}}
+// expected-note@-2 2 {{initializer 'init(wrappedValue:)' imported as 'fileprivate' from 'FileprivateLib' here}}
+// expected-note@-3 2 {{protocol 'FileprivateImportProto' imported as 'fileprivate' from 'FileprivateLib' here}}
+
+private import PrivateLib
+// expected-note@-1 4 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
+ // expected-note@-2 2 {{initializer 'init()' imported as 'private' from 'PrivateLib' here}}
 
 public struct GenericType<T, U> {}
 
