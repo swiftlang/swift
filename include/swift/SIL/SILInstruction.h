@@ -8940,14 +8940,6 @@ public:
     return const_cast<TermInst *>(this)->getSingleSuccessorBlock();
   }
 
-  /// Returns true if \p BB is a successor of this block.
-  bool isSuccessorBlock(SILBasicBlock *BB) const {
-    auto Range = getSuccessorBlocks();
-    return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
-      return BB == SuccBB;
-    });
-  }
-
   using SuccessorBlockArgumentListTy =
       TransformRange<ConstSuccessorListTy, function_ref<ArrayRef<SILArgument *>(
                                                const SILSuccessor &)>>;
