@@ -1308,9 +1308,9 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   swift_unreachable("associated type names don't line up");
 }
 
-namespace {
-  static Lazy<Mutex> DynamicReplacementLock;
-}
+} // end unnamed namespace
+
+static Lazy<Mutex> DynamicReplacementLock;
 
 namespace {
 struct OpaqueTypeMappings {
@@ -1336,7 +1336,6 @@ struct OpaqueTypeMappings {
 
 static Lazy<OpaqueTypeMappings> opaqueTypeMappings;
 
-
 static const OpaqueTypeDescriptor *
 _findOpaqueTypeDescriptor(NodePointer demangleNode,
                           Demangler &dem) {
@@ -1354,6 +1353,8 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   // TODO: Find non-symbolic-referenced opaque decls.
   return nullptr;
 }
+
+namespace {
 
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
