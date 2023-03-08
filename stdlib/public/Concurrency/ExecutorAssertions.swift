@@ -13,6 +13,7 @@
 import Swift
 import SwiftShims
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
@@ -269,3 +270,4 @@ func _executorGetCurrentActiveExecutorName() -> String {
 }
 
 // TODO(ktoso): implement assume for distributed actors as well
+#endif // not SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
