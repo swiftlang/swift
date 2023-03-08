@@ -84,3 +84,16 @@ do {
   let _: (Int, Int).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int, Swift.Int)'}}
   let _: ((Int) -> Void).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int) -> Swift.Void'}}
 }
+
+// rdar://106446740 - source compatibility break - reference to inner type without `.self` used to work
+func test_inner_types_dont_require_self() {
+  struct Test {
+    enum E {}
+
+    func decode<T>(_: T.Type) {}
+
+    func test() {
+      decode(Self.E) // Ok
+    }
+  }
+}
