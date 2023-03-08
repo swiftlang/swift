@@ -1200,6 +1200,14 @@ _gatherGenericParameters(const ContextDescriptor *context,
     auto generics = context->getGenericContext();
     assert(generics);
     {
+      // Add a placeholder length for each shape class.
+      auto packShapeHeader = generics->getGenericPackShapeHeader();
+      if (packShapeHeader.NumShapeClasses > 0) {
+        assert(allGenericArgsVec.empty());
+        allGenericArgsVec.resize(packShapeHeader.NumShapeClasses);
+      }
+
+      // If we have the wrong number of generic arguments, fail.
       auto genericParams = generics->getGenericParams();
       unsigned n = genericParams.size();
       if (allGenericArgs.size() != n) {
@@ -1210,6 +1218,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
                  "generic args, expected " + std::to_string(n);
         });
       }
+
+      // Add metadata for each canonical generic parameter.
       for (unsigned i = 0; i != n; ++i) {
         const auto &param = genericParams[i];
         if (param.getKind() != GenericParamKind::Type) {
@@ -1223,9 +1233,23 @@ _gatherGenericParameters(const ContextDescriptor *context,
         if (param.hasKeyArgument())
           allGenericArgsVec.push_back(allGenericArgs[i]);
       }
-    }
 
-    // If we have the wrong number of generic arguments, fail.
+      // Fill in the length for each shape class.
+      auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+      for (auto packShapeDescriptor : packShapeDescriptors) {
+        if (packShapeDescriptor.Kind != GenericPackKind::Metadata)
+          continue;
+
+        assert(packShapeDescriptor.Index < allGenericArgsVec.size());
+        assert(packShapeDescriptor.ShapeClass < packShapeHeader.NumShapeClasses);
+
+        MetadataPackPointer pack(allGenericArgsVec[packShapeDescriptor.Index]);
+        assert(pack.getLifetime() == PackLifetime::OnHeap);
+
+        allGenericArgsVec[packShapeDescriptor.ShapeClass] =
+            reinterpret_cast<const void *>(pack.getNumElements());
+      }
+    }
 
     // Check whether the generic requirements are satisfied, collecting
     // any extra arguments we need for the instantiation function.

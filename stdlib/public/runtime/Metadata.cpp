@@ -1275,7 +1275,9 @@ swift_allocateMetadataPack(const Metadata * const *ptr, size_t count) {
   PackCacheEntry<Metadata>::Key key{ptr, count};
   auto bytes = MetadataPacks.getOrInsert(key).first->getElements();
 
-  return MetadataPackPointer(bytes, PackLifetime::OnHeap).getPointer();
+  MetadataPackPointer pack(bytes, PackLifetime::OnHeap);
+  assert(pack.getNumElements() == count);
+  return pack.getPointer();
 }
 
 /// The uniquing structure for witness table packs.
@@ -1292,7 +1294,9 @@ swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count) {
   PackCacheEntry<WitnessTable>::Key key{ptr, count};
   auto bytes = WitnessTablePacks.getOrInsert(key).first->getElements();
 
-  return WitnessTablePackPointer(bytes, PackLifetime::OnHeap).getPointer();
+  WitnessTablePackPointer pack(bytes, PackLifetime::OnHeap);
+  assert(pack.getNumElements() == count);
+  return pack.getPointer();
 }
 
 /***************************************************************************/

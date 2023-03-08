@@ -4944,6 +4944,14 @@ public:
   PackLifetime getLifetime() const {
     return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
   }
+
+  // Get the number of elements in the pack, only valid for on-heap packs.
+  size_t getNumElements() const {
+    if (getLifetime() == PackLifetime::OnHeap)
+      return *(reinterpret_cast<const size_t *>(Ptr & ~1) - 1);
+
+    fatalError(0, "Cannot get length of on-stack pack");
+  }
 };
 
 /// A pointer to a metadata pack.
