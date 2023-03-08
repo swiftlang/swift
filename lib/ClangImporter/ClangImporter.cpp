@@ -774,6 +774,23 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-mcx16");
   }
 
+  if (llvm::Optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
+    invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-root");
+    invocationArgStrs.emplace_back(*R);
+  }
+  if (llvm::Optional<StringRef> V = ctx.SearchPathOpts.getWinSDKVersion()) {
+    invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-version");
+    invocationArgStrs.emplace_back(*V);
+  }
+  if (llvm::Optional<StringRef> R = ctx.SearchPathOpts.getVCToolsRoot()) {
+    invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-root");
+    invocationArgStrs.emplace_back(*R);
+  }
+  if (llvm::Optional<StringRef> V = ctx.SearchPathOpts.getVCToolsVersion()) {
+    invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-version");
+    invocationArgStrs.emplace_back(*V);
+  }
+
   if (!importerOpts.Optimization.empty()) {
     invocationArgStrs.push_back(importerOpts.Optimization);
   }

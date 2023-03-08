@@ -1494,6 +1494,15 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_sdk))
     Opts.setSDKPath(A->getValue());
 
+  if (const Arg *A = Args.getLastArg(OPT_windows_sdk_root))
+    Opts.setWinSDKRoot(A->getValue());
+  if (const Arg *A = Args.getLastArg(OPT_windows_sdk_version))
+    Opts.setWinSDKVersion(A->getValue());
+  if (const Arg *A = Args.getLastArg(OPT_visualc_tools_root))
+    Opts.setVCToolsRoot(A->getValue());
+  if (const Arg *A = Args.getLastArg(OPT_visualc_tools_version))
+    Opts.setVCToolsVersion(A->getValue());
+
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
