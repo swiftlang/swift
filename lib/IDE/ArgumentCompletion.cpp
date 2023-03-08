@@ -350,6 +350,13 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
   }
 
   if (shouldPerformGlobalCompletion) {
+    llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
+    if (!Results.empty()) {
+      SolutionSpecificVarTypes = Results[0].SolutionSpecificVarTypes;
+    }
+
+    WithSolutionSpecificVarTypesRAII VarTypes(SolutionSpecificVarTypes);
+
     for (auto &Result : Results) {
       ExpectedTypes.push_back(Result.ExpectedType);
       Lookup.setSolutionSpecificVarTypes(Result.SolutionSpecificVarTypes);

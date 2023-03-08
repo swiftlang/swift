@@ -136,6 +136,11 @@ void swift::ide::getSolutionSpecificVarTypes(
   }
 }
 
+void WithSolutionSpecificVarTypesRAII::setInterfaceType(VarDecl *VD, Type Ty) {
+  VD->getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{VD},
+                                            std::move(Ty));
+}
+
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
                                                   Expr *CompletionExpr) {
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);

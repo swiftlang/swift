@@ -105,6 +105,8 @@ void ExprTypeCheckCompletionCallback::deliverResults(
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
 
   for (auto &Result : Results) {
+    WithSolutionSpecificVarTypesRAII VarTypes(Result.SolutionSpecificVarTypes);
+
     Lookup.setExpectedTypes(ExpectedTypes,
                             Result.IsImplicitSingleExpressionReturn);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
