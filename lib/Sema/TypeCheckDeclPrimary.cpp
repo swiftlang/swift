@@ -3625,12 +3625,23 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Only check again for destructor decl outside of a class if our dstructor
+    // Only check again for destructor decl outside of a class if our destructor
     // is not marked as invalid.
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
       if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
-        DD->diagnose(diag::destructor_decl_outside_class);
+        DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+      }
+
+      // If we have a noncopyable type, check if we have an @objc enum with a
+      // deinit and emit a specialized error. We will have technically already
+      // emitted an error since @objc enum cannot be marked noncopyable, but
+      // this at least makes it a bit clearer to the user that the deinit is
+      // also incorrect.
+      if (auto *e = dyn_cast_or_null<EnumDecl>(nom)) {
+        if (e->isObjC()) {
+          DD->diagnose(diag::destructor_decl_on_objc_enum);
+        }
       }
     }
 
