@@ -422,13 +422,17 @@ private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     return nil
   }
 
-  // Dig out its parent.
-  guard let parentSyntax = token.parent else {
-    print("not on a macro expansion node: \(token.recursiveDescription)")
-    return nil
+  var currentSyntax = Syntax(token)
+  while let parentSyntax = currentSyntax.parent {
+    if let typedParent = parentSyntax.as(type) {
+      return typedParent
+    }
+
+    currentSyntax = parentSyntax
   }
 
-  return parentSyntax.as(type)
+  print("unable to find node: \(token.recursiveDescription)")
+  return nil
 }
 
 @_cdecl("swift_ASTGen_expandAttachedMacro")
