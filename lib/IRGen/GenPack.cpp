@@ -1023,8 +1023,10 @@ StackAddress irgen::allocatePack(IRGenFunction &IGF, CanSILPackType packType) {
         IGF.IGM.OpaquePtrTy, elementCount);
 
     auto addr = IGF.createAlloca(allocType, IGF.IGM.getPointerAlignment());
-    IGF.Builder.CreateLifetimeStart(addr,
-                                elementSize * elementCount);
+    IGF.Builder.CreateLifetimeStart(addr, elementSize * elementCount);
+
+    // We have an [N x opaque*]*; we need an opaque**.
+    addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.OpaquePtrTy);
     return addr;
   }
 
