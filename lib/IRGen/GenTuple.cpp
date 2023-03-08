@@ -36,6 +36,7 @@
 #include "Explosion.h"
 #include "IndirectTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "ResilientTypeInfo.h"
 
 #include "GenTuple.h"
 
@@ -43,6 +44,33 @@
 
 using namespace swift;
 using namespace irgen;
+
+namespace {
+  /// A type implementation for tuple types with a dynamic number of
+  /// elements, that is, that contain pack expansion types. For now,
+  /// these are completely abstract.
+  class DynamicTupleTypeInfo
+      : public ResilientTypeInfo<DynamicTupleTypeInfo>
+  {
+  public:
+    DynamicTupleTypeInfo(llvm::Type *T,
+                         IsCopyable_t copyable)
+      : ResilientTypeInfo(T, copyable, IsABIAccessible) {}
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+    }
+  };
+} // end anonymous namespace
+
+const TypeInfo *
+TypeConverter::convertDynamicTupleType(IsCopyable_t copyable) {
+  llvm::Type *storageType = IGM.OpaqueTy;
+  return new DynamicTupleTypeInfo(storageType, copyable);
+}
 
 namespace {
   class TupleFieldInfo : public RecordField<TupleFieldInfo> {
@@ -488,6 +516,11 @@ namespace {
 } // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
+  if (tuple->containsPackExpansionType()) {
+    // FIXME: Figure out if its copyable at least
+    return &getDynamicTupleTypeInfo(IsCopyable);
+  }
+
   TupleTypeBuilder builder(IGM, SILType::getPrimitiveAddressType(CanType(tuple)));
   return builder.layout(tuple->getElements());
 }

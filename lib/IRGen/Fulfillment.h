@@ -37,10 +37,10 @@ struct Fulfillment {
     : SourceIndex(sourceIndex), State(unsigned(state)), Path(std::move(path)) {}
 
   /// The source index.
-  unsigned SourceIndex : 30;
+  uint64_t SourceIndex : 56;
 
   /// The state of the metadata at the fulfillment.
-  unsigned State : 2;
+  uint64_t State : 8;
 
   /// The path from the source metadata.
   MetadataPath Path;
