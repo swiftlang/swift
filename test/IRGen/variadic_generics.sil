@@ -131,6 +131,7 @@ exit:
 // CHECK-LABEL: define {{.*}}@test_pack_alloc_2_static
 // CHECK:         [[STACK:%[^,]+]] = alloca [2 x %swift.opaque*]
 // CHECK:         call void @llvm.lifetime.start.p0i8
+// CHECK:         [[CAST:%.*]] = bitcast [2 x %swift.opaque*]* [[STACK]] to %swift.opaque**
 // CHECK:         call void @llvm.lifetime.end.p0i8
 sil @test_pack_alloc_2_static : $<each T> () -> () {
   %addr = alloc_pack $Pack{Int, Int}
