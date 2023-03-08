@@ -75,64 +75,57 @@ struct S4 { }
 // RUN:   %s \
 // RUN: )
 
-//##-- cursor-info at '#' position. Cursor doesn't resolve but we will still
-// get refactorings. Should fix that in the new cursor info.
-// RUN: %sourcekitd-test -req=cursor -pos=4:7 -cursor-action %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_POUND %s
-// CURSOR_POUND-NOT: source.lang.swift.ref.macro
-// CURSOR_POUND-LABEL: ACTIONS BEGIN
-// CURSOR_POUND: source.refactoring.kind.expand.macro
-// CURSOR_POUND-NEXT: Expand Macro
-// CURSOR_POUND: ACTIONS END
+//##-- cursor-info on macro expression
+// RUN: %sourcekitd-test -req=cursor -pos=4:7 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_MACRO_EXPR %s
+// RUN: %sourcekitd-test -req=cursor -pos=4:8 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_MACRO_EXPR %s
+// CURSOR_MACRO_EXPR: source.lang.swift.ref.macro (1:33-1:42)
+// CURSOR_MACRO_EXPR: (T) -> (T, String)
+// CURSOR_MACRO_EXPR: <Declaration>@freestanding(expression) macro stringify&lt;T&gt;(_ value: <Type usr="s:9MacroUser1TL_xmfp">T</Type>) -&gt; (<Type usr="s:9MacroUser1TL_xmfp">T</Type>, <Type usr="s:SS">String</Type>) = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</Declaration>
+// CURSOR_MACRO_EXPR: <decl.macro><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@freestanding</syntaxtype.attribute.name>(expression)</syntaxtype.attribute.builtin> <syntaxtype.keyword>macro</syntaxtype.keyword> <decl.name>stringify</decl.name>&lt;<decl.generic_type_param usr="s:9MacroUser1TL_xmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>value</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype> = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</decl.macro>
+// CURSOR_MACRO_EXPR-LABEL: SYMBOL GRAPH BEGIN
+// CURSOR_MACRO_EXPR: "identifier": {
+// CURSOR_MACRO_EXPR-NEXT:   "interfaceLanguage": "swift",
+// CURSOR_MACRO_EXPR-NEXT:   "precise": "s:9MacroUser9stringifyyx_SStxclufm"
+// CURSOR_MACRO_EXPR-NEXT: },
+// CURSOR_MACRO_EXPR-NEXT: "kind": {
+// CURSOR_MACRO_EXPR-NEXT:   "displayName": "Macro",
+// CURSOR_MACRO_EXPR-NEXT:   "identifier": "swift.macro"
+// CURSOR_MACRO_EXPR-NEXT: },
+// CURSOR_MACRO_EXPR: SYMBOL GRAPH END
+// CURSOR_MACRO_EXPR-LABEL: ACTIONS BEGIN
+// CURSOR_MACRO_EXPR: source.refactoring.kind.rename.global
+// CURSOR_MACRO_EXPR-NEXT: Global Rename
+// CURSOR_MACRO_EXPR: source.refactoring.kind.expand.macro
+// CURSOR_MACRO_EXPR-NEXT: Expand Macro
+// CURSOR_MACRO_EXPR: ACTIONS END
 
-//##-- cursor-info at 'stringify' position.
-// RUN: %sourcekitd-test -req=cursor -pos=4:8 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_MACRONAME %s
-// CURSOR_MACRONAME: source.lang.swift.ref.macro (1:33-1:42)
-// CURSOR_MACRONAME: (T) -> (T, String)
-// CURSOR_MACRONAME: <Declaration>@freestanding(expression) macro stringify&lt;T&gt;(_ value: <Type usr="s:9MacroUser1TL_xmfp">T</Type>) -&gt; (<Type usr="s:9MacroUser1TL_xmfp">T</Type>, <Type usr="s:SS">String</Type>) = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</Declaration>
-// CURSOR_MACRONAME: <decl.macro><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@freestanding</syntaxtype.attribute.name>(expression)</syntaxtype.attribute.builtin> <syntaxtype.keyword>macro</syntaxtype.keyword> <decl.name>stringify</decl.name>&lt;<decl.generic_type_param usr="s:9MacroUser1TL_xmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>value</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="s:9MacroUser1TL_xmfp">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype> = #externalMacro(module: &quot;MacroDefinition&quot;, type: &quot;StringifyMacro&quot;)</decl.macro>
-// CURSOR_MACRONAME-LABEL: SYMBOL GRAPH BEGIN
-// CURSOR_MACRONAME: "identifier": {
-// CURSOR_MACRONAME-NEXT:   "interfaceLanguage": "swift",
-// CURSOR_MACRONAME-NEXT:   "precise": "s:9MacroUser9stringifyyx_SStxclufm"
-// CURSOR_MACRONAME-NEXT: },
-// CURSOR_MACRONAME-NEXT: "kind": {
-// CURSOR_MACRONAME-NEXT:   "displayName": "Macro",
-// CURSOR_MACRONAME-NEXT:   "identifier": "swift.macro"
-// CURSOR_MACRONAME-NEXT: },
-// CURSOR_MACRONAME: SYMBOL GRAPH END
-// CURSOR_MACRONAME-LABEL: ACTIONS BEGIN
-// CURSOR_MACRONAME: source.refactoring.kind.rename.global
-// CURSOR_MACRONAME-NEXT: Global Rename
-// CURSOR_MACRONAME: source.refactoring.kind.expand.macro
-// CURSOR_MACRONAME-NEXT: Expand Macro
-// CURSOR_MACRONAME: ACTIONS END
-
-//##-- Refactoring at both position.
+//##-- Refactoring on macro expression
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=4:7 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND %s
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=4:8 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND %s
-
 // EXPAND: source.edit.kind.active:
 // EXPAND-NEXT: 4:7-4:24 (@__swiftmacro_9MacroUser13testStringify1a1bySi_SitF9stringifyfMf_.swift) "(a + b, "a + b")"
 
-//##-- cursor-info at 'myTypeWrapper' position following @. We don't support
-// on the @ currently.
-// RUN: %sourcekitd-test -req=cursor -pos=21:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED_MACRO %s
-// CURSOR_ATTACHED_MACRO-LABEL: SYMBOL GRAPH BEGIN
-// CURSOR_ATTACHED_MACRO: "identifier": {
-// CURSOR_ATTACHED_MACRO-NEXT:   "interfaceLanguage": "swift",
-// CURSOR_ATTACHED_MACRO-NEXT:   "precise": "s:9MacroUser13myTypeWrapperyycfm"
-// CURSOR_ATTACHED_MACRO-NEXT: },
-// CURSOR_ATTACHED_MACRO-NEXT: "kind": {
-// CURSOR_ATTACHED_MACRO-NEXT:   "displayName": "Macro",
-// CURSOR_ATTACHED_MACRO-NEXT:   "identifier": "swift.macro"
-// CURSOR_ATTACHED_MACRO-NEXT: },
-// CURSOR_ATTACHED_MACRO: SYMBOL GRAPH END
-// CURSOR_ATTACHED_MACRO-LABEL: ACTIONS BEGIN
-// CURSOR_ATTACHED_MACRO: source.refactoring.kind.expand.macro
-// CURSOR_ATTACHED_MACRO-NEXT: Expand Macro
-// CURSOR_ATTACHED_MACRO: ACTIONS END
+//##-- cursor-info on attached macro
+// RUN: %sourcekitd-test -req=cursor -pos=21:1 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED %s
+// RUN: %sourcekitd-test -req=cursor -pos=21:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED %s
+// CURSOR_ATTACHED: source.lang.swift.ref.macro (9:7-9:20)
+// CURSOR_ATTACHED-LABEL: SYMBOL GRAPH BEGIN
+// CURSOR_ATTACHED: "identifier": {
+// CURSOR_ATTACHED-NEXT:   "interfaceLanguage": "swift",
+// CURSOR_ATTACHED-NEXT:   "precise": "s:9MacroUser13myTypeWrapperyycfm"
+// CURSOR_ATTACHED-NEXT: },
+// CURSOR_ATTACHED-NEXT: "kind": {
+// CURSOR_ATTACHED-NEXT:   "displayName": "Macro",
+// CURSOR_ATTACHED-NEXT:   "identifier": "swift.macro"
+// CURSOR_ATTACHED-NEXT: },
+// CURSOR_ATTACHED: SYMBOL GRAPH END
+// CURSOR_ATTACHED-LABEL: ACTIONS BEGIN
+// CURSOR_ATTACHED: source.refactoring.kind.expand.macro
+// CURSOR_ATTACHED-NEXT: Expand Macro
+// CURSOR_ATTACHED: ACTIONS END
 
-//##-- Refactoring expanding the attached macro
+//##-- Refactoring on attached macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=21:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ATTACHED_EXPAND %s
 // ATTACHED_EXPAND: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 23:3-23:3 (@__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift) "@accessViaStorage "
@@ -146,7 +139,7 @@ struct S4 { }
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 21:1-21:15 ""
 
-//##-- Refactoring expanding the attribute expanded by @myTypeWrapper
+//##-- Refactoring on the attribute expanded by @myTypeWrapper
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=1:2 @__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_EXPAND %s
 // NESTED_ATTACHED_EXPAND: source.edit.kind.active:
 // NESTED_ATTACHED_EXPAND-NEXT: Macros/macro_basic.swift 23:13-23:13 (@__swiftmacro_9MacroUser1SV1xSivp16accessViaStoragefMa_.swift) "{
