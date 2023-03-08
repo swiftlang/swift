@@ -427,11 +427,6 @@ public:
     return getTerminator()->getSingleSuccessorBlock();
   }
 
-  /// Returns true if \p BB is a successor of this block.
-  bool isSuccessorBlock(SILBasicBlock *Block) const {
-    return getTerminator()->isSuccessorBlock(Block);
-  }
-
   using SuccessorBlockListTy = TermInst::SuccessorBlockListTy;
   using ConstSuccessorBlockListTy = TermInst::ConstSuccessorBlockListTy;
 
@@ -457,12 +452,6 @@ public:
 
   iterator_range<pred_iterator> getPredecessorBlocks() const {
     return {pred_begin(), pred_end()};
-  }
-
-  bool isPredecessorBlock(SILBasicBlock *BB) const {
-    return any_of(
-        getPredecessorBlocks(),
-        [&BB](const SILBasicBlock *PredBB) -> bool { return BB == PredBB; });
   }
 
   SILBasicBlock *getSinglePredecessorBlock() {
