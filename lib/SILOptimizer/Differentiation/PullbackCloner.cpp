@@ -2515,12 +2515,11 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
 
     // Get predecessor terminator operands.
     SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-
-    // Returns true if the given terminator instruction is a `switch_enum` on
-    // an `Optional`-typed value. `switch_enum` instructions require
-    // special-case adjoint value propagation for the operand.
-    auto isSwitchEnumInstOnOptional =
+    if (bbArg->getSingleTerminatorOperands(incomingValues)) {
+      // Returns true if the given terminator instruction is a `switch_enum` on
+      // an `Optional`-typed value. `switch_enum` instructions require
+      // special-case adjoint value propagation for the operand.
+      auto isSwitchEnumInstOnOptional =
         [&ctx = getASTContext()](TermInst *termInst) {
           if (!termInst)
             return false;
@@ -2531,49 +2530,52 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           return false;
         };
 
-    // Check the tangent value category of the active basic block argument.
-    switch (getTangentValueCategory(bbArg)) {
-    // If argument has a loadable tangent value category: materialize adjoint
-    // value of the argument, create a copy, and set the copy as the adjoint
-    // value of incoming values.
-    case SILValueCategory::Object: {
-      auto bbArgAdj = getAdjointValue(bb, bbArg);
-      auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
-      auto concreteBBArgAdjCopy =
+      // Check the tangent value category of the active basic block argument.
+      switch (getTangentValueCategory(bbArg)) {
+        // If argument has a loadable tangent value category: materialize adjoint
+        // value of the argument, create a copy, and set the copy as the adjoint
+        // value of incoming values.
+      case SILValueCategory::Object: {
+        auto bbArgAdj = getAdjointValue(bb, bbArg);
+        auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
+        auto concreteBBArgAdjCopy =
           builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
-      for (auto pair : incomingValues) {
-        auto *predBB = std::get<0>(pair);
-        auto incomingValue = std::get<1>(pair);
-        // Handle `switch_enum` on `Optional`.
-        auto termInst = bbArg->getSingleTerminator();
-        if (isSwitchEnumInstOnOptional(termInst)) {
-          accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
-        } else {
-          blockTemporaries[getPullbackBlock(predBB)].insert(
+        for (auto pair : incomingValues) {
+          pair.second->dump();
+          auto *predBB = std::get<0>(pair);
+          auto incomingValue = std::get<1>(pair);
+          // Handle `switch_enum` on `Optional`.
+          auto termInst = bbArg->getSingleTerminator();
+          if (isSwitchEnumInstOnOptional(termInst)) {
+            accumulateAdjointForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+          } else {
+            blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);
-          setAdjointValue(predBB, incomingValue,
-                          makeConcreteAdjointValue(concreteBBArgAdjCopy));
+            setAdjointValue(predBB, incomingValue,
+                            makeConcreteAdjointValue(concreteBBArgAdjCopy));
+          }
         }
+        break;
       }
-      break;
-    }
-    // If argument has an address tangent value category: materialize adjoint
-    // value of the argument, create a copy, and set the copy as the adjoint
-    // value of incoming values.
-    case SILValueCategory::Address: {
-      auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
-      for (auto pair : incomingValues) {
-        auto incomingValue = std::get<1>(pair);
-        // Handle `switch_enum` on `Optional`.
-        auto termInst = bbArg->getSingleTerminator();
-        if (isSwitchEnumInstOnOptional(termInst))
-          accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
-        else
-          addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
+      // If argument has an address tangent value category: materialize adjoint
+      // value of the argument, create a copy, and set the copy as the adjoint
+      // value of incoming values.
+      case SILValueCategory::Address: {
+        auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
+        for (auto pair : incomingValues) {
+          auto incomingValue = std::get<1>(pair);
+          // Handle `switch_enum` on `Optional`.
+          auto termInst = bbArg->getSingleTerminator();
+          if (isSwitchEnumInstOnOptional(termInst))
+            accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
+          else
+            addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
+        }
+        break;
       }
-      break;
-    }
-    }
+      }
+    } else
+      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
 
   // 3. Build the pullback successor cases for the `switch_enum`

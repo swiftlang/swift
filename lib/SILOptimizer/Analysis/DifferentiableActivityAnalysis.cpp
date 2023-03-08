@@ -303,15 +303,25 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
     return;
   }
   setUseful(value, dependentVariableIndex);
+
   // If the given value is a basic block argument, propagate usefulness to
   // incoming values.
   if (auto *bbArg = dyn_cast<SILPhiArgument>(value)) {
     SmallVector<SILValue, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-    for (auto incomingValue : incomingValues)
-      setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
-    return;
+    if (bbArg->getSingleTerminatorOperands(incomingValues)) {
+      for (auto incomingValue : incomingValues)
+        setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
+      return;
+    } else if (bbArg->isTerminatorResult()) {
+      if (TryApplyInst *tai = dyn_cast<TryApplyInst>(bbArg->getTerminatorForResult())) {
+        propagateUseful(tai, dependentVariableIndex);
+        return;
+      } else
+        llvm::report_fatal_error("unknown terminator with result");
+   } else
+      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
+  
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;

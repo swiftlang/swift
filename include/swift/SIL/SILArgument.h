@@ -178,7 +178,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
@@ -188,7 +188,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
           &returnedSingleTermOperands) const;
 
@@ -303,7 +303,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
@@ -313,7 +313,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
           &returnedSingleTermOperands) const;
 
