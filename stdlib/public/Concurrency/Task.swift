@@ -186,6 +186,7 @@ extension Task: Equatable {
   }
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Error {
     @_spi(MainActorUtilities)
@@ -204,7 +205,9 @@ extension Task where Failure == Error {
         return Task<Success, Error>(task)
     }
 }
+#endif
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Never {
     @_spi(MainActorUtilities)
@@ -223,6 +226,7 @@ extension Task where Failure == Never {
         return Task(task)
     }
 }
+#endif
 
 // ==== Task Priority ----------------------------------------------------------
 
