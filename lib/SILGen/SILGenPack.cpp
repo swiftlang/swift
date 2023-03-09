@@ -194,53 +194,6 @@ void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
   }
 }
 
-static CanPackType getInducedFormalPackType(CanSILPackType packType) {
-  auto &ctx = packType->getASTContext();
-  auto loweredEltTypes = packType.getElementTypes();
-
-  // Build an array of formal element types, but be lazy about it:
-  // use the original array unless we see an element type that doesn't
-  // work as a legal format type.
-  Optional<SmallVector<CanType, 4>> formalEltTypes;
-  for (auto i : indices(loweredEltTypes)) {
-    auto loweredEltType = loweredEltTypes[i];
-    bool isLegal = loweredEltType->isLegalFormalType();
-
-    // If the type isn't legal as a formal type, substitute the empty
-    // tuple type (or an invariant expansion of it over the count type).
-    CanType formalEltType = loweredEltType;
-    if (!isLegal) {
-      formalEltType = TupleType::getEmpty(ctx);
-      if (auto expansion = dyn_cast<PackExpansionType>(loweredEltType))
-        formalEltType = CanPackExpansionType::get(formalEltType,
-                                                  expansion.getCountType());
-    }
-
-    // If we're already building an array, unconditionally append to it.
-    // Otherwise, if the type isn't legal, build the array up to this
-    // point and then append.  Otherwise, we're still being lazy.
-    if (formalEltTypes) {
-      formalEltTypes->push_back(formalEltType);
-    } else if (!isLegal) {
-      formalEltTypes.emplace();
-      formalEltTypes->reserve(loweredEltTypes.size());
-      formalEltTypes->append(loweredEltTypes.begin(),
-                             loweredEltTypes.begin() + i);
-      formalEltTypes->push_back(formalEltType);
-    }
-
-    assert(isLegal || formalEltTypes.hasValue());
-  }
-
-  // Use the array we built if we made one (if we ever saw a non-legal
-  // element type).
-  if (formalEltTypes) {
-    return CanPackType::get(ctx, *formalEltTypes);
-  } else {
-    return CanPackType::get(ctx, loweredEltTypes);
-  }
-}
-
 ManagedValue
 SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
                                            CanPackType formalPackType) {
@@ -252,7 +205,7 @@ SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
   // the lowered pack type.
   auto packType = addr->getType().castTo<SILPackType>();
   if (!formalPackType)
-    formalPackType = getInducedFormalPackType(packType);
+    formalPackType = packType->getApproximateFormalPackType();
 
   // Enter a cleanup for the pack.
   auto cleanup = enterDestroyPackCleanup(addr, formalPackType);

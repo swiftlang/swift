@@ -479,8 +479,75 @@ bool SILPackType::containsPackExpansionType() const {
 }
 
 CanPackType
+CanTupleType::getInducedPackTypeImpl(CanTupleType tuple) {
+  return getInducedPackTypeImpl(tuple, 0, tuple->getNumElements());
+}
+
+CanPackType
 CanTupleType::getInducedPackTypeImpl(CanTupleType tuple, unsigned start, unsigned count) {
   assert(start + count <= tuple->getNumElements() && "range out of range");
   auto &ctx = tuple->getASTContext();
   return CanPackType::get(ctx, tuple.getElementTypes().slice(start, count));
+}
+
+static CanType getApproximateFormalElementType(const ASTContext &ctx,
+                                               CanType loweredEltType) {
+  CanType formalEltType = TupleType::getEmpty(ctx);
+  if (auto expansion = dyn_cast<PackExpansionType>(loweredEltType))
+    formalEltType = CanPackExpansionType::get(formalEltType,
+                                              expansion.getCountType());
+  return formalEltType;
+}
+
+template <class Collection>
+static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
+                                                Collection loweredEltTypes) {
+  // Build an array of formal element types, but be lazy about it:
+  // use the original array unless we see an element type that doesn't
+  // work as a legal format type.
+  Optional<SmallVector<CanType, 4>> formalEltTypes;
+  for (auto i : indices(loweredEltTypes)) {
+    auto loweredEltType = loweredEltTypes[i];
+    bool isLegal = loweredEltType->isLegalFormalType();
+
+    // If the type isn't legal as a formal type, substitute the empty
+    // tuple type (or an invariant expansion of it over the count type).
+    CanType formalEltType = loweredEltType;
+    if (!isLegal) {
+      formalEltType = getApproximateFormalElementType(ctx, loweredEltType);
+    }
+
+    // If we're already building an array, unconditionally append to it.
+    // Otherwise, if the type isn't legal, build the array up to this
+    // point and then append.  Otherwise, we're still being lazy.
+    if (formalEltTypes) {
+      formalEltTypes->push_back(formalEltType);
+    } else if (!isLegal) {
+      formalEltTypes.emplace();
+      formalEltTypes->reserve(loweredEltTypes.size());
+      formalEltTypes->append(loweredEltTypes.begin(),
+                             loweredEltTypes.begin() + i);
+      formalEltTypes->push_back(formalEltType);
+    }
+
+    assert(isLegal || formalEltTypes.hasValue());
+  }
+
+  // Use the array we built if we made one (if we ever saw a non-legal
+  // element type).
+  if (formalEltTypes) {
+    return CanPackType::get(ctx, *formalEltTypes);
+  } else {
+    return CanPackType::get(ctx, loweredEltTypes);
+  }
+}
+
+CanPackType SILPackType::getApproximateFormalPackType() const {
+  return ::getApproximateFormalPackType(getASTContext(), getElementTypes());
+}
+
+CanPackType
+CanTupleType::getInducedApproximateFormalPackTypeImpl(CanTupleType tuple) {
+  return ::getApproximateFormalPackType(tuple->getASTContext(),
+                                        tuple.getElementTypes());
 }
