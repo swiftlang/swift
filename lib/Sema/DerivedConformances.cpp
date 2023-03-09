@@ -334,8 +334,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // Actor.unownedExecutor
-    if (name.isSimpleName(ctx.Id_unownedExecutor))
-      return getRequirement(KnownProtocolKind::Actor);
+    if (name.isSimpleName(ctx.Id_unownedExecutor)) {
+      if (nominal->isDistributedActor()) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      } else {
+        return getRequirement(KnownProtocolKind::Actor);
+      }
+    }
 
     // DistributedActor.id
     if (name.isSimpleName(ctx.Id_id))

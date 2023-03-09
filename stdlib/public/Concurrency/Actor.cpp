@@ -1828,9 +1828,11 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto currentExecutor =
     (trackingInfo ? trackingInfo->getActiveExecutor()
                   : ExecutorRef::generic());
-  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch from executor %p to %p", task,
+  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch from executor %p to %p %s", task,
                        currentExecutor.getIdentity(),
-                       newExecutor.getIdentity());
+                       newExecutor.getIdentity(),
+                       newExecutor.isMainExecutor() ? " (MainActorExecutor)" :
+                       newExecutor.isGeneric() ? " (GenericExecutor)" : "");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
