@@ -3097,6 +3097,9 @@ public:
 
   void checkTupleInst(TupleInst *TI) {
     CanTupleType ResTy = requireObjectType(TupleType, TI, "Result of tuple");
+    require(!ResTy.containsPackExpansionType(),
+            "tuple instruction cannot be used with tuples containing "
+            "pack expansions");
 
     require(TI->getElements().size() == ResTy->getNumElements(),
             "Tuple field count mismatch!");
@@ -3288,6 +3291,10 @@ public:
   void checkTupleExtractInst(TupleExtractInst *EI) {
     CanTupleType operandTy = requireObjectType(TupleType, EI->getOperand(),
                                                "Operand of tuple_extract");
+    require(!operandTy.containsPackExpansionType(),
+            "tuple_extract cannot be used with tuples containing "
+            "pack expansions");
+
     require(EI->getType().isObject(),
             "result of tuple_extract must be object");
 
@@ -3343,21 +3350,21 @@ public:
   }
 
   void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
-    SILType operandTy = EI->getOperand()->getType();
-    require(operandTy.isAddress(),
-            "must derive element_addr from address");
     require(EI->getType().isAddress(),
             "result of tuple_element_addr must be address");
-    require(operandTy.is<TupleType>(),
-            "must derive tuple_element_addr from tuple");
+    SILType operandTy = EI->getOperand()->getType();
+    auto tupleType = requireAddressType(TupleType, operandTy,
+            "operand of tuple_element_addr must be the address of a tuple");
+    require(!tupleType.containsPackExpansionType(),
+            "tuple_element_addr cannot be used with tuples containing "
+            "pack expansions");
 
-    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getElements();
-    require(EI->getFieldIndex() < fields.size(),
-            "invalid field index for element_addr instruction");
+    require(EI->getFieldIndex() < tupleType->getNumElements(),
+            "invalid field index for tuple_element_addr instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           EI->getType().getASTType(),
-          CanType(fields[EI->getFieldIndex()].getType()),
+          tupleType.getElementType(EI->getFieldIndex()),
           "type of tuple_element_addr does not match type of element");
     }
   }

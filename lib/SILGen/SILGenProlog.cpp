@@ -68,7 +68,8 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
 namespace {
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ ManagedValue,
-                                              /*ArgTys...*/ AbstractionPattern>
+                                              /*ArgTys...*/ AbstractionPattern,
+                                              Initialization *>
 {
 public:
   SILGenFunction &SGF;
@@ -87,24 +88,7 @@ public:
         isNoImplicitCopy(isNoImplicitCopy),
         lifetimeAnnotation(lifetimeAnnotation) {}
 
-  ManagedValue visitType(CanType t, AbstractionPattern orig) {
-    return visitType(t, orig, /*isInOut=*/false);
-  }
-
-  ManagedValue visitType(CanType t, AbstractionPattern orig, bool isInOut) {
-    // The calling convention always uses minimal resilience expansion but
-    // inside the function we lower/expand types in context of the current
-    // function.
-    auto argType = SGF.SGM.Types.getLoweredType(t, SGF.getTypeExpansionContext());
-    auto argTypeConv =
-        SGF.SGM.Types.getLoweredType(t, TypeExpansionContext::minimal());
-    argType = argType.getCategoryType(argTypeConv.getCategory());
-
-    if (isInOut || (orig.getParameterConvention(SGF.SGM.Types) ==
-                        AbstractionPattern::Indirect &&
-                    SGF.SGM.M.useLoweredAddresses()))
-      argType = argType.getCategoryType(SILValueCategory::Address);
-
+  ManagedValue claimNextParameter() {
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
@@ -114,15 +98,35 @@ public:
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy,
         lifetimeAnnotation);
+    return mv;
+  }
+
+  ManagedValue visitType(CanType t, AbstractionPattern orig,
+                         Initialization *emitInto) {
+    auto mv = claimNextParameter();
+    return handleScalar(mv, orig, t, emitInto, /*inout*/ false);
+  }
+
+  ManagedValue handleInOut(AbstractionPattern orig, CanType t) {
+    auto mv = claimNextParameter();
+    return handleScalar(mv, orig, t, /*emitInto*/ nullptr, /*inout*/ true);
+  }
+
+  ManagedValue handleScalar(ManagedValue mv,
+                            AbstractionPattern orig, CanType t,
+                            Initialization *emitInto, bool isInOut) {
+    assert(!(isInOut && emitInto != nullptr));
+
+    auto argType = SGF.getLoweredType(t, mv.getType().getCategory());
 
     // This is a hack to deal with the fact that Self.Type comes in as a static
     // metatype, but we have to downcast it to a dynamic Self metatype to get
     // the right semantics.
-    if (argType != paramType) {
+    if (argType != mv.getType()) {
       if (auto argMetaTy = argType.getAs<MetatypeType>()) {
         if (auto argSelfTy = dyn_cast<DynamicSelfType>(argMetaTy.getInstanceType())) {
           assert(argSelfTy.getSelfType()
-                   == paramType.castTo<MetatypeType>().getInstanceType());
+                   == mv.getType().castTo<MetatypeType>().getInstanceType());
           mv = SGF.B.createUncheckedBitCast(loc, mv, argType);
         }
       }
@@ -149,7 +153,8 @@ public:
       }
     }
 
-    if (argType.getASTType() != paramType.getASTType()) {
+    assert(argType.getCategory() == mv.getType().getCategory());
+    if (argType.getASTType() != mv.getType().getASTType()) {
       // Reabstract the value if necessary.
       mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
     }
@@ -174,37 +179,98 @@ public:
       SILValue blockCopy = SGF.B.createCopyBlock(loc, mv.getValue());
       mv = SGF.emitManagedRValueWithCleanup(blockCopy);
     }
+
+    if (emitInto) {
+      if (mv.isPlusOne(SGF))
+        mv.forwardInto(SGF, loc, emitInto);
+      else
+        mv.copyInto(SGF, loc, emitInto);
+      return ManagedValue::forInContext();
+    }
+
     return mv;
   }
 
   ManagedValue visitPackExpansionType(CanPackExpansionType t,
-                                      AbstractionPattern orig) {
+                                      AbstractionPattern orig,
+                                      Initialization *emitInto) {
     // Pack expansions in the formal parameter list are made
     // concrete as packs.
     return visitType(PackType::get(SGF.getASTContext(), {t})
                        ->getCanonicalType(),
-                     orig);
+                     orig, emitInto);
   }
 
-  ManagedValue visitTupleType(CanTupleType t, AbstractionPattern orig) {
+  ManagedValue visitTupleType(CanTupleType t, AbstractionPattern orig,
+                              Initialization *emitInto) {
     // Only destructure if the abstraction pattern is also a tuple.
     if (!orig.isTuple())
-      return visitType(t, orig);
-    
-    SmallVector<ManagedValue, 4> elements;
+      return visitType(t, orig, emitInto);
 
     auto &tl = SGF.SGM.Types.getTypeLowering(t, SGF.getTypeExpansionContext());
+
+    // If the tuple contains pack expansions, and we're not emitting
+    // into an initialization already, create a temporary so that we're
+    // always emitting into an initialization.
+    if (t.containsPackExpansionType() && !emitInto) {
+      auto temporary = SGF.emitTemporary(loc, tl);
+
+      auto result = expandTuple(orig, t, tl, temporary.get());
+      assert(result.isInContext()); (void) result;
+
+      return temporary->getManagedAddress();
+    }
+
+    return expandTuple(orig, t, tl, emitInto);
+  }
+
+  ManagedValue expandTuple(AbstractionPattern orig, CanTupleType t,
+                           const TypeLowering &tl, Initialization *init) {
+    assert((!t.containsPackExpansionType() || init) &&
+           "should always have an emission context when expanding "
+           "a tuple containing pack expansions");
+
     bool canBeGuaranteed = tl.isLoadable();
 
+    // We only use specific initializations here that can always be split.
+    SmallVector<InitializationPtr, 8> eltInitsBuffer;
+    MutableArrayRef<InitializationPtr> eltInits;
+    if (init) {
+      assert(init->canSplitIntoTupleElements());
+      eltInits = init->splitIntoTupleElements(SGF, loc, t, eltInitsBuffer);
+    }
+
     // Collect the exploded elements.
-    for (unsigned i = 0, e = orig.getNumTupleElements(); i < e; ++i) {
-      auto elt = visit(t.getElementType(i),
-                       orig.getTupleElementType(i));
-      // If we can't borrow one of the elements as a guaranteed parameter, then
-      // we have to +1 the tuple.
-      if (elt.hasCleanup())
-        canBeGuaranteed = false;
-      elements.push_back(elt);
+    size_t nextSubstEltIndex = 0;
+    SmallVector<ManagedValue, 4> elements;
+    for (AbstractionPattern origEltType : orig.getTupleElementTypes()) {
+      ManagedValue elt;
+
+      // Reabstraction can give us original types that are pack
+      // expansions without having pack expansions in the result.
+      // In this case, we do not need to force emission into a pack
+      // expansion.
+      if (origEltType.isPackExpansion()) {
+        assert(init);
+        expandPack(origEltType, t, nextSubstEltIndex, eltInits, elements);
+      } else {
+        size_t i = nextSubstEltIndex++;
+        elt = visit(t.getElementType(i), origEltType,
+                    init ? eltInits[i].get() : nullptr);
+        assert((init != nullptr) == (elt.isInContext()));
+        if (!elt.isInContext())
+          elements.push_back(elt);
+
+        if (elt.hasCleanup())
+          canBeGuaranteed = false;
+      }
+    }
+    assert(nextSubstEltIndex == t->getNumElements());
+
+    // If we emitted into a context, we're done.
+    if (init) {
+      init->finishInitialization(SGF);
+      return ManagedValue::forInContext();
     }
 
     if (tl.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
@@ -244,6 +310,101 @@ public:
       }
       return SGF.emitManagedRValueWithCleanup(buffer);
     }
+  }
+
+  void expandPack(AbstractionPattern origEltType,
+                  CanTupleType substTupleType,
+                  size_t &nextSubstEltIndex,
+                  MutableArrayRef<InitializationPtr> eltInits,
+                  SmallVectorImpl<ManagedValue> &eltMVs) {
+    // The next parameter is a pack which corresponds to some number of
+    // components in the tuple.  Some of them may be pack expansions.
+    // Either copy/move them into the tuple (necessary if there are any
+    // pack expansions) or collect them in eltMVs.
+
+    // Claim the next parameter, remember whether it was +1, and forward
+    // the cleanup.  We can get away with just forwarding the cleanup
+    // up front, not destructuring it, because we assume that the work
+    // we're doing here won't ever unwind.
+    ManagedValue packAddrMV = claimNextParameter();
+    CleanupCloner cloner(SGF, packAddrMV);
+    SILValue packAddr = packAddrMV.forward(SGF);
+    auto packTy = packAddr->getType().castTo<SILPackType>();
+
+    auto inducedPackType =
+      substTupleType.getInducedPackType(nextSubstEltIndex,
+                                        packTy->getNumElements());
+
+    unsigned nextPackIndex = 0;
+    origEltType.forEachPackExpandedComponent(
+          [&](AbstractionPattern origComponentType) {
+      size_t substEltIndex = nextSubstEltIndex++;
+      CanType substComponentType =
+        substTupleType.getElementType(substEltIndex);
+      Initialization *componentInit =
+        eltInits.empty() ? nullptr : eltInits[substEltIndex].get();
+
+      auto packComponentIndex = nextPackIndex++;
+      auto packComponentTy = packTy->getSILElementType(packComponentIndex);
+
+      auto substExpansionType =
+        dyn_cast<PackExpansionType>(substComponentType);
+
+      // In the scalar case, project out the element address from the
+      // pack and use the normal scalar path to trigger initialization.
+      if (!substExpansionType) {
+        auto packIndex =
+          SGF.B.createScalarPackIndex(loc, packComponentIndex, inducedPackType);
+        auto eltAddr =
+          SGF.B.createPackElementGet(loc, packIndex, packAddr,
+                                     packComponentTy);
+        auto eltAddrMV = cloner.clone(eltAddr);
+        auto result = handleScalar(eltAddrMV, origComponentType,
+                                   substComponentType, componentInit,
+                                   /*inout*/ false);
+        assert(result.isInContext() == (componentInit != nullptr));
+        if (!result.isInContext())
+          eltMVs.push_back(result);
+        return;
+      }
+
+      // In the pack-expansion case, do the exact same thing,
+      // but in a pack loop.
+      assert(componentInit);
+      assert(componentInit->canPerformPackExpansionInitialization());
+
+      auto opening = SGF.createOpenedElementValueEnvironment(packComponentTy);
+      auto openedEnv = opening.first;
+      auto eltTy = opening.second;
+
+      SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
+                              openedEnv, [&](SILValue indexWithinComponent,
+                                             SILValue expansionPackIndex,
+                                             SILValue packIndex) {
+        componentInit->performPackExpansionInitialization(SGF, loc,
+                                            indexWithinComponent,
+                                            [&](Initialization *eltInit) {
+          // Project out the pack element and enter a managed value for it.
+          auto eltAddr =
+            SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
+          auto eltAddrMV = cloner.clone(eltAddr);
+
+          auto origEltType = origComponentType.getPackExpansionPatternType();
+
+          CanType substEltType = substExpansionType.getPatternType();
+          if (openedEnv) {
+            substEltType =
+              openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
+          }
+
+          auto result = handleScalar(eltAddrMV, origEltType, substEltType,
+                                     eltInit, /*inout*/ false);
+          assert(result.isInContext()); (void) result;
+        });
+      });
+      componentInit->finishInitialization(SGF);
+    });
+    assert(nextPackIndex == packTy->getNumElements());
   }
 };
 } // end anonymous namespace
@@ -291,8 +452,8 @@ struct ArgumentInitHelper {
       ? OrigFnType->getFunctionParamType(ArgNo - 1)
       : AbstractionPattern(canTy);
     if (isInOut)
-      return argEmitter.visitType(canTy, origTy, /*isInOut=*/true);
-    return argEmitter.visit(canTy, origTy);
+      return argEmitter.handleInOut(origTy, canTy);
+    return argEmitter.visit(canTy, origTy, /*emitInto*/ nullptr);
   }
 
   void updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,

@@ -1675,6 +1675,9 @@ public:
                                                SILValue Operand,
                                                unsigned FieldNo,
                                                SILType ResultTy) {
+    assert(!Operand->getType().castTo<TupleType>().containsPackExpansionType()
+           && "tuples with pack expansions must be indexed with "
+              "tuple_pack_element_addr");
     return insert(new (getModule()) TupleElementAddrInst(
         getSILDebugLocation(Loc), Operand, FieldNo, ResultTy));
   }

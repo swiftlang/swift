@@ -42,6 +42,10 @@ static unsigned getTupleSize(CanType t) {
 
 unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
   if (pattern.isTuple()) {
+    if (pattern.doesTupleContainPackExpansionType())
+      return 1;
+
+    // We can use the naive parallel walk here because of the check above.
     unsigned count = 0;
     auto formalTupleType = cast<TupleType>(formalType);
     for (auto i : indices(formalTupleType.getElementTypes())) {
@@ -57,6 +61,10 @@ unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
 /// Return the number of rvalue elements in the given canonical type.
 unsigned RValue::getRValueSize(CanType type) {
   if (auto tupleType = dyn_cast<TupleType>(type)) {
+    // Don't recursively expand tuples containing pack expansions.
+    if (tupleType.containsPackExpansionType())
+      return 1;
+
     unsigned count = 0;
     for (auto eltType : tupleType.getElementTypes())
       count += getRValueSize(eltType);
@@ -156,6 +164,10 @@ public:
   }
 
   void visitTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    // Don't recursively expand tuples containing pack expansions.
+    if (tupleFormalType.containsPackExpansionType())
+      return visitType(tupleFormalType, tuple);
+
     if (tuple.getType().isObject()) {
       return visitObjectTupleType(tupleFormalType, tuple);
     }
@@ -202,6 +214,10 @@ public:
   }
 
   ManagedValue visitTupleType(CanTupleType t, SILLocation l) {
+    // Tuples with pack expansions aren't exploded.
+    if (t.containsPackExpansionType())
+      return visitType(t, l);
+
     SmallVector<ManagedValue, 4> elts;
     for (auto fieldTy : t.getElementTypes())
       elts.push_back(this->visit(fieldTy, l));
@@ -251,6 +267,10 @@ public:
   }
 
   void visitTupleType(CanTupleType t, Initialization *address, SILLocation l) {
+    // Tuples containing pack expansions shouldn't be exploded.
+    if (t.containsPackExpansionType())
+      return visitType(t, address, l);
+
     assert(address->canSplitIntoTupleElements());
     llvm::SmallVector<InitializationPtr, 4> buf;
     auto bufResult = address->splitIntoTupleElements(SGF, l, t, buf);
@@ -272,10 +292,11 @@ public:
 
 template <ImplodeKind KIND>
 static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
-                                       SILGenFunction &SGF, CanType tupleType,
+                                       SILGenFunction &SGF, CanType type,
                                        SILLocation l) {
   // Non-tuples don't need to be imploded.
-  if (!isa<TupleType>(tupleType)) {
+  auto tupleType = dyn_cast<TupleType>(type);
+  if (!tupleType || tupleType.containsPackExpansionType()) {
     assert(values.size() == 1 && "exploded non-tuple value?!");
     return ImplodeLoadableTupleValue<KIND>::getValue(SGF, values[0], l);
   }
@@ -289,13 +310,13 @@ static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
            "address-only values are always managed!");
     auto buffer = SGF.emitTemporary(l, TL);
     ImplodeAddressOnlyTuple<KIND>(values, SGF)
-        .visit(tupleType, buffer.get(), l);
+        .visitTupleType(tupleType, buffer.get(), l);
     return buffer->getManagedAddress();
   }
 
   // To implode loadable tuples, we just need to combine the elements with
   // TupleInsts.
-  return ImplodeLoadableTupleValue<KIND>(values, SGF).visit(tupleType, l);
+  return ImplodeLoadableTupleValue<KIND>(values, SGF).visitTupleType(tupleType, l);
 }
 
 /// Perform a copy or init operation from an array of ManagedValue (from an
@@ -321,7 +342,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   // If the element has non-tuple type, just serve it up to the initialization.
   auto tupleType = dyn_cast<TupleType>(type);
-  if (!tupleType) {
+  if (!tupleType || tupleType.containsPackExpansionType()) {
     // We take the first value.
     ManagedValue result = values[0];
     values = values.slice(1);
@@ -373,7 +394,7 @@ LLVM_ATTRIBUTE_UNUSED
 static unsigned
 expectedExplosionSize(CanType type) {
   auto tuple = dyn_cast<TupleType>(type);
-  if (!tuple)
+  if (!tuple || tuple.containsPackExpansionType())
     return 1;
   unsigned total = 0;
   for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
@@ -545,7 +566,8 @@ static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
                             CanType type, ArrayRef<ManagedValue> &srcValues,
                             SILValue destAddr) {
   // Recurse into tuples.
-  if (auto srcTupleType = dyn_cast<TupleType>(type)) {
+  auto srcTupleType = dyn_cast<TupleType>(type);
+  if (srcTupleType && !srcTupleType.containsPackExpansionType()) {
     assert(destAddr->getType().castTo<TupleType>()->getNumElements()
              == srcTupleType->getNumElements());
     for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
@@ -651,10 +673,16 @@ RValue RValue::extractElement(unsigned n) && {
     return element;
   }
 
+  // This is implementable, but we can do it lazily if we add that kind
+  // of projection.
+  assert(!tupleTy.containsPackExpansionType() &&
+         "can't extract elements from tuples containing pack expansions "
+         "right now");
+
   auto range = getElementRange(tupleTy, n);
   unsigned from = range.first, to = range.second;
 
-  CanType eltType = cast<TupleType>(type).getElementType(n);
+  CanType eltType = tupleTy.getElementType(n);
   RValue element(nullptr, llvm::makeArrayRef(values).slice(from, to - from), eltType);
   makeUsed();
   return element;
@@ -673,6 +701,12 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
     makeUsed();
     return;
   }
+
+  // This is implementable, but we can do it lazily if we add that kind
+  // of decomposition.
+  assert(!tupleTy.containsPackExpansionType() &&
+         "can't extract elements from tuples containing pack expansions "
+         "right now");
 
   unsigned from = 0;
   for (auto eltType : tupleTy.getElementTypes()) {

@@ -129,6 +129,42 @@ public:
 #endif
   }
 };
+
+/// Cleanup to destroy the remaining values in a pack-expansion
+/// component of a tuple.
+class PartialDestroyRemainingTupleCleanup : public Cleanup {
+  SILValue Addr;
+  unsigned ComponentIndex;
+  SILValue CurrentIndexWithinComponent;
+  CanPackType InducedPackType;
+public:
+  PartialDestroyRemainingTupleCleanup(SILValue tupleAddr,
+                                      CanPackType inducedPackType,
+                                      unsigned componentIndex,
+                                      SILValue currentIndexWithinComponent)
+    : Addr(tupleAddr), ComponentIndex(componentIndex),
+      CurrentIndexWithinComponent(currentIndexWithinComponent),
+      InducedPackType(inducedPackType) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitPartialDestroyRemainingTuple(l, Addr, InducedPackType,
+                                         ComponentIndex,
+                                         CurrentIndexWithinComponent);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "PartialDestroyRemainingTupleCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Addr:" << Addr << "\n"
+                 << "InducedPackType:" << InducedPackType << "\n"
+                 << "ComponentIndex:" << ComponentIndex << "\n"
+                 << "CurrentIndexWithinComponent:"
+                 << CurrentIndexWithinComponent << "\n";
+#endif
+  }
+};
 } // end anonymous namespace
 
 CleanupHandle SILGenFunction::enterDeallocPackCleanup(SILValue temp) {
@@ -166,6 +202,18 @@ SILGenFunction::enterPartialDestroyTupleCleanup(SILValue addr,
   return Cleanups.getTopCleanup();
 }
 
+CleanupHandle
+SILGenFunction::enterPartialDestroyRemainingTupleCleanup(SILValue addr,
+                                                CanPackType inducedPackType,
+                                                unsigned componentIndex,
+                                                SILValue indexWithinComponent) {
+  Cleanups.pushCleanup<PartialDestroyRemainingTupleCleanup>(addr,
+                                                   inducedPackType,
+                                                   componentIndex,
+                                                   indexWithinComponent);
+  return Cleanups.getTopCleanup();
+}
+
 void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
                                      CanPackType formalPackType) {
   auto packTy = packAddr->getType().castTo<SILPackType>();
@@ -194,53 +242,6 @@ void SILGenFunction::emitDestroyPack(SILLocation loc, SILValue packAddr,
   }
 }
 
-static CanPackType getInducedFormalPackType(CanSILPackType packType) {
-  auto &ctx = packType->getASTContext();
-  auto loweredEltTypes = packType.getElementTypes();
-
-  // Build an array of formal element types, but be lazy about it:
-  // use the original array unless we see an element type that doesn't
-  // work as a legal format type.
-  Optional<SmallVector<CanType, 4>> formalEltTypes;
-  for (auto i : indices(loweredEltTypes)) {
-    auto loweredEltType = loweredEltTypes[i];
-    bool isLegal = loweredEltType->isLegalFormalType();
-
-    // If the type isn't legal as a formal type, substitute the empty
-    // tuple type (or an invariant expansion of it over the count type).
-    CanType formalEltType = loweredEltType;
-    if (!isLegal) {
-      formalEltType = TupleType::getEmpty(ctx);
-      if (auto expansion = dyn_cast<PackExpansionType>(loweredEltType))
-        formalEltType = CanPackExpansionType::get(formalEltType,
-                                                  expansion.getCountType());
-    }
-
-    // If we're already building an array, unconditionally append to it.
-    // Otherwise, if the type isn't legal, build the array up to this
-    // point and then append.  Otherwise, we're still being lazy.
-    if (formalEltTypes) {
-      formalEltTypes->push_back(formalEltType);
-    } else if (!isLegal) {
-      formalEltTypes.emplace();
-      formalEltTypes->reserve(loweredEltTypes.size());
-      formalEltTypes->append(loweredEltTypes.begin(),
-                             loweredEltTypes.begin() + i);
-      formalEltTypes->push_back(formalEltType);
-    }
-
-    assert(isLegal || formalEltTypes.hasValue());
-  }
-
-  // Use the array we built if we made one (if we ever saw a non-legal
-  // element type).
-  if (formalEltTypes) {
-    return CanPackType::get(ctx, *formalEltTypes);
-  } else {
-    return CanPackType::get(ctx, loweredEltTypes);
-  }
-}
-
 ManagedValue
 SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
                                            CanPackType formalPackType) {
@@ -252,7 +253,7 @@ SILGenFunction::emitManagedPackWithCleanup(SILValue addr,
   // the lowered pack type.
   auto packType = addr->getType().castTo<SILPackType>();
   if (!formalPackType)
-    formalPackType = getInducedFormalPackType(packType);
+    formalPackType = packType->getApproximateFormalPackType();
 
   // Enter a cleanup for the pack.
   auto cleanup = enterDestroyPackCleanup(addr, formalPackType);
@@ -307,7 +308,8 @@ void SILGenFunction::emitPartialDestroyPack(SILLocation loc, SILValue packAddr,
   auto elementEnv = result.first;
   auto elementTy = result.second;
 
-  emitDynamicPackLoop(loc, formalPackType, componentIndex, limitWithinComponent,
+  emitDynamicPackLoop(loc, formalPackType, componentIndex,
+                      /*startAfter*/ SILValue(), limitWithinComponent,
                       elementEnv, /*reverse*/ true,
                       [&](SILValue indexWithinComponent,
                           SILValue packExpansionIndex,
@@ -327,8 +329,31 @@ void SILGenFunction::emitPartialDestroyTuple(SILLocation loc,
   auto elementEnv = result.first;
   auto elementTy = result.second;
 
-  emitDynamicPackLoop(loc, inducedPackType, componentIndex, limitWithinComponent,
+  emitDynamicPackLoop(loc, inducedPackType, componentIndex,
+                      /*startAfter*/ SILValue(), limitWithinComponent,
                       elementEnv, /*reverse*/ true,
+                      [&](SILValue indexWithinComponent,
+                          SILValue packExpansionIndex,
+                          SILValue packIndex) {
+    auto eltAddr =
+      B.createTuplePackElementAddr(loc, packIndex, tupleAddr, elementTy);
+    B.createDestroyAddr(loc, eltAddr);
+  });
+}
+
+void SILGenFunction::emitPartialDestroyRemainingTuple(SILLocation loc,
+                                                      SILValue tupleAddr,
+                                                      CanPackType inducedPackType,
+                                                      unsigned componentIndex,
+                                        SILValue currentIndexWithinComponent) {
+  auto result = createOpenedElementValueEnvironment(
+                    tupleAddr->getType().getTupleElementType(componentIndex));
+  auto elementEnv = result.first;
+  auto elementTy = result.second;
+
+  emitDynamicPackLoop(loc, inducedPackType, componentIndex,
+                      /*startAfter*/ currentIndexWithinComponent,
+                      /*limit*/ SILValue(), elementEnv, /*reverse*/ false,
                       [&](SILValue indexWithinComponent,
                           SILValue packExpansionIndex,
                           SILValue packIndex) {
@@ -341,6 +366,19 @@ void SILGenFunction::emitPartialDestroyTuple(SILLocation loc,
 void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
                                          CanPackType formalPackType,
                                          unsigned componentIndex,
+                                         GenericEnvironment *openedElementEnv,
+                      llvm::function_ref<void(SILValue indexWithinComponent,
+                                              SILValue packExpansionIndex,
+                                              SILValue packIndex)> emitBody) {
+  return emitDynamicPackLoop(loc, formalPackType, componentIndex,
+                             /*startAfter*/ SILValue(), /*limit*/ SILValue(),
+                             openedElementEnv, /*reverse*/false, emitBody);
+}
+
+void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
+                                         CanPackType formalPackType,
+                                         unsigned componentIndex,
+                                         SILValue startingAfterIndexInComponent,
                                          SILValue limitWithinComponent,
                                          GenericEnvironment *openedElementEnv,
                                          bool reverse,
@@ -348,11 +386,18 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
                                               SILValue packExpansionIndex,
                                               SILValue packIndex)> emitBody) {
   assert(isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
+  assert((!startingAfterIndexInComponent || !reverse) &&
+         "cannot reverse with a starting index");
   ASTContext &ctx = SGM.getASTContext();
 
   auto wordTy = SILType::getBuiltinWordType(ctx);
   auto boolTy = SILType::getBuiltinIntegerType(1, ctx);
-  auto zero = B.createIntegerLiteral(loc, wordTy, 0);
+
+  SILValue zero;
+  if (!startingAfterIndexInComponent) {
+    zero = B.createIntegerLiteral(loc, wordTy, 0);
+  }
+
   auto one = B.createIntegerLiteral(loc, wordTy, 1);
 
   // The formal type of the component of the pack that we're iterating over.
@@ -372,10 +417,21 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
     limitWithinComponent = B.createPackLength(loc, formalDynamicPackType);
   }
 
-  // Branch to the loop condition block, passing the initial value
-  // (0 if forward, the limit if reverse).
+  // The initial index value: the limit if iterating in reverse,
+  // otherwise the start-after index + 1 if we have one, otherwise 0.
+  SILValue startingIndex;
+  if (reverse) {
+    startingIndex = limitWithinComponent;
+  } else if (startingAfterIndexInComponent) {
+    startingIndex = B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy,
+                                      { startingAfterIndexInComponent, one });
+  } else {
+    startingIndex = zero;
+  }
+
+  // Branch to the loop condition block, passing the initial index value.
   auto condBB = createBasicBlock();
-  B.createBranch(loc, condBB, { reverse ? limitWithinComponent : zero });
+  B.createBranch(loc, condBB, { startingIndex });
 
   // Condition block:
   B.emitBlock(condBB);

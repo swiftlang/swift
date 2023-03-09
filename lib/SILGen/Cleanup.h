@@ -338,6 +338,10 @@ public:
 
   ManagedValue clone(SILValue value) const;
 
+  ManagedValue cloneForTuplePackExpansionComponent(SILValue value,
+                                                   CanPackType inducedPackType,
+                                                   unsigned componentIndex) const;
+
   static void
   getClonersForRValue(SILGenFunction &SGF, const RValue &rvalue,
                       SmallVectorImpl<CleanupCloner> &resultingCloners);
