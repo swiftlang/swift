@@ -55,6 +55,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that adds conformances to the declaration the
   /// macro is attached to.
   Conformance = 0x40,
+  /// A freestanding macro that expands to expressions, statements and
+  /// declarations in a code block.
+  CodeItem = 0x80,
 };
 
 /// The contexts in which a particular macro declaration can be used.

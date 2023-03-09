@@ -261,7 +261,6 @@ macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", 
 @freestanding(declaration)
 macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
 
-
 // FIXME: Global freestanding macros not yet supported in script mode.
 #if false
 let world = 3 // to be used by the macro expansion below
