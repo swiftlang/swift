@@ -656,6 +656,14 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
 void IRGenModule::emitRuntimeRegistration() {
   // Duck out early if we have nothing to register.
+  // Note that we don't consider `RuntimeResolvableTypes2` here because the
+  // current Swift runtime is unable to handle move-only types at runtime, and
+  // we only use this runtime registration path in JIT mode, so there are no
+  // ABI forward compatibility concerns.
+  //
+  // We should incorporate the types from
+  // `RuntimeResolvableTypes2` into the list of types to register when we do
+  // have runtime support in place.
   if (SwiftProtocols.empty() && ProtocolConformances.empty() &&
       RuntimeResolvableTypes.empty() &&
       (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
@@ -1033,7 +1041,16 @@ void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
 
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
-  RuntimeResolvableTypes.push_back(type);
+  if (type->isMoveOnly()) {
+    // Older runtimes should not be allowed to discover noncopyable types, since
+    // they will try to expose them dynamically as copyable types. Record
+    // noncopyable type descriptors in a separate vector so that future
+    // noncopyable-type-aware runtimes and reflection libraries can still find
+    // them.
+    RuntimeResolvableTypes2.push_back(type);
+  } else {
+    RuntimeResolvableTypes.push_back(type);
+  }
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
     // As soon as the type metadata is available, all the type's conformances
@@ -4202,21 +4219,26 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
 /// otherwise the descriptors are emitted as individual globals and nullptr is
 /// returned).
 llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
-  if (RuntimeResolvableTypes.empty())
+  if (RuntimeResolvableTypes.empty()
+      && RuntimeResolvableTypes2.empty())
     return nullptr;
 
   std::string sectionName;
+  std::string section2Name;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
     sectionName = "__TEXT, __swift5_types, regular";
+    section2Name = "__TEXT, __swift5_types2, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
     sectionName = "swift5_type_metadata";
+    section2Name = "swift5_type_metadata_2";
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
+    section2Name = ".sw5tym2$B";
     break;
   case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
@@ -4276,39 +4298,50 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   }
 
   // In non-JIT mode, emit the type records as individual globals.
-  for (auto type : RuntimeResolvableTypes) {
-    auto ref = getTypeEntityReference(type);
 
-    std::string recordMangledName;
-    if (auto opaque = dyn_cast<OpaqueTypeDecl>(type)) {
-      recordMangledName =
-          LinkEntity::forOpaqueTypeDescriptorRecord(opaque).mangleAsString();
-    } else if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
-      recordMangledName =
-          LinkEntity::forNominalTypeDescriptorRecord(nominal).mangleAsString();
-    } else {
-      llvm_unreachable("bad type in RuntimeResolvableTypes");
+  auto generateGlobalTypeList = [&](ArrayRef<GenericTypeDecl *> typesList,
+                                    StringRef section) {
+    if (typesList.empty()) {
+      return;
     }
+                                    
+    for (auto type : typesList) {
+      auto ref = getTypeEntityReference(type);
 
-    auto var = new llvm::GlobalVariable(
-        Module, TypeMetadataRecordTy, /*isConstant*/ true,
-        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
-        recordMangledName);
+      std::string recordMangledName;
+      if (auto opaque = dyn_cast<OpaqueTypeDecl>(type)) {
+        recordMangledName =
+            LinkEntity::forOpaqueTypeDescriptorRecord(opaque).mangleAsString();
+      } else if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+        recordMangledName =
+            LinkEntity::forNominalTypeDescriptorRecord(nominal).mangleAsString();
+      } else {
+        llvm_unreachable("bad type in RuntimeResolvableTypes");
+      }
 
-    auto record = generateRecord(ref, var, {0});
-    var->setInitializer(record);
+      auto var = new llvm::GlobalVariable(
+          Module, TypeMetadataRecordTy, /*isConstant*/ true,
+          llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+          recordMangledName);
 
-    var->setSection(sectionName);
-    var->setAlignment(llvm::MaybeAlign(4));
-    disableAddressSanitizer(*this, var);
-    addUsedGlobal(var);
+      auto record = generateRecord(ref, var, {0});
+      var->setInitializer(record);
 
-    if (IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the type record) when the type (`ref`) is
-      // not referenced.
-      appendLLVMUsedConditionalEntry(var, ref.getValue());
+      var->setSection(section);
+      var->setAlignment(llvm::MaybeAlign(4));
+      disableAddressSanitizer(*this, var);
+      addUsedGlobal(var);
+
+      if (IRGen.Opts.ConditionalRuntimeRecords) {
+        // Allow dead-stripping `var` (the type record) when the type (`ref`) is
+        // not referenced.
+        appendLLVMUsedConditionalEntry(var, ref.getValue());
+      }
     }
-  }
+  };
+
+  generateGlobalTypeList(RuntimeResolvableTypes, sectionName);
+  generateGlobalTypeList(RuntimeResolvableTypes2, section2Name);
 
   return nullptr;
 }
