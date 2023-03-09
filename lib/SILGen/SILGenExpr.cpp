@@ -1541,8 +1541,7 @@ RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
   auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
 
   SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
-                          /*limit within component*/ SILValue(),
-                          E->getGenericEnvironment(), /*reverse*/ false,
+                          E->getGenericEnvironment(),
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue packIndex) {
@@ -6210,8 +6209,7 @@ static void emitIgnoredPackExpansion(SILGenFunction &SGF,
   auto formalPackType = CanPackType::get(SGF.getASTContext(), expansionType);
   auto openedElementEnv = E->getGenericEnvironment();
   SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
-                          /*limit*/ SILValue(), openedElementEnv,
-                          /*reverse*/ false,
+                          openedElementEnv,
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue packIndex) {

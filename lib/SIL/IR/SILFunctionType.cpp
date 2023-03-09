@@ -1705,7 +1705,7 @@ private:
           packElts.push_back(eltTy.getASTType());
         });
 
-        bool indirect = origType.arePackElementsPassedIndirectly(TC);
+        bool indirect = origEltType.arePackElementsPassedIndirectly(TC);
         SILPackType::ExtInfo extInfo(/*address*/ indirect);
         auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 

@@ -531,6 +531,14 @@ public:
     return SILType(castTo<TupleType>().getElementType(index), getCategory());
   }
 
+  /// Given that this is a pack expansion type, return the lowered type
+  /// of the pattern type.  The result will have the same value category
+  /// as the base type.
+  SILType getPackExpansionPatternType() const {
+    return SILType(castTo<PackExpansionType>().getPatternType(),
+                   getCategory());
+  }
+
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
   SILType getSuperclass() const {

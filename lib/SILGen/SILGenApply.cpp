@@ -3809,8 +3809,7 @@ private:
 
     auto openedElementEnv = expansionExpr->getGenericEnvironment();
     SGF.emitDynamicPackLoop(expansionExpr, formalPackType,
-                            packComponentIndex, /*limit*/ nullptr,
-                            openedElementEnv, /*reverse*/false,
+                            packComponentIndex, openedElementEnv,
                             [&](SILValue indexWithinComponent,
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {

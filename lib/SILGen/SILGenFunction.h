@@ -2429,6 +2429,19 @@ public:
                                                 unsigned componentIndex,
                                                 SILValue limitWithinComponent);
 
+  /// Enter a cleanup to destroy the following values in a
+  /// pack-expansion component of a tuple
+  ///
+  /// \param currentIndexWithinComponent - the current index in the
+  ///   pack expansion component; any elements in the component that
+  ///   *follow* this component will be destroyed. If nil, all the
+  ///   elements in the component will be destroyed
+  CleanupHandle
+  enterPartialDestroyRemainingTupleCleanup(SILValue addr,
+                                           CanPackType inducedPackType,
+                                           unsigned componentIndex,
+                                           SILValue currentIndexWithinComponent);
+
   /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
   ///
   /// The end_lifetime cleanup is not placed into the ManagedValue itself and
@@ -2544,6 +2557,9 @@ public:
   ///   overall pack being iterated over
   /// \param componentIndex - the index of the pack expansion component
   ///   within the formal pack type
+  /// \param startingAfterIndexWithinComponent - the index prior to the
+  ///   first index within the component to dynamically visit; if null,
+  ///   visitation will start at 0
   /// \param limitWithinComponent - the number of elements in a prefix of
   ///   the expansion component to dynamically visit; if null, all elements
   ///   will be visited
@@ -2567,9 +2583,20 @@ public:
   void emitDynamicPackLoop(SILLocation loc,
                            CanPackType formalPackType,
                            unsigned componentIndex,
+                           SILValue startingAfterIndexWithinComponent,
                            SILValue limitWithinComponent,
                            GenericEnvironment *openedElementEnv,
                            bool reverse,
+                        llvm::function_ref<void(SILValue indexWithinComponent,
+                                                SILValue packExpansionIndex,
+                                                SILValue packIndex)> emitBody);
+
+  /// A convenience version of dynamic pack loop that visits an entire
+  /// pack expansion component in forward order.
+  void emitDynamicPackLoop(SILLocation loc,
+                           CanPackType formalPackType,
+                           unsigned componentIndex,
+                           GenericEnvironment *openedElementEnv,
                         llvm::function_ref<void(SILValue indexWithinComponent,
                                                 SILValue packExpansionIndex,
                                                 SILValue packIndex)> emitBody);
@@ -2616,6 +2643,23 @@ public:
                                CanPackType inducedPackType,
                                unsigned componentIndex,
                                SILValue limitWithinComponent);
+
+  /// Emit a loop which destroys a suffix of a pack expansion component
+  /// of a tuple value.
+  ///
+  /// \param tupleAddr - the address of the overall tuple value
+  /// \param inducedPackType - a pack type with the same shape as the
+  ///   element types of the overall tuple value
+  /// \param componentIndex - the index of the pack expansion component
+  ///   within the tuple
+  /// \param currentIndexWithinComponent - the current index in the
+  ///   pack expansion component; all elements *following* this index will
+  ///   be destroyed
+  void emitPartialDestroyRemainingTuple(SILLocation loc,
+                                        SILValue tupleAddr,
+                                        CanPackType inducedPackType,
+                                        unsigned componentIndex,
+                                        SILValue currentIndexWithinComponent);
 };
 
 
