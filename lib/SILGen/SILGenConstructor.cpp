@@ -1062,7 +1062,8 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
                           cast<ParenPattern>(pattern)->getSubPattern());
 
   case PatternKind::Tuple: {
-    TupleInitialization *init = new TupleInitialization();
+    TupleInitialization *init = new TupleInitialization(
+        cast<TupleType>(pattern->getType()->getCanonicalType()));
     auto tuple = cast<TuplePattern>(pattern);
     for (auto &elt : tuple->getElements()) {
       init->SubInitializations.push_back(

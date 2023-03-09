@@ -587,7 +587,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
   // Recursively decompose tuple abstraction patterns.
   if (origResultType.isTuple()) {
     auto resultTupleType = cast<TupleType>(resultType);
-    auto tupleInit = new TupleInitialization();
+    auto tupleInit = new TupleInitialization(resultTupleType);
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
     size_t nextResultEltIndex = 0;

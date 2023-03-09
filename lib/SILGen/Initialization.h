@@ -330,13 +330,16 @@ public:
 /// An initialization which accumulates several other initializations
 /// into a tuple.
 class TupleInitialization : public Initialization {
+  CanTupleType FormalTupleType;
+
 public:
   /// The sub-Initializations aggregated by this tuple initialization.
   /// The TupleInitialization object takes ownership of Initializations pushed
   /// here.
   SmallVector<InitializationPtr, 4> SubInitializations;
-    
-  TupleInitialization() {}
+
+  TupleInitialization(CanTupleType formalTupleType)
+    : FormalTupleType(formalTupleType) {}
 
   bool canSplitIntoTupleElements() const override {
     return true;

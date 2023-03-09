@@ -1333,6 +1333,8 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  bool doesTupleContainPackExpansionType() const;
+
   static AbstractionPattern
   projectTupleElementType(const AbstractionPattern *base, size_t index) {
     return base->getTupleElementType(index);

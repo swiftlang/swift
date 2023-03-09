@@ -420,3 +420,27 @@ ManagedValue CleanupCloner::clone(SILValue value) const {
   }
   return SGF.emitManagedRValueWithCleanup(value);
 }
+
+ManagedValue
+CleanupCloner::cloneForTuplePackExpansionComponent(SILValue tupleAddr,
+                                                   CanPackType inducedPackType,
+                                                   unsigned componentIndex) const {
+  if (isLValue) {
+    return ManagedValue::forLValue(tupleAddr);
+  }
+
+  if (!hasCleanup) {
+    return ManagedValue::forUnmanaged(tupleAddr);
+  }
+
+  assert(!writebackBuffer.has_value());
+  auto expansionTy = tupleAddr->getType().getTupleElementType(componentIndex);
+  if (expansionTy.getPackExpansionPatternType().isTrivial(SGF.F))
+    return ManagedValue::forUnmanaged(tupleAddr);
+
+  auto cleanup =
+    SGF.enterPartialDestroyRemainingTupleCleanup(tupleAddr, inducedPackType,
+                                                 componentIndex,
+                                                 /*start at */ SILValue());
+  return ManagedValue(tupleAddr, cleanup);
+}
