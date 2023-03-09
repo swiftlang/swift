@@ -33,11 +33,11 @@ struct CrashWithThunk {
 
 // CHECK: Thread 0 crashed:
 
-// CHECK: 0                       0x{{[0-9a-f]+}} crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:20:15
-// CHECK-NEXT: 1 [ra] [thunk] [system] 0x{{[0-9a-f]+}} thunk for @escaping @callee_guaranteed () -> () + {{[0-9]+}} in CrashWithThunk at {{.*}}/Backtracing/<compiler-generated>
-// CHECK-NEXT: 2 [ra]                  0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:28:9
-// CHECK-NEXT: 3 [ra] [system]         0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:23:1
-// CHECK-NEXT: 4 [ra] [system]         0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
+// CHECK: 0                    0x{{[0-9a-f]+}} crash() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:20:15
+// CHECK-NEXT: 1 [ra] [thunk]  0x{{[0-9a-f]+}} thunk for @escaping @callee_guaranteed () -> () + {{[0-9]+}} in CrashWithThunk at {{.*}}/Backtracing/<compiler-generated>
+// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:28:9
+// CHECK-NEXT: 3 [ra] [system] 0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:23:1
+// CHECK-NEXT: 4 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
 
 // CHECK: Registers:
 

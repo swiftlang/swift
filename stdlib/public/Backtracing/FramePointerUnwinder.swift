@@ -16,10 +16,6 @@
 
 import Swift
 
-// @available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_getCurrent")
-func _getCurrentAsyncTask() -> UnsafeRawPointer?
-
 @_spi(Unwinders)
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C
@@ -47,7 +43,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     #if (os(macOS) || os(iOS) || os(watchOS)) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
     // On Darwin, we borrow a bit of the frame pointer to indicate async
     // stack frames
-    return (storedFp & (1 << 60)) != 0 && _getCurrentAsyncTask() != nil
+    return (storedFp & (1 << 60)) != 0
     #else
     return false
     #endif
