@@ -122,9 +122,32 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+std::string MetadataOrPack::nameForMetadata() const {
+  if (isNull())
+    return "<<nullptr>>";
+
+  if (isMetadata())
+    return ::nameForMetadata(getMetadata());
+
+  std::string result = "Pack{";
+  MetadataPackPointer pack = getMetadataPack();
+  for (size_t i = 0, e = pack.getNumElements(); i < e; ++i) {
+    if (i != 0)
+      result += ", ";
+    result += ::nameForMetadata(pack.getElements()[i]);
+  }
+  result += "}";
+
+  return result;
+}
+
 #else // SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 std::string swift::nameForMetadata(const Metadata *type, bool qualified) {
+  return "<<< type printer not available >>>";
+}
+
+std::string MetadataOrPack::nameForMetadata() const {
   return "<<< type printer not available >>>";
 }
 

@@ -282,13 +282,69 @@ public:
 
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
+  ///
+  /// The return type here is a lie; it's actually a MetadataOrPack.
   using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
+    std::function<const void *(unsigned depth, unsigned index)>;
 
   /// Callback used to provide the substitution of a witness table based on
   /// its index into the enclosing generic environment.
   using SubstDependentWitnessTableFn =
     std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
+
+  /// A pointer to type metadata or a heap-allocated metadata pack.
+  struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataOrPack {
+    const void *Ptr;
+
+    MetadataOrPack() : Ptr(nullptr) {}
+
+    explicit MetadataOrPack(const void *ptr) : Ptr(ptr) {}
+
+    explicit MetadataOrPack(MetadataResponse response) : Ptr(response.Value) {}
+
+    explicit MetadataOrPack(MetadataPackPointer ptr) : Ptr(ptr.getPointer()) {
+      if (ptr.getLifetime() != PackLifetime::OnHeap)
+        fatalError(0, "Cannot have an on-stack pack here\n");
+    }
+
+    explicit operator bool() const { return Ptr != nullptr; }
+
+    bool isNull() const {
+      return !Ptr;
+    }
+
+    bool isMetadataOrNull() const {
+      return (reinterpret_cast<uintptr_t>(Ptr) & 1) == 0;
+    }
+
+    bool isMetadata() const {
+      return Ptr && isMetadataOrNull();
+    }
+
+    bool isMetadataPack() const {
+      return Ptr && (reinterpret_cast<uintptr_t>(Ptr) & 1) == 1;
+    }
+
+    const Metadata *getMetadata() const {
+      if (isMetadata())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    const Metadata *getMetadataOrNull() const {
+      if (isMetadataOrNull())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    MetadataPackPointer getMetadataPack() const {
+      if (isMetadataPack())
+        return MetadataPackPointer(Ptr);
+      fatalError(0, "Expected a metadata pack but got metadata\n");
+    }
+
+    std::string nameForMetadata() const;
+  };
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the generic arguments from
