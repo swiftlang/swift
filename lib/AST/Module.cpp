@@ -610,6 +610,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasIncrementalInfo = 0;
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
+  Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
 }
 
 ImplicitImportList ModuleDecl::getImplicitImports() const {
@@ -1187,6 +1188,60 @@ void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
   FORWARD(getTopLevelDeclsWhereAttributesMatch, (Results, matchAttributes));
+}
+
+void ModuleDecl::lookupTopLevelDeclsByObjCName(SmallVectorImpl<Decl *> &Results,
+                                               DeclName name) {
+  if (!isObjCNameLookupCachePopulated())
+    populateObjCNameLookupCache();
+
+  // A top level decl can't be special anyways
+  if (name.isSpecial())
+    return;
+
+  auto resultsForFileUnit = ObjCNameLookupCache.find(name.getBaseIdentifier());
+  if (resultsForFileUnit == ObjCNameLookupCache.end())
+    return;
+
+  Results.append(resultsForFileUnit->second.begin(),
+                 resultsForFileUnit->second.end());
+}
+
+void ModuleDecl::populateObjCNameLookupCache() {
+  SmallVector<Decl *> topLevelObjCExposedDeclsInFileUnit;
+  auto hasObjCAttrNamePredicate = [](const DeclAttributes &attrs) -> bool {
+    return attrs.hasAttribute<ObjCAttr>();
+  };
+
+  for (FileUnit *file : getFiles()) {
+    file->getTopLevelDeclsWhereAttributesMatch(
+        topLevelObjCExposedDeclsInFileUnit, hasObjCAttrNamePredicate);
+    if (auto *synth = file->getSynthesizedFile()) {
+      synth->getTopLevelDeclsWhereAttributesMatch(
+          topLevelObjCExposedDeclsInFileUnit, hasObjCAttrNamePredicate);
+    }
+  }
+
+  for (Decl *decl : topLevelObjCExposedDeclsInFileUnit) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(decl); VD && VD->hasName()) {
+      const auto &declObjCAttribute = VD->getAttrs().getAttribute<ObjCAttr>();
+      // No top level decl (class, protocol, extension etc.) is allowed to have a
+      // compound name, @objc provided or otherwise. Global functions are allowed to
+      // have compound names, but not allowed to have @objc attributes. Thus we
+      // are sure to not hit asserts getting the simple name.
+      //
+      // Similarly, init, dealloc and subscript (the special names) can't be top 
+      // level decls, so we won't hit asserts getting the base identifier out of the
+      // value decl.
+      const Identifier &declObjCName =
+          declObjCAttribute->hasName()
+              ? declObjCAttribute->getName()->getSimpleName()
+              : VD->getName().getBaseIdentifier();
+      ObjCNameLookupCache[declObjCName].push_back(decl);
+    }
+  }
+
+  setIsObjCNameLookupCachePopulated(true);
 }
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
@@ -3359,6 +3414,9 @@ bool SourceFile::shouldCrossImport() const {
 
 void ModuleDecl::clearLookupCache() {
   getASTContext().getImportCache().clear();
+
+  setIsObjCNameLookupCachePopulated(false);
+  ObjCNameLookupCache.clear();
 
   if (!Cache)
     return;

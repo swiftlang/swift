@@ -249,8 +249,27 @@ NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)",
 NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(objc_property_not_imported, none, "property %0 unavailable (cannot import)", (const clang::NamedDecl*))
 
-NOTE(forward_declared_interface_label, none, "interface %0 forward declared here", (const clang::NamedDecl*))
-NOTE(forward_declared_protocol_label, none, "protocol %0 forward declared here", (const clang::NamedDecl*))
+NOTE(placeholder_for_forward_declared_interface_member_access_failure, none,
+     "class '%0' will be imported as an opaque placeholder class and may be "
+     "missing members; import the definition to access the complete "
+     "interface", (StringRef))
+NOTE(placeholder_for_forward_declared_protocol_member_access_failure, none,
+     "protocol '%0' will be imported as an opaque placeholder protocol "
+     "and may be missing members; import the definition to access the "
+     "complete protocol", (StringRef))
+NOTE(forward_declared_interface_label, none,
+     "interface %0 forward declared here", (const clang::NamedDecl*))
+NOTE(forward_declared_protocol_label, none,
+     "protocol %0 forward declared here", (const clang::NamedDecl*))
+
+NOTE(forward_declared_interface_clashes_with_imported_objc_Swift_interface, none,
+     "interface %0 is incomplete and cannot be imported as a stub; "
+     "its name conflicts with a %1 in module %2",
+     (const clang::NamedDecl*, StringRef, StringRef))
+NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
+     "protocol %0 is incomplete and cannot be imported as a stub; "
+     "its name conflicts with a %1 in module %2",
+     (const clang::NamedDecl*, StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
