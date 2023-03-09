@@ -1188,7 +1188,7 @@ struct MetadataOrPack {
 /// Use with \c _getTypeByMangledName to decode potentially-generic types.
 class SubstGenericParametersFromWrittenArgs {
   /// The complete set of generic arguments.
-  const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
+  const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs;
 
   /// The counts of generic parameters at each level.
   const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
@@ -1205,7 +1205,7 @@ public:
   /// \param genericParamCounts The count of generic parameters at each
   /// generic level, typically gathered by _gatherGenericParameterCounts.
   explicit SubstGenericParametersFromWrittenArgs(
-      const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+      const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
       const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
       : allGenericArgs(allGenericArgs),
         genericParamCounts(genericParamCounts) {}
@@ -1219,12 +1219,12 @@ public:
 
 static void _gatherWrittenGenericArgs(
     const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
     Demangler &BorrowFrom);
 
 static llvm::Optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
-                         llvm::ArrayRef<const Metadata *> genericArgs,
+                         llvm::ArrayRef<MetadataOrPack> genericArgs,
                          const Metadata *parent,
                          llvm::SmallVectorImpl<unsigned> &genericParamCounts,
                          llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
@@ -1249,11 +1249,11 @@ _gatherGenericParameters(const ContextDescriptor *context,
       str += " <";
 
       bool first = true;
-      for (const Metadata *metadata : genericArgs) {
+      for (MetadataOrPack metadata : genericArgs) {
         if (!first)
           str += ", ";
         first = false;
-        str += nameForMetadata(metadata);
+        str += metadata.nameForMetadata();
       }
 
       str += "> ";
@@ -1297,7 +1297,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
     // Compute the set of generic arguments "as written".
-    llvm::SmallVector<const Metadata *, 8> allGenericArgs;
+    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
 
     // If we have a parent, gather it's generic arguments "as written".
     if (parent) {
@@ -1336,7 +1336,40 @@ _gatherGenericParameters(const ContextDescriptor *context,
       // Add metadata for each canonical generic parameter.
       for (unsigned i = 0; i != n; ++i) {
         const auto &param = genericParams[i];
-        if (param.getKind() != GenericParamKind::Type) {
+        auto arg = allGenericArgs[i];
+
+        switch (param.getKind()) {
+        case GenericParamKind::Type: {
+          if (!arg.isMetadata()) {
+            auto commonString = makeCommonErrorStringGetter();
+            return TypeLookupError([=] {
+              return commonString() + "param " + std::to_string(i) +
+                     " expected metadata but got a metadata pack";
+            });
+          }
+
+          if (param.hasKeyArgument()) {
+            allGenericArgsVec.push_back(arg.getMetadata());
+          }
+
+          break;
+        }
+        case GenericParamKind::TypePack: {
+          if (!arg.isMetadataPack()) {
+            auto commonString = makeCommonErrorStringGetter();
+            return TypeLookupError([=] {
+              return commonString() + "param " + std::to_string(i) +
+                     " expected a metadata pack but got metadata";
+            });
+          }
+
+          if (param.hasKeyArgument()) {
+            allGenericArgsVec.push_back(arg.getMetadataPack().getPointer());
+          }
+
+          break;
+        }
+        default:
           auto commonString = makeCommonErrorStringGetter();
           return TypeLookupError([=] {
             return commonString() + "param " + std::to_string(i) +
@@ -1344,8 +1377,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
                    std::to_string(static_cast<uint8_t>(param.getKind()));
           });
         }
-        if (param.hasKeyArgument())
-          allGenericArgsVec.push_back(allGenericArgs[i]);
       }
 
       // Fill in the length for each shape class.
@@ -1597,12 +1628,9 @@ public:
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
 
-    llvm::SmallVector<const Metadata *, 8> allGenericArgs;
-    for (auto argSet : genericArgs) {
-      // FIXME: variadic generics
-      for (auto arg : argSet)
-        allGenericArgs.push_back(arg.getMetadata());
-    }
+    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
+    for (auto argSet : genericArgs)
+      allGenericArgs.append(argSet.begin(), argSet.end());
     
     // Gather the generic parameters we need to parameterize the opaque decl.
     llvm::SmallVector<unsigned, 8> genericParamCounts;
@@ -1719,12 +1747,7 @@ public:
     llvm::SmallVector<unsigned, 8> genericParamCounts;
     llvm::SmallVector<const void *, 8> allGenericArgsVec;
 
-    // FIXME: variadic generics
-    llvm::SmallVector<const Metadata *, 4> genericArgsMetadata;
-    for (auto arg : genericArgs)
-      genericArgsMetadata.push_back(arg.getMetadata());
-
-    if (auto error = _gatherGenericParameters(typeDecl, genericArgsMetadata,
+    if (auto error = _gatherGenericParameters(typeDecl, genericArgs,
                                               parent.getMetadataOrNull(),
                                               genericParamCounts,
                                               allGenericArgsVec, demangler))
@@ -1968,14 +1991,22 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createPackType(llvm::ArrayRef<BuiltType> elements) const {
-    // FIXME: Runtime support for variadic generics.
-    return BuiltType();
+    for (auto element : elements) {
+      if (!element.isMetadata()) {
+        return TYPE_LOOKUP_ERROR_FMT("Can't have nested metadata packs");
+      }
+    }
+
+    MetadataPackPointer pack(swift_allocateMetadataPack(
+        reinterpret_cast<const Metadata * const *>(elements.data()),
+        elements.size()));
+
+    return BuiltType(pack);
   }
 
   TypeLookupErrorOr<BuiltType>
   createSILPackType(llvm::ArrayRef<BuiltType> elements, bool isElementAddress) const {
-    // FIXME: Runtime support for variadic generics.
-    return BuiltType();
+    return TYPE_LOOKUP_ERROR_FMT("Lowered SILPackType cannot be demangled");
   }
 
   TypeLookupErrorOr<BuiltType>
@@ -1986,8 +2017,7 @@ public:
 
   TypeLookupErrorOr<BuiltType> createDependentMemberType(StringRef name,
                                                          BuiltType base) const {
-    // Should not have unresolved dependent member types here.
-    return BuiltType();
+    return TYPE_LOOKUP_ERROR_FMT("Unbound dependent member type cannot be demangled");
   }
 
   TypeLookupErrorOr<BuiltType>
@@ -2890,8 +2920,10 @@ const Metadata *SubstGenericParametersFromWrittenArgs::getMetadata(
                                         unsigned depth, unsigned index) const {
   if (auto flatIndex =
           _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
-    if (*flatIndex < allGenericArgs.size())
-      return allGenericArgs[*flatIndex];
+    if (*flatIndex < allGenericArgs.size()) {
+      // FIXME: variadic generics
+      return allGenericArgs[*flatIndex].getMetadata();
+    }
   }
 
   return nullptr;
@@ -2924,7 +2956,7 @@ demangleToGenericParamRef(StringRef typeName) {
 
 static void _gatherWrittenGenericArgs(
     const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
     Demangler &BorrowFrom) {
   if (!description)
     return;
@@ -2941,10 +2973,25 @@ static void _gatherWrittenGenericArgs(
       // another type.
       if (param.hasKeyArgument()) {
         auto genericArg = *genericArgs++;
-        allGenericArgs.push_back(genericArg);
+        allGenericArgs.push_back(MetadataOrPack(genericArg));
       } else {
         // Leave a gap for us to fill in by looking at same type info.
-        allGenericArgs.push_back(nullptr);
+        allGenericArgs.push_back(MetadataOrPack());
+        missingWrittenArguments = true;
+      }
+
+      break;
+
+    case GenericParamKind::TypePack:
+      // The type should have a key argument unless it's been same-typed to
+      // another type.
+      if (param.hasKeyArgument()) {
+        auto genericArg = reinterpret_cast<const Metadata * const *>(*genericArgs++);
+        MetadataPackPointer pack(genericArg);
+        allGenericArgs.push_back(MetadataOrPack(pack));
+      } else {
+        // Leave a gap for us to fill in by looking at same type info.
+        allGenericArgs.push_back(MetadataOrPack());
         missingWrittenArguments = true;
       }
 
@@ -2954,7 +3001,7 @@ static void _gatherWrittenGenericArgs(
       // We don't know about this kind of parameter. Create placeholders where
       // needed.
       if (param.hasKeyArgument()) {
-        allGenericArgs.push_back(nullptr);
+        allGenericArgs.push_back(MetadataOrPack());
         ++genericArgs;
       }
 
@@ -3001,7 +3048,7 @@ static void _gatherWrittenGenericArgs(
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
-          swift_getTypeByMangledName(MetadataState::Abstract,
+          MetadataOrPack(swift_getTypeByMangledName(MetadataState::Abstract,
             req.getMangledTypeName(),
             (const void * const *)allGenericArgs.data(),
             [&substitutions](unsigned depth, unsigned index) {
@@ -3009,7 +3056,7 @@ static void _gatherWrittenGenericArgs(
             },
             [&substitutions](const Metadata *type, unsigned index) {
               return substitutions.getWitnessTable(type, index);
-            }).getType().getMetadata();
+            }).getType().getMetadata());
       continue;
     }
 
