@@ -192,6 +192,34 @@ func testRecursive() {
 
 testRecursive()
 
+func testComplexNesting() {
+    let ptr = allocateInternalGenericPtr(of: ComplexNesting<Int, TestClass, TestClass, TestClass>.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: ComplexNesting<Int, TestClass, TestClass, TestClass>(34, x, x, x))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: ComplexNesting<Int, TestClass, TestClass, TestClass>(34, y, y, y))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: ComplexNesting<Int, TestClass, TestClass, TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testComplexNesting()
+
 enum TestEnum {
     case empty
     case nonEmpty(TestClass)
@@ -310,17 +338,17 @@ func testGenericObjc() {
 
     do {
         let y = ObjcClass()
-        // CHECK: Before deinit
+        // CHECK-macosx: Before deinit
         print("Before deinit")
 
-        // CHECK-NEXT: ObjcClass deinitialized!
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
         testGenericAssign(ptr, from: y)
     }
 
-    // CHECK-NEXT: Before deinit
+    // CHECK-macosx-NEXT: Before deinit
     print("Before deinit")
 
-    // CHECK-NEXT: ObjcClass deinitialized!
+    // CHECK-macosx-NEXT: ObjcClass deinitialized!
     testGenericDestroy(ptr, of: ObjcClass.self)
 
     ptr.deallocate()

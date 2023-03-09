@@ -227,7 +227,7 @@ ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) 
   case ReferenceCounting::None:
     return ScalarKind::TriviallyDestroyable;
   case ReferenceCounting::Custom:
-    return ScalarKind::UnknownReference;
+    return ScalarKind::CustomReference;
   }
 }
 
@@ -266,6 +266,7 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::BlockStorage: return "BlockStorage";
   case ScalarKind::ThickFunc: return "ThickFunc";
   case ScalarKind::ExistentialReference: return "ExistentialReference";
+  case ScalarKind::CustomReference: return "Custom";
   }
 }
 
@@ -1105,6 +1106,8 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case ScalarKind::ExistentialReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Existential, size);
     break;
+  case ScalarKind::CustomReference:
+    return false;
   default:
     llvm_unreachable("Unsupported ScalarKind");
   }
@@ -1213,6 +1216,9 @@ void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   case ScalarKind::ExistentialReference: {
     emitDestroyBoxedOpaqueExistentialBuffer(IGF, representative, addr);
     return;
+  }
+  case ScalarKind::CustomReference: {
+    typeInfo.destroy(IGF, addr, representative, true);
   }
   }
 }

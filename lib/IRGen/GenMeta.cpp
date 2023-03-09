@@ -2585,12 +2585,24 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
                                           RequireMetadata_t requireMetadata) {
   eraseExistingTypeContextDescriptor(IGM, type);
 
+  bool hasLayoutString = false;
+  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+    auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, type->getDeclaredType()->getCanonicalType());
+    auto &ti = IGM.getTypeInfo(lowered);
+    auto *typeLayoutEntry =
+        ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
+    auto genericSig =
+        lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+    hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
+  }
+
   if (auto sd = dyn_cast<StructDecl>(type)) {
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
-                                   /*hasLayoutString*/ false).emit();
+                                   hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
     EnumContextDescriptorBuilder(IGM, ed, requireMetadata,
-                                 /*hasLayoutString*/ false)
+                                 hasLayoutString)
         .emit();
   } else if (auto cd = dyn_cast<ClassDecl>(type)) {
     ClassContextDescriptorBuilder(IGM, cd, requireMetadata).emit();
@@ -2873,8 +2885,8 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 }
 
 static void emitInitializeFieldOffsetVectorWithLayoutString(
-    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable,
-    MetadataDependencyCollector *collector) {
+    IRGenFunction &IGF, SILType T, llvm::Value *metadata,
+    bool isVWTMutable, MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   assert(IGM.Context.LangOpts.hasFeature(
       Feature::LayoutStringValueWitnessesInstantiation));
@@ -2905,15 +2917,29 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldMetatype;
     if (auto ownership = propTy.getReferenceStorageOwnership()) {
+      auto &ti = IGF.getTypeInfo(propTy.getObjectType());
+      auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
+      assert(fixedTI && "Reference should have fixed layout");
+      auto fixedSize = fixedTI->getFixedSize().getValue();
       switch (*ownership) {
+      case ReferenceOwnership::Unowned:
+        fieldMetatype = llvm::Constant::getIntegerValue(
+            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
+                                         fixedSize == 8 ? 0x1 : 0x2));
+        break;
       case ReferenceOwnership::Weak:
         fieldMetatype = llvm::Constant::getIntegerValue(
-            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(), 0x7));
+            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
+                                         fixedSize == 8 ? 0x3 : 0x4));
+        break;
+      case ReferenceOwnership::Unmanaged:
+        fieldMetatype = llvm::Constant::getIntegerValue(
+            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
+                                         fixedSize == 8 ? 0x5 : 0x6));
         break;
       case ReferenceOwnership::Strong:
-      case ReferenceOwnership::Unowned:
-      case ReferenceOwnership::Unmanaged:
-        llvm_unreachable("Unmanaged reference should have been lowered");
+        llvm_unreachable("Strong reference should have been lowered");
+        break;
       }
     } else {
       auto request = DynamicMetadataRequest::getNonBlocking(

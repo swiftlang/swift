@@ -2609,8 +2609,27 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
 }
 
 
-const TypeLayout unknownWeakTypeLayout =
-    TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0);
+// TODO: Find out why arm64_32 uses 0x7fffffff for extra inhabitants
+//       of `weak` and `unowned(unsafe)` existential references.
+const TypeLayout knownTypeLayouts[] = {
+  TypeLayout(0, 0, {}, 0),
+  // Unowned
+  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *),
+             ValueWitnessTypes::flags().withBitwiseTakable(true), 1),
+  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *), {}, 0x7fffffff),
+
+  // Weak
+  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0),
+  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *), {}, 0x7fffffff),
+
+  // Unmanaged
+  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *),
+             ValueWitnessTypes::flags().withPOD(true),
+             swift_getHeapObjectExtraInhabitantCount()),
+  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *),
+             ValueWitnessTypes::flags().withPOD(true),
+             swift_getHeapObjectExtraInhabitantCount())
+};
 
 enum LayoutStringFlags : uint64_t {
   Empty = 0,
@@ -2638,8 +2657,8 @@ void swift::swift_initStructMetadataWithLayoutString(
   performBasicLayout(
       layout, fieldTypes, numFields,
       [&](const Metadata *fieldType) {
-        if (((uintptr_t)fieldType) == 0x7) {
-          return &unknownWeakTypeLayout;
+        if (((uintptr_t)fieldType) <= 0x6) {
+          return &knownTypeLayouts[(uintptr_t)fieldType];
         }
         return fieldType->getTypeLayout();
       },
@@ -2653,13 +2672,25 @@ void swift::swift_initStructMetadataWithLayoutString(
   size_t refCountBytes = 0;
   for (unsigned i = 0; i < numFields; ++i) {
     const Metadata *fieldType = fieldTypes[i];
-    unsigned fieldExtraInhabitantCount =
-      fieldType->vw_getNumExtraInhabitants();
 
-    if (((uintptr_t)fieldType) == 0x7) {
-      refCountBytes += sizeof(uint64_t);
+    auto fieldTypePtr = (uintptr_t)fieldType;
+    if (fieldTypePtr <= 0x6) {
+      if (fieldTypePtr <= 0x4) {
+        refCountBytes += sizeof(uint64_t);
+      }
+
+      unsigned fieldExtraInhabitantCount =
+        knownTypeLayouts[fieldTypePtr].getNumExtraInhabitants();
+
+      if (fieldExtraInhabitantCount > extraInhabitantCount) {
+        extraInhabitantCount = fieldExtraInhabitantCount;
+      }
+
       continue;
     }
+
+    unsigned fieldExtraInhabitantCount =
+      fieldType->vw_getNumExtraInhabitants();
 
     if (fieldExtraInhabitantCount > extraInhabitantCount) {
       extraInhabitantCount = fieldExtraInhabitantCount;
@@ -2686,31 +2717,50 @@ void swift::swift_initStructMetadataWithLayoutString(
 
   *((size_t*)(layoutStr + sizeof(uint64_t))) = refCountBytes;
 
-  size_t layoutStrOffset = sizeof(uint64_t) + sizeof(size_t);
-  size_t offset = 0;
+  size_t layoutStrOffset = layoutStringHeaderSize;
+  size_t fullOffset = 0;
+  size_t previousFieldOffset = 0;
   LayoutStringFlags flags = LayoutStringFlags::Empty;
   for (unsigned i = 0; i < numFields; ++i) {
     const Metadata *fieldType = fieldTypes[i];
+    size_t unalignedOffset = fullOffset;
 
-    if (((uintptr_t)fieldType) == 0x7) {
-      offset = roundUpToAlignMask(offset, alignof(uint8_t *));
-      *(uint64_t *)(layoutStr + layoutStrOffset) =
-          ((uint64_t)RefCountingKind::UnknownWeak << 56) | offset;
-      layoutStrOffset += sizeof(uint64_t);
+    auto fieldTypePtr = (uintptr_t)fieldType;
+    if (fieldTypePtr <= 0x6) {
+      auto alignmentMask = knownTypeLayouts[fieldTypePtr].flags.getAlignmentMask();
+      fullOffset = roundUpToAlignMask(fullOffset, alignmentMask);
 
-      offset = sizeof(uint8_t *);
+      if (fieldTypePtr <= 0x4) {
+        size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
+
+        auto tag = fieldTypePtr <= 0x2 ? RefCountingKind::UnknownUnowned :
+                                         RefCountingKind::UnknownWeak;
+
+        *(uint64_t *)(layoutStr + layoutStrOffset) =
+            ((uint64_t)tag << 56) | offset;
+        layoutStrOffset += sizeof(uint64_t);
+      }
+
+      // If this is an existential reference, add
+      // an additional ptr width to the offset
+      if (!(fieldTypePtr & 0x1)) {
+        fullOffset += sizeof(uint8_t *);
+        previousFieldOffset = sizeof(uint8_t *);
+      }
+
+      fullOffset += sizeof(uint8_t *);
+      previousFieldOffset = sizeof(uint8_t *);
+
       continue;
     }
 
-    if (offset) {
-      uint64_t alignmentMask = fieldType->vw_alignment() - 1;
-      uint64_t alignedOffset = offset + alignmentMask;
-      alignedOffset &= ~alignmentMask;
-      offset = alignedOffset;
-    }
+    fullOffset = roundUpToAlignMask(fullOffset, fieldType->vw_alignment() - 1);
+    size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
 
     if (fieldType->getValueWitnesses()->isPOD()) {
       // No need to handle PODs
+      previousFieldOffset = offset + fieldType->vw_size();
+      fullOffset += fieldType->vw_size();
     } else if (fieldType->hasLayoutString()) {
       const uint8_t *fieldLayoutStr = fieldType->getLayoutString();
       const LayoutStringFlags fieldFlags =
@@ -2721,8 +2771,7 @@ void swift::swift_initStructMetadataWithLayoutString(
       memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + layoutStringHeaderSize,
              refCountBytes);
       if (offset) {
-        *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(size_t)) += offset;
-        offset = 0;
+        *(uint64_t *)(layoutStr + layoutStrOffset) += offset;
       }
 
       if (flags & LayoutStringFlags::HasRelativePointers) {
@@ -2731,28 +2780,31 @@ void swift::swift_initStructMetadataWithLayoutString(
                                          fieldType);
       }
 
+      previousFieldOffset = *(const uint64_t*)(fieldLayoutStr + layoutStringHeaderSize + refCountBytes);
+      fullOffset += fieldType->vw_size();
+
       layoutStrOffset += refCountBytes;
     } else if (auto *cls = fieldType->getClassObject()) {
       auto tag = (cls->getFlags() & ClassFlags::UsesSwiftRefcounting) ?
                     RefCountingKind::NativeStrong :
-                    RefCountingKind::ObjC;
+                    RefCountingKind::Unknown;
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)tag << 56) | offset;
       layoutStrOffset += sizeof(uint64_t);
-      offset = 0;
+      previousFieldOffset = fieldType->vw_size();
+      fullOffset += previousFieldOffset;
     } else {
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)RefCountingKind::Metatype << 56) | offset;
       *(uintptr_t*)(layoutStr + layoutStrOffset + sizeof(uint64_t)) =
           (uintptr_t)fieldType;
       layoutStrOffset += sizeof(uint64_t) + sizeof(uintptr_t);
-      offset = 0;
+      previousFieldOffset = fieldType->vw_size();
+      fullOffset += previousFieldOffset;
     }
-
-    offset += fieldType->vw_size();
   }
 
-  *(uint64_t *)(layoutStr + layoutStrOffset) = offset;
+  *(uint64_t *)(layoutStr + layoutStrOffset) = previousFieldOffset;
   *(uint64_t *)(layoutStr + layoutStrOffset + sizeof(uint64_t)) = 0;
 
   // we mask out HasRelativePointers, because at this point they have all been
