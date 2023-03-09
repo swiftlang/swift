@@ -549,13 +549,6 @@ static bool matchCallArgumentsImpl(
       // Record the first argument for the variadic.
       parameterBindings[paramIdx].push_back(*claimed);
 
-      // If the argument is itself variadic, we're forwarding varargs
-      // with a VarargExpansionExpr; don't collect any more arguments.
-      if (args[*claimed].isVariadic() ||
-          args[*claimed].getPlainType()->is<PackExpansionType>()) {
-        return;
-      }
-
       auto currentNextArgIdx = nextArgIdx;
       {
         nextArgIdx = *claimed;
