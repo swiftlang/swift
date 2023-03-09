@@ -430,6 +430,40 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   llvm_unreachable("bad kind");
 }
 
+bool AbstractionPattern::doesTupleContainPackExpansionType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::Opaque:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    llvm_unreachable("pattern is not a tuple");
+  case Kind::Tuple: {
+    for (auto &elt : llvm::makeArrayRef(OrigTupleElements,
+                                        getNumTupleElements_Stored())) {
+      if (elt.isPackExpansion())
+        return true;
+    }
+    return true;
+  }
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::Type:
+  case Kind::Discard:
+  case Kind::ClangType:
+    return cast<TupleType>(getType()).containsPackExpansionType();
+  }
+  llvm_unreachable("bad kind");
+}
+
 static CanType getCanPackElementType(CanType type, unsigned index) {
   return cast<PackType>(type).getElementType(index);
 }
