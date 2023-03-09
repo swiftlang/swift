@@ -2904,11 +2904,17 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 
   // Fill out an array with the field type metadata records.
   Address fieldsMetadata =
-      IGF.createAlloca(llvm::ArrayType::get(IGM.TypeMetadataPtrTy, numFields),
+      IGF.createAlloca(llvm::ArrayType::get(IGM.Int8PtrPtrTy, numFields),
                        IGM.getPointerAlignment(), "fieldsMetadata");
   IGF.Builder.CreateLifetimeStart(fieldsMetadata,
                                   IGM.getPointerSize() * numFields);
   fieldsMetadata = IGF.Builder.CreateStructGEP(fieldsMetadata, 0, Size(0));
+
+  Address fieldTags =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.Int8Ty, numFields),
+                       Alignment(1), "fieldTags");
+  IGF.Builder.CreateLifetimeStart(fieldTags, Size(numFields));
+  fieldTags = IGF.Builder.CreateStructGEP(fieldTags, 0, Size(0));
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
@@ -2916,40 +2922,50 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
            "initializing offset vector for type with missing member?");
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldMetatype;
+    llvm::Value *fieldTag;
     if (auto ownership = propTy.getReferenceStorageOwnership()) {
       auto &ti = IGF.getTypeInfo(propTy.getObjectType());
       auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
       assert(fixedTI && "Reference should have fixed layout");
-      auto fixedSize = fixedTI->getFixedSize().getValue();
+      auto fixedSize = fixedTI->getFixedSize();
+      fieldMetatype = emitTypeLayoutRef(IGF, propTy, collector);
       switch (*ownership) {
       case ReferenceOwnership::Unowned:
-        fieldMetatype = llvm::Constant::getIntegerValue(
-            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
-                                         fixedSize == 8 ? 0x1 : 0x2));
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x1 : 0x2));
         break;
       case ReferenceOwnership::Weak:
-        fieldMetatype = llvm::Constant::getIntegerValue(
-            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
-                                         fixedSize == 8 ? 0x3 : 0x4));
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x3 : 0x4));
         break;
       case ReferenceOwnership::Unmanaged:
-        fieldMetatype = llvm::Constant::getIntegerValue(
-            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(),
-                                         fixedSize == 8 ? 0x5 : 0x6));
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x5 : 0x6));
         break;
       case ReferenceOwnership::Strong:
         llvm_unreachable("Strong reference should have been lowered");
         break;
       }
     } else {
+      fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(), 0x0));
       auto request = DynamicMetadataRequest::getNonBlocking(
           MetadataState::LayoutComplete, collector);
       fieldMetatype = IGF.emitTypeMetadataRefForLayout(propTy, request);
+      fieldMetatype = IGF.Builder.CreateBitCast(fieldMetatype, IGM.Int8PtrPtrTy);
     }
+
+    Address fieldTagAddr = IGF.Builder.CreateConstArrayGEP(
+        fieldTags, index, Size::forBits(IGM.Int8Ty->getBitWidth()));
+    IGF.Builder.CreateStore(fieldTag, fieldTagAddr);
 
     Address fieldMetatypeAddr = IGF.Builder.CreateConstArrayGEP(
         fieldsMetadata, index, IGM.getPointerSize());
     IGF.Builder.CreateStore(fieldMetatype, fieldMetatypeAddr);
+
     ++index;
   });
   assert(index == numFields);
@@ -2963,8 +2979,10 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
   IGF.Builder.CreateCall(
       IGM.getInitStructMetadataWithLayoutStringFunctionPointer(),
       {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-       fieldsMetadata.getAddress(), fieldVector});
+       fieldsMetadata.getAddress(), fieldTags.getAddress(), fieldVector});
 
+  IGF.Builder.CreateLifetimeEnd(fieldTags,
+                                IGM.getPointerSize() * numFields);
   IGF.Builder.CreateLifetimeEnd(fieldsMetadata,
                                 IGM.getPointerSize() * numFields);
 }

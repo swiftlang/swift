@@ -1991,7 +1991,7 @@ static void performBasicLayout(TypeLayout &layout,
     auto &elt = elements[i];
 
     // Lay out this element.
-    const TypeLayout *eltLayout = getLayout(elt);
+    const TypeLayout *eltLayout = getLayout(i, elt);
     size = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
 
     // Report this record to the functor.
@@ -2046,7 +2046,7 @@ void swift::swift_getTupleTypeLayout(TypeLayout *result,
   *result = TypeLayout();
   unsigned numExtraInhabitants = 0;
   performBasicLayout(*result, elements, flags.getNumElements(),
-    [](const TypeLayout *elt) { return elt; },
+    [](size_t i, const TypeLayout *elt) { return elt; },
     [elementOffsets, &numExtraInhabitants]
     (size_t i, const TypeLayout *elt, size_t offset) {
       if (elementOffsets)
@@ -2181,7 +2181,7 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   // Perform basic layout on the tuple.
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, Data.getElements(), Data.NumElements,
-    [](const TupleTypeMetadata::Element &elt) {
+    [](size_t i, const TupleTypeMetadata::Element &elt) {
       return elt.getTypeLayout();
     },
     [](size_t i, TupleTypeMetadata::Element &elt, size_t offset) {
@@ -2583,7 +2583,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(
       layout, fieldTypes, numFields,
-      [&](const TypeLayout *fieldType) { return fieldType; },
+      [&](size_t i, const TypeLayout *fieldType) { return fieldType; },
       [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
@@ -2608,29 +2608,6 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
-
-// TODO: Find out why arm64_32 uses 0x7fffffff for extra inhabitants
-//       of `weak` and `unowned(unsafe)` existential references.
-const TypeLayout knownTypeLayouts[] = {
-  TypeLayout(0, 0, {}, 0),
-  // Unowned
-  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *),
-             ValueWitnessTypes::flags().withBitwiseTakable(true), 1),
-  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *), {}, 0x7fffffff),
-
-  // Weak
-  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *), {}, 0),
-  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *), {}, 0x7fffffff),
-
-  // Unmanaged
-  TypeLayout(sizeof(uint8_t *), alignof(uint8_t *),
-             ValueWitnessTypes::flags().withPOD(true),
-             swift_getHeapObjectExtraInhabitantCount()),
-  TypeLayout(sizeof(uint8_t *) * 2, alignof(uint8_t *),
-             ValueWitnessTypes::flags().withPOD(true),
-             swift_getHeapObjectExtraInhabitantCount())
-};
-
 enum LayoutStringFlags : uint64_t {
   Empty = 0,
   // TODO: Track other useful information tha can be used to optimize layout
@@ -2652,17 +2629,18 @@ inline LayoutStringFlags &operator|=(LayoutStringFlags &a, LayoutStringFlags b) 
 
 void swift::swift_initStructMetadataWithLayoutString(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
-    const Metadata *const *fieldTypes, uint32_t *fieldOffsets) {
+    const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
+    uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(
       layout, fieldTypes, numFields,
-      [&](const Metadata *fieldType) {
-        if (((uintptr_t)fieldType) <= 0x6) {
-          return &knownTypeLayouts[(uintptr_t)fieldType];
+      [&](size_t i, const uint8_t *fieldType) {
+        if (fieldTags[i]) {
+          return (const TypeLayout*)fieldType;
         }
-        return fieldType->getTypeLayout();
+        return ((const Metadata*)fieldType)->getTypeLayout();
       },
-      [&](size_t i, const Metadata *fieldType, uint32_t offset) {
+      [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
 
@@ -2671,16 +2649,16 @@ void swift::swift_initStructMetadataWithLayoutString(
   // Compute total combined size of the layout string
   size_t refCountBytes = 0;
   for (unsigned i = 0; i < numFields; ++i) {
-    const Metadata *fieldType = fieldTypes[i];
 
-    auto fieldTypePtr = (uintptr_t)fieldType;
-    if (fieldTypePtr <= 0x6) {
-      if (fieldTypePtr <= 0x4) {
+    auto fieldTag = fieldTags[i];
+    if (fieldTag) {
+      if (fieldTag <= 0x4) {
         refCountBytes += sizeof(uint64_t);
       }
 
-      unsigned fieldExtraInhabitantCount =
-        knownTypeLayouts[fieldTypePtr].getNumExtraInhabitants();
+      const TypeLayout *fieldType = (const TypeLayout*)fieldTypes[i];
+
+      unsigned fieldExtraInhabitantCount = fieldType->getNumExtraInhabitants();
 
       if (fieldExtraInhabitantCount > extraInhabitantCount) {
         extraInhabitantCount = fieldExtraInhabitantCount;
@@ -2688,6 +2666,8 @@ void swift::swift_initStructMetadataWithLayoutString(
 
       continue;
     }
+
+    const Metadata *fieldType = (const Metadata*)fieldTypes[i];
 
     unsigned fieldExtraInhabitantCount =
       fieldType->vw_getNumExtraInhabitants();
@@ -2722,19 +2702,19 @@ void swift::swift_initStructMetadataWithLayoutString(
   size_t previousFieldOffset = 0;
   LayoutStringFlags flags = LayoutStringFlags::Empty;
   for (unsigned i = 0; i < numFields; ++i) {
-    const Metadata *fieldType = fieldTypes[i];
     size_t unalignedOffset = fullOffset;
 
-    auto fieldTypePtr = (uintptr_t)fieldType;
-    if (fieldTypePtr <= 0x6) {
-      auto alignmentMask = knownTypeLayouts[fieldTypePtr].flags.getAlignmentMask();
+    auto fieldTag = fieldTags[i];
+    if (fieldTag) {
+      const TypeLayout *fieldType = (const TypeLayout*)fieldTypes[i];
+      auto alignmentMask = fieldType->flags.getAlignmentMask();
       fullOffset = roundUpToAlignMask(fullOffset, alignmentMask);
 
-      if (fieldTypePtr <= 0x4) {
+      if (fieldTag <= 0x4) {
         size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
 
-        auto tag = fieldTypePtr <= 0x2 ? RefCountingKind::UnknownUnowned :
-                                         RefCountingKind::UnknownWeak;
+        auto tag = fieldTag <= 0x2 ? RefCountingKind::UnknownUnowned :
+                                     RefCountingKind::UnknownWeak;
 
         *(uint64_t *)(layoutStr + layoutStrOffset) =
             ((uint64_t)tag << 56) | offset;
@@ -2743,7 +2723,7 @@ void swift::swift_initStructMetadataWithLayoutString(
 
       // If this is an existential reference, add
       // an additional ptr width to the offset
-      if (!(fieldTypePtr & 0x1)) {
+      if (!(fieldTag & 0x1)) {
         fullOffset += sizeof(uint8_t *);
         previousFieldOffset = sizeof(uint8_t *);
       }
@@ -2753,6 +2733,8 @@ void swift::swift_initStructMetadataWithLayoutString(
 
       continue;
     }
+
+    const Metadata *fieldType = (const Metadata*)fieldTypes[i];
 
     fullOffset = roundUpToAlignMask(fullOffset, fieldType->vw_alignment() - 1);
     size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
