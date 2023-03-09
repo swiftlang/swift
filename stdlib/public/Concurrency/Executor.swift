@@ -50,6 +50,12 @@ public struct UnownedSerialExecutor: Sendable {
   #if compiler(>=5.5) && $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
+
+  @_spi(ConcurrencyExecutors)
+  @available(SwiftStdlib 5.9, *)
+  public var _executor: Builtin.Executor {
+    self.executor
+  }
   #endif
 
   @inlinable
@@ -67,6 +73,7 @@ public struct UnownedSerialExecutor: Sendable {
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
   }
+
 }
 
 /// Checks if the current task is running on the expected executor.
