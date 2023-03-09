@@ -2647,8 +2647,11 @@ namespace {
         if (!subPatternType)
           return Type();
 
+        // NOTE: The order here is important! Pattern matching equality is
+        // not symmetric (we need to fix that either by using a different
+        // constraint, or actually making it symmetric).
         CS.addConstraint(
-            ConstraintKind::Equal, subPatternType, openedType,
+            ConstraintKind::Equal, openedType, subPatternType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         // FIXME [OPAQUE SUPPORT]: the distinction between where we want opaque
@@ -2759,8 +2762,11 @@ namespace {
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
               castType, bindPatternVarsOneWay);
 
+          // NOTE: The order here is important! Pattern matching equality is
+          // not symmetric (we need to fix that either by using a different
+          // constraint, or actually making it symmetric).
           CS.addConstraint(
-              ConstraintKind::Equal, subPatternType, castType,
+              ConstraintKind::Equal, castType, subPatternType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         }
         return setType(isType);
@@ -2889,7 +2895,13 @@ namespace {
           // FIXME: Verify ExtInfo state is correct, not working by accident.
           FunctionType::ExtInfo info;
           Type functionType = FunctionType::get(params, outputType, info);
-          // TODO: Convert to FunctionInput/FunctionResult constraints.
+
+          // TODO: Convert to own constraint? Note that ApplicableFn isn't quite
+          // right, as pattern matching has data flowing *into* the apply result
+          // and call arguments, no the other way around.
+          // NOTE: The order here is important! Pattern matching equality is
+          // not symmetric (we need to fix that either by using a different
+          // constraint, or actually making it symmetric).
           CS.addConstraint(
               ConstraintKind::Equal, functionType, memberType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
