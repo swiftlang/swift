@@ -58,19 +58,25 @@ if (SWIFT_SWIFT_PARSER)
        ${CMAKE_SHARED_LIBRARY_SUFFIX}
        OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
 
-  # The complete set of files that get installed.
-  set(SWIFT_SYNTAX_DEST_FILES)
+  # Interface library to collect swiftinterfaces and swiftmodules from
+  # SwiftSyntax
+  add_library(swiftSyntaxLibraries INTERFACE)
 
   # Copy over all of the shared libraries from earlyswiftsyntax so they can
   # be found via RPATH.
   foreach (sharedlib ${SWIFT_SYNTAX_SHARED_LIBRARIES})
     add_custom_command(
-      OUTPUT ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
+      OUTPUT "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+      DEPENDS "${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib}"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_SOURCE_DIR}/${sharedlib} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
+    )
+
+    add_custom_target(copy_swiftSyntaxLibrary_${sharedlib}
+      DEPENDS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
       COMMENT "Copying ${sharedlib}"
     )
 
-    list(APPEND SWIFT_SYNTAX_DEST_FILES ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib})
+    add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${sharedlib})
   endforeach()
 
   # Copy all of the Swift modules from earlyswiftsyntax so they can be found
@@ -78,6 +84,7 @@ if (SWIFT_SWIFT_PARSER)
   # toolchain.
   list(TRANSFORM SWIFT_SYNTAX_MODULES APPEND ".swiftmodule"
        OUTPUT_VARIABLE SWIFT_SYNTAX_MODULE_DIRS)
+
   foreach(module_dir ${SWIFT_SYNTAX_MODULE_DIRS})
     # Find all of the source module files.
     file(GLOB module_files
@@ -93,17 +100,18 @@ if (SWIFT_SWIFT_PARSER)
 
     add_custom_command(
       OUTPUT ${dest_module_files}
+      DEPENDS ${module_files}
       COMMAND ${CMAKE_COMMAND} -E make_directory ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${module_files} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}/
+    )
+
+    add_custom_target(copy_swiftSyntaxModule_${module_dir}
+      DEPENDS ${dest_module_files}
       COMMENT "Copying ${module_dir}"
     )
 
-    list(APPEND SWIFT_SYNTAX_DEST_FILES ${dest_module_files})
+    add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxModule_${module_dir})
   endforeach()
-
-  # Add a custom target to copy over the SwiftSyntax build products into
-  # their final places.
-  add_custom_target(swiftSyntaxLibraries DEPENDS ${SWIFT_SYNTAX_DEST_FILES})
 endif()
 
 # Workaround a cmake bug, see the corresponding function in swift-syntax
