@@ -935,15 +935,13 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
 
 :: Package sdk.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\sdk\ ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
   -p:SDK_ROOT=%SDKInstallRoot%\ ^
-  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
-  -p:PlatformToolset=v142
+  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
 
