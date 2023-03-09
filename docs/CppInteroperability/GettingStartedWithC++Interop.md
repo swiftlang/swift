@@ -32,7 +32,7 @@ module CxxTest {
 Add the C++ module to the include path and enable C++ interop:
 - Navigate to your project directory
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
-- Under `Custom Flags` -> `Other Swift Flags` add `-cxx-compatibility-mode=swift-5.9`
+- Under `Custom Flags` -> `Other Swift Flags` add `-cxx-interoperability-mode=swift-5.9`
 - Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/CxxTest`). 
 
 - This should now allow your to import your C++ Module into any `.swift` file.
