@@ -871,6 +871,28 @@ public:
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
 
+  /// Returns an \c ImportFilter with all elements of \c ImportFilterKind.
+  constexpr static ImportFilter getImportFilterAll() {
+    return {ImportFilterKind::Exported,
+            ImportFilterKind::Default,
+            ImportFilterKind::ImplementationOnly,
+            ImportFilterKind::PackageOnly,
+            ImportFilterKind::SPIOnly,
+            ImportFilterKind::ShadowedByCrossImportOverlay};
+  }
+
+  /// Import kinds visible to the module declaring them.
+  ///
+  /// This leaves out \c ShadowedByCrossImportOverlay as even if present in
+  /// the sources it's superseded by the cross-overlay as the local import.
+  constexpr static ImportFilter getImportFilterLocal() {
+    return {ImportFilterKind::Exported,
+            ImportFilterKind::Default,
+            ImportFilterKind::ImplementationOnly,
+            ImportFilterKind::PackageOnly,
+            ImportFilterKind::SPIOnly};
+  }
+
   /// Looks up which modules are imported by this module.
   ///
   /// \p filter controls whether public, private, or any imports are included

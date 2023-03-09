@@ -898,10 +898,8 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
 
   // Module dependencies.
   SmallVector<ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(
-      imports, {ModuleDecl::ImportFilterKind::Exported,
-                ModuleDecl::ImportFilterKind::Default,
-                ModuleDecl::ImportFilterKind::ImplementationOnly});
+  primarySourceFile->getImportedModules(imports,
+                                        ModuleDecl::getImportFilterLocal());
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
                         indexSystemModules, skipStdlib, includeLocals,
