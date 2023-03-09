@@ -1181,7 +1181,46 @@ struct MetadataOrPack {
   }
 };
 
+/// Function object that produces substitutions for the generic parameters
+/// that occur within a mangled name, using the complete set of generic
+/// arguments "as written".
+///
+/// Use with \c _getTypeByMangledName to decode potentially-generic types.
+class SubstGenericParametersFromWrittenArgs {
+  /// The complete set of generic arguments.
+  const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
+
+  /// The counts of generic parameters at each level.
+  const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
+
+public:
+  /// Initialize a new function object to handle substitutions. Both
+  /// parameters are references to vectors that must live longer than
+  /// this function object.
+  ///
+  /// \param allGenericArgs The complete set of generic arguments, as written.
+  /// This could come directly from "source" (where all generic arguments are
+  /// encoded) or from metadata via gatherWrittenGenericArgs().
+  ///
+  /// \param genericParamCounts The count of generic parameters at each
+  /// generic level, typically gathered by _gatherGenericParameterCounts.
+  explicit SubstGenericParametersFromWrittenArgs(
+      const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+      const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
+      : allGenericArgs(allGenericArgs),
+        genericParamCounts(genericParamCounts) {}
+
+  const Metadata *getMetadata(unsigned depth, unsigned index) const;
+  const WitnessTable *getWitnessTable(const Metadata *type,
+                                      unsigned index) const;
+};
+
 }  // end anonymous namespace
+
+static void _gatherWrittenGenericArgs(
+    const Metadata *metadata, const TypeContextDescriptor *description,
+    llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
+    Demangler &BorrowFrom);
 
 static llvm::Optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
@@ -1262,8 +1301,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
     // If we have a parent, gather it's generic arguments "as written".
     if (parent) {
-      gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
-                               allGenericArgs, demangler);
+      _gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
+                                allGenericArgs, demangler);
     }
     
     // Add the generic arguments we were given.
@@ -2883,7 +2922,7 @@ demangleToGenericParamRef(StringRef typeName) {
                                        node->getChild(1)->getIndex());
 }
 
-void swift::gatherWrittenGenericArgs(
+static void _gatherWrittenGenericArgs(
     const Metadata *metadata, const TypeContextDescriptor *description,
     llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
     Demangler &BorrowFrom) {

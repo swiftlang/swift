@@ -423,40 +423,6 @@ public:
                                SubstDependentWitnessTableFn substWitnessTable);
 #pragma clang diagnostic pop
 
-  /// Function object that produces substitutions for the generic parameters
-  /// that occur within a mangled name, using the complete set of generic
-  /// arguments "as written".
-  ///
-  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
-  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
-    /// The complete set of generic arguments.
-    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
-
-    /// The counts of generic parameters at each level.
-    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
-
-  public:
-    /// Initialize a new function object to handle substitutions. Both
-    /// parameters are references to vectors that must live longer than
-    /// this function object.
-    ///
-    /// \param allGenericArgs The complete set of generic arguments, as written.
-    /// This could come directly from "source" (where all generic arguments are
-    /// encoded) or from metadata via gatherWrittenGenericArgs().
-    ///
-    /// \param genericParamCounts The count of generic parameters at each
-    /// generic level, typically gathered by _gatherGenericParameterCounts.
-    explicit SubstGenericParametersFromWrittenArgs(
-        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
-        : allGenericArgs(allGenericArgs),
-          genericParamCounts(genericParamCounts) {}
-
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
-    const WitnessTable *getWitnessTable(const Metadata *type,
-                                        unsigned index) const;
-  };
-
   /// Gather generic parameter counts from a context descriptor.
   ///
   /// \returns true if the innermost descriptor is generic.
@@ -533,23 +499,6 @@ public:
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
-
-  /// Gather the set of generic arguments that would be written in the
-  /// source.
-  ///
-  /// This function computes generic arguments even when they are not
-  /// directly represented in the metadata, e.g., generic parameters that
-  /// are canonicalized away by same-type constraints and are therefore not
-  /// "key" parameters.
-  ///
-  /// \code
-  ///   extension Array where Element == String { }
-  ///   extension Dictionary where Key == Value { }
-  /// \endcode
-  void gatherWrittenGenericArgs(const Metadata *metadata,
-                                const TypeContextDescriptor *description,
-                                llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-                                Demangler &BorrowFrom);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
