@@ -2301,6 +2301,34 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                     {}, {}).getType().getMetadata();
 }
 
+TypeLookupErrorOr<MetadataPackPointer>
+swift::getTypePackByMangledName(StringRef typeName,
+                                const void *const *origArgumentVector,
+                                SubstGenericParameterFn substGenericParam,
+                                SubstDependentWitnessTableFn substWitnessTable) {
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  NodePointer node = demangler.demangleTypeRef(typeName);
+  if (!node)
+    return TypeLookupError("Demangling failed");
+
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable);
+  auto type = Demangle::decodeMangledType(builder, node);
+  if (type.isError()) {
+    return *type.getError();
+  }
+  if (!type.getType()) {
+    return TypeLookupError("NULL type but no error provided");
+  }
+
+  if (!type.getType().isMetadataPack()) {
+    return TypeLookupError("This entry point is only for packs");
+  }
+
+  return type.getType().getMetadataPack();
+}
+
 // ==== Function metadata functions ----------------------------------------------
 
 static llvm::Optional<llvm::StringRef>

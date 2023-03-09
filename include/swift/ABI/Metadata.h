@@ -4917,6 +4917,8 @@ class TargetPackPointer {
   using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
 
 public:
+  explicit TargetPackPointer() : Ptr(0) {}
+
   explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
 
   explicit TargetPackPointer(const void *rawPtr)
@@ -4925,6 +4927,10 @@ public:
   explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
     : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
           (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  explicit operator bool() const {
+    return Ptr != 0;
+  }
 
   // Strips off the LSB.
   const PointerType *getElements() const {
