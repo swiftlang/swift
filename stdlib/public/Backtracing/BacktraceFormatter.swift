@@ -654,7 +654,16 @@ public struct BacktraceFormatter {
           // sourceLocation.column is an index in UTF-8 code units in
           // `untabified`.  We should point at the grapheme cluster that
           // contains that UTF-8 index.
-          let adjustedColumn = max(sourceLocation.column, 1)
+          let adjustedColumn: Int
+          if sourceLocation.column > 0 {
+            adjustedColumn = sourceLocation.column
+          } else {
+            if let ndx = code.firstIndex(where: { $0 != " " }) {
+              adjustedColumn = code.distance(from: code.startIndex, to: ndx) + 1
+            } else {
+              adjustedColumn = 1
+            }
+          }
           let utf8Ndx
             = untabified.utf8.index(untabified.utf8.startIndex,
                                     offsetBy: adjustedColumn,
