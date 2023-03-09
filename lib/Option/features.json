@@ -29,6 +29,9 @@
     },
     {
       "name": "emit-extension-block-symbols"
+    },
+    {
+      "name": "package-name"
     }
   ]
 }
