@@ -332,7 +332,8 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     auto error = _checkGenericRequirements(
         getConditionalRequirements(), conditionalArgs,
         [&substitutions](unsigned depth, unsigned index) {
-          return substitutions.getMetadata(depth, index);
+          // FIXME: Variadic generics
+          return substitutions.getMetadata(depth, index).getMetadataOrNull();
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1281,32 +1282,156 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
   return isSubclass(subclass, superclass);
 }
 
-llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
-    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-    llvm::SmallVectorImpl<const void *> &extraArguments,
-    SubstGenericParameterFn substGenericParam,
-    SubstDependentWitnessTableFn substWitnessTable) {
-  for (const auto &req : requirements) {
-    // Make sure we understand the requirement we're dealing with.
-    if (!req.hasKnownKind())
-      return TypeLookupError("unknown kind");
+static llvm::Optional<TypeLookupError>
+checkGenericRequirement(const GenericRequirementDescriptor &req,
+                        llvm::SmallVectorImpl<const void *> &extraArguments,
+                        SubstGenericParameterFn substGenericParam,
+                        SubstDependentWitnessTableFn substWitnessTable) {
+  assert(!req.getFlags().isPackRequirement());
 
-    if (req.getFlags().isPackRequirement())
-      return TypeLookupError("Packs not supported here yet");
+  // Make sure we understand the requirement we're dealing with.
+  if (!req.hasKnownKind())
+    return TypeLookupError("unknown kind");
 
-    // Resolve the subject generic parameter.
+  // Resolve the subject generic parameter.
+  auto result = swift_getTypeByMangledName(
+      MetadataState::Abstract, req.getParam(), extraArguments.data(),
+      substGenericParam, substWitnessTable);
+  if (result.getError())
+    return *result.getError();
+  const Metadata *subjectType = result.getType().getMetadata();
+
+  // Check the requirement.
+  switch (req.getKind()) {
+  case GenericRequirementKind::Protocol: {
+    const WitnessTable *witnessTable = nullptr;
+    if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+                             &witnessTable)) {
+      const char *protoName =
+          req.getProtocol() ? req.getProtocol().getName() : "<null>";
+      return TYPE_LOOKUP_ERROR_FMT(
+          "subject type %.*s does not conform to protocol %s",
+          (int)req.getParam().size(), req.getParam().data(), protoName);
+    }
+
+    // If we need a witness table, add it.
+    if (req.getProtocol().needsWitnessTable()) {
+      assert(witnessTable);
+      extraArguments.push_back(witnessTable);
+    }
+
+    return llvm::None;
+  }
+
+  case GenericRequirementKind::SameType: {
+    // Demangle the second type under the given substitutions.
     auto result = swift_getTypeByMangledName(
-        MetadataState::Abstract, req.getParam(), extraArguments.data(),
-        substGenericParam, substWitnessTable);
+        MetadataState::Abstract, req.getMangledTypeName(),
+        extraArguments.data(), substGenericParam, substWitnessTable);
     if (result.getError())
       return *result.getError();
-    const Metadata *subjectType = result.getType().getMetadata();
+    auto otherType = result.getType().getMetadata();
 
-    // Check the requirement.
-    switch (req.getKind()) {
-    case GenericRequirementKind::Protocol: {
+    // Check that the types are equivalent.
+    if (subjectType != otherType) {
+      return TYPE_LOOKUP_ERROR_FMT(
+          "subject type %.*s does not match %.*s", (int)req.getParam().size(),
+          req.getParam().data(), (int)req.getMangledTypeName().size(),
+          req.getMangledTypeName().data());
+    }
+
+    return llvm::None;
+  }
+
+  case GenericRequirementKind::Layout: {
+    switch (req.getLayout()) {
+    case GenericRequirementLayoutKind::Class:
+      if (!subjectType->satisfiesClassConstraint()) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "subject type %.*s does not satisfy class constraint",
+            (int)req.getParam().size(), req.getParam().data());
+      }
+      return llvm::None;
+    }
+
+    // Unknown layout.
+    return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+  }
+
+  case GenericRequirementKind::BaseClass: {
+    // Demangle the base type under the given substitutions.
+    auto result = swift_getTypeByMangledName(
+        MetadataState::Abstract, req.getMangledTypeName(),
+        extraArguments.data(), substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    auto baseType = result.getType().getMetadata();
+
+    // If the type which is constrained to a base class is an existential 
+    // type, and if that existential type includes a superclass constraint,
+    // just require that the superclass by which the existential is
+    // constrained is a subclass of the base class.
+    if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subjectType)) {
+      if (auto *superclassConstraint = existential->getSuperclassConstraint())
+        subjectType = superclassConstraint;
+    }
+
+    if (!isSubclass(subjectType, baseType))
+      return TYPE_LOOKUP_ERROR_FMT(
+          "%.*s is not subclass of %.*s", (int)req.getParam().size(),
+          req.getParam().data(), (int)req.getMangledTypeName().size(),
+          req.getMangledTypeName().data());
+
+    return llvm::None;
+  }
+
+  case GenericRequirementKind::SameConformance: {
+    // FIXME: Implement this check.
+    return llvm::None;
+  }
+
+  case GenericRequirementKind::SameShape: {
+    return TYPE_LOOKUP_ERROR_FMT("can't have same-shape requirement where "
+                                 "subject type is not a pack");
+  }
+  }
+
+  // Unknown generic requirement kind.
+  return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
+                               (unsigned)req.getKind());
+}
+
+static llvm::Optional<TypeLookupError>
+checkGenericPackRequirement(const GenericRequirementDescriptor &req,
+                            llvm::SmallVectorImpl<const void *> &extraArguments,
+                            SubstGenericParameterFn substGenericParam,
+                            SubstDependentWitnessTableFn substWitnessTable) {
+  assert(req.getFlags().isPackRequirement());
+
+  // Make sure we understand the requirement we're dealing with.
+  if (!req.hasKnownKind())
+    return TypeLookupError("unknown kind");
+
+  // Resolve the subject generic parameter.
+  auto result = swift::getTypePackByMangledName(
+      req.getParam(), extraArguments.data(),
+      substGenericParam, substWitnessTable);
+  if (result.getError())
+    return *result.getError();
+  MetadataPackPointer subjectType = result.getType();
+  assert(subjectType.getLifetime() == PackLifetime::OnHeap);
+
+  // Check the requirement.
+  switch (req.getKind()) {
+  case GenericRequirementKind::Protocol: {
+    llvm::SmallVector<const WitnessTable *, 4> witnessTables;
+
+    // Look up the conformance of each pack element to the protocol.
+    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      const Metadata *elt = subjectType.getElements()[i];
+
       const WitnessTable *witnessTable = nullptr;
-      if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+      if (!_conformsToProtocol(nullptr, elt, req.getProtocol(),
                                &witnessTable)) {
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
@@ -1315,88 +1440,82 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
             (int)req.getParam().size(), req.getParam().data(), protoName);
       }
 
-      // If we need a witness table, add it.
-      if (req.getProtocol().needsWitnessTable()) {
-        assert(witnessTable);
-        extraArguments.push_back(witnessTable);
-      }
-
-      continue;
+      if (req.getProtocol().needsWitnessTable())
+        witnessTables.push_back(witnessTable);
     }
 
-    case GenericRequirementKind::SameType: {
-      // Demangle the second type under the given substitutions.
-      auto result = swift_getTypeByMangledName(
-          MetadataState::Abstract, req.getMangledTypeName(),
-          extraArguments.data(), substGenericParam, substWitnessTable);
-      if (result.getError())
-        return *result.getError();
-      auto otherType = result.getType().getMetadata();
-
-      // Check that the types are equivalent.
-      if (subjectType != otherType)
-        return TYPE_LOOKUP_ERROR_FMT(
-            "subject type %.*s does not match %.*s", (int)req.getParam().size(),
-            req.getParam().data(), (int)req.getMangledTypeName().size(),
-            req.getMangledTypeName().data());
-
-      continue;
+    // If we need a witness table, add it.
+    if (req.getProtocol().needsWitnessTable()) {
+      assert(witnessTables.size() == subjectType.getNumElements());
+      auto *pack = swift_allocateWitnessTablePack(witnessTables.data(),
+                                                  witnessTables.size());
+      extraArguments.push_back(pack);
     }
 
-    case GenericRequirementKind::Layout: {
-      switch (req.getLayout()) {
-      case GenericRequirementLayoutKind::Class:
-        if (!subjectType->satisfiesClassConstraint())
-          return TYPE_LOOKUP_ERROR_FMT(
-              "subject type %.*s does not satisfy class constraint",
-              (int)req.getParam().size(), req.getParam().data());
-        continue;
-      }
+    return llvm::None;
+  }
 
-      // Unknown layout.
-      return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+  case GenericRequirementKind::SameType: {
+    llvm_unreachable("Implement me");
+  }
+
+  case GenericRequirementKind::Layout: {
+    llvm_unreachable("Implement me");
+  }
+
+  case GenericRequirementKind::BaseClass: {
+    llvm_unreachable("Implement me");
+  }
+
+  case GenericRequirementKind::SameConformance: {
+    // FIXME: Implement this check.
+    return llvm::None;
+  }
+
+  case GenericRequirementKind::SameShape: {
+    auto result = swift::getTypePackByMangledName(
+        req.getParam(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    MetadataPackPointer otherType = result.getType();
+    assert(otherType.getLifetime() == PackLifetime::OnHeap);
+
+    if (subjectType.getNumElements() != otherType.getNumElements()) {
+      return TYPE_LOOKUP_ERROR_FMT("same-shape requirement unsatisfied; "
+                                   "%lu != %lu",
+                                   subjectType.getNumElements(),
+                                   otherType.getNumElements() );
     }
 
-    case GenericRequirementKind::BaseClass: {
-      // Demangle the base type under the given substitutions.
-      auto result = swift_getTypeByMangledName(
-          MetadataState::Abstract, req.getMangledTypeName(),
-          extraArguments.data(), substGenericParam, substWitnessTable);
-      if (result.getError())
-        return *result.getError();
-      auto baseType = result.getType().getMetadata();
+    return llvm::None;
+  }
+  }
 
-      // If the type which is constrained to a base class is an existential 
-      // type, and if that existential type includes a superclass constraint,
-      // just require that the superclass by which the existential is
-      // constrained is a subclass of the base class.
-      if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subjectType)) {
-        if (auto *superclassConstraint = existential->getSuperclassConstraint())
-          subjectType = superclassConstraint;
-      }
+  // Unknown generic requirement kind.
+  return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
+                               (unsigned)req.getKind());
+}
 
-      if (!isSubclass(subjectType, baseType))
-        return TYPE_LOOKUP_ERROR_FMT(
-            "%.*s is not subclass of %.*s", (int)req.getParam().size(),
-            req.getParam().data(), (int)req.getMangledTypeName().size(),
-            req.getMangledTypeName().data());
-
-      continue;
+llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
+    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+    llvm::SmallVectorImpl<const void *> &extraArguments,
+    SubstGenericParameterFn substGenericParam,
+    SubstDependentWitnessTableFn substWitnessTable) {
+  for (const auto &req : requirements) {
+    if (req.getFlags().isPackRequirement()) {
+      auto error = checkGenericPackRequirement(req, extraArguments,
+                                               substGenericParam,
+                                               substWitnessTable);
+      if (error)
+        return error;
+    } else {
+      auto error = checkGenericRequirement(req, extraArguments,
+                                           substGenericParam,
+                                           substWitnessTable);
+      if (error)
+        return error;
     }
-
-    case GenericRequirementKind::SameConformance: {
-      // FIXME: Implement this check.
-      continue;
-    }
-
-    case GenericRequirementKind::SameShape: {
-      llvm_unreachable("Implement me");
-    }
-    }
-
-    // Unknown generic requirement kind.
-    return TYPE_LOOKUP_ERROR_FMT("unknown generic requirement kind %u",
-                                 (unsigned)req.getKind());
   }
 
   // Success!

@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
-
-// FIXME: Get it to build without -disable-concrete-type-metadata-mangled-name-accessors and test both
+// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
 
 // REQUIRES: executable_test
 
@@ -14,17 +13,10 @@ import StdlibUnittest
 
 var types = TestSuite("VariadicGenericTypes")
 
-public struct Outer<each U>
-    where each U: Equatable {
+public struct Outer<each U> {
+  public struct Inner<each V> {}
 
-  public struct Inner<each V>
-      where each V: Equatable {
-  }
-
-  public struct InnerSameShape<each V>
-      where each V: Equatable,
-            (repeat (each U, each V)): Any {
-  }
+  public struct InnerSameShape<each V> where (repeat (each U, each V)): Any {}
 }
 
 types.test("Outer") {
@@ -62,5 +54,16 @@ types.test("Outer.InnerSameShape") {
   expectEqual("main.Outer<Pack{Swift.Int, Swift.String}>.InnerSameShape<Pack{Swift.Bool, Swift.Double}>", _typeName(Outer<Int, String>.InnerSameShape<Bool, Double>.self))
   expectEqual("main.Outer<Pack{Swift.Int, Swift.String, Swift.Float}>.InnerSameShape<Pack{Swift.Bool, Swift.Double, Swift.Character}>", _typeName(Outer<Int, String, Float>.InnerSameShape<Bool, Double, Character>.self))
 }
+
+public struct ConformanceReq<each T: Equatable> {}
+
+types.test("ConformanceReq") {
+  expectEqual("main.ConformanceReq<Pack{}>", _typeName(ConformanceReq< >.self))
+  expectEqual("main.ConformanceReq<Pack{Swift.Int}>", _typeName(ConformanceReq<Int>.self))
+  expectEqual("main.ConformanceReq<Pack{Swift.Int, Swift.String}>", _typeName(ConformanceReq<Int, String>.self))
+  expectEqual("main.ConformanceReq<Pack{Swift.Int, Swift.String, Swift.Float}>", _typeName(ConformanceReq<Int, String, Float>.self))
+}
+
+// FIXME: Test superclass, layout and same-type pack requirements once more stuff is plumbed through
 
 runAllTests()

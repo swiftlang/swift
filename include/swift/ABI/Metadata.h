@@ -4917,6 +4917,8 @@ class TargetPackPointer {
   using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
 
 public:
+  explicit TargetPackPointer() : Ptr(0) {}
+
   explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
 
   explicit TargetPackPointer(const void *rawPtr)
@@ -4925,6 +4927,10 @@ public:
   explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
     : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
           (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  explicit operator bool() const {
+    return Ptr != 0;
+  }
 
   // Strips off the LSB.
   const PointerType *getElements() const {
@@ -4943,6 +4949,14 @@ public:
 
   PackLifetime getLifetime() const {
     return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
+  }
+
+  // Get the number of elements in the pack, only valid for on-heap packs.
+  size_t getNumElements() const {
+    if (getLifetime() == PackLifetime::OnHeap)
+      return *(reinterpret_cast<const size_t *>(Ptr & ~1) - 1);
+
+    fatalError(0, "Cannot get length of on-stack pack");
   }
 };
 

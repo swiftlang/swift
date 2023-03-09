@@ -22,7 +22,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/LayoutConstraintKind.h"
-#include "swift/AST/RequirementBase.h"
+#include "swift/AST/RequirementKind.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"

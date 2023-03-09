@@ -141,18 +141,55 @@ struct TypeRefLayoutConstraint {
   }
 };
 
-class TypeRefRequirement
-    : public RequirementBase<
-          const TypeRef *,
-          llvm::PointerIntPair<const TypeRef *, 3, RequirementKind>,
-          TypeRefLayoutConstraint> {
+class TypeRefRequirement {
+  llvm::PointerIntPair<const TypeRef *, 3, RequirementKind> FirstTypeAndKind;
+
+  /// The second element of the requirement. Its content is dependent
+  /// on the requirement kind.
+  /// The payload of the following enum should always match the kind!
+  /// Any access to the fields of this enum should first check if the
+  /// requested access matches the kind of the requirement.
+  union {
+    const TypeRef * SecondType;
+    TypeRefLayoutConstraint SecondLayout;
+  };
+
 public:
   TypeRefRequirement(RequirementKind kind, const TypeRef *first,
                      const TypeRef *second)
-      : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondType(second) {
+    assert(first);
+    assert(second);
+    assert(kind != RequirementKind::Layout);
+  }
+
   TypeRefRequirement(RequirementKind kind, const TypeRef *first,
                      TypeRefLayoutConstraint second)
-      : RequirementBase(kind, first, second) {}
+      : FirstTypeAndKind(first, kind), SecondLayout(second) {
+    assert(first);
+    assert(second);
+    assert(kind == RequirementKind::Layout);
+  }
+
+  /// Determine the kind of requirement.
+  RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
+
+  /// Retrieve the first type.
+  const TypeRef *getFirstType() const {
+    return FirstTypeAndKind.getPointer();
+  }
+
+  /// Retrieve the second type.
+  const TypeRef *getSecondType() const {
+    assert(getKind() != RequirementKind::Layout);
+    return SecondType;
+  }
+
+  /// Retrieve the layout constraint.
+  TypeRefLayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == RequirementKind::Layout);
+    return SecondLayout;
+  }
 };
 
 // On 32-bit systems this needs more than just pointer alignment to fit the
@@ -991,8 +1028,16 @@ protected:
       ID.addPointer(s.first);
       ID.addPointer(s.second);
     }
-    for (auto &r : Requirements)
-      ID.addInteger((uint64_t)(size_t)hash_value(hash_value(r)));
+    for (auto &r : Requirements) {
+      ID.addInteger(uint32_t(r.getKind()));
+      ID.addPointer(r.getFirstType());
+      if (r.getKind() != RequirementKind::Layout)
+        ID.addPointer(r.getSecondType());
+      else {
+        // FIXME: Implement TypeRefLayoutConstraint
+        ID.addInteger(uint32_t(0));
+      }
+    }
     return ID;
   }
 
