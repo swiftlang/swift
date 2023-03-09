@@ -202,6 +202,18 @@ SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
   return target;
 }
 
+SyntacticElementTarget
+SyntacticElementTarget::forExprPattern(ExprPattern *pattern) {
+  auto *DC = pattern->getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  // Result of ~= operator is always a `Bool`.
+  SyntacticElementTarget target(pattern->getMatchExpr(), DC, CTP_ExprPattern,
+                                ctx.getBoolType(), /*isDiscarded*/ false);
+  target.setPattern(pattern);
+  return target;
+}
+
 ContextualPattern SyntacticElementTarget::getContextualPattern() const {
   if (kind == Kind::uninitializedVar) {
     assert(patternBinding);

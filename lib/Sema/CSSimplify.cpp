@@ -9957,17 +9957,13 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
   if (!pattern->hasUnresolvedOriginalExpr())
     return true;
 
-  auto *DC = pattern->getDeclContext();
   auto &ctx = cs.getASTContext();
 
   // Retrieve a corresponding ExprPattern which we can solve with ~=.
   auto *EP =
       llvm::cantFail(ctx.evaluator(EnumElementExprPatternRequest{pattern}));
 
-  // result of ~= operator is always a `Bool`.
-  auto *matchCall = EP->getMatchExpr();
-  auto target = SyntacticElementTarget::forExprPattern(
-      matchCall, DC, EP, ctx.getBoolDecl()->getDeclaredInterfaceType());
+  auto target = SyntacticElementTarget::forExprPattern(EP);
 
   DiagnosticTransaction diagnostics(ctx.Diags);
   {
