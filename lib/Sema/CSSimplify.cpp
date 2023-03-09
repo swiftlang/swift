@@ -13436,6 +13436,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::PointerToCPointer:
     return simplifyPointerToCPointerRestriction(type1, type2, flags, locator);
 
+  case ConversionRestrictionKind::ArrayToCPointer:
+    llvm_unreachable("not yet implemented");
+
   case ConversionRestrictionKind::InoutToCPointer: {
     SmallVector<Type, 2> optionals;
 
