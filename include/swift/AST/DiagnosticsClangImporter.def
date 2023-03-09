@@ -124,9 +124,6 @@ WARNING(glibc_not_found, none,
 WARNING(libstdcxx_not_found, none,
         "libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
-WARNING(libstdcxx_modulemap_not_found, none,
-        "module map for libstdc++ not found for '%0'; C++ stdlib may be unavailable",
-        (StringRef))
 
 WARNING(too_many_class_template_instantiations, none,
         "template instantiation for '%0' not imported: too many instantiations",
