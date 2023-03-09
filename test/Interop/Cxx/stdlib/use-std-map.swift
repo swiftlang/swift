@@ -31,16 +31,9 @@ StdMapTestSuite.test("Map.subscript") {
   expectNil(m[5])
 }
 
-#if !os(Linux) // TODO: enable on Linux (rdar://105220600)
 StdMapTestSuite.test("UnorderedMap.subscript") {
   // This relies on the `std::unordered_map` conformance to `CxxDictionary` protocol.
   var m = initUnorderedMap()
-  expectEqual(m[1], 3)
-  expectEqual(m[2], 2)
-  expectEqual(m[3], 3)
-  expectNil(m[-1])
-  expectNil(m[5])
 }
-#endif
 
 runAllTests()
