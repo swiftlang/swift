@@ -239,6 +239,10 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
                                             bool checkParent) {
   if (VD->isObjC())
     return false;
+  // Do not expose anything from _Concurrency module yet.
+  if (VD->getModuleContext()->ValueDecl::getName().getBaseIdentifier() ==
+      VD->getASTContext().Id_Concurrency)
+    return false;
   if (VD->getFormalAccess() >= minRequiredAccess) {
     return true;
   } else if (checkParent) {
