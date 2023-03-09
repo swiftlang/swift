@@ -701,15 +701,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      // In Swift < 6 warn about plain type name passed as an
-      // argument to a subscript, dynamic subscript, or ObjC
-      // literal since it used to be accepted.
       DiagnosticBehavior behavior = DiagnosticBehavior::Error;
 
       if (auto *ParentExpr = Parent.getAsExpr()) {
         if (ParentExpr->isValidParentOfTypeExpr(E))
           return;
 
+        // In Swift < 6 warn about
+        // - plain type name passed as an argument to a subscript, dynamic
+        //   subscript, or ObjC literal since it used to be accepted.
+        // - member type expressions rooted on non-identifier types, e.g.
+        //   '[X].Y' since they used to be accepted without the '.self'.
         if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
           if (isa<SubscriptExpr>(ParentExpr) ||
               isa<DynamicSubscriptExpr>(ParentExpr) ||
@@ -718,12 +720,21 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             assert(argList);
             if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
+          } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+            if (auto *TR =
+                    dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
+              if (!isa<IdentTypeRepr>(TR->getBaseComponent())) {
+                behavior = DiagnosticBehavior::Warning;
+              }
+            }
           }
         }
       }
 
       // Is this a protocol metatype?
-      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+      Ctx.Diags
+          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
+                    behavior == DiagnosticBehavior::Warning)
           .limitBehavior(behavior);
 
       // Add fix-it to insert '()', only if this is a metatype of
