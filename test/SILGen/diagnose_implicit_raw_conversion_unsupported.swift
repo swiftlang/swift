@@ -40,44 +40,25 @@ func test_unsupported<T>(arg: T) {
                           // expected-note@-1 {{arguments to generic parameter 'Pointee' ('UInt8' and 'Int8') are expected to be equal}}
 }
 
-// These implicit casts should work according to
-// [SE-0324: Relax diagnostics for pointer arguments to C functions]
-// (https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md)
-// They currently raise a "cannot convert value" error because of
-// the `UInt8` vs. `Int8` mismatch.
-//
-// If we decide to support these as bug-fixes for SE-0324, then the
-// implicit inout-to-raw conversion should also accept them.
-func test_se0324_accept() {
+// Array<T> to C pointer conversion is supported under SE-0324
+func test_array_to_c_pointer_concrete() {
     let constIntArray: [Int8] = [0]
-    read_uchar(constIntArray) // expected-error {{cannot convert value of type 'UnsafePointer<Int8>' to expected argument type 'UnsafePointer<UInt8>'}}
-                              // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int8' and 'UInt8') are expected to be equal}}
+    read_uchar(constIntArray)
 
     let constUIntArray: [UInt8] = [0]
-    read_char(constUIntArray) // expected-error {{cannot convert value of type 'UnsafePointer<UInt8>' to expected argument type 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>')}}
-                              // expected-note@-1 {{arguments to generic parameter 'Pointee' ('UInt8' and 'CChar' (aka 'Int8')) are expected to be equal}}
+    read_char(constUIntArray)
 
-    var intArray: [Int8] = [0]
-    read_uchar(intArray) // expected-error {{cannot convert value of type 'UnsafePointer<Int8>' to expected argument type 'UnsafePointer<UInt8>'}}
-                         // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int8' and 'UInt8') are expected to be equal}}
+    var intArray: [Int8] = [0] // expected-warning {{variable 'intArray' was never mutated; consider changing to 'let' constant}}
+    read_uchar(intArray)
 
-    var uintArray: [UInt8] = [0]
-    read_char(uintArray) // expected-error {{cannot convert value of type 'UnsafePointer<UInt8>' to expected argument type 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>')}}
-                         // expected-note@-1 {{arguments to generic parameter 'Pointee' ('UInt8' and 'CChar' (aka 'Int8')) are expected to be equal}}
+    var uintArray: [UInt8] = [0] // expected-warning {{variable 'uintArray' was never mutated; consider changing to 'let' constant}}
+    read_char(uintArray)
 
 }
 
-// These implicit casts should work according to
-// SE-0324: Relax diagnostics for pointer arguments to C functions]
-// They currently raise a "cannot convert value" error because of
-// the `UInt8` vs. `Int8` mismatch.
-//
-// If we decide to support these as bug-fixes for SE-0324, then the
-// implicit inout-to-raw conversion should issue a warning instead.
-func test_se0324_error<T>(arg: T) {
+// Array<T> to C pointer conversion is supported under SE-0324
+func test_array_to_c_pointer_generic<T>(arg: T) {
     let constArray: [T] = [arg]
-    read_char(constArray) // expected-error {{cannot convert value of type 'UnsafePointer<T>' to expected argument type 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>')}}
-                           // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'CChar' (aka 'Int8')) are expected to be equal}}
-    read_uchar(constArray) // expected-error {{cannot convert value of type 'UnsafePointer<T>' to expected argument type 'UnsafePointer<UInt8>'}}
-                           // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'UInt8') are expected to be equal}}
+    read_char(constArray)
+    read_uchar(constArray)
 }
