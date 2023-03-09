@@ -130,6 +130,20 @@ struct MOSingleRefcountLikeStructNoDeinit {
   var x: C
 }
 
+// Type metadata records for noncopyable types should be in a separate list
+// from copyable types.
+
+// CHECK-LABEL: @"$s{{.*}}1CCHn" = 
+// CHECK-SAME:  section "[[COPYABLE_SECTION_NAME:[^"]+]]"
+
+// CHECK-NOT: @"$s{{.*}}8MOStructVHn" = {{.*}} section "[[COPYABLE_SECTION_NAME]]"
+
+// CHECK-LABEL: @"$s{{.*}}8MOStructVHn" = 
+// CHECK-SAME:  section "[[NONCOPYABLE_SECTION_NAME:[^"]+]]"
+
+// CHECK-LABEL: @"$s{{.*}}6MOEnumOHn" = 
+// CHECK-SAME:  section "[[NONCOPYABLE_SECTION_NAME]]"
+
 // Very large structs will use indirect conventions for their deinit.
 
 @_moveOnly
