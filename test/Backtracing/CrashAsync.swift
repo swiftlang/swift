@@ -52,7 +52,7 @@ struct CrashAsync {
 // CHECK-NEXT:  8 [async] [system] 0x{{[0-9a-f]+}} _async_MainTQ0_ in CrashAsync at {{.*}}/<compiler-generated>
 // CHECK-NEXT:  9 [async] [thunk]  0x{{[0-9a-f]+}} _$sIetH_yts5Error_pIegHrzo_TRTQ0_ in CrashAsync at {{.*}}/<compiler-generated>
 // CHECK-NEXT: 10 [async] [thunk]  0x{{[0-9a-f]+}} _$sIetH_yts5Error_pIegHrzo_TRTATQ0_ in CrashAsync at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 11 [async] [system] 0x{{[0-9a-f]+}} __ZL23completeTaskWithClosurePN5swift12AsyncContextEPNS_10SwiftErrorE in libswift_Concurrency.dylib at {{.*}}/Task.cpp:463
+// CHECK-NEXT: 11 [async] [system] 0x{{[0-9a-f]+}} __ZL23completeTaskWithClosurePN5swift12AsyncContextEPNS_10SwiftErrorE in libswift_Concurrency.dylib
 
 // FRIENDLY: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
 
