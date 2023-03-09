@@ -42,6 +42,10 @@ extension String {
     self = repeatedValue.withUTF8 { repeatedUTF8 in
       let uninitializedCapacity = repeatedUTF8.count * count
       return String(_uninitializedCapacity: uninitializedCapacity) { buffer in
+        guard repeatedUTF8.count > 1 else {
+          buffer.initialize(repeating: repeatedUTF8[0])
+          return buffer.count
+        }
         var initialized = 0
         for i in 0..<count {
           let lower = i &* repeatedUTF8.count
