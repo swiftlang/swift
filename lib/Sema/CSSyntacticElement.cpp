@@ -350,6 +350,18 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
+  if (locator->isLastElement<LocatorPathElt::ExprPatternConjunction>()) {
+    // Collect the ExprPattern type variables.
+    auto *P = castToPattern(locator->getAnchor());
+    P->forEachNode([&](Pattern *subPattern) {
+      if (auto *EP = dyn_cast<ExprPattern>(subPattern))
+        referencedVars.push_back(cs.getType(EP)->castTo<TypeVariableType>());
+    });
+
+    // We solve ExprPatterns in isolation from the rest of the pattern.
+    isIsolated = true;
+  }
+
   UnresolvedVarCollector paramCollector(cs);
 
   for (const auto &entry : elements) {
@@ -401,7 +413,7 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
 
 struct SyntacticElementContext
     : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *> {
+                                SingleValueStmtExpr *, ExprPattern *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -432,6 +444,10 @@ struct SyntacticElementContext
     return context;
   }
 
+  static SyntacticElementContext forExprPattern(ExprPattern *EP) {
+    return SyntacticElementContext{EP};
+  }
+
   DeclContext *getAsDeclContext() const {
     if (auto *fn = this->dyn_cast<AbstractFunctionDecl *>()) {
       return fn;
@@ -439,6 +455,8 @@ struct SyntacticElementContext
       return closure;
     } else if (auto *SVE = dyn_cast<SingleValueStmtExpr *>()) {
       return SVE->getDeclContext();
+    } else if (auto *EP = dyn_cast<ExprPattern *>()) {
+      return EP->getDeclContext();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -510,7 +528,32 @@ public:
                                       ConstraintLocator *locator)
       : cs(cs), context(context), locator(locator) {}
 
-  void visitPattern(Pattern *pattern, ContextualTypeInfo context) {
+  void visitExprPattern(ExprPattern *EP) {
+    auto target = SyntacticElementTarget::forExprPattern(EP);
+
+    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
+                          /*leaveClosureBodyUnchecked=*/false)) {
+      hadError = true;
+      return;
+    }
+    cs.setType(EP->getMatchVar(), cs.getType(EP));
+
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      hadError = true;
+      return;
+    }
+    cs.setTargetFor(EP, target);
+    cs.setExprPatternFor(EP->getSubExpr(), EP);
+  }
+
+  void visitPattern(Pattern *pattern, ContextualTypeInfo contextInfo) {
+    if (context.is<ExprPattern *>()) {
+      // This is for an ExprPattern conjunction, go ahead and generate
+      // constraints for the match expression.
+      visitExprPattern(cast<ExprPattern>(pattern));
+      return;
+    }
+
     auto parentElement =
         locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
 
@@ -526,7 +569,7 @@ public:
       }
 
       if (isa<CaseStmt>(stmt)) {
-        visitCaseItemPattern(pattern, context);
+        visitCaseItemPattern(pattern, contextInfo);
         return;
       }
     }
@@ -1391,6 +1434,20 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   return generator.hadError;
 }
 
+void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
+                                           ConstraintLocatorBuilder locator) {
+  // Form a conjunction of ExprPattern elements.
+  SmallVector<ElementInfo> elements;
+  for (auto *EP : exprPatterns) {
+    auto *loc = getConstraintLocator(EP);
+    ContextualTypeInfo context(getType(EP), CTP_ExprPattern);
+    elements.push_back(makeElement(EP, loc, context));
+  }
+  auto *loc =
+      getConstraintLocator(locator, LocatorPathElt::ExprPatternConjunction());
+  createConjunction(*this, elements, loc);
+}
+
 bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
   if (!closure->hasSingleExpressionBody()) {
     auto *DC = closure->getParent();
@@ -1442,6 +1499,8 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     context = SyntacticElementContext::forFunction(fn);
   } else if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor)) {
     context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
+  } else if (auto *EP = getAsPattern<ExprPattern>(anchor)) {
+    context = SyntacticElementContext::forExprPattern(EP);
   } else {
     return SolutionKind::Error;
   }

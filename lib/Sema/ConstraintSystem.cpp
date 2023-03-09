@@ -5666,6 +5666,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::Witness:
     case ConstraintLocator::WrappedValue:
     case ConstraintLocator::OptionalPayload:
+    case ConstraintLocator::ExprPatternConjunction:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
       break;
     }

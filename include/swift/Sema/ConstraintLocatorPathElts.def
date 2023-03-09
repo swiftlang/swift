@@ -222,6 +222,9 @@ CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
 /// Performing a pattern patch.
 CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
 
+/// A conjunction for the ExprPatterns in a pattern.
+SIMPLE_LOCATOR_PATH_ELT(ExprPatternConjunction)
+
 /// Points to a particular attribute associated with one of
 /// the arguments e.g. `inout` or its type e.g. `@escaping`.
 ///

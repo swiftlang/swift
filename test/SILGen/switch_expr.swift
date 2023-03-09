@@ -323,3 +323,14 @@ func nestedType() throws -> Int {
     0
   }
 }
+
+func exprPatternInClosure() {
+  let f: (Int) -> Void = { i in
+    switch i {
+    case i:
+      ()
+    default:
+      ()
+    }
+  }
+}

@@ -743,3 +743,42 @@ let _: DispatchTime = .#^UNRESOLVED_FUNCTION_CALL^#now() + 0.2
 // UNRESOLVED_FUNCTION_CALL-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: now()[#DispatchTime#];
 // UNRESOLVED_FUNCTION_CALL-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#DispatchTime#];
 // UNRESOLVED_FUNCTION_CALL: End completions
+
+func id<T>(_ x: T) -> T { x }
+
+func testNestedExprPatternCompletion(_ x: SomeEnum1) {
+  // Multi-statement closures have different type-checking code paths,
+  // so we need to test both.
+  let fn = {
+    switch x {
+    case id(.#^UNRESOLVED_NESTED1^#):
+      // UNRESOLVED_NESTED1: Begin completions, 3 items
+      // UNRESOLVED_NESTED1: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#]; name=South
+      // UNRESOLVED_NESTED1: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#]; name=North
+      // UNRESOLVED_NESTED1: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+      // UNRESOLVED_NESTED1: End completions
+      break
+    }
+    if case id(.#^UNRESOLVED_NESTED2^#) = x {}
+    // UNRESOLVED_NESTED2: Begin completions, 3 items
+    // UNRESOLVED_NESTED2: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#]; name=South
+    // UNRESOLVED_NESTED2: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#]; name=North
+    // UNRESOLVED_NESTED2: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+    // UNRESOLVED_NESTED2: End completions
+  }
+  switch x {
+  case id(.#^UNRESOLVED_NESTED3^#):
+    // UNRESOLVED_NESTED3: Begin completions, 3 items
+    // UNRESOLVED_NESTED3: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#]; name=South
+    // UNRESOLVED_NESTED3: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#]; name=North
+    // UNRESOLVED_NESTED3: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+    // UNRESOLVED_NESTED3: End completions
+    break
+  }
+  if case id(.#^UNRESOLVED_NESTED4^#) = x {}
+  // UNRESOLVED_NESTED4: Begin completions, 3 items
+  // UNRESOLVED_NESTED4: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#]; name=South
+  // UNRESOLVED_NESTED4: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#]; name=North
+  // UNRESOLVED_NESTED4: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
+  // UNRESOLVED_NESTED4: End completions
+}
