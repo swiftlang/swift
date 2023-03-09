@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if $Macros && hasAttribute(attached)
+#if $Macros && hasAttribute(attached) && $AttachedMacros
 
 @available(SwiftStdlib 5.9, *)
 @attached(member, names: named(_registrar), named(transactions), named(changes), named(_Storage), named(_storage))
