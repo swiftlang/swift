@@ -825,7 +825,7 @@ namespace swift {
 
     /// If true, forward declarations will be imported using unavailable types
     /// instead of dropped altogether when possible.
-    bool ImportForwardDeclarations = false;
+    bool ImportForwardDeclarations = true;
 
     /// If true ignore the swift bridged attribute.
     bool DisableSwiftBridgeAttr = false;
