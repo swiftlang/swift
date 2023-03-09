@@ -2412,19 +2412,12 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        if (!underlyingType)
-          return Type();
-
         return setType(ParenType::get(CS.getASTContext(), underlyingType));
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
         auto type = getTypeForPattern(subPattern, locator,
                                       bindPatternVarsOneWay);
-
-        if (!type)
-          return Type();
-
         // Var doesn't affect the type.
         return setType(type);
       }
@@ -2600,9 +2593,6 @@ namespace {
 
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
 
-        if (!type)
-          return Type();
-
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
@@ -2618,9 +2608,6 @@ namespace {
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
-
-        if (!subPatternType)
-          return Type();
 
         // NOTE: The order here is important! Pattern matching equality is
         // not symmetric (we need to fix that either by using a different
@@ -2651,9 +2638,6 @@ namespace {
               locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
               bindPatternVarsOneWay);
 
-          if (!eltTy)
-            return Type();
-
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
 
@@ -2668,9 +2652,6 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        if (!subPatternType)
-          return Type();
-
         return setType(OptionalType::get(subPatternType));
       }
 
@@ -2680,7 +2661,6 @@ namespace {
         const Type castType = resolveTypeReferenceInExpression(
             isPattern->getCastTypeRepr(), TypeResolverContext::InExpression,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
-        if (!castType) return Type();
 
         // Allow `is` pattern to infer type from context which is then going
         // to be propaged down to its sub-pattern via conversion. This enables
@@ -2767,9 +2747,6 @@ namespace {
                 TypeResolverContext::InExpression, patternMatchLoc);
           }();
 
-          if (!parentType)
-            return Type();
-
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
           CS.addValueMemberConstraint(
@@ -2803,9 +2780,6 @@ namespace {
               subPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
               bindPatternVarsOneWay);
-
-          if (!subPatternType)
-            return Type();
 
           SmallVector<AnyFunctionType::Param, 4> params;
           decomposeTuple(subPatternType, params);
