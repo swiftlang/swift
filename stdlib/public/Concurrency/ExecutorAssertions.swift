@@ -49,8 +49,7 @@ func preconditionTaskOnExecutor(
   let expectationCheck = _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor)
 
   precondition(expectationCheck,
-      "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
-      "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+      makeUnexpectedExecutorMessage(executor: executor.asUnownedSerialExecutor().executor, message: message()),
       file: file, line: line) // short-cut so we get the exact same failure reporting semantics
 }
 
@@ -86,9 +85,7 @@ func preconditionTaskOnActorExecutor(
   let expectationCheck = _taskIsCurrentExecutor(actor.unownedExecutor.executor)
 
   precondition(expectationCheck,
-      "Expected same executor as actor '\(actor)' " +
-      "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-      "but was executing on '\(_executorGetCurrentActiveExecutorName())'. \(message())",
+      makeUnexpectedExecutorMessage(actor: actor, message: message()),
       file: file, line: line)
 }
 
@@ -123,8 +120,7 @@ func assertTaskOnExecutor(
 
   guard _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor) else {
     assertionFailure(
-        "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        makeUnexpectedExecutorMessage(executor: executor.asUnownedSerialExecutor().executor, message: message()),
         file: file, line: line)
     return
   }
@@ -158,12 +154,9 @@ func assertTaskOnActorExecutor(
   }
 
   guard _taskIsCurrentExecutor(actor.unownedExecutor.executor) else {
-    let msg =
-        "Expected same executor as actor '\(actor)' " +
-        "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'. " +
-        "\(message())";
-    assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
+    assertionFailure(
+        makeUnexpectedExecutorMessage(actor: actor, message: message()),
+        file: file, line: line)
     return
   }
 }
@@ -200,8 +193,7 @@ func assumeOnMainActorExecutor<T>(
 
   guard _taskIsCurrentExecutor(mainExecutor) else {
     fatalError(
-        "Expected '\(_executorGetTypeName(mainExecutor))' executor, " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        makeUnexpectedExecutorMessage(executor: mainExecutor, message: nil),
         file: file, line: line)
   }
 
@@ -241,10 +233,7 @@ func assumeOnActorExecutor<Act: Actor, T>(
   /// as this is our "safe" version of this API.
   let executor: Builtin.Executor = actor.unownedExecutor.executor
   guard _taskIsCurrentExecutor(executor) else {
-    fatalError(
-        "Expected same executor as actor '\(actor)' " +
-        "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+    fatalError(makeUnexpectedExecutorMessage(actor: actor, message: nil),
         file: file, line: line)
   }
 
@@ -260,13 +249,65 @@ func assumeOnActorExecutor<Act: Actor, T>(
 /// I.e. if we're not executing within a task, we expect to have `<unknown>` executor rather than the generic one.
 @usableFromInline
 @available(SwiftStdlib 5.9, *)
-func _executorGetCurrentActiveExecutorName() -> String {
+internal func _executorGetCurrentActiveExecutorName() -> String {
   let (wasActive, ref) = _executorGetCurrentActiveExecutorRef()
   guard wasActive else {
     return "<unknown>"
   }
 
   return _executorGetTypeName(ref)
+}
+
+@usableFromInline
+@available(SwiftStdlib 5.9, *)
+internal func makeUnexpectedExecutorMessage(actor: some Actor, message: String?) -> String {
+  let expectedExecutor = _executorGetTypeName(actor.unownedExecutor.executor)
+  let gotExecutor = _executorGetCurrentActiveExecutorName()
+
+  let sameExecutorNameClarification: String
+  if expectedExecutor == gotExecutor {
+    sameExecutorNameClarification = " of a different actor"
+  } else {
+    sameExecutorNameClarification = ""
+  }
+
+  let trailingMessage: String
+  if let message {
+    trailingMessage = " \(message)"
+  } else {
+    trailingMessage = ""
+  }
+
+  return "Expected same executor as actor '\(actor)' " +
+      "('\(expectedExecutor)'), " +
+      "but was executing on '\(gotExecutor)'" +
+      "\(sameExecutorNameClarification)." +
+      "\(trailingMessage)"
+}
+
+@usableFromInline
+@available(SwiftStdlib 5.9, *)
+internal func makeUnexpectedExecutorMessage(executor: Builtin.Executor, message: String?) -> String {
+  let expectedExecutor = _executorGetTypeName(executor)
+  let gotExecutor = _executorGetCurrentActiveExecutorName()
+
+  let sameExecutorNameClarification: String
+  if expectedExecutor == gotExecutor {
+    sameExecutorNameClarification = " of a different actor"
+  } else {
+    sameExecutorNameClarification = ""
+  }
+
+  let trailingMessage: String
+  if let message {
+    trailingMessage = " \(message)"
+  } else {
+    trailingMessage = ""
+  }
+
+  return "Expected '\(expectedExecutor)' executor, " +
+      "but was executing on '\(gotExecutor)'" +
+      "\(sameExecutorNameClarification)."
 }
 
 // TODO(ktoso): implement assume for distributed actors as well

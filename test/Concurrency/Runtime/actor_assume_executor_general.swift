@@ -61,6 +61,15 @@ actor DefaultExecutorSomeone {
   }
 }
 
+actor DefaultExecutorSomeoneElse {
+  func checkSameExecutorAs(other: DefaultExecutorSomeone) {
+    // this is expected to fail
+    assumeOnActorExecutor(other) { isolatedOther in
+      let s: String = isolatedOther.something // ok, if the runtime check were to pass
+    }
+  }
+}
+
 actor DefaultExecutorSomeonesFriend {
   let someone: DefaultExecutorSomeone
   nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -174,6 +183,15 @@ final class MainActorEcho {
       tests.test("assumeOnActorExecutor: wrongly assume the main executor, on custom executor") {
         expectCrashLater(withMessage: "Expected same executor as actor 'Swift.MainActor' ('MainActorExecutor'), but was executing on 'a.InlineExecutor'.")
         await InlineExecutorActor(someone: someone).checkMainActor()
+      }
+
+      tests.test("assumeOnActorExecutor: wrongly assume 'same executor' as a different default actor, from a different default actor") {
+        // TODO: this message is not very helpful, and we should try to print the exact default actor we executed on,
+        //       however, this is tricky due to the fact a default actor can be destroyed while executing on it, so we 
+        //       must take extra care for how we'd retain and print such default actor. rdar://106487242
+        expectCrashLater(withMessage: "Expected same executor as actor 'a.DefaultExecutorSomeone' ('DefaultActorExecutor'), but was executing on 'DefaultActorExecutor' of a different actor.")
+        let someone = DefaultExecutorSomeone()
+        await DefaultExecutorSomeoneElse().checkSameExecutorAs(other: someone)
       }
     }
 

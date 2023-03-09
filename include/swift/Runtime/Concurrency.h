@@ -897,8 +897,16 @@ TypeNamePair swift_task_getExecutorRefTypeName(ExecutorRef executor);
 /// Since the `nullptr, 0` executor ref is a valid "generic executor" reference,
 /// when we need to know "was the generic one actually set, or are we just defaulting to it
 struct ExecutorActiveAndRef {
-  bool active;
-  ExecutorRef ref;
+  const bool active;
+  const ExecutorRef ref;
+
+  ExecutorActiveAndRef() :
+      active(false),
+      ref(ExecutorRef::generic()) {}
+
+  ExecutorActiveAndRef(bool active, ExecutorRef ref) :
+      active(active),
+      ref(ref) {}
 };
 
 /// Different than `swift_task_getCurrentExecutor` in that it does not default to the generic executor.
