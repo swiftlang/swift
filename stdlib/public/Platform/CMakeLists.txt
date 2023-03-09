@@ -217,3 +217,13 @@ endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
 set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay glibc_modulemap)
+
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  swift_install_in_component(FILES
+      ucrt.modulemap
+      vcruntime.apinotes
+      vcruntime.modulemap
+      winsdk.modulemap
+    DESTINATION "share"
+    COMPONENT sdk-overlay)
+endif()
