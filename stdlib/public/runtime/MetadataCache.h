@@ -625,7 +625,7 @@ public:
         assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
         uintptr_t count = packCounts[packs[packIdx].ShapeClass];
 
-        if (!areMetadataPacksEqual(*adata++, *bdata++, count))
+        if (!areMetadataPacksEqual(adata[argIdx], bdata[argIdx], count))
           return false;
 
         ++packIdx;
@@ -648,7 +648,7 @@ public:
         assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
         uintptr_t count = packCounts[packs[packIdx].ShapeClass];
 
-        if (!areWitnessTablePacksEqual(*adata++, *bdata++, count))
+        if (!areWitnessTablePacksEqual(adata[argIdx], bdata[argIdx], count))
           return false;
 
         ++packIdx;
