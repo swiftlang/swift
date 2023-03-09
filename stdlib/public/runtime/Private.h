@@ -282,13 +282,69 @@ public:
 
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
+  ///
+  /// The return type here is a lie; it's actually a MetadataOrPack.
   using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
+    std::function<const void *(unsigned depth, unsigned index)>;
 
   /// Callback used to provide the substitution of a witness table based on
   /// its index into the enclosing generic environment.
   using SubstDependentWitnessTableFn =
     std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
+
+  /// A pointer to type metadata or a heap-allocated metadata pack.
+  struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataOrPack {
+    const void *Ptr;
+
+    MetadataOrPack() : Ptr(nullptr) {}
+
+    explicit MetadataOrPack(const void *ptr) : Ptr(ptr) {}
+
+    explicit MetadataOrPack(MetadataResponse response) : Ptr(response.Value) {}
+
+    explicit MetadataOrPack(MetadataPackPointer ptr) : Ptr(ptr.getPointer()) {
+      if (ptr.getLifetime() != PackLifetime::OnHeap)
+        fatalError(0, "Cannot have an on-stack pack here\n");
+    }
+
+    explicit operator bool() const { return Ptr != nullptr; }
+
+    bool isNull() const {
+      return !Ptr;
+    }
+
+    bool isMetadataOrNull() const {
+      return (reinterpret_cast<uintptr_t>(Ptr) & 1) == 0;
+    }
+
+    bool isMetadata() const {
+      return Ptr && isMetadataOrNull();
+    }
+
+    bool isMetadataPack() const {
+      return Ptr && (reinterpret_cast<uintptr_t>(Ptr) & 1) == 1;
+    }
+
+    const Metadata *getMetadata() const {
+      if (isMetadata())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    const Metadata *getMetadataOrNull() const {
+      if (isMetadataOrNull())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    MetadataPackPointer getMetadataPack() const {
+      if (isMetadataPack())
+        return MetadataPackPointer(Ptr);
+      fatalError(0, "Expected a metadata pack but got metadata\n");
+    }
+
+    std::string nameForMetadata() const;
+  };
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the generic arguments from
@@ -386,7 +442,7 @@ public:
 
     const void * const *getGenericArgs() const { return genericArgs; }
 
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
                                         unsigned index) const;
   };
@@ -421,41 +477,21 @@ public:
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
-#pragma clang diagnostic pop
 
-  /// Function object that produces substitutions for the generic parameters
-  /// that occur within a mangled name, using the complete set of generic
-  /// arguments "as written".
+  /// Retrieve the type metadata pack described by the given type name.
   ///
-  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
-  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
-    /// The complete set of generic arguments.
-    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  TypeLookupErrorOr<MetadataPackPointer> getTypePackByMangledName(
+                               StringRef typeName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
-    /// The counts of generic parameters at each level.
-    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
-
-  public:
-    /// Initialize a new function object to handle substitutions. Both
-    /// parameters are references to vectors that must live longer than
-    /// this function object.
-    ///
-    /// \param allGenericArgs The complete set of generic arguments, as written.
-    /// This could come directly from "source" (where all generic arguments are
-    /// encoded) or from metadata via gatherWrittenGenericArgs().
-    ///
-    /// \param genericParamCounts The count of generic parameters at each
-    /// generic level, typically gathered by _gatherGenericParameterCounts.
-    explicit SubstGenericParametersFromWrittenArgs(
-        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
-        : allGenericArgs(allGenericArgs),
-          genericParamCounts(genericParamCounts) {}
-
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
-    const WitnessTable *getWitnessTable(const Metadata *type,
-                                        unsigned index) const;
-  };
+#pragma clang diagnostic pop
 
   /// Gather generic parameter counts from a context descriptor.
   ///
@@ -533,23 +569,6 @@ public:
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
-
-  /// Gather the set of generic arguments that would be written in the
-  /// source.
-  ///
-  /// This function computes generic arguments even when they are not
-  /// directly represented in the metadata, e.g., generic parameters that
-  /// are canonicalized away by same-type constraints and are therefore not
-  /// "key" parameters.
-  ///
-  /// \code
-  ///   extension Array where Element == String { }
-  ///   extension Dictionary where Key == Value { }
-  /// \endcode
-  void gatherWrittenGenericArgs(const Metadata *metadata,
-                                const TypeContextDescriptor *description,
-                                llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-                                Demangler &BorrowFrom);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,

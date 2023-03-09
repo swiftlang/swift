@@ -1180,27 +1180,28 @@ swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
 
 namespace {
 
-class MetadataPackCacheEntry {
+template<typename PackType>
+class PackCacheEntry {
 public:
   size_t Count;
 
-  const Metadata * const * getElements() const {
-    return reinterpret_cast<const Metadata * const *>(this + 1);
+  const PackType * const * getElements() const {
+    return reinterpret_cast<const PackType * const *>(this + 1);
   }
 
-  const Metadata ** getElements() {
-    return reinterpret_cast<const Metadata **>(this + 1);
+  const PackType ** getElements() {
+    return reinterpret_cast<const PackType **>(this + 1);
   }
 
   struct Key {
-    const Metadata *const *Data;
+    const PackType *const *Data;
     const size_t Count;
 
     size_t getCount() const {
       return Count;
     }
 
-    const Metadata *getElement(size_t index) const {
+    const PackType *getElement(size_t index) const {
       assert(index < Count);
       return Data[index];
     }
@@ -1213,7 +1214,7 @@ public:
     }
   };
 
-  MetadataPackCacheEntry(const Key &key);
+  PackCacheEntry(const Key &key);
 
   intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value here.
@@ -1229,7 +1230,7 @@ public:
     return true;
   }
 
-  friend llvm::hash_code hash_value(const MetadataPackCacheEntry &value) {
+  friend llvm::hash_code hash_value(const PackCacheEntry<PackType> &value) {
     llvm::hash_code hash = 0;
     for (size_t i = 0; i != value.Count; ++i)
       hash = llvm::hash_combine(hash, value.getElements()[i]);
@@ -1249,7 +1250,9 @@ public:
   }
 };
 
-MetadataPackCacheEntry::MetadataPackCacheEntry(const Key &key) {
+template<typename PackType>
+PackCacheEntry<PackType>::PackCacheEntry(
+    const typename PackCacheEntry<PackType>::Key &key) {
   Count = key.getCount();
 
   for (unsigned i = 0; i < Count; ++i)
@@ -1259,7 +1262,8 @@ MetadataPackCacheEntry::MetadataPackCacheEntry(const Key &key) {
 } // end anonymous namespace
 
 /// The uniquing structure for metadata packs.
-static SimpleGlobalCache<MetadataPackCacheEntry, MetadataPackTag> MetadataPacks;
+static SimpleGlobalCache<PackCacheEntry<Metadata>,
+                         MetadataPackTag> MetadataPacks;
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const Metadata * const *
@@ -1268,11 +1272,17 @@ swift_allocateMetadataPack(const Metadata * const *ptr, size_t count) {
         == PackLifetime::OnHeap)
     return ptr;
 
-  MetadataPackCacheEntry::Key key{ptr, count};
+  PackCacheEntry<Metadata>::Key key{ptr, count};
   auto bytes = MetadataPacks.getOrInsert(key).first->getElements();
 
-  return MetadataPackPointer(bytes, PackLifetime::OnHeap).getPointer();
+  MetadataPackPointer pack(bytes, PackLifetime::OnHeap);
+  assert(pack.getNumElements() == count);
+  return pack.getPointer();
 }
+
+/// The uniquing structure for witness table packs.
+static SimpleGlobalCache<PackCacheEntry<WitnessTable>,
+                         WitnessTablePackTag> WitnessTablePacks;
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 const WitnessTable * const *
@@ -1281,14 +1291,12 @@ swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count) {
         == PackLifetime::OnHeap)
     return ptr;
 
-  size_t totalSize = (size_t) count * sizeof(const WitnessTable *);
+  PackCacheEntry<WitnessTable>::Key key{ptr, count};
+  auto bytes = WitnessTablePacks.getOrInsert(key).first->getElements();
 
-  auto bytes = (const WitnessTable **)
-    MetadataAllocator(WitnessTablePackTag)
-      .Allocate(totalSize, alignof(const WitnessTable *));
-  memcpy((char*) bytes, ptr, totalSize);
-
-  return WitnessTablePackPointer(bytes, PackLifetime::OnHeap).getPointer();
+  WitnessTablePackPointer pack(bytes, PackLifetime::OnHeap);
+  assert(pack.getNumElements() == count);
+  return pack.getPointer();
 }
 
 /***************************************************************************/
@@ -3380,7 +3388,8 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
     auto result = swift_getTypeByMangledName(
         request, superclassName, substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
-          return substitutions.getMetadata(depth, index);
+          // FIXME: Variadic generics
+          return substitutions.getMetadata(depth, index).getMetadata();
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -6094,7 +6103,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
     result = swift_getTypeByMangledName(
         request, mangledName, substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
-          return substitutions.getMetadata(depth, index);
+          // FIXME: Variadic generics
+          return substitutions.getMetadata(depth, index).getMetadata();
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
