@@ -2041,7 +2041,10 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Expansion already visited as auxiliary decls.
+    // Decls in expansion already visited as auxiliary decls.
+    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+      TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
+    });
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3785,11 +3788,9 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   // If it's not a declaration macro or a code item macro, it must have been
   // parsed as an expression macro, and this decl is just its substitute decl.
   // So there's no thing to be done here.
-  if (!roles.contains(MacroRole::Declaration))
+  if (!roles.contains(MacroRole::Declaration) &&
+      !roles.contains(MacroRole::CodeItem))
     return None;
-
-  // Otherwise, we treat it as a declaration macro.
-  assert(roles.contains(MacroRole::Declaration));
 
   // For now, restrict global freestanding macros in script mode.
   if (dc->isModuleScopeContext() &&

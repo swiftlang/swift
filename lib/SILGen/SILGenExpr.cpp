@@ -6169,10 +6169,18 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
     MacroScope scope(SGF, CleanupLocation(rewritten), E, name.str(),
                      E->getMacroRef().getDecl());
     return visit(rewritten, C);
-  } else {
-    assert(E->getSubstituteDecl());
+  }
+  else if (auto *MED = E->getSubstituteDecl()) {
+    Mangle::ASTMangler mangler;
+    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+      if (auto *expr = node.dyn_cast<Expr *>())
+        visit(expr, C);
+      else if (auto *stmt = node.dyn_cast<Stmt *>())
+        SGF.emitStmt(stmt);
+    });
     return RValue();
   }
+  return RValue();
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

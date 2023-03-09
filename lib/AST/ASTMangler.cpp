@@ -3965,6 +3965,7 @@ void ASTMangler::appendMacroExpansionOperator(
   switch (role) {
   case MacroRole::Expression:
   case MacroRole::Declaration:
+  case MacroRole::CodeItem:
     appendOperator("fMf", Index(discriminator));
     break;
 

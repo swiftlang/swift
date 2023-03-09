@@ -10070,6 +10070,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Conformance:
     return "conformance";
+
+  case MacroRole::CodeItem:
+    return "codeItem";
   }
 }
 
@@ -10111,7 +10114,8 @@ StringRef swift::getMacroIntroducedDeclNameString(
 static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
-   MacroRole::Declaration);
+   MacroRole::Declaration |
+   MacroRole::CodeItem);
 static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |
@@ -10317,6 +10321,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Declaration:
   case MacroRole::Member:
   case MacroRole::Peer:
+  case MacroRole::CodeItem:
     names.push_back(MacroDecl::getUniqueNamePlaceholder(getASTContext()));
     break;
 
