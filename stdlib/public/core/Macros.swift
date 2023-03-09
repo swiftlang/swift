@@ -63,6 +63,7 @@ public macro column<T: ExpressibleByIntegerLiteral>() -> T =
 @freestanding(expression)
 public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 
+#if $AttachedMacros
 /// Create an option set from a struct that contains a nested `Options` enum.
 ///
 /// Attach this macro to a struct that contains a nested `Options` enum
@@ -92,5 +93,6 @@ public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 @attached(conformance)
 public macro OptionSet<RawType>() =
   #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
+#endif
 
 #endif
