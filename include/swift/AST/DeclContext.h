@@ -512,9 +512,11 @@ public:
     return false;
   }
 
-  /// Returns the package context of the parent module.
+  /// Returns the package unit of this context.
+  /// \p lookupIfNotCurrent If the current decl context is not PackageUnit, look
+  /// it up via parent module
   LLVM_READONLY
-  PackageUnit *getParentModulePackage() const;
+  PackageUnit *getPackageContext(bool lookupIfNotCurrent = false) const;
 
   /// Returns the module context that contains this context.
   LLVM_READONLY

@@ -159,32 +159,47 @@ class OverlayFile;
 /// location.
 class ModuleSourceFileLocationMap;
 
-/// Package unit used to allow grouping of modules by a package name.
-/// ModuleDecl can set PackageUnit as a parent in its DeclContext
-/// See \c ModuleDecl
+/// A unit that allows grouping of modules by a package name.
+/// It's set as a property in ModuleDecl, instead of as its parent decl context,
+/// since otherwise it will break the existing decl context lookups that assume
+/// ModuleDecl as the top level context. See \c ModuleDecl
 class PackageUnit: public DeclContext {
-
+  /// Identifies this package and used for the equality check
   Identifier PackageName;
+  /// Weakly reference ModuleDecl that points to this package.
+  /// Instead of having multiple ModuleDecls pointing to one PackageUnit, we
+  /// create and set one PackageUnit per ModuleDecl, to make it easier to look
+  /// up the module pointing to this package; this look up is needed in existing
+  /// DeclContext functions, e.g. \c DeclContext::getModuleScopeContext,
+  /// and \c DeclContext::getParentModule
+  ModuleDecl &SourceModule;
 
-  PackageUnit(Identifier name);
+  PackageUnit(Identifier name, ModuleDecl &src)
+      : DeclContext(DeclContextKind::Package, nullptr), PackageName(name),
+        SourceModule(src) {}
 
 public:
-  static PackageUnit *
-  create(Identifier name, ASTContext &ctx) {
-    return new (ctx) PackageUnit(name);
+  static PackageUnit *create(Identifier name, ModuleDecl &src,
+                             ASTContext &ctx) {
+    return new (ctx) PackageUnit(name, src);
   }
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::Package;
   }
 
-  static bool classof(const PackageUnit *PU) {
-    // FIXME: add a correct check
-    return true;
-  }
+  static bool classof(const PackageUnit *PU) { return true; }
 
   Identifier getName() const {
     return PackageName;
+  }
+
+  ModuleDecl &getSourceModule() { return SourceModule; }
+
+  /// Equality check via package name instead of pointer comparison.
+  /// Returns false if the name is empty.
+  bool isSamePackageAs(PackageUnit *other) {
+    return !(getName().empty()) && getName() == other->getName();
   }
 };
 
@@ -202,8 +217,10 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
-  /// The name of the package this module belongs to
-  mutable Identifier PackageName;
+  /// A package this module belongs to. It's set as a property instead of a
+  /// parent decl context; otherwise it will break the existing decl context
+  /// lookups that assume ModuleDecl as the top level context.
+  PackageUnit *Package;
 
   /// Module name to use when referenced in clients module interfaces.
   mutable Identifier ExportAsName;
@@ -440,17 +457,20 @@ public:
     ModuleABIName = name;
   }
 
-  /// Get the package name of the module
-  Identifier getPackageName() const { return PackageName; }
-
-  /// Set the name of the package this module belongs to
-  void setPackageName(Identifier name) {
-    PackageName = name;
-    // TODO: uncomment when PackageUnit gets passed to constructor
-//    PackageUnit *pkgUnit = PackageUnit::create(name, getASTContext());
-//    DeclContext newContext = DeclContext(DeclContextKind::Module, pkgUnit);
-//    setDeclContext(&newContext);
+  /// Get the package name of this module
+  /// FIXME: remove this and bump module version rdar://104723918
+  Identifier getPackageName() const {
+    if (auto pkg = getPackage())
+      return pkg->getName();
+    return Identifier();
   }
+
+  /// Get the package associated with this module
+  PackageUnit *getPackage() const { return Package; }
+
+  /// Set the package this module is associated with
+  /// FIXME: rename this with setPackage(name) rdar://104723918
+  void setPackageName(Identifier name);
 
   Identifier getExportAsName() const { return ExportAsName; }
 

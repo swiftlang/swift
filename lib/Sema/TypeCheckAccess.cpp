@@ -2278,15 +2278,14 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   case AccessLevel::FilePrivate: {
     const DeclContext *DC = ED->getModuleScopeContext();
     bool isPrivate = (userSpecifiedAccess == AccessLevel::Private);
-    desiredAccessScope = AccessScope(DC, isPrivate ? AccessLimitKind::Private
-                                                   : AccessLimitKind::None);
+    desiredAccessScope = AccessScope(DC, isPrivate);
     break;
   }
   case AccessLevel::Internal:
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
   case AccessLevel::Package:
-    desiredAccessScope = AccessScope::getPackage();
+    desiredAccessScope = AccessScope(ED->getPackageContext(true));
     break;
   case AccessLevel::Public:
   case AccessLevel::Open:
