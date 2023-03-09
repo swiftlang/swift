@@ -135,8 +135,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper))
     funcOper = TTI->getOperand();
 
-  auto *FRI = dyn_cast<FunctionRefInst>(funcOper);
-  if (!FRI)
+  if (!isa<FunctionRefInst>(funcOper) &&
+      // Optimizing partial_apply will then enable the partial_apply -> apply peephole.
+      !isa<PartialApplyInst>(funcOper))
     return nullptr;
 
   // Grab our relevant callee types...
@@ -151,8 +152,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
   OperandValueArrayRef Ops = AI.getArguments();
-  SILFunctionConventions substConventions(SubstCalleeTy, FRI->getModule());
-  SILFunctionConventions convertConventions(ConvertCalleeTy, FRI->getModule());
+  SILFunctionConventions substConventions(SubstCalleeTy, CFI->getModule());
+  SILFunctionConventions convertConventions(ConvertCalleeTy, CFI->getModule());
   auto context = AI.getFunction()->getTypeExpansionContext();
   auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
   auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
@@ -229,7 +230,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Builder.createBranch(AI.getLoc(), TAI->getNormalBB(), branchArgs);
     }
     
-    return Builder.createTryApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
+    return Builder.createTryApply(AI.getLoc(), funcOper, SubstitutionMap(), Args,
                                   normalBB, TAI->getErrorBB(),
                                   TAI->getApplyOptions());
   }
@@ -239,9 +240,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // otherwise, we would be creating malformed SIL).
   ApplyOptions Options = AI.getApplyOptions();
   Options -= ApplyFlags::DoesNotThrow;
-  if (FRI->getFunctionType()->hasErrorResult())
+  if (funcOper->getType().castTo<SILFunctionType>()->hasErrorResult())
     Options |= ApplyFlags::DoesNotThrow;
-  ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
+  ApplyInst *NAI = Builder.createApply(AI.getLoc(), funcOper, SubstitutionMap(),
                                        Args, Options);
   SILInstruction *result = NAI;
   
@@ -1455,7 +1456,11 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (isa<PartialApplyInst>(AI->getCallee()))
     return nullptr;
 
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
+  SILValue callee = AI->getCallee();
+  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
+    callee = cee->getOperand();
+  }
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
   if (tryOptimizeKeypath(AI))
