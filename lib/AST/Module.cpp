@@ -543,19 +543,13 @@ void SourceLookupCache::invalidate() {
   (void)SameSizeSmallVector{std::move(AllVisibleValues)};
 }
 
-PackageUnit::PackageUnit(Identifier name)
-  : DeclContext(DeclContextKind::Package, nullptr) {
-    PackageName = name;
-}
-
 //===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
-                       ImplicitImportInfo importInfo,
-                       PackageUnit *pkg = nullptr)
-    : DeclContext(DeclContextKind::Module, pkg),
+                       ImplicitImportInfo importInfo)
+    : DeclContext(DeclContextKind::Module, nullptr),
       TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
       ImportInfo(importInfo) {
 
@@ -3066,6 +3060,10 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   }
 
   return restrictiveImport;
+}
+
+void ModuleDecl::setPackageName(Identifier name) {
+  Package = PackageUnit::create(name, *this, getASTContext());
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
