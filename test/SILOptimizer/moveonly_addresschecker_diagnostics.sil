@@ -279,3 +279,40 @@ bb0(%0 : @owned $NonTrivialStruct):
   %11 = tuple ()
   return %11 : $()
 }
+
+
+sil [ossa] @classSimpleChainArgTest : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
+  // expected-error @-1 {{'x2' consumed more than once}}
+  // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+  debug_value %1 : $*Klass, var, name "x2", argno 1, expr op_deref
+  %3 = alloc_stack [lexical] $Klass, var, name "y2"
+  %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass
+  %5 = begin_access [read] [static] %1 : $*Klass
+  copy_addr %5 to [init] %4 : $*Klass // expected-note {{consuming use here}}
+  end_access %5 : $*Klass
+  %8 = begin_access [read] [static] %1 : $*Klass
+  %9 = load [copy] %8 : $*Klass
+  // expected-note @-1 {{consuming use here}}
+  // expected-note @-2 {{consuming use here}}
+  end_access %8 : $*Klass
+  %11 = begin_access [modify] [static] %4 : $*Klass
+  store %9 to [assign] %11 : $*Klass
+  end_access %11 : $*Klass
+  %14 = alloc_stack [lexical] $Klass, let, name "k2"
+  %15 = mark_must_check [consumable_and_assignable] %14 : $*Klass
+  %16 = begin_access [read] [static] %4 : $*Klass
+  copy_addr %16 to [init] %15 : $*Klass
+  end_access %16 : $*Klass
+  %19 = load_borrow %15 : $*Klass
+  %20 = function_ref @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %21 = apply %20(%19) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %19 : $Klass
+  destroy_addr %15 : $*Klass
+  dealloc_stack %14 : $*Klass
+  destroy_addr %4 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %27 = tuple ()
+  return %27 : $()
+}

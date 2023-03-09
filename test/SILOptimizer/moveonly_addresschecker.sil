@@ -339,7 +339,14 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
-// CHECK-NOT: destroy_addr
+// CHECK: bb0([[ARG0:%.*]] : ${{.*}}, [[ARG1:%.*]] :
+// CHECK:   debug_value [[ARG0]]
+// CHECK:   debug_value [[ARG1]]
+// CHECK:   destroy_addr [[ARG1]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ARG1]]
+// CHECK:   [[GEP:%.*]] = struct_element_addr [[ACCESS]]
+// CHECK:   store [[ARG0]] to [trivial] [[GEP]]
+// CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function 'myBufferViewSetter'
 sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
 bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
@@ -407,4 +414,26 @@ bb0:
   end_access %8 : $*NonTrivialStruct
   %15 = tuple ()
   return %15 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @classSimpleChainArgTestHoistDebugValue : $@convention(thin) (@inout Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT: debug_value [[ARG]]
+sil [ossa] @classSimpleChainArgTestHoistDebugValue : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
+  %3 = alloc_stack [lexical] $Klass, var, name "y2"
+  %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass
+  %5 = begin_access [read] [static] %1 : $*Klass
+  copy_addr %5 to [init] %4 : $*Klass
+  end_access %5 : $*Klass
+  // If we do not hoist this to %1, we should crash. Make sure we dont!
+  debug_value %1 : $*Klass, var, name "x2", argno 1, expr op_deref
+  destroy_addr %4 : $*Klass
+  dealloc_stack %3 : $*Klass
+  %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %newArg = apply %f() : $@convention(thin) () -> @owned Klass
+  store %newArg to [init] %1 : $*Klass
+  %27 = tuple ()
+  return %27 : $()
 }

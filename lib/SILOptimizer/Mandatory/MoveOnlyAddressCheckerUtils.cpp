@@ -410,6 +410,11 @@ struct UseState {
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
   SmallSetVector<SILInstruction *, 2> inoutTermUsers;
 
+  /// We add debug_values to liveness late after we diagnose, but before we
+  /// hoist destroys to ensure that we do not hoist destroys out of access
+  /// scopes.
+  DebugValueInst *debugValue = nullptr;
+
   SILFunction *getFunction() const { return address->getFunction(); }
 
   /// Returns true if this is a terminator instruction that although it doesn't
@@ -429,6 +434,7 @@ struct UseState {
     initInsts.clear();
     reinitInsts.clear();
     inoutTermUsers.clear();
+    debugValue = nullptr;
   }
 
   void dump() {
@@ -464,6 +470,10 @@ struct UseState {
     llvm::dbgs() << "InOut Term Users:\n";
     for (auto *inst : inoutTermUsers) {
       llvm::dbgs() << *inst;
+    }
+    llvm::dbgs() << "Debug Value User:\n";
+    if (debugValue) {
+      llvm::dbgs() << *debugValue;
     }
   }
 
@@ -1198,10 +1208,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
-  // We don't care about debug instructions.
-  if (op->getUser()->isDebugInstruction())
-    return true;
-
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
@@ -1260,6 +1266,19 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
+
+  if (auto *di = dyn_cast<DebugValueInst>(user)) {
+    // Make sure that our debug_value is always on our root value. If not, we
+    // have something we don't understand and should bail. This ensures we can
+    // always hoist the debug_value to our mark_must_check. This ensures that by
+    // marking debug_value later as requiring liveness, we do not change our
+    // liveness calculation since values are always live at the mark_must_check.
+    if (di->getOperand() != getRootAddress())
+      return false;
+
+    useState.debugValue = di;
+    return true;
+  }
 
   // At this point, we have handled all of the non-loadTakeOrCopy/consuming
   // uses.
@@ -1943,21 +1962,6 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
                                      liveness.getRootValue(), defPair.second,
                                      consumes);
     } else {
-      // If our dead def is a mark_must_check and we are processing an inout
-      // argument, do not insert a destroy_addr. We are cheating a little bit by
-      // modeling the initial value as a mark_must_check... so we need to
-      // compensate for our cheating by not inserting the destroy_addr here
-      // since we would be destroying the inout argument before we use it.
-      if (auto *markMustCheckInst =
-              dyn_cast<MarkMustCheckInst>(defPair.first)) {
-        if (auto *arg = dyn_cast<SILFunctionArgument>(
-                markMustCheckInst->getOperand())) {
-          if (arg->getArgumentConvention().isInoutConvention()) {
-            continue;
-          }
-        }
-      }
-
       auto *inst = cast<SILInstruction>(defPair.first);
       auto *insertPt = inst->getNextInstruction();
       assert(insertPt && "def instruction was a terminator");
@@ -2144,9 +2148,28 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     return true;
   }
 
+  //===
+  // Final Transformation
+  //
+
   // Ok, we now know that we fit our model since we did not emit errors and thus
   // can begin the transformation.
   SWIFT_DEFER { consumes.clear(); };
+
+  // First add any debug_values that we saw as liveness uses. This is important
+  // since the debugger wants to see live values when we define a debug_value,
+  // but we do not want to use them earlier when emitting diagnostic errors.
+  if (auto *di = addressUseState.debugValue) {
+    // Move the debug_value to right before the markedAddress to ensure that we
+    // do not actually change our liveness computation.
+    //
+    // NOTE: The author is not sure if this can ever happen with SILGen output,
+    // but this is being put just to be safe.
+    di->moveAfter(markedAddress);
+    liveness.updateForUse(di, TypeTreeLeafTypeRange(markedAddress),
+                          false /*lifetime ending*/);
+  }
+
   FieldSensitivePrunedLivenessBoundary boundary(liveness.getNumSubElements());
   liveness.computeBoundary(boundary);
   insertDestroysOnBoundary(markedAddress, liveness, boundary);
