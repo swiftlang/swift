@@ -771,11 +771,13 @@ public:
 
       // For an initialization, include the pattern in the range too.
       if (isForInitialization()) {
-        if (auto patternRange = getInitializationPattern()->getSourceRange()) {
-          if (range.isInvalid()) {
-            range = patternRange;
-          } else {
-            range.widen(patternRange);
+        if (auto *pattern = getInitializationPattern()) {
+          if (auto patternRange = pattern->getSourceRange()) {
+            if (range.isInvalid()) {
+              range = patternRange;
+            } else {
+              range.widen(patternRange);
+            }
           }
         }
       }
