@@ -356,6 +356,9 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
+  /// The Swift module currently being compiled.
+  ModuleDecl *MainModule = nullptr;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
