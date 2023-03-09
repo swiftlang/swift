@@ -296,6 +296,11 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 }
 
 SWIFT_CC(swift)
+static HeapObject *swift_task_getDefaultActorExecutorIdentityFromRefImpl(ExecutorRef ref) {
+  return ref.isDefaultActor() ? ref.getIdentity() : nullptr;
+}
+
+SWIFT_CC(swift)
 static TypeNamePair swift_task_getExecutorRefTypeNameImpl(ExecutorRef ref) {
   TypeNamePair executorName;
   if (ref.isDefaultActor()) {

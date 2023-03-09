@@ -128,6 +128,10 @@ OVERRIDE_ACTOR(task_getExecutorRefTypeName, TypeNamePair,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, (ExecutorRef executor), (executor))
 
+OVERRIDE_ACTOR(task_getDefaultActorExecutorIdentityFromRef, HeapObject*,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (ExecutorRef executor), (executor))
+
 OVERRIDE_ACTOR(task_getCurrentActiveExecutorRef, ExecutorActiveAndRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)

@@ -999,6 +999,11 @@ func _executorGetTypeName(_ executor: Builtin.Executor) -> String {
 
 @available(SwiftStdlib 5.9, *)
 @usableFromInline
+@_silgen_name("swift_task_getDefaultActorExecutorIdentityFromRef")
+func _executorGetSerialExecutorFromRef(_ executor: Builtin.Executor) -> (any Executor)?
+
+@available(SwiftStdlib 5.9, *)
+@usableFromInline
 @_silgen_name("swift_task_getCurrentActiveExecutorRef")
 func _executorGetCurrentActiveExecutorRef() -> (Bool, Builtin.Executor)
 

@@ -50,7 +50,7 @@ func preconditionTaskOnExecutor(
 
   precondition(expectationCheck,
       "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
-      "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+      "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'.",
       file: file, line: line) // short-cut so we get the exact same failure reporting semantics
 }
 
@@ -88,7 +88,7 @@ func preconditionTaskOnActorExecutor(
   precondition(expectationCheck,
       "Expected same executor as actor '\(actor)' " +
       "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-      "but was executing on '\(_executorGetCurrentActiveExecutorName())'. \(message())",
+      "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'. \(message())",
       file: file, line: line)
 }
 
@@ -124,7 +124,7 @@ func assertTaskOnExecutor(
   guard _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor) else {
     assertionFailure(
         "Expected '\(_executorGetTypeName(executor.asUnownedSerialExecutor().executor))' executor, " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'.",
         file: file, line: line)
     return
   }
@@ -161,7 +161,7 @@ func assertTaskOnActorExecutor(
     let msg =
         "Expected same executor as actor '\(actor)' " +
         "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'. " +
+        "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'. " +
         "\(message())";
     assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
     return
@@ -201,7 +201,7 @@ func assumeOnMainActorExecutor<T>(
   guard _taskIsCurrentExecutor(mainExecutor) else {
     fatalError(
         "Expected '\(_executorGetTypeName(mainExecutor))' executor, " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'.",
         file: file, line: line)
   }
 
@@ -244,7 +244,7 @@ func assumeOnActorExecutor<Act: Actor, T>(
     fatalError(
         "Expected same executor as actor '\(actor)' " +
         "('\(_executorGetTypeName(actor.unownedExecutor.executor))'), " +
-        "but was executing on '\(_executorGetCurrentActiveExecutorName())'.",
+        "but was executing on '\(_executorGetCurrentActiveExecutorDescription())'.",
         file: file, line: line)
   }
 
@@ -260,10 +260,15 @@ func assumeOnActorExecutor<Act: Actor, T>(
 /// I.e. if we're not executing within a task, we expect to have `<unknown>` executor rather than the generic one.
 @usableFromInline
 @available(SwiftStdlib 5.9, *)
-func _executorGetCurrentActiveExecutorName() -> String {
+func _executorGetCurrentActiveExecutorDescription() -> String {
   let (wasActive, ref) = _executorGetCurrentActiveExecutorRef()
   guard wasActive else {
     return "<unknown>"
+  }
+
+  if let serial = _executorGetSerialExecutorFromRef(ref) {
+    print("ASSUME IT")
+    return "\(serial)"
   }
 
   return _executorGetTypeName(ref)

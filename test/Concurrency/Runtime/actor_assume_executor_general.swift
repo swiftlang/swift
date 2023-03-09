@@ -139,8 +139,9 @@ final class MainActorEcho {
         await MainFriend().callCheck(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: wrongly assume the main executor, from actor on other executor") {
-        expectCrashLater(withMessage: "Expected 'MainActorExecutor' executor, but was executing on 'DefaultActorExecutor'.")
+      tests.test("assumeOnMainActorExecutor: wrongly assume the main executor, from actor on default executor") {
+        // Note that the executor here is the type of the actor; "default" executors are per actor
+        expectCrashLater(withMessage: "Expected 'MainActorExecutor' executor, but was executing on 'a.DefaultExecutorSomeone'.")
         await DefaultExecutorSomeone().callCheckMainActor(echo: echo)
       }
 

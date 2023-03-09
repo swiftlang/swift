@@ -894,6 +894,10 @@ bool swift_task_isCurrentExecutor(ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TypeNamePair swift_task_getExecutorRefTypeName(ExecutorRef executor);
 
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+HeapObject *swift_task_getDefaultActorExecutorIdentityFromRef(ExecutorRef executor);
+
 /// Since the `nullptr, 0` executor ref is a valid "generic executor" reference,
 /// when we need to know "was the generic one actually set, or are we just defaulting to it
 struct ExecutorActiveAndRef {
