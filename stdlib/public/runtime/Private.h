@@ -442,7 +442,7 @@ public:
 
     const void * const *getGenericArgs() const { return genericArgs; }
 
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
                                         unsigned index) const;
   };
