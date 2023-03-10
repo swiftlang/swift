@@ -13,6 +13,7 @@
 #include "Initialization.h"
 #include "Scope.h"
 #include "SILGenFunction.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
@@ -165,7 +166,51 @@ public:
 #endif
   }
 };
+
+/// An ASTWalker to emit tuple values in `MaterializePackExpr` nodes.
+///
+/// Materialized packs are emitted inside a pack expansion context before
+/// entering the dynamic pack loop so that the values are only evaluated
+/// once, rather than at each pack element iteration.
+struct MaterializePackEmitter : public ASTWalker {
+  SILGenFunction &SGF;
+
+  MaterializePackEmitter(SILGenFunction &SGF) : SGF(SGF) {}
+
+  ASTWalker::PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    using Action = ASTWalker::Action;
+
+    // Don't walk into nested pack expansions.
+    if (isa<PackExpansionExpr>(expr))
+      return Action::SkipChildren(expr);
+
+    if (auto *packExpr = dyn_cast<MaterializePackExpr>(expr)) {
+      auto *fromExpr = packExpr->getFromExpr();
+      assert(fromExpr->getType()->is<TupleType>());
+
+      auto &lowering = SGF.getTypeLowering(fromExpr->getType());
+      auto loweredTy = lowering.getLoweredType();
+      auto tupleAddr = SGF.emitTemporaryAllocation(fromExpr, loweredTy);
+      auto init = SGF.useBufferAsTemporary(tupleAddr, lowering);
+      SGF.emitExprInto(fromExpr, init.get());
+
+      // Write the tuple value to a side table in the active pack expansion
+      // to be projected later within the dynamic pack loop.
+      auto *activeExpansion = SGF.getInnermostPackExpansion();
+      activeExpansion->MaterializedPacks[packExpr] = tupleAddr;
+    }
+
+    return Action::Continue(expr);
+  }
+};
+
 } // end anonymous namespace
+
+void
+SILGenFunction::prepareToEmitPackExpansionExpr(PackExpansionExpr *E) {
+  MaterializePackEmitter tempPackEmission(*this);
+  E->getPatternExpr()->walk(tempPackEmission);
+}
 
 CleanupHandle SILGenFunction::enterDeallocPackCleanup(SILValue temp) {
   assert(temp->getType().isAddress() &&  "dealloc must have an address type");
@@ -390,6 +435,17 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
          "cannot reverse with a starting index");
   ASTContext &ctx = SGM.getASTContext();
 
+  // Save and restore the innermost pack expansion.
+  ActivePackExpansion activeExpansionRecord = {
+    openedElementEnv
+  };
+
+  llvm::SaveAndRestore<ActivePackExpansion*>
+    packExpansionScope(InnermostPackExpansion, &activeExpansionRecord);
+
+  if (auto *expansion = loc.getAsASTNode<PackExpansionExpr>())
+    prepareToEmitPackExpansionExpr(expansion);
+
   auto wordTy = SILType::getBuiltinWordType(ctx);
   auto boolTy = SILType::getBuiltinIntegerType(1, ctx);
 
@@ -461,6 +517,7 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   // Construct the dynamic pack index into the component.
   SILValue packExpansionIndex =
     B.createDynamicPackIndex(loc, curIndex, formalDynamicPackType);
+  getInnermostPackExpansion()->ExpansionIndex = packExpansionIndex;
 
   // If there's an opened element environment, open it here.
   if (openedElementEnv) {
@@ -478,14 +535,6 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   // Emit the loop body in a scope as a convenience, since it's necessary
   // to avoid dominance problems anyway.
   {
-    // Save and restore the innermost pack expansion.
-    ActivePackExpansion activeExpansionRecord = {
-      packExpansionIndex,
-      openedElementEnv
-    };
-    llvm::SaveAndRestore<ActivePackExpansion*>
-      packExpansionScope(InnermostPackExpansion, &activeExpansionRecord);
-
     FullExpr scope(Cleanups, CleanupLocation(loc));
     emitBody(curIndex, packExpansionIndex, packIndex);
   }
