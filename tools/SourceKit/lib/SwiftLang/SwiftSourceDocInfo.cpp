@@ -704,14 +704,14 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 static void
 collectAvailableRenameInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
                            SmallVectorImpl<RefactoringInfo> &Refactorings) {
-  SmallVector<RenameAvailabilityInfo, 2> Renames;
-  collectRenameAvailabilityInfo(VD, RefInfo, Renames);
-  for (auto Info : Renames) {
-    Refactorings.emplace_back(
-        SwiftLangSupport::getUIDForRefactoringKind(Info.Kind),
-        ide::getDescriptiveRefactoringKindName(Info.Kind),
-        ide::getDescriptiveRenameUnavailableReason(Info.AvailableKind));
-  }
+  Optional<RenameAvailabilityInfo> Info = renameAvailabilityInfo(VD, RefInfo);
+  if (!Info)
+    return;
+
+  Refactorings.emplace_back(
+      SwiftLangSupport::getUIDForRefactoringKind(Info->Kind),
+      ide::getDescriptiveRefactoringKindName(Info->Kind),
+      ide::getDescriptiveRenameUnavailableReason(Info->AvailableKind));
 }
 
 static void collectAvailableRefactoringsOtherThanRename(
