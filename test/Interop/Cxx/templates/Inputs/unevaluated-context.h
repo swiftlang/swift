@@ -16,12 +16,17 @@ auto declval() noexcept -> decltype(__declval<_Tp>(0)) {
   return __declval<_Tp>(0);
 }
 
+inline void stillCalled() {
+    static int x = 0;
+}
+
 template <class T>
 class Vec {
 public:
   void push_back(const T &__x) {
     if (!noexcept(declval<T *>()))
       ;
+    stillCalled();
   }
 };
 

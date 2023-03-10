@@ -104,10 +104,12 @@ public:
   // Do not traverse unevaluated expressions. Doing to might result in compile
   // errors if we try to instantiate an un-instantiatable template.
 
-  bool VisitCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return false; }
+  bool TraverseCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return true; }
 
-  bool VisitCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
-    return TIE->isPotentiallyEvaluated();
+  bool TraverseCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
+    if (TIE->isPotentiallyEvaluated())
+      clang::RecursiveASTVisitor<ClangDeclFinder>::TraverseCXXTypeidExpr(TIE);
+    return true;
   }
 
   bool shouldVisitTemplateInstantiations() const { return true; }
