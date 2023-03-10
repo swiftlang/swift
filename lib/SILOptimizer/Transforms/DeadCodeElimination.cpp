@@ -274,7 +274,13 @@ void DCE::markLive() {
         addReverseDependency(beginAccess, &I);
         break;
       }
-      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::DestroyValueInst: {
+        auto phi = PhiValue(I.getOperand(0));
+        if (phi && phi->isLexical()) {
+          markInstructionLive(&I);
+        }
+        break;
+      }
       case SILInstructionKind::EndBorrowInst:
       case SILInstructionKind::EndLifetimeInst: {
         // The instruction is live only if it's operand value is also live

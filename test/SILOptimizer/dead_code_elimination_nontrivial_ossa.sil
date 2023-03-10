@@ -1150,3 +1150,28 @@ bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
   return %9999 : $()
 }
 
+
+class C {}
+
+sil [ossa] @getC : $@convention(thin) () -> (@owned C)
+
+// CHECK-LABEL: sil [ossa] @dont_dce_lexical_phi :
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'dont_dce_lexical_phi'
+sil [ossa] @dont_dce_lexical_phi : $() -> () {
+ entry:
+   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+   cond_br undef, left, right
+ left:
+   %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+   %m1 = move_value [lexical] %c1 : $C
+   br exit(%m1 : $C)
+ right:
+   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+   br exit(%c2 : $C)
+ exit(%cm : @owned $C):
+   destroy_value %cm : $C
+   %retval = tuple ()
+   return %retval : $()
+}
+
