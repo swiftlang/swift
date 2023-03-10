@@ -87,27 +87,35 @@ public:
   }
 };
 
-
-/// A set of SILInstructions.
+/// A set of instructions.
 ///
 /// For details see NodeBitfield.
-class InstructionSet {
+template <typename Instruction>
+class SomeInstructionSet {
   NodeSet nodeSet;
   
 public:
-  using Element = SILInstruction *;
+  using Element = Instruction *;
 
-  InstructionSet(SILFunction *function) : nodeSet(function) {}
+  SomeInstructionSet(SILFunction *function) : nodeSet(function) {}
 
   SILFunction *getFunction() const { return nodeSet.getFunction(); }
 
-  bool contains(SILInstruction *inst) const { return nodeSet.contains(inst->asSILNode()); }
+  bool contains(Instruction *inst) const {
+    return nodeSet.contains(inst->asSILNode());
+  }
 
   /// Returns true if \p inst was not contained in the set before inserting.
-  bool insert(SILInstruction *inst) { return nodeSet.insert(inst->asSILNode()); }
+  bool insert(Instruction *inst) { return nodeSet.insert(inst->asSILNode()); }
 
-  void erase(SILInstruction *inst) { nodeSet.erase(inst->asSILNode()); }
+  void erase(Instruction *inst) { nodeSet.erase(inst->asSILNode()); }
 };
+
+template <typename Instruction>
+using SomeInstructionSetWithSize =
+    KnownSizeSet<SomeInstructionSet<Instruction>>;
+
+using InstructionSet = SomeInstructionSet<SILInstruction>;
 
 using InstructionSetWithSize = KnownSizeSet<InstructionSet>;
 
