@@ -59,19 +59,28 @@ class ContextFinder : public SourceEntityWalker {
     }
     return Result;
   }
+
 public:
   ContextFinder(SourceFile &SF, ASTNode TargetNode,
                 std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetNode.getSourceRange()), IsContext(IsContext) {}
+
   ContextFinder(SourceFile &SF, SourceLoc TargetLoc,
                 std::function<bool(ASTNode)> IsContext =
                   [](ASTNode N) { return true; }) :
                   SF(SF), Ctx(SF.getASTContext()), SM(Ctx.SourceMgr),
                   Target(TargetLoc), IsContext(IsContext) {
                     assert(TargetLoc.isValid() && "Invalid loc to find");
-                  }
+  }
+
+  // Only need expansions for the expands refactoring, but we
+  // skip nodes that don't contain the passed location anyway.
+  virtual MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return contains(D); }
   bool walkToStmtPre(Stmt *S) override { return contains(S); }
   bool walkToExprPre(Expr *E) override { return contains(E); }
@@ -8497,6 +8506,15 @@ static Optional<unsigned> getMacroExpansionBuffer(
   return None;
 }
 
+/// Retrieve the macro expansion buffer for the given macro expansion
+/// declaration.
+static Optional<unsigned>
+getMacroExpansionBuffer(SourceManager &sourceMgr,
+                        MacroExpansionDecl *expansion) {
+  return evaluateOrDefault(expansion->getASTContext().evaluator,
+                           ExpandMacroExpansionDeclRequest{expansion}, {});
+}
+
 /// Retrieve the macro expansion buffers for the given attached macro reference.
 static llvm::SmallVector<unsigned, 2>
 getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
@@ -8584,13 +8602,14 @@ getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
   // FIXME: A resolved cursor should contain a slice up to its reference.
   // We shouldn't need to find it again.
   ContextFinder Finder(*Info->getSourceFile(), Info->getLoc(), [&](ASTNode N) {
-    if (N.getStartLoc() == Info->getLoc())
-      return true;
-
-    // TODO: Handle MacroExpansionDecl
     if (auto *expr =
             dyn_cast_or_null<MacroExpansionExpr>(N.dyn_cast<Expr *>())) {
-      return expr->getMacroNameLoc().getBaseNameLoc() == Info->getLoc();
+      return expr->getStartLoc() == Info->getLoc() ||
+             expr->getMacroNameLoc().getBaseNameLoc() == Info->getLoc();
+    } else if (auto *decl =
+                   dyn_cast_or_null<MacroExpansionDecl>(N.dyn_cast<Decl *>())) {
+      return decl->getStartLoc() == Info->getLoc() ||
+             decl->getMacroNameLoc().getBaseNameLoc() == Info->getLoc();
     }
 
     return false;
@@ -8599,8 +8618,11 @@ getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
 
   if (!Finder.getContexts().empty()) {
     Optional<unsigned> bufferID;
-    if (auto *target = dyn_cast<MacroExpansionExpr>(
-            Finder.getContexts()[0].get<Expr *>())) {
+    if (auto *target = dyn_cast_or_null<MacroExpansionExpr>(
+            Finder.getContexts()[0].dyn_cast<Expr *>())) {
+      bufferID = getMacroExpansionBuffer(sourceMgr, target);
+    } else if (auto *target = dyn_cast_or_null<MacroExpansionDecl>(
+                   Finder.getContexts()[0].dyn_cast<Decl *>())) {
       bufferID = getMacroExpansionBuffer(sourceMgr, target);
     }
 
