@@ -99,9 +99,13 @@ func returnRepeatTuple<each T>(_ t: repeat each T) -> (repeat T) { // expected-e
   fatalError()
 }
 
-func paremeterAsPackTypeWithoutExpansion<each T>(_ t: T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+func parameterAsPackTypeWithoutExpansion<each T>(_ t: T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
   fatalError()
 }
+
+func expansionOfNonPackType<T>(_ t: repeat each T) {}
+// expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}{{29-29=each }}
+// expected-error@-2 {{variadic expansion 'T' must contain at least one variadic generic parameter}}
 
 func tupleExpansion<each T, each U>(
   _ tuple1: (repeat each T),

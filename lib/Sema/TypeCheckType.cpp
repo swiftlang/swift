@@ -4583,8 +4583,15 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     return ErrorType::get(ctx);
 
   if (!packReference->isParameterPack()) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack,
-                       packReference);
+    auto diag =
+        ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
+    if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
+      if (auto *packIdentBinding = packIdent->getBoundDecl()) {
+        if (packIdentBinding->getLoc().isValid()) {
+          diag.fixItInsert(packIdentBinding->getLoc(), "each ");
+        }
+      }
+    }
     return packReference;
   }
 
