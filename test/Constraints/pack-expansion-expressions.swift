@@ -144,3 +144,33 @@ func callCopyAndBind<T>(_ arg: repeat each T) {
   // Don't propagate errors for invalid declaration reference
   let result = copyIntoTuple(repeat each arg)
 }
+
+do {
+  struct TestArgMatching {
+    subscript<each T>(data arg: repeat each T) -> Int {
+      get { 42 }
+      set {}
+    }
+  }
+
+  func test_that_variadic_generics_claim_unlabeled_arguments<each T>(_ args: repeat each T, test: inout TestArgMatching) {
+    func testLabeled<each U>(data: repeat each U) {}
+    func testUnlabeled<each U>(_: repeat each U) {}
+    func testInBetween<each U>(_: repeat each U, other: String) {}
+
+    testLabeled(data: repeat each args) // Ok
+    testLabeled(data: repeat each args, 1) // Ok
+    testLabeled(data: repeat each args, 1, 2, 3) // Ok
+
+    testUnlabeled(repeat each args) // Ok
+    testUnlabeled(repeat each args, 1) // Ok
+    testUnlabeled(repeat each args, 1, 2, 3) // Ok
+
+    testInBetween(repeat each args, 1, 2.0, other: "") // Ok
+
+    _ = test[data: repeat each args]
+    _ = test[data: repeat each args, 0, ""]
+
+    test[data: repeat each args, "", 42] = 0
+  }
+}
