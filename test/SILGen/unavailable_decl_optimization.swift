@@ -6,11 +6,10 @@
 // CHECK-NO-STRIP: s4Test14globalConstantSbvp
 // CHECK-NO-STRIP: s4Test14globalConstant_WZ
 // CHECK-NO-STRIP: s4Test14globalConstantSbvau
-// FIXME: global var isn't stripped
-// HECK-STRIP-NOT: s4Test14globalConstant_Wz
-// HECK-STRIP-NOT: s4Test14globalConstantSbvp
-// HECK-STRIP-NOT: s4Test14globalConstant_WZ
-// HECK-STRIP-NOT: s4Test14globalConstantSbvau
+// CHECK-STRIP-NOT: s4Test14globalConstant_Wz
+// CHECK-STRIP-NOT: s4Test14globalConstantSbvp
+// CHECK-STRIP-NOT: s4Test14globalConstant_WZ
+// CHECK-STRIP-NOT: s4Test14globalConstantSbvau
 @available(*, unavailable)
 public let globalConstant = true
 
