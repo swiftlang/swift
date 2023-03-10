@@ -4281,7 +4281,7 @@ public:
   /// \param tap the tap expression
   ///
   /// \returns \c true if constraint generation failed, \c false otherwise
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool generateConstraints(TapExpr *tap);
 
   /// Generate constraints for the body of the given function or closure.
