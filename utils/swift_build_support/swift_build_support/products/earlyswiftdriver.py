@@ -152,6 +152,10 @@ def run_build_script_helper(action, host_target, product, args):
         helper_cmd += [
             '--lit-test-dir', lit_test_dir
         ]
+
+    if args.enable_asan:
+        helper_cmd.append('--enable-asan')
+
     if args.verbose_build:
         helper_cmd.append('--verbose')
 
