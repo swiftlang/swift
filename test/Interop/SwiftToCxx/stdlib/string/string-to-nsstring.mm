@@ -27,7 +27,7 @@ public func createString(_ ptr: UnsafePointer<CChar>) -> String {
 #include "StringCreator.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   auto emptyString = String::init();
   NSString *nsStr = emptyString;
 }
@@ -45,7 +45,7 @@ int main() {
 #include "StringCreator.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
 
   auto emptyString = String::init();
 

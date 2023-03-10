@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
 
-// CHECK: namespace Swift __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Swift") {
+// CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -107,7 +107,7 @@
 // CHECK:  SWIFT_INLINE_THUNK UTF8View(UTF8View &&) { abort(); }
 // CHECK-NEXT: SWIFT_INLINE_THUNK String_Index getStartIndex() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK String_Index getEndIndex() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK Swift::Optional<String_Index> indexOffsetByLimitedBy(const String_Index& i, swift::Int n, const String_Index& limit) const SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Optional<String_Index> indexOffsetByLimitedBy(const String_Index& i, swift::Int n, const String_Index& limit) const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const String_Index& i, const String_Index& j) const SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const String_Index& i) const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK String getDescription() const SWIFT_SYMBOL({{.*}});
@@ -124,4 +124,4 @@
 // CHECK-NEXT: #include <swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #endif
 
-// CHECK: } // namespace Swift
+// CHECK: } // namespace swift

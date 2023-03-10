@@ -19,6 +19,7 @@
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -218,7 +219,8 @@ public:
                      llvm::function_ref<void()> body) {
     if (!optionalKind || optionalKind == OTK_None)
       return body();
-    os << "Swift::Optional<";
+    printBaseName(moduleContext->getASTContext().getStdlibModule());
+    os << "::Optional<";
     body();
     os << '>';
   }
@@ -718,7 +720,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
-    os << "Swift::ThrowingResult<";
+    os << "swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -1330,17 +1332,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
     os << "#ifdef __cpp_exceptions\n";
-    os << "    throw (Swift::Error(opaqueError));\n";
+    os << "    throw (swift::Error(opaqueError));\n";
     os << "#else\n";
     if (resultTy->isVoid()) {
-      os << "    return Swift::Expected<void>(Swift::Error(opaqueError));\n";
+      os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
       os << "#endif\n";
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
           *directResultType, resultTy, moduleContext, os, cPrologueOS,
           typeMapping, interopContext, [&]() {
-            os << "    return Swift::Expected<";
+            os << "    return swift::Expected<";
             OptionalTypeKind retKind;
             Type objTy;
             std::tie(objTy, retKind) =
@@ -1348,7 +1350,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
             auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                                                   OutputLanguageMode::Cxx);
-            os << ">(Swift::Error(opaqueError));\n";
+            os << ">(swift::Error(opaqueError));\n";
             os << "#endif\n";
 
             // Return the function result value if it doesn't throw.

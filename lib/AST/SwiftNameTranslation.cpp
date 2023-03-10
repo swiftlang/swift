@@ -163,6 +163,10 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
   if (customNamesOnly)
     return StringRef();
 
+  if (auto *mod = dyn_cast<ModuleDecl>(VD)) {
+    if (mod->isStdlibModule())
+      return "swift";
+  }
   if (VD->getModuleContext()->isStdlibModule()) {
     // Incorporate argument labels into Stdlib API names.
     // FIXME: This should be done more broadly.

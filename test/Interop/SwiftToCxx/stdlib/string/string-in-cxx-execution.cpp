@@ -23,7 +23,7 @@ public func printString(_ s: String) {
 #include "Stringer.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace Stringer;
 
   {

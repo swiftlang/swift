@@ -28,7 +28,7 @@ public func makeString(_ s: String, _ y: String) -> String {
 #include "Stringer.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace Stringer;
 
   {

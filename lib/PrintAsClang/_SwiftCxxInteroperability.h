@@ -71,7 +71,13 @@
 #define SWIFT_SYMBOL_MODULE(moduleValue)
 #endif
 
-namespace swift {
+#if __has_attribute(swift_private)
+#define SWIFT_PRIVATE_ATTR __attribute__((swift_private))
+#else
+#define SWIFT_PRIVATE_ATTR
+#endif
+
+namespace swift SWIFT_PRIVATE_ATTR {
 namespace _impl {
 
 extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
@@ -243,7 +249,7 @@ SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
 
 #pragma clang diagnostic pop
 
-} // namespace swift
+} // namespace swift SWIFT_PRIVATE_ATTR
 #endif
 
 #endif // SWIFT_CXX_INTEROPERABILITY_H

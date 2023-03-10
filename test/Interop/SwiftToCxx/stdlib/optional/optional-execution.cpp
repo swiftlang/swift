@@ -78,7 +78,7 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 #include "UseOptional.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   using namespace UseOptional;
 
   {

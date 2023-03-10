@@ -7,7 +7,7 @@
 
 // CHECK:      #ifndef SWIFT_PRINTED_CORE
 // CHECK-NEXT: #define SWIFT_PRINTED_CORE
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
