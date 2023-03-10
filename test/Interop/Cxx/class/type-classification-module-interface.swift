@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=TypeClassification -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -skip-unsafe-cxx-methods -module-to-print=TypeClassification -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s -check-prefix=CHECK-SKIP-UNSAFE
 
 // Make sure we don't import objects that we can't copy or destroy.
 // CHECK-NOT: StructWithPrivateDefaultedCopyConstructor
@@ -24,6 +25,7 @@
 
 // CHECK: struct HasMethodThatReturnsIterator {
 // CHECK:   func __getIteratorUnsafe() -> Iterator
+// CHECK-SKIP-UNSAFE-NOT: func __getIteratorUnsafe() -> Iterator
 // CHECK: }
 
 // CHECK: struct IteratorBox {
@@ -31,4 +33,5 @@
 
 // CHECK: struct HasMethodThatReturnsIteratorBox {
 // CHECK:   func __getIteratorBoxUnsafe() -> IteratorBox
+// CHECK-SKIP-UNSAFE-NOT: func __getIteratorBoxUnsafe() -> IteratorBox
 // CHECK: }
