@@ -233,6 +233,8 @@ macro(add_sourcekit_library name)
   endif()
   llvm_update_compile_flags(${name})
 
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
   set_output_directory(${name}
       BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
@@ -334,6 +336,8 @@ macro(add_sourcekit_executable name)
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
   add_sourcekit_default_compiler_flags("${name}")
 
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
   if(SWIFT_SWIFT_PARSER)
     set(SKEXEC_HAS_SWIFT_MODULES TRUE)
   else()
@@ -386,6 +390,8 @@ macro(add_sourcekit_framework name)
   llvm_process_sources(srcs ${srcs})
   add_library(${name} SHARED ${srcs})
   llvm_update_compile_flags(${name})
+
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   set(headers)
   foreach(src ${srcs})
@@ -551,6 +557,8 @@ macro(add_sourcekit_xpc_service name framework_target)
 
   swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_LINK_COMPONENTS})
   target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
+
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   add_dependencies(${framework_target} ${name})
 

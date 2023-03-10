@@ -26,16 +26,6 @@ target_link_libraries(swiftParse PRIVATE
 )
 
 if (SWIFT_SWIFT_PARSER)
-  # Link against the SwiftSyntax parser and libraries it depends on. The actual
-  # formulation of this is a hack to work around a CMake bug in Ninja file
-  # generation that results in multiple Ninja targets producing the same file in
-  # a downstream SourceKit target. This should be expressed as:
-  #
-  #   target_link_libraries(swiftParse
-  #     PRIVATE
-  #     SwiftSyntax::SwiftParser
-  #     ...
-  #   )
   target_link_libraries(swiftParse
     PRIVATE
     SwiftSyntax::SwiftBasicFormat
@@ -46,7 +36,7 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftOperators
     SwiftSyntax::SwiftSyntaxBuilder
     SwiftSyntax::SwiftSyntaxMacros
-    $<TARGET_OBJECTS:swiftASTGen>
+    swiftASTGen
   )
 
   add_dependencies(swiftParse

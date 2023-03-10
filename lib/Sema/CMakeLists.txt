@@ -93,7 +93,7 @@ if (SWIFT_SWIFT_PARSER)
     SWIFT_SWIFT_PARSER
   )
   target_link_libraries(swiftSema PRIVATE
-    $<TARGET_OBJECTS:swiftASTGen>)
+    swiftASTGen)
 endif()
 
 set_swift_llvm_is_available(swiftSema)
