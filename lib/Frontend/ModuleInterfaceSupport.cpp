@@ -329,7 +329,7 @@ static void printImports(raw_ostream &out,
       // compatible swiftinterfaces and we can live without
       // checking the generate code for a while.
       if (spiOnlyImportSet.count(import))
-        out << "/*@_spiOnly*/ ";
+        out << "@_spiOnly ";
 
       // List of imported SPI groups for local use.
       for (auto spiName : spis)
