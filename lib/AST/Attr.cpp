@@ -1347,6 +1347,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
+
+    if (Options.SuppressingFreestandingExpression &&
+        Attr->getMacroSyntax() == MacroSyntax::Freestanding &&
+        Attr->getMacroRole() == MacroRole::Expression) {
+      Printer.printAttrName("@expression");
+      break;
+    }
+
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
       Printer.printAttrName("@freestanding");
