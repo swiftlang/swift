@@ -209,13 +209,15 @@ function(add_pure_swift_host_library name)
   # Avoid introducing an implicit dependency on the string-processing library.
   if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
     target_compile_options(${name} PRIVATE
-      $<$<COMPILE_LANGUAGE:Swift>:"SHELL:-Xfrontend -disable-implicit-string-processing-module-import">)
+      $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
+      $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-string-processing-module-import>)
   endif()
 
   # Same for backtracing
   if (SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
     target_compile_options(${name} PRIVATE
-      $<$<COMPILE_LANGUAGE:Swift>:"SHELL:-Xfrontend -disable-implicit-backtracing-module-import">)
+      $<$<COMPILE_LANGUAGE:Swift>:-Xfrontend>
+      $<$<COMPILE_LANGUAGE:Swift>:-disable-implicit-backtracing-module-import>)
   endif()
 
   # The compat56 library is not available in current toolchains. The stage-0
