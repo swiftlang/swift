@@ -13,6 +13,7 @@
 import CASTBridging
 import CBasicBridging
 import SwiftSyntax
+import swiftLLVMJSON
 
 enum PluginError: Error {
   case failedToSendMessage

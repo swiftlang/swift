@@ -9,8 +9,15 @@
 
 import PackageDescription
 
+let swiftSetttings: [SwiftSetting] = [
+  .unsafeFlags([
+    "-I", "../../include/swift/",
+    "-I", "../../include",
+  ])
+]
+
 let package = Package(
-  name: "ASTGen",
+  name: "swiftSwiftCompiler",
   platforms: [
     .macOS(.v10_15)
   ],
@@ -29,14 +36,17 @@ let package = Package(
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        "swiftLLVMJSON"
       ],
-      path: ".",
+      path: "Sources/ASTGen",
       exclude: ["CMakeLists.txt"],
-      swiftSettings: [
-        .unsafeFlags([
-          "-I", "../../include/swift/",
-          "-I", "../../include",
-        ])
-      ])
+      swiftSettings: swiftSetttings
+    ),
+    .target(
+      name: "swiftLLVMJSON",
+      dependencies: [],
+      path: "Sources/LLVMJSON",
+      swiftSettings: swiftSetttings
+    ),
   ]
 )
