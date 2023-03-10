@@ -192,7 +192,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace UseCxxTy __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("UseCxxTy") {
+// CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
 
 // CHECK: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<int> retNonTrivial() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<int>)) char storage[sizeof(ns::NonTrivialTemplate<int>)];
@@ -231,7 +231,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace UseCxxTy __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("UseCxxTy") {
+// CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
 // CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];

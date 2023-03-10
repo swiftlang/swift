@@ -100,7 +100,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK-NEXT: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 
 @frozen public struct FrozenStruct {
     private let storedInt: Int32

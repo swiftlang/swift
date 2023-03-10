@@ -7,7 +7,7 @@
 // for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
 // REQUIRES: asserts
 
-// CHECK-LABEL: namespace Functions __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Functions") {
+// CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 
 // CHECK-LABEL: namespace _impl {
 
@@ -33,15 +33,15 @@ public enum NaiveErrors : Error {
 @_expose(Cxx)
 public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 
-// CHECK: SWIFT_INLINE_THUNK Swift::ThrowingResult<void> emptyThrowFunction() SWIFT_SYMBOL("s:9Functions18emptyThrowFunctionyyKF") {
+// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<void> emptyThrowFunction() SWIFT_SYMBOL("s:9Functions18emptyThrowFunctionyyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
-// CHECK: throw (Swift::Error(opaqueError));
+// CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
+// CHECK: return swift::Expected<void>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -59,15 +59,15 @@ public struct DestroyedError : Error {
 @_expose(Cxx)
 public func testDestroyedError() throws { throw DestroyedError() }
 
-// CHECK: SWIFT_INLINE_THUNK Swift::ThrowingResult<void> testDestroyedError() SWIFT_SYMBOL("s:9Functions18testDestroyedErroryyKF") {
+// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<void> testDestroyedError() SWIFT_SYMBOL("s:9Functions18testDestroyedErroryyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions18testDestroyedErroryyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
-// CHECK: throw (Swift::Error(opaqueError));
+// CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
+// CHECK: return swift::Expected<void>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -77,15 +77,15 @@ public func throwFunction() throws {
     throw NaiveErrors.throwError
 }
 
-// CHECK: SWIFT_INLINE_THUNK Swift::ThrowingResult<void> throwFunction() SWIFT_SYMBOL("s:9Functions13throwFunctionyyKF") {
+// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<void> throwFunction() SWIFT_SYMBOL("s:9Functions13throwFunctionyyKF") {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: _impl::$s9Functions13throwFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
-// CHECK: throw (Swift::Error(opaqueError));
+// CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return Swift::Expected<void>(Swift::Error(opaqueError));
+// CHECK: return swift::Expected<void>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: }
 
@@ -98,15 +98,15 @@ public func throwFunctionWithPossibleReturn(_ a: Int) throws -> Int {
     return 0
 }
 
-// CHECK: SWIFT_INLINE_THUNK Swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_SYMBOL("s:9Functions31throwFunctionWithPossibleReturnyS2iKF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_SYMBOL("s:9Functions31throwFunctionWithPossibleReturnyS2iKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
-// CHECK: throw (Swift::Error(opaqueError));
+// CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return Swift::Expected<swift::Int>(Swift::Error(opaqueError));
+// CHECK: return swift::Expected<swift::Int>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
@@ -118,14 +118,14 @@ public func throwFunctionWithReturn() throws -> Int {
     return 0
 }
 
-// CHECK: SWIFT_INLINE_THUNK Swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_SYMBOL("s:9Functions23throwFunctionWithReturnSiyKF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_SYMBOL("s:9Functions23throwFunctionWithReturnSiyKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
 // CHECK: #ifdef __cpp_exceptions
-// CHECK: throw (Swift::Error(opaqueError));
+// CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else
-// CHECK: return Swift::Expected<swift::Int>(Swift::Error(opaqueError));
+// CHECK: return swift::Expected<swift::Int>(swift::Error(opaqueError));
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }

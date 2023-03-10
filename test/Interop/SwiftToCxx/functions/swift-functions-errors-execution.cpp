@@ -28,12 +28,12 @@ int main() {
 
   try {
     Functions::emptyThrowFunction();
-  } catch (Swift::Error& e) {
+  } catch (swift::Error& e) {
     printf("Exception\n");
   }
   try {
     Functions::throwFunction();
-  } catch (Swift::Error& e) {
+  } catch (swift::Error& e) {
       auto errorOpt = e.as<Functions::NaiveErrors>();
       assert(errorOpt.isSome());
 
@@ -43,12 +43,12 @@ int main() {
   }
   try {
     Functions::throwFunctionWithReturn();
-  } catch (Swift::Error& e) {
+  } catch (swift::Error& e) {
      printf("Exception\n");
   }
   try {
     Functions::testDestroyedError();
-  } catch(const Swift::Error &e) { }
+  } catch(const swift::Error &e) { }
 
   return 0;
 }
