@@ -109,24 +109,25 @@ public:
 ///
 /// It is basically a combination of an instruction vector and an instruction
 /// set. It can be used for typical worklist-processing algorithms.
-class InstructionWorklist {
-  StackList<SILInstruction *> worklist;
+template <typename Instruction>
+class SomeInstructionWorklist {
+  StackList<Instruction *> worklist;
   InstructionSet visited;
 
 public:
   /// Construct an empty worklist.
-  InstructionWorklist(SILFunction *function)
+  SomeInstructionWorklist(SILFunction *function)
       : worklist(function), visited(function) {}
 
   /// Initialize the worklist with \p initialBlock.
-  InstructionWorklist(SILInstruction *initialInstruction)
-      : InstructionWorklist(initialInstruction->getFunction()) {
+  SomeInstructionWorklist(Instruction *initialInstruction)
+      : SomeInstructionWorklist(initialInstruction->getFunction()) {
     push(initialInstruction);
   }
 
   /// Pops the last added element from the worklist or returns null, if the
   /// worklist is empty.
-  SILInstruction *pop() {
+  Instruction *pop() {
     if (worklist.empty())
       return nullptr;
     return worklist.pop_back_val();
@@ -134,7 +135,7 @@ public:
 
   /// Pushes \p instruction onto the worklist if \p instruction has never been
   /// push before.
-  bool pushIfNotVisited(SILInstruction *instruction) {
+  bool pushIfNotVisited(Instruction *instruction) {
     if (visited.insert(instruction)) {
       worklist.push_back(instruction);
       return true;
@@ -144,7 +145,7 @@ public:
 
   /// Like `pushIfNotVisited`, but requires that \p instruction has never been
   /// on the worklist before.
-  void push(SILInstruction *instruction) {
+  void push(Instruction *instruction) {
     assert(!visited.contains(instruction));
     visited.insert(instruction);
     worklist.push_back(instruction);
@@ -152,20 +153,22 @@ public:
 
   /// Like `pop`, but marks the returned instruction as "unvisited". This means,
   /// that the instruction can be pushed onto the worklist again.
-  SILInstruction *popAndForget() {
+  Instruction *popAndForget() {
     if (worklist.empty())
       return nullptr;
-    SILInstruction *instruction = worklist.pop_back_val();
+    Instruction *instruction = worklist.pop_back_val();
     visited.erase(instruction);
     return instruction;
   }
 
   /// Returns true if \p instruction was visited, i.e. has been added to the
   /// worklist.
-  bool isVisited(SILInstruction *instruction) const {
+  bool isVisited(Instruction *instruction) const {
     return visited.contains(instruction);
   }
 };
+
+using InstructionWorklist = SomeInstructionWorklist<SILInstruction>;
 
 /// An implementation of `llvm::SetVector<SILValue,
 ///                                       StackList<SILValue>,
