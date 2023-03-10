@@ -377,6 +377,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
 
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
+  case MangledTypeRefRole::FieldMetadata:
     break;
   }
 

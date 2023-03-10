@@ -264,6 +264,54 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
+        // If a type is noncopyable, lie about the resolved type unless the
+        // runtime is sufficiently aware of noncopyable types.
+        if (substT->isPureMoveOnly()) {
+          // Darwin-based platforms have ABI stability, and we want binaries
+          // that use noncopyable types nongenerically today to be forward
+          // compatible with a future OS runtime that supports noncopyable
+          // generics. On other platforms, a new Swift compiler and runtime
+          // require recompilation anyway, so this dance is unnecessary, and
+          // for now, we can unconditionally lie.
+          bool useForwardCompatibility =
+            IGM.Context.LangOpts.Target.isOSDarwin();
+          
+          llvm::Instruction *br = nullptr;
+          llvm::BasicBlock *supportedBB = nullptr;
+          if (useForwardCompatibility) {
+            auto runtimeSupportsNoncopyableTypesSymbol
+              = IGM.Module.getOrInsertGlobal("swift_runtimeSupportsNoncopyableTypes",
+                                             IGM.Int8Ty);
+            cast<llvm::GlobalVariable>(runtimeSupportsNoncopyableTypesSymbol)
+              ->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+              
+            auto runtimeSupportsNoncopyableTypes
+              = IGF.Builder.CreateIsNotNull(runtimeSupportsNoncopyableTypesSymbol,
+                                            "supports.noncopyable");
+            supportedBB = IGF.createBasicBlock("does.support.noncopyable");
+            auto unsupportedBB = IGF.createBasicBlock("does.not.support.noncopyable");
+            br = IGF.Builder.CreateCondBr(runtimeSupportsNoncopyableTypes,
+                                     supportedBB,
+                                     unsupportedBB);
+                                     
+            IGF.Builder.emitBlock(unsupportedBB);
+          }
+          
+          // If the runtime does not yet support noncopyable types, lie that the
+          // field is an empty tuple, so the runtime doesn't try to do anything
+          // with the actual value.
+          auto phonyRet = IGF.emitTypeMetadataRef(IGM.Context.TheEmptyTupleType);
+          IGF.Builder.CreateRet(phonyRet);
+
+          if (!useForwardCompatibility) {
+            goto done_building_function;
+          }
+          
+          // Emit the type metadata normally otherwise.
+          IGF.Builder.SetInsertPoint(br);
+          IGF.Builder.emitBlock(supportedBB);
+        }
+
         bindFromGenericRequirementsBuffer(
             IGF, requirements,
             Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
@@ -276,6 +324,7 @@ getTypeRefByFunction(IRGenModule &IGM,
         auto ret = IGF.emitTypeMetadataRef(substT);
         IGF.Builder.CreateRet(ret);
       }
+    done_building_function:
       // Form the mangled name with its relative reference.
       auto S = B.beginStruct();
       S.setPacked(true);
@@ -315,6 +364,21 @@ getTypeRefImpl(IRGenModule &IGM,
   case MangledTypeRefRole::FlatUnique:
     useFlatUnique = true;
     break;
+    
+  case MangledTypeRefRole::FieldMetadata:
+    // We want to keep fields of noncopyable type from being exposed to
+    // in-process runtime reflection libraries in older Swift runtimes, since
+    // they more than likely assume they can copy field values, and the language
+    // support for noncopyable types as dynamic or generic types isn't yet
+    // implemented as of the writing of this comment. If the type is
+    // noncopyable, use a function to emit the type ref which will look for a
+    // signal from future runtimes whether they support noncopyable types before
+    // exposing their metadata to them.
+    if (type->isPureMoveOnly()) {
+      IGM.IRGen.noteUseOfTypeMetadata(type);
+      return getTypeRefByFunction(IGM, sig, type);
+    }
+    LLVM_FALLTHROUGH;
 
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -724,14 +788,14 @@ private:
       if (type->isForeignReferenceType()) {
         auto opaqueType = type->getASTContext().getOpaquePointerType();
         // The standard library's Mirror demangles metadata from field
-        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // descriptors, so use MangledTypeRefRole::FieldMetadata to ensure
         // runtime metadata is available.
-        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::Metadata);
+        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::FieldMetadata);
       } else {
         // The standard library's Mirror demangles metadata from field
-        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // descriptors, so use MangledTypeRefRole::FieldMetadata to ensure
         // runtime metadata is available.
-        addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+        addTypeRef(type, genericSig, MangledTypeRefRole::FieldMetadata);
       }
     }
 
