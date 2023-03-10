@@ -1174,11 +1174,11 @@ public:
 
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
-      // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].isWitnessTable())
+      // Skip protocol requirements and counts.  It shouldn't be possible
+      // to get an opened existential type in a conformance requirement
+      // without having one in the generic arguments.
+      if (!Bindings[i].isAnyMetadata())
         continue;
-
-      assert(Bindings[i].isMetadata());
 
       if (Bindings[i].getTypeParameter()->hasOpenedExistential())
         return true;
@@ -1221,10 +1221,11 @@ public:
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
       // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].isWitnessTable())
+      if (Bindings[i].isAnyWitnessTable())
         continue;
 
-      assert(Bindings[i].isMetadata());
+      // FIXME: bind pack counts in the source map
+      assert(Bindings[i].isAnyMetadata());
 
       auto Source = SourceBuilder.createClosureBinding(i);
       auto BindingType = Bindings[i].getTypeParameter();

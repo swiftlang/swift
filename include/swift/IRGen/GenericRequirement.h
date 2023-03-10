@@ -82,6 +82,12 @@ public:
   }
 
   bool isMetadata() const {
+    return kind == Kind::Metadata;
+  }
+  bool isMetadataPack() const {
+    return kind == Kind::MetadataPack;
+  }
+  bool isAnyMetadata() const {
     return kind == Kind::Metadata || kind == Kind::MetadataPack;
   }
 
@@ -94,6 +100,12 @@ public:
   }
 
   bool isWitnessTable() const {
+    return kind == Kind::WitnessTable;
+  }
+  bool isWitnessTablePack() const {
+    return kind == Kind::WitnessTablePack;
+  }
+  bool isAnyWitnessTable() const {
     return kind == Kind::WitnessTable || kind == Kind::WitnessTablePack;
   }
 

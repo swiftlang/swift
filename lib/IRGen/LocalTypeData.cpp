@@ -289,7 +289,10 @@ LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
     auto response = entry->follow(IGF, source, request);
 
     // Following the path automatically caches at every point along it,
-    // including the end.
+    // including the end.  If you hit the second assertion here, it's
+    // probably because MetadataPath::followComponent isn't updating
+    // sourceKey correctly to lead back to the same key you originally
+    // looked up.
     assert(chain.Root->DefinitionPoint == IGF.getActiveDominancePoint());
     assert(isa<ConcreteCacheEntry>(chain.Root));
 
@@ -496,6 +499,9 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
     }
     bool hasInterestingType(CanType type) const override {
       return true;
+    }
+    bool isInterestingPackExpansion(CanPackExpansionType type) const override {
+      return isa<PackArchetypeType>(type.getPatternType());
     }
     bool hasLimitedInterestingConformances(CanType type) const override {
       return false;
