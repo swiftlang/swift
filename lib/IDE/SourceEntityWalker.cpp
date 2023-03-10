@@ -212,6 +212,14 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
       }
       return Action::SkipChildren();
     }
+  } else if (auto *MD = dyn_cast<MacroExpansionDecl>(D)) {
+    if (auto *macro =
+            dyn_cast_or_null<MacroDecl>(MD->getMacroRef().getDecl())) {
+      auto macroRefType = macro->getDeclaredInterfaceType();
+      if (!passReference(macro, macroRefType, MD->getMacroNameLoc(),
+                         ReferenceMetaData(SemaReferenceKind::DeclRef, None)))
+        return Action::Stop();
+    }
   }
 
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)

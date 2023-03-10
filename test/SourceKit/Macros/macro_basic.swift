@@ -51,6 +51,11 @@ macro Hashable() = #externalMacro(module: "MacroDefinition", type: "HashableMacr
 @Hashable
 struct S4 { }
 
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+#anonymousTypes { "hello" }
+
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
@@ -104,6 +109,43 @@ struct S4 { }
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=4:8 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND %s
 // EXPAND: source.edit.kind.active:
 // EXPAND-NEXT: 4:7-4:24 (@__swiftmacro_9MacroUser13testStringify1a1bySi_SitF9stringifyfMf_.swift) "(a + b, "a + b")"
+
+//##-- cursor-info on macro declaration
+// RUN: %sourcekitd-test -req=cursor -pos=57:1 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=cursor -pos=57:2 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=CURSOR_MACRO_DECL %s
+// CURSOR_MACRO_DECL: source.lang.swift.ref.macro (55:7-55:21)
+// CURSOR_MACRO_DECL-LABEL: SYMBOL GRAPH BEGIN
+// CURSOR_MACRO_DECL: "identifier": {
+// CURSOR_MACRO_DECL-NEXT:   "interfaceLanguage": "swift",
+// CURSOR_MACRO_DECL-NEXT:   "precise": "s:9MacroUser14anonymousTypesyySSyXEcfm"
+// CURSOR_MACRO_DECL-NEXT: },
+// CURSOR_MACRO_DECL-NEXT: "kind": {
+// CURSOR_MACRO_DECL-NEXT:   "displayName": "Macro",
+// CURSOR_MACRO_DECL-NEXT:   "identifier": "swift.macro"
+// CURSOR_MACRO_DECL-NEXT: },
+// CURSOR_MACRO_DECL: SYMBOL GRAPH END
+// CURSOR_MACRO_DECL-LABEL: ACTIONS BEGIN
+// CURSOR_MACRO_DECL: source.refactoring.kind.expand.macro
+// CURSOR_MACRO_DECL-NEXT: Expand Macro
+// CURSOR_MACRO_DECL: ACTIONS END
+
+//##-- Refactoring on macro declaration
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:2 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
+// EXPAND_MACRO_DECL: source.edit.kind.active:
+// EXPAND_MACRO_DECL-NEXT: 57:1-57:28 (@__swiftmacro_9MacroUser14anonymousTypesfMf0_.swift) "class $s9MacroUser14anonymousTypesfMf0_4namefMu_ {
+// EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
+// EXPAND_MACRO_DECL-NEXT:     "hello"
+// EXPAND_MACRO_DECL-NEXT:   }
+// EXPAND_MACRO_DECL-NEXT: }
+// EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser14anonymousTypesfMf0_4namefMu0_ {
+// EXPAND_MACRO_DECL-NEXT:   case apple
+// EXPAND_MACRO_DECL-NEXT:   case banana
+// EXPAND_MACRO_DECL-EMPTY:
+// EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
+// EXPAND_MACRO_DECL-NEXT:     "hello"
+// EXPAND_MACRO_DECL-NEXT:   }
+// EXPAND_MACRO_DECL-NEXT: }"
 
 //##-- cursor-info on attached macro
 // RUN: %sourcekitd-test -req=cursor -pos=21:1 -cursor-action -req-opts=retrieve_symbol_graph=1 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ATTACHED %s
