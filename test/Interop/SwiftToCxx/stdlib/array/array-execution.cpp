@@ -32,7 +32,7 @@ public func printArray(_ val: Array<CInt>) {
 #include "UseArray.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
 
   {
     Array<int> val = UseArray::createArray(2);

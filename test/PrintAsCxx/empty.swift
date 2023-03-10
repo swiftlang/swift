@@ -103,7 +103,7 @@
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
-// CHECK:       namespace empty __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("empty") {
+// CHECK:       namespace empty SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("empty") {
 // CHECK:       } // namespace empty
 // CHECK:       #endif
 

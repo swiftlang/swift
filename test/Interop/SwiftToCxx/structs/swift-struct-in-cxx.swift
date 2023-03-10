@@ -4,10 +4,10 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
-// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 // CHECK: namespace _impl {
 
-// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 
 // CHECK: class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField;
 // CHECK-NEXT: } // end namespace
@@ -20,7 +20,7 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
-// CHECK: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 
 // CHECK:      namespace _impl {
 // CHECK-EMPTY:
@@ -103,7 +103,7 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK-NEXT: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 
 public struct StructWithIntField {
   let field: Int64

@@ -142,7 +142,7 @@ void ClangSyntaxPrinter::printModuleNamespaceStart(
     const ModuleDecl &moduleContext) const {
   os << "namespace ";
   printBaseName(&moduleContext);
-  os << " __attribute__((swift_private))";
+  os << " SWIFT_PRIVATE_ATTR";
   printSymbolUSRAttribute(&moduleContext);
   os << " {\n";
 }
@@ -155,7 +155,7 @@ void ClangSyntaxPrinter::printNamespace(
   os << "namespace ";
   namePrinter(os);
   if (trivia == NamespaceTrivia::AttributeSwiftPrivate)
-    os << " __attribute__((swift_private))";
+    os << " SWIFT_PRIVATE_ATTR";
   if (moduleContext)
     printSymbolUSRAttribute(moduleContext);
   os << " {\n\n";

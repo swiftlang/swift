@@ -22,14 +22,14 @@
 int main() {
 
   // Test Empty Constructor
-  auto testIntEmpty = Swift::Expected<int>();
+  auto testIntEmpty = swift::Expected<int>();
 
   // Test Error Constructor
-  Swift::Error e;
-  auto testIntError = Swift::Expected<int>(e);
+  swift::Error e;
+  auto testIntError = swift::Expected<int>(e);
 
   // Test Value Constructor
-  auto testIntValue = Swift::Expected<int>(42);
+  auto testIntValue = swift::Expected<int>(42);
 
   // Test Copy Constructor
   auto testCopy = testIntEmpty;
@@ -37,9 +37,9 @@ int main() {
   // TODO: Test Move Constructor
 
   // Test Destructor
-  auto testDestEmpty = Swift::Expected<int>();
-  auto testDestInt = Swift::Expected<int>(42);
-  auto testDestError = Swift::Expected<int>(e);
+  auto testDestEmpty = swift::Expected<int>();
+  auto testDestInt = swift::Expected<int>(42);
+  auto testDestError = swift::Expected<int>(e);
   testDestEmpty.~Expected();
   testDestInt.~Expected();
   testDestError.~Expected();

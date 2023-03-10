@@ -6,7 +6,7 @@
 
 // REQUIRES: PTRSIZE=64
 
-// CHECK: namespace swift {
+// CHECK: namespace swift SWIFT_PRIVATE_ATTR {
 
 // CHECK: namespace _impl {
 
