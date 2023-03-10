@@ -6,6 +6,7 @@
 
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
 
 import _Concurrency
 import StdlibUnittest
