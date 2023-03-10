@@ -4360,7 +4360,7 @@ namespace {
         // Go back to the first list and find classes with matching Swift names
         // *even if the ObjC name doesn't match.*
         // This shouldn't be allowed but we need it for source compatibility;
-        // people used `@class SwiftNameOfClass` as a workaround for not
+        // people used `\@class SwiftNameOfClass` as a workaround for not
         // having the previous loop, and it "worked".
         for (auto result : swiftDeclsByName) {
           if (auto singleResult = dyn_cast<T>(result)) {
@@ -4401,7 +4401,7 @@ namespace {
       return nullptr;
     }
 
-    /// Given some forward declared Objective-C type `@class Foo` or `@protocol Bar`, this
+    /// Given some forward declared Objective-C type `\@class Foo` or `\@protocol Bar`, this
     /// method attempts to find a matching @objc annotated Swift declaration `@objc class Foo {}`
     /// or `@objc protocol Bar {}`, in an imported Swift module. That is if the Clang node is in
     /// a Clang module, the Swift overlay for that module does not count as "non-local". Similarly,
