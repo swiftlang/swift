@@ -2361,13 +2361,13 @@ function(add_swift_target_library name)
         add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
         swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
                                    RUNTIME
-                                     DESTINATION "bin"
+                                     DESTINATION ${CMAKE_INSTALL_BINDIR}
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    LIBRARY
-                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    ARCHIVE
-                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions})
       else()
@@ -2377,9 +2377,9 @@ function(add_swift_target_library name)
 
         if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
           # Back-deployment libraries get installed into a versioned directory.
-          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${resource_dir_sdk_subdir}")
+          set(install_dest "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${resource_dir}-${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY}/${resource_dir_sdk_subdir}")
         else()
-          set(install_dest "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
+          set(install_dest "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}")
         endif()
 
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
@@ -2394,7 +2394,7 @@ function(add_swift_target_library name)
             get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
             add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${name}-windows-${arch}_IMPLIB)
             swift_install_in_component(FILES ${import_library}
-                                       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
+                                       DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
                                        COMPONENT ${SWIFTLIB_INSTALL_IN_COMPONENT}
                                        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
           endif()
@@ -2464,7 +2464,7 @@ function(add_swift_target_library name)
                                ${THIN_INPUT_TARGETS_STATIC})
         add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target_static})
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
+                                   DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
                                    PERMISSIONS
                                      OWNER_READ OWNER_WRITE
                                      GROUP_READ
@@ -2945,13 +2945,13 @@ function(add_swift_target_executable name)
       add_dependencies(${install_in_component} ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
       swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
                                  RUNTIME
-                                   DESTINATION "bin"
+                                   DESTINATION ${CMAKE_INSTALL_BINDIR}
                                    COMPONENT "${install_in_component}"
                                  LIBRARY
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                   DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
                                    COMPONENT "${install_in_component}"
                                  ARCHIVE
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                   DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
                                    COMPONENT "${install_in_component}"
                                  PERMISSIONS
                                    OWNER_READ OWNER_WRITE OWNER_EXECUTE
@@ -2960,7 +2960,7 @@ function(add_swift_target_executable name)
     else()
       add_dependencies(${install_in_component} ${lipo_target})
 
-      set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
+      set(install_dest "${CMAKE_INSTALL_LIBEXECDIR}${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
       swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
                                    DESTINATION ${install_dest}
                                    COMPONENT "${install_in_component}"

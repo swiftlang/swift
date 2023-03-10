@@ -799,9 +799,9 @@ function(add_swift_host_library name)
   add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
-      RUNTIME DESTINATION bin COMPONENT dev)
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev)
   endif()
 
   swift_is_installing_component(dev is_installing)
@@ -947,7 +947,7 @@ function(add_swift_host_tool executable)
     add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
     swift_install_in_component(TARGETS ${executable}
                                RUNTIME
-                                 DESTINATION bin
+                                 DESTINATION ${CMAKE_INSTALL_BINDIR}
                                  COMPONENT ${ASHT_SWIFT_COMPONENT})
 
     swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)

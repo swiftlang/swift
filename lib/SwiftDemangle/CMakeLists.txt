@@ -9,11 +9,11 @@ target_link_libraries(swiftDemangle PRIVATE
 add_dependencies(compiler swiftDemangle)
 swift_install_in_component(TARGETS swiftDemangle
   RUNTIME
-    DESTINATION "bin"
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
     COMPONENT compiler
   LIBRARY
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}"
     COMPONENT compiler
   ARCHIVE
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}"
     COMPONENT compiler)

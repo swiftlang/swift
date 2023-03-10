@@ -38,4 +38,4 @@ endif()
 
 add_dependencies(tools sourcekitd-test)
 swift_install_in_component(TARGETS sourcekitd-test
-  RUNTIME DESTINATION bin COMPONENT tools)
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT tools)

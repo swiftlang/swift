@@ -26,4 +26,4 @@ endif()
 
 add_dependencies(tools complete-test)
 swift_install_in_component(TARGETS complete-test
-  RUNTIME DESTINATION bin COMPONENT tools)
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT tools)
