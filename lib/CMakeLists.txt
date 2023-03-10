@@ -159,8 +159,15 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# LLVM_LINK_COMPONENTS
-#   LLVM components this library depends on.
+# EMIT_MODULE
+#   Emit '.swiftmodule' to
+#
+# DEPENDENCIES
+#   Target names to pass target_link_library
+#
+# SWIFT_DEPENDENCIES
+#   Target names to pass force_target_link_library.
+#   TODO: Remove this and use DEPENDENCIES when CMake is fixed
 #
 # source1 ...
 #   Sources to add into this library.
@@ -173,10 +180,12 @@ function(add_pure_swift_host_library name)
   # Option handling
   set(options
         SHARED
-        STATIC)
+        STATIC
+        EMIT_MODULE)
   set(single_parameter_options)
   set(multiple_parameter_options
-        DEPENDENCIES)
+        DEPENDENCIES
+        SWIFT_DEPENDENCIES)
 
   cmake_parse_arguments(APSHL
                         "${options}"
@@ -262,10 +271,50 @@ function(add_pure_swift_host_library name)
   target_link_libraries(${name} PUBLIC
     ${APSHL_DEPENDENCIES}
   )
+  # TODO: Change to target_link_libraries when cmake is fixed
+  force_target_link_libraries(${name} PUBLIC
+    ${APSHL_SWIFT_DEPENDENCIES}
+  )
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
     ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+
+  if(APSHL_EMIT_MODULE)
+    # Determine where Swift modules will be built and installed.
+
+    set(module_triple ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE})
+    set(module_dir ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    set(module_base "${module_dir}/${name}.swiftmodule")
+    set(module_file "${module_base}/${module_triple}.swiftmodule")
+    set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
+    set(module_sourceinfo_file "${module_base}/${module_triple}.swiftsourceinfo")
+
+    set_target_properties(${name} PROPERTIES
+        # Set the default module name to the target name.
+        Swift_MODULE_NAME ${name}
+        # Install the Swift module into the appropriate location.
+        Swift_MODULE_DIRECTORY ${module_dir}
+        # NOTE: workaround for CMake not setting up include flags.
+        INTERFACE_INCLUDE_DIRECTORIES ${module_dir})
+
+    # Create the module directory.
+    add_custom_command(
+        TARGET ${name}
+        PRE_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${module_base}
+        COMMENT "Generating module directory for ${name}")
+
+    # Configure the emission of the Swift module files.
+    target_compile_options("${name}" PRIVATE
+        $<$<COMPILE_LANGUAGE:Swift>:
+        -module-name;$<TARGET_PROPERTY:${name},Swift_MODULE_NAME>;
+        -enable-library-evolution;
+        -emit-module-path;${module_file};
+        -emit-module-source-info-path;${module_sourceinfo_file};
+        -emit-module-interface-path;${module_interface_file}
+        >)
+  endif()
 
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
