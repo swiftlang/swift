@@ -72,9 +72,12 @@ public:
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
 
+  /// WARNING: DO NOT MOVE.
+  /// Schedulers may assume the memory location of the Flags in order to avoid a runtime call
+  /// to get the priority of a job.
   JobFlags Flags;
 
-  // Derived classes can use this to store a Job Id.
+  /// Derived classes can use this to store a Job Id.
   uint32_t Id = 0;
 
   /// The voucher associated with the job. Note: this is currently unused on
