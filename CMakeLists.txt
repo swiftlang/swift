@@ -69,7 +69,21 @@ if(SWIFT_ASM_AVAILABLE)
 endif()
 
 # Use C++17.
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+set(SWIFT_MIN_CXX_STANDARD 17)
+
+# Unset CMAKE_CXX_STANDARD if it's too low and in the CMakeCache.txt
+if($CACHE{CMAKE_CXX_STANDARD} AND $CACHE{CMAKE_CXX_STANDARD} LESS ${SWIFT_MIN_CXX_STANDARD})
+  message(WARNING "Resetting cache value for CMAKE_CXX_STANDARD to ${SWIFT_MIN_CXX_STANDARD}")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
+
+# Allow manually specified CMAKE_CXX_STANDARD if it's greater than the minimum
+# required C++ version
+if(DEFINED CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD LESS ${SWIFT_MIN_CXX_STANDARD})
+  message(FATAL_ERROR "Requested CMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD} which is less than the minimum C++ standard ${SWIFT_MIN_CXX_STANDARD}")
+endif()
+
+set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
