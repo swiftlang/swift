@@ -1338,6 +1338,16 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // can't handle the payload case here due to the flow problems caused by the
   // dependency in between the enum and its data.
 
+  // Disable this for empty typle type because empty tuple stack locations maybe
+  // uninitialized. And converting to value form loses tag information.
+  if (IEAI->getElement()->hasAssociatedValues()) {
+    SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
+        IEAI->getElement(), IEAI->getFunction());
+    if (elemType.isEmpty(*IEAI->getFunction())) {
+      return nullptr;
+    }
+  }
+
   assert(IEAI->getOperand()->getType().isAddress() && "Must be an address");
   Builder.setCurrentDebugScope(IEAI->getDebugScope());
 
