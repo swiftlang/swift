@@ -63,6 +63,7 @@ public struct UnownedJob: Sendable {
 ///
 /// Conversions between the two priorities are available as initializers on the respective types.
 @available(SwiftStdlib 5.9, *)
+@frozen
 public struct JobPriority {
   public typealias RawValue = UInt8
 
