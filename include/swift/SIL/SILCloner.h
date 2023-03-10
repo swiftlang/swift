@@ -1484,11 +1484,20 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitExplicitCopyAddrInst(
     ExplicitCopyAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createExplicitCopyAddr(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
-                getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
-                Inst->isInitializationOfDest()));
+  if (!getBuilder().hasOwnership()) {
+    recordClonedInstruction(
+        Inst, getBuilder().createCopyAddr(
+                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                  getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                  Inst->isInitializationOfDest()));
+  } else {
+    // preserve the explicit_*
+    recordClonedInstruction(
+        Inst, getBuilder().createExplicitCopyAddr(
+                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                  getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                  Inst->isInitializationOfDest()));
+  }
 }
 
 template <typename ImplClass>
