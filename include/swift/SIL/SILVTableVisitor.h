@@ -141,8 +141,9 @@ protected:
     if (!theClass->hasKnownSwiftImplementation())
       return;
 
-    for (auto member : theClass->getABIMembers())
+    forEachMemberToLower(theClass, [&](Decl *member) {
       maybeAddMember(member);
+    });
   }
 };
 

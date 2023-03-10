@@ -770,6 +770,13 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
   return emittedFunctions.count(constant);
 }
 
+void SILGenModule::visit(Decl *D) {
+  if (Lowering::shouldSkipLowering(D))
+    return;
+
+  ASTVisitor::visit(D);
+}
+
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
