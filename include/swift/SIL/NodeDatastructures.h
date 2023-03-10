@@ -61,9 +61,9 @@ public:
   }
 };
 
-/// An implementation of `llvm::SetVector<SILInstruction *,
-///                                       StackList<SILInstruction *>,
-///                                       InstructionSet>`.
+/// An implementation of `llvm::SetVector<Instruction *,
+///                                       StackList<Instruction *>,
+///                                       SomeInstructionSet<Instruction>>`.
 ///
 /// Unfortunately it's not possible to use `llvm::SetVector` directly because
 /// the InstructionSet and StackList constructors needs a `SILFunction`
@@ -71,14 +71,15 @@ public:
 ///
 /// Note: This class does not provide a `remove` method intentionally, because
 /// it would have a O(n) complexity.
-class InstructionSetVector {
-  StackList<SILInstruction *> vector;
+template <typename Instruction>
+class SomeInstructionSetVector {
+  StackList<Instruction *> vector;
   InstructionSet set;
 
 public:
-  using iterator = typename StackList<SILInstruction *>::iterator;
+  using iterator = typename StackList<Instruction *>::iterator;
 
-  InstructionSetVector(SILFunction *function)
+  SomeInstructionSetVector(SILFunction *function)
       : vector(function), set(function) {}
 
   iterator begin() const { return vector.begin(); }
@@ -90,13 +91,13 @@ public:
 
   bool empty() const { return vector.empty(); }
 
-  bool contains(SILInstruction *instruction) const {
+  bool contains(Instruction *instruction) const {
     return set.contains(instruction);
   }
 
   /// Returns true if \p instruction was not contained in the set before
   /// inserting.
-  bool insert(SILInstruction *instruction) {
+  bool insert(Instruction *instruction) {
     if (set.insert(instruction)) {
       vector.push_back(instruction);
       return true;
@@ -104,6 +105,8 @@ public:
     return false;
   }
 };
+
+using InstructionSetVector = SomeInstructionSetVector<SILInstruction>;
 
 /// A utility for processing instructions in a worklist.
 ///
