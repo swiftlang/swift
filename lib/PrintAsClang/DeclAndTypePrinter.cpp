@@ -2779,10 +2779,21 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
+                                  const llvm::StringSet<> &exposedModules) {
+  if (VD->hasClangNode())
+    return true;
+  auto *mc = VD->getModuleContext();
+  if (mc == &M || mc->isStdlibModule())
+    return true;
+  return exposedModules.count(mc->getName().str());
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
+                    isExposedToThisModule(M, VD, exposedModules) &&
                     cxx_translation::isExposableToCxx(VD)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
