@@ -105,6 +105,22 @@ namespace swift {
     TaskToThread,
   };
 
+  /// Describes the code size optimization behavior for code associated with
+  /// declarations that are marked unavailable.
+  enum class UnavailableDeclOptimization : uint8_t {
+    /// No optimization. Unavailable declarations will contribute to the
+    /// resulting binary by default in this mode.
+    None,
+
+    /// Avoid generating any code for unavailable declarations.
+    ///
+    /// NOTE: This optimization can be ABI breaking for a library evolution
+    /// enabled module because existing client binaries built with a
+    /// pre-Swift 5.9 compiler may depend on linkable symbols associated with
+    /// unavailable declarations.
+    Complete,
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -170,6 +186,10 @@ namespace swift {
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// Optimization mode for unavailable declarations.
+    UnavailableDeclOptimization UnavailableDeclOptimizationMode =
+        UnavailableDeclOptimization::None;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.

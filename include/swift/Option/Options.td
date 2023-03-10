@@ -490,6 +490,13 @@ def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
   Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Deprecated, has no effect">;
 
+def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimization=">,
+  MetaVarName<"<complete,none>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Specify the optimization mode for unavailable declarations. The "
+           "value may be 'none' (no optimization) or 'complete' (code is not "
+           "generated at all unavailable declarations)">;
+
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
