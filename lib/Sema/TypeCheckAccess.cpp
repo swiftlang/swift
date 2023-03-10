@@ -2285,7 +2285,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
   case AccessLevel::Package:
-    desiredAccessScope = AccessScope(ED->getPackageContext(true));
+    desiredAccessScope = AccessScope(ED->getPackageContext(/*lookupIfNotCurrent*/true));
     break;
   case AccessLevel::Public:
   case AccessLevel::Open:

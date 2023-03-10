@@ -3064,7 +3064,9 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
 }
 
 void ModuleDecl::setPackageName(Identifier name) {
-  Package = PackageUnit::create(name, *this, getASTContext());
+  auto pkg = PackageUnit::create(name, *this, getASTContext());
+  auto newContext = DeclContext(DeclContextKind::Module, pkg);
+  setDeclContext(&newContext);
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {

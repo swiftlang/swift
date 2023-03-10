@@ -285,7 +285,8 @@ PackageUnit *DeclContext::getPackageContext(bool lookupIfNotCurrent) const {
   // the parent module if needed
   if (lookupIfNotCurrent) {
     auto mdecl = getParentModule();
-    return mdecl->getPackage();
+    auto parent = mdecl->getParent();
+    return const_cast<PackageUnit *>(cast<PackageUnit>(parent));
   }
   return nullptr;
 }
@@ -1290,7 +1291,7 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   // has internal or less acl, check if it belongs to
   // the same package as the decl site's to allow access.
   if (auto srcPkg = sourceDC->getPackageContext()) {
-    if (auto usePkg = sourceDC->getPackageContext(true)) {
+    if (auto usePkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/true)) {
       return usePkg->isSamePackageAs(srcPkg);
     }
   }

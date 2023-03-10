@@ -3926,7 +3926,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Package: {
-    auto pkg = resultDC->getPackageContext(true);
+    auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/true);
     if (!pkg) {
       auto &d = VD->getASTContext().Diags;
       d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
@@ -4086,8 +4086,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcPkg = sourceDC->getPackageContext(true);
-    auto usePkg = useDC->getPackageContext(true);
+    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/true);
+    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/true);
     return usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:

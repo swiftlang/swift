@@ -210,21 +210,16 @@ public:
 ///
 /// \sa FileUnit
 class ModuleDecl
-    : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
+: public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
-
+  
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
-  /// A package this module belongs to. It's set as a property instead of a
-  /// parent decl context; otherwise it will break the existing decl context
-  /// lookups that assume ModuleDecl as the top level context.
-  PackageUnit *Package;
-
   /// Module name to use when referenced in clients module interfaces.
   mutable Identifier ExportAsName;
-
+  
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -241,7 +236,7 @@ public:
     using pointer = StringRef *;
     using reference = StringRef;
     using iterator_category = std::forward_iterator_tag;
-
+    
   private:
     PointerUnion<const ModuleDecl *, const /* clang::Module */ void *> current;
   public:
@@ -250,13 +245,13 @@ public:
     explicit ReverseFullNameIterator(const clang::Module *clangModule) {
       current = clangModule;
     }
-
+    
     /// Returns the name of the current module.
     /// Note that for a Swift module, it returns the current module's real (binary) name,
     /// which can be different from the name if module aliasing was used (see `-module-alias`).
     StringRef operator*() const;
     ReverseFullNameIterator &operator++();
-
+    
     friend bool operator==(ReverseFullNameIterator left,
                            ReverseFullNameIterator right) {
       return left.current == right.current;
@@ -265,7 +260,7 @@ public:
                            ReverseFullNameIterator right) {
       return !(left == right);
     }
-
+    
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
     ///
@@ -273,32 +268,32 @@ public:
     /// returned name for a Swift module).
     void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
-
+  
 private:
   /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
-
+  
   SmallVector<FileUnit *, 2> Files;
-
+  
   /// Mapping used to find the source file associated with a given source
   /// location.
   ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
-
+  
   /// The set of auxiliary source files build as part of this module.
   SmallVector<SourceFile *, 2> AuxiliaryFiles;
-
+  
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
-    declaredCrossImports;
-
+  declaredCrossImports;
+  
   /// A description of what should be implicitly imported by each file of this
   /// module.
   const ImplicitImportInfo ImportInfo;
-
+  
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
-
+  
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
   /// or \@NSApplicationMain, or because it is a script file.
@@ -310,28 +305,28 @@ private:
     llvm::PointerIntPair<FileUnit *, 2, OptionSet<Flags>> storage;
   public:
     EntryPointInfoTy() = default;
-
+    
     FileUnit *getEntryPointFile() const;
     void setEntryPointFile(FileUnit *file);
     bool hasEntryPoint() const;
-
+    
     bool markDiagnosedMultipleMainClasses();
     bool markDiagnosedMainClassWithScript();
   };
-
+  
   /// Information about the file responsible for the module's entry point,
   /// if any.
   ///
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
-
+  
   AccessNotesFile accessNotes;
-
+  
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
-
+  
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo, PackageUnit *pkg);
-
+  
 public:
   /// Creates a new module with a given \p name.
   ///
@@ -343,33 +338,33 @@ public:
          PackageUnit *pkg = nullptr) {
     return new (ctx) ModuleDecl(name, ctx, importInfo, pkg);
   }
-
+  
   static ModuleDecl *
   createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo, PackageUnit *pkg = nullptr) {
     auto *Mod = ModuleDecl::create(name, ctx, iinfo, pkg);
     Mod->Bits.ModuleDecl.IsMainModule = true;
     return Mod;
   }
-
+  
   using Decl::getASTContext;
-
+  
   /// Retrieves information about which modules are implicitly imported by
   /// each file of this module.
   const ImplicitImportInfo &getImplicitImportInfo() const { return ImportInfo; }
-
+  
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
   ImplicitImportList getImplicitImports() const;
-
+  
   AccessNotesFile &getAccessNotes() { return accessNotes; }
   const AccessNotesFile &getAccessNotes() const { return accessNotes; }
-
+  
   /// Return whether the module was imported with resilience disabled. The
   /// debugger does this to access private fields.
   bool getBypassResilience() const { return BypassResilience; }
   /// Only to be called by MemoryBufferSerializedModuleLoader.
   void setBypassResilience() { BypassResilience = true; }
-
+  
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
     return Files;
@@ -377,7 +372,7 @@ public:
   ArrayRef<const FileUnit *> getFiles() const {
     return { Files.begin(), Files.size() };
   }
-
+  
   /// Add the given file to this module.
   ///
   /// FIXME: Remove this function from public view. Modules never need to add
@@ -388,18 +383,18 @@ public:
   /// a file in the middle of e.g. semantic analysis, use a \c
   /// SynthesizedFileUnit instead.
   void addFile(FileUnit &newFile);
-
+  
   /// Add an auxiliary source file, introduced as part of the translation.
   void addAuxiliaryFile(SourceFile &sourceFile);
-
+  
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
-
+  
   /// Whether the given location is inside a generated buffer, \c false if
   /// the given location isn't in this module.
   bool isInGeneratedBuffer(SourceLoc loc);
-
+  
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -414,15 +409,15 @@ public:
   /// that are paired with \c false.
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>>
   computeFileIDMap(bool shouldDiagnose) const;
-
+  
   /// Add a file declaring a cross-import overlay.
   void addCrossImportOverlayFile(StringRef file);
-
+  
   /// Collect cross-import overlay names from a given YAML file path.
   static llvm::SmallSetVector<Identifier, 4>
   collectCrossImportOverlay(ASTContext &ctx, StringRef file,
                             StringRef moduleName, StringRef& bystandingModule);
-
+  
   /// If this method returns \c false, the module does not declare any
   /// cross-import overlays.
   ///
@@ -434,29 +429,29 @@ public:
   /// swiftoverlay files, but does not load the files to see if they list any
   /// overlay modules.)
   bool mightDeclareCrossImportOverlays() const;
-
+  
   /// Append to \p overlayNames the names of all modules that this module
   /// declares should be imported when \p bystanderName is imported.
   ///
   /// This operation is asymmetric: you will get different results if you
   /// reverse the positions of the two modules involved in the cross-import.
   void findDeclaredCrossImportOverlays(
-      Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
-      SourceLoc diagLoc) const;
-
+                                       Identifier bystanderName, SmallVectorImpl<Identifier> &overlayNames,
+                                       SourceLoc diagLoc) const;
+  
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(
-      SmallVectorImpl<Identifier> &bystanderNames);
-
+                                        SmallVectorImpl<Identifier> &bystanderNames);
+  
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
   Identifier getABIName() const;
-
+  
   /// Set the ABI name of the module;
   void setABIName(Identifier name) {
     ModuleABIName = name;
   }
-
+  
   /// Get the package name of this module
   /// FIXME: remove this and bump module version rdar://104723918
   Identifier getPackageName() const {
@@ -464,10 +459,14 @@ public:
       return pkg->getName();
     return Identifier();
   }
-
+  
   /// Get the package associated with this module
-  PackageUnit *getPackage() const { return Package; }
-
+  PackageUnit *getPackage() const {
+    if (auto parent = getParent())
+      if (auto pkg = const_cast<PackageUnit *>(cast<PackageUnit>(parent)))
+        return pkg;
+    return nullptr;
+  }
   /// Set the package this module is associated with
   /// FIXME: rename this with setPackage(name) rdar://104723918
   void setPackageName(Identifier name);
