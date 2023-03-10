@@ -95,6 +95,12 @@ public:
     return true;
   }
 
+  bool VisitCXXInheritedCtorInitExpr(clang::CXXInheritedCtorInitExpr *CIE) {
+    if (auto ctor = CIE->getConstructor())
+      callback(ctor);
+    return true;
+  }
+
   // Do not traverse unevaluated expressions. Doing to might result in compile
   // errors if we try to instantiate an un-instantiatable template.
 
