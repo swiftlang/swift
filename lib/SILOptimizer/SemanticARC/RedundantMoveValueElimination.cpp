@@ -39,25 +39,10 @@ bool SemanticARCOptVisitor::visitMoveValueInst(MoveValueInst *mvi) {
   if (!ctx.shouldPerform(ARCTransformKind::RedundantMoveValueElim))
     return false;
 
-  auto original = mvi->getOperand();
-
-  // If the moved-from value has none ownership, hasPointerEscape can't handle
-  // it, so it can't be used to determine whether escaping matches.
-  if (original->getOwnershipKind() != OwnershipKind::Owned) {
+  if (!isRedundantMoveValue(mvi))
     return false;
-  }
-
-  // First, check whether lexicality matches, the cheaper check.
-  if (mvi->isLexical() != original->isLexical()) {
-    return false;
-  }
-
-  // Then, check whether escaping matches, the more expensive check.
-  if (hasPointerEscape(mvi) != hasPointerEscape(original)) {
-    return false;
-  }
 
   // Both characteristics match.
-  eraseAndRAUWSingleValueInstruction(mvi, original);
+  eraseAndRAUWSingleValueInstruction(mvi, mvi->getOperand());
   return true;
 }

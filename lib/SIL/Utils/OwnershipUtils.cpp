@@ -2381,3 +2381,25 @@ bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
     return false;
   });
 }
+
+bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
+  auto original = mvi->getOperand();
+
+  // If the moved-from value has none ownership, hasPointerEscape can't handle
+  // it, so it can't be used to determine whether escaping matches.
+  if (original->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+
+  // First, check whether lexicality matches, the cheaper check.
+  if (mvi->isLexical() != original->isLexical()) {
+    return false;
+  }
+
+  // Then, check whether escaping matches, the more expensive check.
+  if (hasPointerEscape(mvi) != hasPointerEscape(original)) {
+    return false;
+  }
+
+  return true;
+}

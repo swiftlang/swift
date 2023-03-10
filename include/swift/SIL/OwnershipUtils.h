@@ -1347,6 +1347,14 @@ void visitTransitiveEndBorrows(
 /// - the value is itself a begin_borrow [lexical]
 bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 
+/// Whether specified move_value is redundant.
+///
+/// A move_value is redundant if the lifetimes that it separates both have the
+/// same characteristics with respect to
+/// - lexicality
+/// - escaping
+bool isRedundantMoveValue(MoveValueInst *mvi);
+
 } // namespace swift
 
 #endif
