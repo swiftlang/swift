@@ -93,4 +93,12 @@ public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 public macro OptionSet<RawType>() =
   #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
+/// Produce the given warning message during compilation.
+@freestanding(declaration)
+public macro warning(_ message: String) = Builtin.WarningMacro
+
+/// Produce the given error message during compilation.
+@freestanding(declaration)
+public macro error(_ message: String) = Builtin.ErrorMacro
+
 #endif
