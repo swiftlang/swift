@@ -178,3 +178,21 @@ do {
     test[data: repeat each args, "", 42] = 0
   }
 }
+
+func test_pack_expansion_materialization_from_lvalue_base() {
+  struct Data<Value> {}
+
+  struct Test<each T> {
+    var data: (repeat Data<each T>)
+
+    init() {
+      self.data = (repeat Data<each T>())
+      _ = (repeat each data.element) // Ok
+
+      var tmp = (repeat Data<each T>()) // expected-warning {{never mutated}}
+      _ = (repeat each tmp.element) // Ok
+
+      // TODO: Add subscript test-case when syntax is supported.
+    }
+  }
+}
