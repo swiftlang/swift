@@ -2579,8 +2579,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  // We cannot yet represent opened existentials.
-  if (DbgTy.getType()->hasOpenedExistential())
+  // We cannot yet represent local archetypes.
+  if (DbgTy.getType()->hasLocalArchetype())
     return;
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));

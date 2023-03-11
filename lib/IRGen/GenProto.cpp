@@ -765,8 +765,8 @@ static bool shouldSetName(IRGenModule &IGM, llvm::Value *value, CanType type) {
   // If value names are globally disabled, honor that.
   if (!IGM.EnableValueNames) return false;
 
-  // Suppress value names for values with opened existentials.
-  if (type->hasOpenedExistential()) return false;
+  // Suppress value names for values with local archetypes
+  if (type->hasLocalArchetype()) return false;
 
   // If the value already has a name, honor that.
   if (value->hasName()) return false;

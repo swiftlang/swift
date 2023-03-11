@@ -405,6 +405,12 @@ public:
   bool hasOpenedExistential() const {
     return getASTType()->hasOpenedExistential();
   }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more local archetypes.
+  bool hasLocalArchetype() const {
+    return getASTType()->hasLocalArchetype();
+  }
   
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that

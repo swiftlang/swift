@@ -148,6 +148,7 @@ entry(%addr : $*T):
 
 // CHECK-LABEL: define {{.*}}@test_tuple_pack_element_addr_1(
 // CHECK-SAME:        {{.*}}* nocapture [[TUPLE_ADDR:%[^,]+]], i{{(64|32)}} [[INDEX:%[^,]+]]
+// CHECK:         [[ELT_TYPE:%.*]] = phi %swift.type* [
 // CHECK:         [[RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata
 // CHECK:         [[UNCAST_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK:         [[METADATA:%[^,]+]] = bitcast %swift.type* [[UNCAST_METADATA]] to %swift.tuple_type*
@@ -156,7 +157,7 @@ entry(%addr : $*T):
 // CHECK:         [[CAST_TUPLE_ADDR:%[^,]+]] = bitcast <{ %TSS }>* [[TUPLE_ADDR]] to i8*
 // CHECK:         [[UNCAST_ELEMENT_ADDR:%[^,]+]] = getelementptr inbounds i8, i8* [[CAST_TUPLE_ADDR]], i32 [[OFFSET]]
 // CHECK:         [[ELEMENT_ADDR:%[^,]+]] = bitcast i8* [[UNCAST_ELEMENT_ADDR]] to %swift.opaque*
-// CHECK:         call swiftcc void @borrow(%swift.opaque* noalias nocapture [[ELEMENT_ADDR]], %swift.type* %"\CF\84_1_0")
+// CHECK:         call swiftcc void @borrow(%swift.opaque* noalias nocapture [[ELEMENT_ADDR]], %swift.type* [[ELT_TYPE]])
 sil @test_tuple_pack_element_addr_1 :  $<T, U> (@inout (String, T, U, Int), Builtin.Word) -> () {
 bb0(%tuple : $*(String, T, U, Int), %i : $Builtin.Word):
   %index = dynamic_pack_index %i of $Pack{Float, T, U, Float}
