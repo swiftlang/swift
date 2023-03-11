@@ -219,7 +219,7 @@ Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
 
 void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
   auto *classDecl = std::get<0>(getStorage());
-  classDecl->getImplementationContext()->addMember(value);
+  classDecl->addMember(value);
 }
 
 //----------------------------------------------------------------------------//

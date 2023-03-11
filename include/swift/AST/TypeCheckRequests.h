@@ -4133,28 +4133,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Checks that all of a class's \c \@objcImplementation extensions provide
-/// complete and correct implementations for their corresponding interfaces.
-/// This is done on all of a class's implementations at once to improve diagnostics.
-class TypeCheckObjCImplementationRequest
-    : public SimpleRequest<TypeCheckObjCImplementationRequest,
-                           evaluator::SideEffect(ExtensionDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-};
-
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
