@@ -4275,8 +4275,15 @@ namespace {
     bool hasForcedOptionalResult(ExplicitCastExpr *expr) {
       const auto *const TR = expr->getCastTypeRepr();
       if (TR && TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-        auto *locator = cs.getConstraintLocator(
-            expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+        ConstraintLocator *locator;
+        if (isExpr<CoerceExpr>(expr)) {
+          locator = cs.getConstraintLocator(
+              expr, {LocatorPathElt::CoercionOperand(),
+                     ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice});
+        } else {
+          locator = cs.getConstraintLocator(
+              expr, ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice);
+        }
         return solution.getDisjunctionChoice(locator);
       }
       return false;
@@ -4349,7 +4356,8 @@ namespace {
       // If we weren't explicitly told by the caller which disjunction choice,
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
-      auto *locator = cs.getConstraintLocator(expr);
+      auto *locator =
+          cs.getConstraintLocator(expr, LocatorPathElt::CoercionOperand());
       auto choice = solution.getDisjunctionChoice(locator);
 
       // Handle the coercion/bridging of the underlying subexpression, where

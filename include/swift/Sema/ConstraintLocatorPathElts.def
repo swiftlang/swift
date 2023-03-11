@@ -265,6 +265,9 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
 /// A function type global actor.
 SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
 
+/// A type coercion operand.
+SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

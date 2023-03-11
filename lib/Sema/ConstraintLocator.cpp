@@ -105,6 +105,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SingleValueStmtBranch:
   case ConstraintLocator::AnyPatternDecl:
   case ConstraintLocator::GlobalActorType:
+  case ConstraintLocator::CoercionOperand:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -496,6 +497,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "global actor type";
     break;
   }
+
+  case ConstraintLocator::CoercionOperand: {
+    out << "coercion operand";
+    break;
+  }
   }
 }
 
@@ -601,7 +607,7 @@ bool ConstraintLocator::isForAssignment() const {
 }
 
 bool ConstraintLocator::isForCoercion() const {
-  return directlyAt<CoerceExpr>();
+  return isLastElement<LocatorPathElt::CoercionOperand>();
 }
 
 bool ConstraintLocator::isForOptionalTry() const {

@@ -3306,7 +3306,8 @@ namespace {
       if (repr) CS.setType(repr, toType);
 
       auto fromType = CS.getType(expr->getSubExpr());
-      auto locator = CS.getConstraintLocator(expr);
+      auto locator =
+          CS.getConstraintLocator(expr, LocatorPathElt::CoercionOperand());
 
       // Literal initialization (e.g. `UInt32(0)`) doesn't require
       // a conversion because the literal is supposed to assume the
