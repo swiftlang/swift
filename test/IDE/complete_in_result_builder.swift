@@ -59,7 +59,7 @@ func testGlobalLookup() {
 
   @TupleBuilder<String> var x5 {
     "hello: \(#^GLOBAL_LOOKUP_IN_STRING_LITERAL^#)"
-// GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule: MyConstantString[#String#];
+// GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
   }
 
   @TupleBuilder<String> var x5 {
@@ -87,7 +87,7 @@ func testStaticMemberLookup() {
   @TupleBuilder<String> var x3 {
     "hello: \(StringFactory.#^COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL^#)"
 // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Begin completions
-// COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
+// COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
 // COMPLETE_STATIC_MEMBER_IN_STRING_LITERAL: End completions
   }
 }
@@ -197,7 +197,7 @@ func testCompleteInStringLiteral() {
     }
 // STRING_LITERAL_VAR: Begin completions, 2 items
 // STRING_LITERAL_VAR-DAG: Keyword[self]/CurrNominal:          self[#Island#]; name=self
-// STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal: turnipPrice[#String#]; name=turnipPrice
+// STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: turnipPrice[#String#]; name=turnipPrice
   }
 
   func bar(island: Island) {

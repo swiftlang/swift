@@ -14,4 +14,4 @@ public enum Endpoint {
     }
   }
 }
-// CHECK: Decl[LocalVar]/Local: myInt[#Int#];
+// CHECK: Decl[LocalVar]/Local/TypeRelation[Convertible]: myInt[#Int#];

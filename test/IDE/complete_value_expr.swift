@@ -1122,8 +1122,8 @@ func testInterpolatedString1() {
   "\(fooObject.#^INTERPOLATED_STRING_1^#)"
 }
 
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal:      lazyInstanceVar[#Int#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      lazyInstanceVar[#Int#]{{; name=.+$}}
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      instanceVar[#Int#]{{; name=.+$}}
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}

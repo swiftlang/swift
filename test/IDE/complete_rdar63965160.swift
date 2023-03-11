@@ -32,10 +32,6 @@ func test(values: [Value]) {
     Text(value.#^NORMAL?check=CHECK^#)
   }
 }
-// STRINGLITERAL: Begin completions, 2 items
-// STRINGLITERAL-DAG: Keyword[self]/CurrNominal:          self[#Value#];
-// STRINGLITERAL-DAG: Decl[InstanceVar]/CurrNominal: name[#String#];
-
-// NORMAL: Begin completions, 2 items
-// NORMAL-DAG: Keyword[self]/CurrNominal:          self[#Value#];
-// NORMAL-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: name[#String#];
+// CHECK: Begin completions, 2 items
+// CHECK-DAG: Keyword[self]/CurrNominal:          self[#Value#];
+// CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: name[#String#];
