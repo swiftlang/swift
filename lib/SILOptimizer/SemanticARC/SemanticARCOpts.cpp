@@ -51,7 +51,11 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
                    "sil-semantic-arc-owned-to-guaranteed-phi",
                    "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
                    "optimizer for compile time saving purposes, so run this "
-                   "after running peepholes)")),
+                   "after running peepholes)"),
+        clEnumValN(ARCTransformKind::RedundantMoveValueElim,
+                   "sil-semantic-arc-redundant-move-value-elim",
+                   "Eliminate move_value which don't change owned lifetime "
+                   "characteristics.  (Escaping, Lexical).")),
     llvm::cl::desc(
         "For testing purposes only run the specified list of semantic arc "
         "optimization. If the list is empty, we run all transforms"));
@@ -86,6 +90,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       case ARCTransformKind::LoadCopyToLoadBorrowPeephole:
       case ARCTransformKind::AllPeepholes:
       case ARCTransformKind::OwnershipConversionElimPeephole:
+      case ARCTransformKind::RedundantMoveValueElim:
         // We never assume we are at fixed point when running these transforms.
         if (performPeepholesWithoutFixedPoint(visitor)) {
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
