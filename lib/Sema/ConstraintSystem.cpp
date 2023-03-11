@@ -3506,7 +3506,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
 
   case OverloadChoiceKind::MaterializePack: {
-    auto *tuple = choice.getBaseType()->castTo<TupleType>();
+    // Since `.element` is only applicable to single element tuples at the
+    // moment we can just look through l-value base to load it.
+    //
+    // In the future, _if_ the syntax allows for multiple expansions
+    // this code would have to be adjusted to project l-value from the
+    // base type just like TupleIndex does.
+    auto tuple = choice.getBaseType()->getRValueType()->castTo<TupleType>();
     auto *expansion = tuple->getElementType(0)->castTo<PackExpansionType>();
     adjustedRefType = expansion->getPatternType();
     refType = adjustedRefType;

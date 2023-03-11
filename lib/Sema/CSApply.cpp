@@ -3415,6 +3415,14 @@ namespace {
       }
 
       case OverloadChoiceKind::MaterializePack: {
+        auto baseTy = solution.getResolvedType(base);
+
+        // Load the base tuple if necessary, materialization
+        // operates on r-value types only.
+        if (baseTy->is<LValueType>())
+          base = coerceToType(base, baseTy->getRValueType(),
+                              cs.getConstraintLocator(base));
+
         auto packType = solution.getResolvedType(expr);
         return cs.cacheType(
             MaterializePackExpr::create(cs.getASTContext(),
