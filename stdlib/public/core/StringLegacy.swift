@@ -38,27 +38,19 @@ extension String {
       return
     }
 
-    var repeatedValue = repeatedValue
-    self = repeatedValue.withUTF8 { repeatedUTF8 in
-      let uninitializedCapacity = repeatedUTF8.count * count
-      return String(_uninitializedCapacity: uninitializedCapacity) { buffer in
-        guard repeatedUTF8.count > 1 else {
-          buffer.initialize(repeating: repeatedUTF8[0])
-          return buffer.count
-        }
-        var initialized = 0
-        for i in 0..<count {
-          let lower = i &* repeatedUTF8.count
-          let upper = lower &+ repeatedUTF8.count
-          let range = Range(uncheckedBounds: (lower: lower, upper: upper))
-          _ = UnsafeMutableBufferPointer(rebasing: buffer[range])
-            .initialize(from: repeatedUTF8)
-          initialized &+= range.count
-        }
-        _internalInvariant(initialized == uninitializedCapacity)
-        return initialized
+    let repeatedValueGuts = repeatedValue._guts
+    let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: repeatedValueGuts.count &* count)
+    var offset = 0
+    for _ in 0..<count {
+      let bufferRebased = UnsafeMutableBufferPointer(rebasing: buffer[offset...])
+      guard let copied = repeatedValueGuts.copyUTF8(into: bufferRebased) else {
+        fatalError("Buffer's capacity \(buffer.count)" +
+                   " is not enough to accommodate '\(repeatedValue)' \(count) times")
       }
+      offset += copied
     }
+    _internalInvariant(offset == buffer.count)
+    self.init(_StringGuts(UnsafeBufferPointer(buffer), isASCII: repeatedValueGuts.isASCII))
   }
 
   /// A Boolean value indicating whether a string has no characters.
