@@ -3712,7 +3712,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             .Case("consumable_and_assignable",
                   CheckKind::ConsumableAndAssignable)
             .Case("no_consume_or_assign", CheckKind::NoConsumeOrAssign)
-            .Case("assignable_but_not_consumable", CheckKind::AssignableButNotConsumable)
+            .Case("assignable_but_not_consumable",
+                  CheckKind::AssignableButNotConsumable)
+            .Case("initable_but_not_consumable",
+                  CheckKind::InitableButNotConsumable)
             .Default(CheckKind::Invalid);
 
     if (CKind == CheckKind::Invalid) {
