@@ -1,17 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/structs.swift -module-name Structs -emit-module -emit-module-path %t/Structs.swiftmodule -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-structs.h
-
-// FIXME: add import automatically?
-// RUN: echo '#include "structs.h"' > %t/fixed-uses-structs.h
-// RUN: cat %t/uses-structs.h     >> %t/fixed-uses-structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-structs.h -clang-header-expose-module Structs=structs.h
 
 // RUN: %FileCheck %s < %t/uses-structs.h
+// RUN: %check-interop-cxx-header-in-clang(-I %t %t/uses-structs.h)
 
-// RUN: %check-interop-cxx-header-in-clang(%t/fixed-uses-structs.h)
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -cxx-interoperability-mode=swift-5.9 -emit-clang-header-path %t/uses-structs-default.h -clang-header-expose-module Structs=structs.h
+// RUN: %check-interop-cxx-header-in-clang(-I %t %t/uses-structs-default.h)
 
 import Structs
+
+// CHECK: #include <structs.h>
 
 public struct UsesStructsStruct {
     public func passThroughStructSeveralI64(_ y: StructSeveralI64) -> StructSeveralI64 {

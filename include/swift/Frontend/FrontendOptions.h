@@ -413,6 +413,16 @@ public:
   /// header.
   llvm::Optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
 
+  struct ClangHeaderExposedImportedModule {
+    std::string moduleName;
+    std::string headerName;
+  };
+
+  /// Indicates which imported modules have a generated header associated with
+  /// them that can be imported into the generated header for the current
+  /// module.
+  std::vector<ClangHeaderExposedImportedModule> clangHeaderExposedImports;
+
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 

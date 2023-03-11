@@ -1,15 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/enums.swift -module-name Enums -emit-module -emit-module-path %t/Enums.swiftmodule -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesEnums -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-enums.h
-
-// FIXME: add import automatically?
-// RUN: echo '#include "enums.h"' > %t/fixed-uses-enums.h
-// RUN: cat %t/uses-enums.h     >> %t/fixed-uses-enums.h
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesEnums -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-enums.h -clang-header-expose-module Enums=enums.h
 
 // RUN: %FileCheck %s < %t/uses-enums.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/fixed-uses-enums.h)
+// RUN: %check-interop-cxx-header-in-clang(-I %t %t/uses-enums.h)
 
 import Enums
 
