@@ -453,6 +453,12 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   if (auto s = getStructOrBoundGenericStruct()) {
     return s->hasUnreferenceableStorage();
   }
+  // Tuples with pack expansions don't *actually* have unreferenceable
+  // storage, but the optimizer needs to be taught how to handle them,
+  // and it won't do that correctly in the short term.
+  if (auto t = getAs<TupleType>()) {
+    return t.containsPackExpansionType();
+  }
   return false;
 }
 

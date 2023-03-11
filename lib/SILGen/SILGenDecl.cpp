@@ -106,6 +106,7 @@ static void copyOrInitPackExpansionInto(SILGenFunction &SGF,
       // element value, that's fine, we'll just destroy it as part of
       // leaving the iteration.
       eltInit->copyOrInitValueInto(SGF, loc, eltMV, isInit);
+      eltInit->finishInitialization(SGF);
 
       // Deactivate the tail cleanup before continuing the loop.
       if (tailCleanup.isValid())

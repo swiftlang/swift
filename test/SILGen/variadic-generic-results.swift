@@ -212,3 +212,60 @@ func callCopyAndBind<each T>(args: repeat each T) {
   sequence()
 }
 
+struct Wrapper<Value> {
+  let value: Value
+}
+
+// CHECK-LABEL: @$s4main17wrapTupleElementsyAA7WrapperVyxGxQp_txxQpRvzlF
+// CHECK-SAME: $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> @pack_out Pack{repeat Wrapper<each T>}
+func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T>) {
+// CHECK:         [[VALUES:%.*]] = alloc_stack [lexical] $(repeat Wrapper<each T>), let,
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Wrapper<each T>}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[VALUES]] : $*(repeat Wrapper<each T>) as $*Wrapper<@pack_element([[UUID]]) T>
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin Wrapper<@pack_element([[UUID]]) T>.Type
+// CHECK-NEXT:    [[ARG_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    [[ARG_COPY:%.*]] = alloc_stack $@pack_element([[UUID]]) T
+// CHECK-NEXT:    copy_addr [[ARG_ELT_ADDR]] to [init] [[ARG_COPY]] : $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[INIT:%.*]] = function_ref @$s4main7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+// CHECK-NEXT:    apply [[INIT]]<@pack_element([[UUID]]) T>([[ELT_ADDR]], [[ARG_COPY]], [[METATYPE]])
+// CHECK-NEXT:    dealloc_stack [[ARG_COPY]]
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb3:
+  let values = (repeat Wrapper(value: each value))
+
+// CHECK-NEXT:    [[VALUES_COPY:%.*]] = alloc_stack $(repeat Wrapper<each T>)
+// CHECK-NEXT:    copy_addr [[VALUES]] to [init] [[VALUES_COPY]] : $*(repeat Wrapper<each T>)
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb4([[ZERO]] : $Builtin.Word)
+// CHECK:       bb4([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb6, bb5
+// CHECK:       bb5:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Wrapper<each T>}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[OUT_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element([[UUID]]) T>
+// CHECK-NEXT:    [[VALUES_COPY_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[VALUES_COPY]] : $*(repeat Wrapper<each T>) as $*Wrapper<@pack_element([[UUID]]) T>
+// CHECK-NEXT:   copy_addr [take] [[VALUES_COPY_ELT_ADDR]] to [init] [[OUT_ELT_ADDR]] : $*Wrapper<@pack_element([[UUID]]) T>
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb4([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb6:
+// CHECK-NEXT:    dealloc_stack [[VALUES_COPY]] :
+// CHECK-NEXT:    destroy_addr [[VALUES]] :
+// CHECK-NEXT:    dealloc_stack [[VALUES]] :
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+  return values
+}

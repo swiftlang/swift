@@ -170,7 +170,7 @@ public:
       return emitAssignWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasLocalArchetype()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -193,7 +193,7 @@ public:
       return emitAssignWithTakeCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasLocalArchetype()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -223,7 +223,7 @@ public:
       return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasLocalArchetype()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -255,7 +255,7 @@ public:
       return emitInitializeWithTakeCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasLocalArchetype()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -278,7 +278,7 @@ public:
       return emitDestroyCall(IGF, T, addr);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasLocalArchetype()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isTriviallyDestroyable())

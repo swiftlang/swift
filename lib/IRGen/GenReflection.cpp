@@ -1166,7 +1166,7 @@ public:
 
   /// Give up if we captured an opened existential type. Eventually we
   /// should figure out how to represent this.
-  static bool hasOpenedExistential(CanSILFunctionType OrigCalleeType,
+  static bool hasLocalArchetype(CanSILFunctionType OrigCalleeType,
                                    const HeapLayout &Layout) {
     if (!OrigCalleeType->isPolymorphic() ||
         OrigCalleeType->isPseudogeneric())
@@ -1180,7 +1180,7 @@ public:
       if (!Bindings[i].isAnyMetadata())
         continue;
 
-      if (Bindings[i].getTypeParameter()->hasOpenedExistential())
+      if (Bindings[i].getTypeParameter()->hasLocalArchetype())
         return true;
     }
 
@@ -1188,7 +1188,7 @@ public:
         Layout.getElementTypes().slice(Layout.getIndexAfterBindings());
     for (auto ElementType : ElementTypes) {
       auto SwiftType = ElementType.getASTType();
-      if (SwiftType->hasOpenedExistential())
+      if (SwiftType->hasLocalArchetype())
         return true;
     }
 
@@ -1450,7 +1450,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
+  if (CaptureDescriptorBuilder::hasLocalArchetype(OrigCalleeType, Layout))
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   CaptureDescriptorBuilder builder(*this,
