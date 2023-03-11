@@ -3793,8 +3793,6 @@ private:
     auto expansionExpr =
       cast<PackExpansionExpr>(expr->getSemanticsProvidingExpr());
 
-    SGF.prepareToEmitPackExpansionExpr(expansionExpr);
-
     // TODO: try to borrow the existing elements if we can do that within
     // the limitations of the SIL representation.
 

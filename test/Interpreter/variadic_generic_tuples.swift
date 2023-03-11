@@ -57,4 +57,19 @@ tuples.test("makeTuple3") {
   expectEqual("(Swift.Int, Swift.Float)", _typeName(makeTuple3(t: Int.self, u: Float.self)))
 }
 
+func makeTuple<each Element>(
+  _ element: repeat each Element
+) -> (repeat each Element) {
+  return (repeat each element)
+}
+
+func expandTupleElements<each T: Equatable>(_ value: repeat each T) {
+  let values = makeTuple(repeat each value)
+  _ = (repeat expectEqual(each value, each values.element))
+}
+
+tuples.test("expandTuple") {
+  expandTupleElements(1, "hello", true)
+}
+
 runAllTests()

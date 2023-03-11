@@ -3342,6 +3342,24 @@ LValue SILGenLValue::visitPackElementExpr(PackElementExpr *e,
     }
   }
 
+  if (auto packExpr = dyn_cast<MaterializePackExpr>(refExpr)) {
+    auto *activeExpansion = SGF.getInnermostPackExpansion();
+    assert(activeExpansion->MaterializedPacks.count(packExpr) &&
+           "didn't materialize pack before dynamic pack loop emission");
+
+    auto elementTy =
+      SGF.getLoweredType(substFormalType).getAddressType();
+    auto tupleAddr = activeExpansion->MaterializedPacks.find(packExpr);
+    auto packIndex = activeExpansion->ExpansionIndex;
+    auto elementAddr =
+      SGF.B.createTuplePackElementAddr(e, packIndex, tupleAddr->second, elementTy);
+    return LValue::forAddress(accessKind,
+                              ManagedValue::forLValue(elementAddr),
+                              /*access enforcement*/ None,
+                              AbstractionPattern(substFormalType),
+                              substFormalType);
+  }
+
   SGF.SGM.diagnose(refExpr, diag::not_implemented,
                    "emission of 'each' for this kind of expression");
   auto loweredTy = SGF.getLoweredType(substFormalType).getAddressType();

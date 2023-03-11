@@ -1534,8 +1534,6 @@ RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
   assert(init && init->canPerformPackExpansionInitialization() &&
          "cannot emit a PackExpansionExpr without an appropriate context");
 
-  SGF.prepareToEmitPackExpansionExpr(E);
-
   auto type = E->getType()->getCanonicalType();
   assert(isa<PackExpansionType>(type));
   auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
@@ -1570,7 +1568,8 @@ RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
 
 RValue
 RValueEmitter::visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented for MaterializePackExpr");
+  // Always emitted through `visitPackElementExpr`.
+  llvm_unreachable("materialized pack outside of PackElementExpr");
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -6202,8 +6201,6 @@ RValue SILGenFunction::emitPlusZeroRValue(Expr *E) {
 
 static void emitIgnoredPackExpansion(SILGenFunction &SGF,
                                      PackExpansionExpr *E) {
-  SGF.prepareToEmitPackExpansionExpr(E);
-
   auto expansionType =
     cast<PackExpansionType>(E->getType()->getCanonicalType());
   auto formalPackType = CanPackType::get(SGF.getASTContext(), expansionType);
