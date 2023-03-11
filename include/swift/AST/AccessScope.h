@@ -28,14 +28,14 @@ class AccessScope {
   /// <DeclContext*, bool> pair to determine the scope, as shown
   /// in the table below.
   ///
-  /// <DeclContext*, bool>     AccessScope      AccessLevel
-  /// --------------------------------------------
-  ///  <nullptr, false>                Public             public or open
-  ///  <nullptr, true>                  Public             public `@_spi`
-  ///  <PackageUnit*, _>             Package             package
-  ///  <ModuleDecl*, _>                Module               internal
-  ///  <FileUnit*, false>           FileScope           fileprivate
-  ///  <FileUnit*, true>              Private               private
+  /// <DeclContext*, bool>          AccessScope        AccessLevel
+  /// ----------------------------------------------------------------
+  ///  <nullptr, false>              Public           public or open
+  ///  <nullptr, true>               Public           public `@_spi`
+  ///  <PackageUnit*, _>             Package            package
+  ///  <ModuleDecl*, _>              Module             internal
+  ///  <FileUnit*, false>            FileScope        fileprivate
+  ///  <FileUnit*, true>             Private            private
   ///
   /// For example, if a decl with `public` access level is referenced outside of
   /// its defining module, it will be maped to the <nullptr, false> pair during
@@ -84,8 +84,8 @@ public:
   /// child of the other.
   /// 2. This function does _not_ check the restrictiveness of the _access
   /// level_ between two decls.
-  /// 3. The DeclContext of this (use site) may not be null even if the use site has
-  /// a `public` access level.
+  /// 3. The DeclContext of this (use site) may not be null even if the use site
+  /// has a `public` access level.
   ///
   /// Here's an example while typechecking a file with the following code.
   ///
@@ -96,12 +96,12 @@ public:
   /// public func myFunc(_ arg: OtherModule.Foo) {}
   /// ```
   ///
-  /// The use site of `Foo`is a function `myFunc`, and its DeclContext is non-null
-  /// (FileUnit) even though the function decl itself has a `public` access level.
-  /// When `isChildOf` is called, the argument passed in is a pair <nullptr,
-  /// false> created in \c getAccessScopeForFormalAccess based on the access
-  /// level of the decl `Foo`. Since FileUnit is a child of nullptr in the DeclContext
-  /// hierarchy (described above), it returns true.
+  /// The use site of `Foo`is a function `myFunc`, and its DeclContext is
+  /// non-null (FileUnit) even though the function decl itself has a `public`
+  /// access level. When `isChildOf` is called, the argument passed in is a pair
+  /// <nullptr, false> created in \c getAccessScopeForFormalAccess based on the
+  /// access level of the decl `Foo`. Since FileUnit is a child of nullptr in
+  /// the DeclContext hierarchy (described above), it returns true.
   ///
   /// \see AccessScope::getAccessScopeForFormalAccess
   /// \see AccessScope::checkAccessUsingAccessScope
@@ -114,7 +114,7 @@ public:
         return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
       else
         return AS.isPublic();
-    } else {// It's public, so can't be a child of the argument scope
+    } else { // It's public, so can't be a child of the argument scope
       return false;
     }
   }

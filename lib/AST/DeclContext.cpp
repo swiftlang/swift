@@ -1289,7 +1289,7 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   // has internal or less acl, check if it belongs to
   // the same package as the decl site's to allow access.
   if (auto srcPkg = sourceDC->getPackageContext()) {
-    if (auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/true)) {
+    if (auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true)) {
       return usePkg->isSamePackageAs(srcPkg);
     }
   }

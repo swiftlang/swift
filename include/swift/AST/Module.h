@@ -343,8 +343,8 @@ public:
     return new (ctx) ModuleDecl(name, ctx, importInfo);
   }
 
-  static ModuleDecl *
-  createMainModule(ASTContext &ctx, Identifier name, ImplicitImportInfo iinfo) {
+  static ModuleDecl *createMainModule(ASTContext &ctx, Identifier name,
+                                      ImplicitImportInfo iinfo) {
     auto *Mod = ModuleDecl::create(name, ctx, iinfo);
     Mod->Bits.ModuleDecl.IsMainModule = true;
     return Mod;

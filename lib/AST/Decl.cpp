@@ -3926,7 +3926,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Internal:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Package: {
-    auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/true);
+    auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
       auto &d = VD->getASTContext().Diags;
       d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
@@ -3966,18 +3966,19 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 /// The use site of `Foo`is a function `myFunc`, and its DeclContext (useDC)
 /// is FileUnit. The call \c getAccessScopeForFormalAccess inside this function
 /// to get the access scope of`Foo` returns a public scope based on its `public`
-/// access level, which is a wrapper around a nullptr DeclContext. Note that the useDC
-/// is still non-null (FileUnit) even though the use site itself also has a `public` acess
-/// level.
+/// access level, which is a wrapper around a nullptr DeclContext. Note that the
+/// useDC is still non-null (FileUnit) even though the use site itself also has
+/// a `public` acess level.
 ///
-/// The `isChildOf` call compares the DeclContext hierarchy of the use site (useDC)
-/// and the decl (VD) site, and returns true in this case, since FileUnit is a child of nullptr
-/// based on the DeclContext hierarchy. The hierarchy is created when subclasses of
-/// DeclContext such as FileUnit or ModuleDecl are constructed. For example, FileUnit
-/// ctor takes ModuleDecl as its parent DeclContext. There's an exception, however; the
-/// parent of ModuleDecl is nullptr, not set to PackageUnit; ModuleDecl has a pointer to
-/// PackageUnit as its field, and it is treated as the enclosing scope of ModuleDecl in the
-/// `isChildOf` call.
+/// The `isChildOf` call compares the DeclContext hierarchy of the use site
+/// (useDC) and the decl (VD) site, and returns true in this case, since
+/// FileUnit is a child of nullptr based on the DeclContext hierarchy. The
+/// hierarchy is created when subclasses of DeclContext such as FileUnit or
+/// ModuleDecl are constructed. For example, FileUnit ctor takes ModuleDecl as
+/// its parent DeclContext. There's an exception, however; the parent of
+/// ModuleDecl is nullptr, not set to PackageUnit; ModuleDecl has a pointer to
+/// PackageUnit as its field, and it is treated as the enclosing scope of
+/// ModuleDecl in the `isChildOf` call.
 ///
 /// \see DeclContext::ASTHierarchy
 /// \see AccessScope::getAccessScopeForFormalAccess
@@ -4113,8 +4114,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/true);
-    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/true);
+    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     return usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:

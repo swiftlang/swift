@@ -230,14 +230,14 @@ struct FragileFunctionKind {
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
 ///
-/// The hierarchy between DeclContext subclasses is set in their ctors. For example,
-/// FileUnit ctor takes ModuleDecl as its parent DeclContext. The hierarchy from the most
-/// to least restrictive order is:
-///  decl/expr (e.g. ClassDecl) -> FileUnit -> ModuleDecl -> PackageUnit -> nullptr
+/// The hierarchy between DeclContext subclasses is set in their ctors. For
+/// example, FileUnit ctor takes ModuleDecl as its parent DeclContext. The
+/// hierarchy from the most to least restrictive order is:
+/// decl/expr (e.g. ClassDecl) -> FileUnit -> ModuleDecl -> PackageUnit -> nullptr
 ///
-/// There's an exception, however; the parent of ModuleDecl is set nullptr, not set to
-/// PackageUnit; ModuleDecl has a pointer to PackageUnit as its field, and it is treated as
-/// the enclosing scope of ModuleDecl.
+/// There's an exception, however; the parent of ModuleDecl is set nullptr, not
+/// set to PackageUnit; ModuleDecl has a pointer to PackageUnit as its field,
+/// and it is treated as the enclosing scope of ModuleDecl.
 class alignas(1 << DeclContextAlignInBits) DeclContext
     : public ASTAllocated<DeclContext> {
   enum class ASTHierarchy : unsigned {
@@ -332,7 +332,7 @@ public:
   bool isLocalContext() const {
     return getContextKind() <= DeclContextKind::Last_LocalDeclContextKind;
   }
-  
+
   /// \returns true if this is a package context
   LLVM_READONLY
   bool isPackageContext() const; // see swift/AST/Module.h
