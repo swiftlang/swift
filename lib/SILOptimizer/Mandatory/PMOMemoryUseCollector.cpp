@@ -289,7 +289,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     if (auto *si = dyn_cast<StoreInst>(User)) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
         if (auto tupleType = PointeeType.getAs<TupleType>()) {
-          if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+          if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
+              !tupleType->containsPackExpansionType()) {
             UsesToScalarize.push_back(User);
             continue;
           }
@@ -325,7 +326,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
       // have an access that crosses elements.
       if (auto tupleType = PointeeType.getAs<TupleType>()) {
-        if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+        if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
+            !tupleType->containsPackExpansionType()) {
           UsesToScalarize.push_back(CAI);
           continue;
         }

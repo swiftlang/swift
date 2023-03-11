@@ -560,8 +560,17 @@ public:
   SILValue ExpectedExecutor;
 
   struct ActivePackExpansion {
-    SILValue ExpansionIndex;
     GenericEnvironment *OpenedElementEnv;
+    SILValue ExpansionIndex;
+
+    /// Mapping from temporary pack expressions to their values. These
+    /// are evaluated once, with their elements projected in a dynamic
+    /// pack loop.
+    llvm::SmallDenseMap<MaterializePackExpr *, SILValue>
+      MaterializedPacks;
+
+    ActivePackExpansion(GenericEnvironment *OpenedElementEnv)
+        : OpenedElementEnv(OpenedElementEnv) {}
   };
 
   /// The innermost active pack expansion.
@@ -1819,7 +1828,7 @@ public:
   /// places that will need to support any sort of future feature
   /// where e.g. certain `each` operands need to be evaluated once
   /// for the entire expansion.
-  void prepareToEmitPackExpansionExpr(PackExpansionExpr *E) {}
+  void prepareToEmitPackExpansionExpr(PackExpansionExpr *E);
 
   //
   // Helpers for emitting ApplyExpr chains.
