@@ -1964,7 +1964,9 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
         // Members of extensions of nominal types with available ranges were
         // not diagnosed previously, so only emit a warning in that case.
-        auto limit = (enclosingDecl != parent && isa<ExtensionDecl>(parent))
+        bool inExtension = isa<ExtensionDecl>(
+            D->getDeclContext()->getTopmostDeclarationDeclContext());
+        auto limit = (enclosingDecl != parent && inExtension)
                          ? DiagnosticBehavior::Warning
                          : DiagnosticBehavior::Unspecified;
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
