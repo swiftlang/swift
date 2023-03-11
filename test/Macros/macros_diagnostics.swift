@@ -14,7 +14,7 @@ protocol P { }
 
 @freestanding(expression) macro tryToHide<T: P>(_: T) -> some P = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{some' types are only permitted in properties, subscripts, and functions}}
-// expected-error@-2{{generic parameter 'T' could not be inferred}}
+// expected-warning@-2{{external macro implementation type}}
 
 internal struct X { } // expected-note{{type declared here}}
 

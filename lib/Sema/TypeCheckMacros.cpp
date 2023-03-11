@@ -230,6 +230,24 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
   return ctx.getIdentifier(contents);
 }
 
+/// For a macro expansion expression that is known to be #externalMacro,
+/// handle the definition.
+static MacroDefinition handleExternalMacroDefinition(
+    ASTContext &ctx, MacroExpansionExpr *expansion) {
+  // Dig out the module and type name.
+  auto moduleName = getIdentifierFromStringLiteralArgument(ctx, expansion, 0);
+  if (!moduleName) {
+    return MacroDefinition::forInvalid();
+  }
+
+  auto typeName = getIdentifierFromStringLiteralArgument(ctx, expansion, 1);
+  if (!typeName) {
+    return MacroDefinition::forInvalid();
+  }
+
+  return MacroDefinition::forExternal(*moduleName, *typeName);
+}
+
 MacroDefinition MacroDefinitionRequest::evaluate(
     Evaluator &evaluator, MacroDecl *macro
 ) const {
@@ -256,6 +274,14 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     );
 
     return MacroDefinition::forInvalid();
+  }
+
+  // Handle #externalMacro without requiring a declaration at all.
+  // Note: this is a workaround to allow newer compilers to work with
+  // older standard libraries.
+  if (expansion->getMacroName().getBaseName().userFacingName() ==
+          "externalMacro") {
+    return handleExternalMacroDefinition(ctx, expansion);
   }
 
   // Type-check the macro expansion.
@@ -290,18 +316,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     return MacroDefinition::forInvalid();
   }
 
-  // Dig out the module and type name.
-  auto moduleName = getIdentifierFromStringLiteralArgument(ctx, expansion, 0);
-  if (!moduleName) {
-    return MacroDefinition::forInvalid();
-  }
-
-  auto typeName = getIdentifierFromStringLiteralArgument(ctx, expansion, 1);
-  if (!typeName) {
-    return MacroDefinition::forInvalid();
-  }
-
-  return MacroDefinition::forExternal(*moduleName, *typeName);
+  return handleExternalMacroDefinition(ctx, expansion);
 }
 
 /// Load a plugin library based on a module name.
