@@ -71,6 +71,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipLiveness.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -264,6 +265,22 @@ struct TestSpecificationTest : UnitTest {
         llvm_unreachable("unknown field type was expected?!");
       }
     }
+  }
+};
+
+// Arguments:
+// - value: the value to check for escaping
+// Dumps:
+// - the value
+// - whether it has a pointer escape
+struct OwnershipUtilsHasPointerEscape : UnitTest {
+  OwnershipUtilsHasPointerEscape(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    auto has = hasPointerEscape(value);
+    value->print(llvm::errs());
+    auto *boolString = has ? "true" : "false";
+    llvm::errs() << boolString << "\n";
   }
 };
 
@@ -789,6 +806,7 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS("has-pointer-escape", OwnershipUtilsHasPointerEscape)
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)

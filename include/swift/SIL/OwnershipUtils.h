@@ -122,6 +122,12 @@ inline bool isForwardingConsume(SILValue value) {
 
 bool hasPointerEscape(BorrowedValue value);
 
+/// Whether the specified OSSA-lifetime introducer has a pointer escape.
+///
+/// precondition: \p value introduces an OSSA-lifetime, either a BorrowedValue
+/// can be constructed from it or it's an owned value
+bool hasPointerEscape(SILValue value);
+
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
 /// requirement. Return true if no PointerEscape use was found.
 ///
