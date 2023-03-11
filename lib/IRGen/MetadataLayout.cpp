@@ -217,9 +217,23 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
                                       const GenericTypeRequirements &reqts,
                                             unsigned reqtIndex,
                                             llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].isMetadata());
+  assert(reqts.getRequirements()[reqtIndex].getKind()
+           == GenericRequirement::Kind::Metadata);
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.TypeMetadataPtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the nth argument metadata pack.  The type must
+/// have generic arguments.
+llvm::Value *irgen::emitArgumentMetadataPackRef(IRGenFunction &IGF,
+                                                NominalTypeDecl *decl,
+                                      const GenericTypeRequirements &reqts,
+                                                unsigned reqtIndex,
+                                                llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isMetadataPack());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.TypeMetadataPtrPtrTy);
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -230,9 +244,36 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                           const GenericTypeRequirements &reqts,
                                                 unsigned reqtIndex,
                                                 llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].isWitnessTable());
+  assert(reqts.getRequirements()[reqtIndex].getKind()
+           == GenericRequirement::Kind::WitnessTable);
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.WitnessTablePtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to a protocol witness table pack for the nth
+/// argument metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitArgumentWitnessTablePackRef(IRGenFunction &IGF,
+                                                    NominalTypeDecl *decl,
+                                          const GenericTypeRequirements &reqts,
+                                                    unsigned reqtIndex,
+                                                    llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isWitnessTablePack());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.WitnessTablePtrPtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the pack shape for the nth argument
+/// metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
+                                             NominalTypeDecl *decl,
+                                       const GenericTypeRequirements &reqts,
+                                             unsigned reqtIndex,
+                                             llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isShape());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
 }
 
 Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,

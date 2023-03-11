@@ -878,10 +878,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           emitNewParam();
           os << "void * _Nonnull ";
           auto reqt = genericRequirementParam.getRequirement();
-          if (reqt.isWitnessTable())
+          if (reqt.isAnyWitnessTable())
             ClangSyntaxPrinter(os).printBaseName(reqt.getProtocol());
           else
-            assert(reqt.isMetadata());
+            assert(reqt.isAnyMetadata());
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
@@ -1215,7 +1215,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           emitNewParam();
           auto genericRequirement = genericRequirementParam.getRequirement();
           // FIXME: Add protocol requirement support.
-          assert(genericRequirement.isMetadata());
+          assert(genericRequirement.isAnyMetadata());
           if (auto *gtpt = genericRequirement.getTypeParameter()
                                ->getAs<GenericTypeParamType>()) {
             os << "swift::TypeMetadataTrait<";

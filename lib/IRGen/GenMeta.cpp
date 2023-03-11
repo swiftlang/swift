@@ -4432,7 +4432,7 @@ namespace {
     }
 
     void addGenericRequirement(GenericRequirement requirement) {
-      if (requirement.isMetadata()) {
+      if (requirement.isAnyMetadata()) {
         auto t = requirement.getTypeParameter().subst(genericSubstitutions());
         ConstantReference ref = IGM.getAddrOfTypeMetadata(
             CanType(t), SymbolReferenceKind::Relative_Direct);
@@ -4440,7 +4440,7 @@ namespace {
         return;
       }
 
-      assert(requirement.isWitnessTable());
+      assert(requirement.isAnyWitnessTable());
       auto conformance = genericSubstitutions().lookupConformance(
           requirement.getTypeParameter()->getCanonicalType(),
           requirement.getProtocol());
