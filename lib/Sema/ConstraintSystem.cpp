@@ -422,6 +422,14 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
+ConstraintLocator *
+ConstraintSystem::getConstraintLocatorForAmbiguity(ConstraintLocator *locator) {
+  if (locator->findLast<LocatorPathElt::CoercionOperand>()) {
+    return getConstraintLocator(simplifyLocatorToAnchor(locator));
+  }
+  return locator;
+}
+
 ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
     ConstraintLocatorBuilder root, ConversionRestrictionKind restriction) {
   SmallVector<LocatorPathElt, 4> path;
@@ -4951,7 +4959,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
 
-    auto *locator = fix->getLocator();
+    auto *locator = getConstraintLocatorForAmbiguity(fix->getLocator());
 
     if (locator->isForContextualType()) {
       contextualFixes.push_back({&solution, fix});
@@ -5472,6 +5480,19 @@ void constraints::simplifyLocator(ASTNode &anchor,
         }
       }
       break;
+
+    case ConstraintLocator::CoercionOperand: {
+      auto *CE = castToExpr<CoerceExpr>(anchor);
+      anchor = CE->getSubExpr()->getValueProvidingExpr();
+      path = path.slice(1);
+      // When in a argument function type on a coercion context
+      // look past the argument, because is just for identify the
+      // argument type that is being matched.
+      if (!path.empty() && path[0].is<LocatorPathElt::FunctionArgument>()) {
+        path = path.slice(1);
+      }
+      continue;
+    }
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType: {
