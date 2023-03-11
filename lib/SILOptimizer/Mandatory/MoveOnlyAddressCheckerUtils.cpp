@@ -338,33 +338,50 @@ static bool memInstMustConsume(Operand *memOper) {
 /// These are cases where we want to treat the end of the function as a liveness
 /// use to ensure that we reinitialize \p value before the end of the function
 /// if we consume \p value in the function body.
-static bool isInOutDefThatNeedsEndOfFunctionLiveness(SILValue value) {
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
-    switch (fArg->getArgumentConvention()) {
-    case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_Out:
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-    case SILArgumentConvention::Direct_Guaranteed:
-    case SILArgumentConvention::Direct_Owned:
-    case SILArgumentConvention::Direct_Unowned:
-    case SILArgumentConvention::Pack_Guaranteed:
-    case SILArgumentConvention::Pack_Owned:
-    case SILArgumentConvention::Pack_Out:
-      return false;
-    case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
-    case SILArgumentConvention::Pack_Inout:
-      LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
-      return true;
+static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAddr) {
+  SILValue operand = markedAddr->getOperand();
+
+  // Check for inout types of arguments that are marked with consumable and
+  // assignable.
+  if (markedAddr->getCheckKind() ==
+      MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
+      switch (fArg->getArgumentConvention()) {
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Direct_Guaranteed:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Pack_Guaranteed:
+      case SILArgumentConvention::Pack_Owned:
+      case SILArgumentConvention::Pack_Out:
+        return false;
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+      case SILArgumentConvention::Pack_Inout:
+        LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
+        return true;
+      }
     }
   }
 
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
-      if (!fArg->isClosureCapture())
-        return false;
-      LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
-      return true;
+  // See if we have an assignable_but_not_consumable from a project_box +
+  // function_argument. In this case, the value must be live at the end of the
+  // use, similar to an inout parameter.
+  //
+  // TODO: Rather than using a terminator, we might be able to use the
+  // end_access of the access marker instead. That would slightly change the
+  // model and this is semantically ok today.
+  if (markedAddr->getCheckKind() ==
+      MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+    if (auto *pbi = dyn_cast<ProjectBoxInst>(stripAccessMarkers(operand))) {
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
+        if (!fArg->isClosureCapture())
+          return false;
+        LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
+        return true;
+      }
     }
   }
 
@@ -481,7 +498,7 @@ struct UseState {
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
   void initializeInOutTermUsers() {
-    if (!isInOutDefThatNeedsEndOfFunctionLiveness(address->getOperand()))
+    if (!isInOutDefThatNeedsEndOfFunctionLiveness(address))
       return;
 
     SmallVector<SILBasicBlock *, 8> exitBlocks;
