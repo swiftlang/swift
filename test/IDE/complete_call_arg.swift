@@ -1383,7 +1383,7 @@ struct AmbiguousCallInResultBuilder {
   func ttroke(_ content: Int, lineWidth: Int = 1) -> Int { 42 }
   
   @MyResultBuilder var body: Int {
-    self.ttroke(1, #^AMBIGUOUS_IN_RESULT_BUILDER?xfail=TODO^#)
+    self.ttroke(1, #^AMBIGUOUS_IN_RESULT_BUILDER^#)
 // AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: String#}[#String#];
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];

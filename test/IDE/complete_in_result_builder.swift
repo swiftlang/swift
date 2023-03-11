@@ -360,3 +360,24 @@ func testCompleteIfLetInResultBuilder() {
     // IF_LET_IN_RESULT_BUILDER: End completions
   }
 }
+
+func testOverloadedCallArgs() {
+  func overloaded(single: Int) -> Int {}
+  func overloaded(_ first: Int, second: Int) -> Int {}
+
+  @resultBuilder struct ViewBuilder {
+    static func buildBlock(_ content: Int) -> Int { content }
+  }
+
+  struct Test {
+    @ViewBuilder var body: Int {
+      overloaded(#^OVERLOADED_CALL_ARG^#, second: 1)
+      // OVERLOADED_CALL_ARG: Begin completions
+      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#single: Int#}[')'][#Int#];
+      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(first): Int#}, {#second: Int#}[')'][#Int#];
+      // OVERLOADED_CALL_ARG-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
+      // OVERLOADED_CALL_ARG: End completions
+    }
+  }
+
+}

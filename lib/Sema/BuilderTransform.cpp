@@ -1008,6 +1008,9 @@ llvm::Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   // Solve the constraint system.
   if (cs.getASTContext().CompletionCallback) {
     SmallVector<Solution, 4> solutions;
+    cs.Options |= ConstraintSystemFlags::AllowFixes;
+    cs.Options |= ConstraintSystemFlags::SuppressDiagnostics;
+    cs.Options |= ConstraintSystemFlags::ForCodeCompletion;
     cs.solveForCodeCompletion(solutions);
 
     SyntacticElementTarget funcTarget(func);
