@@ -140,12 +140,13 @@ public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                SwiftToClangInteropContext &interopContext, AccessLevel access,
-               bool requiresExposedAttribute, OutputLanguageMode outputLang)
+               bool requiresExposedAttribute, llvm::StringSet<> &exposedModules,
+               OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
         printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
                 typeMapping, interopContext, access, requiresExposedAttribute,
-                outputLang),
+                exposedModules, outputLang),
         outputLangMode(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
@@ -190,11 +191,15 @@ public:
     }
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      // Only add C++ imports in C++ mode for now.
-      if (!D->hasClangNode())
-        return true;
+      // Do not expose compiler private '_ObjC' module.
       if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
         return true;
+      // Add C++ module imports in C++ mode explicitly, to ensure that their
+      // import is always emitted in the header.
+      if (D->hasClangNode()) {
+        if (auto *clangMod = otherModule->findUnderlyingClangModule())
+          imports.insert(clangMod);
+      }
     }
 
     imports.insert(otherModule);
@@ -778,15 +783,16 @@ void swift::printModuleContentsAsObjC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
+  llvm::StringSet<> exposedModules;
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
-               /*requiresExposedAttribute=*/false, OutputLanguageMode::ObjC)
+               /*requiresExposedAttribute=*/false, exposedModules,
+               OutputLanguageMode::ObjC)
       .write();
 }
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
-    raw_ostream &os,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
-    bool requiresExposedAttribute) {
+    raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    bool requiresExposedAttribute, llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -804,7 +810,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
                       AccessLevel::Public, requiresExposedAttribute,
-                      OutputLanguageMode::Cxx);
+                      exposedModules, OutputLanguageMode::Cxx);
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {

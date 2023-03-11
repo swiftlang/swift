@@ -313,7 +313,16 @@ bool ArgsToFrontendOptionsConverter::convert(
                       HasExposeAttrOrImplicitDeps)
             .Default(llvm::None);
   }
-  
+  for (const auto &arg :
+       Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
+    auto splitArg = StringRef(arg).split('=');
+    if (splitArg.second.empty()) {
+      continue;
+    }
+    Opts.clangHeaderExposedImports.push_back(
+        {splitArg.first.str(), splitArg.second.str()});
+  }
+
   Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
                                                  OPT_no_strict_implicit_module_context,
                                                  false);
