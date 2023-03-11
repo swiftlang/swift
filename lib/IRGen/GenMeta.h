@@ -122,6 +122,15 @@ namespace irgen {
                                        llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the type metadata pack stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentMetadataPackRef(IRGenFunction &IGF,
+                                           NominalTypeDecl *theDecl,
+                                           const GenericTypeRequirements &reqts,
+                                           unsigned reqtIndex,
+                                           llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to a protocol witness table stored in the nth
   /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentWitnessTableRef(IRGenFunction &IGF,
@@ -129,6 +138,24 @@ namespace irgen {
                                            const GenericTypeRequirements &reqts,
                                            unsigned reqtIndex,
                                            llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to a protocol witness table pack stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentWitnessTablePackRef(IRGenFunction &IGF,
+                                               NominalTypeDecl *theDecl,
+                                           const GenericTypeRequirements &reqts,
+                                               unsigned reqtIndex,
+                                               llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to a the pack shape stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentPackShapeRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *theDecl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata);
 
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
