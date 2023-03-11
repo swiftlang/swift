@@ -428,15 +428,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkMoveExpr(MoveExpr *moveExpr) {
-      // Make sure the MoveOnly feature is set. If not, error.
-      // This should not currently be reached because the parse should ignore
-      // the _move keyword unless the feature flag is set.
-      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
-        auto error =
-          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
-        Ctx.Diags.diagnose(moveExpr->getLoc(), error);
-      }
-
       if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
         Ctx.Diags.diagnose(moveExpr->getLoc(),
                            diag::move_expression_not_passed_lvalue);
@@ -444,15 +435,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkBorrowExpr(BorrowExpr *borrowExpr) {
-      // Make sure the MoveOnly feature is set. If not, error.
-      // This should not currently be reached because the parse should ignore
-      // the _move keyword unless the feature flag is set.
-      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
-        auto error =
-          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
-        Ctx.Diags.diagnose(borrowExpr->getLoc(), error);
-      }
-
       // Allow for a chain of member_ref exprs that end in a decl_ref expr.
       auto *subExpr = borrowExpr->getSubExpr();
       while (auto *memberRef = dyn_cast<MemberRefExpr>(subExpr))
@@ -6177,11 +6159,6 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
 
 void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     NominalTypeDecl *copyableNominalType) {
-  // If we don't have move only enabled, bail early.
-  if (!copyableNominalType->getASTContext().LangOpts.Features.contains(
-          Feature::MoveOnly))
-    return;
-
   // If we already have a move only type, just bail, we have no further work to
   // do.
   if (copyableNominalType->isMoveOnly())
