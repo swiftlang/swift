@@ -2197,36 +2197,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Otherwise, print all the concrete defining accessors.
   bool PrintAccessorBody = Options.FunctionDefinitions;
 
-  // Helper to print an accessor. Returns true if the
-  // accessor was present but skipped.
-  auto PrintAccessor = [&](AccessorKind Kind) -> bool {
-    auto *Accessor = ASD->getAccessor(Kind);
-    if (!Accessor || !shouldPrint(Accessor))
-      return true;
-    if (!PrintAccessorBody) {
-      Printer << " ";
-      printSelfAccessKindModifiersIfNeeded(Accessor);
-
-      Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
-
-      // handle any effects specifiers
-      if (Accessor->getAccessorKind() == AccessorKind::Get) {
-        if (asyncGet) printWithSpace("async");
-        if (throwsGet) printWithSpace("throws");
-      }
-
-    } else {
-      {
-        IndentRAII IndentMore(*this);
-        indent();
-        visit(Accessor);
-      }
-      indent();
-      Printer.printNewline();
-    }
-    return false;
-  };
-
   // Determine if we should print the getter without the 'get { ... }'
   // block around it.
   bool isOnlyGetter = impl.getReadImpl() == ReadImplKind::Get &&
@@ -2240,28 +2210,31 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
-  Printer << " {";
-
-  if (PrintAccessorBody)
-    Printer.printNewline();
+  // Collect the accessor declarations that we should print.
+  SmallVector<AccessorDecl *, 4> accessorsToPrint;
+  auto AddAccessorToPrint = [&](AccessorKind kind) {
+    auto *Accessor = ASD->getAccessor(kind);
+    if (Accessor && shouldPrint(Accessor))
+      accessorsToPrint.push_back(Accessor);
+  };
 
   if (PrintAbstract) {
-    PrintAccessor(AccessorKind::Get);
+    AddAccessorToPrint(AccessorKind::Get);
     if (ASD->supportsMutation())
-      PrintAccessor(AccessorKind::Set);
+      AddAccessorToPrint(AccessorKind::Set);
   } else {
     switch (impl.getReadImpl()) {
     case ReadImplKind::Stored:
     case ReadImplKind::Inherited:
       break;
     case ReadImplKind::Get:
-      PrintAccessor(AccessorKind::Get);
+      AddAccessorToPrint(AccessorKind::Get);
       break;
     case ReadImplKind::Address:
-      PrintAccessor(AccessorKind::Address);
+      AddAccessorToPrint(AccessorKind::Address);
       break;
     case ReadImplKind::Read:
-      PrintAccessor(AccessorKind::Read);
+      AddAccessorToPrint(AccessorKind::Read);
       break;
     }
     switch (impl.getWriteImpl()) {
@@ -2271,27 +2244,67 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
     case WriteImplKind::InheritedWithObservers: {
-      PrintAccessor(AccessorKind::Get);
-      PrintAccessor(AccessorKind::Set);
+      AddAccessorToPrint(AccessorKind::Get);
+      AddAccessorToPrint(AccessorKind::Set);
       break;
     }
     case WriteImplKind::Set:
-      PrintAccessor(AccessorKind::Set);
+      AddAccessorToPrint(AccessorKind::Set);
       if (!shouldHideModifyAccessor())
-        PrintAccessor(AccessorKind::Modify);
+        AddAccessorToPrint(AccessorKind::Modify);
       break;
     case WriteImplKind::MutableAddress:
-      PrintAccessor(AccessorKind::MutableAddress);
-      PrintAccessor(AccessorKind::WillSet);
-      PrintAccessor(AccessorKind::DidSet);
+      AddAccessorToPrint(AccessorKind::MutableAddress);
+      AddAccessorToPrint(AccessorKind::WillSet);
+      AddAccessorToPrint(AccessorKind::DidSet);
       break;
     case WriteImplKind::Modify:
-      PrintAccessor(AccessorKind::Modify);
+      AddAccessorToPrint(AccessorKind::Modify);
       break;
     }
   }
 
-  if (!PrintAccessorBody)
+  // If we're not printing the accessor bodies and none of the accessors have
+  // attributes then we can print in a shorter, compact form.
+  bool PrintCompactAccessors =
+      !PrintAccessorBody &&
+      std::all_of(accessorsToPrint.begin(), accessorsToPrint.end(),
+                  [](AccessorDecl *accessor) {
+                    return accessor->getAttrs().isEmpty();
+                  });
+
+  Printer << " {";
+
+  if (!PrintCompactAccessors)
+    Printer.printNewline();
+
+  for (auto *accessor : accessorsToPrint) {
+    if (PrintCompactAccessors) {
+      Printer << " ";
+      printSelfAccessKindModifiersIfNeeded(accessor);
+
+      Printer.printKeyword(getAccessorLabel(accessor->getAccessorKind()),
+                           Options);
+
+      // handle any effects specifiers
+      if (accessor->getAccessorKind() == AccessorKind::Get) {
+        if (asyncGet)
+          printWithSpace("async");
+        if (throwsGet)
+          printWithSpace("throws");
+      }
+    } else {
+      {
+        IndentRAII IndentMore(*this);
+        indent();
+        visit(accessor);
+      }
+      indent();
+      Printer.printNewline();
+    }
+  }
+
+  if (PrintCompactAccessors)
     Printer << " ";
 
   Printer << "}";
