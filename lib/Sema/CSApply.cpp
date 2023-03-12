@@ -4621,12 +4621,7 @@ namespace {
     }
     
     Expr *visitIsCaseExpr(IsCaseExpr *expr) {
-      // Turn the subexpression into an rvalue.
-      // Why does this still never get called?
-      auto &ctx = cs.getASTContext();
-      auto sub = cs.coerceToRValue(expr->getSubExpr());
-      expr->setSubExpr(sub);
-      
+      // Should already be type-checked.
       return simplifyExprType(expr);
     }
     
@@ -8448,6 +8443,20 @@ namespace {
       return Action::Continue(expr);
     }
 
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // For IsCaseExprs, the children are already checked, so we only need to
+      // apply the type to the parent node itself.
+      if (auto *ICE = dyn_cast<IsCaseExpr>(expr)) {
+        auto &cs = solution.getConstraintSystem();
+        auto exprType = cs.getType(expr);
+        exprType = solution.simplifyType(exprType);
+        expr->setType(exprType);
+        return Action::SkipChildren(ICE);
+      }
+      
+      return Action::Continue(expr);
+    }
+    
     /// Ignore statements.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       return Action::SkipChildren(stmt);
@@ -8557,6 +8566,12 @@ namespace {
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
         rewriteSingleValueStmtExpr(SVE);
         return Action::SkipChildren(SVE);
+      }
+      
+      // IsCaseExprs are already type-checked and we
+      // shouldn't try to rewrite their children
+      if (auto *ICE = dyn_cast<IsCaseExpr>(expr)) {
+        return Action::SkipChildren(ICE);
       }
 
       if (auto tap = dyn_cast<TapExpr>(expr)) {

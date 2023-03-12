@@ -3409,30 +3409,29 @@ namespace {
     }
     
     Type visitIsCaseExpr(IsCaseExpr *expr) {
-      auto exprPattern = expr->getPattern();
-      Pattern *pattern = TypeChecker::resolvePattern(exprPattern, CurDC,
-                                                     /*isStmtCondition*/ true); // true or false?
-      if (!pattern) {
-        return nullptr;
+      // Type-check the LHS expr
+      Expr *subExpr = expr->getSubExpr();
+      TypeChecker::typeCheckExpression(subExpr, CurDC);
+      if (Expr *newSubExpr = TypeChecker::coerceToRValue(CS.getASTContext(), subExpr)) {
+        subExpr = newSubExpr;
       }
+      expr->setSubExpr(subExpr);
+      Type subExprType = expr->getSubExpr()->getType();
+      
+      // Resolve the pattern.
+      auto *pattern = expr->getPattern();
+      pattern = TypeChecker::resolvePattern(pattern, CurDC, /*isStmtCondition=*/false);
+      expr->setPattern(pattern);
 
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, CurDC);
-      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-      if (patternType->hasError()) {
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, subExprType, patternOptions);
+      if (coercedPattern) {
+        pattern = coercedPattern;
+      } else {
         return nullptr;
       }
-
-      // Trying to emulate how `TypeChecker::typeCheckStmtConditionElement`
-      // handles `if case .bar = value { ... }`. For some reason this returns
-      // `hadError` with `value is case .bar` but not `value is case .bar(1)`.
-      // Even when `hadError` is false, we get an assertion later 
-      auto subExpr = expr->getSubExpr();
-      bool hadError = TypeChecker::typeCheckBinding(pattern, subExpr, CurDC, patternType);
-      if (hadError) {
-        return nullptr;
-      }
-      expr->setPattern(pattern);
-      expr->setSubExpr(subExpr);
       
       // The `IsCaseExpr` itself always has `Bool` type
       auto &ctx = CS.getASTContext();
@@ -4144,6 +4143,15 @@ namespace {
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
         if (CS.generateConstraints(SVE))
           return Action::Stop();
+        return Action::SkipChildren(expr);
+      }
+    
+      // Check `is case` exprs without checking its sub-expressions,
+      // since `visitIsCaseExpr` handles checking the children.
+      if (auto *ICE = dyn_cast<IsCaseExpr>(expr)) {
+        auto type = CG.visit(ICE);
+        auto simplifiedType = CS.simplifyType(type);
+        CS.setType(expr, simplifiedType);
         return Action::SkipChildren(expr);
       }
 
