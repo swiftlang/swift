@@ -37,6 +37,40 @@ struct ModifyConditionallyAvailable<T> {
     }
 }
 
+@propertyWrapper
+struct SetterMoreAvailable<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+
+        @available(macOS 10.49, *)
+        set { fatalError() }
+    }
+
+    var projectedValue: T {
+        get { fatalError() }
+
+        @available(macOS 10.49, *)
+        set { fatalError() }
+    }
+}
+
+@propertyWrapper
+struct ModifyMoreAvailable<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+
+        @available(macOS 10.49, *)
+        _modify { fatalError() }
+    }
+
+    var projectedValue: T {
+        get { fatalError() }
+
+        @available(macOS 10.49, *)
+        _modify { fatalError() }
+    }
+}
+
 struct Butt {
     var modify_conditionally_available: Int {
         get { fatalError() }
@@ -50,6 +84,12 @@ struct Butt {
 
     @ModifyConditionallyAvailable
     var wrapped_modify_conditionally_available: Int
+
+    @SetterMoreAvailable
+    var wrapped_setter_more_available: Int
+
+    @ModifyMoreAvailable
+    var wrapped_modify_more_available: Int
 }
 
 func butt(x: inout Butt) { // expected-note * {{}}
@@ -58,6 +98,10 @@ func butt(x: inout Butt) { // expected-note * {{}}
     x.wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
     x.$wrapped_setter_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
     x.$wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
+    x.wrapped_setter_more_available = 0
+    x.wrapped_modify_more_available = 0
+    x.$wrapped_setter_more_available = 0
+    x.$wrapped_modify_more_available = 0
 
     if #available(macOS 10.51, *) {
         x.modify_conditionally_available = 0
@@ -66,6 +110,25 @@ func butt(x: inout Butt) { // expected-note * {{}}
         x.$wrapped_setter_conditionally_available = 0
         x.$wrapped_modify_conditionally_available = 0
     }
+}
+
+@available(macOS, unavailable)
+extension Butt {
+  @available(iOS, unavailable)
+  struct Nested { // expected-note {{has been explicitly marked unavailable here}}
+    @SetterMoreAvailable
+    var wrapped_setter_more_available: Int // expected-note 2 {{has been explicitly marked unavailable here}}
+
+    @ModifyMoreAvailable
+    var wrapped_modify_more_available: Int // expected-note 2 {{has been explicitly marked unavailable here}}
+  }
+}
+
+func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unavailable in macOS}}
+  x.wrapped_setter_more_available = 0 // expected-error {{is unavailable in macOS}}
+  x.wrapped_modify_more_available = 0 // expected-error {{is unavailable in macOS}}
+  x.$wrapped_setter_more_available = 0 // expected-error {{is unavailable in macOS}}
+  x.$wrapped_modify_more_available = 0 // expected-error {{is unavailable in macOS}}
 }
 
 @available(macOS 11.0, *)
