@@ -282,7 +282,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printInlineForThunk();
   os << '~';
   printer.printBaseName(typeDecl);
-  os << "() {\n";
+  os << "() noexcept {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
       os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
@@ -293,7 +293,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printBaseName(typeDecl);
   os << "(const ";
   printer.printBaseName(typeDecl);
-  os << " &other) {\n";
+  os << " &other) noexcept {\n";
   ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
       os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   if (isOpaqueLayout) {
@@ -312,7 +312,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
-  os << " &&) { abort(); }\n";
+  os << " &&) noexcept { abort(); }\n";
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())
@@ -324,21 +324,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
-  // FIXME: make noexcept.
   if (isOpaqueLayout) {
     os << "(";
     printer.printSwiftImplQualifier();
-    os << "ValueWitnessTable * _Nonnull vwTable) : _storage(vwTable->size, "
+    os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
+          "_storage(vwTable->size, "
           "vwTable->getAlignment()) {}\n";
   } else {
-    os << "() {}\n";
+    os << "() noexcept {}\n";
   }
   // Print out '_make' function which returns an unitialized instance for
   // passing to Swift.
   os << "  static ";
   printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
-  os << " _make() {";
+  os << " _make() noexcept {";
   if (isOpaqueLayout) {
     os << "\n";
     ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
@@ -354,14 +354,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // Print out the private accessors to the underlying Swift value storage.
   os << "  ";
   printer.printInlineForThunk();
-  os << "const char * _Nonnull _getOpaquePointer() const { return "
+  os << "const char * _Nonnull _getOpaquePointer() const noexcept { return "
         "_storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
   os << "  ";
   printer.printInlineForThunk();
-  os << "char * _Nonnull _getOpaquePointer() { return _storage";
+  os << "char * _Nonnull _getOpaquePointer() noexcept { return _storage";
   if (isOpaqueLayout)
     os << ".getOpaquePointer()";
   os << "; }\n";
@@ -370,7 +370,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (isa<EnumDecl>(typeDecl)) {
     os << "  ";
     printer.printInlineForThunk();
-    os << "char * _Nonnull _destructiveProjectEnumData() {\n";
+    os << "char * _Nonnull _destructiveProjectEnumData() noexcept {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
           "metadata._0);\n";
@@ -378,14 +378,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  }\n";
     os << "  ";
     printer.printInlineForThunk();
-    os << "void _destructiveInjectEnumTag(unsigned tag) {\n";
+    os << "void _destructiveInjectEnumTag(unsigned tag) noexcept {\n";
     printEnumVWTableVariable();
     os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, "
           "metadata._0);\n";
     os << "  }\n";
     os << "  ";
     printer.printInlineForThunk();
-    os << "unsigned _getEnumTag() const {\n";
+    os << "unsigned _getEnumTag() const noexcept {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";

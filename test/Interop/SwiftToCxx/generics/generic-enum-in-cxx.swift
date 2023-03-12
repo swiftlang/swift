@@ -112,7 +112,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK ~GenericOpt() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ~GenericOpt() noexcept {
 // CHECK-NEXT:   auto metadata = _impl::$s8Generics10GenericOptOMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
