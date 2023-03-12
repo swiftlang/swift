@@ -324,3 +324,8 @@ func f63834_D(_ x: Int = 0) {}
 func f63834_D(_ x: String) {}
 
 (f63834_D as Magic)() // expected-error{{missing argument for parameter #1 in call}}
+
+func fn63834_3() -> String {} // expected-note {{found candidate with type 'String'}}
+func fn63834_3() -> Double {} // expected-note {{found candidate with type 'Double'}}
+
+fn63834_3() as Int // expected-error {{no exact matches in call to global function 'fn63834_3'}}
