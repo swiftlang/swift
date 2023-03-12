@@ -333,6 +333,11 @@ public:
     return visit(E->getSubPattern());
   }
   
+  // Unwrap UnresolvedMemberChainResultExprs.
+  Pattern *visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E) {
+    return visit(E->getSubExpr());
+  }
+  
   // Convert a '_' expression to an AnyPattern.
   Pattern *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     if (E->isImplicit()) {
