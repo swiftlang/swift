@@ -81,23 +81,28 @@ public:
   using Index =
       decltype(reinterpret_cast<Collection *>(0x123)->getStartIndex());
 
-  SWIFT_INLINE_THUNK CollectionIterator(const Collection &c) : collection(c) {
+  SWIFT_INLINE_THUNK CollectionIterator(const Collection &c) noexcept(
+      noexcept(c.getStartIndex()) &&noexcept(c.getEndIndex()))
+      : collection(c) {
     index = collection.getStartIndex();
     endIndex = collection.getEndIndex();
     // FIXME: Begin read access.
   }
 
-  SWIFT_INLINE_THUNK ~CollectionIterator() {
+  SWIFT_INLINE_THUNK ~CollectionIterator() noexcept {
     // FIXME: End read access.
   }
 
-  SWIFT_INLINE_THUNK T operator*() const { return collection[index]; }
-  SWIFT_INLINE_THUNK void operator++() {
+  SWIFT_INLINE_THUNK T operator*() const noexcept(noexcept(collection[index])) {
+    return collection[index];
+  }
+  SWIFT_INLINE_THUNK void operator++() noexcept(noexcept(++index)) {
     ++index;
     // FIXME: assert(index <= endIndex); // No need to go past the end.
   }
 
-  SWIFT_INLINE_THUNK bool operator!=(const IterationEndSentinel &) const {
+  SWIFT_INLINE_THUNK bool
+  operator!=(const IterationEndSentinel &) const noexcept {
     return index != endIndex;
   }
 
