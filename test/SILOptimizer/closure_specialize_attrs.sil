@@ -6,6 +6,10 @@ class C {}
 
 sil [ossa] @getC : $@convention(thin) () -> @owned C
 
+class Storage {}
+
+struct Val {}
+
 // Verify that the argument to the specialized take_closure is still @_eagerMove.
 
 // CHECK-LABEL: sil {{.*}}@$s12take_closure0B04main1CCTf1nc_n : {{.*}}{
@@ -43,4 +47,41 @@ bb0(%0 : $C):
   dealloc_stack %4 : $@noescape @callee_guaranteed (@owned C, @owned C) -> ()
   %retval = tuple()
   return %retval : $()
+}
+
+// =============================================================================
+// rdar://105887096: do not insert a retain inside a read-only function.
+// For now, the specialization is disabled.
+//
+// TODO: A @noescape closure should never be converted to an @owned argument
+// regardless of the function attribute.
+
+// This should not be specialized until we support guaranteed arguments.
+// CHECK-NOT: @$s20takesReadOnlyClosure
+sil private [readonly] @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val {
+bb0(%2 : $@noescape @callee_guaranteed (Val) -> Val):
+  %46 = struct $Val ()
+  %261 = apply %2(%46) : $@noescape @callee_guaranteed (Val) -> Val
+  return %261 : $Val
+}
+
+sil private @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val {
+bb0(%0 : $Val, %1 : @closureCapture $Storage):
+  %46 = struct $Val ()
+  return %46 : $Val
+}
+
+// CHECK-LABEL: sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+// CHECK-NOT: @owned Storage
+// CHECK: apply %{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+// CHECK-LABEL: } // end sil function 'testPassReadOnlyClosure'
+sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+bb0(%0 : $Storage):
+  %176 = function_ref @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %177 = partial_apply [callee_guaranteed] [on_stack] %176(%0) : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %178 = mark_dependence %177 : $@noescape @callee_guaranteed (Val) -> Val on %0 : $Storage
+  %188 = function_ref @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+  %189 = apply %188(%178) : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+  dealloc_stack %177 : $@noescape @callee_guaranteed (Val) -> Val
+  return %189 : $Val
 }
