@@ -471,24 +471,24 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
   // Tuples do not alias non-tuples.
   bool LTyTT = LTy.is<TupleType>();
   bool RTyTT = RTy.is<TupleType>();
-  if ((LTyTT && !RTyTT) || (!LTyTT && RTyTT))
+  if (LTyTT != RTyTT)
     return false;
 
   // Structs do not alias non-structs.
   StructDecl *LTyStruct = LTy.getStructOrBoundGenericStruct();
   StructDecl *RTyStruct = RTy.getStructOrBoundGenericStruct();
-  if ((LTyStruct && !RTyStruct) || (!LTyStruct && RTyStruct))
+  if ((LTyStruct != nullptr) != (RTyStruct != nullptr))
     return false;
 
   // Enums do not alias non-enums.
   EnumDecl *LTyEnum = LTy.getEnumOrBoundGenericEnum();
   EnumDecl *RTyEnum = RTy.getEnumOrBoundGenericEnum();
-  if ((LTyEnum && !RTyEnum) || (!LTyEnum && RTyEnum))
+  if ((LTyEnum != nullptr) != (RTyEnum != nullptr))
     return false;
 
   // Classes do not alias non-classes.
   ClassDecl *RTyClass = RTy.getClassOrBoundGenericClass();
-  if ((LTyClass && !RTyClass) || (!LTyClass && RTyClass))
+  if ((LTyClass != nullptr) != (RTyClass != nullptr))
     return false;
 
   // Classes with separate class hierarchies do not alias.
