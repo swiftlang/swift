@@ -1458,10 +1458,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   //
   // Note: If the transform is ever enabled for patterns - new branch
   // would have to be added to `nameLoc` selection.
-  if (auto last = locator.last()) {
-    if (last->is<LocatorPathElt::PatternMatch>())
-      return functionType;
-  }
+  if (locator.endsWith<LocatorPathElt::PatternMatch>())
+    return functionType;
 
   auto *paramList = funcDecl->getParameters();
   auto paramTypes = functionType->getParams();
@@ -1510,12 +1508,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
 
 /// Determine whether the given locator is for a witness or requirement.
 static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
-  if (auto last = locator.last()) {
-    return last->getKind() == ConstraintLocator::ProtocolRequirement ||
-           last->getKind() == ConstraintLocator::Witness;
-  }
-
-  return false;
+  return locator.endsWith<LocatorPathElt::ProtocolRequirement>() ||
+         locator.endsWith<LocatorPathElt::Witness>();
 }
 
 AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
