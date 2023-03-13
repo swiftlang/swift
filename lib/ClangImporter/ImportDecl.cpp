@@ -2122,25 +2122,6 @@ namespace {
         isNonTrivialPtrAuth = Impl.SwiftContext.SILOpts
                                   .EnableImportPtrauthFieldFunctionPointers &&
                               isNonTrivialDueToAddressDiversifiedPtrAuth(decl);
-        if (!isNonTrivialPtrAuth) {
-          // Note that there is a third predicate related to these,
-          // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
-          // for us because Swift never "trivially default-initializes" a struct
-          // (i.e. uses whatever bits were lying around as an initial value).
-
-          // FIXME: It would be nice to instead import the declaration but mark
-          // it as unavailable, but then it might get used as a type for an
-          // imported function and the developer would be able to use it without
-          // referencing the name, which would sidestep our availability
-          // diagnostics.
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(
-                  diag::record_non_trivial_copy_destroy,
-                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
-              decl->getLocation());
-          return nullptr;
-        }
       }
 
       // Import the name.
@@ -3219,6 +3200,21 @@ namespace {
       return false;
     }
 
+    static ImportTypeKind
+    importTypeKindForRecordFieldObjCLifetime(clang::Qualifiers::ObjCLifetime objCLifetime) {
+      switch (objCLifetime) {
+        case clang::Qualifiers::OCL_None:
+        case clang::Qualifiers::OCL_ExplicitNone:
+          return ImportTypeKind::RecordFieldWithReferenceSemantics;
+        case clang::Qualifiers::OCL_Strong:
+        case clang::Qualifiers::OCL_Weak:
+          return ImportTypeKind::RecordField;
+        // Fields cannot have autoreleasing membership
+        case clang::Qualifiers::OCL_Autoreleasing:
+          llvm_unreachable("invalid ObjC lifetime");
+      }
+    }
+
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Import the name of the function.
       ImportedName importedName;
@@ -3857,20 +3853,21 @@ namespace {
       auto fieldType = decl->getType();
       ImportedType importedType = findOptionSetType(fieldType, Impl);
 
+      auto objcLifetime = decl->getType().getObjCLifetime();
       if (!importedType)
         importedType =
-            Impl.importType(decl->getType(), ImportTypeKind::RecordField,
-                            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                            isInSystemModule(dc), Bridgeability::None,
-                            getImportTypeAttrs(decl));
+          Impl.importType(decl->getType(),
+                          importTypeKindForRecordFieldObjCLifetime(objcLifetime),
+                          ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                          isInSystemModule(dc), Bridgeability::None,
+                          getImportTypeAttrs(decl));
+
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
             decl->getSourceRange().getBegin());
         return nullptr;
       }
-
-      auto type = importedType.getType();
 
       auto result =
         Impl.createDeclWithClangNode<VarDecl>(decl, AccessLevel::Public,
@@ -3886,7 +3883,28 @@ namespace {
       }
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      result->setInterfaceType(type);
+
+      // If struct field is a weak objc object pointer, create a weak storage type
+      // and add the appropriate wrapper to the param
+      if (objcLifetime == clang::Qualifiers::OCL_Weak) {
+        if (auto nullability =
+              decl->getType()->getNullability(Impl.getClangASTContext()))
+        {
+          if (*nullability == clang::NullabilityKind::NonNull) {
+            Impl.addImportDiagnostic(
+                decl, Diagnostic(diag::record_field_weak_nonnull, decl),
+                decl->getSourceRange().getBegin());
+            return nullptr;
+          }
+        }
+
+        auto typeToWrap = importedType.getType();
+        result->setInterfaceType(WeakStorageType::get(typeToWrap->isOptional() ? typeToWrap : typeToWrap->wrapInOptionalType(), Impl.SwiftContext));
+        result->getAttrs().add(new (Impl.SwiftContext) ReferenceOwnershipAttr(ReferenceOwnership::Weak));
+      } else {
+        result->setInterfaceType(importedType.getType());
+      }
+
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
