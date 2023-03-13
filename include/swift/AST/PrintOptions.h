@@ -257,6 +257,10 @@ struct PrintOptions {
   /// Protocols marked with @_show_in_interface are still printed.
   bool SkipUnderscoredStdlibProtocols = false;
 
+  /// Whether to skip unsafe C++ class methods that were renamed
+  /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
+  bool SkipUnsafeCXXMethods = false;
+
   /// Whether to skip extensions that don't add protocols or no members.
   bool SkipEmptyExtensionDecls = true;
 
@@ -642,6 +646,7 @@ struct PrintOptions {
     result.SkipSwiftPrivateClangDecls = true;
     result.SkipPrivateStdlibDecls = true;
     result.SkipUnderscoredStdlibProtocols = true;
+    result.SkipUnsafeCXXMethods = true;
     result.SkipDeinit = true;
     result.EmptyLineBetweenMembers = true;
     result.CascadeDocComment = true;
@@ -756,6 +761,7 @@ struct PrintOptions {
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.SkipPrivateStdlibDecls = true;
+    PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;

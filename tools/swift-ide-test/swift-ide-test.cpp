@@ -682,6 +682,12 @@ SkipUnderscoredStdlibProtocols("skip-underscored-stdlib-protocols",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SkipUnsafeCXXMethods("skip-unsafe-cxx-methods",
+    llvm::cl::desc("Don't print unsafe C++ class methods that were renamed as unsafe"),
+    llvm::cl::cat(Category),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipDocumentationComments("skip-print-doc-comments",
     llvm::cl::desc("Don't print documentation comments from clang module headers"),
     llvm::cl::cat(Category),
@@ -4506,6 +4512,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
     PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
+    PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
     PrintOpts.SkipImports = options::SkipImports;
