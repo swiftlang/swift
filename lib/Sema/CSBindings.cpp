@@ -1931,12 +1931,15 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   if (!Defaults.empty()) {
     out << " [defaults: ";
-    for (const auto &entry : Defaults) {
-      auto *constraint = entry.second;
-      auto defaultBinding =
-          PrintableBinding::exact(constraint->getSecondType());
-      defaultBinding.print(out, PO);
-    }
+    interleave(
+        Defaults,
+        [&](const auto &entry) {
+          auto *constraint = entry.second;
+          auto defaultBinding =
+              PrintableBinding::exact(constraint->getSecondType());
+          defaultBinding.print(out, PO);
+        },
+        [&] { out << ", "; });
     out << "]";
   }
   
