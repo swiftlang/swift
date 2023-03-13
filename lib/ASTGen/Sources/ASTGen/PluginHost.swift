@@ -37,6 +37,35 @@ public func _deinitializePlugin(
   plugin.deinitialize()
 }
 
+/// Load the library plugin in the plugin server.
+@_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
+func swift_ASTGen_pluginServerLoadLibraryPlugin(
+  opaqueHandle: UnsafeMutableRawPointer,
+  libraryPath: UnsafePointer<Int8>,
+  moduleName: UnsafePointer<Int8>,
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+) -> Bool {
+  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  assert(plugin.capability.features?.contains("loadPluginLibrary") == true)
+  let libraryPath = String(cString: libraryPath)
+  let moduleName = String(cString: moduleName)
+  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+
+  do {
+    let result = try plugin.sendMessageAndWait(
+      .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
+    )
+    guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
+      throw PluginError.invalidReponseKind
+    }
+    diagEngine.emit(diagnostics);
+    return loaded
+  } catch {
+    diagEngine.diagnose(error: error)
+    return false
+  }
+}
+
 struct CompilerPlugin {
   let opaqueHandle: UnsafeMutableRawPointer
 
@@ -222,6 +251,14 @@ class PluginDiagnosticsEngine {
     for diagnostic in diagnostics {
       self.emit(diagnostic)
     }
+  }
+
+  func diagnose(error: Error) {
+    self.emitSingle(
+      message: String(describing: error),
+      severity: .error,
+      position: .invalid
+    )
   }
 
   /// Produce the C++ source location for a given position based on a

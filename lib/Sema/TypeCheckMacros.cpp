@@ -72,43 +72,9 @@ extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
 
 extern "C" void swift_ASTGen_initializePlugin(void *handle);
 extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
-
-/// Produce the mangled name for the nominal type descriptor of a type
-/// referenced by its module and type name.
-static std::string mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
-  using namespace Demangle;
-
-  //  kind=Global
-  //    kind=NominalTypeDescriptor
-  //      kind=Type
-  //        kind=Structure|Enum|Class
-  //          kind=Module, text=moduleName
-  //          kind=Identifier, text=typeName
-  Demangle::Demangler D;
-  auto *global = D.createNode(Node::Kind::Global);
-  {
-    auto *nominalDescriptor =
-        D.createNode(Node::Kind::TypeMetadataAccessFunction);
-    {
-      auto *type = D.createNode(Node::Kind::Type);
-      {
-        auto *module = D.createNode(Node::Kind::Module, moduleName);
-        auto *identifier = D.createNode(Node::Kind::Identifier, typeName);
-        auto *structNode = D.createNode(typeKind);
-        structNode->addChild(module, D);
-        structNode->addChild(identifier, D);
-        type->addChild(structNode, D);
-      }
-      nominalDescriptor->addChild(type, D);
-    }
-    global->addChild(nominalDescriptor, D);
-  }
-
-  auto mangleResult = mangleNode(global);
-  assert(mangleResult.isSuccess());
-  return mangleResult.result();
-}
+extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
+    void *handle, const char *libraryPath, const char *moduleName,
+    void *diagEngine);
 
 #if SWIFT_SWIFT_PARSER
 /// Look for macro's type metadata given its external module and type name.
@@ -125,7 +91,7 @@ static void const *lookupMacroTypeMetadataByExternalName(
 
   void *accessorAddr = nullptr;
   for (auto typeKind : typeKinds) {
-    auto symbolName = mangledNameForTypeMetadataAccessor(
+    auto symbolName = Demangle::mangledNameForTypeMetadataAccessor(
         moduleName, typeName, typeKind);
     accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str(), libraryHint);
     if (accessorAddr)
@@ -375,9 +341,23 @@ static Optional<ExternalMacroDefinition>
 resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName) {
 #if SWIFT_SWIFT_PARSER
-  // Find macros in exectuable plugins.
-  auto *executablePlugin =
-      ctx.lookupExecutablePluginByModuleName(moduleName);
+  std::string executablePluginPath;
+  std::string libraryPath;
+
+  // Find macros in executable plugins.
+  if (auto found = ctx.lookupExternalLibraryPluginByModuleName(moduleName)) {
+    // Found in '-external-plugin-path'.
+    std::tie(libraryPath, executablePluginPath) = found.value();
+  } else if (auto found = ctx.lookupExecutablePluginByModuleName(moduleName)) {
+    // Found in '-load-plugin-executable'.
+    executablePluginPath = found->str();
+  }
+  if (executablePluginPath.empty())
+    return None;
+
+  // Launch the plugin.
+  LoadedExecutablePlugin *executablePlugin =
+      ctx.loadExecutablePlugin(executablePluginPath);
   if (!executablePlugin)
     return None;
 
@@ -388,6 +368,21 @@ resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
     executablePlugin->setCleanup([executablePlugin] {
       swift_ASTGen_deinitializePlugin(executablePlugin);
     });
+  }
+
+  // If this is a plugin server. Load the library in that process before
+  // resolving the macro.
+  if (!libraryPath.empty()) {
+    llvm::SmallString<128> resolvedLibraryPath;
+    auto fs = ctx.SourceMgr.getFileSystem();
+    if (fs->getRealPath(libraryPath, resolvedLibraryPath)) {
+      return None;
+    }
+    bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
+        executablePlugin, resolvedLibraryPath.c_str(), moduleName.str().data(),
+        &ctx.Diags);
+    if (!loaded)
+      return None;
   }
 
   if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(

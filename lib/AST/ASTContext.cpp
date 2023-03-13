@@ -67,6 +67,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Config/config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
@@ -6344,15 +6345,34 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   return decl->getDeclaredInterfaceType();
 }
 
-LoadedExecutablePlugin *
+Optional<StringRef>
 ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
   auto &execPluginPaths = getImpl().ExecutablePluginPaths;
   auto found = execPluginPaths.find(moduleName);
   if (found == execPluginPaths.end())
-    return nullptr;
+    return None;
+  return found->second;
+}
 
-  // Let the VFS to map the path.
-  auto &path = found->second;
+Optional<std::pair<std::string, std::string>>
+ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
+  auto fs = this->SourceMgr.getFileSystem();
+  for (auto &pair : SearchPathOpts.ExternalPluginSearchPaths) {
+    StringRef searchPath;
+    StringRef serverPath;
+    std::tie(searchPath, serverPath) = StringRef(pair).split('#');
+
+    SmallString<128> fullPath(searchPath);
+    llvm::sys::path::append(fullPath, "lib" + moduleName.str() + LTDL_SHLIB_EXT);
+
+    if (fs->exists(fullPath)) {
+      return {{std::string(fullPath), serverPath.str()}};
+    }
+  }
+  return None;
+}
+
+LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   SmallString<128> resolvedPath;
   auto fs = this->SourceMgr.getFileSystem();
   if (auto err = fs->getRealPath(path, resolvedPath)) {

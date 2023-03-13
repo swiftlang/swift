@@ -382,6 +382,11 @@ public:
   /// macro implementations.
   std::vector<std::string> PluginSearchPaths;
 
+  /// Paths that contain compiler plugins and the path to the plugin server
+  /// executable.
+  /// e.g. '/path/to/usr/lib/swift/host/plugins#/path/to/usr/bin/plugin-server'.
+  std::vector<std::string> ExternalPluginSearchPaths;
+
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 

@@ -22,7 +22,8 @@ let package = Package(
     .macOS(.v10_15)
   ],
   products: [
-    .library(name: "swiftASTGen", targets: ["swiftASTGen"])
+    .library(name: "swiftASTGen", targets: ["swiftASTGen"]),
+    .library(name: "swiftLLVMJSON", targets: ["swiftLLVMJSON"]),
   ],
   dependencies: [
     .package(path: "../../../swift-syntax")
