@@ -7,7 +7,7 @@
 @_moveOnly
 @objc enum Foo : Int { // expected-error {{@objc enums cannot be marked as move-only}}
   case X, Y, Z
-  deinit {} // objc enums cannot have deinits
+  deinit {} // expected-error {{deinitializers cannot be declared on an @objc enum type}}
 }
 
 @_moveOnly

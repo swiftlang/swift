@@ -9062,14 +9062,23 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   DD->getAttrs() = Attributes;
 
-  // Reject 'destructor' functions outside of structs, enums, and classes.
+  // Reject 'destructor' functions outside of structs, enums, classes, or
+  // extensions that provide objc implementations.
   //
   // Later in the type checker, we validate that structs/enums only do this if
-  // they are move only.
-  auto *nom = dyn_cast<NominalTypeDecl>(CurDeclContext);
-  if (!nom ||
-      (!isa<StructDecl>(nom) && !isa<EnumDecl>(nom) && !isa<ClassDecl>(nom))) {
-    diagnose(DestructorLoc, diag::destructor_decl_outside_class);
+  // they are move only and that @objcImplementations are main-body.
+  auto rejectDestructor = [](DeclContext *dc) {
+    if (isa<StructDecl>(dc) || isa<EnumDecl>(dc) ||
+        isa<ClassDecl>(dc))
+      return false;
+
+    if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+      return !ED->isObjCImplementation();
+
+    return true;
+  };
+  if (rejectDestructor(CurDeclContext)) {
+    diagnose(DestructorLoc, diag::destructor_decl_outside_class_or_noncopyable);
 
     // Tell the type checker not to touch this destructor.
     DD->setInvalid();
