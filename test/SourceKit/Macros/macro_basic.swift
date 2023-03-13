@@ -1,7 +1,7 @@
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
 func testStringify(a: Int, b: Int) {
-  _ = #stringify(a + b)
+  _ = #stringify(a + b).1
 }
 
 @attached(memberAttribute)
@@ -242,10 +242,10 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // RUN: %sourcekitd-test -req=doc-info %s -- ${COMPILER_ARGS_WITHOUT_SOURCE[@]} | %FileCheck -check-prefix=DOCINFO %s
 // DOCINFO: key.name: "myTypeWrapper()"
 // DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
-// DOCINFO-NEXT: key.offset: 621
+// DOCINFO-NEXT: key.offset: 623
 // DOCINFO: key.name: "myTypeWrapper()"
 // DOCINFO-NEXT: key.usr: "s:9MacroUser13myTypeWrapperyycfm"
-// DOCINFO-NEXT: key.offset: 250
+// DOCINFO-NEXT: key.offset: 252
 
 //##-- Formatting shouldn't include the added attribute (or crash)
 // RUN: %sourcekitd-test -req=format -line=23 -length=1 %s | %FileCheck -check-prefix=FORMATTED %s
