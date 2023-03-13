@@ -107,14 +107,12 @@ public:
   /// \see AccessScope::checkAccessUsingAccessScope
   /// \see DeclContext::ASTHierarchy
   bool isChildOf(AccessScope AS) const {
-    if (isPackage()) { // This needs to be checked first before isInContext
-      return AS.isPublic();
-    } else if (isInContext()) {
+    if (isInContext()) {
       if (AS.isInContext())
         return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
       else
         return AS.isPublic();
-    } else { // It's public, so can't be a child of the argument scope
+    } else { // It's public, so can't be a child of public or less argument scope
       return false;
     }
   }
