@@ -246,6 +246,8 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   // Swift libraries that usually have autolink directives
   // in most object files
   std::unordered_map<std::string, bool> SwiftRuntimeLibraries = {
+      // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
+      {"-lXCTest", false},
       // Common Swift runtime libs
       {"-lswiftSwiftOnoneSupport", false},
       {"-lswiftCore", false},
@@ -269,8 +271,6 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       {"-lcurl", false},
       {"-lxml2", false},
       {"-luuid", false},
-      // XCTest runtime libs (due to an RPATH bug, this must come after Foundation)
-      {"-lXCTest", false},
       // ICU Swift runtime libs
       {"-licui18nswift", false},
       {"-licuucswift", false},
