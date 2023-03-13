@@ -244,14 +244,41 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 
   // Keep track of whether we've already added the common
   // Swift libraries that ususally have autolink directives
-  // in most object fiels
+  // in most object files
   std::unordered_map<std::string, bool> SwiftRuntimeLibraries = {
+      // Common Swift runtime libs
       {"-lswiftSwiftOnoneSupport", false},
       {"-lswiftCore", false},
       {"-lswift_Concurrency", false},
       {"-lswift_StringProcessing", false},
+      {"-lswift_RegexBuilder", false},
       {"-lswift_RegexParser", false},
       {"-lswift_Backtracing", false},
+      {"-lswiftGlibc", false},
+      {"-lBlocksRuntime", false},
+      // Dispatch-specific Swift runtime libs
+      {"-ldispatch", false},
+      {"-lDispatchStubs", false},
+      {"-lswiftDispatch", false},
+      // CoreFoundation and Foundation Swift runtime libs
+      {"-lCoreFoundation", false},
+      {"-lFoundation", false},
+      {"-lFoundationNetworking", false},
+      {"-lFoundationXML", false},
+      // Foundation support libs
+      {"-lcurl", false},
+      {"-lxml2", false},
+      {"-luuid", false},
+      // ICU Swift runtime libs
+      {"-licui18nswift", false},
+      {"-licuucswift", false},
+      {"-licudataswift", false},
+      // Common-use ordering-agnostic Linux system libs
+      {"-lm", false},
+      {"-lpthread", false},
+      {"-lutil", false},
+      {"-ldl", false},
+      {"-lz", false},
   };
 
   // Extract the linker flags from the objects.
