@@ -3646,7 +3646,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
-  assert(getFormalAccess() <= AccessLevel::Internal);
+  assert(getFormalAccess() < AccessLevel::Public);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -3767,7 +3767,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      access <= AccessLevel::Internal &&
+      access < AccessLevel::Public &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
@@ -4073,8 +4073,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
       // marked 'public' if the protocol was '@_versioned' (now
       // '@usableFromInline'). Which works at the ABI level, so let's keep
       // supporting that here by explicitly checking for it.
+      auto protoAccess = proto->getFormalAccess();
       if (access == AccessLevel::Public &&
-          proto->getFormalAccess() == AccessLevel::Internal &&
+          (protoAccess == AccessLevel::Internal || protoAccess == AccessLevel::Package) &&
           proto->isUsableFromInline()) {
         return true;
       }

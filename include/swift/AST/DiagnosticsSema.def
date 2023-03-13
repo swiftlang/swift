@@ -2439,10 +2439,10 @@ WARNING(protocol_access_warn,none,
         (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 ERROR(protocol_usable_from_inline,none,
       "protocol %select{refined|used}0 by '@usableFromInline' protocol "
-      "must be '@usableForInline' or public", (bool))
+      "must be '@usableFromInline' or public", (bool))
 WARNING(protocol_usable_from_inline_warn,none,
         "protocol %select{refined|used}0 by '@usableFromInline' protocol "
-        "should be '@usableForInline' or public", (bool))
+        "should be '@usableFromInline' or public", (bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "protocols cannot require properties to be immutable; declare read-only "
       "properties by using 'var' with a '{ get }' specifier", ())
@@ -6162,7 +6162,7 @@ ERROR(frozen_attr_on_internal_type,
       (DeclName, AccessLevel))
 
 ERROR(usable_from_inline_attr_with_explicit_access,
-      none, "'@usableFromInline' attribute can only be applied to internal "
+      none, "'@usableFromInline' attribute can only be applied to internal or package "
       "declarations, but %0 is %select{private|fileprivate|%error|package|public|open}1",
       (DeclName, AccessLevel))
 

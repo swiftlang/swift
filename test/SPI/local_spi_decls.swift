@@ -1,10 +1,10 @@
 // Checks for SPI declarations and limited exportability.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5 -package-name myPkg
 
 // Without -enable-library-evolution the exportability check looks at struct internal properties.
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5 -package-name myPkg
 
 // SPI declarations
 @_spi(MySPI) public func spiFunc() {}
@@ -120,3 +120,7 @@ public func inlinableSPI() {
   spiFunc()
   let _ = SPIClass()
 }
+
+@_spi(S) func internalFunc() {} // expected-error {{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
+
+@_spi(S) package func packageFunc() {} // expected-error {{package global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}

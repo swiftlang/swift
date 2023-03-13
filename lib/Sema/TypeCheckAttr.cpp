@@ -2886,8 +2886,9 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
     return;
   }
 
-  // @usableFromInline can only be applied to internal declarations.
-  if (VD->getFormalAccess() != AccessLevel::Internal) {
+  // @usableFromInline can only be applied to internal or package declarations.
+  if (VD->getFormalAccess() != AccessLevel::Internal &&
+      VD->getFormalAccess() != AccessLevel::Package) {
     diagnoseAndRemoveAttr(attr,
                           diag::usable_from_inline_attr_with_explicit_access,
                           VD->getName(), VD->getFormalAccess());
