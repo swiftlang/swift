@@ -28,6 +28,27 @@
 
 using namespace swift;
 
+static bool addMissingImport(SourceLoc loc, const Decl *D,
+                             const ExportContext &where) {
+  ASTContext &ctx = where.getDeclContext()->getASTContext();
+  ModuleDecl *M = D->getModuleContext();
+  auto *SF = where.getDeclContext()->getParentSourceFile();
+
+  // Only add imports of API level modules if this is an API level module.
+  if (M->getLibraryLevel() != LibraryLevel::API &&
+      SF->getParentModule()->getLibraryLevel() == LibraryLevel::API)
+    return false;
+
+  // Hack to fix swiftinterfaces in case of missing imports. We can get rid of
+  // this logic when we don't leak the use of non-locally imported things in
+  // API.
+  auto missingImport = ImportedModule(ImportPath::Access(),
+                                      const_cast<ModuleDecl *>(M));
+  SF->addMissingImportedModule(missingImport);
+  ctx.Diags.diagnose(loc, diag::missing_import_inserted, M->getName());
+  return true;
+}
+
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  const ExportContext &where) {
@@ -184,8 +205,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   if (originKind == DisallowedOriginKind::MissingImport &&
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
-    ctx.Diags.diagnose(loc, diag::missing_import_inserted,
-                       definingModule->getName());
+    addMissingImport(loc, D, where);
 
   return true;
 }
@@ -202,7 +222,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
-  ASTContext &ctx = definingModule->getASTContext();
+  ASTContext &ctx = where.getDeclContext()->getASTContext();
 
   auto fragileKind = where.getFragileFunctionKind();
   auto reason = where.getExportabilityReason();
@@ -236,8 +256,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
 
     if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)
-      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
-                         definingModule->getName());
+      addMissingImport(loc, D, where);
   }
 
   return true;
@@ -296,9 +315,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                originKind == DisallowedOriginKind::MissingImport,
                                6);
 
-    if (originKind == DisallowedOriginKind::MissingImport &&
-        !ctx.LangOpts.isSwiftVersionAtLeast(6))
-      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
-                         M->getName());
+  if (originKind == DisallowedOriginKind::MissingImport &&
+      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+    addMissingImport(loc, ext, where);
+
   return true;
 }

@@ -3115,21 +3115,6 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
 
-  if (importKind == RestrictedImportKind::MissingImport &&
-      (module->getLibraryLevel() == LibraryLevel::API ||
-       getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
-    // Hack to fix swiftinterfaces in case of missing imports.
-    // We can get rid of this logic when we don't leak the use of non-locally
-    // imported things in API.
-    ImportPath::Element pathElement = {module->getName(), SourceLoc()};
-    auto pathArray = getASTContext().AllocateCopy(
-                       llvm::makeArrayRef(pathElement));
-    auto missingImport = ImportedModule(
-                           ImportPath::Access(pathArray),
-                           const_cast<ModuleDecl *>(module));
-    addMissingImportedModule(missingImport);
-  }
-
   return importKind;
 }
 
