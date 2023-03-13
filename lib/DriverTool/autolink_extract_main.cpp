@@ -243,7 +243,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   std::vector<std::string> LinkerFlags;
 
   // Keep track of whether we've already added the common
-  // Swift libraries that ususally have autolink directives
+  // Swift libraries that usually have autolink directives
   // in most object files
   std::unordered_map<std::string, bool> SwiftRuntimeLibraries = {
       // Common Swift runtime libs
