@@ -422,8 +422,10 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
       "initializers cannot have a result type", ())
 
 // Destructor
-ERROR(destructor_decl_outside_class,none,
-      "deinitializers may only be declared within a class or actor", ())
+ERROR(destructor_decl_outside_class_or_noncopyable,none,
+      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+ERROR(destructor_decl_on_objc_enum,none,
+      "deinitializers cannot be declared on an @objc enum type", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
