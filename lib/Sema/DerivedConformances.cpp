@@ -524,7 +524,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
   getterDecl->copyFormalAccessFrom(property);
 
-
   return getterDecl;
 }
 

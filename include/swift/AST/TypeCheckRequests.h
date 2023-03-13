@@ -1220,7 +1220,7 @@ private:
 
 public:
     // Caching
-    bool isCached() const { return true; }
+    bool isCached() const { return false; }
 };
 
 /// Obtain the constructor of the 'RemoteCallTarget' type.

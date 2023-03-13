@@ -424,31 +424,32 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 /******************************* PROPERTIES ***********************************/
 /******************************************************************************/
 
-// TODO(distributed): make use of this after all, but FORCE it?
-static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-  assert(derived.Nominal->isDistributedActor());
-  auto &C = derived.Context;
-
-  // ```
-  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
-  // ```
-  auto propertyType = getDistributedActorIDType(derived.Nominal);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
-
-  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
-  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-  return propDecl;
-}
+//// TODO(distributed): make use of this after all, but FORCE it?
+//static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
+//  assert(derived.Nominal->isDistributedActor());
+//  auto &C = derived.Context;
+//
+//  // ```
+//  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
+//  // ```
+//  auto propertyType = getDistributedActorIDType(derived.Nominal);
+//
+//  VarDecl *propDecl;
+//  PatternBindingDecl *pbDecl;
+//  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+//      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
+//      propertyType,
+//      /*isStatic=*/false, /*isFinal=*/true);
+//
+//  // mark as nonisolated, allowing access to it from everywhere
+//  propDecl->getAttrs().add(
+//      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+//
+//  fprintf(stderr, "[%s:%d](%s) INSERT ID: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
+//  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
+//  return propDecl;
+//}
 
 static ValueDecl *deriveDistributedActor_actorSystem(
     DerivedConformance &derived) {
@@ -479,15 +480,17 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   // we don't allocate memory after those two fields, so their order is very
   // important. The `hint` below makes sure the system is inserted right after.
   if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
+    fprintf(stderr, "[%s:%d](%s) INSERT SYSTEM: AFTER ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
+    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
   } else {
     // `id` will be synthesized next, and will insert at head,
     // so in order for system to be SECOND (as it must be),
     // we'll insert at head right now and as id gets synthesized we'll get
     // the correct order: id, actorSystem.
-    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
+    fprintf(stderr, "[%s:%d](%s) INSERT SYSTEM: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
+    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
   }
 
   return propDecl;
@@ -707,12 +710,34 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
       derived.addGetterToReadOnlyDerivedProperty(property, executorType);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
 
-  derived.addMembersToConformanceContext(
-      { property, propertyPair.second, });
+  // IMPORTANT: MUST BE AFTER [id, actorSystem].
+  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
+    if (auto system = derived.Nominal->getDistributedActorSystemProperty()) {
+      // good, we must be after the system; this is the final order
+      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: AFTER SYSTEM\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      system->dump();
+      derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/system);
+      derived.addMemberToConformanceContext(property, /*hint=*/system);
+    } else {
+      // system was not yet synthesized, it'll insert after id and we'll be okey
+      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: AFTER ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/id);
+      derived.addMemberToConformanceContext(property, /*hint=*/id);
+    }
+  } else {
+    // nor id or system synthesized yet, id will insert first and system will be after it
+      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    derived.addMemberToConformanceContext(propertyPair.second, /*insertAtHead==*/true);
+    derived.addMemberToConformanceContext(property, /*insertAtHead==*/true);
+  }
+
+  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  derived.Nominal->dump();
+  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+
   return property;
 }
-
-
 
 /******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
@@ -725,14 +750,57 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
-    if (var->getName() == Context.Id_id)
-      return deriveDistributedActor_id(*this);
+    ValueDecl *derivedValue = nullptr;
+//    if (var->getName() == Context.Id_id) {
+//      fprintf(stderr, "[%s:%d](%s) DERIVE ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      derivedValue = deriveDistributedActor_id(*this);
+//    } else
+  //  NOTE: `id` is implemented in addImplicitDistributedActorIDProperty
 
-    if (var->getName() == Context.Id_actorSystem)
-      return deriveDistributedActor_actorSystem(*this);
+    if (var->getName() == Context.Id_actorSystem) {
+      fprintf(stderr, "[%s:%d](%s) DERIVE SYS\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      derivedValue = deriveDistributedActor_actorSystem(*this);
+    } else if (var->getName() == Context.Id_unownedExecutor) {
+      fprintf(stderr, "[%s:%d](%s) DERIVE EX\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      derivedValue = deriveDistributedActor_unownedExecutor(*this);
+    }
 
-    if (var->getName() == Context.Id_unownedExecutor)
-      return deriveDistributedActor_unownedExecutor(*this);
+    if (derivedValue) {
+      if (auto id = Nominal->getDistributedActorIDProperty()) {
+        if (auto system = Nominal->getDistributedActorSystemProperty()) {
+          if (auto classDecl = dyn_cast<ClassDecl>(Nominal)) {
+            if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+              int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
+              int idx = 0;
+              for (auto member : Nominal->getMembers()) {
+                if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
+                  fprintf(stderr, "[%s:%d](%s) member = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+                  member->dump();
+                  if (binding->getSingleVar()->getName() == Context.Id_id) {
+                    idIdx = idx;
+                  } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
+                    actorSystemIdx = idx;
+                  } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
+                    unownedExecutorIdx = idx;
+                  }
+                  idx += 1;
+                }
+              }
+              if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+                fprintf(stderr, "[%s:%d](%s) ******************************************************************************************\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+                Nominal->dump();
+                fprintf(stderr, "[%s:%d](%s) ******************************************************************************************\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+                fprintf(stderr, "[%s:%d](%s) member == id  = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, idIdx);
+                fprintf(stderr, "[%s:%d](%s) member == sys = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, actorSystemIdx);
+                fprintf(stderr, "[%s:%d](%s) member == ex  = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, unownedExecutorIdx);
+//                assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+              }
+            }
+          }
+        }
+      }
+      return derivedValue;
+    }
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
@@ -750,6 +818,7 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
     AssociatedTypeDecl *assocType) {
   if (!canDeriveDistributedActor(Nominal, cast<DeclContext>(ConformanceDecl)))
     return std::make_pair(Type(), nullptr);
+
 
   if (assocType->getName() == Context.Id_ActorSystem) {
     return std::make_pair(deriveDistributedActorType_ActorSystem(*this),
