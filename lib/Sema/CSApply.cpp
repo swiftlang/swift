@@ -5869,7 +5869,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     ArgumentList *args, AnyFunctionType *funcType, ConcreteDeclRef callee,
     ApplyExpr *apply, ConstraintLocatorBuilder locator,
     ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
-  assert(locator.last() && locator.last()->is<LocatorPathElt::ApplyArgument>());
+  assert(locator.endsWith<LocatorPathElt::ApplyArgument>());
 
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
@@ -7290,8 +7290,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     /// Whether the given effect is polymorphic at this location.
     auto isEffectPolymorphic = [&](EffectKind kind) -> bool {
-      auto last = locator.last();
-      if (!(last && last->is<LocatorPathElt::ApplyArgToParam>()))
+      if (!locator.endsWith<LocatorPathElt::ApplyArgToParam>())
         return false;
 
       if (auto *call = getAsExpr<ApplyExpr>(locator.getAnchor())) {

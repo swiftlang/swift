@@ -1411,8 +1411,7 @@ bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
 }
 
 bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
-  auto last = locator.last();
-  if (!(last && last->is<LocatorPathElt::Condition>()))
+  if (!locator.endsWith<LocatorPathElt::Condition>())
     return false;
 
   SmallVector<LocatorPathElt, 4> path;
