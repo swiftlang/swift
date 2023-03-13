@@ -2377,6 +2377,11 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
   // match the type of the original `differentiable_function_extract`,
   // create a `convert_function`.
   if (newValue->getType() != DFEI->getType()) {
+    CanSILFunctionType opTI = newValue->getType().castTo<SILFunctionType>();
+    CanSILFunctionType resTI = DFEI->getType().castTo<SILFunctionType>();
+    if (!opTI->isABICompatibleWith(resTI, *DFEI->getFunction()).isCompatible())
+      return nullptr;
+
     std::tie(newValue, std::ignore) =
       castValueToABICompatibleType(&Builder, DFEI->getLoc(),
                                    newValue,
