@@ -531,7 +531,7 @@ extension Actor {
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping (isolated Self) async -> Void
   ) {
     let flags = taskCreateFlags(
-            priority: nil, isChildTask: false, copyTaskLocals: false,
+            priority: nil, isChildTask: false, copyTaskLocals: true,
             inheritContext: true, enqueueJob: false,
             addPendingGroupTaskUnconditionally: false)
 
