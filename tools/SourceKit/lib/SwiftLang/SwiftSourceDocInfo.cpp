@@ -689,7 +689,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   Symbol.ModuleName = FullName;
   if (auto IFaceGenRef = IFaceGenContexts.find(Symbol.ModuleName, Invok))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
-  Symbol.IsSystem = Mod.isSystemModule();
+  Symbol.IsSystem = Mod.isNonUserModule();
   if (auto MD = Mod.getAsSwiftModule()) {
     ide::collectModuleGroups(const_cast<ModuleDecl *>(MD), ModuleGroups);
     Symbol.ModuleGroupArray = llvm::makeArrayRef(ModuleGroups);
@@ -1064,8 +1064,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           SwiftLangSupport::getUIDForDeclLanguage(FI.VD),
           swift::getAccessLevelSpelling(FI.VD->getFormalAccess()), Filename,
           getModuleName(FI.VD, Allocator),
-          FI.VD->getModuleContext()->isSystemModule(),
-          FI.VD->isSPI(),
+          FI.VD->getModuleContext()->isNonUserModule(), FI.VD->isSPI(),
           copyArray(Allocator, llvm::makeArrayRef(FIParents)));
     }
     Symbol.ReferencedSymbols = copyArray(Allocator,
@@ -1143,7 +1142,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.ReceiverUSRs = copyAndClearArray(Allocator, Strings);
 
-  Symbol.IsSystem = DInfo.VD->getModuleContext()->isSystemModule();
+  Symbol.IsSystem = DInfo.VD->getModuleContext()->isNonUserModule();
   Symbol.IsDynamic = DInfo.IsDynamic;
   Symbol.IsSynthesized = DInfo.VD->isImplicit();
 
