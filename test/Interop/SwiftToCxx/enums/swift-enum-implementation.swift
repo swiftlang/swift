@@ -116,7 +116,7 @@ public struct S {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int getTen() const SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void printSelf() const SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
 // CHECK-NEXT: private:
-// CHECK:        SWIFT_INLINE_THUNK char * _Nonnull _destructiveProjectEnumData() {
+// CHECK:        SWIFT_INLINE_THUNK char * _Nonnull _destructiveProjectEnumData() noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -128,7 +128,7 @@ public struct S {
 // CHECK-NEXT:     enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), metadata._0);
 // CHECK-NEXT:     return _getOpaquePointer();
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void _destructiveInjectEnumTag(unsigned tag) {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void _destructiveInjectEnumTag(unsigned tag) noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -139,7 +139,7 @@ public struct S {
 // CHECK-NEXT:     const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:     enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK unsigned _getEnumTag() const {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK unsigned _getEnumTag() const noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__

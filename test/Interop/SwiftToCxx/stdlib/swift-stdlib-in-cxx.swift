@@ -29,9 +29,9 @@
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK ~Array() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ~Array() noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
 // CHECK: }
 // CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) SWIFT_SYMBOL({{.*}});
@@ -53,9 +53,9 @@
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK ~Optional() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ~Optional() noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK Optional(const Optional &other) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK Optional(const Optional &other) noexcept {
 // CHECK: }
 // CHECK:   enum class cases {
 // CHECK-NEXT: some SWIFT_SYMBOL({{.*}}),
@@ -67,11 +67,11 @@
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) String final {
 // CHECK-NEXT: public:
-// CHECK-NEXT: SWIFT_INLINE_THUNK ~String() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK ~String() noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) {
+// CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String(String &&) { abort(); }
+// CHECK-NEXT:  SWIFT_INLINE_THUNK String(String &&) noexcept { abort(); }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
@@ -104,7 +104,7 @@
 // CHECK-NEXT: private:
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
-// CHECK:  SWIFT_INLINE_THUNK UTF8View(UTF8View &&) { abort(); }
+// CHECK:  SWIFT_INLINE_THUNK UTF8View(UTF8View &&) noexcept { abort(); }
 // CHECK-NEXT: SWIFT_INLINE_THUNK String_Index getStartIndex() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK String_Index getEndIndex() const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Optional<String_Index> indexOffsetByLimitedBy(const String_Index& i, swift::Int n, const String_Index& limit) const SWIFT_SYMBOL({{.*}});
