@@ -2624,6 +2624,11 @@ namespace {
             decl->getLocation());
         return nullptr;
       }
+      if (semanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
+        // FIXME: add a diagnostic here for unsupported imported use of Swift
+        // type?
+        return nullptr;
+      }
 
       auto result = VisitRecordDecl(decl);
       if (!result)

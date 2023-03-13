@@ -1433,6 +1433,20 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
                                        AbstractionPattern origType,
                                        CanType substType,
                                        const TypeLowering &substTL) {
+  // If this is a native Swift class that's passed directly to C/C++, treat it
+  // as indirect.
+  if (origType.isClangType()) {
+    if (auto *classDecl = substType->lookThroughAllOptionalTypes()
+                              ->getClassOrBoundGenericClass()) {
+      if (!classDecl->isForeignReferenceType()) {
+        if (origType.getClangType()
+                ->getUnqualifiedDesugaredType()
+                ->getAsCXXRecordDecl())
+          return true;
+      }
+    }
+  }
+
   // If the C type of the argument is a const pointer, but the Swift type
   // isn't, treat it as indirect.
   if (origType.isClangType()
@@ -3301,6 +3315,23 @@ public:
   ParameterConvention getIndirectParameter(unsigned index,
                             const AbstractionPattern &type,
                            const TypeLowering &substTL) const override {
+    if (type.isClangType()) {
+      if (type.getClangType()
+              ->getUnqualifiedDesugaredType()
+              ->getAsCXXRecordDecl()) {
+        auto t = substTL.getLoweredType().getASTType();
+        if (auto *classDecl = t.getPointer()
+                                  ->lookThroughAllOptionalTypes()
+                                  ->getClassOrBoundGenericClass()) {
+          if (!classDecl->isForeignReferenceType()) {
+            assert(!classDecl->hasClangNode() &&
+                   "unexpected imported class type in C function");
+            assert(!classDecl->isGeneric());
+            return ParameterConvention::Indirect_In_Guaranteed;
+          }
+        }
+      }
+    }
     return getIndirectCParameterConvention(getParamType(index));
   }
 
@@ -3328,6 +3359,20 @@ public:
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
       return ResultConvention::Unowned;
+    if (FnType->getReturnType()
+            ->getUnqualifiedDesugaredType()
+            ->getAsCXXRecordDecl()) {
+      auto t = tl.getLoweredType().getASTType();
+      if (auto *classDecl = t.getPointer()
+                                ->lookThroughAllOptionalTypes()
+                                ->getClassOrBoundGenericClass()) {
+        assert(!classDecl->hasClangNode() &&
+               "unexpected imported class type in C function");
+        assert(!classDecl->isGeneric());
+        return ResultConvention::Owned;
+      }
+    }
+
     return ResultConvention::Autoreleased;
   }
 
