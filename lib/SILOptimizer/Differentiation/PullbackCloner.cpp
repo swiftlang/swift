@@ -2541,7 +2541,6 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         auto concreteBBArgAdjCopy =
           builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
         for (auto pair : incomingValues) {
-          pair.second->dump();
           auto *predBB = std::get<0>(pair);
           auto incomingValue = std::get<1>(pair);
           // Handle `switch_enum` on `Optional`.
