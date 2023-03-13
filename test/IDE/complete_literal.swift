@@ -1,13 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL1 | %FileCheck %s -check-prefix=LITERAL1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | %FileCheck %s -check-prefix=LITERAL2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | %FileCheck %s -check-prefix=LITERAL3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL4 | %FileCheck %s -check-prefix=LITERAL4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL5 | %FileCheck %s -check-prefix=LITERAL5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL6 | %FileCheck %s -check-prefix=LITERAL6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL7 | %FileCheck %s -check-prefix=LITERAL7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL8 | %FileCheck %s -check-prefix=LITERAL8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL9 | %FileCheck %s -check-prefix=LITERAL9
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL10 | %FileCheck %s -check-prefix=LITERAL10
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 {
   1.#^LITERAL1^#

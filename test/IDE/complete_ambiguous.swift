@@ -424,11 +424,10 @@ CreateThings {
     }
 }
 
-// FIXME: No results in multi-statement closure with erroreous sibling result builder element
 CreateThings {
     Thing { point in
       print("hello")
-      point.#^MULTICLOSURE_FUNCBUILDER_FIXME?check=NORESULTS^#
+      point.#^MULTICLOSURE_FUNCBUILDER_FIXME?check=POINT_MEMBER^#
     }
     Thing. // ErrorExpr
 }
