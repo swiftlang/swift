@@ -269,6 +269,8 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       {"-lcurl", false},
       {"-lxml2", false},
       {"-luuid", false},
+      // XCTest runtime libs (due to an RPATH bug, this must come after Foundation)
+      {"-lXCTest", false},
       // ICU Swift runtime libs
       {"-licui18nswift", false},
       {"-licuucswift", false},
