@@ -2392,7 +2392,6 @@ NodePointer Demangler::demangleArchetype() {
     NodePointer PatternTy = popTypeAndGetChild();
     NodePointer PackExpansionTy = createType(
           createWithChildren(Node::Kind::PackExpansion, PatternTy, CountTy));
-    addSubstitution(PackExpansionTy);
     return PackExpansionTy;
   }
   case 'P':

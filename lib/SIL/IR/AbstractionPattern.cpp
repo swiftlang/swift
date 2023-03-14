@@ -79,7 +79,12 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   auto sig = var->getDeclContext()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto swiftType = sig.getReducedType(var->getInterfaceType());
+
+  auto interfaceType = var->getInterfaceType();
+  if (auto *packExpansionType = interfaceType->getAs<PackExpansionType>())
+    interfaceType = packExpansionType->getPatternType();
+
+  auto swiftType = sig.getReducedType(interfaceType);
 
   if (isNonObjC)
     return AbstractionPattern(sig, swiftType);
