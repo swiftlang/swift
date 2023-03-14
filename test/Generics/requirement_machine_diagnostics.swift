@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
-// REQUIRES: rdar106457182
-
 func testInvalidConformance() {
   // expected-error@+1 {{type 'T' constrained to non-protocol, non-class type 'Int'}}
   func invalidIntConformance<T>(_: T) where T: Int {}
