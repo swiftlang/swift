@@ -13,6 +13,7 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }

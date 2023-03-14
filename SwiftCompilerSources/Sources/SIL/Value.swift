@@ -13,6 +13,7 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
   var type: Type { get }
