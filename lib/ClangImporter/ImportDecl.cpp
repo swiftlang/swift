@@ -4288,9 +4288,7 @@ namespace {
 
     template <typename T, typename U>
     T *resolveSwiftDeclImpl(const U *decl, Identifier name,
-                            bool hasKnownSwiftName, ModuleDecl *module,
-                            bool allowObjCMismatchFallback,
-                            bool cacheResult) {
+                            bool hasKnownSwiftName, ModuleDecl *overlay) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
@@ -4322,7 +4320,7 @@ namespace {
 
       // First look at Swift types with the same name.
       SmallVector<ValueDecl *, 4> swiftDeclsByName;
-      module->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
+      overlay->lookupValue(name, NLKind::QualifiedLookup, swiftDeclsByName);
       T *found = nullptr;
       for (auto result : swiftDeclsByName) {
         if (auto singleResult = dyn_cast<T>(result)) {
@@ -4344,7 +4342,14 @@ namespace {
         SmallVector<Decl *, 4> matchingTopLevelDecls;
 
         // Get decls with a matching @objc attribute
-        module->lookupTopLevelDeclsByObjCName(matchingTopLevelDecls, name);
+        overlay->getTopLevelDeclsWhereAttributesMatch(
+          matchingTopLevelDecls,
+          [&name](const DeclAttributes attrs) -> bool {
+            if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
+              if (auto objcName = objcAttr->getName())
+                return objcName->getSimpleName() == name;
+            return false;
+          });
 
         // Filter by decl kind
         for (auto result : matchingTopLevelDecls) {
@@ -4356,7 +4361,7 @@ namespace {
         }
       }
 
-      if (!found && allowObjCMismatchFallback) {
+      if (!found) {
         // Go back to the first list and find classes with matching Swift names
         // *even if the ObjC name doesn't match.*
         // This shouldn't be allowed but we need it for source compatibility;
@@ -4374,7 +4379,7 @@ namespace {
         }
       }
 
-      if (found && cacheResult)
+      if (found)
         Impl.ImportedDecls[{decl->getCanonicalDecl(),
                             getActiveSwiftVersion()}] = found;
 
@@ -4385,81 +4390,27 @@ namespace {
     T *resolveSwiftDecl(const U *decl, Identifier name,
                         bool hasKnownSwiftName, ClangModuleUnit *clangModule) {
       if (auto overlay = clangModule->getOverlayModule())
-        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay,
-                                       /*allowObjCMismatchFallback*/ true, /*cacheResult*/ true);
+        return resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, overlay);
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
-          if (T *result =
-                  resolveSwiftDeclImpl<T>(decl, name, hasKnownSwiftName, owner,
-                                          /*allowObjCMismatchFallback*/ true, /*cacheResult*/ true))
+          if (T *result = resolveSwiftDeclImpl<T>(decl, name,
+                                                  hasKnownSwiftName, owner))
             return result;
         }
       }
-      return nullptr;
-    }
-
-    /// Given some forward declared Objective-C type `\@class Foo` or `\@protocol Bar`, this
-    /// method attempts to find a matching @objc annotated Swift declaration `@objc class Foo {}`
-    /// or `@objc protocol Bar {}`, in an imported Swift module. That is if the Clang node is in
-    /// a Clang module, the Swift overlay for that module does not count as "non-local". Similarly,
-    /// if the Clang node is in a bridging header, any owners of that header also do not count as
-    /// "non-local". This is intended to find @objc exposed Swift declarations in a different module
-    /// that share the name as the forward declaration.
-    ///
-    /// Pass \p hasKnownSwiftName when the Clang declaration is annotated with NS_SWIFT_NAME or similar,
-    /// such that the @objc provided name is known.
-    template <typename T, typename U>
-    T* hasNonLocalNativeSwiftDecl(U *decl, Identifier name, bool hasKnownSwiftName) {
-      assert(!decl->hasDefinition() && "This method is only intended to be used on incomplete Clang types");
-
-      // We intentionally do not consider if the declaration has a clang::ExternalSourceSymbolAttr
-      // attribute, since we can't know if the corresponding Swift definition is "local" (ie.
-      // in the overlay or bridging header owner) or not.
-
-      // Check first if the Swift definition is "local"
-      auto owningClangModule = Impl.getClangModuleForDecl(decl, /*allowForwardDeclaration*/ true);
-      if (owningClangModule && resolveSwiftDecl<T>(decl, name, hasKnownSwiftName, owningClangModule))
-        return nullptr;
-
-      // If not, check all imported Swift modules for a definition
-      if (auto mainModule = Impl.SwiftContext.MainModule) {
-        llvm::SmallVector<ValueDecl *> results;
-        llvm::SmallVector<ImportedModule> importedModules;
-
-        ModuleDecl::ImportFilter moduleImportFilter = ModuleDecl::ImportFilterKind::Default;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::Exported;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay;
-
-        mainModule->getImportedModules(importedModules, moduleImportFilter);
-
-        for (auto &import : importedModules) {
-          if (import.importedModule->isNonSwiftModule())
-            continue;
-
-          if (T *result = resolveSwiftDeclImpl<T>(
-                  decl, name, hasKnownSwiftName, import.importedModule,
-                  /*allowObjCMismatchFallback*/ false, /*cacheResult*/ false))
-            return result;
-        }
-      }
-
       return nullptr;
     }
 
     template <typename T, typename U>
     bool hasNativeSwiftDecl(const U *decl, Identifier name,
-                            const DeclContext *dc, T *&swiftDecl,
-                            bool hasKnownSwiftName = true) {
+                            const DeclContext *dc, T *&swiftDecl) {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
       auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-      swiftDecl = resolveSwiftDecl<T>(decl, name, hasKnownSwiftName,
+      swiftDecl = resolveSwiftDecl<T>(decl, name, /*hasCustomSwiftName=*/true,
                                       wrapperUnit);
       return true;
     }
@@ -4492,6 +4443,8 @@ namespace {
       Identifier name = importedName.getDeclName().getBaseIdentifier();
       bool hasKnownSwiftName = importedName.hasCustomName();
 
+      // FIXME: Figure out how to deal with incomplete protocols, since that
+      // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
         // Check if this protocol is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
@@ -4503,39 +4456,6 @@ namespace {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::forward_declared_protocol_label, decl),
             decl->getSourceRange().getBegin());
-
-        if (Impl.ImportForwardDeclarations) {
-          if (auto native = hasNonLocalNativeSwiftDecl<ProtocolDecl>(decl, name, hasKnownSwiftName)) {
-            const ModuleDecl* moduleForNativeDecl = native->getParentModule();
-            assert(moduleForNativeDecl);
-            Impl.addImportDiagnostic(decl, Diagnostic(diag::forward_declared_protocol_clashes_with_imported_objc_Swift_protocol,
-                  decl, Decl::getDescriptiveKindName(native->getDescriptiveKind()), moduleForNativeDecl->getNameStr()),
-                decl->getSourceRange().getBegin());
-          } else {
-            auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
-                decl, AccessLevel::Public,
-                Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
-                                          /*allowForwardDeclaration=*/true),
-                Impl.importSourceLoc(decl->getBeginLoc()),
-                Impl.importSourceLoc(decl->getLocation()), name,
-                ArrayRef<PrimaryAssociatedTypeName>(), None,
-                /*TrailingWhere=*/nullptr);
-
-            Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-            result->setAddedImplicitInitializers(); // suppress all initializers
-            addObjCAttribute(result,
-                            Impl.importIdentifier(decl->getIdentifier()));
-            result->setImplicit();
-            auto attr = AvailableAttr::createPlatformAgnostic(
-                Impl.SwiftContext,
-                "This Objective-C protocol has only been forward-declared; "
-                "import its owning module to use it");
-            result->getAttrs().add(attr);
-            result->getAttrs().add(new (Impl.SwiftContext)
-                                      ForbidSerializingReferenceAttr(true));
-            return result;
-          }
-        }
 
         forwardDeclaration = true;
         return nullptr;
@@ -4590,9 +4510,7 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-
-      auto createFakeClass = [=](Identifier name, bool cacheResult,
-                                     bool inheritFromNSObject,
+      auto createFakeRootClass = [=](Identifier name,
                                      DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
@@ -4605,14 +4523,8 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc,
                                                         /*isActor*/false);
-        if (cacheResult)
-          Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-
-        if (inheritFromNSObject)
-          result->setSuperclass(Impl.getNSObjectType());
-        else
-          result->setSuperclass(Type());
-
+        Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+        result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         result->setHasMissingVTableEntries(false);
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
@@ -4632,10 +4544,8 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createFakeClass(Impl.SwiftContext.Id_Protocol,
-                                          /* cacheResult */ false,
-                                          /* inheritFromNSObject */ false,
-                                          nsObjectDecl->getDeclContext());
+        auto result = createFakeRootClass(Impl.SwiftContext.Id_Protocol,
+                                      nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
       }
@@ -4667,30 +4577,21 @@ namespace {
           }
         }
 
-        Impl.addImportDiagnostic(
-            decl, Diagnostic(diag::forward_declared_interface_label, decl),
-            decl->getSourceRange().getBegin());
-
         if (Impl.ImportForwardDeclarations) {
-          if (auto native = hasNonLocalNativeSwiftDecl<ClassDecl>(decl, name, hasKnownSwiftName)) {
-            const ModuleDecl* moduleForNativeDecl = native->getParentModule();
-            assert(moduleForNativeDecl);
-            Impl.addImportDiagnostic(decl, Diagnostic(diag::forward_declared_interface_clashes_with_imported_objc_Swift_interface,
-                  decl, Decl::getDescriptiveKindName(native->getDescriptiveKind()), moduleForNativeDecl->getNameStr()),
-                decl->getSourceRange().getBegin());
-          } else {
-            // Fake it by making an unavailable opaque @objc root class.
-            auto result = createFakeClass(name, /* cacheResult */ true,
-                                              /* inheritFromNSObject */ true);
-            result->setImplicit();
-            auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
-                "This Objective-C class has only been forward-declared; "
-                "import its owning module to use it");
-            result->getAttrs().add(attr);
-            result->getAttrs().add(
-                new (Impl.SwiftContext) ForbidSerializingReferenceAttr(true));
-            return result;
-          }
+          // Fake it by making an unavailable opaque @objc root class.
+          auto result = createFakeRootClass(name);
+          result->setImplicit();
+          auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
+              "This Objective-C class has only been forward-declared; "
+              "import its owning module to use it");
+          result->getAttrs().add(attr);
+          result->getAttrs().add(
+              new (Impl.SwiftContext) ForbidSerializingReferenceAttr(true));
+          return result;
+        } else {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::forward_declared_interface_label, decl),
+              decl->getSourceRange().getBegin());
         }
 
         forwardDeclaration = true;

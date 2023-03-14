@@ -292,8 +292,6 @@ private:
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
 
-  llvm::DenseMap<Identifier, SmallVector<Decl *, 2>> ObjCNameLookupCache;
-
   /// A description of what should be implicitly imported by each file of this
   /// module.
   const ImplicitImportInfo ImportInfo;
@@ -688,14 +686,6 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
-  bool isObjCNameLookupCachePopulated() const {
-    return Bits.ModuleDecl.ObjCNameLookupCachePopulated;
-  }
-
-  void setIsObjCNameLookupCachePopulated(bool value) {
-    Bits.ModuleDecl.ObjCNameLookupCachePopulated = value;
-  }
-
   /// For the main module, retrieves the list of primary source files being
   /// compiled, that is, the files we're generating code for.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const;
@@ -732,24 +722,6 @@ public:
   void lookupVisibleDecls(ImportPath::Access AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
-
-private:
-  void populateObjCNameLookupCache();
-
-public:
-  /// Finds top-levels decls of this module by @objc provided name.
-  /// Decls that have no @objc attribute are not considered.
-  ///
-  /// This does a simple local lookup, not recursively looking through imports.
-  /// The order of the results is not guaranteed to be meaningful.
-  ///
-  /// \param Results Vector collecting the decls.
-  ///
-  /// \param name The @objc simple name to look for. Declarations with matching
-  /// name and "anonymous" @objc attribute, as well a matching named @objc
-  /// attribute will be added to Results.
-  void lookupTopLevelDeclsByObjCName(SmallVectorImpl<Decl *> &Results,
-                                     DeclName name);
 
   /// This is a hack for 'main' file parsing and the integrated REPL.
   ///

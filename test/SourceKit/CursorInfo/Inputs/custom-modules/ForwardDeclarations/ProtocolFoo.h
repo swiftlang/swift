@@ -1,2 +1,0 @@
-@protocol Foo
-{ -(void)sayHello; }
