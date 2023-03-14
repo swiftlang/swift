@@ -6264,7 +6264,8 @@ swift_getAssociatedTypeWitnessRelativeSlowImpl(
   auto result = swift_getTypeByMangledName(
       request, mangledName, substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index);
+        // FIXME: Variadic generics
+        return substitutions.getMetadata(depth, index).getMetadata();
       },
       [&substitutions](const Metadata *type, unsigned index) {
         return substitutions.getWitnessTable(type, index);
