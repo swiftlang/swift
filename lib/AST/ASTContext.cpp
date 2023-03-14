@@ -4178,6 +4178,13 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               Type result,
                                               Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
+
+  // We do not allow type variables in GenericFunctionTypes. Note that if this
+  // ever changes, we'll need to setup arena-specific allocation for
+  // GenericFunctionTypes.
+  assert(llvm::none_of(params, [](Param param) {
+    return param.getPlainType()->hasTypeVariable();
+  }));
   assert(!result->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
