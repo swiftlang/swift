@@ -259,7 +259,7 @@ public:
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeForEachInKeyword() override;
-  void completePostfixExpr(Expr *E, bool hasSpace) override;
+  void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
@@ -391,7 +391,8 @@ void CodeCompletionCallbacksImpl::completeForEachInKeyword() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
+void CodeCompletionCallbacksImpl::completePostfixExpr(CodeCompletionExpr *E,
+                                                      bool hasSpace) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
@@ -405,7 +406,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
     CompleteExprSelectorContext = ParseExprSelectorContext;
   }
 
-  ParsedExpr = E;
+  ParsedExpr = E->getBase();
+  CodeCompleteTokenExpr = E;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -1469,6 +1471,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   };
 
   switch (Kind) {
+  case CompletionKind::PostfixExpr:
   case CompletionKind::DotExpr: {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
@@ -1478,9 +1481,10 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
-    Expr *CheckedBase = CodeCompleteTokenExpr->getBase();
-    Lookup.deliverResults(CheckedBase, CurDeclContext, DotLoc,
-                          isInsideObjCSelector(), CompletionContext, Consumer);
+    bool IncludeOperators = (Kind == CompletionKind::PostfixExpr);
+
+    Lookup.deliverResults(DotLoc, isInsideObjCSelector(), IncludeOperators,
+                          HasSpace, CompletionContext, Consumer);
     return true;
   }
   case CompletionKind::UnresolvedMember: {
@@ -1694,25 +1698,9 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::AccessorBeginning:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::PostfixExprParen:
+  case CompletionKind::PostfixExpr:
     llvm_unreachable("should be already handled");
     return;
-
-  case CompletionKind::PostfixExpr: {
-    Lookup.setHaveLeadingSpace(HasSpace);
-    if (isDynamicLookup(*ExprType))
-      Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-    /// We set the type of ParsedExpr explicitly above. But we don't want an
-    /// unresolved type in our AST when we type check again for operator
-    /// completions. Remove the type of the ParsedExpr and see if we can come up
-    /// with something more useful based on the the full sequence expression.
-    if (ParsedExpr->getType()->is<UnresolvedType>()) {
-      ParsedExpr->setType(nullptr);
-    }
-    Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
-    Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
-    break;
-  }
 
   case CompletionKind::KeyPathExprObjC: {
     if (DotLoc.isValid())
@@ -1724,7 +1712,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       if (isDynamicLookup(*ExprType))
         Lookup.setIsDynamicLookup();
 
-      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
+      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl(),
+                                     /*IncludeFunctionCallCompletions=*/true);
     } else {
       SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
       Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
@@ -1949,7 +1938,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
         if (isDynamicLookup(resultTy))
           Lookup.setIsDynamicLookup();
-        Lookup.getValueExprCompletions(resultTy, /*VD=*/nullptr);
+        Lookup.getValueExprCompletions(resultTy, /*VD=*/nullptr,
+                                       /*IncludeFunctionCallCompletions=*/true);
         Lookup.getOperatorCompletions(analyzedExpr, leadingSequenceExprs);
         Lookup.getPostfixKeywordCompletions(resultTy, analyzedExpr);
       }

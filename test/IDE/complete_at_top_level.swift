@@ -40,7 +40,7 @@ func resyncParser1() {}
 fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1-DAG: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-DAG: Decl[InstanceMethod]/CurrNominal:   .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-DAG: BuiltinOperator/None:               = {#FooStruct#}[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_1-DAG: BuiltinOperator/None:               = {#FooStruct#}{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-DAG: Keyword[self]/CurrNominal:          .self[#FooStruct#]{{; name=.+$}}
 
 func resyncParser2() {}
@@ -51,7 +51,7 @@ var _tmpVar1 : FooStruct
 fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2-DAG: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_2-DAG: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_2-DAG: BuiltinOperator/None:                     = {#FooStruct#}{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-DAG: Keyword[self]/CurrNominal: .self[#FooStruct#]{{; name=.+$}}
 
 func resyncParser3() {}
@@ -59,7 +59,7 @@ func resyncParser3() {}
 fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3-DAG: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_3-DAG: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]{{; name=.+$}}
+// TYPE_CHECKED_EXPR_3-DAG: BuiltinOperator/None:                     = {#FooStruct#}{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-DAG: Keyword[self]/CurrNominal: .self[#FooStruct#]{{; name=.+$}}
 
 func resyncParser4() {}

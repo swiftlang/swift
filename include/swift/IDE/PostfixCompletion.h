@@ -20,9 +20,8 @@
 namespace swift {
 namespace ide {
 
-/// Used to collect and store information needed to perform member completion
-/// (\c CompletionKind::DotExpr ) from the solutions formed during expression
-/// type-checking.
+/// Used to collect and store information needed to perform postfix completion
+/// (either <base>.#^COMPLETE^# or <base> #^COMPLETE^#).
 class PostfixCompletionCallback : public TypeCheckCompletionCallback {
   struct Result {
     /// The type that we are completing on. Will never be null.
@@ -31,6 +30,11 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     /// The decl that we are completing on. Is \c nullptr if we are completing
     /// on an expression.
     ValueDecl *BaseDecl;
+
+    /// Whether \c BaseDecl refers to a function that has not been called yet.
+    /// In such cases, we know that \p BaseTy is the type of \p BaseDecl and we
+    /// can use \p BaseDecl for more detailed call pattern completions.
+    bool IsBaseDeclUnapplied;
 
     /// If the expression we are completing on statically refers to a metatype,
     /// that is if it's something like 'MyType'. In such cases we want to offer
@@ -90,8 +94,18 @@ public:
   /// \c sawSolution for each solution formed.
   void fallbackTypeCheck(DeclContext *DC) override;
 
-  void deliverResults(Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc,
-                      bool IsInSelector, CodeCompletionContext &CompletionCtx,
+  /// Deliver code completion results that were discoverd by \c sawSolution to
+  /// \p Consumer.
+  /// \param DotLoc If we are completing after a dot, the location of the dot,
+  ///               otherwise an invalid SourceLoc.
+  /// \param IsInSelector Whether we are completing in an Objective-C selector.
+  /// \param IncludeOperators If operators should be suggested. Assumes that
+  ///                         \p DotLoc is invalid
+  /// \param HasLeadingSpace Whether there is a space separating the exiting
+  ///                        expression and the code completion token.
+  void deliverResults(SourceLoc DotLoc, bool IsInSelector,
+                      bool IncludeOperators, bool HasLeadingSpace,
+                      CodeCompletionContext &CompletionCtx,
                       CodeCompletionConsumer &Consumer);
 };
 

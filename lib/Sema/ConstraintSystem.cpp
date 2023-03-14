@@ -515,7 +515,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
-          locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>()) {
+      locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>()) {
     auto *kpExpr = castToExpr<KeyPathExpr>(anchor);
     auto component = kpExpr->getComponents()[componentElt->getIndex()];
 
@@ -525,7 +525,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::Subscript:
       // For a subscript the callee is given by 'component -> subscript member'.
       return getConstraintLocator(
-          anchor, {*componentElt, ConstraintLocator::SubscriptMember});
+                                  anchor, {*componentElt, ConstraintLocator::SubscriptMember});
     case ComponentKind::UnresolvedProperty:
     case ComponentKind::Property:
       // For a property, the choice is just given by the component.
@@ -563,14 +563,14 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     if (fnTy->is<AnyMetatypeType>()) {
       return getConstraintLocator(anchor,
                                   {LocatorPathElt::ApplyFunction(),
-                                   LocatorPathElt::ConstructorMember()});
+        LocatorPathElt::ConstructorMember()});
     }
 
     // Handle an apply of a nominal type which supports callAsFunction.
     if (fnTy->isCallAsFunctionType(DC)) {
       return getConstraintLocator(anchor,
                                   {LocatorPathElt::ApplyFunction(),
-                                   LocatorPathElt::ImplicitCallAsFunction()});
+        LocatorPathElt::ImplicitCallAsFunction()});
     }
 
     // Handling an apply for a nominal type that supports @dynamicCallable.
@@ -605,13 +605,13 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
         UDE->getName().getBaseName() == Context.Id_callAsFunction) {
       return getConstraintLocator(anchor,
                                   {LocatorPathElt::ApplyFunction(),
-                                   LocatorPathElt::ImplicitCallAsFunction()});
+        LocatorPathElt::ImplicitCallAsFunction()});
     }
 
     return getConstraintLocator(
-        anchor, TypeChecker::getSelfForInitDelegationInConstructor(DC, UDE)
-                    ? ConstraintLocator::ConstructorMember
-                    : ConstraintLocator::Member);
+                                anchor, TypeChecker::getSelfForInitDelegationInConstructor(DC, UDE)
+                                ? ConstraintLocator::ConstructorMember
+                                : ConstraintLocator::Member);
   }
 
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
@@ -631,6 +631,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     return getCalleeLocator(locator, lookThroughApply, getType, simplifyType,
                             getOverloadFor);
   }
+
+  if (auto FVE = getAsExpr<ForceValueExpr>(anchor))
+    return getConstraintLocator(FVE->getSubExpr(), ConstraintLocator::Member);
 
   return getConstraintLocator(anchor);
 }

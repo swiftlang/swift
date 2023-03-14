@@ -38,6 +38,7 @@ void PostfixCompletionCallback::Result::merge(const Result &Other,
                                               DeclContext &DC) {
   assert(canBeMergedWith(Other, DC));
   // These properties should match if we are talking about the same BaseDecl.
+  assert(IsBaseDeclUnapplied == Other.IsBaseDeclUnapplied);
   assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
 
   if (!BaseTy->isEqual(Other.BaseTy) &&
@@ -126,6 +127,29 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
                                         getClosureActorIsolationThunk);
 }
 
+/// Returns \c true if \p Choice refers to a function that hasn't been called
+/// yet.
+static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
+  if (!Choice.isDecl()) {
+    return false;
+  }
+  switch (Choice.getFunctionRefKind()) {
+  case FunctionRefKind::Unapplied:
+    return true;
+  case FunctionRefKind::SingleApply:
+    if (auto BaseTy = Choice.getBaseType()) {
+      // We consider curried member calls as unapplied. E.g.
+      //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
+      // is unapplied.
+      return BaseTy->is<MetatypeType>();
+    } else {
+      return false;
+    }
+  default:
+    return false;
+  }
+}
+
 void PostfixCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
   auto &CS = S.getConstraintSystem();
@@ -147,16 +171,10 @@ void PostfixCompletionCallback::sawSolutionImpl(
 
   auto *CalleeLocator = S.getCalleeLocator(Locator);
   ValueDecl *ReferencedDecl = nullptr;
-  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator))
+  bool IsBaseDeclUnapplied = false;
+  if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
-
-  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
-      ClosureActorIsolations;
-  bool IsAsync = isContextAsync(S, DC);
-  for (auto SAT : S.targets) {
-    if (auto ACE = getAsExpr<AbstractClosureExpr>(SAT.second.getAsASTNode())) {
-      ClosureActorIsolations[ACE] = getClosureActorIsolation(S, ACE);
-    }
+    IsBaseDeclUnapplied = isUnappliedFunctionRef(SelectedOverload->choice);
   }
 
   bool BaseIsStaticMetaType = S.isStaticallyDerivedMetatype(ParsedExpr);
@@ -184,30 +202,204 @@ void PostfixCompletionCallback::sawSolutionImpl(
   bool IsImplicitSingleExpressionReturn =
       isImplicitSingleExpressionReturn(CS, CompletionExpr);
 
+  bool IsInAsyncContext = isContextAsync(S, DC);
+  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+      ClosureActorIsolations;
+  for (auto SAT : S.targets) {
+    if (auto ACE = getAsExpr<AbstractClosureExpr>(SAT.second.getAsASTNode())) {
+      ClosureActorIsolations[ACE] = getClosureActorIsolation(S, ACE);
+    }
+  }
+
   Result Res = {
       BaseTy,
       ReferencedDecl,
+      IsBaseDeclUnapplied,
       BaseIsStaticMetaType,
       ExpectedTypes,
       ExpectsNonVoid,
       IsImplicitSingleExpressionReturn,
-      IsAsync,
+      IsInAsyncContext,
       ClosureActorIsolations
   };
 
   addResult(Res);
 }
 
+/// Returns \c true if \p T is '_OptionalNilComparisonType'.
+static bool isOptionalNilComparisonType(Type T) {
+  if (!T) {
+    return false;
+  }
+  auto *nominal = T->getAnyNominal();
+  if (!nominal) {
+    return false;
+  }
+  return (nominal->isStdlibDecl() &&
+          nominal->getName() ==
+              nominal->getASTContext().Id_OptionalNilComparisonType);
+}
+
+static DeclRefKind getDeclRefKindOfOperator(OperatorDecl *op) {
+  switch (op->getKind()) {
+  case DeclKind::PrefixOperator:
+    return DeclRefKind::PrefixOperator;
+  case DeclKind::PostfixOperator:
+    return DeclRefKind::PostfixOperator;
+  case DeclKind::InfixOperator:
+    return DeclRefKind::BinaryOperator;
+  default:
+    llvm_unreachable("unexpected operator kind");
+  }
+}
+
+/// Return type of \c getOperatorCompletionTypes.
+struct OperatorResultTypes {
+  /// If we are trying to complete a binary operator, the type the operator
+  /// expects for the RHS. Null for postfix operators.
+  Type RHSType;
+
+  /// The type the operator returns when called.
+  Type ResultType;
+
+  bool operator==(const OperatorResultTypes &Other) const {
+    return nullableTypesEqual(RHSType, Other.RHSType) &&
+           nullableTypesEqual(ResultType, Other.ResultType);
+  }
+};
+
+/// Builds a constriant system that tries applying the operator \p op on a LHS
+/// of type \p LHSType. If that succeeds, returns the result type of the
+/// operator call and (in case of binary operators) the expected type for the
+/// RHS.
+static SmallVector<OperatorResultTypes>
+getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+
+  ConstraintSystem CS(DC, options);
+
+  // The source loc of the generated expression doesn't matter.
+  SourceLoc Loc;
+
+  // We represent the LHS and RHS by CodeCompletionExprs because there's no
+  // other better choice. rhs will have its type set in the constraint system
+  // below and, in case of binary operators, rhs will be inspected for its type
+  // when the constraint system has been solved.
+  CodeCompletionExpr LHS(Loc);
+  CodeCompletionExpr RHS(Loc);
+
+  UnresolvedDeclRefExpr UDRE(DeclNameRef(Op->getName()),
+                             getDeclRefKindOfOperator(Op), DeclNameLoc(Loc));
+  DiagnosticTransaction IgnoreDiags(DC->getASTContext().Diags);
+  Expr *OpExpr =
+      resolveDeclRefExpr(&UDRE, DC, /*replaceInvalidRefsWithErrors=*/true);
+  IgnoreDiags.abort();
+  if (isa<ErrorExpr>(OpExpr)) {
+    // If we couldn't resolve the operator (e.g. because there is only an
+    // operator definition but no decls that implement it), we can't call the
+    // operator.
+    return {};
+  }
+
+  Expr *OpCallExpr;
+  switch (Op->getKind()) {
+  case DeclKind::PrefixOperator:
+    // Don't insert prefix operators in postfix position.
+    return {};
+  case DeclKind::PostfixOperator:
+    OpCallExpr = PostfixUnaryExpr::create(DC->getASTContext(), OpExpr, &LHS);
+    break;
+  case DeclKind::InfixOperator:
+    OpCallExpr = BinaryExpr::create(DC->getASTContext(), &LHS, OpExpr, &RHS,
+                                    /*implicit*/ true);
+    break;
+  default:
+    llvm_unreachable("unexpected operator kind");
+  }
+
+  CS.preCheckExpression(OpCallExpr, DC, /*replaceInvalidRefsWithErrors=*/true,
+                        /*leaveClosureBodyUnchecked=*/false);
+  OpCallExpr = CS.generateConstraints(OpCallExpr, DC);
+
+  CS.assignFixedType(CS.getType(&LHS)->getAs<TypeVariableType>(), LHSType);
+
+  SmallVector<Solution, 1> Solutions;
+  CS.solve(Solutions);
+
+  SmallVector<OperatorResultTypes> Results;
+  for (auto &S : Solutions) {
+    Type RHSType;
+    if (Op->getKind() == DeclKind::InfixOperator) {
+      RHSType = getTypeForCompletion(S, &RHS);
+    }
+    Type ResultType = getTypeForCompletion(S, OpCallExpr);
+
+    OperatorResultTypes ResultTypes = {RHSType, ResultType};
+    if (llvm::is_contained(Results, ResultTypes)) {
+      continue;
+    }
+
+    if (S.getFixedScore().Data[SK_ValueToOptional] > 0) {
+      if (Op->getName().str() == "??" || isOptionalNilComparisonType(RHSType)) {
+        // Don't suggest optional operators that need to demote the LHS to an
+        // Optional to become applicable.
+        continue;
+      }
+    }
+
+    Results.push_back(ResultTypes);
+  }
+
+  return Results;
+}
+
+/// Adds applicable operator suggestions to \p Lookup.
+static void addOperatorResults(Type LHSType, ArrayRef<OperatorDecl *> Operators,
+                               DeclContext *DC, CompletionLookup &Lookup) {
+  for (auto Op : Operators) {
+    switch (Op->getKind()) {
+    case DeclKind::PrefixOperator:
+      break;
+    case DeclKind::PostfixOperator:
+      for (auto operatorType : getOperatorCompletionTypes(DC, LHSType, Op)) {
+        Lookup.addPostfixOperatorCompletion(Op, operatorType.ResultType);
+      }
+      break;
+    case DeclKind::InfixOperator:
+      for (auto operatorType : getOperatorCompletionTypes(DC, LHSType, Op)) {
+        Lookup.addInfixOperatorCompletion(Op, operatorType.ResultType,
+                                          operatorType.RHSType);
+      }
+      break;
+    default:
+      llvm_unreachable("unexpected operator kind");
+    }
+  }
+  if (LHSType->hasLValueType()) {
+    Lookup.addAssignmentOperator(LHSType->getRValueType());
+  }
+  if (auto ValueT = LHSType->getRValueType()->getOptionalObjectType()) {
+    Lookup.addPostfixBang(ValueT);
+  }
+}
+
 void PostfixCompletionCallback::deliverResults(
-    Expr *BaseExpr, DeclContext *DC, SourceLoc DotLoc, bool IsInSelector,
-    CodeCompletionContext &CompletionCtx, CodeCompletionConsumer &Consumer) {
+    SourceLoc DotLoc, bool IsInSelector, bool IncludeOperators,
+    bool HasLeadingSpace, CodeCompletionContext &CompletionCtx,
+    CodeCompletionConsumer &Consumer) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
 
-  if (DotLoc.isValid())
+  if (DotLoc.isValid()) {
+    assert(!IncludeOperators && "We shouldn't be suggesting operators if we "
+                                "are completing after a dot");
     Lookup.setHaveDot(DotLoc);
+  }
+  Lookup.setHaveLeadingSpace(HasLeadingSpace);
 
+  Expr *BaseExpr = CompletionExpr->getBase();
   Lookup.setIsSuperRefExpr(isa<SuperRefExpr>(BaseExpr));
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(BaseExpr))
@@ -219,6 +411,10 @@ void PostfixCompletionCallback::deliverResults(
   if (IsInSelector) {
     Lookup.includeInstanceMembers();
     Lookup.setPreferFunctionReferencesToCalls();
+  }
+  SmallVector<OperatorDecl *> Operators;
+  if (IncludeOperators) {
+    Lookup.collectOperators(Operators);
   }
 
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
@@ -232,7 +428,12 @@ void PostfixCompletionCallback::deliverResults(
                             Result.ExpectsNonVoid);
     if (isDynamicLookup(Result.BaseTy))
       Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl);
+    Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl,
+                                   Result.IsBaseDeclUnapplied);
+
+    if (IncludeOperators && !Result.BaseIsStaticMetaType) {
+      addOperatorResults(Result.BaseTy, Operators, DC, Lookup);
+    }
   }
 
   deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);

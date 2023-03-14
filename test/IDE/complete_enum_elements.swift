@@ -99,7 +99,7 @@ enum BarEnum {
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .barInstanceFunc({#(self): &BarEnum#})[#() -> Void#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:        .staticVar[#Int#]{{; name=.+$}}
-// BAR_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:     .barStaticFunc()[#Void#]{{; name=.+$}}
+// BAR_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:     .barStaticFunc()[#Void#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:          .self[#BarEnum.Type#]; name=self
 // BAR_ENUM_NO_DOT-DAG: Keyword/CurrNominal:                .Type[#BarEnum.Type#]; name=Type
 
@@ -141,7 +141,7 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#(self): &BazEnum<Int>#})[#() -> Void#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVarT[#Int#]{{; name=.+$}}
-// BAZ_INT_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
+// BAZ_INT_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:   .bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#BazEnum<Int>.Type#]; name=self
 // BAZ_INT_ENUM_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#BazEnum<Int>.Type#]; name=Type
 
@@ -150,7 +150,7 @@ enum BazEnum<T> {
 // BAZ_T_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#(self): &BazEnum<_>#})[#() -> Void#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVarT[#_#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:   .bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#BazEnum<_>.Type#]; name=self
 // BAZ_T_ENUM_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#BazEnum<_>.Type#]; name=Type
 
@@ -395,7 +395,7 @@ func ~=(pattern: OtherEnum, value: EnumWithCustomPatternMatchingOperator) -> Boo
 func completeEnumWithCustomPatternMatchingOperator(x: EnumWithCustomPatternMatchingOperator) {
   switch x {
   case .#^PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING^#
-// We should be suggesting static members of `OtherEnum`, because we can match it to `EnumWithCustomPatternMatchingOperator` using the custom pattern match operator. 
+// We should be suggesting static members of `OtherEnum`, because we can match it to `EnumWithCustomPatternMatchingOperator` using the custom pattern match operator.
 // We should also suggest enum cases from `EnumWithCustomPatternMatchingOperator` whose pattern matching doesn't go through any `~=` operator.
 // We shouldn't suggest `staticMember` because `EnumWithCustomPatternMatchingOperator` doesn`t have `~=` defined between two of its instances.
 // PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING:     Begin completions, 4 items

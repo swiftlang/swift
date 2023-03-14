@@ -206,3 +206,22 @@ func test_cc_in_pattern(subject: IntHolder, i1: Int) {
 }
 
 // CC_IN_PATTERN_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i1[#Int#]; name=i1
+
+func testCompleteAfterPatternInClosure() {
+  func takeClosure(_ x: () -> Void) {}
+
+  enum MyEnum {
+    case failure(Int)
+  }
+
+  func test(value: MyEnum) {
+    takeClosure {
+      switch value {
+      case let .failure(error)#^AFTER_PATTERN_IN_CLOSURE^#:
+        break
+      }
+    }
+  }
+
+  // AFTER_PATTERN_IN_CLOSURE-NOT: Begin completions
+}
