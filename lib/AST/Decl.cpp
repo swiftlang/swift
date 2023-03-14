@@ -1126,6 +1126,9 @@ bool Decl::isAlwaysWeakImported() const {
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
+  if (getSemanticUnavailableAttr())
+    return true;
+
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
 
