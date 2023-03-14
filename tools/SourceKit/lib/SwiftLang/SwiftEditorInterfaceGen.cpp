@@ -290,6 +290,11 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
 
   PrintOptions Options = PrintOptions::printModuleInterface(
       Ctx.TypeCheckerOpts.PrintFullConvention);
+  if (Mod->findUnderlyingClangModule()) {
+    // Show unavailable C++ APIs.
+    if (Ctx.LangOpts.EnableCXXInterop)
+      Options.SkipUnavailable = false;
+  }
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
