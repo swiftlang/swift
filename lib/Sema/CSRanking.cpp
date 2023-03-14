@@ -956,6 +956,25 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // FIXME: Along with the FIXME below, this is a hack to work around
     // problems with restating requirements in protocols.
     identical = false;
+
+    if (cs.Context.CompletionCallback) {
+      // Don't rank based on overload choices of function calls that contain the
+      // code completion token.
+      ASTNode anchor = simplifyLocatorToAnchor(overload.locator);
+      if (auto expr = getAsExpr(anchor)) {
+        // If the anchor is a called function, also don't rank overload choices
+        // if any of the arguments contain the code completion token.
+        if (auto apply = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(expr))) {
+          if (apply->getFn() == expr) {
+            anchor = apply;
+          }
+        }
+      }
+      if (anchor && cs.containsIDEInspectionTarget(anchor)) {
+        continue;
+      }
+    }
+
     bool decl1InSubprotocol = false;
     bool decl2InSubprotocol = false;
     if (dc1->getContextKind() == DeclContextKind::GenericTypeDecl &&

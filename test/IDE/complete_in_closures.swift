@@ -485,3 +485,16 @@ func testReferenceToVariableDefinedInClosure() {
   // VARIABLE_DEFINED_IN_CLOSURE: Decl[LocalVar]/Local:               item[#String#]; name=item
 }
 
+func testBinaryOperatorWithEnum() {
+  func closureWithEnum(completionHandler: (SomeEnum) -> Void) {}
+
+  closureWithEnum { foo in
+    if foo != .#^BINARY_OPERATOR_WITH_ENUM^# {
+    }
+  }
+// BINARY_OPERATOR_WITH_ENUM: Begin completions
+// BINARY_OPERATOR_WITH_ENUM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: north[#SomeEnum#]
+// BINARY_OPERATOR_WITH_ENUM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: south[#SomeEnum#]
+// BINARY_OPERATOR_WITH_ENUM: End completions
+
+}
