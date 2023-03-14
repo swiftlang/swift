@@ -159,7 +159,9 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(Observation)
   endif()
 
-  add_subdirectory(Backtracing)
+  if(SWIFT_ENABLE_BACKTRACING)
+    add_subdirectory(Backtracing)
+  endif()
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
