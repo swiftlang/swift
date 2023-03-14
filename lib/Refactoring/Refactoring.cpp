@@ -625,28 +625,53 @@ static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
   return nullptr;
 }
 
-static Optional<RefactoringKind>
-getAvailableRenameForDecl(const ValueDecl *VD,
-                          Optional<RenameRefInfo> RefInfo) {
-  SmallVector<RenameAvailabilityInfo, 2> Infos;
-  collectRenameAvailabilityInfo(VD, RefInfo, Infos);
-  for (auto &Info : Infos) {
-    if (Info.AvailableKind == RenameAvailableKind::Available)
-      return Info.Kind;
+struct RenameInfo {
+  ValueDecl *VD;
+  RenameAvailabilityInfo Availability;
+};
+
+/// Given a cursor, return the decl and its rename availability. \c None if
+/// the cursor did not resolve to a decl or it resolved to a decl that we do
+/// not allow renaming on.
+static Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
+  auto valueCursor = dyn_cast<ResolvedValueRefCursorInfo>(cursorInfo);
+  if (!valueCursor)
+    return None;
+
+  ValueDecl *VD = valueCursor->typeOrValue();
+  if (!VD)
+    return None;
+
+  Optional<RenameRefInfo> refInfo;
+  if (!valueCursor->getShorthandShadowedDecls().empty()) {
+    // Find the outermost decl for a shorthand if let/closure capture
+    VD = valueCursor->getShorthandShadowedDecls().back();
+  } else if (valueCursor->isRef()) {
+    refInfo = {valueCursor->getSourceFile(), valueCursor->getLoc(),
+               valueCursor->isKeywordArgument()};
   }
-  return None;
+
+  Optional<RenameAvailabilityInfo> info = renameAvailabilityInfo(VD, refInfo);
+  if (!info)
+    return None;
+
+  return RenameInfo{VD, *info};
 }
 
 class RenameRangeCollector : public IndexDataConsumer {
 public:
   RenameRangeCollector(StringRef USR, StringRef newName)
-      : USR(USR.str()), newName(newName.str()) {}
+      : USR(USR), newName(newName) {}
 
   RenameRangeCollector(const ValueDecl *D, StringRef newName)
-      : newName(newName.str()) {
-    llvm::raw_string_ostream OS(USR);
+      : newName(newName) {
+    SmallString<64> SS;
+    llvm::raw_svector_ostream OS(SS);
     printValueDeclUSR(D, OS);
+    USR = stringStorage.copyString(SS.str());
   }
+
+  RenameRangeCollector(RenameRangeCollector &&collector) = default;
 
   ArrayRef<RenameLoc> results() const { return locations; }
 
@@ -689,8 +714,8 @@ private:
                                              StringRef NewName);
 
 private:
-  std::string USR;
-  std::string newName;
+  StringRef USR;
+  StringRef newName;
   StringScratchSpace stringStorage;
   std::vector<RenameLoc> locations;
 };
@@ -845,29 +870,14 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
 
 bool RefactoringActionLocalRename::isApplicable(
     ResolvedCursorInfoPtr CursorInfo, DiagnosticEngine &Diag) {
-  auto ValueRefInfo = dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
-  if (!ValueRefInfo)
-    return false;
-
-  Optional<RenameRefInfo> RefInfo;
-  if (ValueRefInfo->isRef())
-    RefInfo = {CursorInfo->getSourceFile(), CursorInfo->getLoc(),
-               ValueRefInfo->isKeywordArgument()};
-
-  auto RenameOp = getAvailableRenameForDecl(ValueRefInfo->getValueD(), RefInfo);
-  return RenameOp.has_value() &&
-    RenameOp.value() == RefactoringKind::LocalRename;
+  Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
+  return Info &&
+         Info->Availability.AvailableKind == RenameAvailableKind::Available &&
+         Info->Availability.Kind == RefactoringKind::LocalRename;
 }
 
-static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
-                               DiagnosticEngine &Diags,
+static void analyzeRenameScope(ValueDecl *VD,
                                SmallVectorImpl<DeclContext *> &Scopes) {
-  Scopes.clear();
-  if (!getAvailableRenameForDecl(VD, RefInfo).has_value()) {
-    Diags.diagnose(SourceLoc(), diag::value_decl_no_loc, VD->getName());
-    return;
-  }
-
   auto *Scope = VD->getDeclContext();
   // There may be sibling decls that the renamed symbol is visible from.
   switch (Scope->getContextKind()) {
@@ -892,6 +902,53 @@ static void analyzeRenameScope(ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
   Scopes.push_back(Scope);
 }
 
+static Optional<RenameRangeCollector> localRenames(SourceFile *SF,
+                                                   SourceLoc startLoc,
+                                                   StringRef preferredName,
+                                                   DiagnosticEngine &diags) {
+  auto cursorInfo =
+      evaluateOrDefault(SF->getASTContext().evaluator,
+                        CursorInfoRequest{CursorInfoOwner(SF, startLoc)},
+                        new ResolvedCursorInfo());
+
+  Optional<RenameInfo> info = getRenameInfo(cursorInfo);
+  if (!info) {
+    diags.diagnose(startLoc, diag::unresolved_location);
+    return None;
+  }
+
+  switch (info->Availability.AvailableKind) {
+  case RenameAvailableKind::Available:
+    break;
+  case RenameAvailableKind::Unavailable_system_symbol:
+    diags.diagnose(startLoc, diag::decl_is_system_symbol, info->VD->getName());
+    return None;
+  case RenameAvailableKind::Unavailable_has_no_location:
+    diags.diagnose(startLoc, diag::value_decl_no_loc, info->VD->getName());
+    return None;
+  case RenameAvailableKind::Unavailable_has_no_name:
+    diags.diagnose(startLoc, diag::decl_has_no_name);
+    return None;
+  case RenameAvailableKind::Unavailable_has_no_accessibility:
+    diags.diagnose(startLoc, diag::decl_no_accessibility);
+    return None;
+  case RenameAvailableKind::Unavailable_decl_from_clang:
+    diags.diagnose(startLoc, diag::decl_from_clang);
+    return None;
+  }
+
+  SmallVector<DeclContext *, 8> scopes;
+  analyzeRenameScope(info->VD, scopes);
+  if (scopes.empty())
+    return None;
+
+  RenameRangeCollector rangeCollector(info->VD, preferredName);
+  for (DeclContext *DC : scopes)
+    indexDeclContext(DC, rangeCollector);
+
+  return rangeCollector;
+}
+
 bool RefactoringActionLocalRename::performChange() {
   if (StartLoc.isInvalid()) {
     DiagEngine.diagnose(SourceLoc(), diag::invalid_location);
@@ -906,40 +963,16 @@ bool RefactoringActionLocalRename::performChange() {
                         MD->getNameStr());
     return true;
   }
-  CursorInfo =
-      evaluateOrDefault(TheFile->getASTContext().evaluator,
-                        CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
-                        new ResolvedCursorInfo());
-  auto ValueRefCursorInfo = dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
-  if (ValueRefCursorInfo && ValueRefCursorInfo->getValueD()) {
-    ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
-    // The index always uses the outermost shadow for references
-    if (!ValueRefCursorInfo->getShorthandShadowedDecls().empty()) {
-      VD = ValueRefCursorInfo->getShorthandShadowedDecls().back();
-    }
 
-    SmallVector<DeclContext *, 8> Scopes;
-
-    Optional<RenameRefInfo> RefInfo;
-    if (ValueRefCursorInfo->isRef())
-      RefInfo = {CursorInfo->getSourceFile(), CursorInfo->getLoc(),
-                 ValueRefCursorInfo->isKeywordArgument()};
-
-    analyzeRenameScope(VD, RefInfo, DiagEngine, Scopes);
-    if (Scopes.empty())
-      return true;
-    RenameRangeCollector rangeCollector(VD, PreferredName);
-    for (DeclContext *DC : Scopes)
-      indexDeclContext(DC, rangeCollector);
-
-    auto consumers = DiagEngine.takeConsumers();
-    assert(consumers.size() == 1);
-    return syntacticRename(TheFile, rangeCollector.results(), EditConsumer,
-                           *consumers[0]);
-  } else {
-    DiagEngine.diagnose(StartLoc, diag::unresolved_location);
+  Optional<RenameRangeCollector> rangeCollector =
+      localRenames(TheFile, StartLoc, PreferredName, DiagEngine);
+  if (!rangeCollector)
     return true;
-  }
+
+  auto consumers = DiagEngine.takeConsumers();
+  assert(consumers.size() == 1);
+  return syntacticRename(TheFile, rangeCollector->results(), EditConsumer,
+                         *consumers[0]);
 }
 
 StringRef getDefaultPreferredName(RefactoringKind Kind) {
@@ -8805,9 +8838,9 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
-void swift::ide::collectRenameAvailabilityInfo(
-    const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
-    SmallVectorImpl<RenameAvailabilityInfo> &Infos) {
+Optional<RenameAvailabilityInfo>
+swift::ide::renameAvailabilityInfo(const ValueDecl *VD,
+                                   Optional<RenameRefInfo> RefInfo) {
   RenameAvailableKind AvailKind = RenameAvailableKind::Available;
   if (getRelatedSystemDecl(VD)){
     AvailKind = RenameAvailableKind::Unavailable_system_symbol;
@@ -8822,22 +8855,22 @@ void swift::ide::collectRenameAvailabilityInfo(
   if (isa<AbstractFunctionDecl>(VD)) {
     // Disallow renaming accessors.
     if (isa<AccessorDecl>(VD))
-      return;
+      return None;
 
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
-      return;
+      return None;
 
     // Disallow renaming init with no arguments.
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
-        return;
+        return None;
 
       if (RefInfo && !RefInfo->IsArgLabel) {
         NameMatcher Matcher(*(RefInfo->SF));
         auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
         if (Resolved.LabelRanges.empty())
-          return;
+          return None;
       }
     }
 
@@ -8847,13 +8880,13 @@ void swift::ide::collectRenameAvailabilityInfo(
       // whether it's an instance method, so we do the same here for now.
       if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
         if (!FD->getParameters()->size())
-          return;
+          return None;
 
         if (RefInfo && !RefInfo->IsArgLabel) {
           NameMatcher Matcher(*(RefInfo->SF));
           auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
           if (Resolved.LabelRanges.empty())
-            return;
+            return None;
         }
       }
     }
@@ -8861,16 +8894,13 @@ void swift::ide::collectRenameAvailabilityInfo(
 
   // Always return local rename for parameters.
   // FIXME: if the cursor is on the argument, we should return global rename.
-  if (isa<ParamDecl>(VD)) {
-    Infos.emplace_back(RefactoringKind::LocalRename, AvailKind);
-    return;
-  }
+  if (isa<ParamDecl>(VD))
+    return RenameAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
 
   // If the indexer considers VD a global symbol, then we apply global rename.
   if (index::isLocalSymbol(VD))
-    Infos.emplace_back(RefactoringKind::LocalRename, AvailKind);
-  else
-    Infos.emplace_back(RefactoringKind::GlobalRename, AvailKind);
+    return RenameAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
+  return RenameAvailabilityInfo{RefactoringKind::GlobalRename, AvailKind};
 }
 
 void swift::ide::collectAvailableRefactorings(
@@ -8880,27 +8910,10 @@ void swift::ide::collectAvailableRefactorings(
       CursorInfo->getSourceFile()->getASTContext().SourceMgr);
 
   if (!ExcludeRename) {
-    if (RefactoringActionLocalRename::isApplicable(CursorInfo, DiagEngine))
-      Kinds.push_back(RefactoringKind::LocalRename);
-
-    switch (CursorInfo->getKind()) {
-    case CursorInfoKind::ModuleRef:
-    case CursorInfoKind::Invalid:
-    case CursorInfoKind::StmtStart:
-    case CursorInfoKind::ExprStart:
-      break;
-    case CursorInfoKind::ValueRef: {
-      auto ValueRefInfo = cast<ResolvedValueRefCursorInfo>(CursorInfo);
-      Optional<RenameRefInfo> RefInfo;
-      if (ValueRefInfo->isRef())
-        RefInfo = {CursorInfo->getSourceFile(), CursorInfo->getLoc(),
-                   ValueRefInfo->isKeywordArgument()};
-      auto RenameOp =
-          getAvailableRenameForDecl(ValueRefInfo->getValueD(), RefInfo);
-      if (RenameOp.has_value() &&
-          RenameOp.value() == RefactoringKind::GlobalRename)
-        Kinds.push_back(RenameOp.value());
-    }
+    if (auto Info = getRenameInfo(CursorInfo)) {
+      if (Info->Availability.AvailableKind == RenameAvailableKind::Available) {
+        Kinds.push_back(Info->Availability.Kind);
+      }
     }
   }
 
@@ -9106,29 +9119,11 @@ int swift::ide::findLocalRenameRanges(
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-  ResolvedCursorInfoPtr CursorInfo =
-      evaluateOrDefault(SF->getASTContext().evaluator,
-                        CursorInfoRequest{CursorInfoOwner(SF, StartLoc)},
-                        new ResolvedCursorInfo());
-  auto ValueRefCursorInfo = dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
-  if (!ValueRefCursorInfo || !ValueRefCursorInfo->getValueD()) {
-    Diags.diagnose(StartLoc, diag::unresolved_location);
+  Optional<RenameRangeCollector> RangeCollector =
+      localRenames(SF, StartLoc, StringRef(), Diags);
+  if (!RangeCollector)
     return true;
-  }
-  ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
-  Optional<RenameRefInfo> RefInfo;
-  if (ValueRefCursorInfo->isRef())
-    RefInfo = {CursorInfo->getSourceFile(), CursorInfo->getLoc(),
-               ValueRefCursorInfo->isKeywordArgument()};
 
-  llvm::SmallVector<DeclContext *, 8> Scopes;
-  analyzeRenameScope(VD, RefInfo, Diags, Scopes);
-  if (Scopes.empty())
-    return true;
-  RenameRangeCollector RangeCollector(VD, StringRef());
-  for (DeclContext *DC : Scopes)
-    indexDeclContext(DC, RangeCollector);
-
-  return findSyntacticRenameRanges(SF, RangeCollector.results(), RenameConsumer,
-                                   DiagConsumer);
+  return findSyntacticRenameRanges(SF, RangeCollector->results(),
+                                   RenameConsumer, DiagConsumer);
 }
