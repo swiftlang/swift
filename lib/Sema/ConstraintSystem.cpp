@@ -422,14 +422,6 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *
-ConstraintSystem::getConstraintLocatorForAmbiguity(ConstraintLocator *locator) {
-  if (locator->findLast<LocatorPathElt::CoercionOperand>()) {
-    return getConstraintLocator(simplifyLocatorToAnchor(locator));
-  }
-  return locator;
-}
-
 ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
     ConstraintLocatorBuilder root, ConversionRestrictionKind restriction) {
   SmallVector<LocatorPathElt, 4> path;
@@ -629,6 +621,14 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
 
   if (isExpr<ObjectLiteralExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
+
+  if (locator->isFirstElement<LocatorPathElt::CoercionOperand>()) {
+    auto *CE = castToExpr<CoerceExpr>(anchor);
+    locator = getConstraintLocator(CE->getSubExpr()->getValueProvidingExpr(),
+                                   path.drop_front());
+    return getCalleeLocator(locator, lookThroughApply, getType, simplifyType,
+                            getOverloadFor);
+  }
 
   return getConstraintLocator(anchor);
 }
@@ -4980,7 +4980,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
 
-    auto *locator = getConstraintLocatorForAmbiguity(fix->getLocator());
+    auto *locator = fix->getLocator();
 
     if (locator->isForContextualType()) {
       contextualFixes.push_back({&solution, fix});

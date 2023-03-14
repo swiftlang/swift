@@ -90,11 +90,6 @@ public:
 
   ConstraintLocator *getLocator() const { return Locator; }
 
-  ConstraintLocator *getAmbiguityLocator() const {
-    auto &cs = getConstraintSystem();
-    return cs.getConstraintLocatorForAmbiguity(Locator);
-  }
-
   Type getType(ASTNode node, bool wantRValue = true) const;
 
   /// Get type associated with a given ASTNode without resolving it,
@@ -2181,6 +2176,8 @@ public:
         UseConditionalCast(useConditionalCast) {}
 
   ASTNode getAnchor() const override;
+
+  SourceLoc getLoc() const override;
 
   bool diagnoseAsError() override;
 };

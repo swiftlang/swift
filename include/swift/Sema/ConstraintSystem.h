@@ -3249,12 +3249,6 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
-  /// Retrieves a locator that identifies where an overload ambiguity may be
-  /// present. In most cases this is a no-op, but may simplify locator e.g
-  /// coercions for ambiguities in the expression operand.
-  ConstraintLocator *
-  getConstraintLocatorForAmbiguity(ConstraintLocator *locator);
-
   /// Compute a constraint locator for an implicit value-to-value
   /// conversion rooted at the given location.
   ConstraintLocator *

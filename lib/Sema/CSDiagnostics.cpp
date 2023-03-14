@@ -1225,21 +1225,28 @@ ASTNode InvalidCoercionFailure::getAnchor() const {
   return anchor;
 }
 
+SourceLoc InvalidCoercionFailure::getLoc() const {
+  if (getLocator()->isForCoercion()) {
+    auto *CE = castToExpr<CoerceExpr>(getRawAnchor());
+    return CE->getAsLoc();
+  }
+  return FailureDiagnostic::getLoc();
+}
+
 bool InvalidCoercionFailure::diagnoseAsError() {
   auto fromType = getFromType();
   auto toType = getToType();
-  auto *CE = getAsExpr<CoerceExpr>(getRawAnchor());
 
   emitDiagnostic(diag::cannot_coerce_to_type, fromType, toType);
 
   if (UseConditionalCast) {
     emitDiagnostic(diag::missing_optional_downcast)
-        .highlight(CE->getSourceRange())
-        .fixItReplace(CE->getAsLoc(), "as?");
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as?");
   } else {
     emitDiagnostic(diag::missing_forced_downcast)
-        .highlight(CE->getSourceRange())
-        .fixItReplace(CE->getAsLoc(), "as!");
+        .highlight(getSourceRange())
+        .fixItReplace(getLoc(), "as!");
   }
 
   return true;
@@ -2662,7 +2669,7 @@ bool ContextualFailure::diagnoseAsError() {
 }
 
 bool ContextualFailure::diagnoseAsNote() {
-  auto *locator = getAmbiguityLocator();
+  auto *locator = getLocator();
 
   auto overload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!(overload && overload->choice.isDecl()))
@@ -4931,7 +4938,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
 }
 
 bool MissingArgumentsFailure::diagnoseAsNote() {
-  auto *locator = getAmbiguityLocator();
+  auto *locator = getLocator();
   if (auto overload = getCalleeOverloadChoiceIfAvailable(locator)) {
     auto *fn = resolveType(overload->adjustedOpenedType)->getAs<AnyFunctionType>();
     auto loc = overload->choice.getDecl()->getLoc();
@@ -5733,7 +5740,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getAmbiguityLocator());
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!(overload && overload->choice.isDecl()))
     return false;
 
@@ -5741,8 +5748,8 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
   auto numArgs = getTotalNumArguments();
   if (isExpr<ClosureExpr>(getAnchor())) {
     emitDiagnosticAt(decl, diag::candidate_with_extraneous_args_closure,
-                    ContextualType, ContextualType->getNumParams(), numArgs,
-                    (numArgs == 1));
+                     ContextualType, ContextualType->getNumParams(), numArgs,
+                     (numArgs == 1));
   } else {
     emitDiagnosticAt(decl, diag::candidate_with_extraneous_args,
                      overload->adjustedOpenedType, numArgs, ContextualType,
