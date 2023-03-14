@@ -148,9 +148,8 @@ struct RenameRefInfo {
   bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
 };
 
-void collectRenameAvailabilityInfo(
-    const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
-    llvm::SmallVectorImpl<RenameAvailabilityInfo> &Infos);
+Optional<RenameAvailabilityInfo>
+renameAvailabilityInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo);
 
 } // namespace ide
 } // namespace swift
