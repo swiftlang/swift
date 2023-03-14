@@ -47,11 +47,15 @@ add_link_opts(libSwiftScan)
 add_dependencies(compiler libSwiftScan)
 
 
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-swift_install_in_component(TARGETS libSwiftScan
-  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" COMPONENT compiler
-  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" COMPONENT compiler
-  RUNTIME DESTINATION "bin" COMPONENT compiler)
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  swift_install_in_component(TARGETS libSwiftScan
+    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}" COMPONENT compiler
+    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}" COMPONENT compiler
+    RUNTIME DESTINATION "bin" COMPONENT compiler)
+
+  swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/DependencyScan/"
+    DESTINATION "include/${SWIFT_SCAN_LIB_NAME}"
+    COMPONENT compiler)
 else()
   # On other platforms, instead install the library into 'lib/swift/host' and symlink to it from 'lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'
   swift_install_in_component(TARGETS libSwiftScan
@@ -75,8 +79,8 @@ else()
                                 ${target_install_relative_path}
                                 lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})"
           COMPONENT compiler)
-endif()
 
-swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/DependencyScan/"
-                           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SCAN_LIB_NAME}"
-                           COMPONENT compiler)
+  swift_install_in_component(DIRECTORY "${SWIFT_MAIN_INCLUDE_DIR}/swift-c/DependencyScan/"
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SCAN_LIB_NAME}"
+    COMPONENT compiler)
+endif()
