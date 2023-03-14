@@ -66,6 +66,7 @@ getNameForCxx(const ValueDecl *VD,
 enum RepresentationKind { Representable, Unsupported };
 
 enum RepresentationError {
+  UnrepresentableObjC,
   UnrepresentableAsync,
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,

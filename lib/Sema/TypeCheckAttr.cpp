@@ -2013,9 +2013,7 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
-  // Expose cannot be mixed with '@objc'/'@_cdecl' declarations.
-  if (VD->isObjC())
-    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@objc");
+  // Expose cannot be mixed with '@_cdecl' declarations.
   if (VD->getAttrs().hasAttribute<CDeclAttr>())
     diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
 
@@ -2038,6 +2036,10 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   if (repr.isUnsupported()) {
     using namespace cxx_translation;
     switch (*repr.error) {
+    case UnrepresentableObjC:
+      diagnose(attr->getLocation(), diag::expose_unsupported_objc_decl_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
     case UnrepresentableAsync:
       diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
                VD->getDescriptiveKind(), VD);

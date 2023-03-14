@@ -200,6 +200,8 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
 
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
+  if (VD->isObjC())
+    return {Unsupported, UnrepresentableObjC};
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
   Optional<CanGenericSignature> genericSignature;
@@ -241,8 +243,6 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
                                             AccessLevel minRequiredAccess,
                                             bool checkParent) {
-  if (VD->isObjC())
-    return false;
   // Do not expose anything from _Concurrency module yet.
   if (VD->getModuleContext()->ValueDecl::getName().getBaseIdentifier() ==
       VD->getASTContext().Id_Concurrency)
