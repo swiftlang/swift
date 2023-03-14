@@ -1679,6 +1679,7 @@ ERROR(access_control_open_bad_decl,none,
 WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
+ERROR(access_control_requires_package_name, none, "decl has a package access level but no -package-name was passed", ())
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
