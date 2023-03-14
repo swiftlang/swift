@@ -2358,6 +2358,13 @@ ConstraintSystem::getTypeOfMemberReference(
     return { openedType, openedType, memberTy, memberTy };
   }
 
+  if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
+    if (value->getInterfaceType()->is<ErrorType>()) {
+      auto genericErrorTy = ErrorType::get(getASTContext());
+      return { genericErrorTy, genericErrorTy, genericErrorTy, genericErrorTy };
+    }
+  }
+
   // Figure out the declaration context to use when opening this type.
   DeclContext *innerDC = value->getInnermostDeclContext();
   DeclContext *outerDC = value->getDeclContext();
@@ -2366,18 +2373,22 @@ ConstraintSystem::getTypeOfMemberReference(
   Type openedType;
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
-  unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
-      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
-  AnyFunctionType *funcType;
+  // If we have a generic signature, open the parameters. We delay opening
+  // requirements to allow contextual types to affect the situation.
+  auto genericSig = innerDC->getGenericSignatureOfContext();
+  if (genericSig)
+    openGenericParameters(outerDC, genericSig, replacements, locator);
 
   if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
-    if (auto ErrorTy = value->getInterfaceType()->getAs<ErrorType>()) {
-      auto genericErrorTy = ErrorType::get(ErrorTy->getASTContext());
-      return { genericErrorTy, genericErrorTy, genericErrorTy, genericErrorTy };
-    }
     // This is the easy case.
-    funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
+    openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
+
+    if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
+      openedType = genericFn->substGenericArgs([&](Type type) {
+        return openType(type, replacements);
+      });
+    }
   } else {
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
@@ -2418,29 +2429,21 @@ ConstraintSystem::getTypeOfMemberReference(
         !selfTy->hasError())
       selfFlags = selfFlags.withInOut(true);
 
-    // If the storage is generic, add a generic signature.
-    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    if (auto sig = innerDC->getGenericSignatureOfContext()) {
-      GenericFunctionType::ExtInfo info;
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType, info);
-    } else {
-      FunctionType::ExtInfo info;
-      funcType = FunctionType::get({selfParam}, refType, info);
+    // If the storage is generic, open the self and ref types.
+    if (genericSig) {
+      selfTy = openType(selfTy, replacements);
+      refType = openType(refType, replacements);
     }
-  }
+    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
-  // While opening member function type, let's delay opening requirements
-  // to allow contextual types to affect the situation.
-  if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
-    openGenericParameters(outerDC, genericFn->getGenericSignature(),
-                          replacements, locator);
-
-    openedType = genericFn->substGenericArgs(
-        [&](Type type) { return openType(type, replacements); });
-  } else {
-    openedType = funcType;
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    openedType = FunctionType::get({selfParam}, refType, info);
   }
+  assert(!openedType->hasTypeParameter());
+
+  unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
+      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
@@ -2491,9 +2494,9 @@ ConstraintSystem::getTypeOfMemberReference(
   // failing we'll get a generic requirement constraint failure
   // if mismatch is related to generic parameters which is much
   // easier to diagnose.
-  if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
+  if (genericSig) {
     openGenericRequirements(
-        outerDC, genericFn->getGenericSignature(),
+        outerDC, genericSig,
         /*skipProtocolSelfConstraint=*/true, locator,
         [&](Type type) { return openType(type, replacements); });
   }
