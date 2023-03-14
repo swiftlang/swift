@@ -16,6 +16,11 @@ enum FakeOptional<T> {
 
 sil @get_klass : $@convention(thin) () -> @owned Klass
 
+// This test is not optimized because the dest bb of the branch has a single predecessor
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading1 :
+// CHECK: switch_enum
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading1'
 sil [ossa] @test_simplify_switch_enum_jump_threading1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   test_specification "simplify-cfg-try-jump-threading @instruction[1]"
@@ -37,7 +42,10 @@ bb4:
   return %t : $()
 }
 
-
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading2 :
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading2'
 sil [ossa] @test_simplify_switch_enum_jump_threading2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   cond_br undef, bb1, bb2
@@ -68,6 +76,10 @@ bb6:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading3 :
+// CHECK: select_enum
+// CHECK: select_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading3'
 sil [ossa] @test_simplify_switch_enum_jump_threading3 : $@convention(thin) (@owned Klass) -> Builtin.Int1 {
 bb0(%0 : @owned $Klass):
   %t = integer_literal $Builtin.Int1, 1
@@ -128,6 +140,10 @@ bb5:
   return %z : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_jump_thread_checked_cast_value :
+// CHECK: select_enum
+// CHECK: select_enum
+// CHECK-LABEL: } // end sil function 'test_jump_thread_checked_cast_value'
 sil [ossa] @test_jump_thread_checked_cast_value : $@convention(thin) (@owned AnyKlass, @owned AnyKlass) -> () {
 bb0(%0 : @owned $AnyKlass, %1 : @owned $AnyKlass):
   cond_br undef, bb1, bb2
