@@ -350,7 +350,7 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     // macro does not produce the requested name, so the only impact is possibly
     // expanding earlier than needed / unnecessarily looking in the top-level
     // auxiliary decl cache.
-    for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    for (auto attrConst : decl->getAttrs().getAttributes<CustomAttr>()) {
       auto *attr = const_cast<CustomAttr *>(attrConst);
       UnresolvedMacroReference macroRef(attr);
       auto macroName = macroRef.getMacroName().getBaseIdentifier();

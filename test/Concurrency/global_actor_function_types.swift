@@ -386,3 +386,13 @@ func test_global_actor_mismatch() {
     let _: @MainActor () -> T = fn // expected-error{{cannot convert value actor-isolated to 'GA' to specified type actor-isolated to 'MainActor'}}
   }
 }
+
+struct GlobalType {}
+
+@_Concurrency.MainActor
+extension global_actor_function_types.GlobalType {
+  @_Concurrency.MainActor static func ==(
+    lhs: global_actor_function_types.GlobalType,
+    rhs: global_actor_function_types.GlobalType
+  ) -> Bool { true }
+}
