@@ -919,7 +919,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   return !resultTy;
 }
 
-/// Find the '~=` operator that can compare an expression inside a pattern to a
+/// Find the `~=` operator that can compare an expression inside a pattern to a
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
@@ -930,13 +930,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
 
-  // Result of `~=` should always be a boolean.
-  auto *matchCall = EP->getMatchExpr();
-  auto contextualTy = Context.getBoolDecl()->getDeclaredInterfaceType();
-  auto target =
-      SyntacticElementTarget::forExprPattern(matchCall, DC, EP, contextualTy);
-
   // Check the expression as a condition.
+  auto target = SyntacticElementTarget::forExprPattern(EP);
   auto result = typeCheckExpression(target);
   if (!result)
     return true;
