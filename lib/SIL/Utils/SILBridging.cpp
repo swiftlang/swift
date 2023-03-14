@@ -447,8 +447,21 @@ static Operand *castToOperand(BridgedOperand operand) {
   return const_cast<Operand *>(static_cast<const Operand *>(operand.op));
 }
 
-BridgedValue Operand_getValue(BridgedOperand operand) {
-  return {castToOperand(operand)->get()};
+BridgedClassifiedValue Operand_getValue(BridgedOperand operand) {
+  SILValue v = castToOperand(operand)->get();
+  BridgedClassifiedValue::Kind k;
+  if (isa<SingleValueInstruction>(v)) {
+    k = BridgedClassifiedValue::Kind::SingleValueInstruction;
+  } else if (isa<SILArgument>(v)) {
+    k = BridgedClassifiedValue::Kind::Argument;
+  } else if (isa<MultipleValueInstructionResult>(v)) {
+    k = BridgedClassifiedValue::Kind::MultipleValueInstructionResult;
+  } else if (isa<SILUndef>(v)) {
+    k = BridgedClassifiedValue::Kind::Undef;
+  } else {
+    llvm_unreachable("unknown SILValue");
+  }
+  return {castToOperand(operand)->get(), k};
 }
 
 OptionalBridgedOperand Operand_nextUse(BridgedOperand operand) {
