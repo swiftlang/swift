@@ -497,6 +497,9 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
 
     if (isa<RefElementAddrInst>(stripAccessMarkers(operand)))
       return true;
+
+    if (isa<GlobalAddrInst>(stripAccessMarkers(operand)))
+      return true;
   }
 
   return false;
