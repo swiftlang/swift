@@ -819,12 +819,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
 
   private func hasRelevantType(_ value: Value, at path: SmallProjectionPath) -> Bool {
-    if !value.hasTrivialNonPointerType {
-      return true
-    }
     if visitor.followTrivialTypes &&
        // When part of a class field only need to follow non-trivial types
        !path.hasClassProjection {
+      return true
+    }
+    if !value.hasTrivialNonPointerType {
       return true
     }
     return false
