@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: rdar://106656555
+// rdar://106656555
+// REQUIRES: rdar106656555
 
 import StdlibUnittest
 
