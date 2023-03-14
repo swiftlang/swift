@@ -30,10 +30,6 @@
 #include <memory>
 #include <string>
 
-namespace llvm {
-  class raw_ostream;
-}
-
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
