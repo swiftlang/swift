@@ -13768,6 +13768,19 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   };
 
+  auto elementLoc = locator.withPathElement(LocatorPathElt::GenericArgument(0));
+
+  if (swiftPtr->isTypeVariableOrMember()) {
+    // Inference between the equivalent pointer kinds is
+    // handled by regular pointer conversions.
+    if (swiftPtrKind == cPtrKind)
+      return SolutionKind::Error;
+
+    addConstraint(ConstraintKind::BindToPointerType, swiftPtr, cPtr,
+                  elementLoc);
+    return markSupported();
+  }
+
   // If pointers have the same element type there is nothing to do.
   if (swiftPtr->isEqual(cPtr))
     return markSupported();
@@ -13783,14 +13796,9 @@ ConstraintSystem::simplifyPointerToCPointerRestriction(
     // Unsafe[Mutable]Pointer<T> -> Unsafe[Mutable]Pointer<[U]Int8>
     if (cPtr->isInt8() || cPtr->isUInt8()) {
       // <T> can default to the type of C pointer.
-      addConstraint(
-          ConstraintKind::Defaultable, swiftPtr, cPtr,
-          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      addConstraint(ConstraintKind::Defaultable, swiftPtr, cPtr, elementLoc);
       return markSupported();
     }
-
-    auto elementLoc =
-        locator.withPathElement(LocatorPathElt::GenericArgument(0));
 
     // Unsafe[Mutable]Pointer<Int{8, 16, ...}> <->
     // Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
