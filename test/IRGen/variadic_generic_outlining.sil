@@ -18,7 +18,7 @@ struct Wrapper<Value> {
 // CHECK-NEXT:  [[ELT_TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align
 //   Test that we do the copy through the VWT for the element type.
 // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[ELT_TYPE]] to i8***
-// CHECK-NEXT:  [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
+// CHECK-NEXT:  [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], [[INT]] -1
 sil hidden @test_outlining : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat Wrapper<each T>}) -> @pack_out Pack{repeat Wrapper<each T>} {
 bb0(%0 : $*Pack{repeat Wrapper<each T>}, %1 : $*Pack{repeat Wrapper<each T>}):
   %zero = integer_literal $Builtin.Word, 0
