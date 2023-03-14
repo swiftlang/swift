@@ -25,7 +25,6 @@ set(sources
   _SwiftBacktracing.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
-  _SwiftRuntime.h
 
   module.modulemap
   )

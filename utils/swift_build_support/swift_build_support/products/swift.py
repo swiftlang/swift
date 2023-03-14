@@ -58,9 +58,6 @@ class Swift(product.Product):
         # Add backtracing flag.
         self.cmake_options.extend(self._enable_backtracing)
 
-        # Add experimental reflection flag.
-        self.cmake_options.extend(self._enable_experimental_reflection)
-
         # Add experimental observation flag.
         self.cmake_options.extend(self._enable_experimental_observation)
 
@@ -180,11 +177,6 @@ updated without updating swift.py?")
     def _enable_backtracing(self):
         return [('SWIFT_ENABLE_BACKTRACING:BOOL',
                  self.args.swift_enable_backtracing)]
-
-    @property
-    def _enable_experimental_reflection(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL',
-                 self.args.enable_experimental_reflection)]
 
     @property
     def _enable_experimental_observation(self):

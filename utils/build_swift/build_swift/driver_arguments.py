@@ -1319,9 +1319,6 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift string processing.')
 
-    option('--enable-experimental-reflection', toggle_true,
-           default=True,
-           help='Enable experimental Swift reflection.')
     option('--enable-experimental-observation', toggle_true,
            default=True,
            help='Enable experimental Swift observation.')

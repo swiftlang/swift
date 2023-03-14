@@ -189,7 +189,6 @@ normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
@@ -393,10 +392,6 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_BACKTRACING)
           list(APPEND LIT_ARGS "--param" "backtracing")
-        endif()
-
-        if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-          list(APPEND LIT_ARGS "--param" "reflection")
         endif()
 
         if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
