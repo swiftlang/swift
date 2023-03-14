@@ -306,11 +306,12 @@ using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
 
 static void createConjunction(ConstraintSystem &cs,
                               ArrayRef<ElementInfo> elements,
-                              ConstraintLocator *locator) {
-  bool isIsolated = false;
-
+                              ConstraintLocator *locator,
+                              bool isIsolated = false,
+                              ArrayRef<TypeVariableType *> extraTypeVars = {}) {
   SmallVector<Constraint *, 4> constraints;
   SmallVector<TypeVariableType *, 2> referencedVars;
+  referencedVars.append(extraTypeVars.begin(), extraTypeVars.end());
 
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());

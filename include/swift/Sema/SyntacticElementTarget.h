@@ -190,13 +190,6 @@ public:
                          ConstraintLocator *convertTypeLocator,
                          bool isDiscarded);
 
-  SyntacticElementTarget(Expr *expr, DeclContext *dc, ExprPattern *pattern,
-                         Type patternType)
-      : SyntacticElementTarget(expr, dc, CTP_ExprPattern, patternType,
-                               /*isDiscarded=*/false) {
-    setPattern(pattern);
-  }
-
   SyntacticElementTarget(ClosureExpr *closure, Type convertType) {
     kind = Kind::closure;
     this->closure.closure = closure;
@@ -296,11 +289,8 @@ public:
   forPropertyWrapperInitializer(VarDecl *wrappedVar, DeclContext *dc,
                                 Expr *initializer);
 
-  static SyntacticElementTarget forExprPattern(Expr *expr, DeclContext *dc,
-                                               ExprPattern *pattern,
-                                               Type patternTy) {
-    return {expr, dc, pattern, patternTy};
-  }
+  /// Form a target for the match expression of an ExprPattern.
+  static SyntacticElementTarget forExprPattern(ExprPattern *pattern);
 
   /// This is useful for code completion.
   ASTNode getAsASTNode() const {
@@ -781,11 +771,13 @@ public:
 
       // For an initialization, include the pattern in the range too.
       if (isForInitialization()) {
-        if (auto patternRange = getInitializationPattern()->getSourceRange()) {
-          if (range.isInvalid()) {
-            range = patternRange;
-          } else {
-            range.widen(patternRange);
+        if (auto *pattern = getInitializationPattern()) {
+          if (auto patternRange = pattern->getSourceRange()) {
+            if (range.isInvalid()) {
+              range = patternRange;
+            } else {
+              range.widen(patternRange);
+            }
           }
         }
       }
