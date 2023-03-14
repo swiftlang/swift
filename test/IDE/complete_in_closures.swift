@@ -498,3 +498,56 @@ func testBinaryOperatorWithEnum() {
 // BINARY_OPERATOR_WITH_ENUM: End completions
 
 }
+
+func testPreviousSyntacticElementHasError() {
+  struct MyStruct {}
+
+  class MyClass {
+    var myMember: Int = 1
+    var myString: String = "1"
+  }
+
+  @resultBuilder struct ViewBuilder {
+    static func buildBlock<Content>(_ content: Content) -> Content { content }
+  }
+
+  func buildView<Content>(@ViewBuilder content: () -> Content) -> Int { 0 }
+
+  func takeClosure(_ action: () -> Void) {}
+
+  func test(x: MyClass) {
+    // Not that the previous syntactic element (let a) has an error because we
+    // skip MyStruct inside the result builder for performance reasons.
+    takeClosure {
+      let a = buildView {
+        MyStruct()
+      }
+      x.#^PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR^#myMember = 1234
+    }
+  }
+// PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR: Begin completions
+// PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR-DAG: Keyword[self]/CurrNominal:          self[#MyClass#]; name=self
+// PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: myMember[#Int#]; name=myMember
+// PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR-DAG: Decl[InstanceVar]/CurrNominal:      myString[#String#]; name=myString
+// PREVIOUS_SYNTACTIC_ELEMENT_HAS_ERROR: End completions
+}
+
+func testCompleteAfterClosureWithIfExprThatContainErrors() {
+  _ = {
+    if true {
+      invalid(1)
+    } else if true {
+      invalid(2)
+    } else {
+      invalid(3)
+    }
+  }#^AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS^#
+
+  // FIXME: We shouldn't be suggesting 'self' and '()' twice here
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS: Begin completions, 4 items
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Keyword[self]/CurrNominal:          .self[#() -> _#]; name=self
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Keyword[self]/CurrNominal:          .self[#() -> ()#]; name=self
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#_#]; name=()
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Void#]; name=()
+  // AFTER_CLOSURE_WITH_IF_EXPR_THAT_CONTAIN_ERRORS: End completions
+}

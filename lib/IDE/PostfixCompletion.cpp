@@ -95,6 +95,14 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
     }
   }
 
+  if (isa<AbstractClosureExpr>(fallbackDC)) {
+    // If the expression is embedded in a closure, the constraint system tries
+    // to retrieve that closure's type, which will fail since we won't have
+    // generated any type variables for it. Thus, fallback type checking isn't
+    // available in this case.
+    return;
+  }
+
   SyntacticElementTarget completionTarget(fallbackExpr, fallbackDC, CTP_Unused,
                                           Type(),
                                           /*isDiscared=*/true);
