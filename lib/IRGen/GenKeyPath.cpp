@@ -726,14 +726,18 @@ emitKeyPathComponent(IRGenModule &IGM,
   assert(fields.getNextOffsetFromGlobal() % Alignment(4) == Size(0)
          && "must be 32-bit-aligned here");
 
+  auto sig = genericEnv
+               ? genericEnv->getGenericSignature().getCanonicalSignature()
+               : nullptr;
+
+  Lowering::TypeConverter::GenericContextRAII
+    genericScope(IGM.getSILTypes(), sig);
+
   SILType loweredBaseTy;
   loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
                                      baseTy->getWithoutSpecifierType());
   // TODO: Eliminate GenericContextScope entirely
-  GenericContextScope scope(
-      IGM, genericEnv
-               ? genericEnv->getGenericSignature().getCanonicalSignature()
-               : nullptr);
+  GenericContextScope scope(IGM, sig);
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = cast<VarDecl>(component.getStoredPropertyDecl());

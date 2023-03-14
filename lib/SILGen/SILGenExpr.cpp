@@ -2988,6 +2988,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   // Build the signature of the thunk as expected by the keypath runtime.
   auto signature = [&]() {
+    TypeConverter::GenericContextRAII genericsScope(SGM.Types, genericSig);
+
     CanType loweredBaseTy, loweredPropTy;
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
@@ -3163,6 +3165,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   // Build the signature of the thunk as expected by the keypath runtime.
   auto signature = [&]() {
+    TypeConverter::GenericContextRAII genericsScope(SGM.Types, genericSig);
+
     CanType loweredBaseTy, loweredPropTy;
     {
       AbstractionPattern opaque = AbstractionPattern::getOpaque();
@@ -3342,6 +3346,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     genericSig = nullptr;
     genericEnv = nullptr;
   }
+
+  TypeConverter::GenericContextRAII scope(SGM.Types, genericSig);
 
   auto &C = SGM.getASTContext();
   auto unsafeRawPointerTy = C.getUnsafeRawPointerType()->getCanonicalType();

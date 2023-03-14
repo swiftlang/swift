@@ -50,8 +50,12 @@ SILType SILFunctionType::substInterfaceType(SILModule &M,
                                             SILType interfaceType,
                                             TypeExpansionContext context) const {
   // Apply pattern substitutions first, then invocation substitutions.
-  if (auto subs = getPatternSubstitutions())
+  if (auto subs = getPatternSubstitutions()) {
+    Optional<TypeConverter::GenericContextRAII> genericsScope;
+    if (auto invocationSig = getInvocationGenericSignature())
+      genericsScope.emplace(M.Types, invocationSig);
     interfaceType = interfaceType.subst(M, subs, context);
+  }
   if (auto subs = getInvocationSubstitutions())
     interfaceType = interfaceType.subst(M, subs, context);
   return interfaceType;
@@ -63,6 +67,14 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
   // If we have no substitutions, there's nothing to do.
   if (!hasPatternSubstitutions() && !hasInvocationSubstitutions())
     return CanSILFunctionType(mutableThis);
+
+  auto signature = isPolymorphic() ? getInvocationGenericSignature()
+                                   : CanGenericSignature();
+
+  Optional<TypeConverter::GenericContextRAII> genericsScope;
+  if (signature) {
+    genericsScope.emplace(M.Types, signature);
+  }
 
   // Otherwise, substitute the component types.
 
@@ -94,8 +106,6 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
     errorResult = error->map(substComponentType);
   }
 
-  auto signature = isPolymorphic() ? getInvocationGenericSignature()
-                                   : CanGenericSignature();
   return SILFunctionType::get(signature,
                               getExtInfo(),
                               getCoroutineKind(),
@@ -515,6 +525,8 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
+    TypeConverter::GenericContextRAII genericsScope(TC, sig);
+
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
@@ -542,6 +554,8 @@ static CanSILFunctionType getAutoDiffDifferentialType(
           ResultConvention origResConv) -> ResultConvention {
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+
+    TypeConverter::GenericContextRAII genericsScope(TC, sig);
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -663,6 +677,8 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
 
+    TypeConverter::GenericContextRAII genericsScope(TC, sig);
+
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
     auto &tl =
@@ -696,6 +712,8 @@ static CanSILFunctionType getAutoDiffPullbackType(
           ParameterConvention origParamConv) -> ResultConvention {
     auto sig = buildDifferentiableGenericSignature(
       originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+
+    TypeConverter::GenericContextRAII genericsScope(TC, sig);
 
     tanType = tanType->getReducedType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -2244,6 +2262,7 @@ static CanSILFunctionType getSILFunctionType(
   }();
   
   SubstitutionMap substFunctionTypeSubs;
+  Optional<TypeConverter::GenericContextRAII> substFunctionTypeGenericsRAII;
   
   if (shouldBuildSubstFunctionType) {
     // Generalize the generic signature in the abstraction pattern, so that
@@ -2264,6 +2283,7 @@ static CanSILFunctionType getSILFunctionType(
       coroutineOrigYieldType = substYieldType;
       coroutineSubstYieldType = substYieldType.getType();
     }
+    substFunctionTypeGenericsRAII.emplace(TC, origType.getGenericSignature());
   }
 
   // Lower the result type.

@@ -175,6 +175,12 @@ enum IsLexical_t : bool {
   IsLexical = true,
 };
 
+/// Does this type contain at least one non-copyable type?
+enum IsMoveOnly_t : bool {
+  IsNotMoveOnly = false,
+  IsMoveOnly = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -191,10 +197,11 @@ public:
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
       LexicalFlag                = 1 << 7,
+      MoveOnlyFlag               = 1 << 8,
     };
     // clang-format on
 
-    uint8_t Flags;
+    uint16_t Flags;
   public:
     /// Construct a default RecursiveProperties, which corresponds to
     /// a trivial, loadable, fixed-layout type.
@@ -206,14 +213,16 @@ public:
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
-        IsLexical_t isLexical = IsNotLexical)
+        IsLexical_t isLexical = IsNotLexical,
+        IsMoveOnly_t isMoveOnly = IsNotMoveOnly)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
                 (hasRawPointer ? HasRawPointerFlag : 0U) |
-                (isLexical ? LexicalFlag : 0U)) {}
+                (isLexical ? LexicalFlag : 0U) |
+                (isMoveOnly ? MoveOnlyFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -271,6 +280,9 @@ public:
     IsLexical_t isLexical() const {
       return IsLexical_t((Flags & LexicalFlag) != 0);
     }
+    IsMoveOnly_t isMoveOnly() const {
+      return IsMoveOnly_t((Flags & MoveOnlyFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -284,6 +296,7 @@ public:
     void setLexical(IsLexical_t isLexical) {
       Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
     }
+    void setMoveOnly() { Flags |= MoveOnlyFlag; }
   };
 
 private:
@@ -737,13 +750,13 @@ class TypeConverter {
     }
 
     static bool isTreacherousInterfaceType(CanType type) {
-      // Don't cache lowerings for interface function types that involve
-      // type parameters; we might need a contextual generic signature to
-      // handle them correctly.
-      if (!type->hasTypeParameter()) return false;
-      return type.findIf([](CanType type) {
-        return isa<FunctionType>(type) && type->hasTypeParameter();
-      });
+      // Don't cache lowerings for interface types that involve
+      // type parameters; we might need a contextual generic
+      // signature to handle them correctly.  Note that computing
+      // a lowered type generally only cares about this within
+      // function types, but computing type properties can care
+      // about this more generally.
+      return type->hasTypeParameter();
     }
   };
 
@@ -819,8 +832,9 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &getTypeLoweringForLoweredType(
-      AbstractionPattern origType, CanType loweredType,
-      TypeExpansionContext forExpansion,
+      CanType loweredType, TypeExpansionContext forExpansion);
+  const TypeLowering &getTypeLoweringForLoweredType(
+      CanType loweredType, TypeExpansionContext forExpansion,
       IsTypeExpansionSensitive_t isTypeExpansionSensitive);
 
   const TypeLowering *getTypeLoweringForExpansion(
@@ -934,7 +948,7 @@ public:
   static bool isIndirectPlusZeroSelfParameter(SILType T) {
     return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
-  
+
   /// Lowers a context-independent Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   ///
@@ -968,17 +982,30 @@ public:
   const TypeLowering &
   getTypeLowering(SILType t, SILFunction &F);
 
-  // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t, TypeExpansionContext forExpansion) {
-    return getTypeLowering(t, forExpansion).getLoweredType();
-  }
+  /// Lower the given formal type according to the abstraction pattern
+  /// and expansion context and return its formal properties.
+  /// The lowered type is always an object type.
+  std::pair<SILType, TypeLowering::RecursiveProperties>
+  getLoweredTypeAndProperties(AbstractionPattern origType,
+                              CanType substType,
+                              TypeExpansionContext forExpansion);
+
+  TypeLowering::RecursiveProperties
+  getTypeProperties(Type substType, TypeExpansionContext forExpansion);
+
+  TypeLowering::RecursiveProperties
+  getTypeProperties(SILType t, TypeExpansionContext forExpansion);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(AbstractionPattern origType, Type substType,
-                         TypeExpansionContext forExpansion) {
-    return getTypeLowering(origType, substType, forExpansion)
-      .getLoweredType();
+  SILType getLoweredType(Type t, TypeExpansionContext forExpansion) {
+    return getLoweredType(AbstractionPattern(t->getCanonicalType()),
+                          t, forExpansion);
   }
+
+  /// Returns the lowered SIL type for a Swift type.  Always returns
+  /// an object type.
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
+                         TypeExpansionContext forExpansion);
 
   SILType getLoweredLoadableType(Type t,
                                  TypeExpansionContext forExpansion,
@@ -990,14 +1017,10 @@ public:
     return ti.getLoweredType();
   }
 
-  CanType getLoweredRValueType(TypeExpansionContext context, Type t) {
-    return getLoweredType(t, context).getRawASTType();
-  }
+  CanType getLoweredRValueType(TypeExpansionContext context, Type t);
 
   CanType getLoweredRValueType(TypeExpansionContext context,
-                               AbstractionPattern origType, Type substType) {
-    return getLoweredType(origType, substType, context).getRawASTType();
-  }
+                               AbstractionPattern origType, Type substType);
 
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
                                            bool isNonObjC = false);
@@ -1230,10 +1253,6 @@ public:
   void setLoweredAddresses();
 
 private:
-  CanType computeLoweredRValueType(TypeExpansionContext context,
-                                   AbstractionPattern origType,
-                                   CanType substType);
-
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               Bridgeability bridging,
                               SILFunctionTypeRepresentation rep,
