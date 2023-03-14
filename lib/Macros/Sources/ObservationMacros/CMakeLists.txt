@@ -12,4 +12,10 @@
 
 add_swift_macro_library(ObservationMacros
   ObservableMacro.swift
+  SWIFT_DEPENDENCIES
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftSyntaxMacros
 )

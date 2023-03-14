@@ -93,6 +93,7 @@ include(CheckSymbolExists)
 include(CMakeDependentOption)
 include(CheckLanguage)
 include(GNUInstallDirs)
+include(SwiftImplicitImport)
 
 # Enable Swift for the host compiler build if we have the language. It is
 # optional until we have a bootstrap story.
@@ -732,6 +733,16 @@ message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPIL
 message(STATUS "Assembler (${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER}) Version: ${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER_VERSION}")
 if (CMAKE_Swift_COMPILER)
   message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
+
+  # Check if the current Swift compiler has implicit _StringProcessing module.
+  swift_supports_implicit_module("string-processing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  message(STATUS "  Implicit 'string-processing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT}")
+
+  # Same for _Backtracing.
+  swift_supports_implicit_module("backtracing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+  message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
@@ -777,6 +788,7 @@ include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
+include(AddPureSwift)
 
 # Configure swift include, install, build components.
 swift_configure_components()
