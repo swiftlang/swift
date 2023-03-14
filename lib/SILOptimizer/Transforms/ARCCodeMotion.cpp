@@ -254,6 +254,17 @@ bool CodeMotionContext::run() {
   // Initialize the data flow.
   initializeCodeMotionDataFlow();
 
+  if (RCRootVault.size() > 500) {
+    // Emergency exit to avoid bad compile time problems in rare corner cases.
+    // This limit is more than enough for "real world" code.
+    // Even large functions have < 100 locations.
+    // But in some corner cases - especially in generated code - we can run
+    // into quadratic complexity for large functions.
+    // TODO: eventually the ARCCodeMotion passes will be replaced by OSSA
+    //       optimizations which shouldn't have this problem.
+    return false;
+  }
+
   // Converge the BBSetOut with iterative data flow.
   if (MultiIteration) {
     initializeCodeMotionBBMaxSet();

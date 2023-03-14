@@ -1204,6 +1204,17 @@ bool DSEContext::run() {
   //
   // Initialize the BBToLocState mapping.
   unsigned LocationNum = this->getLocationVault().size();
+
+  if (LocationNum > 500) {
+    // Emergency exit to avoid bad compile time problems in rare corner cases.
+    // This limit is more than enough for "real world" code.
+    // Even large functions have < 100 locations.
+    // But in some corner cases - especially in generated code - we can run
+    // into quadratic complexity for large functions.
+    // TODO: implement DSE with a better (non-quadratic) algorithm
+    return false;
+  }
+
   for (auto bs : BBToLocState) {
     bs.data.init(&bs.block, LocationNum, Optimistic);
     bs.data.initStoreSetAtEndOfBlock(*this);
