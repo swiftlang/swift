@@ -1036,8 +1036,8 @@ namespace {
       // If there isn't one there, optimistically create an entry and
       // try to swap it in.
       if (!existingEntry) {
-        auto allocatedEntry =
-          new SingletonMetadataCacheEntry(std::forward<ArgTys>(args)...);
+        auto allocatedEntry = swift_cxx_newObject<SingletonMetadataCacheEntry>(
+            std::forward<ArgTys>(args)...);
         if (cache.Private.compare_exchange_strong(existingEntry,
                                                   allocatedEntry,
                                                   std::memory_order_acq_rel,
@@ -3316,12 +3316,12 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
     if (!_globalIvarOffsets) {
       if (numFields <= NumInlineGlobalIvarOffsets) {
         _globalIvarOffsets = _inlineGlobalIvarOffsets;
+        // Make sure all the entries start out null.
+        memset(_globalIvarOffsets, 0, sizeof(size_t *) * numFields);
       } else {
-        _globalIvarOffsets = new size_t*[numFields];
+        _globalIvarOffsets =
+            static_cast<size_t **>(calloc(sizeof(size_t *), numFields));
       }
-
-      // Make sure all the entries start out null.
-      memset(_globalIvarOffsets, 0, sizeof(size_t*) * numFields);
     }
     return _globalIvarOffsets;
   };
@@ -3381,7 +3381,7 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
 
     // Free the out-of-line if we allocated one.
     if (_globalIvarOffsets != _inlineGlobalIvarOffsets) {
-      delete [] _globalIvarOffsets;
+      free(_globalIvarOffsets);
     }
   }
 

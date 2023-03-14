@@ -30,10 +30,10 @@ SwiftTLSContext &SwiftTLSContext::get() {
 
   static swift::once_t token;
   swift::tls_init_once(token, swift::tls_key::runtime, [](void *pointer) {
-    delete static_cast<SwiftTLSContext *>(pointer);
+    swift_cxx_deleteObject(static_cast<SwiftTLSContext *>(pointer));
   });
 
-  ctx = new SwiftTLSContext();
+  ctx = swift_cxx_newObject<SwiftTLSContext>();
   swift::tls_set(swift::tls_key::runtime, ctx);
   return *ctx;
 
@@ -51,7 +51,7 @@ SwiftTLSContext &SwiftTLSContext::get() {
   static swift::once_t token;
 
   swift::tls_alloc_once(token, runtimeKey, [](void *pointer) {
-    delete static_cast<SwiftTLSContext *>(pointer);
+    swift_cxx_deleteObject(static_cast<SwiftTLSContext *>(pointer));
   });
 
   SwiftTLSContext *ctx =
@@ -59,7 +59,7 @@ SwiftTLSContext &SwiftTLSContext::get() {
   if (ctx)
     return *ctx;
 
-  ctx = new SwiftTLSContext();
+  ctx = swift_cxx_newObject<SwiftTLSContext>();
   swift::tls_set(runtimeKey, ctx);
   return *ctx;
 
