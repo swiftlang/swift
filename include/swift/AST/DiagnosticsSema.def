@@ -6629,7 +6629,21 @@ ERROR(cannot_declare_computed_var_in_result_builder,none,
 ERROR(cannot_convert_result_builder_result_to_return_type,none,
       "cannot convert result builder result type %0 to return type %1",
       (Type,Type))
-
+ERROR(result_builder_buildblock_not_accessible,none,
+      "result builder must provide at least one static 'buildBlock' as "
+      "accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_first_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(first:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(accumulated:next:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
