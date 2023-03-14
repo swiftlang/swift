@@ -65,4 +65,16 @@ extension Enum {
     // CHECK-NEXT:   get
     // CHECK-NEXT: }
   }
+
+  // CHECK: #if compiler(>=5.3) && $Actors
+  // CHECK-NEXT: @_hasMissingDesignatedInitializers @available(macOS, unavailable)
+  // CHECK-NEXT: public actor UnavailableExtensionNestedActor {
+  @available(macOS, unavailable)
+  public actor UnavailableExtensionNestedActor {
+    // CHECK: @available(iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+    // CHECK-NEXT: @available(macOS, unavailable)
+    // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+    // CHECK-NEXT:   get
+    // CHECK-NEXT: }
+  }
 }

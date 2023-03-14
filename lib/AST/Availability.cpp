@@ -143,26 +143,54 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // a per-platform basis.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
-    for (const DeclAttribute *Attr : D->getAttrs()) {
-      auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
-      if (!AvAttr || AvAttr->isInvalid())
-        continue;
+    do {
+      for (const DeclAttribute *Attr : D->getAttrs()) {
+        auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
+        if (!AvAttr || AvAttr->isInvalid())
+          continue;
 
-      mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
 
-      if (Message.empty() && !AvAttr->Message.empty())
-        Message = AvAttr->Message;
+        if (Message.empty() && !AvAttr->Message.empty())
+          Message = AvAttr->Message;
 
-      if (Rename.empty() && !AvAttr->Rename.empty()) {
-        Rename = AvAttr->Rename;
-        RenameDecl = AvAttr->RenameDecl;
+        if (Rename.empty() && !AvAttr->Rename.empty()) {
+          Rename = AvAttr->Rename;
+          RenameDecl = AvAttr->RenameDecl;
+        }
       }
+
+      // Walk up the enclosing declaration hierarchy to make sure we aren't
+      // missing any inherited attributes.
+      D = AvailabilityInference::parentDeclForInferredAvailability(D);
+    } while (D);
+  }
+
+  DeclAttributes &Attrs = ToDecl->getAttrs();
+
+  // Some kinds of platform agnostic availability supersede any platform
+  // specific availability.
+  auto InferredAgnostic = Inferred.find(PlatformKind::none);
+  if (InferredAgnostic != Inferred.end()) {
+    switch (InferredAgnostic->second.PlatformAgnostic) {
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+      Attrs.add(createAvailableAttr(PlatformKind::none,
+                                    InferredAgnostic->second, Message, Rename,
+                                    RenameDecl, Context));
+      return;
+
+    case PlatformAgnosticAvailabilityKind::None:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+      break;
     }
   }
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
-  DeclAttributes &Attrs = ToDecl->getAttrs();
   for (auto &Pair : Inferred) {
     auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
                                      Rename, RenameDecl, Context);
