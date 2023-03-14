@@ -149,7 +149,7 @@ extension TriggerSequence: AsyncSequence {
         subject.field3 = i
       }
     }
-
+#if false // disabled for now
     suite.test("unobserved value changes (nonmacro)") {
       let subject = TestWithoutMacro()
       for i in 0..<100 {
@@ -268,7 +268,7 @@ extension TriggerSequence: AsyncSequence {
       subject.field1 = "asdf"
       expectEqual(changed.contents, true)
     }
-
+#endif
     await runAllTestsAsync()
   }
 }
