@@ -42,6 +42,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -264,6 +265,24 @@ static bool convertExtractsToDestructures(CanonicalDefWorklist &copiedDefs,
 }
 
 //===----------------------------------------------------------------------===//
+//                MARK: Eliminate redundant moves
+//===----------------------------------------------------------------------===//
+
+/// If the specified move_value is redundant (there's no benefit to separating
+/// the lifetime at it), replace its uses with uses of the moved-from value and
+/// delete it.
+static bool eliminateRedundantMove(MoveValueInst *mvi,
+                                   InstructionDeleter &deleter) {
+  if (!isRedundantMoveValue(mvi))
+    return false;
+  mvi->replaceAllUsesWith(mvi->getOperand());
+  // Call InstructionDeleter::forceDeleteWithUsers to avoid "fixing up"
+  // ownership of the moved-from value, i.e. inserting a destroy_value.
+  deleter.forceDeleteWithUsers(mvi);
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                   MARK: Sink owned forwarding operations
 //===----------------------------------------------------------------------===//
 
@@ -420,6 +439,7 @@ void CopyPropagation::run() {
   bool changed = false;
 
   StackList<BeginBorrowInst *> beginBorrowsToShrink(f);
+  StackList<MoveValueInst *> moveValues(f);
 
   // Driver: Find all copied or borrowed defs.
   for (auto &bb : *f) {
@@ -428,6 +448,8 @@ void CopyPropagation::run() {
         defWorklist.updateForCopy(copy);
       } else if (auto *borrow = dyn_cast<BeginBorrowInst>(&i)) {
         beginBorrowsToShrink.push_back(borrow);
+      } else if (auto *move = dyn_cast<MoveValueInst>(&i)) {
+        moveValues.push_back(move);
       } else if (canonicalizeAll) {
         if (auto *destroy = dyn_cast<DestroyValueInst>(&i)) {
           defWorklist.updateForCopy(destroy->getOperand());
@@ -480,8 +502,12 @@ void CopyPropagation::run() {
           hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
+      eliminateRedundantMove(folded, deleter);
       firstRun = false;
     }
+  }
+  for (auto *mvi : moveValues) {
+    eliminateRedundantMove(mvi, deleter);
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {

@@ -556,9 +556,9 @@ exit:
 // CHECK:         [[COPY_C:%[^,]+]] = copy_value [[LIFETIME_C]]
 // CHECK:         [[LIFETIME_D:%[^,]+]] = begin_borrow [[INSTANCE_D]]
 // CHECK:         struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
-// CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         end_borrow [[LIFETIME_D]]
 // CHECK:         destroy_value [[INSTANCE_D]]
+// CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         return [[COPY_C]]
 // CHECK-LABEL: } // end sil function 'hoist_over_struct'
 sil [ossa] @hoist_over_struct : $@convention(thin) (@owned C, @owned D) -> @owned C {
