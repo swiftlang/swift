@@ -2676,12 +2676,14 @@ void swift::swift_initStructMetadataWithLayoutString(
       extraInhabitantCount = fieldExtraInhabitantCount;
     }
 
-    if (fieldType->getValueWitnesses()->isPOD()) {
+    if (fieldType->vw_size() == 0) {
+      continue;
+    } else if (fieldType->getValueWitnesses()->isPOD()) {
       // no extra space required for POD
     } else if (fieldType->hasLayoutString()) {
       refCountBytes += *(const size_t *)(fieldType->getLayoutString() +
                                          sizeof(uint64_t));
-    } else if (fieldType->isClassObject()) {
+    } else if (fieldType->isClassObject() || fieldType->isAnyExistentialType()) {
       refCountBytes += sizeof(uint64_t);
     } else {
       refCountBytes += sizeof(uint64_t) + sizeof(uintptr_t);
@@ -2721,15 +2723,8 @@ void swift::swift_initStructMetadataWithLayoutString(
         layoutStrOffset += sizeof(uint64_t);
       }
 
-      // If this is an existential reference, add
-      // an additional ptr width to the offset
-      if (!(fieldTag & 0x1)) {
-        fullOffset += sizeof(uint8_t *);
-        previousFieldOffset = sizeof(uint8_t *);
-      }
-
-      fullOffset += sizeof(uint8_t *);
-      previousFieldOffset = sizeof(uint8_t *);
+      fullOffset += fieldType->size;
+      previousFieldOffset = fieldType->size;
 
       continue;
     }
@@ -2739,7 +2734,9 @@ void swift::swift_initStructMetadataWithLayoutString(
     fullOffset = roundUpToAlignMask(fullOffset, fieldType->vw_alignment() - 1);
     size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
 
-    if (fieldType->getValueWitnesses()->isPOD()) {
+    if (fieldType->vw_size() == 0) {
+      continue;
+    } else if (fieldType->getValueWitnesses()->isPOD()) {
       // No need to handle PODs
       previousFieldOffset = offset + fieldType->vw_size();
       fullOffset += fieldType->vw_size();
@@ -2747,35 +2744,68 @@ void swift::swift_initStructMetadataWithLayoutString(
       const uint8_t *fieldLayoutStr = fieldType->getLayoutString();
       const LayoutStringFlags fieldFlags =
           *(const LayoutStringFlags *)fieldLayoutStr;
-      const size_t refCountBytes =
+      const size_t fieldRefCountBytes =
           *(const size_t *)(fieldLayoutStr + sizeof(uint64_t));
-      flags |= fieldFlags;
-      memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + layoutStringHeaderSize,
-             refCountBytes);
-      if (offset) {
-        *(uint64_t *)(layoutStr + layoutStrOffset) += offset;
-      }
+      if (fieldRefCountBytes > 0) {
+        flags |= fieldFlags;
+        memcpy(layoutStr + layoutStrOffset, fieldLayoutStr + layoutStringHeaderSize,
+               fieldRefCountBytes);
 
-      if (flags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(layoutStr, layoutStrOffset,
-                                         fieldLayoutStr, refCountBytes,
-                                         fieldType);
-      }
+        if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
+          swift_resolve_resilientAccessors(layoutStr, layoutStrOffset,
+                                           fieldLayoutStr, fieldRefCountBytes,
+                                           fieldType);
+        }
 
-      previousFieldOffset = *(const uint64_t*)(fieldLayoutStr + layoutStringHeaderSize + refCountBytes);
+        if (offset) {
+          *(uint64_t *)(layoutStr + layoutStrOffset) += offset;
+        }
+
+        previousFieldOffset = *(const uint64_t*)(fieldLayoutStr + layoutStringHeaderSize + fieldRefCountBytes);
+        layoutStrOffset += fieldRefCountBytes;
+      } else {
+        previousFieldOffset += fieldType->vw_size();
+      }
       fullOffset += fieldType->vw_size();
-
-      layoutStrOffset += refCountBytes;
     } else if (auto *cls = fieldType->getClassObject()) {
-      auto tag = (cls->getFlags() & ClassFlags::UsesSwiftRefcounting) ?
-                    RefCountingKind::NativeStrong :
-                    RefCountingKind::Unknown;
+      RefCountingKind tag;
+      if (!cls->isTypeMetadata()) {
+      #if SWIFT_OBJC_INTEROP
+        tag = RefCountingKind::ObjC;
+      #else
+        tag = RefCountingKind::Unknown;
+      #endif
+      } else {
+        auto *vwt = cls->getValueWitnesses();
+        if (vwt == &VALUE_WITNESS_SYM(Bo)) {
+          tag = RefCountingKind::NativeStrong;
+        } else if (vwt == &VALUE_WITNESS_SYM(BO)) {
+        #if SWIFT_OBJC_INTEROP
+          tag = RefCountingKind::ObjC;
+        #else
+          tag = RefCountingKind::Unknown;
+        #endif
+        } else if (vwt == &VALUE_WITNESS_SYM(Bb)) {
+          tag = RefCountingKind::Bridge;
+        } else {
+          goto metadata;
+        };
+      }
+
+      *(uint64_t*)(layoutStr + layoutStrOffset) =
+        ((uint64_t)tag << 56) | offset;
+      layoutStrOffset += sizeof(uint64_t);
+      previousFieldOffset = fieldType->vw_size();
+      fullOffset += previousFieldOffset;
+    } else if (fieldType->isAnyExistentialType()) {
+      auto tag = RefCountingKind::Existential;
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)tag << 56) | offset;
       layoutStrOffset += sizeof(uint64_t);
       previousFieldOffset = fieldType->vw_size();
       fullOffset += previousFieldOffset;
     } else {
+metadata:
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)RefCountingKind::Metatype << 56) | offset;
       *(uintptr_t*)(layoutStr + layoutStrOffset + sizeof(uint64_t)) =
@@ -2791,7 +2821,9 @@ void swift::swift_initStructMetadataWithLayoutString(
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
-  *(uint64_t *)(layoutStr) = (uint64_t)flags & ~(LayoutStringFlags::HasRelativePointers);
+  *(uint64_t *)(layoutStr) = ((uint64_t)flags) & ~((uint64_t)LayoutStringFlags::HasRelativePointers);
+
+  structType->setLayoutString(layoutStr);
 
   auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
   vwtable->destroy = swift_generic_destroy;
@@ -2806,8 +2838,6 @@ void swift::swift_initStructMetadataWithLayoutString(
   installCommonValueWitnesses(layout, vwtable);
 
   vwtable->publishLayout(layout);
-
-  structType->setLayoutString(layoutStr);
 }
 
 /***************************************************************************/

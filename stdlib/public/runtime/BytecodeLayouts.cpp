@@ -17,8 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "BytecodeLayouts.h"
-#include "../../public/runtime/WeakReference.h"
-#include "../../public/SwiftShims/swift/shims/HeapObject.h"
+#include "WeakReference.h"
+#include "../SwiftShims/swift/shims/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/Runtime/Error.h"
@@ -137,8 +137,7 @@ swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
       return;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
@@ -222,8 +221,7 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
       return dest;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
@@ -270,8 +268,7 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
           (WeakReference*)((uintptr_t)src + addrOffset));
       break;
     case RefCountingKind::Metatype: {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
         type->vw_initializeWithTake(
             (OpaqueValue*)((uintptr_t)dest + addrOffset),

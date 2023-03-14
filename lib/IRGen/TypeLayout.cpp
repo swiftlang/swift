@@ -2067,6 +2067,8 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
                                          LayoutStringBuilder &B,
                                          GenericSignature genericSig) const {
+  if (!isFixedSize(IGM)) return false;
+
   switch (copyDestroyKind(IGM)) {
   case CopyDestroyStrategy::TriviallyDestroyable: {
     auto size = fixedSize(IGM);
@@ -2078,11 +2080,6 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case CopyDestroyStrategy::ForwardToPayload:
     return cases[0]->refCountString(IGM, B, genericSig);
   case CopyDestroyStrategy::Normal: {
-    if (!isFixedSize(IGM)) {
-      //      B.addResilientRefCount(accessor);
-      return false;
-    }
-
     auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
     B.addFixedEnumRefCount(accessor);
     B.addSkip(fixedSize(IGM)->getValue());

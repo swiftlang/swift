@@ -308,7 +308,7 @@ public:
   }
 
   const uint8_t *getLayoutString() const {
-    assert(hasLayoutString());
+    //assert(hasLayoutString());
     if (isAnyClass()) {
       return asFullMetadata(
                  reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(

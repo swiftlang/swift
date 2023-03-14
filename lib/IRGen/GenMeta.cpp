@@ -5171,8 +5171,8 @@ namespace {
         return false;
       }
       return !!getLayoutString() ||
-             IGM.Context.LangOpts.hasFeature(
-                 Feature::LayoutStringValueWitnessesInstantiation);
+             (IGM.Context.LangOpts.hasFeature(
+                 Feature::LayoutStringValueWitnessesInstantiation) && hasCompletionFunction());
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
