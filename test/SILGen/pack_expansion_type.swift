@@ -43,3 +43,9 @@ func variadicMetatypes<each T>(_: repeat each T) {
   _ = ((repeat each T) -> ()).self
   _ = ((Int, repeat Array<each T>) -> ()).self
 }
+
+// Mangling bugs with substitutions
+
+// CHECK-LABEL: sil [ossa] @$s19pack_expansion_type18sameExpansionTwice2us05more_G02vsyxxQp_xxQpq_q_QptRvzRv_r0_lF : $@convention(thin) <each U, each V> (@pack_guaranteed Pack{repeat each U}, @pack_guaranteed Pack{repeat each U}, @pack_guaranteed Pack{repeat each V}) -> () {
+public func sameExpansionTwice<each U, each V>(us: repeat each U, more_us: repeat each U, vs: repeat each V) {}
+
