@@ -12,4 +12,9 @@
 
 add_swift_macro_library(SwiftMacros
   OptionSetMacro.swift
+  SWIFT_DEPENDENCIES
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::SwiftSyntaxMacros
 )
