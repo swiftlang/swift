@@ -424,32 +424,9 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 /******************************* PROPERTIES ***********************************/
 /******************************************************************************/
 
-//// TODO(distributed): make use of this after all, but FORCE it?
-//static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-//  assert(derived.Nominal->isDistributedActor());
-//  auto &C = derived.Context;
-//
-//  // ```
-//  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
-//  // ```
-//  auto propertyType = getDistributedActorIDType(derived.Nominal);
-//
-//  VarDecl *propDecl;
-//  PatternBindingDecl *pbDecl;
-//  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-//      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-//      propertyType,
-//      /*isStatic=*/false, /*isFinal=*/true);
-//
-//  // mark as nonisolated, allowing access to it from everywhere
-//  propDecl->getAttrs().add(
-//      new (C) NonisolatedAttr(/*IsImplicit=*/true));
-//
-//  fprintf(stderr, "[%s:%d](%s) INSERT ID: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
-//  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-//  return propDecl;
-//}
+// NOTE: There is no deriveDistributedActor_aid since it must be handled earlier
+//       due to the Identifiable Conformance it must fulfil as well.
+// TODO(distributed): try to bring back `id` synthesis from addImplicitDistributedActorIDProperty to Derived infra
 
 static ValueDecl *deriveDistributedActor_actorSystem(
     DerivedConformance &derived) {

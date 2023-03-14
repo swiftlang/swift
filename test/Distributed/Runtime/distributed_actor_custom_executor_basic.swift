@@ -22,10 +22,10 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor Worker {
-//  nonisolated var unownedExecutor: UnownedSerialExecutor {
-//    print("get unowned executor")
-//    return MainActor.sharedUnownedExecutor
-//  }
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    print("get unowned executor")
+    return MainActor.sharedUnownedExecutor
+  }
 
   distributed func test(x: Int) async throws {
     print("executed: \(#function)")
@@ -42,6 +42,8 @@ distributed actor Worker {
     let worker = Worker(actorSystem: DefaultDistributedActorSystem())
     // CHECK: | assign id
     // CHECK: | actor ready
+
+    precondition(__isLocalActor(worker), "must be local")
 
     try! await worker.test(x: 42)
     // CHECK: get unowned executor
