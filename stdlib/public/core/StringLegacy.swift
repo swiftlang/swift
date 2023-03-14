@@ -39,7 +39,9 @@ extension String {
     }
 
     let repeatedValueGuts = repeatedValue._guts
-    let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: repeatedValueGuts.count &* count)
+    let buffer: UnsafeMutableBufferPointer<UInt8> =
+      .allocate(capacity: repeatedValueGuts.count &* count)
+    defer { buffer.deallocate() }
     var offset = 0
     for _ in 0..<count {
       let bufferRebased = UnsafeMutableBufferPointer(rebasing: buffer[offset...])
@@ -50,7 +52,9 @@ extension String {
       offset += copied
     }
     _internalInvariant(offset == buffer.count)
-    self.init(_StringGuts(UnsafeBufferPointer(buffer), isASCII: repeatedValueGuts.isASCII))
+    self = repeatedValueGuts.isASCII ?
+      String._uncheckedFromASCII(UnsafeBufferPointer(buffer)) :
+      String._uncheckedFromUTF8(UnsafeBufferPointer(buffer), isASCII: false)
   }
 
   /// A Boolean value indicating whether a string has no characters.
