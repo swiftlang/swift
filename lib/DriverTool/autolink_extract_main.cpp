@@ -247,8 +247,6 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   // in most object files
 
   std::vector<std::string> SwiftRuntimeLibsOrdered = {
-      // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
-      "-lXCTest",
       // Common Swift runtime libs
       "-lswiftSwiftOnoneSupport",
       "-lswiftCore",
@@ -272,6 +270,8 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lcurl",
       "-lxml2",
       "-luuid",
+      // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
+      "-lXCTest",
       // ICU Swift runtime libs
       "-licui18nswift",
       "-licuucswift",
