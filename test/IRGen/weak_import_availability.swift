@@ -56,12 +56,18 @@ public func useConditionallyAvailableGlobal() {
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivs"(i64)
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivs"(i64)
 
+// CHECK-OLD-LABEL: declare extern_weak swiftcc { i8*, %TSi* } @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivM"(i8* noalias dereferenceable(32))
+// CHECK-NEW-LABEL: declare swiftcc { i8*, %TSi* } @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivM"(i8* noalias dereferenceable(32))
+
 func blackHole<T>(_: T) {}
 
 @available(macOS 10.50, *)
 public func useConditionallyAvailableStruct() {
   blackHole(ConditionallyAvailableStruct.self)
 }
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
+// CHECK-NEW-LABEL: declare swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
 
 @available(macOS 10.50, *)
 public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
