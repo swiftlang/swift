@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENFUNCTION_H
 #define SWIFT_SILGEN_SILGENFUNCTION_H
 
+#include "ExecutorValue.h"
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "InitializeDistActorIdentity.h"
@@ -540,6 +541,7 @@ public:
   SILValue InitDelegationSelfBox;
   Optional<SILLocation> InitDelegationLoc;
   ManagedValue SuperInitDelegationSelf;
+  bool ComputingSelfForRebindInConstructor = false;
 
   RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
                                            SILValue result, SGFContext C);
@@ -557,7 +559,7 @@ public:
   /// isolated to the given executor, and hop_to_executor instructions must
   /// be inserted at the begin of the function and after all suspension
   /// points.
-  SILValue ExpectedExecutor;
+  ExecutorValue ExpectedExecutor;
 
   struct ActivePackExpansion {
     GenericEnvironment *OpenedElementEnv;
@@ -1042,10 +1044,10 @@ public:
   ///
   /// This function emits the appropriate hop_to_executor for a constructor's
   /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
   void emitConstructorPrologActorHop(SILLocation loc,
-                                     Optional<ActorIsolation> actorIso);
+                                     ConstructorDecl *ctor,
+                                     ManagedValue self,
+                                     ActorIsolation actorIso);
 
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
