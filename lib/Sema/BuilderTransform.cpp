@@ -195,6 +195,15 @@ protected:
       // Allocate variable with a placeholder type
       auto *resultVar = buildPlaceholderVar(stmt->getStartLoc(), newBody);
 
+      if (ctx.CompletionCallback && stmt->getSourceRange().isValid() &&
+          !containsIDEInspectionTarget(stmt->getSourceRange(), ctx.SourceMgr) &&
+          !isa<GuardStmt>(stmt)) {
+        // A statement that doesn't contain the code completion expression can't
+        // influence the type of the code completion expression, so we can skip
+        // it to improve performance.
+        return None;
+      }
+
       auto result = visit(stmt, resultVar);
       if (!result)
         return UnsupportedElt(stmt);
@@ -223,6 +232,16 @@ protected:
       // to rank code completion items that match the type expected by
       // buildBlock higher.
       buildBlockArguments.push_back(expr);
+    } else if (ctx.CompletionCallback && expr->getSourceRange().isValid() &&
+               !containsIDEInspectionTarget(expr->getSourceRange(),
+                                            ctx.SourceMgr)) {
+      // A statement that doesn't contain the code completion expression can't
+      // influence the type of the code completion expression. Add a variable
+      // for it that we can put into the buildBlock call but don't add the
+      // expression itself into the transformed body to improve performance.
+      auto *resultVar = buildPlaceholderVar(expr->getStartLoc(), newBody);
+      buildBlockArguments.push_back(
+          builder.buildVarRef(resultVar, expr->getStartLoc()));
     } else {
       auto *capture = captureExpr(expr, newBody);
       // A reference to the synthesized variable is passed as an argument

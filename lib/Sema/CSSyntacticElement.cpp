@@ -1167,17 +1167,26 @@ private:
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
           !cs.containsIDEInspectionTarget(element)) {
-        // Statements and expressions can't influence the expresion that
-        // contains the code completion token. To improve performance, skip
-        // type checking them entirely.
-        if (element.is<Expr *>() && !element.isExpr(ExprKind::TypeJoin)) {
-          // Type join expressions are not really pure expressions, they kind of
-          // declare new type variables and are important to a result builder's
-          // structure. Don't skip them.
-          continue;
-        } else if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard)) {
+        // To improve performance, skip type checking elements that can't
+        // influence the code completion token.
+        if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard) && !element.isStmt(StmtKind::Return)) {
+          // Statements can't influence the expresion that contains the code
+          // completion token.
           // Guard statements might define variables that are used in the code
           // completion expression. Don't skip them.
+          // Return statements influence the type of the closure itself. Don't
+          // skip them either.
+          continue;
+        }
+        if (element.isExpr(ExprKind::Assign)) {
+          // Assignments are also similar to statements and can't influence the
+          // code completion token.
+          continue;
+        }
+        if (element.isExpr(ExprKind::Error)) {
+          // ErrorExpr can't influcence the expresssion that contains the code
+          // completion token. Since they are causing type checking to abort
+          // early, just skip them.
           continue;
         }
       }
