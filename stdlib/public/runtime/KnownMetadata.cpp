@@ -98,6 +98,13 @@ namespace ctypes {
       HeapObject *Identity;
       uintptr_t Implementation;
     };
+
+    // Types that are defined in the Distributed library
+
+    // Non-default distributed actor storage type.
+    struct alignas(2 * alignof(void*)) Bd {
+      void *storage[NumWords_NonDefaultDistributedActor];
+    };
   }
 }
 

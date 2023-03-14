@@ -831,11 +831,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
   }
 
-  // Initialize the default-actor instance.
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
+    // Initialize the default-actor instance.
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
     emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
+  } else if (selfClassDecl->isNonDefaultExplicitDistributedActor() && !isDelegating) {
+    // Initialize the distributed local actor with custom executor,
+    // with additional storage such that we can store the local/remote bit
+    assert(false && "FIXME not implemented initializing the local one"); // FIXME: !!!!
   }
 
   if (!ctor->hasStubImplementation()) {

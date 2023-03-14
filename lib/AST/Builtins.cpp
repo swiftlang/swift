@@ -85,6 +85,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheJobType;
   if (Name == "DefaultActorStorage")
     return Context.TheDefaultActorStorageType;
+  if (Name == "NonDefaultDistributedActorStorage")
+    return Context.TheNonDefaultDistributedActorStorageType;
   if (Name == "Executor")
     return Context.TheExecutorType;
   if (Name == "NativeObject")
@@ -3021,6 +3023,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
+    break;
+  case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE);
     break;
   case BuiltinTypeKind::BuiltinPackIndex:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_PACKINDEX);

@@ -3464,6 +3464,8 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
     // storage, which is never accessed directly.
     case Field::DefaultActorStorage:
       return;
+    case Field::NonDefaultDistributedActorStorage:
+      return;
     }
 
     auto prop = field.getVarDecl();
@@ -3917,6 +3919,10 @@ namespace {
 
     void addDefaultActorStorageFieldOffset() {
       B.addInt(IGM.SizeTy, getDefaultActorStorageFieldOffset(IGM).getValue());
+    }
+
+    void addNonDefaultDistributedActorStorageFieldOffset() {
+      B.addInt(IGM.SizeTy, getNonDefaultDistributedActorStorageFieldOffset(IGM).getValue());
     }
 
     void addReifiedVTableEntry(SILDeclRef fn) {

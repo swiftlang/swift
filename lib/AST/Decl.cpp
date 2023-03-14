@@ -9598,6 +9598,15 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
   return (!superclass || superclass->isNSObject());
 }
 
+bool ClassDecl::isNonDefaultExplicitDistributedActor() const {
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
+}
+bool ClassDecl::isNonDefaultExplicitDistributedActor(ModuleDecl *M,
+                                             ResilienceExpansion expansion) const {
+  return !isDefaultActor(M, expansion) && isExplicitDistributedActor();
+}
+
+
 bool ClassDecl::isNativeNSObjectSubclass() const {
   // @objc actors implicitly inherit from NSObject.
   if (isActor()) {

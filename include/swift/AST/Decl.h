@@ -4499,6 +4499,10 @@ public:
   bool isRootDefaultActor() const;
   bool isRootDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;
 
+  /// It is a `distributed actor` with a custom executor.
+  bool isNonDefaultExplicitDistributedActor() const;
+  bool isNonDefaultExplicitDistributedActor(ModuleDecl *M, ResilienceExpansion expansion) const;
+
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
 

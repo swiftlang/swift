@@ -936,6 +936,40 @@ private:
   void deallocateUnconditional();
 };
 
+class NonDefaultDistributedActorImpl : public HeapObject {
+  // TODO (rokhinip): Make this a flagset
+  bool isDistributedRemoteActor;
+
+public:
+  /// Properly construct an actor, except for the heap header.
+  void initialize(bool isDistributedRemote = false) {
+    fprintf(stderr, "[%s:%d](%s) initialize NonDefaultDistributedActorImpl; remote = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isDistributedRemote);
+    this->isDistributedRemoteActor = isDistributedRemote;
+    SWIFT_TASK_DEBUG_LOG("Creating non-default distributed actor %p", this);
+    // concurrency::trace::actor_create(this); // FIXME: !!!!
+  }
+
+  /// Properly destruct an actor, except for the heap header.
+  void destroy() {
+    // empty
+  }
+
+  /// Properly respond to the last release of a default actor.  Note
+  /// that the actor will have been completely torn down by the time
+  /// we reach this point.
+  void deallocate() {
+    // empty
+  }
+
+  /// Check if the actor is actually a distributed *remote* actor.
+  ///
+  /// Note that a distributed *local* actor instance is the same as any other
+  /// ordinary default (local) actor, and no special handling is needed for them.
+  bool isDistributedRemote() {
+    return isDistributedRemoteActor;
+  }
+};
+
 } /// end anonymous namespace
 
 // We can't use sizeof(DefaultActor) since the alignment requirement on the
@@ -950,12 +984,25 @@ static_assert(DefaultActorImpl::offsetOfActiveActorStatus() % ACTIVE_ACTOR_STATU
               "ActiveActorStatus is aligned to the right size");
 #endif
 
+static_assert(sizeof(DefaultActor) == sizeof(NonDefaultDistributedActor),
+              "NonDefaultDistributedActor size should be the same as DefaultActor");
+static_assert(sizeof(NonDefaultDistributedActorImpl) <= ((sizeof(void *) * NumWords_NonDefaultDistributedActor) + sizeof(HeapObject)) &&
+              alignof(NonDefaultDistributedActorImpl) <= alignof(NonDefaultDistributedActor),
+              "NonDefaultDistributedActorImpl doesn't fit in NonDefaultDistributedActor");
+
 static DefaultActorImpl *asImpl(DefaultActor *actor) {
   return reinterpret_cast<DefaultActorImpl*>(actor);
 }
 
 static DefaultActor *asAbstract(DefaultActorImpl *actor) {
   return reinterpret_cast<DefaultActor*>(actor);
+}
+
+static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor) {
+  return reinterpret_cast<NonDefaultDistributedActorImpl*>(actor);
+}
+static NonDefaultDistributedActor *asAbstract(NonDefaultDistributedActorImpl *actor) {
+  return reinterpret_cast<NonDefaultDistributedActor*>(actor);
 }
 
 /*****************************************************************************/
@@ -1949,40 +1996,46 @@ void swift::swift_executor_escalate(ExecutorRef executor, AsyncTask *task,
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
-  auto *classMetadata = actorType->getClassObject();
+  auto *metadata = actorType->getClassObject();
 
   // TODO(distributed): make this allocation smaller
   // ==== Allocate the memory for the remote instance
-  HeapObject *alloc = swift_allocObject(classMetadata,
-                                        classMetadata->getInstanceSize(),
-                                        classMetadata->getInstanceAlignMask());
+  HeapObject *alloc = swift_allocObject(metadata,
+                                        metadata->getInstanceSize(),
+                                        metadata->getInstanceAlignMask());
 
   // TODO: remove this memset eventually, today we only do this to not have
   //       to modify the destructor logic, as releasing zeroes is no-op
-  memset(alloc + 1, 0, classMetadata->getInstanceSize() - sizeof(HeapObject));
+  memset(alloc + 1, 0, metadata->getInstanceSize() - sizeof(HeapObject));
 
   // TODO(distributed): a remote one does not have to have the "real"
   //  default actor body, e.g. we don't need an executor at all; so
   //  we can allocate more efficiently and only share the flags/status field
   //  between the both memory representations
-  // --- Currently we ride on the DefaultActorImpl to reuse the memory layout
-  // of the flags etc. So initialize the default actor into the allocation.
-  auto actor = asImpl(reinterpret_cast<DefaultActor*>(alloc));
-  actor->initialize(/*remote*/true);
-  assert(actor->isDistributedRemote());
+  // If it is a default actor, we reuse the same layout as DefaultActorImpl,
+  // and store flags in the allocation directly as we initialize it.
+  if (isDefaultActorClass(metadata)) {
+    fprintf(stderr, "[%s:%d](%s) IS DEFAULT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    auto actor = asImpl(reinterpret_cast<DefaultActor *>(alloc));
+    actor->initialize(/*remote*/true);
+    return reinterpret_cast<OpaqueValue*>(actor);
+  } else {
+    fprintf(stderr, "[%s:%d](%s) initialize NOT DEFAULT [REMOTE] DISTRIBUTED ACTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
+    actor->initialize(/*remote*/true);
+  }
+  assert(swift_distributed_actor_is_remote(alloc));
 
-  return reinterpret_cast<OpaqueValue*>(actor);
 }
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
-  fprintf(stderr, "[%s:%d](%s) IS IT REMOTE?\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d](%s) CHECK: swift_distributed_actor_is_remote\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   auto metadata = cast<ClassMetadata>(_actor->metadata);
   if (isDefaultActorClass(metadata)) {
-    fprintf(stderr, "[%s:%d](%s) the distributed actor is DEFAULT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     return asImpl((DefaultActor *) _actor)->isDistributedRemote();
   } else {
-    fprintf(stderr, "[%s:%d](%s) the distributed actor is CUSTOM\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    return false; // TODO: just a placeholder to verify logic on Linux
+    fprintf(stderr, "[%s:%d](%s) NEW PATH swift_distributed_actor_is_remote\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    return asImpl((NonDefaultDistributedActor *) _actor)->isDistributedRemote(); // NEW
   }
 }
 

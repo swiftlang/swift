@@ -370,6 +370,17 @@ namespace {
                                                IsLexical});
     }
 
+    RetTy visitBuiltinNonDefaultDistributedActorStorageType(
+                                         CanBuiltinNonDefaultDistributedActorStorageType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
     RetTy visitAnyFunctionType(CanAnyFunctionType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
