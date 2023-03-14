@@ -274,15 +274,31 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
-PackageUnit *DeclContext::getParentModulePackage() const {
-  auto parentModule = getParentModule();
-  auto pkg = parentModule->getParent();
-  if (pkg)
-    return const_cast<PackageUnit *>(cast<PackageUnit>(pkg));
+PackageUnit *DeclContext::getPackageContext(bool lookupIfNotCurrent) const {
+  // Current decl context might be PackageUnit, which is not in the
+  // DeclContext hierarchy, so check for it first
+  if (isPackageContext())
+    return const_cast<PackageUnit *>(cast<PackageUnit>(this));
+
+  // If the current context is not PackageUnit, look it up via
+  // the parent module if needed
+  if (lookupIfNotCurrent) {
+    auto mdecl = getParentModule();
+    return mdecl->getPackage();
+  }
   return nullptr;
 }
 
 ModuleDecl *DeclContext::getParentModule() const {
+  // If the current context is PackageUnit, return the module
+  // decl context pointing to the current context. This check
+  // needs to be done first as PackageUnit is not in the DeclContext
+  // hierarchy.
+  if (auto pkg = getPackageContext()) {
+    auto &mdecl = pkg->getSourceModule();
+    return &mdecl;
+  }
+
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
     DC = DC->getParent();
@@ -292,7 +308,7 @@ ModuleDecl *DeclContext::getParentModule() const {
 SourceFile *DeclContext::getParentSourceFile() const {
   const DeclContext *DC = this;
   SourceLoc loc;
-  while (!DC->isModuleScopeContext()) {
+  while (DC && !DC->isModuleScopeContext()) {
     // If we don't have a source location yet, try to grab one from this
     // context.
     if (loc.isInvalid()) {
@@ -323,6 +339,9 @@ SourceFile *DeclContext::getParentSourceFile() const {
     DC = DC->getParent();
   }
 
+  if (!DC)
+    return nullptr;
+
   auto fallbackSF = const_cast<SourceFile *>(dyn_cast<SourceFile>(DC));
   if (auto module = DC->getParentModule()) {
     if (auto sf = module->getSourceFileContainingLocation(loc))
@@ -345,15 +364,24 @@ SourceFile *DeclContext::getOutermostParentSourceFile() const {
 }
 
 DeclContext *DeclContext::getModuleScopeContext() const {
-  auto DC = const_cast<DeclContext*>(this);
+  // If the current context is PackageUnit, return the module
+  // decl context pointing to the current context. This check
+  // needs to be done first as PackageUnit is not in the DeclContext
+  // hierarchy.
+  if (auto pkg = getPackageContext()) {
+    auto &mdecl = pkg->getSourceModule();
+    return &mdecl;
+  }
 
+  auto DC = const_cast<DeclContext *>(this);
   while (true) {
     if (DC->ParentAndKind.getInt() == ASTHierarchy::FileUnit)
       return DC;
     if (auto NextDC = DC->getParent()) {
       DC = NextDC;
     } else {
-      assert(isa<ModuleDecl>(DC->getAsDecl()));
+      assert(DC && isa<ModuleDecl>(DC->getAsDecl()) &&
+             "no module decl context found!");
       return DC;
     }
   }
@@ -1213,13 +1241,11 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-AccessScope::AccessScope(const DeclContext *DC, AccessLimitKind limitKind)
-    : Value(DC, limitKind) {
-  auto isPrivate = false;
-  if (limitKind == AccessLimitKind::Private) {
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
+    : Value(DC, isPrivate) {
+  if (isPrivate) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
-    isPrivate = true;
   }
   if (!DC || isa<ModuleDecl>(DC) || isa<PackageUnit>(DC))
     assert(!isPrivate && "public, package, or internal scope can't be private");
@@ -1233,6 +1259,11 @@ bool AccessScope::isFileScope() const {
 bool AccessScope::isInternal() const {
   auto DC = getDeclContext();
   return DC && isa<ModuleDecl>(DC);
+}
+
+bool AccessScope::isPackage() const {
+  auto DC = getDeclContext();
+  return DC && isa<PackageUnit>(DC);
 }
 
 AccessLevel AccessScope::accessLevelForDiagnostics() const {
@@ -1254,6 +1285,14 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   if (useDC->isChildContextOf(sourceDC))
     return true;
 
+  // If the decl site has package acl, but the use site
+  // has internal or less acl, check if it belongs to
+  // the same package as the decl site's to allow access.
+  if (auto srcPkg = sourceDC->getPackageContext()) {
+    if (auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true)) {
+      return usePkg->isSamePackageAs(srcPkg);
+    }
+  }
   // Do not allow access if the sourceDC is in a different file
   auto useSF = useDC->getParentSourceFile();
   if (useSF != sourceDC->getParentSourceFile())

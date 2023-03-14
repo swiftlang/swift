@@ -75,6 +75,19 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 using namespace swift;
 using namespace metadataimpl;
 
+#if defined(__APPLE__)
+// Binaries using noncopyable types check the address of the symbol
+// `swift_runtimeSupportsNoncopyableTypes` before exposing any noncopyable
+// type metadata through in-process reflection, to prevent existing code
+// that expects all types to be copyable from crashing or causing bad behavior
+// by copying noncopyable types. The runtime does not yet support noncopyable
+// types, so we explicitly define this symbol to be zero for now. Binaries
+// weak-import this symbol so they will resolve it to a zero address on older
+// runtimes as well.
+__asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
+__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
+#endif
+
 // GenericParamDescriptor is a single byte, so while it's difficult to
 // imagine needing even a quarter this many generic params, there's very
 // little harm in doing it.

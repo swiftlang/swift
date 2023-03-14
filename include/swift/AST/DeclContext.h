@@ -229,6 +229,15 @@ struct FragileFunctionKind {
 /// and therefore can safely access trailing memory. If you need to create a
 /// macro context, please see GenericContext for how to minimize new entries in
 /// the ASTHierarchy enum below.
+///
+/// The hierarchy between DeclContext subclasses is set in their ctors. For
+/// example, FileUnit ctor takes ModuleDecl as its parent DeclContext. The
+/// hierarchy from the most to least restrictive order is:
+/// decl/expr (e.g. ClassDecl) -> FileUnit -> ModuleDecl -> PackageUnit -> nullptr
+///
+/// There's an exception, however; the parent of ModuleDecl is set nullptr, not
+/// set to PackageUnit; ModuleDecl has a pointer to PackageUnit as its field,
+/// and it is treated as the enclosing scope of ModuleDecl.
 class alignas(1 << DeclContextAlignInBits) DeclContext
     : public ASTAllocated<DeclContext> {
   enum class ASTHierarchy : unsigned {
@@ -323,12 +332,8 @@ public:
   bool isLocalContext() const {
     return getContextKind() <= DeclContextKind::Last_LocalDeclContextKind;
   }
-  
-  /// \returns true if this is a context with package-wide scope, e.g. a package,
-  /// a module, or a source file.
-  LLVM_READONLY
-  bool isPackageScopeContext() const; // see swift/AST/Module.h
 
+  /// \returns true if this is a package context
   LLVM_READONLY
   bool isPackageContext() const; // see swift/AST/Module.h
 
@@ -512,9 +517,11 @@ public:
     return false;
   }
 
-  /// Returns the package context of the parent module.
+  /// Returns the package unit of this context.
+  /// \p lookupIfNotCurrent If the current decl context is not PackageUnit, look
+  /// it up via parent module
   LLVM_READONLY
-  PackageUnit *getParentModulePackage() const;
+  PackageUnit *getPackageContext(bool lookupIfNotCurrent = false) const;
 
   /// Returns the module context that contains this context.
   LLVM_READONLY

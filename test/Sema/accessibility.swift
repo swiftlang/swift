@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 -package-name mylib
 
 /// Test structs with protocols and extensions
 public protocol PublicProto {
@@ -1021,8 +1021,8 @@ public struct PublicWithInternalSettersConformPublic : PublicMutationOperations 
 }
 
 public struct PublicWithPackageSettersConformPublic : PublicMutationOperations {
-  public package(set) var size = 0 // FIXME: rdar://104987295 this should error
-  public package(set) subscript (_: Int) -> Int { // FIXME: rdar://104987295 this should error
+  public package(set) var size = 0 // expected-error {{setter for property 'size' must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the property as 'public' to satisfy the requirement}} {{10-23=}}
+  public package(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the subscript as 'public' to satisfy the requirement}} {{10-23=}}
     get { return 42 }
     set {}
   }

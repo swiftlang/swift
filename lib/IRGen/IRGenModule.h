@@ -575,6 +575,10 @@ public:
 
 /// Describes the role of a mangled type reference string.
 enum class MangledTypeRefRole {
+  /// The mangled type reference is used for field metadata, which is used
+  /// by both in-process and out-of-process reflection, so still requires
+  /// referenced types' metadata to be fully emitted.
+  FieldMetadata,
   /// The mangled type reference is used for normal metadata.
   Metadata,
   /// The mangled type reference is used for reflection metadata.
