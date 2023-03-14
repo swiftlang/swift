@@ -60,6 +60,14 @@ public func callUnavailableFunction() {
 
 // CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper19unavailableFunctionyyF"()
 
+@available(macOS, unavailable)
+public func callUnavailableButIntroducedFunction() {
+  unavailableButIntroducedFunction()
+}
+
+// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper32unavailableButIntroducedFunctionyyF"()
+// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper32unavailableButIntroducedFunctionyyF"()
+
 @available(macOS 10.50, *)
 public func useConditionallyAvailableGlobal() {
   _ = conditionallyAvailableGlobal

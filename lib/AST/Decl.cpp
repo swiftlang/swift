@@ -1126,7 +1126,12 @@ bool Decl::isAlwaysWeakImported() const {
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
-  if (getSemanticUnavailableAttr())
+  // Declarations that are unavailable should be weak linked since they are
+  // meant to be unreachable at runtime and their removal should not affect
+  // clients. However, make an exception for unavailable declarations with
+  // explicit introduction versions, which are considered required ABI.
+  if (getSemanticUnavailableAttr() &&
+      getAvailabilityForLinkage().isAlwaysAvailable())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))

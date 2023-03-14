@@ -5,6 +5,10 @@ public func conditionallyAvailableFunction() {}
 public func unavailableFunction() {}
 
 @available(macOS 10.50, *)
+@available(macOS, unavailable)
+public func unavailableButIntroducedFunction() {}
+
+@available(macOS 10.50, *)
 public var conditionallyAvailableGlobal: Int {
   get {return 0}
   set {}
