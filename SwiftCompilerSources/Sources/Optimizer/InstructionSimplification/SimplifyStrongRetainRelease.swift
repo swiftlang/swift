@@ -67,6 +67,9 @@ extension StrongReleaseInst : Simplifyable, SILCombineSimplifyable {
 /// Returns true if \p value is something where reference counting instructions
 /// don't have any effect.
 private func isNotReferenceCounted(value: Value) -> Bool {
+  if value.type.isMarkedAsImmortal {
+    return true
+  }
   switch value {
     case let cfi as ConvertFunctionInst:
       return isNotReferenceCounted(value: cfi.fromFunction)

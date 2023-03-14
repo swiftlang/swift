@@ -76,6 +76,13 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
           "optimize.sil.specialize.owned2guarantee.never")
 
+// To be used on a nominal type declaration.
+// Assumes that a class (or class references inside a nominal type) are immortal.
+// ARC operations on such types can be eliminated.
+// If specified on a protocol declaration, all types which conform to that protocol
+// are assumed to be immortal.
+SEMANTICS_ATTR(ARC_IMMORTAL, "arc.immortal")
+
 SEMANTICS_ATTR(OSLOG_MESSAGE_TYPE, "oslog.message.type")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_INTERPOLATION, "oslog.message.init_interpolation")
 SEMANTICS_ATTR(OSLOG_MESSAGE_INIT_STRING_LITERAL, "oslog.message.init_stringliteral")

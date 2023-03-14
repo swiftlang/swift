@@ -345,6 +345,7 @@ BridgedType SILType_instanceTypeOfMetatype(BridgedType type, BridgedFunction fun
 BridgedDecl SILType_getNominal(BridgedType type);
 bool SILType_isOrContainsObjectiveCClass(BridgedType type);
 bool SILType_isCalleeConsumedFunction(BridgedType type);
+bool SILType_isMarkedAsImmortal(BridgedType type);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
 SwiftInt SILType_getNumNominalFields(BridgedType type);
