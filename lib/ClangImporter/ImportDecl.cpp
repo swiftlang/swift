@@ -2712,13 +2712,18 @@ namespace {
         return Impl.importDecl(decl->getSpecializedTemplate(),
                                Impl.CurrentVersion);
 
+      bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
+                    decl->getSpecializedTemplate()->getName() == "pair";
+
       // Before we go any further, check if we've already got tens of thousands
       // of specializations. If so, it means we're likely instantiating a very
       // deep/complex template, or we've run into an infinite loop. In either
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
-      if (llvm::size(decl->getSpecializedTemplate()->specializations()) >
-          1000) {
+      size_t specializationLimit = !isPair ? 1000 : 10000;
+      if (!isPair &&
+          llvm::size(decl->getSpecializedTemplate()->specializations()) >
+              specializationLimit) {
         std::string name;
         llvm::raw_string_ostream os(name);
         decl->printQualifiedName(os);
