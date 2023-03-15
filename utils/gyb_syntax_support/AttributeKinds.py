@@ -661,7 +661,7 @@ DECL_ATTR_KINDS = [
     SimpleDeclAttribute('preconcurrency', 'Preconcurrency',
                         OnFunc, OnConstructor, OnProtocol, OnGenericType, OnVar, OnSubscript,  # noqa: E501
                         OnEnumElement, OnImport,
-                        ABIBreakingToAdd, ABIBreakingToRemove, APIBreakingToAdd, APIBreakingToRemove,  # noqa: E501
+                        ABIStableToAdd, ABIBreakingToRemove, APIBreakingToAdd, APIBreakingToRemove,  # noqa: E501
                         code=125),
 
     DeclAttribute('_unavailableFromAsync', 'UnavailableFromAsync',
