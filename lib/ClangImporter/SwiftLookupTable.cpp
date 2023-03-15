@@ -2217,3 +2217,7 @@ SwiftNameLookupExtension::createExtensionReader(
   // Return the new reader.
   return std::move(tableReader);
 }
+
+void swift::dumpSwiftLookupTable(SwiftLookupTable *table) {
+  table->dump();
+}

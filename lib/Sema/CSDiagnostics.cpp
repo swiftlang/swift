@@ -3801,6 +3801,131 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
       !isa_and_nonnull<clang::CXXRecordDecl>(
           baseType->getAnyNominal()->getClangDecl()))
     return;
+  
+  if (name.getBaseIdentifier().str() == "getFromPointer" ||
+      name.getBaseIdentifier().str() == "isValid" ||
+      name.getBaseIdentifier().str() == "__dataUnsafe" ||
+      name.getBaseIdentifier().str() == "__getOpaquePointerValueUnsafe" ||
+      name.getBaseIdentifier().str() == "__getStartUnsafe" ||
+      name.getBaseIdentifier().str() == "__c_strUnsafe") {
+    // OK, we did not find a member that we probably should have.
+    // Dump the world.
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+    llvm::dbgs() << "Hello! You have unfortuantly stubled across an interop bug that we have been trying to track down for a while. Please reach out to Zoe Carver and provide a link to this build. You can re-run this build and it should work next time. Sorry for the inconvience.\n\n";
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+    
+    llvm::dbgs() << "THE NAME: "; name.dump();
+    
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+
+    auto cxxRecord = cast<clang::CXXRecordDecl>(baseType->getAnyNominal()->getClangDecl());
+    llvm::dbgs() << "CXX RECORD: "; cxxRecord->dump();
+    
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+
+    auto dumpRedecls = [](const clang::CXXRecordDecl *cxxRecordToDump) {
+      llvm::dbgs() << "REDECLS:\n";
+      unsigned redeclIdx = 0;
+      for (auto redecl : cxxRecordToDump->redecls()) {
+        llvm::dbgs() << "REDECL(" << redeclIdx << "): "; redecl->dump();
+        redeclIdx++;
+      }
+    };
+    
+    dumpRedecls(cxxRecord);
+    
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+    if (name.getBaseIdentifier().str() == "getFromPointer" ||
+        name.getBaseIdentifier().str() == "isValid") {
+      llvm::dbgs() << "LOOKUP UNSAFE VERSION:\n";
+      auto unsafeId =
+          ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
+      for (auto found :
+           baseType->getAnyNominal()->lookupDirect(DeclBaseName(unsafeId))) {
+        llvm::dbgs() << "**FOUND UNSAFE VERSION**\n";
+        llvm::dbgs() << "UNSAFE: ";
+        found->dump();
+
+        if (auto cxxMethod = dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl())) {
+          llvm::dbgs() << "FOUND CXX METHOD.";
+          auto returnType = cxxMethod->getReturnType();
+          llvm::dbgs() << "CXX METHOD RETURN TYPE: ";
+          returnType->dump();
+          
+          llvm::dbgs() << "CAN RETURN TYPE: ";
+          returnType->getCanonicalTypeUnqualified().dump();
+          
+          if (auto recordType = dyn_cast<clang::RecordType>(returnType)) {
+            dumpRedecls(returnType->getAsCXXRecordDecl());
+          } else {
+            llvm::dbgs() << "NOT A RECORD TYPE\n";
+          }
+        }
+      }
+    } else {
+      std::string safeName;
+      if (name.getBaseIdentifier().str() == "__dataUnsafe")
+        safeName = "data";
+      if (name.getBaseIdentifier().str() == "__getOpaquePointerValueUnsafe")
+        safeName = "getOpaquePointerValue";
+      if (name.getBaseIdentifier().str() == "__getStartUnsafe")
+        safeName = "getStart";
+      if (name.getBaseIdentifier().str() == "__c_strUnsafe")
+        safeName = "c_str";
+      
+      auto safeId = ctx.getIdentifier(safeName);
+      for (auto found :
+           baseType->getAnyNominal()->lookupDirect(DeclBaseName(safeId))) {
+        llvm::dbgs() << "**FOUND SAFE VERSION**\n";
+        llvm::dbgs() << "UNSAFE: ";
+        found->dump();
+
+        if (auto cxxMethod = dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl())) {
+          llvm::dbgs() << "FOUND CXX METHOD.";
+          auto returnType = cxxMethod->getReturnType();
+          llvm::dbgs() << "CXX METHOD RETURN TYPE: ";
+          returnType->dump();
+          
+          llvm::dbgs() << "CAN RETURN TYPE: ";
+          returnType->getCanonicalTypeUnqualified().dump();
+          
+          if (auto recordType = dyn_cast<clang::RecordType>(returnType)) {
+            dumpRedecls(returnType->getAsCXXRecordDecl());
+          } else {
+            llvm::dbgs() << "NOT A RECORD TYPE\n";
+          }
+        }
+      }
+    }
+    
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+    llvm::dbgs() << "(IMPORTED) SWIFT TYPE: ";
+    baseType->dump();
+    
+    llvm::dbgs() << "(IMPORTED) SWIFT DECL: ";
+    baseType->getAnyNominal()->dump();
+    
+    // And for my final trick, I will dump the whole lookup table.
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "====================================================\n\n";
+    llvm::dbgs() << "LOOKUP TABLE: ";
+    
+    if (auto clangModule = cxxRecord->getOwningModule()) {
+      dumpSwiftLookupTable(ctx.getClangModuleLoader()->findLookupTable(clangModule));
+    } else {
+      llvm::dbgs() << "NO MODULE\n";
+    }
+    
+    llvm::dbgs() << "====================================================\n";
+    llvm::dbgs() << "DBUG DUMP DONE\n";
+    llvm::dbgs() << "====================================================\n\n";
+  }
 
   auto unsafeId =
       ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
