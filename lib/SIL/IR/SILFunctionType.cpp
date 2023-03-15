@@ -4650,8 +4650,14 @@ public:
   }
 
   bool hasSameShape(CanType lhs, CanType rhs) {
-    // FIXME
-    return lhs == rhs;
+    if (lhs->isTypeParameter() && rhs->isTypeParameter()) {
+      assert(Sig);
+      return Sig->haveSameShape(lhs, rhs);
+    }
+
+    auto lhsArchetype = cast<PackArchetypeType>(lhs);
+    auto rhsArchetype = cast<PackArchetypeType>(rhs);
+    return lhsArchetype->getReducedShape() == rhsArchetype->getReducedShape();
   }
 };
 

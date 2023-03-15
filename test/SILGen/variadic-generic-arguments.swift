@@ -1,4 +1,6 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
+
+// Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
 // CHECK-LABEL: @$s4main14receive_simpleyyxxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
