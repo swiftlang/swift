@@ -244,10 +244,19 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
              "Protocol symbol can only appear at the start of a type term");
       break;
 
-    case Symbol::Kind::GenericParam:
+    case Symbol::Kind::GenericParam: {
       assert(prefix.empty() &&
              "Generic parameter symbol can only appear at the start of a type term");
+
+      if (std::find_if(Params.begin(), Params.end(),
+                       [&](Type otherParam) -> bool {
+                         return otherParam->isEqual(symbol.getGenericParam());
+                       }) == Params.end()) {
+        return prefix;
+      }
+
       break;
+    }
 
     case Symbol::Kind::AssociatedType: {
       const auto *props = Map.lookUpProperties(prefix);
