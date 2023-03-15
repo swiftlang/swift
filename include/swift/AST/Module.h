@@ -160,18 +160,27 @@ class OverlayFile;
 class ModuleSourceFileLocationMap;
 
 /// A unit that allows grouping of modules by a package name.
-/// It's set as a property in ModuleDecl, instead of as its parent decl context,
-/// since otherwise it will break the existing decl context lookups that assume
-/// ModuleDecl as the top level context. See \c ModuleDecl
+///
+/// PackageUnit is treated as an enclosing scope of ModuleDecl. Unlike other
+/// DeclContext subclasses where a parent context is set in ctor, PackageUnit
+/// (parent context) is set as a field in ModuleDecl (child context). It also has a
+/// pointer back to the ModuleDecl, so that it can be used to return the module
+/// in the existing DeclContext lookup functions, which assume ModuleDecl as
+/// the top level context. Since both PackageUnit and ModuleDecl are created
+/// in the ASTContext memory arena, i.e. they will be destroyed when the
+/// ASTContext is destroyed, both pointng to each other is not considered risky.
+///
+/// See \c ModuleDecl
 class PackageUnit: public DeclContext {
   /// Identifies this package and used for the equality check
   Identifier PackageName;
-  /// Weakly references ModuleDecl that points to this package.
+  /// Non-null reference to ModuleDecl that points to this package.
   /// Instead of having multiple ModuleDecls pointing to one PackageUnit, we
-  /// create and set one PackageUnit per ModuleDecl, to make it easier to look
-  /// up the module pointing to this package; this look up is needed in existing
-  /// DeclContext functions, e.g. \c DeclContext::getModuleScopeContext,
-  /// and \c DeclContext::getParentModule
+  /// create one PackageUnit per ModuleDecl, to make it easier to look up the
+  /// module pointing to this package context, which is needed in the existing
+  /// DeclContext look up functions.
+  /// \see DeclContext::getModuleScopeContext
+  /// \see DeclContext::getParentModule
   ModuleDecl &SourceModule;
 
   PackageUnit(Identifier name, ModuleDecl &src)
@@ -219,7 +228,7 @@ class ModuleDecl
 
   /// A package this module belongs to. It's set as a property instead of a
   /// parent decl context; otherwise it will break the existing decl context
-  /// lookups that assume ModuleDecl as the top level context.
+  /// lookup functions that assume ModuleDecl as the top level context.
   PackageUnit *Package = nullptr;
 
   /// Module name to use when referenced in clients module interfaces.

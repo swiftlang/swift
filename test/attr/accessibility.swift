@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -package-name myPkg
 
 // CHECK PARSING
 private // expected-note {{modifier already specified here}}
@@ -16,9 +16,16 @@ func triplicateAttrChanged() {}
 
 private // expected-note 3 {{modifier already specified here}}
 public // expected-error {{duplicate modifier}}
+package // expected-error {{duplicate modifier}}
+internal // expected-error {{duplicate modifier}}
+func quadruplicateAttrChanged() {}
+
+private // expected-note 4 {{modifier already specified here}}
+public // expected-error {{duplicate modifier}}
+package // expected-error {{duplicate modifier}}
 internal // expected-error {{duplicate modifier}}
 fileprivate // expected-error {{duplicate modifier}}
-func quadruplicateAttrChanged() {}
+func quintuplicateAttrChanged() {}
 
 private(set)
 public
@@ -27,6 +34,27 @@ var customSetter = 0
 fileprivate(set)
 public
 var customSetter2 = 0
+
+// FIXME: rdar://104931420 folowing should not error
+// expected-error @+2{{cannot find 'package' in scope}}{{none}}
+// expected-error @+1{{cannot find 'set' in scope; did you mean 'Set'?}}{{9-12=Set}}
+package(set)
+public
+var customSetter3 = 0
+
+// FIXME: rdar://104931420 folowing should not error
+// expected-error @+1{{expected expression}}
+public
+package(set)
+var customSetter4 = 0
+
+private(set)
+package
+var customSetter5 = 0
+
+internal(set)
+package
+var customSetter6 = 0
 
 private(set) // expected-note {{modifier already specified here}}
 public(set) // expected-error {{duplicate modifier}}
@@ -87,9 +115,15 @@ private enum TestEnum {
   private case Foo, Bar // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
 }
 
+package enum PkgTestEnum {
+  package case Foo, Bar // expected-error {{'package' modifier cannot be applied to this declaration}} {{3-11=}}
+}
+
 private protocol TestProtocol {
   private associatedtype Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
   internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}} {{3-12=}}
+  // expected-note@-1 {{protocol requirements implicitly have the same access as the protocol itself}}
+  package func cat() // expected-error {{'package' modifier cannot be used in protocols}} {{3-11=}}
   // expected-note@-1 {{protocol requirements implicitly have the same access as the protocol itself}}
   public func baz() // expected-error {{'public' modifier cannot be used in protocols}} {{3-10=}}
   // expected-note@-1 {{protocol requirements implicitly have the same access as the protocol itself}}
@@ -98,6 +132,7 @@ private protocol TestProtocol {
 public(set) func publicSetFunc() {} // expected-error {{'public' modifier cannot be applied to this declaration}} {{1-13=}}
 
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
+
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
 private(set) var defaultVisOK = 0
 private(set) public var publicVis = 0
@@ -160,18 +195,49 @@ internal protocol EmptyProto2 {}
 private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
 private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
+package protocol EmptyProto3 {}
+package protocol EmptyProto4 {}
+public protocol EmptyProto5 {}
+
+private extension Properties : EmptyProto3 {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
+private(set) extension Properties : EmptyProto4 {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
+
+package extension Properties : EmptyProto5 {} // expected-error {{'package' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
+
 public struct PublicStruct {}
+package struct PackageStruct {} // expected-note * {{declared here}}
 internal struct InternalStruct {} // expected-note * {{declared here}}
 private struct PrivateStruct {} // expected-note * {{declared here}}
 
 protocol InternalProto { // expected-note * {{declared here}}
   associatedtype Assoc
 }
+package protocol PackageProto { // expected-note * {{declared here}}
+  associatedtype Assoc
+}
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
+public extension PackageProto {} // expected-error {{extension of package protocol cannot be declared public}} {{1-8=}}
+package extension PackageProto {} // no-error
+package extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared package}} {{1-9=}}
+package extension PackageProto where Assoc == PublicStruct {}
+package extension PackageProto where Assoc == PackageStruct {}
+package extension PackageProto where Assoc == InternalStruct {} // expected-error {{extension cannot be declared package because its generic requirement uses an internal type}}
+package extension PackageProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared package because its generic requirement uses a private type}}
+internal extension PackageProto where Assoc == PublicStruct {}
+internal extension PackageProto where Assoc == PackageStruct {}
+internal extension PackageProto where Assoc == InternalStruct {}
+internal extension PackageProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
+private extension PackageProto where Assoc == PublicStruct {}
+private extension PackageProto where Assoc == PackageStruct {}
+private extension PackageProto where Assoc == InternalStruct {}
+private extension PackageProto where Assoc == PrivateStruct {}
+
 internal extension InternalProto where Assoc == PublicStruct {}
+internal extension InternalProto where Assoc == PackageStruct {}
 internal extension InternalProto where Assoc == InternalStruct {}
 internal extension InternalProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
 private extension InternalProto where Assoc == PublicStruct {}
+private extension InternalProto where Assoc == PackageStruct {}
 private extension InternalProto where Assoc == InternalStruct {}
 private extension InternalProto where Assoc == PrivateStruct {}
 
@@ -180,14 +246,28 @@ public protocol PublicProto {
 }
 public extension PublicProto {}
 public extension PublicProto where Assoc == PublicStruct {}
+public extension PublicProto where Assoc == PackageStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses a package type}}
 public extension PublicProto where Assoc == InternalStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses an internal type}}
 public extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses a private type}}
+
+package extension PublicProto where Assoc == PublicStruct {}
+package extension PublicProto where Assoc == PackageStruct {}
+package extension PublicProto where Assoc == InternalStruct {} // expected-error {{extension cannot be declared package because its generic requirement uses an internal type}}
+package extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared package because its generic requirement uses a private type}}
+
 internal extension PublicProto where Assoc == PublicStruct {}
+internal extension PublicProto where Assoc == PackageStruct {}
 internal extension PublicProto where Assoc == InternalStruct {}
 internal extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
 private extension PublicProto where Assoc == PublicStruct {}
+private extension PublicProto where Assoc == PackageStruct {}
 private extension PublicProto where Assoc == InternalStruct {}
 private extension PublicProto where Assoc == PrivateStruct {}
+
+extension PublicProto where Assoc == PackageStruct {
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with package requirements}} {{3-9=package}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with package requirements}} {{3-7=package}}
+}
 
 extension PublicProto where Assoc == InternalStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
@@ -200,10 +280,23 @@ extension InternalProto where Assoc == PublicStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
   open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
 }
+extension InternalProto where Assoc == PackageStruct {
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
+}
 
 public struct GenericStruct<Param> {}
 public extension GenericStruct where Param: InternalProto {} // expected-error {{extension cannot be declared public because its generic requirement uses an internal type}}
 extension GenericStruct where Param: InternalProto {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
 }
+public extension GenericStruct where Param: PackageProto {} // expected-error {{extension cannot be declared public because its generic requirement uses a package type}}
+extension GenericStruct where Param: PackageProto {
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with package requirements}} {{3-9=package}}
+}
 
+package struct PkgGenericStruct<Param> {}
+package extension PkgGenericStruct where Param: InternalProto {} // expected-error {{extension cannot be declared package because its generic requirement uses an internal type}}
+extension PkgGenericStruct where Param: InternalProto {
+  package func foo() {} // expected-error {{cannot declare a package instance method in an extension with internal requirements}} {{3-10=internal}}
+}

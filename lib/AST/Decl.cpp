@@ -3982,12 +3982,11 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC,
 /// (useDC) and the decl (VD) site, and returns true in this case, since
 /// FileUnit is a child of nullptr based on the DeclContext hierarchy. The
 /// hierarchy is created when subclasses of DeclContext such as FileUnit or
-/// ModuleDecl are constructed. For example, FileUnit ctor takes ModuleDecl as
-/// its parent DeclContext. There's an exception, however; the parent of
-/// ModuleDecl is nullptr, not set to PackageUnit; ModuleDecl has a pointer to
-/// PackageUnit as its field, and it is treated as the enclosing scope of
-/// ModuleDecl in the `isChildOf` call.
-///
+/// ModuleDecl are constructed. For example, a top ClassDecl ctor takes FileUnit
+/// as its parent DeclContext and FileUnit ctor takes ModuleDecl as its parent
+/// DeclContext. There's an exception, however, for the case of PackageUnit.
+/// \see PackageUnit for details on how the hierachy between that and ModuleDecl
+///      is created.
 /// \see DeclContext::ASTHierarchy
 /// \see AccessScope::getAccessScopeForFormalAccess
 /// \see ValueDecl::isAccessibleFrom for a description of \p forConformance.
