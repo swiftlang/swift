@@ -729,6 +729,18 @@ static void emitDefaultActorInitialization(
                       { self.borrow(SGF, loc).getValue() });
 }
 
+static void emitNonDefaultDistributedActorInitialization(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue self) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(
+    getBuiltinName(BuiltinValueKind::InitializeNonDefaultDistributedActor));
+  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
+
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
+  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                      { self.borrow(SGF, loc).getValue() });
+}
+
 void SILGenFunction::emitConstructorPrologActorHop(
                                            SILLocation loc,
                                            Optional<ActorIsolation> maybeIso) {
@@ -832,14 +844,21 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
+    fprintf(stderr, "[%s:%d](%s) EMIT DEFAULT INIT!!!! initialize\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     // Initialize the default-actor instance.
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
     emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
   } else if (selfClassDecl->isNonDefaultExplicitDistributedActor() && !isDelegating) {
     // Initialize the distributed local actor with custom executor,
-    // with additional storage such that we can store the local/remote bit
-    assert(false && "FIXME not implemented initializing the local one"); // FIXME: !!!!
+    // with additional storage such that we can store the local/remote bit.
+    //
+    // We do this because normally non-default actors do not get any synthesized storage,
+    // as their executor is provided via user implementation. However, a distributed actor
+    // always needs additional storage for e.g. the isRemote/isLocal information.
+    SILLocation PrologueLoc(selfDecl);
+    PrologueLoc.markAsPrologue();
+    emitNonDefaultDistributedActorInitialization(*this, PrologueLoc, selfArg);
   }
 
   if (!ctor->hasStubImplementation()) {

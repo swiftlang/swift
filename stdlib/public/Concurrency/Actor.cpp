@@ -946,7 +946,7 @@ public:
     fprintf(stderr, "[%s:%d](%s) initialize NonDefaultDistributedActorImpl; remote = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isDistributedRemote);
     this->isDistributedRemoteActor = isDistributedRemote;
     SWIFT_TASK_DEBUG_LOG("Creating non-default distributed actor %p", this);
-    // concurrency::trace::actor_create(this); // FIXME: !!!!
+    concurrency::trace::actor_create(this); // FIXME: !!!!
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -1993,6 +1993,12 @@ void swift::swift_executor_escalate(ExecutorRef executor, AsyncTask *task,
 /*****************************************************************************/
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
+
+void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
+  fprintf(stderr, "[%s:%d](%s) NON DEFAULT DefaultActor initialize!!!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  asImpl(_actor)->initialize();
+}
+
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {

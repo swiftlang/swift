@@ -799,7 +799,11 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
-/// Initialize the runtime storage for a distributed remote actor.
+/// Initialize the runtime storage for a non-default distributed actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
+
+/// Create and initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);

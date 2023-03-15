@@ -9599,10 +9599,10 @@ bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
 }
 
 bool ClassDecl::isNonDefaultExplicitDistributedActor() const {
-  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
+  return isNonDefaultExplicitDistributedActor(getModuleContext(), ResilienceExpansion::Maximal);
 }
 bool ClassDecl::isNonDefaultExplicitDistributedActor(ModuleDecl *M,
-                                             ResilienceExpansion expansion) const {
+                                                     ResilienceExpansion expansion) const {
   return !isDefaultActor(M, expansion) && isExplicitDistributedActor();
 }
 

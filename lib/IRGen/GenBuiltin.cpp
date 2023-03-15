@@ -347,10 +347,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
+      Builtin.ID == BuiltinValueKind::InitializeNonDefaultDistributedActor ||
       Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
-    auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor
-                  ? IGF.IGM.getDefaultActorInitializeFunctionPointer()
-                  : IGF.IGM.getDefaultActorDestroyFunctionPointer();
+    irgen::FunctionPointer fn;
+    switch (Builtin.ID) {
+      case BuiltinValueKind::InitializeDefaultActor:
+        fn = IGF.IGM.getDefaultActorInitializeFunctionPointer();
+        break;
+      case BuiltinValueKind::InitializeNonDefaultDistributedActor:
+        fn = IGF.IGM.getNonDefaultDistributedActorInitializeFunctionPointer();
+        break;
+      case BuiltinValueKind::DestroyDefaultActor:
+        fn = IGF.IGM.getDefaultActorDestroyFunctionPointer();
+        break;
+      default:
+        llvm_unreachable("unhandled builtin id!");
+    }
     auto actor = args.claimNext();
     actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
     auto call = IGF.Builder.CreateCall(fn, {actor});
