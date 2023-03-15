@@ -656,6 +656,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[protocol-metatype-to-object]";
   case ConversionRestrictionKind::ArrayToPointer:
     return "[array-to-pointer]";
+  case ConversionRestrictionKind::ArrayToCPointer:
+    return "[array-to-c-pointer]";
   case ConversionRestrictionKind::StringToPointer:
     return "[string-to-pointer]";
   case ConversionRestrictionKind::InoutToPointer:

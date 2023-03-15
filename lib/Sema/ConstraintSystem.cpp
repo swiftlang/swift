@@ -6238,6 +6238,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
                                         ConstraintLocatorBuilder locator) {
   switch (conversion) {
   case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::ArrayToCPointer:
   case ConversionRestrictionKind::StringToPointer:
     // Always ephemeral.
     return ConversionEphemeralness::Ephemeral;

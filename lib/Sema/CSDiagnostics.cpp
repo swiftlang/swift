@@ -7367,7 +7367,8 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
 
   // Then try to find a suitable alternative.
   switch (ConversionKind) {
-  case ConversionRestrictionKind::ArrayToPointer: {
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::ArrayToCPointer: {
     // Don't suggest anything for optional arrays, as there's currently no
     // direct alternative.
     if (getArgType()->getOptionalObjectType())
