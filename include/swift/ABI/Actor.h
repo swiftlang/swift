@@ -44,7 +44,7 @@ class alignas(Alignment_NonDefaultDistributedActor) NonDefaultDistributedActor :
 public:
   // These constructors do not initialize the actor instance, and the
   // destructor does not destroy the actor instance; you must call
-  // swift_defaultActor_{initialize,destroy} yourself.
+  // swift_nonDefaultDistributedActor_initialize yourself.
   constexpr NonDefaultDistributedActor(const HeapMetadata *metadata)
     : HeapObject(metadata), PrivateData{} {}
 
