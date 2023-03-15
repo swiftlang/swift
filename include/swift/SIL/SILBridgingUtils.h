@@ -33,10 +33,6 @@ inline SILNode *castToSILNode(BridgedNode node) {
   return static_cast<SILNode *>(node.obj);
 }
 
-inline SILValue castToSILValue(BridgedValue value) {
-  return static_cast<ValueBase *>(value.obj);
-}
-
 inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
 }
@@ -93,12 +89,12 @@ castToWitnessTableEntry(BridgedWitnessTableEntry entry) {
   return static_cast<const SILWitnessTable::Entry *>(entry.ptr);
 }
 
-inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {
+inline ValueOwnershipKind castToOwnership(BridgedValue::Ownership ownership) {
   switch (ownership) {
-    case Ownership_Unowned:    return OwnershipKind::Unowned;
-    case Ownership_Owned:      return OwnershipKind::Owned;
-    case Ownership_Guaranteed: return OwnershipKind::Guaranteed;
-    case Ownership_None:       return OwnershipKind::None;
+    case BridgedValue::Ownership::Unowned:    return OwnershipKind::Unowned;
+    case BridgedValue::Ownership::Owned:      return OwnershipKind::Owned;
+    case BridgedValue::Ownership::Guaranteed: return OwnershipKind::Guaranteed;
+    case BridgedValue::Ownership::None:       return OwnershipKind::None;
   }
 }
 

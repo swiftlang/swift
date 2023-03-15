@@ -43,7 +43,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   final public var operands: OperandArray {
-    return OperandArray(opArray: SILInstruction_getOperands(bridged))
+    let operands = SILInstruction_getOperands(bridged)
+    return OperandArray(base: operands.base, count: operands.count)
   }
 
   fileprivate var resultCount: Int { 0 }

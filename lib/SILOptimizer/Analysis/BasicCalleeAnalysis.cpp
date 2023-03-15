@@ -340,7 +340,7 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee) {
   BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
-  CalleeList cl = bca->getCalleeListOfValue(castToSILValue(callee));
+  CalleeList cl = bca->getCalleeListOfValue(callee.getSILValue());
   return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
 }
 

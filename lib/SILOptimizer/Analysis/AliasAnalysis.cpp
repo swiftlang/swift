@@ -711,7 +711,7 @@ BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
                                                    BridgedInstruction inst,
                                                    BridgedValue addr) {
   return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
-    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
+    computeMemoryBehavior(castToInst(inst), addr.getSILValue());
 }
 
 void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,

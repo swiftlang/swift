@@ -26,8 +26,10 @@
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+struct BridgedInstruction;
+struct OptionalBridgedOperand;
+
 enum {
-  BridgedOperandSize = 4 * sizeof(uintptr_t),
   BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t),
   BridgedVTableEntrySize = 5 * sizeof(uintptr_t),
   BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
@@ -48,18 +50,88 @@ typedef struct {
   void * _Nullable typePtr;
 } BridgedType;
 
+struct BridgedValue {
+  SwiftObject obj;
+
+  enum class Kind {
+    SingleValueInstruction,
+    Argument,
+    MultipleValueInstructionResult,
+    Undef
+  };
+
+  // Unfortunately we need to take a detour over this enum.
+  // Currently it's not possible to switch over `OwnershipKind::inntery`, because it's not a class enum.
+  enum class Ownership {
+    Unowned,
+    Owned,
+    Guaranteed,
+    None
+  };
+
+  Kind getKind() const;
+
+  swift::SILValue getSILValue() const { return static_cast<swift::ValueBase *>(obj); }
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedOperand getFirstUse() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedType getType() const { return {getSILValue()->getType().getOpaqueValue()}; }
+
+  Ownership getOwnership() const {
+    switch (getSILValue()->getOwnershipKind()) {
+      case swift::OwnershipKind::Any:
+        llvm_unreachable("Invalid ownership for value");
+      case swift::OwnershipKind::Unowned:    return Ownership::Unowned;
+      case swift::OwnershipKind::Owned:      return Ownership::Owned;
+      case swift::OwnershipKind::Guaranteed: return Ownership::Guaranteed;
+      case swift::OwnershipKind::None:       return Ownership::None;
+    }
+  }
+};
+
+// This is the layout of a class existential.
+struct BridgeValueExistential {
+  BridgedValue value;
+  void * _Nonnull conformance;
+};
+
 typedef struct {
-  const void * _Nullable data;
+  const BridgeValueExistential * _Nullable base;
   size_t count;
 } BridgedValueArray;
 
-typedef struct {
-  const void * _Nonnull op;
-} BridgedOperand;
+struct BridgedOperand {
+  swift::Operand * _Nonnull op;
 
-typedef struct {
-  const void * _Nullable op;
-} OptionalBridgedOperand;
+  bool isTypeDependent() const { return op->isTypeDependent(); }
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedOperand getNextUse() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue getValue() const { return {op->get()}; }
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedInstruction getUser() const;
+};
+
+struct OptionalBridgedOperand {
+  swift::Operand * _Nullable op;
+
+  // Assumes that `op` is not null.
+  SWIFT_IMPORT_UNSAFE
+  BridgedOperand advancedBy(SwiftInt index) const { return {op + index}; }
+
+  // Assumes that `op` is not null.
+  SwiftInt distanceTo(BridgedOperand element) const { return element.op - op; }
+};
+
+struct BridgedOperandArray {
+  OptionalBridgedOperand base;
+  SwiftInt count;
+};
 
 typedef struct {
   const void * _Nonnull succ;
@@ -130,29 +202,12 @@ typedef struct {
 } BridgedNode;
 
 typedef struct {
-  SwiftObject obj;
-} BridgedValue;
-
-// For fast SILValue -> Value briding.
-// This is doing the type checks in C++ rather than in Swift.
-// It's used for getting the value of an Operand, which is a time critical function.
-typedef struct {
-  SwiftObject obj;
-  enum class Kind {
-    SingleValueInstruction,
-    Argument,
-    MultipleValueInstructionResult,
-    Undef
-  } kind;
-} BridgedClassifiedValue;
-
-typedef struct {
   OptionalSwiftObject obj;
 } OptionalBridgedValue;
 
-typedef struct {
+struct BridgedInstruction {
   SwiftObject obj;
-} BridgedInstruction;
+};
 
 typedef struct {
   OptionalSwiftObject obj;
@@ -189,13 +244,6 @@ typedef enum {
   EffectKind_readOnly,
   EffectKind_releaseNone,
 } BridgedEffectAttributeKind;
-
-typedef enum {
-  Ownership_Unowned,
-  Ownership_Owned,
-  Ownership_Guaranteed,
-  Ownership_None
-} BridgedOwnership;
 
 typedef enum {
   ArgumentConvention_Indirect_In,
@@ -308,7 +356,7 @@ SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
 BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index);
 BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
                                                BridgedType type,
-                                               BridgedOwnership ownership);
+                                               BridgedValue::Ownership ownership);
 void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index);
 void SILBasicBlock_moveAllInstructionsToBegin(BridgedBasicBlock block, BridgedBasicBlock dest);
 void SILBasicBlock_moveAllInstructionsToEnd(BridgedBasicBlock block, BridgedBasicBlock dest);
@@ -318,15 +366,7 @@ OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
 BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
 
-BridgedClassifiedValue Operand_getValue(BridgedOperand);
-OptionalBridgedOperand Operand_nextUse(BridgedOperand);
-BridgedInstruction Operand_getUser(BridgedOperand);
-SwiftInt Operand_isTypeDependent(BridgedOperand);
-
 std::string SILNode_debugDescription(BridgedNode node);
-OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
-BridgedType SILValue_getType(BridgedValue value);
-BridgedOwnership SILValue_getOwnership(BridgedValue value);
 
 std::string SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
@@ -370,7 +410,7 @@ OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
 OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
 BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst);
 bool SILInstruction_isDeleted(BridgedInstruction inst);
-BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst);
+BridgedOperandArray SILInstruction_getOperands(BridgedInstruction inst);
 void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
                                BridgedValue value);
 swift::SILDebugLocation SILInstruction_getLocation(BridgedInstruction inst);
@@ -494,6 +534,19 @@ BridgedInstruction SILBuilder_createBranch(
           BridgedBuilder builder, BridgedBasicBlock destBlock,
           BridgedValueArray arguments);
 BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder builder);
+
+OptionalBridgedOperand BridgedOperand::getNextUse() const {
+  return {op->getNextUse()};
+}
+
+BridgedInstruction BridgedOperand::getUser() const {
+  return {op->getUser()->asSILNode()};
+}
+
+OptionalBridgedOperand BridgedValue::getFirstUse() const {
+  return {*getSILValue()->use_begin()};
+}
+
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

@@ -1592,15 +1592,15 @@ void PassContext_freeNodeSet(BridgedPassContext context,
 }
 
 SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->contains(castToSILValue(value)) ? 1 : 0;
+  return castToNodeSet(set)->contains(value.getSILValue()) ? 1 : 0;
 }
 
 SwiftInt NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->insert(castToSILValue(value)) ? 1 : 0;
+  return castToNodeSet(set)->insert(value.getSILValue()) ? 1 : 0;
 }
 
 void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
-  castToNodeSet(set)->erase(castToSILValue(value));
+  castToNodeSet(set)->erase(value.getSILValue());
 }
 
 SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst) {

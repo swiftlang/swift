@@ -217,7 +217,7 @@ extension Builder {
 
 extension Undef {
   static func get(type: Type, _ context: some MutatingContext) -> Undef {
-    SILUndef_get(type.bridged, context._bridged).getAs(Undef.self)
+    SILUndef_get(type.bridged, context._bridged).value as! Undef
   }
 }
 
