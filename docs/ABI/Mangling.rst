@@ -574,6 +574,9 @@ Types
     type ::= 'BD'                              // Builtin.DefaultActorStorage
     type ::= 'Be'                              // Builtin.Executor
   #endif
+  #if SWIFT_RUNTIME_VERSION >= 5.9
+    type ::= 'Bd'                              // Builtin.NonDefaultDistributedActorStorage
+  #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral

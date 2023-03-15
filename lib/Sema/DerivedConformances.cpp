@@ -334,8 +334,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // Actor.unownedExecutor
-    if (name.isSimpleName(ctx.Id_unownedExecutor))
-      return getRequirement(KnownProtocolKind::Actor);
+    if (name.isSimpleName(ctx.Id_unownedExecutor)) {
+      if (nominal->isDistributedActor()) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      } else {
+        return getRequirement(KnownProtocolKind::Actor);
+      }
+    }
 
     // DistributedActor.id
     if (name.isSimpleName(ctx.Id_id))
@@ -518,7 +523,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
   getterDecl->copyFormalAccessFrom(property);
-
 
   return getterDecl;
 }

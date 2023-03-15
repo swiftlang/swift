@@ -2538,6 +2538,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
+    case BuiltinValueKind::InitializeNonDefaultDistributedActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::StartAsyncLet:

@@ -242,6 +242,21 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// the default initializer is not synthesized, and all the user-defined initializers must take care to initialize this property.
   nonisolated var actorSystem: ActorSystem { get }
 
+  /// Retrieve the executor for this actor as an optimized, unowned
+  /// reference.
+  ///
+  /// This property must always evaluate to the same executor for a
+  /// given actor instance, and holding on to the actor must keep the
+  /// executor alive.
+  ///
+  /// This property will be implicitly accessed when work needs to be
+  /// scheduled onto this actor.  These accesses may be merged,
+  /// eliminated, and rearranged with other work, and they may even
+  /// be introduced when not strictly required.  Visible side effects
+  /// are therefore strongly discouraged within this property.
+  @available(SwiftStdlib 5.9, *)
+  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
+
   /// Resolves the passed in `id` against the `system`, returning
   /// either a local or remote actor reference.
   ///
@@ -257,6 +272,7 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// - Parameter id: identity uniquely identifying a, potentially remote, actor in the system
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
+
 }
 
 // ==== Hashable conformance ---------------------------------------------------

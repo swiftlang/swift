@@ -1620,6 +1620,22 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType)
 
+/// BuiltinNonDefaultDistributedActorStorageType - The type of the stored property
+/// that's added implicitly to distributed actors.  No C equivalent because
+/// the C types all include a heap-object header.  Similarly, this type
+/// generally does not appear in the AST/SIL around default actors;
+/// it's purely a convenience in IRGen.
+class BuiltinNonDefaultDistributedActorStorageType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinNonDefaultDistributedActorStorageType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinNonDefaultDistributedActorStorage, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinNonDefaultDistributedActorStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNonDefaultDistributedActorStorageType, BuiltinType)
+
 /// BuiltinPackIndexType - The type of an (untyped) index into a pack
 /// in SIL.  Essentially a UInt32 with some structural restrictions
 /// about how it can be produced that ensures SIL maintains well-typed

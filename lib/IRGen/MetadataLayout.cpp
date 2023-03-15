@@ -415,6 +415,13 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::addDefaultActorStorageFieldOffset();
     }
 
+    void addNonDefaultDistributedActorStorageFieldOffset() {
+      if (IsInTargetFields) {
+        ++Layout.NumImmediateMembers;
+      }
+      super::addNonDefaultDistributedActorStorageFieldOffset();
+    }
+
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
       if (placeholder->getDeclContext()->getImplementedObjCContext() == Target) {
         Layout.NumImmediateMembers +=

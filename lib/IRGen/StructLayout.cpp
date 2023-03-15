@@ -231,7 +231,34 @@ void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
   headerSize = CurSize;
 }
 
+void StructLayoutBuilder::addNonDefaultDistributedActorHeader(ElementLayout &elt) {
+  assert(StructFields.size() == 1 &&
+         StructFields[0] == IGM.RefCountedStructTy &&
+         "adding default actor header at wrong offset");
+
+  // These must match the NonDefaultDistributedActor class in Actor.h.
+  auto size = NumWords_NonDefaultDistributedActor * IGM.getPointerSize();
+  auto align = Alignment(Alignment_NonDefaultDistributedActor);
+  auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_NonDefaultDistributedActor);
+
+  // Note that we align the *entire structure* to the new alignment,
+  // not the storage we're adding.  Otherwise we would potentially
+  // get internal padding.
+  assert(CurSize.isMultipleOf(IGM.getPointerSize()));
+  assert(align >= CurAlignment);
+  assert(CurSize == getNonDefaultDistributedActorStorageFieldOffset(IGM));
+  elt.completeFixed(IsNotTriviallyDestroyable, CurSize, /*struct index*/ 1);
+  CurSize += size;
+  CurAlignment = align;
+  StructFields.push_back(ty);
+  headerSize = CurSize;
+}
+
 Size irgen::getDefaultActorStorageFieldOffset(IRGenModule &IGM) {
+  return IGM.RefCountedStructSize;
+}
+
+Size irgen::getNonDefaultDistributedActorStorageFieldOffset(IRGenModule &IGM) {
   return IGM.RefCountedStructSize;
 }
 
@@ -417,8 +444,11 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   auto numFields =
     target->getStoredPropertiesAndMissingMemberPlaceholders().size();
   if (auto cls = dyn_cast<ClassDecl>(target)) {
-    if (cls->isRootDefaultActor())
+    if (cls->isRootDefaultActor()) {
       numFields++;
+    } else if (cls->isRootDefaultActor()) {
+      numFields++;
+    }
   }
   return numFields;
 }
@@ -426,8 +456,12 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
 void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (classDecl && classDecl->isRootDefaultActor()) {
-    fn(Field::DefaultActorStorage);
+  if (classDecl) {
+    if (classDecl->isRootDefaultActor()) {
+      fn(Field::DefaultActorStorage);
+    } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+      fn(Field::NonDefaultDistributedActorStorage);
+    }
   }
 
   for (auto decl :
@@ -450,6 +484,9 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
+  case Field::NonDefaultDistributedActorStorage:
+    return SILType::getPrimitiveObjectType(
+                             IGM.Context.TheNonDefaultDistributedActorStorageType);
   }
   llvm_unreachable("bad field kind");
 }
@@ -462,6 +499,8 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
+  case Field::NonDefaultDistributedActorStorage:
+    return IGM.Context.TheNonDefaultDistributedActorStorageType;
   }
   llvm_unreachable("bad field kind");
 }
@@ -474,6 +513,8 @@ StringRef Field::getName() const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
+  case Field::NonDefaultDistributedActorStorage:
+    return NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME;
   }
   llvm_unreachable("bad field kind");
 }

@@ -63,6 +63,9 @@ constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";
 
+constexpr static const StringLiteral NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME =
+    "$nonDefaultDistributedActor";
+
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
 
@@ -149,6 +152,9 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_EXECUTOR = {
 /// The name of the Builtin type for DefaultActorStorage
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE = {
     "Builtin.DefaultActorStorage"};
+/// The name of the Builtin type for NonDefaultDistributedActorStorage
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE = {
+    "Builtin.NonDefaultDistributedActorStorage"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for

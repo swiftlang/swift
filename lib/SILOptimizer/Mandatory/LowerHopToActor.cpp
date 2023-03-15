@@ -177,8 +177,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
   // If the actor type is a default actor, go ahead and devirtualize here.
   auto module = F->getModule().getSwiftModule();
   SILValue unmarkedExecutor;
-  if (isDefaultActorType(actorType, module, F->getResilienceExpansion()) ||
-      actorType->isDistributedActor()) {
+  if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
     auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
     auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
@@ -189,14 +188,17 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
 
   // Otherwise, go through Actor.unownedExecutor.
   } else {
-    auto actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+    auto actorKind = actorType->isDistributedActor() ?
+                     KnownProtocolKind::DistributedActor :
+                     KnownProtocolKind::Actor;
+    auto actorProtocol = ctx.getProtocol(actorKind);
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");
     SILDeclRef fn(req, SILDeclRef::Kind::Func);
 
     auto actorConf = module->lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
-           "hop_to_executor with actor that doesn't conform to Actor");
+           "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
 
     auto subs = SubstitutionMap::get(req->getGenericSignature(),
                                      {actorType}, {actorConf});

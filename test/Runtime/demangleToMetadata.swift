@@ -275,6 +275,7 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.RawUnsafeContinuation.self, _typeByName("Bc")!)
   expectEqual(Builtin.Executor.self, _typeByName("Be")!)
   expectNotNil(_typeByName("BD"))
+  expectNotNil(_typeByName("Bd")) // NonDefaultDistributedActor storage
   expectEqual(Builtin.Job.self, _typeByName("Bj")!)
 }
 

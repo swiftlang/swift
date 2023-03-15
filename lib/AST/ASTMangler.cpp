@@ -1210,6 +1210,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
+    case TypeKind::BuiltinNonDefaultDistributedActorStorage:
+      return appendOperator("Bd");
     case TypeKind::BuiltinPackIndex:
       return appendOperator("BP");
     case TypeKind::BuiltinRawPointer:
