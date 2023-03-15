@@ -1271,13 +1271,25 @@ struct VarRefCollector : public ASTWalker {
 
         SmallVector<TypeVariableType *, 2> referencedVars;
 
-        // If tap expression is located in a closure, let's connect them
-        // because interpolation could use parameters.
         if (auto *tap = getAsExpr<TapExpr>(appendingExpr)) {
           auto *tapDC = tap->getVar()->getDeclContext();
+          // If tap expression is located in a closure, let's
+          // connect them because interpolation could use parameters.
           if (auto *closure = dyn_cast<ClosureExpr>(tapDC)) {
             referencedVars.push_back(
                 CS.getType(closure)->castTo<TypeVariableType>());
+          }
+
+          // Collect all of the variable references that appear
+          // in the tap body, otherwise tap expression is going
+          // to get disconnected from the context.
+          if (auto *body = tap->getBody()) {
+            VarRefCollector refCollector(CS);
+
+            body->walk(refCollector);
+
+            referencedVars.append(refCollector.varRefs.begin(),
+                                  refCollector.varRefs.end());
           }
         }
 
