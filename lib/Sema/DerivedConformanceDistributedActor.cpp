@@ -457,7 +457,6 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   // we don't allocate memory after those two fields, so their order is very
   // important. The `hint` below makes sure the system is inserted right after.
   if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    fprintf(stderr, "[%s:%d](%s) INSERT SYSTEM: AFTER ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
     derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
   } else {
@@ -465,7 +464,6 @@ static ValueDecl *deriveDistributedActor_actorSystem(
     // so in order for system to be SECOND (as it must be),
     // we'll insert at head right now and as id gets synthesized we'll get
     // the correct order: id, actorSystem.
-    fprintf(stderr, "[%s:%d](%s) INSERT SYSTEM: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
     derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
   }
@@ -720,6 +718,51 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
 
+/// Asserts that the synthesized fields appear in the expected order.
+///
+/// The `id` and `actorSystem` MUST be the first two fields of a distributed actor,
+/// because we assume their location in IRGen, and also when we allocate a distributed remote actor,
+/// we're able to allocate memory ONLY for those and without allocating any of the storage for the actor's
+/// properties.
+///         [id, actorSystem]
+/// followed by the executor fields for a default distributed actor.
+///
+static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, ValueDecl *derivedValue) {
+#ifndef NDEBUG
+  if (derivedValue) {
+    auto Nominal = derived.Nominal;
+    auto &Context = derived.Context;
+    if (auto id = Nominal->getDistributedActorIDProperty()) {
+      if (auto system = Nominal->getDistributedActorSystemProperty()) {
+        if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
+          if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+            int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
+            int idx = 0;
+            for (auto member: Nominal->getMembers()) {
+              if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
+                fprintf(stderr, "[%s:%d](%s) member = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+                member->dump();
+                if (binding->getSingleVar()->getName() == Context.Id_id) {
+                  idIdx = idx;
+                } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
+                  actorSystemIdx = idx;
+                } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
+                  unownedExecutorIdx = idx;
+                }
+                idx += 1;
+              }
+            }
+            if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+              assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
+}
+
 // !!!!!!!!!!!!! IMPORTANT WHEN MAKING CHANGES TO REQUIREMENTS !!!!!!!!!!!!!!!!!
 // !! Remember to update DerivedConformance::getDerivableRequirement          !!
 // !! any time the signatures or list of derived requirements change.         !!
@@ -728,12 +771,6 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
     ValueDecl *derivedValue = nullptr;
-//    if (var->getName() == Context.Id_id) {
-//      fprintf(stderr, "[%s:%d](%s) DERIVE ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//      derivedValue = deriveDistributedActor_id(*this);
-//    } else
-  //  NOTE: `id` is implemented in addImplicitDistributedActorIDProperty
-
     if (var->getName() == Context.Id_actorSystem) {
       fprintf(stderr, "[%s:%d](%s) DERIVE SYS\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       derivedValue = deriveDistributedActor_actorSystem(*this);
@@ -742,42 +779,8 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
     }
 
-    if (derivedValue) {
-      if (auto id = Nominal->getDistributedActorIDProperty()) {
-        if (auto system = Nominal->getDistributedActorSystemProperty()) {
-          if (auto classDecl = dyn_cast<ClassDecl>(Nominal)) {
-            if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
-              int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
-              int idx = 0;
-              for (auto member : Nominal->getMembers()) {
-                if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
-                  fprintf(stderr, "[%s:%d](%s) member = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-                  member->dump();
-                  if (binding->getSingleVar()->getName() == Context.Id_id) {
-                    idIdx = idx;
-                  } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
-                    actorSystemIdx = idx;
-                  } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
-                    unownedExecutorIdx = idx;
-                  }
-                  idx += 1;
-                }
-              }
-              if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
-                fprintf(stderr, "[%s:%d](%s) ******************************************************************************************\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-                Nominal->dump();
-                fprintf(stderr, "[%s:%d](%s) ******************************************************************************************\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-                fprintf(stderr, "[%s:%d](%s) member == id  = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, idIdx);
-                fprintf(stderr, "[%s:%d](%s) member == sys = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, actorSystemIdx);
-                fprintf(stderr, "[%s:%d](%s) member == ex  = %d \n", __FILE_NAME__, __LINE__, __FUNCTION__, unownedExecutorIdx);
-//                assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
-              }
-            }
-          }
-        }
-      }
-      return derivedValue;
-    }
+    assertRequiredSynthesizedPropertyOrder(*this, derivedValue);
+    return derivedValue;
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
