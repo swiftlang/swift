@@ -3329,9 +3329,8 @@ namespace {
       // bindings for the result of the coercion.
       if (repr &&
           repr->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-        auto *locatorIUO = CS.getConstraintLocator(expr);
-        return createTypeVariableAndDisjunctionForIUOCoercion(toType,
-                                                              locatorIUO);
+        return createTypeVariableAndDisjunctionForIUOCoercion(
+            toType, CS.getConstraintLocator(expr));
       }
 
       return toType;

@@ -282,6 +282,9 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return getAffectedDeclFromType(contextualTy);
   }
 
+  if (getLocator()->isFirstElement<LocatorPathElt::CoercionOperand>())
+    return getAffectedDeclFromType(getOwnerType());
+
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this
     // failure e.g. an overload choice of the call
