@@ -279,10 +279,10 @@ macro(add_sourcekit_library name)
   add_dependencies(${SOURCEKITLIB_INSTALL_IN_COMPONENT} ${name})
   swift_install_in_component(TARGETS ${name}
     LIBRARY
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
     ARCHIVE
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}"
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
     RUNTIME
       DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -455,13 +455,13 @@ macro(add_sourcekit_framework name)
     add_dependencies(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
                                FRAMEWORK
-                                 DESTINATION ${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
                                  COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
                                LIBRARY
-                                 DESTINATION ${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
                                  COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
                                ARCHIVE
-                                 DESTINATION ${CMAKE_INSTALL_LIBDIR}${LLVM_LIBDIR_SUFFIX}
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
                                  COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
                                RUNTIME
                                  DESTINATION ${CMAKE_INSTALL_BINDIR}
