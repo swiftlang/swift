@@ -58,7 +58,9 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var isCalleeConsumedFunction: Bool { SILType_isCalleeConsumedFunction(bridged) }
-  
+
+  public var isMarkedAsImmortal: Bool { SILType_isMarkedAsImmortal(bridged) }
+
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withStringRef {
       SILType_getCaseIdxOfEnumType(bridged, $0)

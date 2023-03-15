@@ -133,6 +133,19 @@ typedef struct {
   SwiftObject obj;
 } BridgedValue;
 
+// For fast SILValue -> Value briding.
+// This is doing the type checks in C++ rather than in Swift.
+// It's used for getting the value of an Operand, which is a time critical function.
+typedef struct {
+  SwiftObject obj;
+  enum class Kind {
+    SingleValueInstruction,
+    Argument,
+    MultipleValueInstructionResult,
+    Undef
+  } kind;
+} BridgedClassifiedValue;
+
 typedef struct {
   OptionalSwiftObject obj;
 } OptionalBridgedValue;
@@ -305,7 +318,7 @@ OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
 BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
 
-BridgedValue Operand_getValue(BridgedOperand);
+BridgedClassifiedValue Operand_getValue(BridgedOperand);
 OptionalBridgedOperand Operand_nextUse(BridgedOperand);
 BridgedInstruction Operand_getUser(BridgedOperand);
 SwiftInt Operand_isTypeDependent(BridgedOperand);
@@ -332,6 +345,7 @@ BridgedType SILType_instanceTypeOfMetatype(BridgedType type, BridgedFunction fun
 BridgedDecl SILType_getNominal(BridgedType type);
 bool SILType_isOrContainsObjectiveCClass(BridgedType type);
 bool SILType_isCalleeConsumedFunction(BridgedType type);
+bool SILType_isMarkedAsImmortal(BridgedType type);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
 SwiftInt SILType_getNumNominalFields(BridgedType type);

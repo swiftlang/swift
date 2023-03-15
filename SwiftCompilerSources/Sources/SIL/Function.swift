@@ -13,6 +13,7 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 final public class Function : CustomStringConvertible, HasShortDescription, Hashable {
   public private(set) var effects = FunctionEffects()
 

@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/BridgingUtils.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBridgingUtils.h"
@@ -447,8 +449,21 @@ static Operand *castToOperand(BridgedOperand operand) {
   return const_cast<Operand *>(static_cast<const Operand *>(operand.op));
 }
 
-BridgedValue Operand_getValue(BridgedOperand operand) {
-  return {castToOperand(operand)->get()};
+BridgedClassifiedValue Operand_getValue(BridgedOperand operand) {
+  SILValue v = castToOperand(operand)->get();
+  BridgedClassifiedValue::Kind k;
+  if (isa<SingleValueInstruction>(v)) {
+    k = BridgedClassifiedValue::Kind::SingleValueInstruction;
+  } else if (isa<SILArgument>(v)) {
+    k = BridgedClassifiedValue::Kind::Argument;
+  } else if (isa<MultipleValueInstructionResult>(v)) {
+    k = BridgedClassifiedValue::Kind::MultipleValueInstructionResult;
+  } else if (isa<SILUndef>(v)) {
+    k = BridgedClassifiedValue::Kind::Undef;
+  } else {
+    llvm_unreachable("unknown SILValue");
+  }
+  return {castToOperand(operand)->get(), k};
 }
 
 OptionalBridgedOperand Operand_nextUse(BridgedOperand operand) {
@@ -572,6 +587,48 @@ bool SILType_isOrContainsObjectiveCClass(BridgedType type) {
 bool SILType_isCalleeConsumedFunction(BridgedType type) {
   auto funcTy = castToSILType(type).castTo<SILFunctionType>();
   return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
+}
+
+static bool hasImmortalAttr(NominalTypeDecl *nominal) {
+  if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
+    if (semAttr->Value == semantics::ARC_IMMORTAL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool isMarkedAsImmortal(NominalTypeDecl *nominal) {
+  if (hasImmortalAttr(nominal))
+    return true;
+
+  if (!isa<ProtocolDecl>(nominal)) {
+    for (ProtocolDecl *p : nominal->getAllProtocols()) {
+      if (hasImmortalAttr(p))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool SILType_isMarkedAsImmortal(BridgedType type) {
+  SILType ty = castToSILType(type);
+  NominalTypeDecl *nominal = ty.getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return false;
+
+  if (isMarkedAsImmortal(nominal))
+    return true;
+
+  if (ClassDecl *cl = dyn_cast<ClassDecl>(nominal)) {
+    cl = cl->getSuperclassDecl();
+    while (cl) {
+      if (isMarkedAsImmortal(cl))
+        return true;
+      cl = cl->getSuperclassDecl();
+    }
+  }
+  return false;
 }
 
 SwiftInt SILType_getNumTupleElements(BridgedType type) {

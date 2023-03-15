@@ -120,19 +120,19 @@ public typealias SwiftObject = UnsafeMutablePointer<BridgedSwiftObject>
 
 extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
   public init<T: AnyObject>(_ object: T) {
-    let ptr = Unmanaged.passUnretained(object).toOpaque()
+    let ptr = unsafeBitCast(object, to: UnsafeMutableRawPointer.self)
     self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
   }
 
   public func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
-    return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
+    return unsafeBitCast(self, to: T.self)
   }
 }
 
 extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
   public func getAs<T: AnyObject>(_ objectType: T.Type) -> T? {
     if let pointer = self {
-      return Unmanaged<T>.fromOpaque(pointer).takeUnretainedValue()
+      return pointer.getAs(objectType)
     }
     return nil
   }
