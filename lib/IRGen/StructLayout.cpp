@@ -208,7 +208,7 @@ void StructLayoutBuilder::addNSObjectHeader() {
   headerSize = CurSize;
 }
 
-void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) { // FIXME: !!!! make sure we call this equivalent for distributed
+void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
   assert(StructFields.size() == 1 &&
          StructFields[0] == IGM.RefCountedStructTy &&
          "adding default actor header at wrong offset");
@@ -236,7 +236,7 @@ void StructLayoutBuilder::addNonDefaultDistributedActorHeader(ElementLayout &elt
          StructFields[0] == IGM.RefCountedStructTy &&
          "adding default actor header at wrong offset");
 
-  // These must match the NonDefaultDistributedActor class in Actor.h. // FIXME: !!!! make such class
+  // These must match the NonDefaultDistributedActor class in Actor.h.
   auto size = NumWords_NonDefaultDistributedActor * IGM.getPointerSize();
   auto align = Alignment(Alignment_NonDefaultDistributedActor);
   auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_NonDefaultDistributedActor);
