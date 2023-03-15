@@ -5,8 +5,9 @@ enum Either<T,U> {
   case second(U)
 }
 
-@resultBuilder
-struct TupleBuilder { // expected-note {{struct 'TupleBuilder' declared here}}
+// expected-note @+2 {{add 'buildArray(_:)' to the result builder 'TupleBuilder' to add support for 'for'..'in' loops}}
+// expected-note @+1 2 {{struct 'TupleBuilder' declared here}}
+@resultBuilder struct TupleBuilder {
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -78,7 +79,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{in call to function 'tuplify(_:body:)'}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{'tuplify(_:body:)' declared here}}
   print(body(cond))
 }
 
@@ -88,9 +89,9 @@ func tuplifyWithoutIf<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T)
 
 func testDiags() {
   // For loop
-  tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+  tuplify(true) { _ in
     17
-    for c in name {
+    for c in name { // expected-error {{closure containing control flow statement cannot be used with result builder 'TupleBuilder'}}
     // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
@@ -464,7 +465,7 @@ struct TestConstraintGenerationErrors {
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+    tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
@@ -732,7 +733,7 @@ struct TuplifiedStructWithInvalidClosure {
 
   @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
     tuplify(true) { _ in
-      tuplify { _ in
+      tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
         self. // expected-error {{expected member name following '.'}}
       }
       42

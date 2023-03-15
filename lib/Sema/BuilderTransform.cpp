@@ -2462,8 +2462,11 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     return getTypeMatchSuccess();
   }
 
-  // Pre-check the body: pre-check any expressions in it and look
-  // for return statements.
+  // We have already pre-checked the result builder body. Technically, we
+  // shouldn't need to do anything here, but there was a bug here that we did
+  // not apply the result builder transform if it contained an explicit return.
+  // To maintain source compatibility, we still need to check for HasReturnStmt.
+  // https://github.com/apple/swift/issues/64332.
   auto request =
       PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/false}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
@@ -2473,16 +2476,10 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     break;
 
   case ResultBuilderBodyPreCheck::Error: {
-    InvalidResultBuilderBodies.insert(fn);
-
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
-
-    if (recordFix(IgnoreInvalidResultBuilderBody::create(
-            *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
-      return getTypeMatchFailure(locator);
-
-    return getTypeMatchSuccess();
+    llvm_unreachable(
+        "Running PreCheckResultBuilderRequest on a function shouldn't run "
+        "preCheckExpression and thus we should never enter this case.");
+    break;
   }
 
   case ResultBuilderBodyPreCheck::HasReturnStmt:
@@ -2800,8 +2797,11 @@ public:
 
 ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
     Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
+  // Closures should already be pre-checked when we run this, so there's no need
+  // to pre-check them again.
+  bool skipPrecheck = owner.Fn.getAbstractClosureExpr();
   return PreCheckResultBuilderApplication(
-             owner.Fn, /*skipPrecheck=*/false,
+             owner.Fn, skipPrecheck,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)
       .run();
 }
