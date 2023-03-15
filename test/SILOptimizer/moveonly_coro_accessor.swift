@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify -enable-experimental-move-only %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
 
 @inline(never) func someFunction() {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil -o /dev/null
+// RUN: %target-swift-frontend -verify %s -parse-stdlib -emit-sil -o /dev/null
 
 import Swift
 

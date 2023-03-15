@@ -2161,12 +2161,8 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
-  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
-    auto error =
-        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
-    diagnoseAndRemoveAttr(attr, error);
-    return;
-  }
+  if (!D->getASTContext().supportsMoveOnlyTypes())
+    D->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
   if (isa<StructDecl>(D) || isa<EnumDecl>(D))
     return;

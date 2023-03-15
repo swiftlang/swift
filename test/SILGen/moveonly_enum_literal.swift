@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // This test makes sure that we properly setup enums when we construct moveonly
 // enums from literals.

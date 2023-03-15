@@ -1,5 +1,5 @@
 // TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-swift-emit-ir -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=IR %s
+// RUN: %target-swift-emit-ir -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=IR %s
 
 // Test that makes sure that at IRGen time we properly handle conditional
 // releases for trivial and non-trivial move only types. The SIL/SILGen part of

@@ -620,8 +620,7 @@ class LetValueInitialization : public Initialization {
 public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
     const TypeLowering *lowering = nullptr;
-    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        vd->isNoImplicitCopy()) {
+    if (vd->isNoImplicitCopy()) {
       lowering = &SGF.getTypeLowering(
           SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
     } else {
@@ -661,8 +660,7 @@ public:
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
+    if (lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
@@ -740,10 +738,6 @@ public:
                                              SILValue value, bool wasPlusOne) {
     // If we have none...
     if (value->getOwnershipKind() == OwnershipKind::None) {
-      // If we don't have move only features enabled, just return, we are done.
-      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
-        return value;
-
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
       if (value->getType().isPureMoveOnly()) {
@@ -766,15 +760,6 @@ public:
       return SGF.B.createMarkMustCheckInst(
           PrologueLoc, value,
           MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-    }
-
-    // Then if we don't have move only, just perform a lexical borrow if the
-    // lifetime is lexical.
-    if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly)) {
-      if (SGF.F.getLifetime(vd, value->getType()).isLexical())
-        return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
-      else
-        return value;
     }
 
     // Otherwise, we need to perform some additional processing. First, if we
@@ -2136,51 +2121,49 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
-    if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
-      if (mvi->hasMoveCheckerKind()) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-            if (bbi->isLexical()) {
-              B.emitDestroyValueOperation(silLoc, mvi);
-              B.createEndBorrow(silLoc, bbi);
-              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-              return;
-            }
-          }
-        }
-
-        if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
-                mvi->getOperand())) {
-          if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
-            if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-              if (bbi->isLexical()) {
-                B.emitDestroyValueOperation(silLoc, mvi);
-                B.createEndBorrow(silLoc, bbi);
-                B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-                return;
-              }
-            }
-          }
-        }
-
-        if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-            if (bbi->isLexical()) {
-              B.emitDestroyValueOperation(silLoc, mvi);
-              B.createEndBorrow(silLoc, bbi);
-              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-              return;
-            }
-          }
-        }
-
-        // Handle trivial arguments.
-        if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
-          if (move->isLexical()) {
+  if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
+    if (mvi->hasMoveCheckerKind()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+          if (bbi->isLexical()) {
             B.emitDestroyValueOperation(silLoc, mvi);
+            B.createEndBorrow(silLoc, bbi);
+            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
             return;
           }
+        }
+      }
+
+      if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+              mvi->getOperand())) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              B.emitDestroyValueOperation(silLoc, mvi);
+              B.createEndBorrow(silLoc, bbi);
+              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+              return;
+            }
+          }
+        }
+      }
+
+      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+          if (bbi->isLexical()) {
+            B.emitDestroyValueOperation(silLoc, mvi);
+            B.createEndBorrow(silLoc, bbi);
+            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+            return;
+          }
+        }
+      }
+
+      // Handle trivial arguments.
+      if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
+        if (move->isLexical()) {
+          B.emitDestroyValueOperation(silLoc, mvi);
+          return;
         }
       }
     }

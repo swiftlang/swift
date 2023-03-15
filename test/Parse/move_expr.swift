@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 var global: Int = 5
 func testGlobal() {
@@ -49,11 +49,6 @@ func useConsumeVar(consume: inout String) {
     // We can do member access and subscript a variable named `consume`
     let i = consume.startIndex
     let _ = consume[i]
-}
-
-// Temporary `_move` syntax is still parsed but raises a warning and fixit.
-func oldMoveSyntax(x: String) {
-    _ = _move x // expected-warning{{renamed to 'consume'}} {{9-14=consume}}
 }
 
 @propertyWrapper

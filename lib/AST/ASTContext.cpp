@@ -6370,3 +6370,8 @@ ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
 
   return plugin.get();
 }
+
+bool ASTContext::supportsMoveOnlyTypes() const {
+  // currently the only thing holding back whether the types can appear is this.
+  return SILOpts.LexicalLifetimes != LexicalLifetimesOption::Off;
+}

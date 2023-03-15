@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift
 
 protocol P: _Copyable {} // expected-error {{'_Copyable' is unavailable}}
 struct S: P {}

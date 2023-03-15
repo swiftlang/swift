@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-experimental-move-only %s -emit-sib -o %t/tmp.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-move-only %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-move-only %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name basic2
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
 
 // Once move only is no longer behind a feature flag, merge this into basic2.
 
