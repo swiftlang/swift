@@ -116,36 +116,37 @@ final class PluginHostConnection: MessageConnection {
     }
   }
 
-  /// Send a serialized message data to the message channel.
+  /// Send a serialized message to the message channel.
   private func sendMessageData(_ data: UnsafeBufferPointer<Int8>) throws {
     // Write the header (a 64-bit length field in little endian byte order).
     var header: UInt64 = UInt64(data.count).littleEndian
     let writtenSize = try Swift.withUnsafeBytes(of: &header) { buffer in
-      try self.write(data: UnsafeRawBufferPointer(buffer))
+      try self.write(buffer: UnsafeRawBufferPointer(buffer))
     }
-    guard writtenSize == 8 else {
+    guard writtenSize == MemoryLayout.size(ofValue: header) else {
       throw PluginServerError(message: "failed to write message header")
     }
 
     // Write the body.
-    guard try self.write(data: UnsafeRawBufferPointer(data)) == data.count else {
-      throw PluginServerError(message: "failed to write message data")
+    guard try self.write(buffer: UnsafeRawBufferPointer(data)) == data.count else {
+      throw PluginServerError(message: "failed to write message body")
     }
   }
 
-  /// Read a serialized message data from the message channel and call the 'body'
+  /// Read a serialized message from the message channel and call the 'body'
   /// with the data.
   private func withReadingMessageData<R>(_ body: (UnsafeBufferPointer<Int8>) throws -> R) throws -> R? {
-    // Read the header.
+    // Read the header (a 64-bit length field in little endian byte order).
     var header: UInt64 = 0
     let readSize = try Swift.withUnsafeMutableBytes(of: &header) { buffer in
       try self.read(into: UnsafeMutableRawBufferPointer(buffer))
     }
-    if readSize == 0 {
-      // The host closed the pipe.
-      return nil
-    }
-    guard readSize == 8 else {
+    guard readSize == MemoryLayout.size(ofValue: header) else {
+      if readSize == 0 {
+        // The host closed the pipe.
+        return nil
+      }
+      // Otherwise, some error happened.
       throw PluginServerError(message: "failed to read message header")
     }
 
@@ -154,18 +155,21 @@ final class PluginHostConnection: MessageConnection {
     let data = UnsafeMutableBufferPointer<Int8>.allocate(capacity: count)
     defer { data.deallocate() }
     guard try self.read(into: UnsafeMutableRawBufferPointer(data)) == count else {
-      throw PluginServerError(message: "failed to read message data")
+      throw PluginServerError(message: "failed to read message body")
     }
 
     // Invoke the handler.
     return try body(UnsafeBufferPointer(data))
   }
 
-  /// Write the 'data' to the message channel.
+  /// Write the 'buffer' to the message channel.
   /// Returns the number of bytes succeeded to write.
-  private func write(data: UnsafeRawBufferPointer) throws -> Int {
-    var bytesToWrite = data.count
-    var ptr = data.baseAddress!
+  private func write(buffer: UnsafeRawBufferPointer) throws -> Int {
+    var bytesToWrite = buffer.count
+    guard bytesToWrite > 0 else {
+      return 0
+    }
+    var ptr = buffer.baseAddress!
 
     while (bytesToWrite > 0) {
       let writtenSize = PluginServer_write(handle, ptr, bytesToWrite)
@@ -176,13 +180,16 @@ final class PluginHostConnection: MessageConnection {
       ptr = ptr.advanced(by: writtenSize)
       bytesToWrite -= writtenSize
     }
-    return data.count - bytesToWrite
+    return buffer.count - bytesToWrite
   }
 
   /// Read data from the message channel into the 'buffer' up to 'buffer.count' bytes.
   /// Returns the number of bytes succeeded to read.
   private func read(into buffer: UnsafeMutableRawBufferPointer) throws -> Int {
     var bytesToRead = buffer.count
+    guard bytesToRead > 0 else {
+      return 0
+    }
     var ptr = buffer.baseAddress!
 
     while bytesToRead > 0 {
