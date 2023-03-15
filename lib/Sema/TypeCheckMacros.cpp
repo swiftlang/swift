@@ -286,10 +286,9 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadPluginByName(StringRef searchPath,
-                              StringRef moduleName,
-                              llvm::vfs::FileSystem &fs,
-                              PluginRegistry *registry) {
+static void *loadLibraryPluginByName(StringRef searchPath, StringRef moduleName,
+                                     llvm::vfs::FileSystem &fs,
+                                     PluginRegistry *registry) {
   SmallString<128> fullPath(searchPath);
   llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
   if (fs.getRealPath(fullPath, fullPath))
@@ -298,15 +297,76 @@ static void *loadPluginByName(StringRef searchPath,
   return loadResult ? *loadResult : nullptr;
 }
 
-void *CompilerPluginLoadRequest::evaluate(
-    Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
-) const {
+static LoadedExecutablePlugin *
+loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
+  // Find an executable plugin.
+  std::string libraryPath;
+  std::string executablePluginPath;
+
+  if (auto found = ctx.lookupExternalLibraryPluginByModuleName(moduleName)) {
+    // Found in '-external-plugin-path'.
+    std::tie(libraryPath, executablePluginPath) = found.value();
+  } else if (auto found = ctx.lookupExecutablePluginByModuleName(moduleName)) {
+    // Found in '-load-plugin-executable'.
+    executablePluginPath = found->str();
+  }
+  if (executablePluginPath.empty())
+    return nullptr;
+
+  // Launch the plugin.
+  LoadedExecutablePlugin *executablePlugin =
+      ctx.loadExecutablePlugin(executablePluginPath);
+  if (!executablePlugin)
+    return nullptr;
+
+  // FIXME: Ideally this should be done right after invoking the plugin.
+  // But plugin loading is in libAST and it can't link ASTGen symbols.
+  if (!executablePlugin->isInitialized()) {
+#if SWIFT_SWIFT_PARSER
+    swift_ASTGen_initializePlugin(executablePlugin);
+    executablePlugin->setCleanup([executablePlugin] {
+      swift_ASTGen_deinitializePlugin(executablePlugin);
+    });
+#endif
+  }
+
+  // If this is a plugin server, load the library.
+  if (!libraryPath.empty()) {
+#if SWIFT_SWIFT_PARSER
+    llvm::SmallString<128> resolvedLibraryPath;
+    auto fs = ctx.SourceMgr.getFileSystem();
+    if (fs->getRealPath(libraryPath, resolvedLibraryPath)) {
+      return nullptr;
+    }
+    bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
+        executablePlugin, resolvedLibraryPath.c_str(), moduleName.str().data(),
+        &ctx.Diags);
+    if (!loaded)
+      return nullptr;
+#endif
+  }
+
+  return executablePlugin;
+}
+
+LoadedCompilerPlugin
+CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                    Identifier moduleName) const {
   auto fs = ctx->SourceMgr.getFileSystem();
   auto &searchPathOpts = ctx->SearchPathOpts;
   auto *registry = ctx->getPluginRegistry();
+
+  // First, check '-plugin-path' paths.
   for (const auto &path : searchPathOpts.PluginSearchPaths) {
-    if (auto found = loadPluginByName(path, moduleName.str(), *fs, registry))
-      return found;
+    if (auto found =
+            loadLibraryPluginByName(path, moduleName.str(), *fs, registry))
+      return LoadedCompilerPlugin::inProcess(found);
+  }
+
+  // Fall back to executable plugins.
+  // i.e. '-external-plugin-path', and '-load-plugin-executable'.
+  if (auto *found = loadExecutablePluginByName(*ctx, moduleName)) {
+    return LoadedCompilerPlugin::executable(found);
   }
 
   return nullptr;
@@ -338,53 +398,10 @@ resolveInProcessMacro(
 }
 
 static Optional<ExternalMacroDefinition>
-resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
-                      Identifier typeName) {
+resolveExecutableMacro(ASTContext &ctx,
+                       LoadedExecutablePlugin *executablePlugin,
+                       Identifier moduleName, Identifier typeName) {
 #if SWIFT_SWIFT_PARSER
-  std::string executablePluginPath;
-  std::string libraryPath;
-
-  // Find macros in executable plugins.
-  if (auto found = ctx.lookupExternalLibraryPluginByModuleName(moduleName)) {
-    // Found in '-external-plugin-path'.
-    std::tie(libraryPath, executablePluginPath) = found.value();
-  } else if (auto found = ctx.lookupExecutablePluginByModuleName(moduleName)) {
-    // Found in '-load-plugin-executable'.
-    executablePluginPath = found->str();
-  }
-  if (executablePluginPath.empty())
-    return None;
-
-  // Launch the plugin.
-  LoadedExecutablePlugin *executablePlugin =
-      ctx.loadExecutablePlugin(executablePluginPath);
-  if (!executablePlugin)
-    return None;
-
-  // FIXME: Ideally this should be done right after invoking the plugin.
-  // But plugin loading is in libAST and it can't link ASTGen symbols.
-  if (!executablePlugin->isInitialized()) {
-    swift_ASTGen_initializePlugin(executablePlugin);
-    executablePlugin->setCleanup([executablePlugin] {
-      swift_ASTGen_deinitializePlugin(executablePlugin);
-    });
-  }
-
-  // If this is a plugin server. Load the library in that process before
-  // resolving the macro.
-  if (!libraryPath.empty()) {
-    llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.SourceMgr.getFileSystem();
-    if (fs->getRealPath(libraryPath, resolvedLibraryPath)) {
-      return None;
-    }
-    bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
-        executablePlugin, resolvedLibraryPath.c_str(), moduleName.str().data(),
-        &ctx.Diags);
-    if (!loaded)
-      return None;
-  }
-
   if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
           moduleName.str().data(), moduleName.str().size(),
           typeName.str().data(), typeName.str().size(), executablePlugin)) {
@@ -395,7 +412,6 @@ resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
 #endif
-
   return None;
 }
 
@@ -406,8 +422,9 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   // Try to load a plugin module from the plugin search paths. If it
   // succeeds, resolve in-process from that plugin
   CompilerPluginLoadRequest loadRequest{ctx, moduleName};
-  if (auto loadedLibrary = evaluateOrDefault(
-          evaluator, loadRequest, nullptr)) {
+  LoadedCompilerPlugin loaded =
+      evaluateOrDefault(evaluator, loadRequest, nullptr);
+  if (auto loadedLibrary = loaded.getAsInProcessPlugin()) {
     if (auto inProcess = resolveInProcessMacro(
             *ctx, moduleName, typeName, loadedLibrary))
       return *inProcess;
@@ -418,9 +435,11 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     return *inProcess;
 
   // Try executable plugins.
-  if (auto executableMacro =
-          resolveExecutableMacro(*ctx, moduleName, typeName)) {
-    return executableMacro;
+  if (auto *executablePlugin = loaded.getAsExecutablePlugin()) {
+    if (auto executableMacro = resolveExecutableMacro(*ctx, executablePlugin,
+                                                      moduleName, typeName)) {
+      return executableMacro;
+    }
   }
 
   return None;
