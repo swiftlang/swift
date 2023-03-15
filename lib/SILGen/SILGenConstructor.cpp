@@ -844,7 +844,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
-    fprintf(stderr, "[%s:%d](%s) EMIT DEFAULT INIT!!!! initialize\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     // Initialize the default-actor instance.
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();

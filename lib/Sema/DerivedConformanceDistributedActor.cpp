@@ -689,27 +689,18 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
     if (auto system = derived.Nominal->getDistributedActorSystemProperty()) {
       // good, we must be after the system; this is the final order
-      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: AFTER SYSTEM\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      system->dump();
       derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/system);
       derived.addMemberToConformanceContext(property, /*hint=*/system);
     } else {
       // system was not yet synthesized, it'll insert after id and we'll be okey
-      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: AFTER ID\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/id);
       derived.addMemberToConformanceContext(property, /*hint=*/id);
     }
   } else {
     // nor id or system synthesized yet, id will insert first and system will be after it
-      fprintf(stderr, "[%s:%d](%s) INSERT EXECUTOR: FIRST\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     derived.addMemberToConformanceContext(propertyPair.second, /*insertAtHead==*/true);
     derived.addMemberToConformanceContext(property, /*insertAtHead==*/true);
   }
-
-  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  derived.Nominal->dump();
-  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d](%s) ================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
   return property;
 }
@@ -740,8 +731,6 @@ static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, 
             int idx = 0;
             for (auto member: Nominal->getMembers()) {
               if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
-                fprintf(stderr, "[%s:%d](%s) member = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-                member->dump();
                 if (binding->getSingleVar()->getName() == Context.Id_id) {
                   idIdx = idx;
                 } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
@@ -753,6 +742,7 @@ static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, 
               }
             }
             if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+              // we have found all the necessary fields, let's assert their order
               assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
             }
           }
@@ -772,10 +762,8 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
     ValueDecl *derivedValue = nullptr;
     if (var->getName() == Context.Id_actorSystem) {
-      fprintf(stderr, "[%s:%d](%s) DERIVE SYS\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       derivedValue = deriveDistributedActor_actorSystem(*this);
     } else if (var->getName() == Context.Id_unownedExecutor) {
-      fprintf(stderr, "[%s:%d](%s) DERIVE EX\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
     }
 

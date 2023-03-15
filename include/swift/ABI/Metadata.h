@@ -4139,14 +4139,10 @@ public:
   }
 
   bool isActor() const {
-    fprintf(stderr, "[%s:%d](%s) is actor? %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            this->getTypeContextDescriptorFlags().class_isActor());
     return this->getTypeContextDescriptorFlags().class_isActor();
   }
 
   bool isDefaultActor() const {
-    fprintf(stderr, "[%s:%d](%s) is actor? %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            this->getTypeContextDescriptorFlags().class_isDefaultActor());
     return this->getTypeContextDescriptorFlags().class_isDefaultActor();
   }
 

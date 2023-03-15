@@ -861,7 +861,6 @@ class DefaultActorImpl : public HeapObject {
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
-    fprintf(stderr, "[%s:%d](%s) initialize DefaultActorImpl; remote = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isDistributedRemote);
     this->isDistributedRemoteActor = isDistributedRemote;
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
     new (&this->drainLock) Mutex();
@@ -943,10 +942,9 @@ class NonDefaultDistributedActorImpl : public HeapObject {
 public:
   /// Properly construct an actor, except for the heap header.
   void initialize(bool isDistributedRemote = false) {
-    fprintf(stderr, "[%s:%d](%s) initialize NonDefaultDistributedActorImpl; remote = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, isDistributedRemote);
     this->isDistributedRemoteActor = isDistributedRemote;
     SWIFT_TASK_DEBUG_LOG("Creating non-default distributed actor %p", this);
-    concurrency::trace::actor_create(this); // FIXME: !!!!
+    concurrency::trace::actor_create(this);
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -1713,7 +1711,6 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
 }
 
 void swift::swift_defaultActor_initialize(DefaultActor *_actor) {
-  fprintf(stderr, "[%s:%d](%s) DefaultActor initialize!!!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   asImpl(_actor)->initialize();
 }
 
@@ -1734,13 +1731,10 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
 }
 
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
-  fprintf(stderr, "[%s:%d](%s) is DefaultActor ???\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
   assert(metadata->isTypeMetadata());
   while (true) {
     // Trust the class descriptor if it says it's a default actor.
     if (metadata->getDescription()->isDefaultActor()) {
-      fprintf(stderr, "[%s:%d](%s) is DefaultActor = YES\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return true;
     }
 
@@ -1749,7 +1743,6 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
 
     // If we run out of Swift classes, it's not a default actor.
     if (!metadata || !metadata->isTypeMetadata()) {
-      fprintf(stderr, "[%s:%d](%s) is DefaultActor = NO IT IS NOT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return false;
     }
   }
@@ -1995,10 +1988,8 @@ void swift::swift_executor_escalate(ExecutorRef executor, AsyncTask *task,
 /*****************************************************************************/
 
 void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
-  fprintf(stderr, "[%s:%d](%s) NON DEFAULT DefaultActor initialize!!!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   asImpl(_actor)->initialize();
 }
-
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
@@ -2021,12 +2012,10 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   // If it is a default actor, we reuse the same layout as DefaultActorImpl,
   // and store flags in the allocation directly as we initialize it.
   if (isDefaultActorClass(metadata)) {
-    fprintf(stderr, "[%s:%d](%s) IS DEFAULT\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     auto actor = asImpl(reinterpret_cast<DefaultActor *>(alloc));
     actor->initialize(/*remote*/true);
     return reinterpret_cast<OpaqueValue*>(actor);
   } else {
-    fprintf(stderr, "[%s:%d](%s) initialize NOT DEFAULT [REMOTE] DISTRIBUTED ACTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
     actor->initialize(/*remote*/true);
   }
@@ -2035,12 +2024,10 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 }
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
-  fprintf(stderr, "[%s:%d](%s) CHECK: swift_distributed_actor_is_remote\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   auto metadata = cast<ClassMetadata>(_actor->metadata);
   if (isDefaultActorClass(metadata)) {
     return asImpl((DefaultActor *) _actor)->isDistributedRemote();
   } else {
-    fprintf(stderr, "[%s:%d](%s) NEW PATH swift_distributed_actor_is_remote\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     return asImpl((NonDefaultDistributedActor *) _actor)->isDistributedRemote(); // NEW
   }
 }
