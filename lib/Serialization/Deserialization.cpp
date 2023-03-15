@@ -1292,7 +1292,8 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
         parentSigOrError.get(), UUID::fromTime(),
-        existentialOrShapeTypeOrError.get()->getCanonicalType(),
+        cast<GenericTypeParamType>(
+          existentialOrShapeTypeOrError.get()->getCanonicalType()),
         contextSubsOrError.get());
   }
 

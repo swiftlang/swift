@@ -3387,13 +3387,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     // Parse the shape class that should be opened.  This is a contextual
     // type within the signature we just parsed.
     CanType shapeClass;
+    SourceLoc shapeClassLoc;
     if (!P.consumeIf(tok::comma) ||
         parseVerbatim("shape") ||
         P.parseToken(tok::sil_dollar,
                      diag::expected_tok_in_sil_instr, "$") ||
-        parseASTType(shapeClass, openedGenericsSig, openedGenerics,
-                     /*wantContextualType*/ true))
+        parseASTType(shapeClass, shapeClassLoc, openedGenericsSig,
+                     openedGenerics, /*wantContextualType*/ true))
       return true;
+
+    // Map it out of context.  It should be a type pack parameter.
+    shapeClass = shapeClass->mapTypeOutOfContext()->getCanonicalType();
+    auto shapeParam = dyn_cast<GenericTypeParamType>(shapeClass);
+    if (!shapeParam || !shapeParam->isParameterPack()) {
+      P.diagnose(shapeClassLoc, diag::opened_shape_class_not_pack_param);
+      return true;
+    }
 
     // Parse the UUID for the opening.
     UUID uuid;
@@ -3406,10 +3415,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     // the opened elements to the signature we parsed above.
     auto openedElementSig =
       P.Context.getOpenedElementSignature(
-        openedGenericsSig.getCanonicalSignature(), shapeClass);
+        openedGenericsSig.getCanonicalSignature(), shapeParam);
 
     auto openedEnv = GenericEnvironment::forOpenedElement(openedElementSig,
-                         uuid, shapeClass, openedSubMap);
+                         uuid, shapeParam, openedSubMap);
 
     auto openInst = B.createOpenPackElement(InstLoc, Val, openedEnv);
     ResultVal = openInst;

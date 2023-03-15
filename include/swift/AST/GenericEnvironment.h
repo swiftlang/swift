@@ -71,7 +71,7 @@ struct OpenedExistentialEnvironmentData {
 /// Extra data in a generic environment for an opened pack element.
 struct OpenedElementEnvironmentData {
   UUID uuid;
-  CanType shapeClass;
+  CanGenericTypeParamType shapeClass;
   SubstitutionMap outerSubstitutions;
 };
 
@@ -146,7 +146,8 @@ private:
 
   /// Private constructor for opened element environments.
   explicit GenericEnvironment(GenericSignature signature,
-                              UUID uuid, CanType shapeClass,
+                              UUID uuid,
+                              CanGenericTypeParamType shapeClass,
                               SubstitutionMap outerSubs);
 
   friend ArchetypeType;
@@ -194,7 +195,8 @@ public:
   SubstitutionMap getPackElementContextSubstitutions() const;
 
   /// Retrieve the shape equivalence class for an opened element environment.
-  CanType getOpenedElementShapeClass() const;
+  /// This is always a pack parameter.
+  CanGenericTypeParamType getOpenedElementShapeClass() const;
 
   /// Retrieve the UUID for an opened element environment.
   UUID getOpenedElementUUID() const;
@@ -238,12 +240,12 @@ public:
   /// signature of the context whose element type is being opened, but with
   /// the pack parameter bit erased from one or more generic parameters
   /// \param uuid The unique identifier for this opened element
-  /// \param shapeClass The shape equivalence class for the originating packs.
+  /// \param shapeClass The shape equivalence class for the originating packs
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context.
   static GenericEnvironment *
   forOpenedElement(GenericSignature signature,
-                   UUID uuid, CanType shapeClass,
+                   UUID uuid, CanGenericTypeParamType shapeClass,
                    SubstitutionMap outerSubs);
 
   /// Make vanilla new/delete illegal.

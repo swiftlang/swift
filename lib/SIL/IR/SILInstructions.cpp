@@ -2379,7 +2379,6 @@ OpenPackElementInst *OpenPackElementInst::create(
                                      PackType *packSubstitution) {
     collector.collect(packSubstitution->getCanonicalType());
   });
-  collector.collect(env->getOpenedElementShapeClass());
   collector.addTo(typeDependentOperands, F);
 
   SILType type = SILType::getSILTokenType(F.getASTContext());

@@ -1385,7 +1385,7 @@ public:
   /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig,
-                                                CanType shapeClass);
+                                                CanGenericTypeParamType shapeClass);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
