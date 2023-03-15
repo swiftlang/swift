@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -I %t -enable-experimental-feature ResultBuilderASTTransform
+// RUN: %target-typecheck-verify-swift -I %t
 
 // This test verifies that `buildBlock` is type-checked together with enclosing context,
 // which means that it's not captured into separate variable but rather used directly and
