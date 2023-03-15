@@ -3,8 +3,6 @@
 // Experimental features require an asserts compiler
 // REQUIRES: asserts
 
-// XFAIL: OS=windows-msvc
-
 // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type16variadicFunction1t1ux_q_txQp_txxQp_q_xQptq_RhzRvzRv_r0_lF : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (@pack_guaranteed Pack{repeat each T}, @pack_guaranteed Pack{repeat each U}) -> @pack_out Pack{repeat (each T, each U)} {
 // CHECK: bb0(%0 : $*Pack{repeat (each T, each U)}, %1 : $*Pack{repeat each T}, %2 : $*Pack{repeat each U}):
 public func variadicFunction<each T, each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {}
