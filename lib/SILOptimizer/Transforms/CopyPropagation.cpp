@@ -35,6 +35,16 @@
 /// TODO: Cleanup the resulting SIL by deleting instructions that produce dead
 /// values (after removing its copies).
 ///
+/// PASS DEPENDENCIES:
+/// - ComputeSideEffects
+///
+/// ANALYSES USED:
+/// - BasicCalleeAnalysis
+/// - DeadEndBlocksAnalysis
+/// - DominanceAnalysis
+/// - NonLocalAccessBlockAnalysis
+/// - PostOrderAnalysis
+///
 /// ===----------------------------------------------------------------------===
 
 #define DEBUG_TYPE "copy-propagation"
