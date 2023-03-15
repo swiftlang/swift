@@ -63,7 +63,8 @@ size_t GenericEnvironment::numTrailingObjects(
 }
 
 size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
-  return getGenericParams().size();
+  return getGenericParams().size()
+       + (getKind() == Kind::OpenedElement ? getNumOpenedPackParams() : 0);
 }
 
 /// Retrieve the array containing the context types associated with the
@@ -80,6 +81,21 @@ MutableArrayRef<Type> GenericEnvironment::getContextTypes() {
 ArrayRef<Type> GenericEnvironment::getContextTypes() const {
   return ArrayRef<Type>(getTrailingObjects<Type>(),
                         getGenericParams().size());
+}
+
+unsigned GenericEnvironment::getNumOpenedPackParams() const {
+  assert(getKind() == Kind::OpenedElement);
+  return getGenericSignature().getInnermostGenericParams().size();
+}
+
+MutableArrayRef<Type> GenericEnvironment::getOpenedPackParams() {
+  auto begin = getTrailingObjects<Type>() + getGenericParams().size();
+  return MutableArrayRef<Type>(begin, getNumOpenedPackParams());
+}
+
+ArrayRef<Type> GenericEnvironment::getOpenedPackParams() const {
+  auto begin = getTrailingObjects<Type>() + getGenericParams().size();
+  return ArrayRef<Type>(begin, getNumOpenedPackParams());
 }
 
 TypeArrayView<GenericTypeParamType>
@@ -230,6 +246,16 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature,
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
+
+  // Fill in the array of opened pack parameters.
+  auto openedPacksBuffer = getOpenedPackParams();
+  unsigned i = 0;
+  for (auto param : signature.getGenericParams()) {
+    if (!param->isParameterPack()) continue;
+    if (!signature->haveSameShape(param, shapeClass)) continue;
+    openedPacksBuffer[i++] = param;
+  }
+  assert(i == openedPacksBuffer.size());
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
