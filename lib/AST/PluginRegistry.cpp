@@ -40,6 +40,10 @@
 
 using namespace swift;
 
+PluginRegistry::PluginRegistry() {
+  dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
+}
+
 llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
   auto found = LoadedPluginLibraries.find(path);
   if (found != LoadedPluginLibraries.end()) {
@@ -93,6 +97,8 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
 
   auto plugin = std::unique_ptr<LoadedExecutablePlugin>(
       new LoadedExecutablePlugin(path, stat.getLastModificationTime()));
+
+  plugin->setDumpMessaging(dumpMessaging);
 
   // Launch here to see if it's actually executable, and diagnose (by returning
   // an error) if necessary.
@@ -213,6 +219,10 @@ ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
 llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   ssize_t writtenSize = 0;
 
+  if (dumpMessaging) {
+    llvm::dbgs() << "->(plugin:" << Process->pid << ") " << message << "\n";
+  }
+
   const char *data = message.data();
   size_t size = message.size();
 
@@ -267,6 +277,10 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
     }
     sizeToRead -= readSize;
     message.append(buffer, readSize);
+  }
+
+  if (dumpMessaging) {
+    llvm::dbgs() << "<-(plugin:" << Process->pid << ") " << message << "\n";
   }
 
   return message;

@@ -103,10 +103,6 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-//      // FIXME: Add -dump-plugin-message option?
-//      data.withMemoryRebound(to: UInt8.self) { buffer in
-//        print(">> " + String(decoding: buffer, as: UTF8.self))
-//      }
       return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
     }
     if hadError {
@@ -122,10 +118,6 @@ struct CompilerPlugin {
       throw PluginError.failedToReceiveMessage
     }
     let data = UnsafeBufferPointer(start: result.baseAddress, count: result.size)
-//    // FIXME: Add -dump-plugin-message option?
-//    data.withMemoryRebound(to: UInt8.self) { buffer in
-//      print("<< " + String(decoding: buffer, as: UTF8.self))
-//    }
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
   }
 
