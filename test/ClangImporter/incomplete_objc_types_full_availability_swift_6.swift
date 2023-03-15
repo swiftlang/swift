@@ -7,6 +7,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 import IncompleteTypeLibrary1
 import CompleteTypes

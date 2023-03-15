@@ -2,6 +2,7 @@
 // RUN: not %target-swift-frontend -swift-version 6 -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes %s 2>&1 | %FileCheck  %s
 
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 import IncompleteTypeLibrary1
 import IncompleteNoRootTypeProtocolLibrary
