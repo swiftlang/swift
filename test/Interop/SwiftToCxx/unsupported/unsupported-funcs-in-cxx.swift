@@ -8,6 +8,7 @@
 // CHECK-NOT: unsupported
 // CHECK: HasMethods
 // CHECK: supported
+// CHECK-NOT: unsupported
 
 public func supported() {}
 
@@ -35,5 +36,11 @@ public struct HasMethods {
         get throws {
             return 42
         }
+    }
+
+    @_expose(Cxx) // expected-error {{property 'unsupportedAEICProp' can not be exposed to C++ as it requires code to be emitted into client}}
+    @_alwaysEmitIntoClient
+    public var unsupportedAEICProp: Bool {
+        return false
     }
 }
