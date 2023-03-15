@@ -294,10 +294,26 @@ public:
 
   /// Map a contextual type containing parameter packs to a contextual
   /// type in the opened element generic context.
+  ///
+  /// This operation only makes sense if the generic environment that the
+  /// pack archetypes are contextual in matches the generic signature
+  /// of this environment.  That will be true for opened element
+  /// environments coming straight out of the type checker, such as
+  /// the one in a PackExpansionExpr, or opened element environments
+  /// created directly from the current environment.  It is not
+  /// reliable for opened element environments in arbitrary SIL functions.
   Type mapContextualPackTypeIntoElementContext(Type type) const;
 
   /// Map a contextual type containing parameter packs to a contextual
   /// type in the opened element generic context.
+  ///
+  /// This operation only makes sense if the generic environment that the
+  /// pack archetypes are contextual in matches the generic signature
+  /// of this environment.  That will be true for opened element
+  /// environments coming straight out of the type checker, such as
+  /// the one in a PackExpansionExpr, or opened element environments
+  /// created directly from the current environment.  It is not
+  /// reliable for opened element environments in arbitrary SIL functions.
   CanType mapContextualPackTypeIntoElementContext(CanType type) const;
 
   /// Map a type containing pack element type parameters to a contextual
