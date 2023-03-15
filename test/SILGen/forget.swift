@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only -module-name test %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-sil -enable-experimental-move-only -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
+// RUN: %target-swift-emit-silgen -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 
 func invokedDeinit() {}
 

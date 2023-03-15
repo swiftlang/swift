@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift
 
 // This test validates that move only enums cannot be marked indirect or have
 // indirect cases.

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only -Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
 

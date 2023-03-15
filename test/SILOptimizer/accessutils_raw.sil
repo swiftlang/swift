@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-move-only %s -dump-access -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-access -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

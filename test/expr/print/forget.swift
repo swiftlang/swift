@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -print-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast %s 2>&1 | %FileCheck %s
 
 @_moveOnly
 struct S {
