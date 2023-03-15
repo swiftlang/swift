@@ -205,6 +205,10 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
   Optional<CanGenericSignature> genericSignature;
+  // Don't expose @_alwaysEmitIntoClient decls as they require their
+  // bodies to be emitted into client.
+  if (VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return {Unsupported, UnrepresentableRequiresClientEmission};
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
       return {Unsupported, UnrepresentableAsync};
@@ -212,10 +216,6 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    // Don't expose @_alwaysEmitIntoClient functions as they require their
-    // bodies to be emitted into client.
-    if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-      return {Unsupported, UnrepresentableRequiresClientEmission};
     if (AFD->isGeneric())
       genericSignature = AFD->getGenericSignature().getCanonicalSignature();
   }

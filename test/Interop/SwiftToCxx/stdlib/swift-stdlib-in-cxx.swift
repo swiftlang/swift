@@ -77,7 +77,6 @@
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const UTF8View& newValue) SWIFT_SYMBOL({{.*}});
-// CHECK:  SWIFT_INLINE_THUNK bool isContiguousUTF8() const SWIFT_SYMBOL({{.*}});
 // CHECK:  #if defined(__OBJC__)
 // CHECK-NEXT:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
