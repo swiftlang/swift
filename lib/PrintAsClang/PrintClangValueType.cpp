@@ -442,7 +442,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
         os << "  template<class T>\n";
         os << "  static ";
-        ClangSyntaxPrinter(os).printInlineForThunk();
+        ClangSyntaxPrinter(os).printInlineForHelperFunction();
         printCxxTypeName(os, typeDecl, moduleContext);
         printGenericParamRefs(os);
         os << " returnNewValue(T callable) {\n";

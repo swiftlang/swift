@@ -64,7 +64,7 @@
 // CHECK-NEXT: static SWIFT_INLINE_THUNK char *  _Nonnull getOpaquePointer(StructWithIntField &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT: static SWIFT_INLINE_THUNK const char * _Nonnull getOpaquePointer(const StructWithIntField &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT: template<class T>
-// CHECK-NEXT: static SWIFT_INLINE_THUNK StructWithIntField returnNewValue(T callable) {
+// CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER StructWithIntField returnNewValue(T callable) {
 // CHECK-NEXT:   auto result = StructWithIntField::_make();
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;

@@ -197,6 +197,10 @@ void ClangSyntaxPrinter::printInlineForThunk() const {
   os << "SWIFT_INLINE_THUNK ";
 }
 
+void ClangSyntaxPrinter::printInlineForHelperFunction() const {
+  os << "SWIFT_INLINE_PRIVATE_HELPER ";
+}
+
 void ClangSyntaxPrinter::printNullability(
     Optional<OptionalTypeKind> kind, NullabilityPrintKind printKind) const {
   if (!kind)

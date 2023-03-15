@@ -154,6 +154,7 @@ public:
   };
 
   void printInlineForThunk() const;
+  void printInlineForHelperFunction() const;
 
   void printNullability(
       Optional<OptionalTypeKind> kind,
