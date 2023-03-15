@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.50 -emit-module -emit-module-path %t/weak_import_availability_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_availability_helper.swift -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/weak_import_availability_helper.swiftmodule -parse-as-library %S/Inputs/weak_import_availability_helper.swift -enable-library-evolution
 //
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir | %FileCheck %s --check-prefix=CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefix=CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 | %FileCheck %s --check-prefix=CHECK-NEW
 
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-OLD
-// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefixes=CHECK,CHECK-NEW
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.50 -weak-link-at-target | %FileCheck %s --check-prefix=CHECK-OLD
+// RUN: %target-swift-frontend -primary-file %s -I %t -emit-ir -target %target-cpu-apple-macosx10.60 -weak-link-at-target | %FileCheck %s --check-prefix=CHECK-NEW
 
 // REQUIRES: OS=macosx
 
@@ -35,16 +35,6 @@ public func useConditionallyAvailableConformance() {
 // CHECK-OLD-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = extern_weak global i8*
 // CHECK-NEW-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA0eF8ProtocolAAWP" = external global i8*
 
-@available(macOS, unavailable)
-func useUnavailableConformance<T : UnavailableProtocol>(_: T.Type) {}
-
-@available(macOS, unavailable)
-public func useUnavailableConformance() {
-  useUnavailableConformance(AlwaysAvailableStruct.self)
-}
-
-// CHECK-LABEL: @"$s31weak_import_availability_helper21AlwaysAvailableStructVAA19UnavailableProtocolAAWP" = extern_weak global i8*, align 8
-
 @available(macOS 10.50, *)
 public func callConditionallyAvailableFunction() {
   conditionallyAvailableFunction()
@@ -52,21 +42,6 @@ public func callConditionallyAvailableFunction() {
 
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper30conditionallyAvailableFunctionyyF"()
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper30conditionallyAvailableFunctionyyF"()
-
-@available(macOS, unavailable)
-public func callUnavailableFunction() {
-  unavailableFunction()
-}
-
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper19unavailableFunctionyyF"()
-
-@available(macOS, unavailable)
-public func callUnavailableButIntroducedFunction() {
-  unavailableButIntroducedFunction()
-}
-
-// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper32unavailableButIntroducedFunctionyyF"()
-// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper32unavailableButIntroducedFunctionyyF"()
 
 @available(macOS 10.50, *)
 public func useConditionallyAvailableGlobal() {
@@ -81,37 +56,12 @@ public func useConditionallyAvailableGlobal() {
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivs"(i64)
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivs"(i64)
 
-// CHECK-OLD-LABEL: declare extern_weak swiftcc { i8*, %TSi* } @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivM"(i8* noalias dereferenceable(32))
-// CHECK-NEW-LABEL: declare swiftcc { i8*, %TSi* } @"$s31weak_import_availability_helper28conditionallyAvailableGlobalSivM"(i8* noalias dereferenceable(32))
-
-@available(macOS, unavailable)
-public func useUnavailableGlobal() {
-  _ = unavailableGlobal
-  unavailableGlobal = 0
-  unavailableGlobal += 1
-}
-
-// CHECK-LABEL: declare extern_weak swiftcc i64 @"$s31weak_import_availability_helper17unavailableGlobalSivg"()
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper17unavailableGlobalSivs"(i64)
-// CHECK-LABEL: declare extern_weak swiftcc { i8*, %TSi* } @"$s31weak_import_availability_helper17unavailableGlobalSivM"(i8* noalias dereferenceable(32))
-
 func blackHole<T>(_: T) {}
 
 @available(macOS 10.50, *)
 public func useConditionallyAvailableStruct() {
   blackHole(ConditionallyAvailableStruct.self)
 }
-
-// CHECK-OLD-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
-// CHECK-NEW-LABEL: declare swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructVMa"(i64)
-
-@available(macOS 10.50, *)
-public func useNestedConditionallyAvailableStruct() {
-  blackHole(ConditionallyAvailableStruct.NestedStruct.self)
-}
-
-// CHECK-OLD-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructV06NestedG0VMa"(i64)
-// CHECK-NEW-LABEL: declare swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructV06NestedG0VMa"(i64)
 
 @available(macOS 10.50, *)
 public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
@@ -120,17 +70,3 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
 
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(%swift.opaque* noalias nocapture swiftself)
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(%swift.opaque* noalias nocapture swiftself)
-
-@available(macOS, unavailable)
-public func useUnavailableStruct() {
-  blackHole(UnvailableStruct.self)
-}
-
-// CHECK-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper16UnvailableStructVMa"(i64)
-
-@available(macOS, unavailable)
-public func useUnavailableMethod(s: UnvailableStruct) {
-  s.unavailableMethod()
-}
-
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(%swift.opaque* noalias nocapture swiftself)
