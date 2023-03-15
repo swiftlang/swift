@@ -3057,6 +3057,7 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::PackExpansionPattern);
       auto patternTy = CS.createTypeVariable(patternLoc,
                                              TVO_CanBindToPack |
+                                             TVO_CanBindToNoEscape |
                                              TVO_CanBindToHole);
       auto elementResultType = CS.getType(expr->getPatternExpr());
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
