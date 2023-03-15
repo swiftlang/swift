@@ -13,6 +13,7 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
   var type: Type { get }
@@ -157,18 +158,21 @@ extension Value {
 extension BridgedValue {
   public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
 
+  public var value: Value { getAs(AnyObject.self) as! Value }
+}
+
+extension BridgedClassifiedValue {
   public var value: Value {
-    // This is much faster than a conformance lookup with `as! Value`.
-    let v = getAs(AnyObject.self)
-    switch v {
-      case let inst as SingleValueInstruction:
-        return inst
-      case let arg as Argument:
-        return arg
-      case let mvr as MultipleValueInstructionResult:
-        return mvr
-      case let undef as Undef:
-        return undef
+    // Doing the type check in C++ is much faster than a conformance lookup with `as! Value`.
+    switch kind {
+      case .SingleValueInstruction:
+        return obj.getAs(SingleValueInstruction.self)
+      case .Argument:
+        return obj.getAs(Argument.self)
+      case .MultipleValueInstructionResult:
+        return obj.getAs(MultipleValueInstructionResult.self)
+      case .Undef:
+        return obj.getAs(Undef.self)
       default:
         fatalError("unknown Value type")
     }

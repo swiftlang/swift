@@ -2037,6 +2037,15 @@ FUNCTION(DefaultActorDeallocateResilient,
          ATTRS(NoUnwind),
          EFFECT(Concurrency))
 
+// void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
+FUNCTION(NonDefaultDistributedActorInitialize,
+         swift_nonDefaultDistributedActor_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency))
+
 // OpaqueValue* swift_distributedActor_remote_initialize(
 //    const Metadata *actorType
 // );

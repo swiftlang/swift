@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift
 
 // Coverage for check that requires some ownership specifier to be written
 // when a move-only / noncopyable type appears as a parameter of a function.

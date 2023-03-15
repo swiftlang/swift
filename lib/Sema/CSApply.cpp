@@ -6879,7 +6879,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return result;
     }
 
-    case ConversionRestrictionKind::ArrayToPointer: {
+    case ConversionRestrictionKind::ArrayToPointer:
+    case ConversionRestrictionKind::ArrayToCPointer: {
       bool isOptional = false;
       Type unwrappedTy = toType;
       if (Type unwrapped = toType->getOptionalObjectType()) {

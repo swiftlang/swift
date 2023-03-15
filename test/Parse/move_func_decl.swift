@@ -12,3 +12,12 @@ func testUserMove() {
   let t = String()
   let _ = _move(t: t)
 }
+
+struct What {
+  func _move(_ x: String) -> String { return x }
+
+  func testMethod() {
+    let t = String()
+    let _ = _move(t)
+  }
+}

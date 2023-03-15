@@ -2400,7 +2400,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     auto &astContext = fn->getASTContext();
 
     // Only run this pass if the move only language feature is enabled.
-    if (!astContext.LangOpts.Features.contains(Feature::MoveOnly))
+    if (!astContext.supportsMoveOnlyTypes())
       return;
 
     // Don't rerun diagnostics on deserialized functions.

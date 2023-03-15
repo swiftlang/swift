@@ -196,3 +196,9 @@ func test_pack_expansion_materialization_from_lvalue_base() {
     }
   }
 }
+
+func takesFunctionPack<each T, R>(functions: repeat ((each T) -> R)) {}
+
+func forwardFunctionPack<each T>(functions: repeat (each T) -> Bool) {
+  takesFunctionPack(functions: repeat each functions)
+}

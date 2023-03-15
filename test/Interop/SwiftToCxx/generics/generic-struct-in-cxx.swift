@@ -255,7 +255,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK char * _Nonnull getOpaquePointer(GenericPair<T_0_0, T_0_1> &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK const char * _Nonnull getOpaquePointer(const GenericPair<T_0_0, T_0_1> &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT: template<class T>
-// CHECK-NEXT: static SWIFT_INLINE_THUNK GenericPair<T_0_0, T_0_1> returnNewValue(T callable) {
+// CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER GenericPair<T_0_0, T_0_1> returnNewValue(T callable) {
 // CHECK-NEXT:   auto result = GenericPair<T_0_0, T_0_1>::_make();
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;

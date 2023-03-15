@@ -234,9 +234,9 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
   : ClangScanningService(clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
                          clang::tooling::dependencies::ScanningOutputFormat::Full,
                          clang::CASOptions(),
+                         /* CAS (llvm::cas::ObjectStore) */ nullptr,
                          /* Cache (llvm::cas::ActionCache) */ nullptr,
                          /* SharedFS */ nullptr,
-                         /* ReuseFileManager */ false,
                          /* OptimizeArgs */ false) {
     SharedFilesystemCache.emplace();
 }

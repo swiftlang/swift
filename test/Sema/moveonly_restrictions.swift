@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature MoveOnlyClasses
 
 // REQUIRES: concurrency
 

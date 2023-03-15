@@ -35,4 +35,27 @@ inline void initVector() {
   vv.push_back(0);
 }
 
+template <class T>
+class UseDeclVal {
+public:
+    UseDeclVal() {}
+
+    auto declTypeRet() const noexcept -> decltype(declval<T>().method()) {
+        return T().method();
+    }
+
+    inline int callMethod() const {
+        int x = declTypeRet();
+        return x;
+    }
+};
+
+struct StructWithMethod {
+    inline int method() {
+        return 42;
+    }
+};
+
+using UseDeclValStruct = UseDeclVal<StructWithMethod>;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_UNEVALUATED_CONTEXT_H

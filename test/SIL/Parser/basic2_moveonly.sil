@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-move-only %s | %target-sil-opt -enable-experimental-move-only | %FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 
 // Once move only is no longer behind a feature flag, merge this into basic2.
 

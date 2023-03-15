@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-module -g -enable-experimental-move-only -experimental-skip-non-inlinable-function-bodies-without-types %s 
+// RUN: %target-swift-frontend -emit-module -g -experimental-skip-non-inlinable-function-bodies-without-types %s
 
 // Just make sure we don't crash.
 

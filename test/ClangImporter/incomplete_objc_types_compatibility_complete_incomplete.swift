@@ -11,6 +11,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 // "ForwardDeclaredInterface" and "ForwardDeclaredProtocol" are forward declared in IncompleteTypeLibrary1/2, and
 // completely declared in CompleteTypes. This test verifies that instances of the complete types can be passed

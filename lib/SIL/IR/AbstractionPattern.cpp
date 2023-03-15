@@ -79,7 +79,12 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   auto sig = var->getDeclContext()
                  ->getGenericSignatureOfContext()
                  .getCanonicalSignature();
-  auto swiftType = sig.getReducedType(var->getInterfaceType());
+
+  auto interfaceType = var->getInterfaceType();
+  if (auto *packExpansionType = interfaceType->getAs<PackExpansionType>())
+    interfaceType = packExpansionType->getPatternType();
+
+  auto swiftType = sig.getReducedType(interfaceType);
 
   if (isNonObjC)
     return AbstractionPattern(sig, swiftType);
@@ -1988,9 +1993,21 @@ public:
       return CanType(pack);
     }
 
+    auto substPatternType = visit(pack->getPatternType(),
+                                  pattern.getPackExpansionPatternType());
+    auto substCountType = visit(pack->getCountType(),
+                                pattern.getPackExpansionCountType());
+
+    SmallVector<Type> rootParameterPacks;
+    substPatternType->getTypeParameterPacks(rootParameterPacks);
+
+    for (auto parameterPack : rootParameterPacks) {
+      substRequirements.emplace_back(RequirementKind::SameShape,
+                                     parameterPack, substCountType);
+    }
+
     return CanType(PackExpansionType::get(
-        visit(pack->getPatternType(), pattern.getPackExpansionPatternType()),
-        visit(pack->getCountType(), pattern.getPackExpansionCountType())));
+        substPatternType, substCountType));
   }
 
   CanType visitExistentialType(ExistentialType *exist,

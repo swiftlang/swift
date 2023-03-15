@@ -9,6 +9,7 @@ var UnevaluatedTestSuite = TestSuite("UnevaluatedContext")
 
 UnevaluatedTestSuite.test("declval") {
   initVector()
+  let _ = UseDeclValStruct().callMethod()
 }
 
 runAllTests()

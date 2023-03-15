@@ -1210,6 +1210,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
+    case TypeKind::BuiltinNonDefaultDistributedActorStorage:
+      return appendOperator("Bd");
     case TypeKind::BuiltinPackIndex:
       return appendOperator("BP");
     case TypeKind::BuiltinRawPointer:
@@ -3164,9 +3166,13 @@ void ASTMangler::appendGenericSignatureParts(
 
 /// Determine whether an associated type reference into the given set of
 /// protocols is unambiguous.
-static bool associatedTypeRefIsUnambiguous(ArrayRef<ProtocolDecl *> protocols) {
+static bool associatedTypeRefIsUnambiguous(GenericSignature sig, Type t) {
+  // FIXME: This should be an assertion.
+  if (!sig->isValidTypeParameter(t))
+    return false;
+
   unsigned numProtocols = 0;
-  for (auto proto : protocols) {
+  for (auto proto : sig->getRequiredProtocols(t)) {
     // Skip marker protocols, which cannot have associated types.
     if (proto->isMarkerProtocol())
       continue;
@@ -3186,7 +3192,7 @@ ASTMangler::dropProtocolFromAssociatedType(DependentMemberType *dmt,
   auto baseTy = dmt->getBase();
   bool unambiguous =
       (!dmt->getAssocType() ||
-       associatedTypeRefIsUnambiguous(sig->getRequiredProtocols(baseTy)));
+       associatedTypeRefIsUnambiguous(sig, baseTy));
 
   if (auto *baseDMT = baseTy->getAs<DependentMemberType>())
     baseTy = dropProtocolFromAssociatedType(baseDMT, sig);
@@ -3223,7 +3229,7 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
     // associated type name by protocol.
     if (!OptimizeProtocolNames || !sig ||
         !associatedTypeRefIsUnambiguous(
-            sig->getRequiredProtocols(dmt->getBase()))) {
+            sig, dmt->getBase())) {
       appendAnyGenericType(assocTy->getProtocol());
     }
     return;

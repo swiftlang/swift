@@ -918,8 +918,14 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
 bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // For now only do this for nominal type decls.
-  if (isa<NominalTypeDecl>(decl))
-    return decl->getAttrs().hasAttribute<MoveOnlyAttr>();
+  if (isa<NominalTypeDecl>(decl)) {
+      if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+        if (!decl->getASTContext().supportsMoveOnlyTypes())
+            decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+        return true;
+      }
+  }
   return false;
 }
 

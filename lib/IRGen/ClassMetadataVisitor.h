@@ -207,6 +207,9 @@ private:
     case Field::DefaultActorStorage:
       asImpl().addDefaultActorStorageFieldOffset();
       return;
+    case Field::NonDefaultDistributedActorStorage:
+      asImpl().addNonDefaultDistributedActorStorageFieldOffset();
+      return;
     }
   }
 };
@@ -245,6 +248,7 @@ public:
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addDefaultActorStorageFieldOffset() { addPointer(); }
+  void addNonDefaultDistributedActorStorageFieldOffset() { addPointer(); }
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
     for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();

@@ -476,7 +476,6 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       B.emitBlock(finishBB);
 
     if (cd->isRootDefaultActor()) {
-      // TODO(distributed): we may need to call the distributed destroy here instead?
       auto builtinName = getASTContext().getIdentifier(
           getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
       auto resultTy = SGM.Types.getEmptyTupleType();

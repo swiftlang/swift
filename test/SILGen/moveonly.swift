@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -537,9 +537,9 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[BORROWED_COPYABLE_KLASS:%.*]] = begin_borrow [[COPYABLE_KLASS]]
 // CHECK:   [[FIELD:%.*]] = ref_element_addr [[BORROWED_COPYABLE_KLASS]]
-// CHECK:   [[FIELD_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[FIELD]]
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD_MARK]]
-// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
+// CHECK:   [[ACCESS_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
+// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS_MARK]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVhF :
 // CHECK:   apply [[FN]]([[BORROWED_MOVEONLY_KLASS]])
 // CHECK:   end_borrow [[BORROWED_MOVEONLY_KLASS]]
@@ -549,6 +549,22 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassMoveOnlyKlassNonCons
     var k = NonTrivialStruct()
     k = NonTrivialStruct()
     borrowVal(k.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass.fd)
+}
+
+//////////////////////
+// Assignment Tests //
+//////////////////////
+
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly19assignCopyableKlassyyAA0cD0CF : $@convention(thin) (@guaranteed CopyableKlass) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed
+// CHECK:   [[REF:%.*]] = ref_element_addr [[ARG]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
+// CHECK:   [[MARKED_ACCESS:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]]
+// CHECK:   assign {{%.*}} to [[MARKED_ACCESS]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK: } // end sil function '$s8moveonly19assignCopyableKlassyyAA0cD0CF'
+func assignCopyableKlass(_ x: CopyableKlass) {
+    x.fd = FD()
 }
 
 ///////////////////////

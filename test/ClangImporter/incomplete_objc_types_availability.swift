@@ -10,6 +10,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 // Verify that Clang declarations referencing either of the forward declares types "ForwardDeclaredInterface" or
 // "ForwardDeclaredProtocol" are usable from Swift.

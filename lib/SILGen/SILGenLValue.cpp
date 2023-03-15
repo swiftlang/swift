@@ -790,17 +790,6 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
-      // If we have a move only type...
-      if (result->getType().isMoveOnly()) {
-        auto checkKind =
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
-        if (isReadAccess(getAccessKind())) {
-          // Add a mark_must_check [no_consume_or_assign].
-          checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
-        }
-        result = SGF.B.createMarkMustCheckInst(loc, result, checkKind);
-      }
-
       // Avoid emitting access markers completely for non-accesses or immutable
       // declarations. Access marker verification is aware of these cases.
       if (!IsNonAccessing && !Field->isLet()) {
@@ -809,6 +798,20 @@ namespace {
                                     getAccessKind(), *enforcement,
                                     takeActorIsolation());
         }
+      }
+
+      // If we have a move only type, add a marker.
+      //
+      // NOTE: We purposely do this on the access itself to ensure that when we
+      // hoist destroy_addr, they stay within the access scope.
+      if (result->getType().isMoveOnly()) {
+        auto checkKind =
+            MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
+        if (isReadAccess(getAccessKind())) {
+          // Add a mark_must_check [no_consume_or_assign].
+          checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+        }
+        result = SGF.B.createMarkMustCheckInst(loc, result, checkKind);
       }
 
       return ManagedValue::forLValue(result);

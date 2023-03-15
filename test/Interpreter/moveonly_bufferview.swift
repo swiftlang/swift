@@ -1,5 +1,5 @@
 // TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xllvm -sil-disable-pass=simplification) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none

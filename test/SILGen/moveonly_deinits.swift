@@ -1,6 +1,6 @@
 // TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-emit-sil -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SIL %s
 
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -enable-experimental-move-only -sil-consume-operator-copyable-addresses-checker | %FileCheck %s
+// RUN: %target-sil-opt %s -sil-consume-operator-copyable-addresses-checker | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 

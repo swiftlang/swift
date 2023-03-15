@@ -1681,8 +1681,9 @@ ERROR(access_control_open_bad_decl,none,
 WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
-ERROR(access_control_requires_package_name, none, "decl has a package access level but no -package-name was passed", ())
-
+ERROR(access_control_requires_package_name, none,
+      "decl has a package access level but no -package-name was passed",
+      ())
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
@@ -6629,7 +6630,21 @@ ERROR(cannot_declare_computed_var_in_result_builder,none,
 ERROR(cannot_convert_result_builder_result_to_return_type,none,
       "cannot convert result builder result type %0 to return type %1",
       (Type,Type))
-
+ERROR(result_builder_buildblock_not_accessible,none,
+      "result builder must provide at least one static 'buildBlock' as "
+      "accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_first_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(first:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(accumulated:next:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
@@ -6747,11 +6762,6 @@ ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental move only is disabled! Pass"
       " the frontend flag -enable-experimental-move-only to swift to enable "
       "the usage of this language feature", ())
-ERROR(experimental_moveonly_feature_can_only_be_imported_when_enabled,
-      none, "Can not import module %0 that uses move only features when "
-      "experimental move only is disabled! Pass the frontend flag "
-      "-enable-experimental-move-only to swift to enable the usage of this "
-      "language feature", (Identifier))
 ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
@@ -6833,6 +6843,10 @@ ERROR(move_expression_not_passed_lvalue,none,
       "'consume' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
+
+ERROR(moveOnly_requires_lexical_lifetimes,none,
+      "noncopyable types require lexical borrow scopes "
+      "(add -enable-lexical-borrow-scopes=true)", ())
 
 //------------------------------------------------------------------------------
 // MARK: #_hasSymbol

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name moveonly_addresschecker -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage raw
 
@@ -27,6 +27,7 @@ public struct NonTrivialStruct {
 }
 
 sil @useNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+sil @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
 
 @_moveOnly
 public struct NonTrivialStructPair {
@@ -436,4 +437,59 @@ bb0(%0 : $*Klass):
   store %newArg to [init] %1 : $*Klass
   %27 = tuple ()
   return %27 : $()
+}
+
+// Make sure that we treat the move only access below like an inout parameter
+// that is live at the end of its lifetime, rather than like a var.
+//
+// CHECK: sil [ossa] @closure_assignable_but_not_consumable_treated_like_inout : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> () {
+// CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed
+// CHECK-NEXT: project_box
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: begin_access
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: end_access
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'closure_assignable_but_not_consumable_treated_like_inout'
+sil [ossa] @closure_assignable_but_not_consumable_treated_like_inout : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
+  %4 = project_box %0 : ${ var NonTrivialStruct }, 0
+  %9 = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
+  %11 = begin_access [modify] [dynamic] %4 : $*NonTrivialStruct
+  %12 = mark_must_check [assignable_but_not_consumable] %11 : $*NonTrivialStruct
+  store %10 to [assign] %12 : $*NonTrivialStruct
+  end_access %11 : $*NonTrivialStruct
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK: sil hidden [ossa] @ref_element_addr_treated_like_inout : $@convention(method) (@guaranteed ClassContainingMoveOnly) -> () {
+// CHECK: bb0(
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: begin_access
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: end_access
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'ref_element_addr_treated_like_inout'
+sil hidden [ossa] @ref_element_addr_treated_like_inout : $@convention(method) (@guaranteed ClassContainingMoveOnly) -> () {
+bb0(%0 : @guaranteed $ClassContainingMoveOnly):
+  %9 = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
+  %5 = ref_element_addr %0 : $ClassContainingMoveOnly, #ClassContainingMoveOnly.value
+  %6 = begin_access [modify] [dynamic] %5 : $*NonTrivialStruct
+  %7 = mark_must_check [assignable_but_not_consumable] %6 : $*NonTrivialStruct
+  store %10 to [assign] %7 : $*NonTrivialStruct
+  end_access %6 : $*NonTrivialStruct
+  %11 = tuple ()
+  return %11 : $()
 }

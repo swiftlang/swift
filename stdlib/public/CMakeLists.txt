@@ -151,15 +151,13 @@ if(SWIFT_BUILD_STDLIB)
     add_subdirectory(RegexBuilder)
   endif()
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-    add_subdirectory(Reflection)
-  endif()
-
   if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
     add_subdirectory(Observation)
   endif()
 
-  add_subdirectory(Backtracing)
+  if(SWIFT_ENABLE_BACKTRACING)
+    add_subdirectory(Backtracing)
+  endif()
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)

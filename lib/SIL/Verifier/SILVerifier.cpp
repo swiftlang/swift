@@ -1640,27 +1640,30 @@ public:
   void checkApplyTypeDependentArguments(ApplySite AS) {
     SILInstruction *AI = AS.getInstruction();
 
-    llvm::DenseSet<LocalArchetypeType *> FoundRootLocalArchetypes;
+    llvm::DenseSet<SILInstruction *> allOpeningInsts;
     unsigned hasDynamicSelf = 0;
 
-    // Function to collect local archetypes in FoundRootLocalArchetypes
-    // and set hasDynamicSelf.
-    auto HandleType = [&](CanType Ty) {
+    // Function to collect local archetypes in allOpeningInsts and set
+    // hasDynamicSelf.
+    auto handleType = [&](CanType Ty) {
       if (const auto A = dyn_cast<LocalArchetypeType>(Ty)) {
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
 
         const auto root = A.getRoot();
 
-        // Collect all root local archetypes used in the substitutions list.
-        FoundRootLocalArchetypes.insert(root);
-        // Also check that they are properly tracked inside the current
-        // function.
+        // Check that opened archetypes are properly tracked inside
+        // the current function.
         auto *openingInst = F.getModule().getRootLocalArchetypeDefInst(
             root, AI->getFunction());
         require(openingInst == AI || properlyDominates(openingInst, AI),
                 "Use of a local archetype should be dominated by a "
                 "definition of this root opened archetype");
+
+        // Remember all the opening instructions.  We unique by instruction
+        // identity when building the list of type dependency operands, and
+        // some instructions can open multiple archetypes.
+        allOpeningInsts.insert(openingInst);
       }
       if (Ty->hasDynamicSelfType()) {
         hasDynamicSelf = 1;
@@ -1669,11 +1672,11 @@ public:
 
     // Search for local archetypes and dynamic self.
     for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
-      Replacement->getCanonicalType().visit(HandleType);
+      Replacement->getCanonicalType().visit(handleType);
     }
-    AS.getSubstCalleeType().visit(HandleType);
+    AS.getSubstCalleeType().visit(handleType);
 
-    require(FoundRootLocalArchetypes.size() + hasDynamicSelf ==
+    require(allOpeningInsts.size() + hasDynamicSelf ==
                 AI->getTypeDependentOperands().size(),
             "Number of local archetypes and dynamic self in the substitutions "
             "list should match the number of type dependent operands");
@@ -1691,19 +1694,19 @@ public:
         auto DI = V->getDefiningInstruction();
         require(DI,
                 "local archetype operand should refer to a SIL instruction");
-        bool definesFoundArchetype = false;
-        bool definesAnyArchetype = false;
-        DI->forEachDefinedLocalArchetype(
-            [&](CanLocalArchetypeType archetype, SILValue dependency) {
-          definesAnyArchetype = true;
-          if (FoundRootLocalArchetypes.count(archetype))
-            definesFoundArchetype = true;
-        });
-        require(definesAnyArchetype,
-                "local archetype operand should define a local archetype");
-        require(definesFoundArchetype,
+        require(allOpeningInsts.count(DI),
                 "local archetype operand does not correspond to any local "
                 "archetype from the substitutions list");
+
+        bool matchedDependencyResult = false;
+        DI->forEachDefinedLocalArchetype(
+            [&](CanLocalArchetypeType archetype, SILValue dependency) {
+          if (dependency == V)
+            matchedDependencyResult = true;
+        });
+        require(matchedDependencyResult,
+                "local archetype operand was not the dependency result "
+                "of the opening instruction");
       }
     }
   }
@@ -2822,6 +2825,18 @@ public:
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
+  void checkExplicitCopyAddrInst(ExplicitCopyAddrInst *ecai) {
+    require(F.hasOwnership(), "explicit_copy_* is only valid in OSSA.");
+    require(ecai->getSrc()->getType().isAddress(),
+            "Src value should be lvalue");
+    require(ecai->getDest()->getType().isAddress(),
+            "Dest address should be lvalue");
+    requireSameType(ecai->getDest()->getType(), ecai->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
+    require(F.isTypeABIAccessible(ecai->getDest()->getType()),
+            "cannot directly copy type with inaccessible ABI");
+  }
+
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
     require(F.hasOwnership(), "Only valid in OSSA.");
     require(F.getModule().getStage() == SILStage::Raw, "Only valid in Raw SIL");
@@ -2859,6 +2874,14 @@ public:
     require(I->getModule().getStage() == SILStage::Raw ||
                 !I->getOperand()->getType().isMoveOnly(),
             "'MoveOnly' types can only be copied in Raw SIL?!");
+  }
+
+  void checkExplicitCopyValueInst(ExplicitCopyValueInst *I) {
+    require(F.hasOwnership(), "explicit_copy_* is only valid in OSSA.");
+    require(I->getOperand()->getType().isObject(),
+            "Source value should be an object value");
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {

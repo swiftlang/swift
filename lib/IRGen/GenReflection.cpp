@@ -822,6 +822,9 @@ private:
     case Field::DefaultActorStorage:
       flags.setIsArtificial();
       break;
+    case Field::NonDefaultDistributedActorStorage:
+      flags.setIsArtificial();
+      break;
     }
     flags.setIsVar(!isLet);
 

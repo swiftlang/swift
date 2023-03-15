@@ -857,6 +857,8 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
     Buffer << 'j';
   } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
     Buffer << 'D';
+  } else if (text == BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE) {
+    Buffer << 'd';
   } else if (text == BUILTIN_TYPE_NAME_EXECUTOR) {
     Buffer << 'e';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {

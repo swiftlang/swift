@@ -27,7 +27,7 @@ public struct TestMacroArgTypechecking {
 
 @resultBuilder
 public struct Builder {
-  static func buildBlock(_: Int...) -> Void {}
+  public static func buildBlock(_: Int...) -> Void {}
 }
 @freestanding(expression)
 public macro macroWithBuilderArgs(@Builder _: () -> Void) = #externalMacro(module: "A", type: "B")

@@ -93,10 +93,10 @@ public:
     // FIXME: End read access.
   }
 
-  SWIFT_INLINE_THUNK T operator*() const noexcept(noexcept(collection[index])) {
+  SWIFT_INLINE_THUNK T operator*() const noexcept {
     return collection[index];
   }
-  SWIFT_INLINE_THUNK void operator++() noexcept(noexcept(++index)) {
+  SWIFT_INLINE_THUNK void operator++() noexcept {
     ++index;
     // FIXME: assert(index <= endIndex); // No need to go past the end.
   }

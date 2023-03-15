@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify -enable-experimental-move-only %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
 
 @inline(never) func someFunction() {}
 
@@ -43,12 +43,10 @@ public class ListOfFiles {
 // CHECK:    [[NEW_VAL_RELOADED:%.*]] = load [[NEW_VAL_STACK]] : $*File
 // >> destroy the element currently in the field
 // CHECK:    [[FIELD:%.*]] = ref_element_addr [[SELF]] : $ListOfFiles, #ListOfFiles.file
-// CHECK:    destroy_addr [[FIELD]] : $*File
 // >> write the new value in its place
 // CHECK:    [[FIELD_ACCESS:%.*]] = begin_access [modify] [dynamic] [[FIELD]] : $*File
+// CHECK:    destroy_addr [[FIELD_ACCESS]] : $*File
 // CHECK:    store [[NEW_VAL_RELOADED]] to [[FIELD_ACCESS]] : $*File
-// >> FIXME: we should not be destroying the field here  rdar://105910066
-// CHECK:    destroy_addr [[FIELD]] : $*File
 //
 // CHECK:    end_access [[FIELD_ACCESS]] : $*File
 // CHECK-NOT: begin_access
@@ -65,15 +63,13 @@ public class ListOfFiles {
 // CHECK:    yield [[ACCESS]] : $*File, resume bb1, unwind bb2
 //
 // CHECK:    bb1:
-// >> FIXME: we should not be destroying the field here  rdar://105910066
-// CHECK:    destroy_addr [[FIELD]] : $*File
 //
 // CHECK:    end_access [[ACCESS]] : $*File
 // CHECK-NOT: begin_access
+// CHECK-NOT:    destroy_addr [[FIELD]] : $*File
 //
 // CHECK:    bb2:
-// >> FIXME: we should not be destroying the field here  rdar://105910066
-// CHECK:    destroy_addr [[FIELD]] : $*File
+// CHECK-NOT:    destroy_addr [[FIELD]] : $*File
 //
 // CHECK:    end_access [[ACCESS]] : $*File
 // CHECK-NOT: begin_access

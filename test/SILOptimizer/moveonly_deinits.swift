@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -enable-experimental-move-only -verify -emit-sil %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil %s
 
 class Klass {}
 

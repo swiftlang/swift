@@ -1,4 +1,6 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
+
+// Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
 func sequence() {}
@@ -268,4 +270,58 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
   return values
+}
+
+struct Pair<First, Second> {
+  init(_ first: First, _ second: Second) {}
+}
+
+// CHECK-LABEL: @$s4main9makePairs6firsts7secondsAA4PairVyxq_GxQp_txxQp_q_xQptq_RhzRvzRv_r0_lF
+// CHECK-SAME: $@convention(thin) <each First, each Second where (repeat (each First, each Second)) : Any> (@pack_guaranteed Pack{repeat each First}, @pack_guaranteed Pack{repeat each Second}) -> @pack_out Pack{repeat Pair<each First, each Second>}
+func makePairs<each First, each Second>(
+  firsts first: repeat each First,
+  seconds second: repeat each Second
+) -> (repeat Pair<each First, each Second>) {
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each First}
+// CHECK-NEXT:    br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Pair<each First, each Second>}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each First, each Second where (repeat (each First, each Second)) : Any> at <Pack{repeat each First}, Pack{repeat each Second}>, shape $First, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[OUT_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat Pair<each First, each Second>} as $*Pair<@pack_element([[UUID]]) First, @pack_element([[UUID]]) Second>
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin Pair<@pack_element([[UUID]]) First, @pack_element([[UUID]]) Second>.Type
+// CHECK-NEXT:    [[FIRST_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each First} as $*@pack_element([[UUID]]) First
+// CHECK-NEXT:    [[FIRST_COPY:%.*]] = alloc_stack $@pack_element([[UUID]]) First
+// CHECK-NEXT:    copy_addr [[FIRST_ELT_ADDR]] to [init] [[FIRST_COPY]] : $*@pack_element([[UUID]]) First
+// CHECK-NEXT:    [[SECOND_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %2 : $*Pack{repeat each Second} as $*@pack_element([[UUID]]) Second
+// CHECK-NEXT:    [[SECOND_COPY:%.*]] = alloc_stack $@pack_element([[UUID]]) Second
+// CHECK-NEXT:    copy_addr [[SECOND_ELT_ADDR]] to [init] [[SECOND_COPY]] : $*@pack_element([[UUID]]) Second
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[FN:%.*]] = function_ref
+// CHECK-NEXT:    [[PAIR:%.*]] = apply [[FN]]<@pack_element([[UUID]]) First, @pack_element([[UUID]]) Second>([[FIRST_COPY]], [[SECOND_COPY]], [[METATYPE]])
+// CHECK-NEXT:    dealloc_stack [[SECOND_COPY]] : $*@pack_element([[UUID]]) Second
+// CHECK-NEXT:    dealloc_stack [[FIRST_COPY]] : $*@pack_element([[UUID]]) First
+// CHECK-NEXT:    store [[PAIR]] to [trivial] [[OUT_ELT_ADDR]] : $*Pair<@pack_element([[UUID]]) First, @pack_element([[UUID]]) Second>
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+  return (repeat Pair(each first, each second))
+}
+
+protocol Container {
+  associatedtype Contents
+  var contents: Contents { get }
+}
+
+func makeContentsPairs<each First: Container, each Second: Container>(
+  firsts first: repeat each First,
+  seconds second: repeat each Second
+) -> (repeat Pair<(each First).Contents, (each Second).Contents>) {
+  return (repeat Pair((each first).contents, (each second).contents))
 }
