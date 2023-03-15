@@ -64,6 +64,9 @@ class LoadedExecutablePlugin {
   /// Callbacks to be called when the connection is restored.
   llvm::SmallVector<std::function<void(void)> *, 0> onReconnect;
 
+  /// Flag to dump plugin messagings.
+  bool dumpMessaging = false;
+
   /// Cleanup function to call ASTGen.
   std::function<void(void)> cleanup;
 
@@ -121,6 +124,8 @@ public:
 
   const void *getCapability() { return capability; };
   void setCapability(const void *newValue) { capability = newValue; };
+
+  void setDumpMessaging(bool flag) { dumpMessaging = flag; }
 };
 
 class PluginRegistry {
@@ -131,7 +136,12 @@ class PluginRegistry {
   llvm::StringMap<std::unique_ptr<LoadedExecutablePlugin>>
       LoadedPluginExecutables;
 
+  /// Flag to dump plugin messagings.
+  bool dumpMessaging = false;
+
 public:
+  PluginRegistry();
+
   /// Load a dynamic link library specified by \p path.
   /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<void *> loadLibraryPlugin(llvm::StringRef path);
