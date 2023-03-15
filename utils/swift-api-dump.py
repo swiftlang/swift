@@ -106,8 +106,6 @@ def create_parser():
                         help='Enable experimental distributed actors.')
     parser.add_argument('--enable-experimental-string-processing', action='store_true',
                         help='Enable experimental string processing.')
-    parser.add_argument('--enable-experimental-reflection', action='store_true',
-                        help='Enable experimental reflection.')
     parser.add_argument('--enable-experimental-observation', action='store_true',
                         help='Enable experimental observation.')
     parser.add_argument('-swift-version', metavar='N',
