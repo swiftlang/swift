@@ -1272,43 +1272,34 @@ public:
     // Recur into tuples.
     if (origType.isTuple()) {
       auto substTupleType = cast<TupleType>(substType);
-      size_t substEltIndex = 0;
-      for (size_t origEltIndex = 0, n = origType.getNumTupleElements();
-             origEltIndex != n; ++origEltIndex) {
-        AbstractionPattern origEltType =
-          origType.getTupleElementType(origEltIndex);
-
+      origType.forEachTupleElement(substTupleType,
+          [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origEltType, CanType substEltType) {
         // If the original element type is not a pack expansion, just
         // pull off the next substituted element type.
-        if (!origEltType.isPackExpansion()) {
-          CanType substEltType =
-            substTupleType.getElementType(substEltIndex++);
-          destructure(origEltType, substEltType);
-          continue;
-        }
+        destructure(origEltType, substEltType);
 
+      },  [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origExpansionType,
+              CanTupleEltTypeArrayRef substEltTypes) {
         // If the original element type is a pack expansion, build a
         // lowered pack type for the substituted components it expands to.
-        bool indirect = origEltType.arePackElementsPassedIndirectly(TC);
-        SmallVector<CanType, 4> packElts;
+        bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
 
-        origEltType.forEachPackExpandedComponent(
-            [&](AbstractionPattern origComponentType) {
-          CanType substEltType =
-            substTupleType.getElementType(substEltIndex++);
-          SILType substEltTy =
-            TC.getLoweredType(origComponentType, substEltType, context);
-          packElts.push_back(substEltTy.getASTType());
-        });
+        SmallVector<CanType, 4> packElts;
+        for (auto substEltType : substEltTypes) {
+          auto origComponentType
+            = origExpansionType.getPackExpansionComponentType(substEltType);
+          CanType loweredEltTy =
+            TC.getLoweredRValueType(context, origComponentType, substEltType);
+          packElts.push_back(loweredEltTy);
+        };
 
         SILPackType::ExtInfo extInfo(indirect);
         auto packType = SILPackType::get(TC.Context, extInfo, packElts);
         SILResultInfo result(packType, ResultConvention::Pack);
         Results.push_back(result);
-      }
-
-      assert(substEltIndex == substTupleType->getNumElements() &&
-             "didn't exhaust the substituted type");
+      });
       return;
     }
 
@@ -1534,12 +1525,18 @@ private:
       origType.isTypeParameter()
         ? params.size()
         : origType.getNumFunctionParams();
-    unsigned nextParamIndex = 0;
 
+    // If we're importing a freestanding foreign function as a member
+    // function, the formal types (subst and orig) will conspire to
+    // pretend that there is a self parameter in the position Swift
+    // expects it: the end of the parameter lists.  In the lowered type,
+    // we need to put this in its proper place, which for static methods
+    // generally means dropping it entirely.
+    bool hasForeignSelf = Foreign.self.isImportAsMember();
+
+    // Is there a self parameter in the formal parameter lists?
     bool hasSelf =
-      (extInfoBuilder.hasSelfParam() || Foreign.self.isImportAsMember());
-    unsigned numOrigNonSelfParams =
-      (hasSelf ? numOrigParams - 1 : numOrigParams);
+      (extInfoBuilder.hasSelfParam() || hasForeignSelf);
 
     TopLevelOrigType = origType;
     // If we have a foreign self parameter, set up the ForeignSelfInfo
@@ -1547,7 +1544,7 @@ private:
     if (Foreign.self.isInstance()) {
       assert(hasSelf && numOrigParams > 0);
       ForeignSelf = ForeignSelfInfo{
-        origType.getFunctionParamType(numOrigNonSelfParams),
+        origType.getFunctionParamType(numOrigParams - 1),
         params.back()
       };
     }
@@ -1558,54 +1555,46 @@ private:
     maybeAddForeignParameters();
 
     // Process all the non-self parameters.
-    for (unsigned i = 0; i != numOrigNonSelfParams; ++i) {
-      auto origParamType = origType.getFunctionParamType(i);
-
+    origType.forEachFunctionParam(params, hasSelf,
+        [&](unsigned origParamIndex, unsigned substParamIndex,
+            ParameterTypeFlags origFlags,
+            AbstractionPattern origParamType,
+            AnyFunctionType::CanParam substParam) {
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
-      if (!origParamType.isPackExpansion()) {
-        visit(origParamType, params[nextParamIndex++], /*forSelf*/false);
-        continue;
+      visit(origParamType, substParam, /*forSelf*/false);
+    },  [&](unsigned origParamIndex, unsigned substParamIndex,
+            ParameterTypeFlags origFlags,
+            AbstractionPattern origExpansionType,
+            AnyFunctionType::CanParamArrayRef substParams) {
+      // Otherwise, collect the substituted components into a pack.
+      SmallVector<CanType, 8> packElts;
+      for (auto substParam : substParams) {
+        auto substParamType = substParam.getParameterType();
+        auto origParamType =
+          origExpansionType.getPackExpansionComponentType(substParamType);
+        auto loweredParamTy = TC.getLoweredRValueType(expansion,
+                                              origParamType, substParamType);
+        packElts.push_back(loweredParamTy);
       }
 
-      // Otherwise, collect the substituted components into a pack.
-
-      // If the parameter *is* a pack expansion, it must not be an
-      // opaque pattern, so we can safely call this.
-      auto origFlags = origType.getFunctionParamFlags(i);
-
-      SmallVector<CanType, 8> packElts;
-      origParamType.forEachPackExpandedComponent(
-          [&](AbstractionPattern origParamComponent) {
-        auto substParam = params[nextParamIndex++];
-        auto substParamType = substParam.getParameterType();
-
-        auto substTy = TC.getLoweredType(origParamType, substParamType,
-                                         expansion);
-        packElts.push_back(substTy.getASTType());
-      });
-
-      bool indirect = origParamType.arePackElementsPassedIndirectly(TC);
+      bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
       addPackParameter(packTy, origFlags.getValueOwnership(),
                        origFlags.isNoDerivative());
-    }
+    });
 
-    // Process the self parameter.
-    if (hasSelf && Foreign.self.isImportAsMember()) {
-      // Drop the formal foreign self parameter at this point if we
-      // set it up earlier.
-      nextParamIndex++;
-    } else if (hasSelf) {
-      auto origParamType = origType.getFunctionParamType(numOrigNonSelfParams);
-      auto substParam = params[nextParamIndex++];
+    // Process the self parameter.  But if we have a formal foreign self
+    // parameter, we should have processed it earlier in a call to
+    // maybeAddForeignParameters().
+    if (hasSelf && !hasForeignSelf) {
+      auto origParamType = origType.getFunctionParamType(numOrigParams - 1);
+      auto substParam = params.back();
       visit(origParamType, substParam, /*forSelf*/true);
     }
-
-    assert(nextParamIndex == params.size());
 
     TopLevelOrigType = AbstractionPattern::getInvalid();
     ForeignSelf = None;
@@ -1684,36 +1673,30 @@ private:
                    bool isNonDifferentiable) {
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
-    assert(origType.matchesTuple(substType));
 
-    unsigned numOrigElts = origType.getNumTupleElements();
-    unsigned nextSubstEltIndex = 0;
-    for (unsigned i = 0; i != numOrigElts; ++i) {
-      auto origEltType = origType.getTupleElementType(i);
-      if (!origEltType.isPackExpansion()) {
-        auto substEltType =
-          substType.getElementType(nextSubstEltIndex++);
-        visit(ownership, forSelf, origEltType, substEltType,
-              isNonDifferentiable);
-      } else {
-        SmallVector<CanType, 8> packElts;
-        origEltType.forEachPackExpandedComponent(
-            [&](AbstractionPattern origEltComponentType) {
-          auto substEltType = substType.getElementType(nextSubstEltIndex++);
-          auto eltTy = TC.getLoweredType(origEltComponentType, substEltType,
-                                         expansion);
-          packElts.push_back(eltTy.getASTType());
-        });
+    origType.forEachTupleElement(substType,
+        [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origEltType, CanType substEltType) {
+      visit(ownership, forSelf, origEltType, substEltType,
+            isNonDifferentiable);
+    },  [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origExpansionType,
+            CanTupleEltTypeArrayRef substEltTypes) {
+      SmallVector<CanType, 8> packElts;
+      for (auto substEltType : substEltTypes) {
+        auto origComponentType
+          = origExpansionType.getPackExpansionComponentType(substEltType);
+        auto loweredEltTy =
+          TC.getLoweredRValueType(expansion, origComponentType, substEltType);
+        packElts.push_back(loweredEltTy);
+      };
 
-        bool indirect = origEltType.arePackElementsPassedIndirectly(TC);
-        SILPackType::ExtInfo extInfo(/*address*/ indirect);
-        auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
+      bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
+      SILPackType::ExtInfo extInfo(/*address*/ indirect);
+      auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
-        addPackParameter(packTy, ownership, isNonDifferentiable);
-      }
-    }
-
-    assert(nextSubstEltIndex == substType->getNumElements());
+      addPackParameter(packTy, ownership, isNonDifferentiable);
+    });
   }
 
   /// Add a parameter that we derived from deconstructing the

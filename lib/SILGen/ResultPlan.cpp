@@ -414,27 +414,27 @@ public:
   PackExpansionResultPlan(ResultPlanBuilder &builder,
                           SILValue packAddr,
                           MutableArrayRef<InitializationPtr> inits,
-                          ArrayRef<AbstractionPattern> origTypes,
+                          AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
     auto packTy = packAddr->getType().castTo<SILPackType>();
     auto formalPackType =
       CanPackType::get(packTy->getASTContext(), substEltTypes);
+    auto origPatternType = origExpansionType.getPackExpansionPatternType();
 
     ComponentPlans.reserve(inits.size());
     for (auto i : indices(inits)) {
       auto &init = inits[i];
-      auto origType = origTypes[i];
       CanType substEltType = substEltTypes[i];
 
       if (isa<PackExpansionType>(substEltType)) {
         ComponentPlans.emplace_back(
           builder.buildPackExpansionIntoPack(packAddr, formalPackType, i,
-                                             init.get(), origType));
+                                             init.get(), origPatternType));
       } else {
         ComponentPlans.emplace_back(
           builder.buildScalarIntoPack(packAddr, formalPackType, i,
-                                      init.get(), origType));
+                                      init.get(), origPatternType));
       }
     }
   }
@@ -616,30 +616,21 @@ public:
     // Create plans for all the sub-initializations.
     eltPlans.reserve(origType.getNumTupleElements());
 
-    auto substEltTypes = substType.getElementTypes();
-
-    size_t nextSubstEltIndex = 0;
-
-    for (auto origEltType : origType.getTupleElementTypes()) {
-      if (origEltType.isPackExpansion()) {
-        auto origComponentTypes = origEltType.getPackExpandedComponents();
-        auto numComponents = origComponentTypes.size();
-        auto i = nextSubstEltIndex;
-        nextSubstEltIndex += numComponents;
-        auto componentInits = eltInits.slice(i, numComponents);
-        auto substComponentTypes = substEltTypes.slice(i, numComponents);
-        eltPlans.push_back(builder.buildForPackExpansion(componentInits,
-                                                         origComponentTypes,
-                                                         substComponentTypes));
-      } else {
-        auto i = nextSubstEltIndex++;
-        CanType substEltType = substEltTypes[i];
-        Initialization *eltInit = eltInits[i].get();
-        eltPlans.push_back(builder.build(eltInit, origEltType, substEltType));
-      }
-    }
-
-    assert(nextSubstEltIndex == substType->getNumElements());
+    origType.forEachTupleElement(substType,
+        [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origEltType,
+            CanType substEltType) {
+      Initialization *eltInit = eltInits[substEltIndex].get();
+      eltPlans.push_back(builder.build(eltInit, origEltType, substEltType));
+    },
+        [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origExpansionType,
+            CanTupleEltTypeArrayRef substEltTypes) {
+      auto componentInits = eltInits.slice(substEltIndex, substEltTypes.size());
+      eltPlans.push_back(builder.buildForPackExpansion(componentInits,
+                                                       origExpansionType,
+                                                       substEltTypes));
+    });
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc,
@@ -1151,10 +1142,9 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 
 ResultPlanPtr ResultPlanBuilder::
     buildForPackExpansion(MutableArrayRef<InitializationPtr> inits,
-                          ArrayRef<AbstractionPattern> origTypes,
+                          AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substTypes) {
-  assert(inits.size() == origTypes.size() &&
-         inits.size() == substTypes.size());
+  assert(inits.size() == substTypes.size());
 
   // Pack expansions in the original result type always turn into
   // a single @pack_out result.
@@ -1172,7 +1162,7 @@ ResultPlanPtr ResultPlanBuilder::
     SGF.emitTemporaryPackAllocation(loc, packTy.getObjectType());
 
   return ResultPlanPtr(new PackExpansionResultPlan(*this, packAddr, inits,
-                                                   origTypes, substTypes));
+                                                   origExpansionType, substTypes));
 }
 
 ResultPlanPtr
@@ -1180,8 +1170,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
                                               CanPackType formalPackType,
                                               unsigned componentIndex,
                                               Initialization *init,
-                                              AbstractionPattern origType) {
-  assert(origType.isPackExpansion());
+                                        AbstractionPattern origPatternType) {
   assert(init && init->canPerformPackExpansionInitialization());
 
   // Create an opened-element environment sufficient for working with
@@ -1232,10 +1221,9 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
   });
 
   // The result plan will write into `init` during finish().
-  origType = origType.getPackExpansionPatternType();
   return ResultPlanPtr(
     new PackTransformResultPlan(packAddr, formalPackType,
-                                componentIndex, init, origType,
+                                componentIndex, init, origPatternType,
                                 calleeTypeInfo.getOverrideRep()));
 }
 

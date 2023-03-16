@@ -5164,10 +5164,12 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
+  unsigned numOpenedParams = signature.getInnermostGenericParams().size();
   size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
                                   OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
-      0, 0, 1, numGenericParams);
+                                  OpenedElementEnvironmentData,
+                                  Type>(
+      0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv = new (mem) GenericEnvironment(signature,
                                                   uuid, shapeClass,

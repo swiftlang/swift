@@ -498,47 +498,37 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
 static void
 preparePackResultInit(SILGenFunction &SGF, SILLocation loc,
                       AbstractionPattern origExpansionType,
-                      CanTupleType resultTupleType,
-                      size_t &nextResultEltIndex,
+                      CanTupleEltTypeArrayRef resultEltTypes,
                       SILArgument *packAddr,
                       SmallVectorImpl<CleanupHandle> &cleanups,
                       SmallVectorImpl<InitializationPtr> &inits) {
-  assert(origExpansionType.isPackExpansion());
-  auto origComponentTypes = origExpansionType.getPackExpandedComponents();
-
   auto loweredPackType = packAddr->getType().castTo<SILPackType>();
-  assert(loweredPackType->getNumElements() == origComponentTypes.size() &&
+  assert(loweredPackType->getNumElements() == resultEltTypes.size() &&
          "mismatched pack components; possible missing substitutions on orig type?");
 
   // If the pack expanded to nothing, there shouldn't be any initializers
   // for it in our context.
-  if (origComponentTypes.empty()) {
+  if (resultEltTypes.empty()) {
     return;
   }
 
+  auto origPatternType = origExpansionType.getPackExpansionPatternType();
+
   // Induce a formal pack type from the slice of the tuple elements.
   CanPackType formalPackType =
-    resultTupleType.getInducedPackType(nextResultEltIndex,
-                                       origComponentTypes.size());
-  nextResultEltIndex += origComponentTypes.size();
+    CanPackType::get(SGF.getASTContext(), resultEltTypes);
 
-  for (auto componentIndex : indices(origComponentTypes)) {
-    auto origComponentType = origComponentTypes[componentIndex];
+  for (auto componentIndex : indices(resultEltTypes)) {
     auto resultComponentType = formalPackType.getElementType(componentIndex);
     auto loweredComponentType = loweredPackType->getElementType(componentIndex);
-    assert(origComponentType.isPackExpansion()
+    assert(isa<PackExpansionType>(loweredComponentType)
              == isa<PackExpansionType>(resultComponentType) &&
-           "need expansions in similar places");
-    assert(origComponentType.isPackExpansion()
-             == isa<PackExpansionType>(loweredComponentType) &&
            "need expansions in similar places");
 
     // If we have a pack expansion, the initializer had better be a
     // pack expansion expression, and we'll generate a loop for it.
     // Preserve enough information to do this properly.
-    if (origComponentType.isPackExpansion()) {
-      auto origPatternType =
-        origComponentType.getPackExpansionPatternType();
+    if (isa<PackExpansionType>(resultComponentType)) {
       auto resultPatternType =
         cast<PackExpansionType>(resultComponentType).getPatternType();
       auto expectedPatternTy = SILType::getPrimitiveAddressType(
@@ -568,7 +558,7 @@ preparePackResultInit(SILGenFunction &SGF, SILLocation loc,
                 SILType::getPrimitiveAddressType(loweredComponentType));
 
       inits.push_back(createIndirectResultInit(SGF, eltAddr,
-                                               origComponentType,
+                                               origPatternType,
                                                resultComponentType,
                                                cleanups));
     }
@@ -590,33 +580,33 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
     auto tupleInit = new TupleInitialization(resultTupleType);
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
-    size_t nextResultEltIndex = 0;
-    for (size_t origEltIndex = 0, e = origResultType.getNumTupleElements();
-           origEltIndex < e; ++origEltIndex) {
-      auto origEltType = origResultType.getTupleElementType(origEltIndex);
-      if (origEltType.isPackExpansion()) {
-        assert(allResults[0].isPack());
-        assert(SGF.silConv.isSILIndirect(allResults[0]));
-        allResults = allResults.slice(1);
+    origResultType.forEachTupleElement(resultTupleType,
+        [&](unsigned origEltIndex,
+            unsigned substEltIndex,
+            AbstractionPattern origEltType,
+            CanType substEltType) {
+      auto eltInit = prepareIndirectResultInit(SGF, loc, fnTypeForResults,
+                                       origEltType, substEltType,
+                                       allResults,
+                                       directResults,
+                                       indirectResultAddrs, cleanups);
+      tupleInit->SubInitializations.push_back(std::move(eltInit));
+    },
+        [&](unsigned origEltIndex,
+            unsigned substEltIndex,
+            AbstractionPattern origExpansionType,
+            CanTupleEltTypeArrayRef substEltTypes) {
+      assert(allResults[0].isPack());
+      assert(SGF.silConv.isSILIndirect(allResults[0]));
+      allResults = allResults.slice(1);
 
-        auto packAddr = indirectResultAddrs[0];
-        indirectResultAddrs = indirectResultAddrs.slice(1);
+      auto packAddr = indirectResultAddrs[0];
+      indirectResultAddrs = indirectResultAddrs.slice(1);
 
-        preparePackResultInit(SGF, loc, origEltType, resultTupleType,
-                              nextResultEltIndex, packAddr,
-                              cleanups, tupleInit->SubInitializations);
-      } else {
-        auto substEltType =
-          resultTupleType.getElementType(nextResultEltIndex++);
-        auto eltInit = prepareIndirectResultInit(SGF, loc, fnTypeForResults,
-                                         origEltType, substEltType,
-                                         allResults,
-                                         directResults,
-                                         indirectResultAddrs, cleanups);
-        tupleInit->SubInitializations.push_back(std::move(eltInit));
-      }
-    }
-    assert(nextResultEltIndex == resultTupleType->getNumElements());
+      preparePackResultInit(SGF, loc, origExpansionType, substEltTypes,
+                            packAddr,
+                            cleanups, tupleInit->SubInitializations);
+    });
 
     return InitializationPtr(tupleInit);
   }
