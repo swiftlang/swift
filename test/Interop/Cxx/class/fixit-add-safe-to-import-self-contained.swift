@@ -21,21 +21,21 @@ struct X {
 import Test
 
 public func test(x: X) {
-  // CHECK: note: Mark method 'test' as 'safe_to_import' in C++ to make it available in Swift.
+  // CHECK: note: Mark method 'test' as 'SAFE_TO_IMPORT' in C++ to make it available in Swift.
   // CHECK: int *test() { }
   // CHECK: ^
-  // CHECK: __attribute__((swift_attr("safe_to_import")))
+  // CHECK: SAFE_TO_IMPORT
   
   x.test()
   
-  // CHECK: note: Mark method 'other' as 'safe_to_import' in C++ to make it available in Swift.
+  // CHECK: note: Mark method 'other' as 'SAFE_TO_IMPORT' in C++ to make it available in Swift.
   // CHECK: Ptr other() { }
   // CHECK: ^
-  // CHECK: __attribute__((swift_attr("safe_to_import")))
+  // CHECK: SAFE_TO_IMPORT
   
-  // CHECK: note: Mark type 'Ptr' as 'self_contained' in C++ to make methods that use it available in Swift.
+  // CHECK: note: Mark type 'Ptr' as 'SELF_CONTAINED' in C++ to make methods that use it available in Swift.
   // CHECK: struct X {
   // CHECK: ^
-  // CHECK: __attribute__((swift_attr("self_contained")))
+  // CHECK: SELF_CONTAINED
   x.other()
 }

@@ -3897,7 +3897,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
           .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
                     name.getBaseIdentifier().str())
           .fixItInsert(methodSwiftLoc,
-                       " __attribute__((swift_attr(\"safe_to_import\"))) ");
+                       " SAFE_TO_IMPORT ");
     } else if (cxxMethod->getReturnType()->isReferenceType()) {
       // Rewrite a call to .at(42) as a subscript.
       if (name.getBaseIdentifier().is("at") &&
@@ -3928,7 +3928,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
             .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
                       name.getBaseIdentifier().str())
             .fixItInsert(methodSwiftLoc,
-                         " __attribute__((swift_attr(\"safe_to_import\"))) ");
+                         " SAFE_TO_IMPORT ");
       }
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
@@ -3950,11 +3950,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
               .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
                         name.getBaseIdentifier().str())
               .fixItInsert(methodSwiftLoc,
-                           " __attribute__((swift_attr(\"safe_to_import\"))) ");
+                           " SAFE_TO_IMPORT ");
           ctx.Diags
               .diagnose(baseSwiftLoc, diag::mark_self_contained, returnTypeStr)
               .fixItInsert(baseSwiftLoc,
-                           "__attribute__((swift_attr(\"self_contained\"))) ");
+                           "SELF_CONTAINED ");
         }
       }
     }
