@@ -137,6 +137,9 @@ function(add_pure_swift_host_library name)
   add_library(${name} ${libkind} ${APSHL_SOURCES})
   _add_host_swift_compile_options(${name})
 
+  set_property(TARGET ${name}
+    PROPERTY BUILD_WITH_INSTALL_RPATH YES)
+
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
   # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
@@ -256,6 +259,13 @@ function(add_pure_swift_host_tool name)
   # Create the library.
   add_executable(${name} ${APSHT_SOURCES})
   _add_host_swift_compile_options(${name})
+
+  set_property(TARGET ${name}
+    APPEND PROPERTY INSTALL_RPATH
+      "@executable_path/../lib/swift/host")
+
+  set_property(TARGET ${name}
+    PROPERTY BUILD_WITH_INSTALL_RPATH YES)
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
