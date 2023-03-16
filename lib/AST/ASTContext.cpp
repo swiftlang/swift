@@ -100,6 +100,7 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 #include "swift/AST/KnownProtocols.def"
   }
   llvm_unreachable("bad KnownProtocolKind");
+#undef PROTOCOL_WITH_NAME
 }
 
 namespace {
