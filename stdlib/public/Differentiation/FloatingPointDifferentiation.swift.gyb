@@ -51,6 +51,26 @@ extension ${Self}: Differentiable {
 // Derivatives
 //===----------------------------------------------------------------------===//
 
+/// Derivatives of constructors.
+${Availability(bits)}
+extension ${Self} {
+  @inlinable
+  @_transparent
+  @derivative(of: init(_:))
+  static func _vjpInit(x: ${Self})
+    -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
+    return (x, { v in v })
+  }
+
+  @inlinable
+  @_transparent
+  @derivative(of: init(_:))
+  static func _jvpInit(x: ${Self})
+  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
+    return (x, { dx in dx })
+  }
+}
+
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
 extension ${Self} {
