@@ -5,6 +5,7 @@ function(swift_supports_implicit_module module_name out_var)
     COMMAND
       "${CMAKE_Swift_COMPILER}"
       -Xfrontend -disable-implicit-${module_name}-module-import
+      -Xfrontend -parse-stdlib
       -c - -o /dev/null
     INPUT_FILE
       "${CMAKE_BINARY_DIR}/tmp/empty-check-${module_name}.swift"
