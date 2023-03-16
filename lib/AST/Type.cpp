@@ -4684,7 +4684,18 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
-    
+
+    if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
+      auto patternTy = substType(packExpansionTy->getPatternType(),
+                                 substitutions, lookupConformances, options);
+      auto countTy = substType(packExpansionTy->getCountType(),
+                               substitutions, lookupConformances, options);
+      if (auto *archetypeTy = countTy->getAs<PackArchetypeType>())
+        countTy = archetypeTy->getReducedShape();
+
+      return Type(PackExpansionType::get(patternTy, countTy)->expand());
+    }
+
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
       if (silFnTy->isPolymorphic())
         return None;

@@ -536,7 +536,7 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
 
 Type
 GenericSignatureImpl::getReducedShape(Type type) const {
-  return getRequirementMachine()->getReducedShape(type);
+  return getRequirementMachine()->getReducedShape(type, getGenericParams());
 }
 
 bool
