@@ -468,6 +468,10 @@ void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
         continue;
       }
 
+    } else if (dep.isInternalOrBelow()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::InternalOrBelow))
+        continue;
+
     } else if (dep.isPackageOnly()) {
       if (!filter.contains(ModuleDecl::ImportFilterKind::PackageOnly))
         continue;

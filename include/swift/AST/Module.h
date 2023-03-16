@@ -857,16 +857,20 @@ public:
     Exported = 1 << 0,
     /// Include "regular" imports with an access-level of `public`.
     Default = 1 << 1,
-    /// Include imports declared with `@_implementationOnly` or with an
-    /// access-level of `package` or less.
+    /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
     /// Include imports declared with `package import`.
     PackageOnly = 1 << 3,
+    /// Include imports marked `internal` or lower. These differs form
+    /// implementation-only imports by stricter type-checking and loading
+    /// policies. At this moment, we can group them under the same category
+    /// as they have the same loading behavior.
+    InternalOrBelow = 1 << 4,
     /// Include imports declared with `@_spiOnly`.
-    SPIOnly = 1 << 4,
+    SPIOnly = 1 << 5,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
-    ShadowedByCrossImportOverlay = 1 << 5
+    ShadowedByCrossImportOverlay = 1 << 6
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
@@ -877,6 +881,7 @@ public:
             ImportFilterKind::Default,
             ImportFilterKind::ImplementationOnly,
             ImportFilterKind::PackageOnly,
+            ImportFilterKind::InternalOrBelow,
             ImportFilterKind::SPIOnly,
             ImportFilterKind::ShadowedByCrossImportOverlay};
   }
@@ -890,6 +895,7 @@ public:
             ImportFilterKind::Default,
             ImportFilterKind::ImplementationOnly,
             ImportFilterKind::PackageOnly,
+            ImportFilterKind::InternalOrBelow,
             ImportFilterKind::SPIOnly};
   }
 

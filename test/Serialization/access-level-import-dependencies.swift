@@ -42,15 +42,15 @@ private import HiddenDep
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 
 // RUN: %target-swift-frontend -typecheck %t/ClientOfPublic.swift -I %t \
-// RUN:   -enable-library-evolution -package-name MyOtherPackage \
-// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
-// VISIBLE-HIDDEN-DEP: source: '{{.*}}HiddenDep.swiftmodule'
+// RUN:   -package-name MyOtherPackage \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
+// VISIBLE-DEP: loaded module 'HiddenDep'
 //--- ClientOfPublic.swift
 import PublicDep
 
 // RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
-// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=HIDDEN-HIDDEN-DEP %s
-// HIDDEN-HIDDEN-DEP-NOT: HiddenDep
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=HIDDEN-DEP %s
+// HIDDEN-DEP-NOT: loaded module 'HiddenDep'
 //--- ClientOfNonPublic.swift
 import PackageDep
 import InternalDep
@@ -70,7 +70,29 @@ import PrivateDep
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 
 // RUN: %target-swift-frontend -typecheck %t/ClientOfPublic.swift -I %t \
-// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
 // RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
-// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-HIDDEN-DEP %s
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
 
+/// Even with resilience, all access-level dependencies are visible to clients
+/// for modules with testing enabled.
+// RUN: %target-swift-frontend -emit-module %t/PublicDep.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -emit-module %t/PackageDep.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing -package-name MyPackage \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -emit-module %t/InternalDep.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -emit-module %t/FileprivateDep.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -emit-module %t/PrivateDep.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+
+// RUN: %target-swift-frontend -typecheck %t/ClientOfPublic.swift -I %t \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
+// RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s

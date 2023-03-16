@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 754; // allocbox move debug info
+const uint16_t SWIFTMODULE_VERSION_MINOR = 755; // InternalOrBelow dependency
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -583,12 +583,14 @@ enum class ImportControl : uint8_t {
   Normal = 0,
   /// `@_exported import FooKit`
   Exported,
-  /// `@_uncheckedImplementationOnly import FooKit`
+  /// `@_implementationOnly import FooKit`
   ImplementationOnly,
+  /// `internal import FooKit` or more restrictive.
+  InternalOrBelow,
   /// `package import FooKit`
-  PackageOnly
+  PackageOnly,
 };
-using ImportControlField = BCFixed<2>;
+using ImportControlField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
