@@ -2456,8 +2456,7 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
-  unsigned HasDynamicLifetime : 1;
-  unsigned Reflection : 1;
+  USE_SHARED_UINT8;
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
@@ -2475,13 +2474,20 @@ public:
     return getType().castTo<SILBoxType>();
   }
 
-  void setDynamicLifetime() { HasDynamicLifetime = true; }
-  bool hasDynamicLifetime() const { return HasDynamicLifetime; }
+  void setDynamicLifetime() {
+    sharedUInt8().AllocBoxInst.dynamicLifetime = true;
+  }
+
+  bool hasDynamicLifetime() const {
+    return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  }
 
   /// True if the box should be emitted with reflection metadata for its
   /// contents.
-  bool emitReflectionMetadata() const { return Reflection; }
-  
+  bool emitReflectionMetadata() const {
+    return sharedUInt8().AllocBoxInst.reflection;
+  }
+
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
 
