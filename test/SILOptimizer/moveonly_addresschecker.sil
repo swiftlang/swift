@@ -493,3 +493,29 @@ bb0(%0 : @guaranteed $ClassContainingMoveOnly):
   %11 = tuple ()
   return %11 : $()
 }
+
+// CHECK: sil [ossa] @test_global_addr_write_use : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: global_addr
+// CHECK-NEXT: begin_access
+// CHECK-NEXT: destroy_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: end_access
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_global_addr_write_use'
+sil [ossa] @test_global_addr_write_use : $@convention(thin) () -> () {
+bb0:
+  %9 = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
+  %0 = global_addr @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $*NonTrivialStruct
+  %1 = begin_access [modify] [dynamic] %0 : $*NonTrivialStruct
+  %2 = mark_must_check [assignable_but_not_consumable] %0 : $*NonTrivialStruct
+  store %10 to [assign] %2 : $*NonTrivialStruct
+  end_access %1 : $*NonTrivialStruct
+  %8 = tuple ()
+  return %8 : $()
+}
