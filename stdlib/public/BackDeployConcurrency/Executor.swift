@@ -116,10 +116,6 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
     _enqueueOnDispatchQueue(job, queue: self)
   }
 
-  func enqueue(_ job: __owned Job) {
-    _enqueueOnDispatchQueue(job, queue: self)
-  }
-
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
