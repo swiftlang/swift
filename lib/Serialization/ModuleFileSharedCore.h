@@ -25,6 +25,15 @@ namespace llvm {
 
 namespace swift {
 
+/// How a dependency should be loaded.
+///
+/// \sa getTransitiveLoadingBehavior
+enum class ModuleLoadingBehavior {
+  Required,
+  Optional,
+  Ignored
+};
+
 /// Serialized core data of a module. The difference with `ModuleFile` is that
 /// `ModuleFileSharedCore` provides immutable data and is independent of a
 /// particular ASTContext. It is designed to be able to be shared across
@@ -581,6 +590,22 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ///
+  /// If \p debuggerMode, more transitive dependencies should try to be loaded
+  /// as they can be useful in debugging.
+  ///
+  /// If \p isPartialModule, transitive dependencies should be loaded as we're
+  /// in merge-module mode.
+  ///
+  /// If \p packageName is set, transitive package dependencies are loaded if
+  /// loaded from the same package.
+  ModuleLoadingBehavior
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool debuggerMode,
+                               bool isPartialModule,
+                               StringRef packageName) const;
 };
 
 template <typename T, typename RawData>

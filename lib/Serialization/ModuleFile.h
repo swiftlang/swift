@@ -646,6 +646,10 @@ public:
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool recoverFromIncompatibility);
 
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ModuleLoadingBehavior
+  getTransitiveLoadingBehavior(const Dependency &dependency) const;
+
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate
   /// that the object must be kept alive as long as the diagnostics exist.
