@@ -28,9 +28,9 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 struct BridgedInstruction;
 struct OptionalBridgedOperand;
+struct OptionalBridgedSuccessor;
 
 enum {
-  BridgedSuccessorSize = 4 * sizeof(uintptr_t) + sizeof(uint64_t),
   BridgedVTableEntrySize = 5 * sizeof(uintptr_t),
   BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
 };
@@ -134,14 +134,6 @@ struct BridgedOperandArray {
 };
 
 typedef struct {
-  const void * _Nonnull succ;
-} BridgedSuccessor;
-
-typedef struct {
-  const void * _Nullable succ;
-} OptionalBridgedSuccessor;
-
-typedef struct {
   const void * _Nonnull ptr;
 } BridgedVTable;
 
@@ -181,9 +173,37 @@ typedef struct {
   SwiftObject obj;
 } BridgedGlobalVar;
 
-typedef struct {
+struct BridgedBasicBlock {
   SwiftObject obj;
-} BridgedBasicBlock;
+};
+
+struct BridgedSuccessor {
+  const swift::SILSuccessor * _Nonnull succ;
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedSuccessor getNext() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedBasicBlock getTargetBlock() const {
+    return {succ->getBB()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedInstruction getContainingInst() const;
+};
+
+struct OptionalBridgedSuccessor {
+  const swift::SILSuccessor * _Nullable succ;
+
+  // Assumes that `succ` is not null.
+  SWIFT_IMPORT_UNSAFE
+  BridgedSuccessor advancedBy(SwiftInt index) const { return {succ + index}; }
+};
+
+struct BridgedSuccessorArray {
+  OptionalBridgedSuccessor base;
+  SwiftInt count;
+};
 
 typedef struct {
   OptionalSwiftObject obj;
@@ -362,9 +382,6 @@ void SILBasicBlock_moveAllInstructionsToBegin(BridgedBasicBlock block, BridgedBa
 void SILBasicBlock_moveAllInstructionsToEnd(BridgedBasicBlock block, BridgedBasicBlock dest);
 void BasicBlock_moveArgumentsTo(BridgedBasicBlock block, BridgedBasicBlock dest);
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
-OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
-BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
-BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
 
 std::string SILNode_debugDescription(BridgedNode node);
 
@@ -428,7 +445,7 @@ SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
 BridgedMultiValueResult
   MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index);
 
-BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
+BridgedSuccessorArray TermInst_getSuccessors(BridgedInstruction term);
 
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
 SwiftInt LoadInst_getLoadOwnership(BridgedInstruction load);
@@ -545,6 +562,14 @@ BridgedInstruction BridgedOperand::getUser() const {
 
 OptionalBridgedOperand BridgedValue::getFirstUse() const {
   return {*getSILValue()->use_begin()};
+}
+
+OptionalBridgedSuccessor BridgedSuccessor::getNext() const {
+  return {succ->getNext()};
+}
+
+BridgedInstruction BridgedSuccessor::getContainingInst() const {
+  return {succ->getContainingInst()};
 }
 
 

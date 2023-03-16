@@ -779,7 +779,8 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
 public class TermInst : Instruction {
   final public var successors: SuccessorArray {
-    SuccessorArray(succArray: TermInst_getSuccessors(bridged))
+    let succArray = TermInst_getSuccessors(bridged)
+    return SuccessorArray(base: succArray.base, count: succArray.count)
   }
   
   public var isFunctionExiting: Bool { false }

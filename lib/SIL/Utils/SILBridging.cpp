@@ -293,9 +293,6 @@ void SILFunction_setNeedStackProtection(BridgedFunction function,
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
 
-static_assert(BridgedSuccessorSize == sizeof(SILSuccessor),
-              "wrong bridged SILSuccessor size");
-
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block) {
   SILBasicBlock *b = castToBasicBlock(block);
   auto iter = std::next(b->getIterator());
@@ -371,22 +368,6 @@ void BasicBlock_moveArgumentsTo(BridgedBasicBlock block, BridgedBasicBlock dest)
 
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->pred_begin().getSuccessorRef()};
-}
-
-static SILSuccessor *castToSuccessor(BridgedSuccessor succ) {
-  return const_cast<SILSuccessor *>(static_cast<const SILSuccessor *>(succ.succ));
-}
-
-OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getNext()};
-}
-
-BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getBB()};
-}
-
-BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getContainingInst()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -885,9 +866,9 @@ MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index) {
   return {castToInst<MultipleValueInstruction>(inst)->getResult(index)};
 }
 
-BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term) {
+BridgedSuccessorArray TermInst_getSuccessors(BridgedInstruction term) {
   auto successors = castToInst<TermInst>(term)->getSuccessors();
-  return {(const unsigned char *)successors.data(), successors.size()};
+  return {{successors.data()}, (SwiftInt)successors.size()};
 }
 
 //===----------------------------------------------------------------------===//
