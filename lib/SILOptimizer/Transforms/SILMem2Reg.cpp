@@ -470,19 +470,43 @@ replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
   }
 }
 
-/// Create a tuple value for an empty tuple or a tuple of empty tuples.
-static SILValue createValueForEmptyTuple(SILType ty,
-                                         SILInstruction *insertionPoint,
-                                         SILBuilderContext &ctx) {
-  auto tupleTy = ty.castTo<TupleType>();
-  SmallVector<SILValue, 4> elements;
-  for (unsigned idx : range(tupleTy->getNumElements())) {
-    SILType elementTy = ty.getTupleElementType(idx);
-    elements.push_back(
-        createValueForEmptyTuple(elementTy, insertionPoint, ctx));
+/// Instantiate the specified empty type by recursively tupling and structing
+/// the empty types aggregated together at each level.
+static SILValue createValueForEmptyType(SILType ty,
+                                        SILInstruction *insertionPoint,
+                                        SILBuilderContext &ctx) {
+  auto *function = insertionPoint->getFunction();
+  assert(ty.isEmpty(*function));
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    SmallVector<SILValue, 4> elements;
+    for (unsigned idx : range(tupleTy->getNumElements())) {
+      SILType elementTy = ty.getTupleElementType(idx);
+      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
+      elements.push_back(element);
+    }
+    SILBuilderWithScope builder(insertionPoint, ctx);
+    return builder.createTuple(insertionPoint->getLoc(), ty, elements);
+  } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+    TypeExpansionContext tec = *function;
+    auto &module = function->getModule();
+    if (decl->isResilient(tec.getContext()->getParentModule(),
+                          tec.getResilienceExpansion())) {
+      llvm::errs() << "Attempting to create value for illegal empty type:\n";
+      ty.print(llvm::errs());
+      llvm::report_fatal_error("illegal empty type: resilient struct");
+    }
+    SmallVector<SILValue, 4> elements;
+    for (auto *field : decl->getStoredProperties()) {
+      auto elementTy = ty.getFieldType(field, module, tec);
+      auto element = createValueForEmptyType(elementTy, insertionPoint, ctx);
+      elements.push_back(element);
+    }
+    SILBuilderWithScope builder(insertionPoint, ctx);
+    return builder.createStruct(insertionPoint->getLoc(), ty, elements);
   }
-  SILBuilderWithScope builder(insertionPoint, ctx);
-  return builder.createTuple(insertionPoint->getLoc(), ty, elements);
+  llvm::errs() << "Attempting to create value for illegal empty type:\n";
+  ty.print(llvm::errs());
+  llvm::report_fatal_error("illegal empty type: neither tuple nor struct.");
 }
 
 /// Whether lexical lifetimes should be added for the values stored into the
@@ -1859,11 +1883,11 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // with our running value.
     if (isLoadFromStack(inst, asi)) {
       if (!runningVals) {
-        // Loading without a previous store is only acceptable if the type is
-        // Void (= empty tuple) or a tuple of Voids.
+        // Loading from uninitialized memory is only acceptable if the type is
+        // empty--an aggregate of types without storage.
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createValueForEmptyTuple(
+                                  /*replacement=*/createValueForEmptyType(
                                       asi->getElementType(), inst, ctx)),
             /*isStorageValid=*/true};
       }
