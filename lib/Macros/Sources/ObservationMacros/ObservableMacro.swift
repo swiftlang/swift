@@ -53,15 +53,15 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
 
     let transactions: DeclSyntax =
       """
-      public nonisolated func transactions<Delivery>(for properties: TrackedProperties<\(parentName)>, isolation: Delivery) -> ObservedTransactions<\(parentName), Delivery> where Delivery: Actor {
-        _registrar.transactions(for: properties, isolation: isolation)
+      public nonisolated func changes<Isolation>(for properties: TrackedProperties<\(parentName)>, isolation: Isolation) -> ObservedChanges<\(parentName), Isolation> where Isolation: Actor {
+        _registrar.changes(for: properties, isolation: isolation)
       }
       """
 
     let changes: DeclSyntax =
       """
-      public nonisolated func changes<Member>(for keyPath: KeyPath<\(parentName), Member>) -> ObservedChanges<\(parentName), Member> where Member: Sendable {
-        _registrar.changes(for: keyPath)
+      public nonisolated func values<Member>(for keyPath: KeyPath<\(parentName), Member>) -> ObservedValues<\(parentName), Member> where Member: Sendable {
+        _registrar.values(for: keyPath)
       }
       """
 

@@ -45,7 +45,7 @@ public struct ObservationTracking {
     internal init() { }
     
     internal mutating func addAccess<Subject: Observable>(
-      keyPath: PartialKeyPath<Subject>, 
+      keyPath: PartialKeyPath<Subject>,
       context: ObservationRegistrar<Subject>.Context
     ) {
       entries[context.id, default: Entry(context)].insert(keyPath)
@@ -53,7 +53,7 @@ public struct ObservationTracking {
   }
   
   public static func withTracking<T>(
-    _ apply: () -> T, 
+    _ apply: () -> T,
     onChange: @autoclosure () -> @Sendable () -> Void
   ) -> T {
     var _AccessList: _AccessList?
@@ -79,7 +79,7 @@ public struct ObservationTracking {
 
   @_spi(SwiftUI)
   public static func _installTracking(
-    _ list: _AccessList, 
+    _ list: _AccessList,
     onChange: @escaping @Sendable () -> Void
   ) {
     let state = _ManagedCriticalState([ObjectIdentifier: Int]())
