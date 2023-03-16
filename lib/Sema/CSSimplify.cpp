@@ -5058,63 +5058,6 @@ bool ConstraintSystem::repairFailures(
     if (!anchor)
       return false;
 
-    if (auto *coercion = getAsExpr<CoerceExpr>(anchor)) {
-      // Coercion from T.Type to T.Protocol.
-      if (hasConversionOrRestriction(
-              ConversionRestrictionKind::MetatypeToExistentialMetatype))
-        return false;
-
-      if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
-        return false;
-
-      // Let's check whether the sub-expression is an optional type which
-      // is possible to unwrap (either by force or `??`) to satisfy the cast,
-      // otherwise we'd have to fallback to force downcast.
-      if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                  conversionsOrFixes,
-                                  getConstraintLocator(coercion->getSubExpr())))
-        return true;
-
-      // If the result type of the coercion has an value to optional conversion
-      // we can instead suggest the conditional downcast as it is safer in
-      // situations like conditional binding.
-      auto useConditionalCast =
-          llvm::any_of(ConstraintRestrictions, [&](const auto &restriction) {
-            Type type1, type2;
-            std::tie(type1, type2) = restriction.first;
-            auto restrictionKind = restriction.second;
-
-            if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
-              return false;
-
-            return rhs->isEqual(type1);
-          });
-
-      // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
-      if (auto *coerceToCheckCastFix =
-              CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
-                                           getConstraintLocator(locator))) {
-        conversionsOrFixes.push_back(coerceToCheckCastFix);
-        return true;
-      }
-
-      // If it has a deep equality restriction, defer the diagnostic to
-      // GenericMismatch.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
-          !hasConversionOrRestriction(
-              ConversionRestrictionKind::OptionalToOptional)) {
-        return false;
-      }
-
-      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
-        return false;
-
-      auto *fix = ContextualMismatch::create(*this, lhs, rhs,
-                                             getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-      return true;
-    }
-
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -6449,6 +6392,64 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::CoercionOperand: {
+    auto *coercion = castToExpr<CoerceExpr>(anchor);
+
+    // Coercion from T.Type to T.Protocol.
+    if (hasConversionOrRestriction(
+            ConversionRestrictionKind::MetatypeToExistentialMetatype))
+      return false;
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
+      return false;
+
+    // Let's check whether the sub-expression is an optional type which
+    // is possible to unwrap (either by force or `??`) to satisfy the cast,
+    // otherwise we'd have to fallback to force downcast.
+    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                conversionsOrFixes,
+                                getConstraintLocator(coercion->getSubExpr())))
+      return true;
+
+    // If the result type of the coercion has an value to optional conversion
+    // we can instead suggest the conditional downcast as it is safer in
+    // situations like conditional binding.
+    auto useConditionalCast =
+        llvm::any_of(ConstraintRestrictions, [&](const auto &restriction) {
+          Type type1, type2;
+          std::tie(type1, type2) = restriction.first;
+          auto restrictionKind = restriction.second;
+
+          if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
+            return false;
+
+          return rhs->isEqual(type1);
+        });
+
+    // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
+    if (auto *coerceToCheckCastFix =
+            CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
+                                         getConstraintLocator(locator))) {
+      conversionsOrFixes.push_back(coerceToCheckCastFix);
+      return true;
+    }
+
+    // If it has a deep equality restriction, defer the diagnostic to
+    // GenericMismatch.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+        !hasConversionOrRestriction(
+            ConversionRestrictionKind::OptionalToOptional)) {
+      return false;
+    }
+
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+      return false;
+
+    auto *fix = ContextualMismatch::create(*this, lhs, rhs,
+                                           getConstraintLocator(locator));
+    conversionsOrFixes.push_back(fix);
+    return true;
+  }
   default:
     break;
   }
@@ -6963,7 +6964,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                    ArrayRef<LocatorPathElt> path) {
           // E.g. contextual conversion from coercion/cast
           // to some other type.
-          if (!path.empty())
+          if (!(path.empty() ||
+                path.back().is<LocatorPathElt::CoercionOperand>()))
             return false;
 
           return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
@@ -11328,7 +11330,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
     SmallVector<LocatorPathElt, 4> elts;
     auto anchor = locator.getLocatorParts(elts);
-    if (!elts.empty())
+    if (elts.empty() || !elts.back().is<LocatorPathElt::CoercionOperand>())
       return false;
 
     auto *coercion = getAsExpr<CoerceExpr>(anchor);

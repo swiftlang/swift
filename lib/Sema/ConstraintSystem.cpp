@@ -622,10 +622,12 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (isExpr<ObjectLiteralExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::ConstructorMember);
 
-  if (locator->isLastElement<LocatorPathElt::FunctionArgument>()) {
-    if (auto *CE = getAsExpr<CoerceExpr>(anchor)) {
-      return getConstraintLocator(CE->getSubExpr());
-    }
+  if (locator->isFirstElement<LocatorPathElt::CoercionOperand>()) {
+    auto *CE = castToExpr<CoerceExpr>(anchor);
+    locator = getConstraintLocator(CE->getSubExpr()->getValueProvidingExpr(),
+                                   path.drop_front());
+    return getCalleeLocator(locator, lookThroughApply, getType, simplifyType,
+                            getOverloadFor);
   }
 
   return getConstraintLocator(anchor);
@@ -4685,10 +4687,25 @@ static bool diagnoseAmbiguity(
           fixes.push_back(entry.second);
       }
 
+      auto emitGeneralFoundCandidateNote = [&]() {
+        // Emit a general "found candidate" note
+        if (decl->getLoc().isInvalid()) {
+          if (candidateTypes.insert(type->getCanonicalType()).second)
+            DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
+        } else {
+          DE.diagnose(noteLoc, diag::found_candidate);
+        }
+      };
+
       if (fixes.size() == 1) {
         diagnosed &= fixes.front()->diagnose(solution, /*asNote*/ true);
       } else if (!fixes.empty() &&
                  llvm::all_of(fixes, [&](const ConstraintFix *fix) {
+                   // Ignore coercion fixes in this context, to
+                   // focus on the argument mismatches.
+                   if (fix->getLocator()->isForCoercion())
+                     return true;
+
                    return fix->getLocator()
                        ->findLast<LocatorPathElt::ApplyArgument>()
                        .has_value();
@@ -4702,28 +4719,34 @@ static bool diagnoseAmbiguity(
             type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
         assert(fn);
 
-        auto *argList = solution.getArgumentList(fixes.front()->getLocator());
-        assert(argList);
+        auto first = llvm::find_if(fixes, [&](const ConstraintFix *fix) {
+          return fix->getLocator()
+              ->findLast<LocatorPathElt::ApplyArgument>()
+              .has_value();
+        });
 
-        if (fn->getNumParams() == 1 && argList->isUnary()) {
-          const auto &param = fn->getParams()[0];
-          auto argTy = solution.getResolvedType(argList->getUnaryExpr());
+        if (first != fixes.end()) {
+          auto *argList = solution.getArgumentList((*first)->getLocator());
+          assert(argList);
 
-          DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
-                      solution.simplifyType(param.getPlainType()),
-                      /*position=*/1, param.isInOut(), argTy);
+          if (fn->getNumParams() == 1 && argList->isUnary()) {
+            const auto &param = fn->getParams()[0];
+            auto argTy = solution.getResolvedType(argList->getUnaryExpr());
+
+            DE.diagnose(noteLoc,
+                        diag::candidate_has_invalid_argument_at_position,
+                        solution.simplifyType(param.getPlainType()),
+                        /*position=*/1, param.isInOut(), argTy);
+          } else {
+            DE.diagnose(noteLoc, diag::candidate_partial_match,
+                        fn->getParamListAsString(fn->getParams()));
+          }
         } else {
-          DE.diagnose(noteLoc, diag::candidate_partial_match,
-                      fn->getParamListAsString(fn->getParams()));
+          // Only coercion ambiguity fixes.
+          emitGeneralFoundCandidateNote();
         }
       } else {
-        // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
-          if (candidateTypes.insert(type->getCanonicalType()).second)
-            DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
-        } else {
-          DE.diagnose(noteLoc, diag::found_candidate);
-        }
+        emitGeneralFoundCandidateNote();
       }
     }
 
@@ -5478,6 +5501,19 @@ void constraints::simplifyLocator(ASTNode &anchor,
         }
       }
       break;
+
+    case ConstraintLocator::CoercionOperand: {
+      auto *CE = castToExpr<CoerceExpr>(anchor);
+      anchor = CE->getSubExpr()->getValueProvidingExpr();
+      path = path.slice(1);
+      // When in a argument function type on a coercion context
+      // look past the argument, because is just for identify the
+      // argument type that is being matched.
+      if (!path.empty() && path[0].is<LocatorPathElt::FunctionArgument>()) {
+        path = path.slice(1);
+      }
+      continue;
+    }
 
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType: {
