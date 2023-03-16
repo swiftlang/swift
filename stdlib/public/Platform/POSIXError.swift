@@ -850,7 +850,7 @@ public enum POSIXErrorCode : Int32 {
     case STRUNCATE      = 80
 }
 
-#elseif os(OpenBSD)
+#elseif os(OpenBSD) || os(FreeBSD)
 
 /// Enumeration describing POSIX error codes.
 public enum POSIXErrorCode : Int32 {
@@ -1018,6 +1018,8 @@ public enum POSIXErrorCode : Int32 {
     case EAUTH			= 80
     /// Need authenticator
     case ENEEDAUTH		= 81
+
+#if os(OpenBSD)
     /// IPsec processing failure
     case EIPSEC			= 82
     /// Attribute not found
@@ -1046,6 +1048,40 @@ public enum POSIXErrorCode : Int32 {
     case EOWNERDEAD		= 94
     /// Protocol error
     case EPROTO			= 95
+#elseif os(FreeBSD)
+    /// Identifier removed
+    case EIDRM                  = 82
+    /// No message of desired type
+    case ENOMSG                 = 83
+    /// Value too large to be stored in data type
+    case EOVERFLOW              = 84
+    /// Operation canceled
+    case ECANCELED              = 85
+    /// Illegal byte sequence
+    case EILSEQ                 = 86
+    /// Attribute not found
+    case ENOATTR                = 87
+    /// Programming error
+    case EDOOFUS                = 88
+    /// Bad message
+    case EBADMSG                = 89
+    /// Multihop attempted
+    case EMULTIHOP              = 90
+    /// Link has been severed
+    case ENOLINK                = 91
+    /// Protocol error
+    case EPROTO                 = 92
+    /// Capabilities insufficient
+    case ENOTCAPABLE            = 93
+    /// Not permitted in capability mode
+    case ECAPMODE               = 94
+    /// State not recoverable
+    case ENOTRECOVERABLE        = 95
+    /// Previous owner died
+    case EOWNERDEAD             = 96
+    /// Integrity check failed
+    case EINTEGRITY             = 97
+#endif
 }
 
 #endif
