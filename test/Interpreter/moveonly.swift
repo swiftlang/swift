@@ -1,23 +1,49 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
 
-// CHECK: MyInt: 5
-@inline(never)
-func printInt(_ x: Int) { print("MyInt: \(x)") }
+import StdlibUnittest
+
+defer { runAllTests() }
+
+var Tests = TestSuite("MoveOnlyTests")
 
 @_moveOnly
 struct FD {
-    var i = 5
+    var a  = LifetimeTracked(0)
 
     deinit {
-        printInt(i)
     }
 }
 
-func main() {
-    let x = FD()
-    let _ = x
+Tests.test("simple deinit called once") {
+    do {
+        let s = FD()
+    }
+    expectEqual(0, LifetimeTracked.instances)
 }
 
-main()
+Tests.test("ref element addr destroyed once") {
+    class CopyableKlass {
+        var fd = FD()
+    }
+
+    func assignCopyableKlass(_ x: CopyableKlass) {
+        x.fd = FD()
+    }
+
+    do {
+        let x = CopyableKlass()
+        assignCopyableKlass(x)
+    }
+    expectEqual(0, LifetimeTracked.instances)
+}
+
+var global = FD()
+
+Tests.test("global destroyed once") {
+    do {
+        global = FD()
+    }
+    expectEqual(0, LifetimeTracked.instances)    
+}
