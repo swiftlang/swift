@@ -2378,40 +2378,13 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
     NullablePtr<BraceStmt> newBody;
 
-    if (auto transformedBody = transform->transformedBody) {
-      fn.setParsedBody(const_cast<BraceStmt *>(transformedBody.get()),
-                       /*singleExpression=*/false);
+    auto transformedBody = transform->transformedBody;
+    fn.setParsedBody(transformedBody,
+                     /*singleExpression=*/false);
 
-      ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
-
-      return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
-                              : SolutionApplicationToFunctionResult::Success;
-    }
-
-    // Apply the result builder to the closure. We want to be in the
-    // context of the closure for subsequent transforms.
-    newBody = applyResultBuilderTransform(
-        solution, *transform, fn.getBody(), fn.getAsDeclContext(),
-        [&](SyntacticElementTarget target) {
-          auto resultTarget = rewriteTarget(target);
-          if (resultTarget) {
-            if (auto expr = resultTarget->getAsExpr())
-              solution.setExprTypes(expr);
-          }
-
-          return resultTarget;
-        });
-
-    if (!newBody)
-      return SolutionApplicationToFunctionResult::Failure;
-
-    fn.setTypecheckedBody(newBody.get(), /*isSingleExpression=*/false);
-    if (closure) {
-      solution.setExprTypes(closure);
-    }
-
-    return SolutionApplicationToFunctionResult::Success;
-
+    ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
+    return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
+                            : SolutionApplicationToFunctionResult::Success;
   }
   assert(closure && "Can only get here with a closure at the moment");
 

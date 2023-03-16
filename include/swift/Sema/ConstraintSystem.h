@@ -155,7 +155,7 @@ private:
   unsigned VarCounter = 0;
 
 public:
-  ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
+  ResultBuilder(ConstraintSystem &CS, DeclContext *DC, Type builderType);
 
   DeclContext *getDeclContext() const { return DC; }
 
@@ -996,32 +996,7 @@ struct AppliedBuilderTransform {
 
   /// The version of the original body with result builder applied
   /// as AST transformation.
-  NullablePtr<BraceStmt> transformedBody;
-
-  /// An expression whose value has been recorded for later use.
-  struct RecordedExpr {
-    /// The temporary value that captures the value of the expression, if
-    /// there is one.
-    VarDecl *temporaryVar;
-
-    /// The expression that results from generating constraints with this
-    /// particular builder.
-    Expr *generatedExpr;
-  };
-
-  /// A mapping from expressions whose values are captured by the builder
-  /// to information about the temporary variable capturing the
-  llvm::DenseMap<Expr *, RecordedExpr> capturedExprs;
-
-  /// A mapping from statements to a pair containing the implicit variable
-  /// declaration that captures the result of that expression, and the
-  /// set of expressions that can be used to produce a value for that
-  /// variable.
-  llvm::DenseMap<Stmt *, std::pair<VarDecl *, llvm::TinyPtrVector<Expr *>>>
-      capturedStmts;
-
-  /// The return expression, capturing the last value to be emitted.
-  Expr *returnExpr = nullptr;
+  BraceStmt *transformedBody;
 };
 
 struct Score;
@@ -6211,25 +6186,6 @@ bool exprNeedsParensOutsideFollowingOperator(
 bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
-
-/// Apply the given result builder transform within a specific solution
-/// to produce the rewritten body.
-///
-/// \param solution The solution to use during application, providing the
-/// specific types for each type variable.
-/// \param applied The applied builder transform.
-/// \param body The body to transform
-/// \param dc The context in which the transform occurs.
-/// \param rewriteTarget Rewrites a target to its final, type-checked version.
-///
-/// \returns the transformed body
-BraceStmt *applyResultBuilderTransform(
-    const constraints::Solution &solution,
-    constraints::AppliedBuilderTransform applied, BraceStmt *body,
-    DeclContext *dc,
-    std::function<Optional<constraints::SyntacticElementTarget>(
-        constraints::SyntacticElementTarget)>
-        rewriteTarget);
 
 /// Whether the given parameter requires an argument.
 bool parameterRequiresArgument(
