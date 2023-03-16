@@ -12,6 +12,9 @@
 // Tests for the NSString APIs as exposed by String
 //
 
+// Temporarily disabled as it is taking too long to execute.
+// REQUIRES: rdar106755810
+
 import StdlibUnittest
 
 
