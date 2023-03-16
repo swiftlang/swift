@@ -2312,7 +2312,13 @@ public:
           << " of " << subs.getGenericSignature()
           << " at ";
     printSubstitutions(subs);
-    *this << ", shape $" << env->getOpenedElementShapeClass()
+    // The shape class in the opened environment is a canonical interface
+    // type, which won't resolve in the generic signature we just printed.
+    // Map it back to the sugared generic parameter.
+    auto sugaredShapeClass =
+      subs.getGenericSignature()->getSugaredType(
+        env->getOpenedElementShapeClass());
+    *this << ", shape $" << sugaredShapeClass
           << ", uuid \"" << env->getOpenedElementUUID() << "\"";
   }
   void visitPackElementGetInst(PackElementGetInst *I) {

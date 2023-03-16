@@ -667,13 +667,16 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
       !shapeClass->isEqual(uuidAndShape.second))
     return nullptr;
 
+  auto shapeParam = cast<GenericTypeParamType>(
+      shapeClass->mapTypeOutOfContext()->getCanonicalType());
+
   auto &ctx = getASTContext();
   auto elementSig = ctx.getOpenedElementSignature(
-      DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeClass);
+      DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeParam);
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
   return GenericEnvironment::forOpenedElement(elementSig, uuidAndShape.first,
-                                              shapeClass, contextSubs);
+                                              shapeParam, contextSubs);
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions

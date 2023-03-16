@@ -104,7 +104,8 @@ GenericEnvironment::getPackElementContextSubstitutions() const {
   return environmentData->outerSubstitutions;
 }
 
-CanType GenericEnvironment::getOpenedElementShapeClass() const {
+CanGenericTypeParamType
+GenericEnvironment::getOpenedElementShapeClass() const {
   assert(getKind() == Kind::OpenedElement);
   auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
   return environmentData->shapeClass;
@@ -160,7 +161,7 @@ void GenericEnvironment::forEachPackElementGenericTypeParam(
 
     // Only include opened element parameters for packs in the given
     // shape equivalence class.
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+    if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
     function(genericParam);
@@ -218,7 +219,8 @@ GenericEnvironment::GenericEnvironment(
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature,
-                                       UUID uuid, CanType shapeClass,
+                                       UUID uuid,
+                                       CanGenericTypeParamType shapeClass,
                                        SubstitutionMap outerSubs)
   : SignatureAndKind(signature, Kind::OpenedElement)
 {
@@ -627,7 +629,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
     if (!genericParam->isParameterPack())
       continue;
 
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+    if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
     auto elementIndex = elementParamForPack.size();
@@ -680,7 +682,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     if (!genericParam->isParameterPack())
       continue;
 
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+    if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
     GenericParamKey elementKey(/*isParameterPack*/false,
@@ -767,16 +769,19 @@ OpenedElementContext::createForContextualExpansion(ASTContext &ctx,
          "must be given a contextual type");
 
   // Get the outer generic signature and environment.
-  auto *genericEnv = cast<ArchetypeType>(expansionType.getCountType())
-                         ->getGenericEnvironment();
+  auto countArchetype = cast<ArchetypeType>(expansionType.getCountType());
+  auto *genericEnv = countArchetype->getGenericEnvironment();
   auto subMap = genericEnv->getForwardingSubstitutionMap();
+
+  auto countType = cast<GenericTypeParamType>(
+      countArchetype->getInterfaceType()->getCanonicalType());
 
   auto genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
   // Create an opened element signature and environment.
   auto elementSig = ctx.getOpenedElementSignature(
-      genericSig, expansionType.getCountType());
+      genericSig, countType);
   auto *elementEnv = GenericEnvironment::forOpenedElement(
-      elementSig, UUID::fromTime(), expansionType.getCountType(), subMap);
+      elementSig, UUID::fromTime(), countType, subMap);
 
   return {elementEnv, elementSig};
 }

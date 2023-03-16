@@ -5144,7 +5144,8 @@ GenericEnvironment::forOpenedExistential(
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedElement(GenericSignature signature,
-                                     UUID uuid, CanType shapeClass,
+                                     UUID uuid,
+                                     CanGenericTypeParamType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
@@ -5735,7 +5736,7 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
 
 CanGenericSignature
 ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
-                                      CanType shapeClass) {
+                                      CanGenericTypeParamType shapeClass) {
   auto &sigs = getImpl().ElementSignatures;
   auto key = std::make_pair(shapeClass, baseGenericSig.getPointer());
   auto found = sigs.find(key);
@@ -5774,7 +5775,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
 
     // Only include opened element parameters for packs in the given
     // shape equivalence class.
-    if (!baseGenericSig->haveSameShape(paramType, shapeClass->mapTypeOutOfContext()))
+    if (!baseGenericSig->haveSameShape(paramType, shapeClass))
       continue;
 
     auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,

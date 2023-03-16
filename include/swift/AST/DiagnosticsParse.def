@@ -1676,6 +1676,8 @@ ERROR(pack_element_attribute_expected_rparen,none,
       "expected ')' after id value for 'pack_element' attribute", ())
 ERROR(multiple_open_pack_element,none,
       "multiple 'open_pack_element' instructions with same UUID", ())
+ERROR(opened_shape_class_not_pack_param,none,
+      "shape class type must be a pack type parameter", ())
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,

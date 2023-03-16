@@ -6765,8 +6765,7 @@ public:
     auto sig = subs.getGenericSignature();
     auto params = sig.getGenericParams();
 
-    auto elementShapeClass =
-      env->getOpenedElementShapeClass()->mapTypeOutOfContext();
+    auto elementShapeClass = env->getOpenedElementShapeClass();
 
     // The element archetypes are at a depth one past the max depth
     // of the base signature.
