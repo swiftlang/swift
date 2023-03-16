@@ -153,7 +153,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // These happen after ClosureLifetimeFixup because they depend on the
   // resolution of nonescaping closure lifetimes to correctly check the use
   // of move-only values as captures in nonescaping closures as borrows.
-  P.addMoveValueInserter();
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
@@ -165,6 +164,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
   P.addConsumeOperatorCopyableValuesChecker();
+
+  P.addMoveValueInserter();
 
   //
   // End Ownership Optimizations
@@ -573,6 +574,7 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
+  P.addSubsequentMoveValueInserter();
 
   // Verify AccessStorage once in OSSA before optimizing.
 #ifndef NDEBUG
@@ -599,6 +601,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
+  P.addSubsequentMoveValueInserter();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
   // This unblocks many other passes' optimizations (e.g. inlining) and this is

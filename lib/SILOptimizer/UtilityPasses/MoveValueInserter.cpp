@@ -18,12 +18,16 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/ADT/DenseSet.h"
 
 using namespace swift;
 
 namespace {
 
+llvm::DenseSet<SILValue> movedValues;
+
 class Implementation {
+  bool isSubsequent;
   SILFunction *function;
   SILBuilderContext context;
   SmallPtrSet<SILValue, 16> movedValues;
@@ -49,6 +53,10 @@ class Implementation {
   }
 
   bool shouldMoveValue(SILValue value) {
+    if (isSubsequent && !movedValues.insert(value).second) {
+      // Runs of "subsequent" shouldn't repeatedly move the same value.
+      return false;
+    }
     if (!movedValues.insert(value).second) {
       // If it's already moved, don't move it.
       return false;
@@ -107,8 +115,9 @@ class Implementation {
   }
 
 public:
-  Implementation(SILFunction *function)
-      : function(function), context(function->getModule()) {}
+  Implementation(SILFunction *function, bool isSubsequent)
+      : isSubsequent(isSubsequent), function(function),
+        context(function->getModule()) {}
 
   bool run() {
     bool changed = false;
@@ -137,12 +146,18 @@ public:
 
 class MoveValueInserter : public SILFunctionTransform {
 
+  bool isSubsequent;
+
+public:
+  MoveValueInserter(bool isSubsequent) : isSubsequent(isSubsequent) {}
+
+private:
   void run() override {
     SILFunction *f = getFunction();
     if (!f->hasOwnership()) {
       return;
     }
-    Implementation impl(f);
+    Implementation impl(f, isSubsequent);
     if (impl.run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
@@ -151,5 +166,9 @@ class MoveValueInserter : public SILFunctionTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createMoveValueInserter() {
-  return new MoveValueInserter();
+  return new MoveValueInserter(false);
+}
+
+SILTransform *swift::createSubsequentMoveValueInserter() {
+  return new MoveValueInserter(true);
 }
