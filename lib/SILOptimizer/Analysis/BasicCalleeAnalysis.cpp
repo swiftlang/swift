@@ -345,10 +345,10 @@ BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis
 }
 
 BridgedCalleeList CalleeAnalysis_getDestructors(BridgedCalleeAnalysis calleeAnalysis,
-                                                BridgedType type,
+                                                SILType type,
                                                 SwiftInt isExactType) {
   BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
-  CalleeList cl = bca->getDestructors(castToSILType(type), isExactType != 0);
+  CalleeList cl = bca->getDestructors(type, isExactType != 0);
   return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
 }
 

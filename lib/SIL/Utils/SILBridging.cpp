@@ -197,11 +197,10 @@ SwiftInt SILFunction_getNumSILArguments(BridgedFunction function) {
   return conv.getNumSILArguments();
 }
 
-BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx) {
+swift::SILType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx) {
   SILFunction *f = castToFunction(function);
   SILFunctionConventions conv(f->getConventionsInContext());
-  SILType argTy = conv.getSILArgumentType(idx, f->getTypeExpansionContext());
-  return {argTy.getOpaqueValue()};
+  return conv.getSILArgumentType(idx, f->getTypeExpansionContext());
 }
 
 BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention conv) {
@@ -236,11 +235,10 @@ BridgedArgumentConvention SILFunction_getSILArgumentConvention(BridgedFunction f
   return SILArgumentConvention_getBridged(SILArgumentConvention(conv.getParamInfoForSILArg(idx).getConvention()));
 }
 
-BridgedType SILFunction_getSILResultType(BridgedFunction function) {
+swift::SILType SILFunction_getSILResultType(BridgedFunction function) {
   SILFunction *f = castToFunction(function);
   SILFunctionConventions conv(f->getConventionsInContext());
-  SILType resTy = conv.getSILResultType(f->getTypeExpansionContext());
-  return {resTy.getOpaqueValue()};
+  return conv.getSILResultType(f->getTypeExpansionContext());
 }
 
 SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
@@ -344,9 +342,9 @@ BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt inde
 }
 
 BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
-                                               BridgedType type,
+                                               swift::SILType type,
                                                BridgedValue::Ownership ownership) {
-  return {castToBasicBlock(block)->createPhiArgument(castToSILType(type),
+  return {castToBasicBlock(block)->createPhiArgument(type,
                                                 castToOwnership(ownership))};
 }
 
@@ -433,223 +431,6 @@ BridgedValue::Kind BridgedValue::getKind() const {
     return BridgedValue::Kind::Undef;
   }
   llvm_unreachable("unknown SILValue");
-}
-
-//===----------------------------------------------------------------------===//
-//                            SILType
-//===----------------------------------------------------------------------===//
-
-std::string SILType_debugDescription(BridgedType type) {
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  castToSILType(type).print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
-}
-
-SwiftInt SILType_isAddress(BridgedType type) {
-  return castToSILType(type).isAddress();
-}
-
-SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
-  return castToSILType(type).isTrivial(*castToFunction(function));
-}
-
-SwiftInt SILType_isReferenceCounted(BridgedType type, BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  return castToSILType(type).isReferenceCounted(f->getModule()) ? 1 : 0;
-}
-
-bool SILType_hasArchetype(BridgedType type) {
-  return castToSILType(type).hasArchetype();
-}
-
-SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
-                                                  BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
-}
-
-SwiftInt SILType_isNominal(BridgedType type) {
-  return castToSILType(type).getNominalOrBoundGenericNominal() ? 1 : 0;
-}
-
-SwiftInt SILType_isClass(BridgedType type) {
-  return castToSILType(type).getClassOrBoundGenericClass() ? 1 : 0;
-}
-
-SwiftInt SILType_isStruct(BridgedType type) {
-  return castToSILType(type).getStructOrBoundGenericStruct() ? 1 : 0;
-}
-
-SwiftInt SILType_isTuple(BridgedType type) {
-  return castToSILType(type).is<TupleType>() ? 1 : 0;
-}
-
-SwiftInt SILType_isEnum(BridgedType type) {
-  return castToSILType(type).getEnumOrBoundGenericEnum() ? 1 : 0;
-}
-
-bool SILType_isFunction(BridgedType type) {
-  return castToSILType(type).is<SILFunctionType>();
-}
-
-bool SILType_isMetatype(BridgedType type) {
-  return castToSILType(type).is<MetatypeType>();
-}
-
-BridgedType SILType_instanceTypeOfMetatype(BridgedType type, BridgedFunction function) {
-  auto metaType = castToSILType(type).castTo<MetatypeType>();
-  CanType instanceTy = metaType.getInstanceType();
-  SILFunction *f = castToFunction(function);
-  auto &tl = f->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*f));
-  return {tl.getLoweredType().getOpaqueValue()};
-}
-
-BridgedDecl SILType_getNominal(BridgedType type) {
-  return castToSILType(type).getNominalOrBoundGenericNominal();
-}
-
-bool SILType_isOrContainsObjectiveCClass(BridgedType type) {
-  return castToSILType(type).getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
-}
-
-bool SILType_isCalleeConsumedFunction(BridgedType type) {
-  auto funcTy = castToSILType(type).castTo<SILFunctionType>();
-  return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
-}
-
-static bool hasImmortalAttr(NominalTypeDecl *nominal) {
-  if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
-    if (semAttr->Value == semantics::ARC_IMMORTAL) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool isMarkedAsImmortal(NominalTypeDecl *nominal) {
-  if (hasImmortalAttr(nominal))
-    return true;
-
-  if (!isa<ProtocolDecl>(nominal)) {
-    for (ProtocolDecl *p : nominal->getAllProtocols()) {
-      if (hasImmortalAttr(p))
-        return true;
-    }
-  }
-  return false;
-}
-
-bool SILType_isMarkedAsImmortal(BridgedType type) {
-  SILType ty = castToSILType(type);
-  NominalTypeDecl *nominal = ty.getNominalOrBoundGenericNominal();
-  if (!nominal)
-    return false;
-
-  if (isMarkedAsImmortal(nominal))
-    return true;
-
-  if (ClassDecl *cl = dyn_cast<ClassDecl>(nominal)) {
-    cl = cl->getSuperclassDecl();
-    while (cl) {
-      if (isMarkedAsImmortal(cl))
-        return true;
-      cl = cl->getSuperclassDecl();
-    }
-  }
-  return false;
-}
-
-SwiftInt SILType_getNumTupleElements(BridgedType type) {
-  TupleType *tupleTy = castToSILType(type).castTo<TupleType>();
-  return tupleTy->getNumElements();
-}
-
-BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
-  SILType ty = castToSILType(type);
-  SILType elmtTy = ty.getTupleElementType((unsigned)elementIdx);
-  return {elmtTy.getOpaqueValue()};
-}
-
-SwiftInt SILType_getNumNominalFields(BridgedType type) {
-  SILType silType = castToSILType(type);
-  auto *nominal = silType.getNominalOrBoundGenericNominal();
-  assert(nominal && "expected nominal type");
-  return getNumFieldsInNominal(nominal);
-}
-
-BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
-                                        BridgedFunction function) {
-  SILType silType = castToSILType(type);
-  SILFunction *silFunction = castToFunction(function);
-
-  NominalTypeDecl *decl = silType.getNominalOrBoundGenericNominal();
-  VarDecl *field = getIndexedField(decl, (unsigned)index);
-
-  SILType fieldType = silType.getFieldType(
-      field, silFunction->getModule(), silFunction->getTypeExpansionContext());
-
-  return {fieldType.getOpaqueValue()};
-}
-
-StringRef SILType_getNominalFieldName(BridgedType type, SwiftInt index) {
-  SILType silType = castToSILType(type);
-
-  NominalTypeDecl *decl = silType.getNominalOrBoundGenericNominal();
-  VarDecl *field = getIndexedField(decl, (unsigned)index);
-  return field->getName().str();
-}
-
-SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
-                                          StringRef fieldName) {
-  SILType ty = castToSILType(type);
-  auto *nominal = ty.getNominalOrBoundGenericNominal();
-  if (!nominal)
-    return -1;
-
-  SmallVector<NominalTypeDecl *, 5> decls;
-  decls.push_back(nominal);
-  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-    while ((cd = cd->getSuperclassDecl()) != nullptr) {
-      decls.push_back(cd);
-    }
-  }
-  std::reverse(decls.begin(), decls.end());
-
-  SwiftInt idx = 0;
-  for (auto *decl : decls) {
-    for (VarDecl *field : decl->getStoredProperties()) {
-      if (field->getName().str() == fieldName)
-        return idx;
-      idx++;
-    }
-  }
-  return -1;
-}
-
-SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
-                                      StringRef caseName) {
-  SILType ty = castToSILType(type);
-  auto *enumDecl = ty.getEnumOrBoundGenericEnum();
-  if (!enumDecl)
-    return -1;
-
-  SwiftInt idx = 0;
-  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
-    if (elem->getNameStr() == caseName)
-      return idx;
-    idx++;
-  }
-  return -1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1070,14 +851,14 @@ SwiftInt FullApplySite_numIndirectResultArguments(BridgedInstruction inst) {
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder b, StringRef name,
-          BridgedType operandType, BridgedType resultType,
+          SILType operandType, SILType resultType,
           BridgedValueArray arguments) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   SmallVector<SILValue, 16> argValues;
   return {builder.createBuiltinBinaryFunction(
-      RegularLocation(b.loc.getLocation()), name, getSILType(operandType),
-      getSILType(resultType), getSILValues(arguments, argValues))};
+      RegularLocation(b.loc.getLocation()), name, operandType,
+      resultType, getSILValues(arguments, argValues))};
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedBuilder b,
@@ -1089,20 +870,20 @@ BridgedInstruction SILBuilder_createCondFail(BridgedBuilder b,
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder b,
-          BridgedType type, SwiftInt value) {
+          SILType type, SwiftInt value) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   return {builder.createIntegerLiteral(RegularLocation(b.loc.getLocation()),
-                                       getSILType(type), value)};
+                                       type, value)};
 }
 
 BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder b,
-          BridgedType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
+          SILType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
           SwiftInt wasMoved) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   return {builder.createAllocStack(
-      RegularLocation(b.loc.getLocation()), getSILType(type), None,
+      RegularLocation(b.loc.getLocation()), type, None,
       hasDynamicLifetime != 0, isLexical != 0, wasMoved != 0)};
 }
 
@@ -1125,11 +906,11 @@ BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder b,
 BridgedInstruction
 SILBuilder_createUncheckedRefCast(BridgedBuilder b,
                                   BridgedValue op,
-                                  BridgedType type) {
+                                  SILType type) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   return {builder.createUncheckedRefCast(RegularLocation(b.loc.getLocation()),
-                                         op.getSILValue(), getSILType(type))};
+                                         op.getSILValue(), type)};
 }
 
 BridgedInstruction SILBuilder_createSetDeallocating(BridgedBuilder b,
@@ -1214,13 +995,13 @@ static EnumElementDecl *getEnumElement(SILType enumType, int caseIndex) {
 
 BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder b,
           BridgedValue enumVal, SwiftInt caseIdx,
-          BridgedType resultType) {
+          SILType resultType) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   SILValue en = enumVal.getSILValue();
   return {builder.createUncheckedEnumData(
       RegularLocation(b.loc.getLocation()), enumVal.getSILValue(),
-      getEnumElement(en->getType(), caseIdx), castToSILType(resultType))};
+      getEnumElement(en->getType(), caseIdx), resultType)};
 }
 
 BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder b,

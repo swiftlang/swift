@@ -103,7 +103,7 @@ BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee);
 BridgedCalleeList CalleeAnalysis_getDestructors(BridgedCalleeAnalysis calleeAnalysis,
-                                                BridgedType type,
+                                                swift::SILType type,
                                                 SwiftInt isExactType);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
@@ -181,7 +181,7 @@ void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock fro
 
 swift::SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
-                                      BridgedType bridgedType);
+                                      swift::SILType bridgedType);
 
 void PassContext_beginTransformFunction(BridgedFunction function,
                                         BridgedPassContext ctxt);
@@ -208,7 +208,7 @@ SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
 SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context);
 bool SILOptions_enableSimplificationFor(BridgedInstruction inst);
 
-BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context);
+BridgedValue SILUndef_get(swift::SILType type, BridgedPassContext context);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

@@ -1631,8 +1631,7 @@ void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock fro
 
 SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
-                                      BridgedType bridgedType) {
-  auto type = castToSILType(bridgedType);
+                                      SILType type) {
   auto *ntd = type.getASTType()->getAnyNominal();
   auto *pm = castToPassInvocation(context)->getPassManager();
   auto *m = pm->getModule()->getSwiftModule();
@@ -1742,8 +1741,7 @@ bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
   return false;
 }
 
-BridgedValue SILUndef_get(BridgedType type, BridgedPassContext context) {
-  SILUndef *undef = SILUndef::get(castToSILType(type),
-                                  *castToPassInvocation(context)->getFunction());
+BridgedValue SILUndef_get(SILType type, BridgedPassContext context) {
+  SILUndef *undef = SILUndef::get(type, *castToPassInvocation(context)->getFunction());
   return {undef};
 }

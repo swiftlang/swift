@@ -25,16 +25,8 @@
 
 namespace swift {
 
-inline SILType getSILType(BridgedType ty) {
-  return SILType::getFromOpaqueValue(ty.typePtr);
-}
-
 inline SILNode *castToSILNode(BridgedNode node) {
   return static_cast<SILNode *>(node.obj);
-}
-
-inline SILType castToSILType(BridgedType type) {
-  return SILType::getFromOpaqueValue(type.typePtr);
 }
 
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
