@@ -282,6 +282,9 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return getAffectedDeclFromType(contextualTy);
   }
 
+  if (getLocator()->isFirstElement<LocatorPathElt::CoercionOperand>())
+    return getAffectedDeclFromType(getOwnerType());
+
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
     // If there is a declaration associated with this
     // failure e.g. an overload choice of the call
@@ -786,7 +789,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   //
   // `value` has to get implicitly wrapped into 2 optionals
   // before pointer types could be compared.
-  auto path = getLocator()->getPath();
+  auto locator = getLocator();
+  auto path = locator->getPath();
   unsigned toDrop = 0;
   for (const auto &elt : llvm::reverse(path)) {
     if (!elt.is<LocatorPathElt::OptionalPayload>())
@@ -802,7 +806,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (path.empty()) {
     if (isExpr<AssignExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_AssignSource);
-    } else if (isExpr<CoerceExpr>(anchor)) {
+    } else if (locator->isForCoercion()) {
       diagnostic = getDiagnosticFor(CTP_CoerceOperand);
     } else {
       return false;
@@ -884,6 +888,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
     case ConstraintLocator::UnresolvedMemberChainResult: {
       diagnostic = diag::cannot_convert_chain_result_type;
+      break;
+    }
+
+    case ConstraintLocator::CoercionOperand: {
+      diagnostic = getDiagnosticFor(CTP_CoerceOperand);
       break;
     }
 
@@ -1217,6 +1226,14 @@ ASTNode InvalidCoercionFailure::getAnchor() const {
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     return assignExpr->getSrc();
   return anchor;
+}
+
+SourceLoc InvalidCoercionFailure::getLoc() const {
+  if (getLocator()->isForCoercion()) {
+    auto *CE = castToExpr<CoerceExpr>(getRawAnchor());
+    return CE->getAsLoc();
+  }
+  return FailureDiagnostic::getLoc();
 }
 
 bool InvalidCoercionFailure::diagnoseAsError() {
@@ -2487,7 +2504,7 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_condition_value;
     break;
   }
-      
+  case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::InstanceType: {
     if (diagnoseCoercionToUnrelatedType())
       return true;
@@ -2809,7 +2826,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
         emitDiagnostic(diag::unresolved_nil_literal);
         return true;
       }
-    } else if (isa<CoerceExpr>(parentExpr)) {
+    } else if (locator->isForCoercion()) {
       // `nil` is passed as a left-hand side of the coercion
       // operator e.g. `nil as Foo`
       CTP = CTP_CoerceOperand;
@@ -2891,23 +2908,23 @@ bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
 }
 
 bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
-  auto anchor = getAnchor();
-
-  if (auto *coerceExpr = getAsExpr<CoerceExpr>(anchor)) {
-    const auto fromType = getType(coerceExpr->getSubExpr());
-    const auto toType = getType(coerceExpr->getCastTypeRepr());
-
-    auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
-
-    auto diag = emitDiagnostic(*diagnostic, fromType, toType);
-    diag.highlight(getSourceRange());
-
-    (void)tryFixIts(diag);
-    
-    return true;
+  auto anchor = getRawAnchor();
+  auto *coerceExpr = getAsExpr<CoerceExpr>(anchor);
+  if (!coerceExpr) {
+    return false;
   }
 
-  return false;
+  const auto fromType = getType(coerceExpr->getSubExpr());
+  const auto toType = getType(coerceExpr->getCastTypeRepr());
+
+  auto diagnostic = getDiagnosticFor(CTP_CoerceOperand, toType);
+
+  auto diag = emitDiagnostic(*diagnostic, fromType, toType);
+  diag.highlight(getSourceRange());
+
+  (void)tryFixIts(diag);
+
+  return true;
 }
 
 bool ContextualFailure::diagnoseConversionToBool() const {
@@ -3178,9 +3195,6 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (getFromType()->isSubstring()) {
     if (getToType()->isString()) {
       auto *anchor = castToExpr(getAnchor())->getSemanticsProvidingExpr();
-      if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
-        anchor = CE->getSubExpr();
-      }
 
       if (auto *call = dyn_cast<CallExpr>(anchor)) {
         auto *fnExpr = call->getFn();
@@ -5860,9 +5874,15 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 
   auto *decl = overload->choice.getDecl();
   auto numArgs = getTotalNumArguments();
-  emitDiagnosticAt(decl, diag::candidate_with_extraneous_args, ContextualType,
-                   ContextualType->getNumParams(), numArgs, (numArgs == 1),
-                   isExpr<ClosureExpr>(getAnchor()));
+  if (isExpr<ClosureExpr>(getAnchor())) {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args_closure,
+                     ContextualType, ContextualType->getNumParams(), numArgs,
+                     (numArgs == 1));
+  } else {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args,
+                     overload->adjustedOpenedType, numArgs, ContextualType,
+                     ContextualType->getNumParams());
+  }
   return true;
 }
 
@@ -8878,12 +8898,7 @@ GlobalActorFunctionMismatchFailure::getDiagnosticMessage() const {
   auto path = locator->getPath();
 
   if (path.empty()) {
-    auto anchor = getAnchor();
-    if (isExpr<CoerceExpr>(anchor)) {
-      return diag::cannot_convert_global_actor_coercion;
-    } else {
-      return diag::cannot_convert_global_actor;
-    }
+    return diag::cannot_convert_global_actor;
   }
 
   auto last = path.back();
@@ -8900,6 +8915,9 @@ GlobalActorFunctionMismatchFailure::getDiagnosticMessage() const {
   }
   case ConstraintLocator::TernaryBranch: {
     return diag::ternary_expr_cases_global_actor_mismatch;
+  }
+  case ConstraintLocator::CoercionOperand: {
+    return diag::cannot_convert_global_actor_coercion;
   }
   default:
     break;

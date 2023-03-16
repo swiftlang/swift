@@ -2177,6 +2177,8 @@ public:
 
   ASTNode getAnchor() const override;
 
+  SourceLoc getLoc() const override;
+
   bool diagnoseAsError() override;
 };
 
