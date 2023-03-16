@@ -160,6 +160,8 @@ public:
     return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
   }
 
+  bool isMainActor() const;
+
   bool isDistributedActor() const;
 
   Type getGlobalActor() const {

@@ -3616,15 +3616,6 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
-/// Determine whether this is the main actor type.
-/// FIXME: the diagnostics engine and TypeCheckConcurrency both have a copy of
-///        this
-static bool isMainActor(NominalTypeDecl *nominal) {
-  return nominal->getName().is("MainActor") &&
-         nominal->getParentModule()->getName() ==
-             nominal->getASTContext().Id_Concurrency;
-}
-
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -3667,7 +3658,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  if (isMainActor(nominal) && Ctx.LangOpts.isConcurrencyModelTaskToThread() &&
+  if (nominal->isMainActor() && Ctx.LangOpts.isConcurrencyModelTaskToThread() &&
       !AvailableAttr::isUnavailable(D)) {
     Ctx.Diags.diagnose(attr->getLocation(),
                        diag::concurrency_task_to_thread_model_main_actor,
