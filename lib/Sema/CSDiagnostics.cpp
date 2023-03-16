@@ -3968,10 +3968,6 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                              ->getName()
                              .str();
 
-    auto baseClangLoc = cxxMethod->getParent()->getLocation();
-    auto baseSwiftLoc =
-        ctx.getClangModuleLoader()->importSourceLocation(baseClangLoc);
-
     auto methodClangLoc = cxxMethod->getLocation();
     auto methodSwiftLoc =
         ctx.getClangModuleLoader()->importSourceLocation(methodClangLoc);
@@ -4083,6 +4079,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         } else {
           assert(methodSemantics ==
                  CxxRecordSemanticsKind::UnsafePointerMember);
+
+          auto baseSwiftLoc = ctx.getClangModuleLoader()->importSourceLocation(
+              cxxRecord->getLocation());
+
           ctx.Diags.diagnose(loc, diag::projection_value_not_imported,
                              name.getBaseIdentifier().str(), returnTypeStr);
           ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
