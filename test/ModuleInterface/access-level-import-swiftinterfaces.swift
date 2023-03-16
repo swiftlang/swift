@@ -46,8 +46,6 @@
 // RUN: %FileCheck %s < %t/MultiFiles.swiftinterface
 // RUN: %FileCheck %s < %t/MultiFiles.private.swiftinterface
 
-// REQUIRES: rdar106219959
-
 //--- PublicLib.swift
 //--- PackageLib.swift
 //--- InternalLib.swift
