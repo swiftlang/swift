@@ -983,7 +983,7 @@ SmallVectorImpl<T> &SmallVectorImpl<T>::
     // Assign common elements.
     iterator NewEnd;
     if (RHSSize)
-      NewEnd = std::copy(RHS.begin(), RHS.begin()+RHSSize, this->begin());
+      NewEnd = std::copy_n(RHS.begin(), RHSSize, this->begin());
     else
       NewEnd = this->begin();
 
@@ -1005,7 +1005,7 @@ SmallVectorImpl<T> &SmallVectorImpl<T>::
     this->grow(RHSSize);
   } else if (CurSize) {
     // Otherwise, use assignment for the already-constructed elements.
-    std::copy(RHS.begin(), RHS.begin()+CurSize, this->begin());
+    std::copy_n(RHS.begin(), CurSize, this->begin());
   }
 
   // Copy construct the new elements in place.

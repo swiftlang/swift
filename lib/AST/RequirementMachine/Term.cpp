@@ -194,7 +194,7 @@ MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
 /// Replace the subterm in the range [from,to) of this term with \p rhs.
 void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
   auto oldSize = size();
-  unsigned lhsLength = (unsigned)(to - from);
+  size_t lhsLength = (size_t)(to - from);
 
   if (lhsLength == rhs.size()) {
     // Copy the RHS to the LHS.
@@ -213,7 +213,7 @@ void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
     assert(lhsLength < rhs.size());
 
     // Copy the LHS-sized prefix of RHS to the LHS.
-    auto newTo = std::copy(rhs.begin(), rhs.begin() + lhsLength, from);
+    auto newTo = std::copy_n(rhs.begin(), lhsLength, from);
     assert(newTo == to);
 
     // Insert the remainder of the RHS term.
