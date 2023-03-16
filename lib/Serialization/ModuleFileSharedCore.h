@@ -573,6 +573,10 @@ public:
     return ModulePackageName;
   }
 
+  bool isTestable() const {
+    return Bits.IsTestable;
+  }
+
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
