@@ -1702,7 +1702,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
-    if (debuggerMode) {
+    if (debuggerMode || forTestable) {
       // In the debugger, try to load the module if possible.
       // Same in the case of a testable import, try to load the dependency
       // but don't fail if it's missing as this could be source breaking.
