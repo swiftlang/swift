@@ -1434,6 +1434,11 @@ public:
     if (ABI->emitReflectionMetadata()) {
       *this << "[reflection] ";
     }
+
+    if (ABI->getUsesMoveableValueDebugInfo()) {
+      *this << "[moveable_value_debuginfo] ";
+    }
+
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);

@@ -375,27 +375,30 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
-                           bool hasDynamicLifetime, bool reflection)
+                           bool hasDynamicLifetime, bool reflection,
+                           bool usesMoveableValueDebugInfo)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
   sharedUInt8().AllocBoxInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocBoxInst.reflection = reflection;
+  sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
+      usesMoveableValueDebugInfo;
 }
 
-AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
-                                   CanSILBoxType BoxType,
+AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    SILFunction &F,
                                    Optional<SILDebugVariable> Var,
-                                   bool hasDynamicLifetime,
-                                   bool reflection) {
+                                   bool hasDynamicLifetime, bool reflection,
+                                   bool usesMoveableValueDebugInfo) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
-                                  hasDynamicLifetime, reflection);
+  return ::new (Buf)
+      AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                   hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
 }
 
 SILType AllocBoxInst::getAddressType() const {

@@ -1034,9 +1034,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    unsigned flags
-      = (ABI->hasDynamicLifetime() ? 1 : 0)
-      | (ABI->emitReflectionMetadata() ? 2 : 0);
+    unsigned flags = 0;
+    flags |= unsigned(ABI->hasDynamicLifetime());
+    flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
+    flags |= unsigned(ABI->getUsesMoveableValueDebugInfo()) << 2;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
