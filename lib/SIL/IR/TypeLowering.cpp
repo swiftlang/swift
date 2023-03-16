@@ -2534,24 +2534,21 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
                                             TypeExpansionContext context,
                                             AbstractionPattern origType,
                                             CanTupleType substType) {
-  assert(origType.matchesTuple(substType));
+  if (substType->getNumElements() == 0) return substType;
 
-  // Does the lowered tuple type differ from the substituted type in
-  // any interesting way?
   bool changed = false;
   SmallVector<TupleTypeElt, 4> loweredElts;
   loweredElts.reserve(substType->getNumElements());
 
-  for (auto i : indices(substType->getElementTypes())) {
-    auto origEltType = origType.getTupleElementType(i);
-    auto substEltType = substType.getElementType(i);
-
-    CanType loweredTy =
-        tc.getLoweredRValueType(context, origEltType, substEltType);
-    changed = (changed || substEltType != loweredTy);
-
-    loweredElts.push_back(substType->getElement(i).getWithType(loweredTy));
-  }
+  origType.forEachExpandedTupleElement(substType,
+                                       [&](AbstractionPattern origEltType,
+                                           CanType substEltType,
+                                           const TupleTypeElt &elt) {
+    auto loweredTy =
+      tc.getLoweredRValueType(context, origEltType, substEltType);
+    if (loweredTy != substEltType) changed = true;
+    loweredElts.push_back(elt.getWithType(loweredTy));
+  });
 
   if (!changed) return substType;
 
@@ -3014,12 +3011,8 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
           substPatternType);
       changed |= (loweredSubstPatternType != substPatternType);
 
-      CanType substCountType = substPackExpansionType.getCountType();
-      CanType loweredSubstCountType = TC.getLoweredRValueType(
-          forExpansion,
-          origType.getPackExpansionCountType(),
-          substCountType);
-      changed |= (loweredSubstCountType != substCountType);
+      // Count types are AST types and are not lowered.
+      CanType loweredSubstCountType = substPackExpansionType.getCountType();
 
       if (!changed)
         return substPackExpansionType;

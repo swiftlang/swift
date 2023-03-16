@@ -241,31 +241,31 @@ public:
     }
 
     // Collect the exploded elements.
-    size_t nextSubstEltIndex = 0;
+    //
+    // Reabstraction can give us original types that are pack
+    // expansions without having pack expansions in the result.
+    // In this case, we do not need to force emission into a pack
+    // expansion.
     SmallVector<ManagedValue, 4> elements;
-    for (AbstractionPattern origEltType : orig.getTupleElementTypes()) {
-      ManagedValue elt;
+    orig.forEachTupleElement(t,
+       [&](unsigned origEltIndex, unsigned substEltIndex,
+           AbstractionPattern origEltType,
+           CanType substEltType) {
+      auto elt = visit(substEltType, origEltType,
+                       init ? eltInits[substEltIndex].get() : nullptr);
+      assert((init != nullptr) == (elt.isInContext()));
+      if (!elt.isInContext())
+        elements.push_back(elt);
 
-      // Reabstraction can give us original types that are pack
-      // expansions without having pack expansions in the result.
-      // In this case, we do not need to force emission into a pack
-      // expansion.
-      if (origEltType.isPackExpansion()) {
-        assert(init);
-        expandPack(origEltType, t, nextSubstEltIndex, eltInits, elements);
-      } else {
-        size_t i = nextSubstEltIndex++;
-        elt = visit(t.getElementType(i), origEltType,
-                    init ? eltInits[i].get() : nullptr);
-        assert((init != nullptr) == (elt.isInContext()));
-        if (!elt.isInContext())
-          elements.push_back(elt);
-
-        if (elt.hasCleanup())
-          canBeGuaranteed = false;
-      }
-    }
-    assert(nextSubstEltIndex == t->getNumElements());
+      if (elt.hasCleanup())
+        canBeGuaranteed = false;
+    }, [&](unsigned origEltIndex, unsigned substEltIndex,
+           AbstractionPattern origExpansionType,
+           CanTupleEltTypeArrayRef substEltTypes) {
+      assert(init);
+      expandPack(origExpansionType, substEltTypes, substEltIndex,
+                 eltInits, elements);
+    });
 
     // If we emitted into a context, we're done.
     if (init) {
@@ -312,11 +312,13 @@ public:
     }
   }
 
-  void expandPack(AbstractionPattern origEltType,
-                  CanTupleType substTupleType,
-                  size_t &nextSubstEltIndex,
+  void expandPack(AbstractionPattern origExpansionType,
+                  CanTupleEltTypeArrayRef substEltTypes,
+                  size_t firstSubstEltIndex,
                   MutableArrayRef<InitializationPtr> eltInits,
                   SmallVectorImpl<ManagedValue> &eltMVs) {
+    assert(substEltTypes.size() == eltInits.size());
+
     // The next parameter is a pack which corresponds to some number of
     // components in the tuple.  Some of them may be pack expansions.
     // Either copy/move them into the tuple (necessary if there are any
@@ -331,20 +333,15 @@ public:
     SILValue packAddr = packAddrMV.forward(SGF);
     auto packTy = packAddr->getType().castTo<SILPackType>();
 
+    auto origPatternType = origExpansionType.getPackExpansionPatternType();
+
     auto inducedPackType =
-      substTupleType.getInducedPackType(nextSubstEltIndex,
-                                        packTy->getNumElements());
+      CanPackType::get(SGF.getASTContext(), substEltTypes);
 
-    unsigned nextPackIndex = 0;
-    origEltType.forEachPackExpandedComponent(
-          [&](AbstractionPattern origComponentType) {
-      size_t substEltIndex = nextSubstEltIndex++;
-      CanType substComponentType =
-        substTupleType.getElementType(substEltIndex);
+    for (auto packComponentIndex : indices(substEltTypes)) {
+      CanType substComponentType = substEltTypes[packComponentIndex];
       Initialization *componentInit =
-        eltInits.empty() ? nullptr : eltInits[substEltIndex].get();
-
-      auto packComponentIndex = nextPackIndex++;
+        eltInits.empty() ? nullptr : eltInits[packComponentIndex].get();
       auto packComponentTy = packTy->getSILElementType(packComponentIndex);
 
       auto substExpansionType =
@@ -359,13 +356,13 @@ public:
           SGF.B.createPackElementGet(loc, packIndex, packAddr,
                                      packComponentTy);
         auto eltAddrMV = cloner.clone(eltAddr);
-        auto result = handleScalar(eltAddrMV, origComponentType,
+        auto result = handleScalar(eltAddrMV, origPatternType,
                                    substComponentType, componentInit,
                                    /*inout*/ false);
         assert(result.isInContext() == (componentInit != nullptr));
         if (!result.isInContext())
           eltMVs.push_back(result);
-        return;
+        continue;
       }
 
       // In the pack-expansion case, do the exact same thing,
@@ -389,22 +386,19 @@ public:
             SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
           auto eltAddrMV = cloner.clone(eltAddr);
 
-          auto origEltType = origComponentType.getPackExpansionPatternType();
-
           CanType substEltType = substExpansionType.getPatternType();
           if (openedEnv) {
             substEltType =
               openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
           }
 
-          auto result = handleScalar(eltAddrMV, origEltType, substEltType,
+          auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
                                      eltInit, /*inout*/ false);
           assert(result.isInContext()); (void) result;
         });
       });
       componentInit->finishInitialization(SGF);
-    });
-    assert(nextPackIndex == packTy->getNumElements());
+    }
   }
 };
 } // end anonymous namespace
