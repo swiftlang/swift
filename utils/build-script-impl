@@ -2567,12 +2567,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
 
                     with_pushd "${LIBICU_BUILD_DIR}" \
-                        call env CXXFLAGS=-fPIC "${LIBICU_SOURCE_DIR}"/icu4c/source/runConfigureICU Linux \
+                        call env CXXFLAGS=-fPIC LDFLAGS='-Wl,-rpath=\$$ORIGIN' \
+                        "${LIBICU_SOURCE_DIR}"/icu4c/source/runConfigureICU Linux \
                         ${icu_build_variant_arg} --prefix=${ICU_TMPINSTALL} \
                         ${libicu_enable_debug} \
                         --enable-renaming --with-library-suffix=swift \
                         --libdir=${ICU_TMPLIBDIR} \
-                        --enable-shared --enable-static --enable-rpath \
+                        --enable-shared --enable-static \
                         --enable-strict --disable-icuio \
                         --disable-plugins --disable-dyload --disable-extras \
                         --disable-samples --disable-layoutex --with-data-packaging=auto
