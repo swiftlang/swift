@@ -8322,6 +8322,13 @@ bool CouldNotInferPlaceholderType::diagnoseAsError() {
     }
   }
 
+  // When placeholder type appears in an editor placeholder i.e.
+  // `<#T##() -> _#>` we rely on the parser to produce a diagnostic
+  // about editor placeholder and glance over all placeholder type
+  // inference issues.
+  if (isExpr<EditorPlaceholderExpr>(getAnchor()))
+    return true;
+
   return false;
 }
 
