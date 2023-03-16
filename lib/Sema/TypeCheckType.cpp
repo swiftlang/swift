@@ -4548,9 +4548,11 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
   }
 
-  // We might not allow variadic expansions here at all.
+  auto expansion = PackExpansionType::get(patternType, rootParameterPacks[0]);
+
+  // We might not allow pack expansions here at all.
   if (!options.isPackExpansionSupported(getDeclContext())) {
-    diagnose(repr->getLoc(), diag::expansion_not_allowed, patternType);
+    diagnose(repr->getLoc(), diag::expansion_not_allowed, expansion);
     return ErrorType::get(ctx);
   }
 
@@ -4568,7 +4570,7 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return result;
   }
 
-  return PackExpansionType::get(patternType, rootParameterPacks[0]);
+  return expansion;
 }
 
 NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,

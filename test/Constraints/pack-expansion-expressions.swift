@@ -87,7 +87,7 @@ func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
   _ = repeat (Array<each T>(), each u) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
 }
 
-func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' cannot appear outside of a function parameter list, tuple element, or generic argument list}}
   fatalError()
 }
 
@@ -99,13 +99,13 @@ func returnRepeatTuple<each T>(_ t: repeat each T) -> (repeat T) { // expected-e
   fatalError()
 }
 
-func parameterAsPackTypeWithoutExpansion<each T>(_ t: T) -> repeat each T { // expected-error {{variadic expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+func parameterAsPackTypeWithoutExpansion<each T>(_ t: T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' cannot appear outside of a function parameter list, tuple element, or generic argument list}}
   fatalError()
 }
 
 func expansionOfNonPackType<T>(_ t: repeat each T) {}
 // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}{{29-29=each }}
-// expected-error@-2 {{variadic expansion 'T' must contain at least one variadic generic parameter}}
+// expected-error@-2 {{pack expansion pattern 'T' must contain at least one parameter pack}}
 
 func tupleExpansion<each T, each U>(
   _ tuple1: (repeat each T),
@@ -143,7 +143,7 @@ func copyIntoTuple<each T>(_ arg: repeat each T) -> (repeat each T) {
 }
 func callCopyAndBind<T>(_ arg: repeat each T) {
   // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}
-  // expected-error@-2 {{variadic expansion 'T' must contain at least one variadic generic parameter}}
+  // expected-error@-2 {{pack expansion pattern 'T' must contain at least one parameter pack}}
 
   // Don't propagate errors for invalid declaration reference
   let result = copyIntoTuple(repeat each arg)
