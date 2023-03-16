@@ -1668,7 +1668,7 @@ PassContext_nextFunctionInModule(BridgedFunction function) {
 BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   auto vTables = mod->getVTables();
-  return {(const BridgedVTable *)vTables.data(), vTables.size()};
+  return {(const BridgedVTable *)vTables.data(), (SwiftInt)vTables.size()};
 }
 
 OptionalBridgedWitnessTable

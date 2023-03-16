@@ -67,14 +67,6 @@ inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
 }
 
-inline const SILVTable *castToVTable(BridgedVTable vTable) {
-  return static_cast<const SILVTable *>(vTable.ptr);
-}
-
-inline const SILVTableEntry *castToVTableEntry(BridgedVTableEntry entry) {
-  return static_cast<const SILVTableEntry *>(entry.ptr);
-}
-
 inline const SILWitnessTable *castToWitnessTable(BridgedWitnessTable table) {
   return static_cast<const SILWitnessTable *>(table.ptr);
 }

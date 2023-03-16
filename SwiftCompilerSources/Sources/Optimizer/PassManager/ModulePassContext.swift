@@ -37,12 +37,12 @@ struct ModulePassContext : Context {
 
   struct VTableArray : BridgedRandomAccessCollection {
     fileprivate let bridged: BridgedVTableArray
-    
+
     var startIndex: Int { return 0 }
-    var endIndex: Int { return Int(bridged.count) }
-    
+    var endIndex: Int { return bridged.count }
+
     subscript(_ index: Int) -> VTable {
-      assert(index >= 0 && index < bridged.count)
+      assert(index >= startIndex && index < endIndex)
       return VTable(bridged: bridged.vTables![index])
     }
   }

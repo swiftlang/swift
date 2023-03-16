@@ -20,6 +20,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILVTable.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <string>
@@ -31,7 +32,6 @@ struct OptionalBridgedOperand;
 struct OptionalBridgedSuccessor;
 
 enum {
-  BridgedVTableEntrySize = 5 * sizeof(uintptr_t),
   BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
 };
 
@@ -135,14 +135,6 @@ struct BridgedOperandArray {
 
 typedef struct {
   const void * _Nonnull ptr;
-} BridgedVTable;
-
-typedef struct {
-  const void * _Nonnull ptr;
-} BridgedVTableEntry;
-
-typedef struct {
-  const void * _Nonnull ptr;
 } BridgedWitnessTable;
 
 typedef struct {
@@ -236,6 +228,34 @@ typedef struct {
 typedef struct {
   SwiftObject obj;
 } BridgedMultiValueResult;
+
+struct BridgedVTableEntry {
+  const swift::SILVTableEntry * _Nonnull entry;
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedFunction getImplementation() const {
+    return {entry->getImplementation()};
+  }
+};
+
+struct BridgedVTableEntryArray {
+  BridgedVTableEntry base;
+  SwiftInt count;
+};
+
+struct BridgedVTable {
+  const swift::SILVTable * _Nonnull vTable;
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedVTableEntryArray getEntries() const {
+    auto entries = vTable->getEntries();
+    return {{entries.data()}, (SwiftInt)entries.size()};
+  }
+};
 
 typedef struct {
   const unsigned char * _Nullable message;
@@ -352,11 +372,6 @@ void SILFunction_setNeedStackProtection(BridgedFunction function,
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
-
-std::string SILVTable_debugDescription(BridgedVTable vTable);
-BridgedArrayRef SILVTable_getEntries(BridgedVTable vTable);
-std::string SILVTableEntry_debugDescription(BridgedVTableEntry entry);
-BridgedFunction SILVTableEntry_getFunction(BridgedVTableEntry entry);
 
 std::string SILWitnessTable_debugDescription(BridgedWitnessTable table);
 BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table);

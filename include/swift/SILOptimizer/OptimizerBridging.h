@@ -29,7 +29,7 @@ typedef struct {
 
 typedef struct {
   const BridgedVTable * _Nullable vTables;
-  size_t count;
+  SwiftInt count;
 } BridgedVTableArray;
 
 typedef struct {
