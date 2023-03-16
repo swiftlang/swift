@@ -317,9 +317,10 @@ BacktraceInitializer::BacktraceInitializer() {
       = swift_copyAuxiliaryExecutablePath("swift-backtrace");
 
     if (!_swift_backtraceSettings.swiftBacktracePath) {
-      swift::warning(0,
+      // Disabled warning for now - rdar://106813646
+      /* swift::warning(0,
                      "swift runtime: unable to locate swift-backtrace; "
-                     "disabling backtracing.\n");
+                     "disabling backtracing.\n"); */
       _swift_backtraceSettings.enabled = OnOffTty::Off;
     }
   }
