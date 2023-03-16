@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// REQUIRES: rdar106819422
 
 // Package name should have valid characters
 // RUN: not --crash %target-swift-frontend -module-name Logging -package-name My-Logging%Pkg %s -emit-module -emit-module-path %t/Logging.swiftmodule 2> %t/resultA.output
