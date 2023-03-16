@@ -5310,10 +5310,10 @@ ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
 ERROR(expansion_not_allowed,none,
-      "variadic expansion %0 cannot appear outside of a function parameter list, "
+      "pack expansion %0 cannot appear outside of a function parameter list, "
       "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
-      "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
+      "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
       "pack reference %0 can only appear in pack expansion or generic requirement",
       (Type))
@@ -5321,7 +5321,7 @@ ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
 ERROR(pack_expansion_missing_pack_reference,none,
-      "pack expansion %0 must specify a pack reference",
+      "pack type %0 must be referenced with 'each'",
       (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
@@ -5329,7 +5329,7 @@ ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
 
 ERROR(expansion_not_same_shape,none,
-      "variadic expansion %0 requires that %1 and %2 have the same shape",
+      "pack expansion %0 requires that %1 and %2 have the same shape",
       (Type, Type, Type))
 ERROR(expansion_expr_not_same_shape,none,
       "pack expansion requires that %0 and %1 have the same shape",

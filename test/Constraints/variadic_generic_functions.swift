@@ -22,8 +22,8 @@ func min<each T: Comparable>(_ values: repeat each T) -> T? {
 
 func invalidPacks() {
   func monovariadic1() -> (each String) {} // expected-error {{'each' cannot be applied to non-pack type 'String'}}
-  func monovariadic2<T>() -> (repeat T) {} // expected-error {{variadic expansion 'T' must contain at least one variadic generic parameter}}
-  func monovariadic3<T, U>() -> (T, repeat U) {} // expected-error {{variadic expansion 'U' must contain at least one variadic generic parameter}}
+  func monovariadic2<T>() -> (repeat T) {} // expected-error {{pack expansion 'T' must contain at least one pack reference}}
+  func monovariadic3<T, U>() -> (T, repeat U) {} // expected-error {{pack expansion 'U' must contain at least one pack reference}}
 }
 
 func call() {
