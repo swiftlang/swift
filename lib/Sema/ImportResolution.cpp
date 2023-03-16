@@ -420,6 +420,15 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
+static void tryStdlibFixit(ASTContext &ctx,
+                           StringRef moduleName,
+                           SourceLoc loc) {
+  if (moduleName.startswith("std")) {
+    ctx.Diags.diagnose(loc, diag::did_you_mean_cxxstdlib)
+      .fixItReplaceChars(loc, loc.getAdvancedLoc(3), "CxxStdlib");
+  }
+}
+
 static void diagnoseNoSuchModule(ModuleDecl *importingModule,
                                  SourceLoc importLoc,
                                  ImportPath::Module modulePath,
@@ -438,6 +447,7 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
     if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
       diagKind = diag::sema_no_import_repl;
     ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+    tryStdlibFixit(ctx, modulePathStr, importLoc);
   }
 
   if (ctx.SearchPathOpts.getSDKPath().empty() &&
