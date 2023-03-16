@@ -10538,7 +10538,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // let's return, otherwise let's fall-through and report
         // this problem as a missing member.
         if (result == SolutionKind::Solved)
-          return recordFix(InsertExplicitCall::create(*this, locator))
+          return recordFix(InsertExplicitCall::create(
+                     *this, getConstraintLocator(
+                                locator, ConstraintLocator::MemberRefBase)))
                      ? SolutionKind::Error
                      : SolutionKind::Solved;
       }

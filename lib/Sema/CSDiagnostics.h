@@ -534,9 +534,19 @@ public:
   bool diagnoseAsNote() override;
 };
 
+/// A diagnostic that will be emitted on the base if its locator points to a
+/// member access.
+class MemberReferenceFailure : public FailureDiagnostic {
+public:
+  MemberReferenceFailure(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  ASTNode getAnchor() const override;
+};
+
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
-class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
+class MemberAccessOnOptionalBaseFailure final : public MemberReferenceFailure {
   DeclNameRef Member;
   Type MemberBaseType;
   bool ResultTypeIsOptional;
@@ -544,10 +554,9 @@ class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName,
-                                    Type memberBaseType,
+                                    DeclNameRef memberName, Type memberBaseType,
                                     bool resultOptional)
-      : FailureDiagnostic(solution, locator), Member(memberName),
+      : MemberReferenceFailure(solution, locator), Member(memberName),
         MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
@@ -1127,6 +1136,8 @@ public:
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
         UsingProjection(usingProjection) {}
 
+  ASTNode getAnchor() const override;
+
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
@@ -1201,14 +1212,14 @@ public:
   bool diagnoseAsNote() override;
 };
 
-class InvalidMemberRefFailure : public FailureDiagnostic {
+class InvalidMemberRefFailure : public MemberReferenceFailure {
   Type BaseType;
   DeclNameRef Name;
 
 public:
   InvalidMemberRefFailure(const Solution &solution, Type baseType,
                           DeclNameRef memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+      : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Name(memberName) {}
 
 protected:
@@ -1334,7 +1345,7 @@ public:
 ///
 /// }
 /// ```
-class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
+class AllowTypeOrInstanceMemberFailure final : public MemberReferenceFailure {
   Type BaseType;
   ValueDecl *Member;
   DeclNameRef Name;
@@ -1343,7 +1354,7 @@ public:
   AllowTypeOrInstanceMemberFailure(const Solution &solution, Type baseType,
                                    ValueDecl *member, DeclNameRef name,
                                    ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+      : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
   }

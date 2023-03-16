@@ -77,13 +77,6 @@ ASTNode FailureDiagnostic::getAnchor() const {
       return locator->getAnchor();
   }
 
-  // FIXME: Work around an odd locator representation that doesn't separate the
-  // base of a subscript member from the member access.
-  if (locator->isLastElement<LocatorPathElt::SubscriptMember>()) {
-    if (auto subscript = getAsExpr<SubscriptExpr>(anchor))
-      anchor = subscript->getBase();
-  }
-
   return anchor;
 }
 
@@ -1343,6 +1336,15 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   }
   diag.fixItInsertAfter(getSourceRange().End, insertAfter);
   return true;
+}
+
+ASTNode MemberReferenceFailure::getAnchor() const {
+  auto anchor = FailureDiagnostic::getAnchor();
+  if (auto base = getBaseExprFor(getAsExpr(anchor))) {
+    return base;
+  } else {
+    return anchor;
+  }
 }
 
 SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
@@ -3680,6 +3682,15 @@ bool MissingCallFailure::diagnoseAsError() {
   return true;
 }
 
+ASTNode PropertyWrapperReferenceFailure::getAnchor() const {
+  auto anchor = FailureDiagnostic::getAnchor();
+  if (getReferencedMember()) {
+    return getBaseExprFor(getAsExpr(anchor));
+  } else {
+    return anchor;
+  }
+}
+
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
   auto newPrefix = usingProjection() ? "$" : "_";
 
@@ -3751,21 +3762,12 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   auto &sourceMgr = getASTContext().SourceMgr;
 
   auto *memberExpr = castToExpr<UnresolvedDotExpr>(getRawAnchor());
-
-  auto memberRange = getSourceRange();
-
-  {
-    auto rawAnchor = getRawAnchor();
-    auto path = locator->getPath();
-    simplifyLocator(rawAnchor, path, memberRange);
-  }
-
-  auto nameLoc = DeclNameLoc(memberRange.Start);
+  auto *base = memberExpr->getBase();
 
   auto diag = emitDiagnostic(diag::could_not_find_subscript_member_did_you_mean,
-                             getType(getAnchor()));
+                             getType(base));
 
-  diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
+  diag.highlight(memberExpr->getNameLoc().getSourceRange());
 
   if (auto *parentExpr = dyn_cast_or_null<ApplyExpr>(findParentExpr(memberExpr))) {
     auto *args = parentExpr->getArgs();
@@ -3775,7 +3777,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 
     diag.fixItReplace(SourceRange(args->getStartLoc()),
                       getTokenText(tok::l_square));
-    diag.fixItRemove(nameLoc.getSourceRange());
+    diag.fixItRemove(memberExpr->getNameLoc().getSourceRange());
     diag.fixItRemove(SourceRange(memberExpr->getDotLoc()));
 
     if (sourceMgr.extractText(lastArgSymbol) == getTokenText(tok::r_paren))
