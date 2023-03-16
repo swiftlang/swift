@@ -54,7 +54,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> WitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextWitnessTableInModule(t.bridged).table
+        currentTable = PassContext_nextWitnessTableInModule(t.bridged).witnessTable
         return t
       }
       return nil
@@ -68,7 +68,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> DefaultWitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextDefaultWitnessTableInModule(t.bridged).table
+        currentTable = PassContext_nextDefaultWitnessTableInModule(t.bridged).defaultWitnessTable
         return t
       }
       return nil
@@ -84,11 +84,11 @@ struct ModulePassContext : Context {
   }
   
   var witnessTables: WitnessTableList {
-    WitnessTableList(first: PassContext_firstWitnessTableInModule(_bridged).table)
+    WitnessTableList(first: PassContext_firstWitnessTableInModule(_bridged).witnessTable)
   }
 
   var defaultWitnessTables: DefaultWitnessTableList {
-    DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
+    DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).defaultWitnessTable)
   }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.

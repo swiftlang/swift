@@ -1681,7 +1681,7 @@ PassContext_firstWitnessTableInModule(BridgedPassContext context) {
 
 OptionalBridgedWitnessTable
 PassContext_nextWitnessTableInModule(BridgedWitnessTable table) {
-  auto *t = castToWitnessTable(table);
+  auto *t = table.table;
   auto nextIter = std::next(t->getIterator());
   if (nextIter == t->getModule().getWitnessTables().end())
     return {nullptr};
@@ -1698,7 +1698,7 @@ PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context) {
 
 OptionalBridgedDefaultWitnessTable
 PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
-  auto *t = castToDefaultWitnessTable(table);
+  auto *t = table.table;
   auto nextIter = std::next(t->getIterator());
   if (nextIter == t->getModule().getDefaultWitnessTables().end())
     return {nullptr};

@@ -733,51 +733,28 @@ std::string BridgedVTableEntry::getDebugDescription() const {
 //                    SILVWitnessTable, SILDefaultWitnessTable
 //===----------------------------------------------------------------------===//
 
-static_assert(BridgedWitnessTableEntrySize == sizeof(SILWitnessTable::Entry),
-              "wrong bridged WitnessTable entry size");
-
-std::string SILWitnessTable_debugDescription(BridgedWitnessTable table) {
+std::string BridgedWitnessTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToWitnessTable(table)->print(os);
+  entry->print(os, /*verbose=*/ false, PrintOptions::printSIL());
   str.pop_back(); // Remove trailing newline.
   return str;
 }
 
-BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table) {
-  auto entries = castToWitnessTable(table)->getEntries();
-  return {(const unsigned char *)entries.data(), entries.size()};
-}
-
-std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table) {
+std::string BridgedWitnessTable::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToDefaultWitnessTable(table)->print(os);
+  table->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
 
-BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table) {
-  auto entries = castToDefaultWitnessTable(table)->getEntries();
-  return {(const unsigned char *)entries.data(), entries.size()};
-}
-
-std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry) {
+std::string BridgedDefaultWitnessTable::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToWitnessTableEntry(entry)->print(os, /*verbose=*/ false,
-                                        PrintOptions::printSIL());
+  table->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
-}
-
-SILWitnessTable::WitnessKind
-SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
-  return castToWitnessTableEntry(entry)->getKind();
-}
-
-OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry) {
-  return {castToWitnessTableEntry(entry)->getMethodWitness().Witness};
 }
 
 //===----------------------------------------------------------------------===//

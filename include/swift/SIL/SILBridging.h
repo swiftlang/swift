@@ -20,6 +20,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILVTable.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -30,10 +31,6 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 struct BridgedInstruction;
 struct OptionalBridgedOperand;
 struct OptionalBridgedSuccessor;
-
-enum {
-  BridgedWitnessTableEntrySize = 5 * sizeof(uintptr_t)
-};
 
 enum ChangeNotificationKind {
   instructionsChanged,
@@ -132,26 +129,6 @@ struct BridgedOperandArray {
   OptionalBridgedOperand base;
   SwiftInt count;
 };
-
-typedef struct {
-  const void * _Nonnull ptr;
-} BridgedWitnessTable;
-
-typedef struct {
-  const void * _Nullable ptr;
-} OptionalBridgedWitnessTable;
-
-typedef struct {
-  const void * _Nonnull ptr;
-} BridgedDefaultWitnessTable;
-
-typedef struct {
-  const void * _Nullable ptr;
-} OptionalBridgedDefaultWitnessTable;
-
-typedef struct {
-  const void * _Nonnull ptr;
-} BridgedWitnessTableEntry;
 
 typedef struct {
   SwiftObject obj;
@@ -255,6 +232,59 @@ struct BridgedVTable {
     auto entries = vTable->getEntries();
     return {{entries.data()}, (SwiftInt)entries.size()};
   }
+};
+
+struct BridgedWitnessTableEntry {
+  const swift::SILWitnessTable::Entry * _Nonnull entry;
+
+  SWIFT_IMPORT_UNSAFE
+  std::string getDebugDescription() const;
+
+  swift::SILWitnessTable::WitnessKind getKind() const {
+    return entry->getKind();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedFunction getMethodFunction() const {
+    return {entry->getMethodWitness().Witness};
+  }
+};
+
+struct BridgedWitnessTableEntryArray {
+  BridgedWitnessTableEntry base;
+  SwiftInt count;
+};
+
+struct BridgedWitnessTable {
+  const swift::SILWitnessTable * _Nonnull table;
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedWitnessTableEntryArray getEntries() const {
+    auto entries = table->getEntries();
+    return {{entries.data()}, (SwiftInt)entries.size()};
+  }
+};
+
+struct OptionalBridgedWitnessTable {
+  const swift::SILWitnessTable * _Nullable table;
+};
+
+struct BridgedDefaultWitnessTable {
+  const swift::SILDefaultWitnessTable * _Nonnull table;
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedWitnessTableEntryArray getEntries() const {
+    auto entries = table->getEntries();
+    return {{entries.data()}, (SwiftInt)entries.size()};
+  }
+};
+
+struct OptionalBridgedDefaultWitnessTable {
+  const swift::SILDefaultWitnessTable * _Nullable table;
 };
 
 typedef struct {
@@ -372,14 +402,6 @@ void SILFunction_setNeedStackProtection(BridgedFunction function,
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
-
-std::string SILWitnessTable_debugDescription(BridgedWitnessTable table);
-BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table);
-std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table);
-BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table);
-std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry);
-swift::SILWitnessTable::WitnessKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry);
-OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);

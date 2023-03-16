@@ -67,20 +67,6 @@ inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
 }
 
-inline const SILWitnessTable *castToWitnessTable(BridgedWitnessTable table) {
-  return static_cast<const SILWitnessTable *>(table.ptr);
-}
-
-inline const SILDefaultWitnessTable *
-castToDefaultWitnessTable(BridgedDefaultWitnessTable table) {
-  return static_cast<const SILDefaultWitnessTable *>(table.ptr);
-}
-
-inline const SILWitnessTable::Entry *
-castToWitnessTableEntry(BridgedWitnessTableEntry entry) {
-  return static_cast<const SILWitnessTable::Entry *>(entry.ptr);
-}
-
 inline ValueOwnershipKind castToOwnership(BridgedValue::Ownership ownership) {
   switch (ownership) {
     case BridgedValue::Ownership::Unowned:    return OwnershipKind::Unowned;
