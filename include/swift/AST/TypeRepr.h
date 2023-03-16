@@ -408,7 +408,6 @@ public:
     return {getTrailingObjects<TypeRepr*>(),
             Bits.GenericIdentTypeRepr.NumGenericArgs};
   }
-
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
   static bool classof(const TypeRepr *T) {

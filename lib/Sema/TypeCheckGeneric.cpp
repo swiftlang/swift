@@ -136,8 +136,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-    opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
-    
+    opaqueReprs = collectOpaqueTypeReprs(repr, ctx, dc);
+
     if (opaqueReprs.empty()) {
       return nullptr;
     }
