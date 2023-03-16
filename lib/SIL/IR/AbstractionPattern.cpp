@@ -1221,6 +1221,56 @@ unsigned AbstractionPattern::getNumFunctionParams() const {
   return cast<AnyFunctionType>(getType()).getParams().size();
 }
 
+void AbstractionPattern::
+forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
+                     bool ignoreFinalParam,
+         llvm::function_ref<void(unsigned origParamIndex,
+                                 unsigned substParamIndex,
+                                 ParameterTypeFlags origFlags,
+                                 AbstractionPattern origParamType,
+                                 AnyFunctionType::CanParam substParam)>
+             handleScalar,
+         llvm::function_ref<void(unsigned origParamIndex,
+                                 unsigned substParamIndex,
+                                 ParameterTypeFlags origFlags,
+                                 AbstractionPattern origExpansionType,
+                        AnyFunctionType::CanParamArrayRef substParams)>
+             handleExpansion) const {
+  // Honor ignoreFinalParam for the substituted parameters on all paths.
+  if (ignoreFinalParam) substParams = substParams.drop_back();
+
+  // If this isn't a function type, use the substituted type.
+  if (isTypeParameterOrOpaqueArchetype()) {
+    for (auto substParamIndex : indices(substParams)) {
+      handleScalar(substParamIndex, substParamIndex,
+                   substParams[substParamIndex].getParameterFlags(),
+                   *this, substParams[substParamIndex]);
+    }
+    return;
+  }
+
+  size_t numOrigParams = getNumFunctionParams();
+  if (ignoreFinalParam) numOrigParams--;
+
+  size_t substParamIndex = 0;
+  for (auto origParamIndex : range(numOrigParams)) {
+    auto origParamType = getFunctionParamType(origParamIndex);
+    if (origParamType.isPackExpansion()) {
+      unsigned numComponents = origParamType.getNumPackExpandedComponents();
+      handleExpansion(origParamIndex, substParamIndex,
+                      getFunctionParamFlags(origParamIndex), origParamType,
+                      substParams.slice(substParamIndex, numComponents));
+      substParamIndex += numComponents;
+    } else {
+      handleScalar(origParamIndex, substParamIndex,
+                   getFunctionParamFlags(origParamIndex), origParamType,
+                   substParams[substParamIndex]);
+      substParamIndex++;
+    }
+  }
+  assert(substParamIndex == substParams.size());
+}
+
 static CanType getOptionalObjectType(CanType type) {
   auto objectType = type.getOptionalObjectType();
   assert(objectType && "type was not optional");

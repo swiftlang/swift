@@ -1488,6 +1488,30 @@ public:
   /// parameters in the pattern.
   unsigned getNumFunctionParams() const;
 
+  /// Perform a parallel visitation of the parameters of a function.
+  ///
+  /// If this is a function pattern, calls handleScalar or
+  /// handleExpansion as appropriate for each parameter of the
+  /// original function, in order.
+  ///
+  /// If this is not a function pattern, calls handleScalar for each
+  /// parameter of the substituted function type.  Functions with
+  /// pack expansions cannot be abstracted legally this way.
+  void forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
+                            bool ignoreFinalParam,
+           llvm::function_ref<void(unsigned origParamIndex,
+                                   unsigned substParamIndex,
+                                   ParameterTypeFlags origFlags,
+                                   AbstractionPattern origParamType,
+                                   AnyFunctionType::CanParam substParam)>
+               handleScalar,
+           llvm::function_ref<void(unsigned origParamIndex,
+                                   unsigned substParamIndex,
+                                   ParameterTypeFlags origFlags,
+                                   AbstractionPattern origExpansionType,
+                          AnyFunctionType::CanParamArrayRef substParams)>
+               handleExpansion) const;
+
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
   AbstractionPattern getOptionalObjectType() const;

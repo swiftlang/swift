@@ -3239,13 +3239,13 @@ public:
 
       // Otherwise we need to emit a pack argument.
       } else {
-        auto origPackEltPatterns =
-          origFormalParamType.getPackExpandedComponents();
+        auto numComponents =
+          origFormalParamType.getNumPackExpandedComponents();
 
         auto argSourcesSlice =
-          argSources.slice(nextArgSourceIndex, origPackEltPatterns.size());
-        emitPackArg(argSourcesSlice, origPackEltPatterns);
-        nextArgSourceIndex += origPackEltPatterns.size();
+          argSources.slice(nextArgSourceIndex, numComponents);
+        emitPackArg(argSourcesSlice, origFormalParamType);
+        nextArgSourceIndex += numComponents;
       }
     }
 
@@ -3690,7 +3690,7 @@ private:
   }
 
   void emitPackArg(MutableArrayRef<ArgumentSource> args,
-                   ArrayRef<AbstractionPattern> origFormalTypes) {
+                   AbstractionPattern origExpansionType) {
     // Adjust for the foreign error or async argument if necessary.
     maybeEmitForeignArgument();
 
@@ -3722,7 +3722,7 @@ private:
     auto formalPackType = getFormalPackType(args);
 
     bool consumed = param.getConvention() == ParameterConvention::Pack_Owned;
-    emitIndirectIntoPack(args, origFormalTypes, pack, formalPackType,
+    emitIndirectIntoPack(args, origExpansionType, pack, formalPackType,
                          consumed);
   }
 
@@ -3735,12 +3735,10 @@ private:
   }
 
   void emitIndirectIntoPack(MutableArrayRef<ArgumentSource> args,
-                            ArrayRef<AbstractionPattern> origFormalTypes,
+                            AbstractionPattern origExpansionType,
                             SILValue packAddr,
                             CanPackType formalPackType,
                             bool consumed) {
-    assert(args.size() == origFormalTypes.size());
-
     auto packTy = packAddr->getType().castTo<SILPackType>();
     assert(packTy->getNumElements() == args.size() &&
            "wrong pack shape for arguments");
@@ -3749,11 +3747,14 @@ private:
 
     for (auto i : indices(args)) {
       ArgumentSource &&arg = std::move(args[i]);
-      const AbstractionPattern &origFormalType = origFormalTypes[i];
       auto expectedEltTy = packTy->getSILElementType(i);
 
+      bool isPackExpansion = expectedEltTy.is<PackExpansionType>();
+      AbstractionPattern origFormalType =
+        origExpansionType.getPackExpansionComponentType(isPackExpansion);
+
       auto cleanup = CleanupHandle::invalid();
-      if (origFormalType.isPackExpansion()) {
+      if (isPackExpansion) {
         cleanup =
           emitPackExpansionIntoPack(std::move(arg), origFormalType,
                                     expectedEltTy, consumed,
@@ -4400,9 +4401,7 @@ struct ParamLowering {
         auto origParamType = origFormalType.getFunctionParamType(i);
         if (origParamType.isPackExpansion()) {
           count++;
-          origParamType.forEachPackExpandedComponent([&](AbstractionPattern) {
-            nextSubstParamIndex++;
-          });
+          nextSubstParamIndex += origParamType.getNumPackExpandedComponents();
         } else {
           auto substParam = substParams[nextSubstParamIndex++];
           if (substParam.isInOut()) {
