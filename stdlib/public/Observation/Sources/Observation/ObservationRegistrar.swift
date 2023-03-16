@@ -95,10 +95,10 @@ public struct ObservationRegistrar<Subject: Observable>: Sendable {
     return try mutation()
   }
   
-  public func changes<Delivery: Actor>(
+  public func changes<Isolation: Actor>(
     for properties: TrackedProperties<Subject>,
-    isolation: Delivery
-  ) -> ObservedChanges<Subject, Delivery> {
+    isolatedTo isolation: Isolation
+  ) -> ObservedChanges<Subject, Isolation> {
     ObservedChanges(context, properties: properties, isolation: isolation)
   }
   

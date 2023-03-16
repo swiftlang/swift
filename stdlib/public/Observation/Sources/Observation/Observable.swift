@@ -15,7 +15,7 @@ import _Concurrency
 public protocol Observable {
   nonisolated func changes<Isolation: Actor>(
     for properties: TrackedProperties<Self>,
-    isolation: Isolation
+    isolatedTo isolation: Isolation
   ) -> ObservedChanges<Self, Isolation>
   
   nonisolated func values<Member: Sendable>(
@@ -32,21 +32,21 @@ public protocol Observable {
 extension Observable {
   public nonisolated func changes<Member, Isolation: Actor>(
     for keyPath: KeyPath<Self, Member>,
-    isolation: Isolation
+    isolatedTo isolation: Isolation
   ) -> ObservedChanges<Self, Isolation> {
-    changes(for: [keyPath], isolation: isolation)
+    changes(for: [keyPath], isolatedTo: isolation)
   }
   
   public nonisolated func changes(
     for properties: TrackedProperties<Self>
   ) -> ObservedChanges<Self, MainActor.ActorType> {
-    changes(for: properties, isolation: MainActor.shared)
+    changes(for: properties, isolatedTo: MainActor.shared)
   }
   
   public nonisolated func changes<Member>(
     for keyPath: KeyPath<Self, Member>
   ) -> ObservedChanges<Self, MainActor.ActorType> {
-    changes(for: [keyPath], isolation: MainActor.shared)
+    changes(for: [keyPath], isolatedTo: MainActor.shared)
   }
   
   public nonisolated static func dependencies(

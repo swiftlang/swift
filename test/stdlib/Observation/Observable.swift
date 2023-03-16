@@ -28,9 +28,9 @@ final class TestWithoutMacro: Observable {
 
   nonisolated func changes<Isolation>(
     for properties: TrackedProperties<TestWithoutMacro>, 
-    isolation: Isolation
+    isolatedTo isolation: Isolation
   ) -> ObservedChanges<TestWithoutMacro, Isolation> where Isolation: Actor {
-    _registrar.changes(for: properties, isolation: isolation)
+    _registrar.changes(for: properties, isolatedTo: isolation)
   }
 
   nonisolated func values<Member>(
