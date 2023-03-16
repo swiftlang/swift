@@ -16,8 +16,10 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
 
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(SwiftStdlib 5.1, *)
+  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
   func enqueue(_ job: UnownedJob)
 
   @available(SwiftStdlib 5.9, *)
@@ -32,7 +34,10 @@ public protocol SerialExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(*, deprecated, message: "Implement 'enqueue_: __owned Job) instead")
+  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
   func enqueue(_ job: UnownedJob)
 
   // This requirement is repeated here as a non-override so that we
