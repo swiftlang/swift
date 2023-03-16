@@ -3867,7 +3867,8 @@ alloc_box
 `````````
 ::
 
-  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_box' alloc-box-option* sil-type (',' debug-var-attr)*
+  alloc-box-option ::= uses_moveable_value_debuginfo
 
   %1 = alloc_box $T
   //   %1 has type $@box T
@@ -3884,6 +3885,11 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
+
+The optional ``uses_moveable_value_debuginfo`` attribute specifies that when
+emitting debug info, the code generator can not assume that the value in the
+alloc_stack can be semantically valid over the entire function frame when
+emitting debug info.
 
 alloc_global
 ````````````

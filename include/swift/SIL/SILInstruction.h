@@ -2461,13 +2461,13 @@ class AllocBoxInst final
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false);
+               bool reflection = false,
+               bool usesMoveableValueDebugInfo = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F,
-                              Optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime,
-                              bool reflection = false);
+                              SILFunction &F, Optional<SILDebugVariable> Var,
+                              bool hasDynamicLifetime, bool reflection = false,
+                              bool usesMoveableValueDebugInfo = false);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2495,6 +2495,14 @@ public:
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
+
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
+  }
+
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo;
+  }
 };
 
 /// This represents the allocation of a heap box for an existential container.

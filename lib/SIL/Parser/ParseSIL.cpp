@@ -2833,6 +2833,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AllocBoxInst: {
     bool hasDynamicLifetime = false;
     bool hasReflection = false;
+    bool usesMoveableValueDebugInfo = false;
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
@@ -2840,9 +2841,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         hasDynamicLifetime = true;
       } else if (attrName.equals("reflection")) {
         hasReflection = true;
+      } else if (attrName.equals("uses_moveable_value_debuginfo")) {
+        usesMoveableValueDebugInfo = true;
       } else {
-        P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
-                   "dynamic_lifetime or reflection");
+        P.diagnose(
+            attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
+            "dynamic_lifetime, reflection, or usesMoveableValueDebugInfo");
       }
     }
 
@@ -2855,7 +2859,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
-                                 hasDynamicLifetime, hasReflection);
+                                 hasDynamicLifetime, hasReflection,
+                                 usesMoveableValueDebugInfo);
     break;
   }
   case SILInstructionKind::ApplyInst:
