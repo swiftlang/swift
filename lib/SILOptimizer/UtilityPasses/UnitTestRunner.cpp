@@ -468,6 +468,10 @@ struct IsLexicalTest : UnitTest {
   }
 };
 
+// Arguments:
+// - value: introducer whose scope is to be shrunk
+// - expected: whether shrinkBorrowScope should return true
+// - exhaustive list of copy_values expected to be modified
 struct ShrinkBorrowScopeTest : UnitTest {
   ShrinkBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
