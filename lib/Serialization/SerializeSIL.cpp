@@ -1079,7 +1079,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = 0;
     attr |= unsigned(ASI->hasDynamicLifetime());
     attr |= unsigned(ASI->isLexical()) << 1;
-    attr |= unsigned(ASI->getWasMoved()) << 2;
+    attr |= unsigned(ASI->getUsesMoveableValueDebugInfo()) << 2;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }

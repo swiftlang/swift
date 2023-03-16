@@ -5087,7 +5087,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     // If we were not moved return early. If this SILUndef was moved, then we
     // need to let it through so we can ensure the debug info invalidated.
-    if (!i->getWasMoved())
+    if (!i->getUsesMoveableValueDebugInfo())
       return;
   }
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
@@ -5138,18 +5138,18 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (IsAddrVal)
     Copy.emplace_back(emitShadowCopyIfNeeded(
         getLoweredAddress(SILVal).getAddress(), i->getDebugScope(), *VarInfo,
-        IsAnonymous, i->getWasMoved()));
+        IsAnonymous, i->getUsesMoveableValueDebugInfo()));
   else
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           i->getWasMoved(), Copy);
+                           i->getUsesMoveableValueDebugInfo(), Copy);
 
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
-  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getLoc(), *VarInfo, Indirection,
-                               AddrDbgInstrKind(i->getWasMoved()));
+  emitDebugVariableDeclaration(
+      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
+      Indirection, AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -5479,7 +5479,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
-                              /*init*/ true, i->getWasMoved())
+                              /*init*/ true, i->getUsesMoveableValueDebugInfo())
                    .getAddress();
         Indirection =
             InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
@@ -5518,9 +5518,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo) {
-    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo,
-                                 Indirection,
-                                 AddrDbgInstrKind(i->getWasMoved()));
+    emitDebugVariableDeclaration(
+        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
+        AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
   }
 }
 
