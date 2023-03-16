@@ -3834,6 +3834,9 @@ public:
   /// Whether this nominal type qualifies as any actor (plain or distributed).
   bool isAnyActor() const;
 
+  /// Whether this nominal type is the `MainActor` global actor.
+  bool isMainActor() const;
+
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getSemanticsAttrs()) {
