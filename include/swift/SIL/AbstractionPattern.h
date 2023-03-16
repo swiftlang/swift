@@ -1470,6 +1470,18 @@ public:
   AbstractionPattern getPackExpansionComponentType(CanType substType) const;
   AbstractionPattern getPackExpansionComponentType(bool isExpansion) const;
 
+  /// Given that the value being abstracted is a metatype type, return
+  /// the abstraction pattern for its instance type.
+  AbstractionPattern getMetatypeInstanceType() const;
+
+  /// Given that the value being abstracted is a dynamic self type, return
+  /// the abstraction pattern for its self type.
+  AbstractionPattern getDynamicSelfSelfType() const;
+
+  /// Given that the value being abstracted is a parameterized protocol
+  /// type, return the abstraction pattern for one of its argument types.
+  AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
+
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
   AbstractionPattern getFunctionResultType() const;

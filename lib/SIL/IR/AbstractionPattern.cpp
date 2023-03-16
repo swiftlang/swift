@@ -24,7 +24,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeVisitor.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -688,6 +688,28 @@ size_t AbstractionPattern::getNumPackExpandedComponents() const {
   auto substShape = cast<PackType>(
     origExpansion.getCountType().subst(GenericSubs)->getCanonicalType());
   return substShape->getNumElements();
+}
+
+AbstractionPattern AbstractionPattern::getMetatypeInstanceType() const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+                       cast<AnyMetatypeType>(getType()).getInstanceType());
+}
+
+AbstractionPattern AbstractionPattern::getDynamicSelfSelfType() const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+                            cast<DynamicSelfType>(getType()).getSelfType());
+}
+
+AbstractionPattern
+AbstractionPattern::getParameterizedProtocolArgType(unsigned argIndex) const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+            cast<ParameterizedProtocolType>(getType()).getArgs()[argIndex]);
 }
 
 AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
@@ -1798,8 +1820,8 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
 
 namespace {
 class SubstFunctionTypePatternVisitor
-  : public TypeVisitor<SubstFunctionTypePatternVisitor, CanType,
-                       AbstractionPattern>
+  : public CanTypeVisitor<SubstFunctionTypePatternVisitor, CanType,
+                          AbstractionPattern>
 {
 public:
   TypeConverter &TC;
@@ -1815,7 +1837,7 @@ public:
   // signature if `pattern` is a type parameter or opaque archetype. Returns
   // null otherwise.
   CanType handleTypeParameterInAbstractionPattern(AbstractionPattern pattern,
-                                                  Type substTy) {
+                                                  CanType substTy) {
     if (!pattern.isTypeParameterOrOpaqueArchetype())
       return CanType();
 
@@ -1891,10 +1913,14 @@ public:
     return CanType(gp);
   }
 
-  CanType visitType(TypeBase *t, AbstractionPattern pattern) {
+  CanType visit(CanType t, AbstractionPattern pattern) {
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, t))
       return gp;
-    
+
+    return CanTypeVisitor::visit(t, pattern);
+  }
+
+  CanType visitType(CanType t, AbstractionPattern pattern) {
     assert(pattern.getType()->isExistentialType() ||
            (!pattern.getType()->hasTypeParameter()
            && !pattern.getType()->hasArchetype()
@@ -1902,41 +1928,32 @@ public:
     return pattern.getType();
   }
   
-  CanType visitDynamicSelfType(DynamicSelfType *dst,
+  CanType visitDynamicSelfType(CanDynamicSelfType dst,
                                AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, dst))
-      return gp;
-
     // A "dynamic self" type can be bound to another dynamic self type, or the
     // non-dynamic base class type.
-    if (auto origDynSelf = dyn_cast<DynamicSelfType>(pattern.getType())) {
-      auto origSelf = AbstractionPattern(pattern.getGenericSignatureOrNull(),
-                                         origDynSelf.getSelfType());
-      
-      auto newBase = visit(dst->getSelfType(), origSelf);
+    if (isa<DynamicSelfType>(pattern.getType())) {
+      auto origSelf = pattern.getDynamicSelfSelfType();
+      auto newBase = visit(dst.getSelfType(), origSelf);
       return DynamicSelfType::get(newBase, TC.Context)
         ->getCanonicalType();
     }
     
-    return visit(dst->getSelfType(), pattern);
+    return visit(dst.getSelfType(), pattern);
   }
   
-  CanType visitAnyMetatypeType(AnyMetatypeType *mt, AbstractionPattern pattern){
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, mt))
-      return gp;
+  CanType visitAnyMetatypeType(CanAnyMetatypeType mt, AbstractionPattern pattern){
+    auto substInstance = visit(mt.getInstanceType(),
+                               pattern.getMetatypeInstanceType());
     
-    auto origMeta = cast<AnyMetatypeType>(pattern.getType());
-    
-    auto substInstance = visit(mt->getInstanceType(),
-                       AbstractionPattern(pattern.getGenericSignatureOrNull(),
-                                          origMeta.getInstanceType()));
-    
-    return isa<ExistentialMetatypeType>(origMeta)
-      ? CanType(CanExistentialMetatypeType::get(substInstance))
+    // The CanType cast is required for this to type-check because
+    // C++'s ?: operator doesn't look for common superclasses.
+    return isa<ExistentialMetatypeType>(mt)
+      ? CanExistentialMetatypeType::get(substInstance)
       : CanType(CanMetatypeType::get(substInstance));
   }
   
-  CanType handleGenericNominalType(CanType orig, Type subst,
+  CanType handleGenericNominalType(CanType orig, CanType subst,
                                    CanGenericSignature origSig) {
     // If there are no loose type parameters in the pattern here, we don't need
     // to do a recursive visit at all.
@@ -1945,7 +1962,7 @@ public:
         && !orig->hasOpaqueArchetype()) {
       return CanType(subst);
     }
-    
+
     // If the substituted type is a subclass of the abstraction pattern
     // type, use the substituted type for the abstraction pattern. This only
     // comes up when lowering override types for vtable entries.
@@ -1980,7 +1997,7 @@ public:
     }
     
     if (differentOrigClass) {
-      orig = CanType(subst);
+      orig = subst;
       origSig = TC.getCurGenericSignature();
       assert((!subst->hasTypeParameter() || origSig) &&
              "lowering mismatched interface types in a context without "
@@ -2017,10 +2034,7 @@ public:
     return decl->getDeclaredInterfaceType().subst(newSubMap)->getCanonicalType();
   }
   
-  CanType visitNominalType(NominalType *nom, AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, nom))
-      return gp;
-
+  CanType visitNominalType(CanNominalType nom, AbstractionPattern pattern) {
     auto nomDecl = nom->getDecl();
     
     // If the type is generic (because it's a nested type in a generic context),
@@ -2031,33 +2045,27 @@ public:
     }
     
     // Otherwise, there are no structural type parameters to visit.
-    return CanType(nom);
+    return nom;
   }
   
-  CanType visitBoundGenericType(BoundGenericType *bgt,
+  CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, bgt))
-      return gp;
-
     return handleGenericNominalType(pattern.getType(), bgt,
                                     pattern.getGenericSignatureOrNull());
   }
 
-  CanType visitPackType(PackType *pack, AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, pack))
-      return gp;
-
+  CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
     // Break down the pack.
-    SmallVector<Type, 4> packElts;
-    for (unsigned i = 0; i < pack->getNumElements(); ++i) {
-      packElts.push_back(visit(pack->getElementType(i),
+    SmallVector<CanType, 4> packElts;
+    for (auto i : range(pack->getNumElements())) {
+      packElts.push_back(visit(pack.getElementType(i),
                                pattern.getPackElementType(i)));
     }
 
-    return CanType(PackType::get(TC.Context, packElts));
+    return CanPackType::get(TC.Context, packElts);
   }
 
-  CanType visitPackExpansionType(PackExpansionType *pack,
+  CanType visitPackExpansionType(CanPackExpansionType pack,
                                  AbstractionPattern pattern) {
     // Avoid walking into the pattern and count type if we can help it.
     if (!pack->hasTypeParameter() && !pack->hasArchetype() &&
@@ -2065,9 +2073,9 @@ public:
       return CanType(pack);
     }
 
-    auto substPatternType = visit(pack->getPatternType(),
+    auto substPatternType = visit(pack.getPatternType(),
                                   pattern.getPackExpansionPatternType());
-    auto substCountType = visit(pack->getCountType(),
+    auto substCountType = visit(pack.getCountType(),
                                 AbstractionPattern::getOpaque());
 
     SmallVector<Type> rootParameterPacks;
@@ -2078,15 +2086,11 @@ public:
                                      parameterPack, substCountType);
     }
 
-    return CanType(PackExpansionType::get(
-        substPatternType, substCountType));
+    return CanPackExpansionType::get(substPatternType, substCountType);
   }
 
-  CanType visitExistentialType(ExistentialType *exist,
+  CanType visitExistentialType(CanExistentialType exist,
                                AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, exist))
-      return gp;
-
     // Avoid walking into the constraint type if we can help it.
     if (!exist->hasTypeParameter() && !exist->hasArchetype() &&
         !exist->hasOpaqueArchetype()) {
@@ -2094,24 +2098,20 @@ public:
     }
 
     return CanExistentialType::get(visit(
-        exist->getConstraintType(), pattern.getExistentialConstraintType()));
+        exist.getConstraintType(), pattern.getExistentialConstraintType()));
   }
 
-  CanType visitParameterizedProtocolType(ParameterizedProtocolType *ppt,
+  CanType visitParameterizedProtocolType(CanParameterizedProtocolType ppt,
                                          AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, ppt))
-      return gp;
-
     // Recurse into the arguments of the parameterized protocol.
     SmallVector<Type, 4> substArgs;
     auto origPPT = pattern.getAs<ParameterizedProtocolType>();
     if (!origPPT)
-      return CanType(ppt);
+      return ppt;
     
     for (unsigned i = 0; i < ppt->getArgs().size(); ++i) {
-      auto argTy = ppt->getArgs()[i];
-      auto origArgTy = AbstractionPattern(pattern.getGenericSignatureOrNull(),
-                                          origPPT.getArgs()[i]);
+      auto argTy = ppt.getArgs()[i];
+      auto origArgTy = pattern.getParameterizedProtocolArgType(i);
       auto substEltTy = visit(argTy, origArgTy);
       substArgs.push_back(substEltTy);
     }
@@ -2120,22 +2120,20 @@ public:
         TC.Context, ppt->getBaseType(), substArgs));
   }
 
-  CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
-      return gp;
-    
+  CanType visitTupleType(CanTupleType tuple, AbstractionPattern pattern) {
     // Break down the tuple.
     SmallVector<TupleTypeElt, 4> tupleElts;
     for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
       auto elt = tuple->getElement(i);
-      auto substEltTy = visit(elt.getType(), pattern.getTupleElementType(i));
+      auto substEltTy = visit(tuple.getElementType(i),
+                              pattern.getTupleElementType(i));
       tupleElts.emplace_back(substEltTy, elt.getName());
     }
     
     return CanType(TupleType::get(tupleElts, TC.Context));
   }
   
-  CanType handleUnabstractedFunctionType(AnyFunctionType *func,
+  CanType handleUnabstractedFunctionType(CanAnyFunctionType func,
                                          AbstractionPattern pattern,
                                          CanType yieldType,
                                          AbstractionPattern yieldPattern) {
@@ -2144,7 +2142,7 @@ public:
     for (unsigned i = 0; i < func->getParams().size(); ++i) {
       auto param = func->getParams()[i];
       // Lower the formal type of the argument binding, eliminating variadicity.
-      auto newParamTy = visit(param.getParameterType(true)->getCanonicalType(),
+      auto newParamTy = visit(CanType(param.getParameterType(true)),
                               pattern.getFunctionParamType(i));
       auto newParam = FunctionType::Param(newParamTy,
                                           param.getLabel(),
@@ -2158,7 +2156,7 @@ public:
       substYieldType = visit(yieldType, yieldPattern);
     }
     
-    auto newResultTy = visit(func->getResult(),
+    auto newResultTy = visit(func.getResult(),
                              pattern.getFunctionResultType());
     
     Optional<FunctionType::ExtInfo> extInfo;
@@ -2166,15 +2164,11 @@ public:
       extInfo = func->getExtInfo();
     
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
-                  CanType(newResultTy),
-                  extInfo);
+                                newResultTy, extInfo);
   }
   
-  CanType visitFunctionType(FunctionType *func,
+  CanType visitFunctionType(CanFunctionType func,
                             AbstractionPattern pattern) {
-    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, func))
-      return gp;
-
     return handleUnabstractedFunctionType(func, pattern,
                                           CanType(),
                                           AbstractionPattern::getInvalid());
