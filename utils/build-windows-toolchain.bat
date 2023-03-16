@@ -940,7 +940,8 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
   -p:OutputPath=%PackageRoot%\sdk\ ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\
+  -p:SDK_ROOT=%SDKInstallRoot%\ ^
+  -p:XCTEST_ROOT=%PlatformRoot%\Developer\Library\XCTest-development\
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
 
