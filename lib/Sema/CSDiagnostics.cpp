@@ -4047,11 +4047,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
         auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
 
-        ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
-                           name.getBaseIdentifier().str(), returnTypeStr);
-        ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
-                           name.getBaseIdentifier().str());
-        ctx.Diags.diagnose(loc, diag::at_to_subscript)
+        ctx.Diags.diagnose(dotExpr->getDotLoc(), diag::at_to_subscript)
             .fixItRemove(
                 {dotExpr->getDotLoc(), callExpr->getArgs()->getStartLoc()})
             .fixItReplaceChars(
@@ -4060,6 +4056,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
             .fixItReplaceChars(
                 callExpr->getArgs()->getEndLoc(),
                 callExpr->getArgs()->getEndLoc().getAdvancedLoc(1), "]");
+        ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
+                           name.getBaseIdentifier().str(), returnTypeStr);
+        ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
+                           name.getBaseIdentifier().str());
       } else {
         ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
                            name.getBaseIdentifier().str(), returnTypeStr);
