@@ -2631,6 +2631,8 @@ void swift::swift_initStructMetadataWithLayoutString(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
     uint32_t *fieldOffsets) {
+  assert(structType->hasLayoutString());
+
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(
       layout, fieldTypes, numFields,

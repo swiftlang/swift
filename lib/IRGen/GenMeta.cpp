@@ -2586,18 +2586,25 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   eraseExistingTypeContextDescriptor(IGM, type);
 
   bool hasLayoutString = false;
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
-    auto lowered = getLoweredTypeInPrimaryContext(
+  auto lowered = getLoweredTypeInPrimaryContext(
           IGM, type->getDeclaredType()->getCanonicalType());
-    auto &ti = IGM.getTypeInfo(lowered);
-    auto *typeLayoutEntry =
-        ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
+  auto &ti = IGM.getTypeInfo(lowered);
+  auto *typeLayoutEntry =
+      ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
+  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
     hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
   }
 
   if (auto sd = dyn_cast<StructDecl>(type)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+      hasLayoutString |= requiresForeignTypeMetadata(type) ||
+        needsSingletonMetadataInitialization(IGM, type) ||
+        (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
+    }
+
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
                                    hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
@@ -5172,7 +5179,9 @@ namespace {
       }
       return !!getLayoutString() ||
              (IGM.Context.LangOpts.hasFeature(
-                 Feature::LayoutStringValueWitnessesInstantiation) && hasCompletionFunction());
+                 Feature::LayoutStringValueWitnessesInstantiation) &&
+                    (HasDependentVWT || HasDependentMetadata) &&
+                      !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
