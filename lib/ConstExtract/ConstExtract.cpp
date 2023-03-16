@@ -339,6 +339,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
     } break;
 
+    case ExprKind::InjectIntoOptional: {
+      auto injectIntoOptionalExpr = cast<InjectIntoOptionalExpr>(expr);
+      return extractCompileTimeValue(injectIntoOptionalExpr->getSubExpr());
+    }
+
     default: {
       break;
     }
