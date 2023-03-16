@@ -4021,7 +4021,9 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
         ctx.Diags.diagnose(loc, diag::replace_with_nil)
-            .fixItReplaceChars(loc, callExpr->getArgs()->getEndLoc(), "nil");
+            .fixItReplaceChars(
+                getAnchor().getStartLoc(),
+                callExpr->getArgs()->getEndLoc().getAdvancedLoc(1), "nil");
       } else {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
