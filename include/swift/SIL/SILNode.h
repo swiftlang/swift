@@ -214,6 +214,10 @@ protected:
                  usesMoveableValueDebugInfo : 1,
                  hasInvalidatedVarInfo : 1);
 
+    SHARED_FIELD(AllocBoxInst, uint8_t
+                 dynamicLifetime : 1,
+                 reflection : 1);
+
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
       onStack : 1,
