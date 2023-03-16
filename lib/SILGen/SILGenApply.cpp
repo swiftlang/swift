@@ -2203,10 +2203,20 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
 
   // Otherwise, add up the elements.
   unsigned count = 0;
-  for (auto i : indices(substTuple.getElementTypes())) {
-    count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                    substTuple.getElementType(i));
-  }
+  origType.forEachTupleElement(substTuple,
+                              [&](unsigned origEltIndex,
+                                   unsigned substEltIndex,
+                                   AbstractionPattern origEltType,
+                                   CanType substEltType) {
+    // Recursively expand scalar components.
+    count += getFlattenedValueCount(origEltType, substEltType);
+  },                           [&](unsigned origEltIndex,
+                                   unsigned substEltIndex,
+                                   AbstractionPattern origExpansionType,
+                                   CanTupleEltTypeArrayRef substEltTypes) {
+    // Expansion components turn into a single parameter.
+    count++;
+  });
   return count;
 }
 

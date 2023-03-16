@@ -93,7 +93,7 @@ struct ResultPlanBuilder {
                               AbstractionPattern origType,
                               CanTupleType substType);
   ResultPlanPtr buildForPackExpansion(MutableArrayRef<InitializationPtr> inits,
-                                      ArrayRef<AbstractionPattern> origTypes,
+                                      AbstractionPattern origPatternType,
                                       CanTupleEltTypeArrayRef substTypes);
   ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,
                                            CanPackType formalPackType,

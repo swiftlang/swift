@@ -913,6 +913,9 @@ public:
   bool hasCachingKey() const {
     // Only the simplest Kind::Type pattern has a caching key; we
     // don't want to try to unique by Clang node.
+    //
+    // Even if we support Clang nodes someday, we *cannot* cache
+    // by the open-coded patterns like Tuple and PackExpansion.
     return getKind() == Kind::Type || getKind() == Kind::Opaque
         || getKind() == Kind::Discard;
   }
@@ -1216,9 +1219,7 @@ public:
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
     case Kind::Opaque:
-      return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::Tuple:
-      return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return typename CanTypeWrapperTraits<TYPE>::type();
@@ -1275,7 +1276,7 @@ public:
 
   /// Is the given tuple type a valid substitution of this abstraction
   /// pattern?
-  bool matchesTuple(CanTupleType substType);
+  bool matchesTuple(CanTupleType substType) const;
 
   bool isTuple() const {
     switch (getKind()) {
@@ -1345,6 +1346,40 @@ public:
     assert(isTuple());
     return { { this, 0 }, { this, getNumTupleElements() } };
   }
+
+  /// Perform a parallel visitation of the elements of a tuple type,
+  /// preserving structure about where pack expansions appear in the
+  /// original type and how many elements of the substituted type they
+  /// expand to.
+  ///
+  /// This pattern must be a tuple pattern.
+  ///
+  /// Calls handleScalar or handleExpansion as appropriate for each
+  /// element of the original tuple, in order.
+  void forEachTupleElement(CanTupleType substType,
+           llvm::function_ref<void(unsigned origEltIndex,
+                                   unsigned substEltIndex,
+                                   AbstractionPattern origEltType,
+                                   CanType substEltType)>
+               handleScalar,
+           llvm::function_ref<void(unsigned origEltIndex,
+                                   unsigned substEltIndex,
+                                   AbstractionPattern origExpansionType,
+                                   CanTupleEltTypeArrayRef substEltTypes)>
+               handleExpansion) const;
+
+  /// Perform a parallel visitation of the elements of a tuple type,
+  /// expanding the elements of the type.  This preserves the structure
+  /// of the *substituted* tuple type: it will be called once per element
+  /// of the substituted type, in order.  The original element trappings
+  /// are also provided for convenience.
+  ///
+  /// This pattern must match the substituted type, but it may be an
+  /// opaque pattern.
+  void forEachExpandedTupleElement(CanTupleType substType,
+      llvm::function_ref<void(AbstractionPattern origEltType,
+                              CanType substEltType,
+                              const TupleTypeElt &elt)> handleElement) const;
 
   /// Is the given pack type a valid substitution of this abstraction
   /// pattern?
@@ -1420,13 +1455,20 @@ public:
   /// the abstraction pattern for an element type.
   AbstractionPattern getPackElementType(unsigned index) const;
 
-  /// Give that the value being abstracted is a pack expansion type, return the
-  /// underlying pattern type.
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the underlying pattern type.
+  ///
+  /// If you're looking for getPackExpansionCountType(), it deliberately
+  /// does not exist.  Count types are not lowered types, and the original
+  /// count types are not relevant to lowering.  Only the substituted
+  /// components and expansion counts are significant.
   AbstractionPattern getPackExpansionPatternType() const;
 
-  /// Give that the value being abstracted is a pack expansion type, return the
-  /// underlying count type.
-  AbstractionPattern getPackExpansionCountType() const;
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the appropriate pattern type for the given expansion
+  /// component.
+  AbstractionPattern getPackExpansionComponentType(CanType substType) const;
+  AbstractionPattern getPackExpansionComponentType(bool isExpansion) const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
@@ -1485,6 +1527,8 @@ public:
   /// component.
   void forEachPackExpandedComponent(
       llvm::function_ref<void(AbstractionPattern pattern)> fn) const;
+
+  size_t getNumPackExpandedComponents() const;
 
   SmallVector<AbstractionPattern, 4> getPackExpandedComponents() const;
 

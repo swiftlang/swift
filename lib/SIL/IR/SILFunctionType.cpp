@@ -1272,43 +1272,34 @@ public:
     // Recur into tuples.
     if (origType.isTuple()) {
       auto substTupleType = cast<TupleType>(substType);
-      size_t substEltIndex = 0;
-      for (size_t origEltIndex = 0, n = origType.getNumTupleElements();
-             origEltIndex != n; ++origEltIndex) {
-        AbstractionPattern origEltType =
-          origType.getTupleElementType(origEltIndex);
-
+      origType.forEachTupleElement(substTupleType,
+          [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origEltType, CanType substEltType) {
         // If the original element type is not a pack expansion, just
         // pull off the next substituted element type.
-        if (!origEltType.isPackExpansion()) {
-          CanType substEltType =
-            substTupleType.getElementType(substEltIndex++);
-          destructure(origEltType, substEltType);
-          continue;
-        }
+        destructure(origEltType, substEltType);
 
+      },  [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origExpansionType,
+              CanTupleEltTypeArrayRef substEltTypes) {
         // If the original element type is a pack expansion, build a
         // lowered pack type for the substituted components it expands to.
-        bool indirect = origEltType.arePackElementsPassedIndirectly(TC);
-        SmallVector<CanType, 4> packElts;
+        bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
 
-        origEltType.forEachPackExpandedComponent(
-            [&](AbstractionPattern origComponentType) {
-          CanType substEltType =
-            substTupleType.getElementType(substEltIndex++);
-          SILType substEltTy =
-            TC.getLoweredType(origComponentType, substEltType, context);
-          packElts.push_back(substEltTy.getASTType());
-        });
+        SmallVector<CanType, 4> packElts;
+        for (auto substEltType : substEltTypes) {
+          auto origComponentType
+            = origExpansionType.getPackExpansionComponentType(substEltType);
+          CanType loweredEltTy =
+            TC.getLoweredRValueType(context, origComponentType, substEltType);
+          packElts.push_back(loweredEltTy);
+        };
 
         SILPackType::ExtInfo extInfo(indirect);
         auto packType = SILPackType::get(TC.Context, extInfo, packElts);
         SILResultInfo result(packType, ResultConvention::Pack);
         Results.push_back(result);
-      }
-
-      assert(substEltIndex == substTupleType->getNumElements() &&
-             "didn't exhaust the substituted type");
+      });
       return;
     }
 
@@ -1684,36 +1675,30 @@ private:
                    bool isNonDifferentiable) {
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
-    assert(origType.matchesTuple(substType));
 
-    unsigned numOrigElts = origType.getNumTupleElements();
-    unsigned nextSubstEltIndex = 0;
-    for (unsigned i = 0; i != numOrigElts; ++i) {
-      auto origEltType = origType.getTupleElementType(i);
-      if (!origEltType.isPackExpansion()) {
-        auto substEltType =
-          substType.getElementType(nextSubstEltIndex++);
-        visit(ownership, forSelf, origEltType, substEltType,
-              isNonDifferentiable);
-      } else {
-        SmallVector<CanType, 8> packElts;
-        origEltType.forEachPackExpandedComponent(
-            [&](AbstractionPattern origEltComponentType) {
-          auto substEltType = substType.getElementType(nextSubstEltIndex++);
-          auto eltTy = TC.getLoweredType(origEltComponentType, substEltType,
-                                         expansion);
-          packElts.push_back(eltTy.getASTType());
-        });
+    origType.forEachTupleElement(substType,
+        [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origEltType, CanType substEltType) {
+      visit(ownership, forSelf, origEltType, substEltType,
+            isNonDifferentiable);
+    },  [&](unsigned origEltIndex, unsigned substEltIndex,
+            AbstractionPattern origExpansionType,
+            CanTupleEltTypeArrayRef substEltTypes) {
+      SmallVector<CanType, 8> packElts;
+      for (auto substEltType : substEltTypes) {
+        auto origComponentType
+          = origExpansionType.getPackExpansionComponentType(substEltType);
+        auto loweredEltTy =
+          TC.getLoweredRValueType(expansion, origComponentType, substEltType);
+        packElts.push_back(loweredEltTy);
+      };
 
-        bool indirect = origEltType.arePackElementsPassedIndirectly(TC);
-        SILPackType::ExtInfo extInfo(/*address*/ indirect);
-        auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
+      bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
+      SILPackType::ExtInfo extInfo(/*address*/ indirect);
+      auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
-        addPackParameter(packTy, ownership, isNonDifferentiable);
-      }
-    }
-
-    assert(nextSubstEltIndex == substType->getNumElements());
+      addPackParameter(packTy, ownership, isNonDifferentiable);
+    });
   }
 
   /// Add a parameter that we derived from deconstructing the
