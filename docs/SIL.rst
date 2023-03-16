@@ -3745,7 +3745,10 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? '[moved]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
+  alloc-stack-option ::= '[dynamic_lifetime]'
+  alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[uses_moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3767,11 +3770,10 @@ This is the case, e.g. for conditionally initialized objects.
 The optional ``lexical`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
-The optional ``moved`` attribute specifies that at the source level, the
-variable associated with this alloc_stack was moved and furthermore that at the
-SIL level it passed move operator checking. This means that one can not assume
-that the value in the alloc_stack can be semantically valid over the entire
-function frame when emitting debug info.
+The optional ``uses_moveable_value_debuginfo`` attribute specifies that when
+emitting debug info, the code generator can not assume that the value in the
+alloc_stack can be semantically valid over the entire function frame when
+emitting debug info.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -4155,7 +4157,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? '[moved]'? '[trace]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-instruction ::= debug_value '[poison]'? '[uses_moveable_value_debuginfo]'? '[trace]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
@@ -4164,7 +4166,7 @@ specified operand.  The declaration in question is identified by either the
 SILLocation attached to the debug_value instruction or the SILLocation specified
 in the advanced debug variable attributes.
 
-If the '[moved]' flag is set, then one knows that the debug_value's operand is
+If the '[uses_moveable_value_debuginfo]' flag is set, then one knows that the debug_value's operand is
 moved at some point of the program, so one can not model the debug_value using
 constructs that assume that the value is live for the entire function (e.x.:
 llvm.dbg.declare).

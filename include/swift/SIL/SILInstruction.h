@@ -2094,12 +2094,12 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical, bool wasMoved);
+                 bool isLexical, bool usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F, Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime, bool isLexical,
-                                bool wasMoved);
+                                bool usesMoveableValueDebugInfo);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -2116,11 +2116,15 @@ public:
     }
   }
 
-  void markAsMoved() { sharedUInt8().AllocStackInst.wasMoved = true; }
+  void markUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool getWasMoved() const { return sharedUInt8().AllocStackInst.wasMoved; }
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
+  }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
   /// be ascertained from uses.
@@ -5012,14 +5016,17 @@ class DebugValueInst final
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
 public:
-  void markAsMoved() { sharedUInt8().DebugValueInst.operandWasMoved = true; }
+  /// Sets a bool that states this debug_value is supposed to use the
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// True if this debug_value is on an SSA value that was moved.
   ///
   /// IRGen uses this information to determine if we should use llvm.dbg.addr or
   /// llvm.dbg.declare.
-  bool getWasMoved() const {
-    return sharedUInt8().DebugValueInst.operandWasMoved;
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo;
   }
 
   /// Return the underlying variable declaration that this denotes,

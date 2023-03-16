@@ -460,10 +460,10 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      cast<DebugValueInst>(**this)->markAsMoved();
+      cast<DebugValueInst>(**this)->setUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocStack:
-      cast<AllocStackInst>(**this)->markAsMoved();
+      cast<AllocStackInst>(**this)->markUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocBox:
       llvm_unreachable("Not implemented");
@@ -476,9 +476,9 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getWasMoved();
+      return cast<DebugValueInst>(**this)->getUsesMoveableValueDebugInfo();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getWasMoved();
+      return cast<AllocStackInst>(**this)->getUsesMoveableValueDebugInfo();
     case Kind::AllocBox:
       // We do not support moving alloc box today, so we always return false.
       return false;

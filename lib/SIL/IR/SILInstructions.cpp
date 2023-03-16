@@ -229,7 +229,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical,
-                               bool wasMoved)
+                               bool usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.has_value() : false,
@@ -240,20 +240,22 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
       VarInfo(0) {
   sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = isLexical;
-  sharedUInt8().AllocStackInst.wasMoved = wasMoved;
+  sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
+      usesMoveableValueDebugInfo;
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
-  // VarInfo must be initialized after `sharedUInt32().AllocStackInst.numOperands`!
-  // Otherwise the trailing object addresses are wrong.
-  VarInfo = TailAllocatedDebugVariable(Var,
-               getTrailingObjects<char>(),
-               getTrailingObjects<SILType>(),
-               getTrailingObjects<SILLocation>(),
-               getTrailingObjects<const SILDebugScope *>(),
-               getTrailingObjects<SILDIExprElement>());
+  // VarInfo must be initialized after
+  // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
+  // addresses are wrong.
+  VarInfo = TailAllocatedDebugVariable(
+      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      getTrailingObjects<SILLocation>(),
+      getTrailingObjects<const SILDebugScope *>(),
+      getTrailingObjects<SILDIExprElement>());
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
-         TypeDependentOperands.size() && "Truncation");
+             TypeDependentOperands.size() &&
+         "Truncation");
   auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
   if (Var && VD) {
     VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
@@ -417,7 +419,7 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
     VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
   if (wasMoved)
-    markAsMoved();
+    setUsesMoveableValueDebugInfo();
   setTrace(trace);
 }
 

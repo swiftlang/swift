@@ -9,16 +9,16 @@ import Builtin
 // We don't serialize debug_value today... but we should.
 //
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK:  %1 = alloc_stack [moved] $Builtin.NativeObject
+// CHECK:  %1 = alloc_stack [uses_moveable_value_debuginfo] $Builtin.NativeObject
 // CHECK: } // end sil function 'test_debug_value_alloc_stack_moved'
 sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  debug_value [moved] %0 : $Builtin.NativeObject
+  debug_value [uses_moveable_value_debuginfo] %0 : $Builtin.NativeObject
   debug_value [poison] %0 : $Builtin.NativeObject
-  debug_value [moved] [poison] %0 : $Builtin.NativeObject
-  debug_value [poison] [moved] %0 : $Builtin.NativeObject
+  debug_value [uses_moveable_value_debuginfo] [poison] %0 : $Builtin.NativeObject
+  debug_value [poison] [uses_moveable_value_debuginfo] %0 : $Builtin.NativeObject
 
-  %1 = alloc_stack [moved] $Builtin.NativeObject
+  %1 = alloc_stack [uses_moveable_value_debuginfo] $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
 
   destroy_value %0 : $Builtin.NativeObject
