@@ -14,9 +14,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
-// rdar://106822386
-// REQUIRES: rdar106822386
-
 import StdlibUnittest
 import Distributed
 import FakeDistributedActorSystems
