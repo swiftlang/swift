@@ -787,7 +787,6 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
   if (!canDeriveDistributedActor(Nominal, cast<DeclContext>(ConformanceDecl)))
     return std::make_pair(Type(), nullptr);
 
-
   if (assocType->getName() == Context.Id_ActorSystem) {
     return std::make_pair(deriveDistributedActorType_ActorSystem(*this),
                           nullptr);

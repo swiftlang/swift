@@ -218,7 +218,7 @@ func assumeOnMainActorExecutor<T>(
 /// if another actor uses the same serial executor--by using that actor's ``Actor/unownedExecutor``
 /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
 public
 func assumeOnActorExecutor<Act: Actor, T>(
@@ -246,4 +246,5 @@ func assumeOnActorExecutor<Act: Actor, T>(
 }
 
 // TODO(ktoso): implement assume for distributed actors as well
+
 #endif // not SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

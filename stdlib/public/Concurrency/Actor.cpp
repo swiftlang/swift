@@ -1993,7 +1993,7 @@ void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedAct
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
-  auto *metadata = actorType->getClassObject();
+  const ClassMetadata *metadata = actorType->getClassObject();
 
   // TODO(distributed): make this allocation smaller
   // ==== Allocate the memory for the remote instance
@@ -2014,21 +2014,22 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   if (isDefaultActorClass(metadata)) {
     auto actor = asImpl(reinterpret_cast<DefaultActor *>(alloc));
     actor->initialize(/*remote*/true);
+    assert(swift_distributed_actor_is_remote(alloc));
     return reinterpret_cast<OpaqueValue*>(actor);
   } else {
     auto actor = asImpl(reinterpret_cast<NonDefaultDistributedActor *>(alloc));
     actor->initialize(/*remote*/true);
+    assert(swift_distributed_actor_is_remote(alloc));
+    return reinterpret_cast<OpaqueValue*>(actor);
   }
-  assert(swift_distributed_actor_is_remote(alloc));
-
 }
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
-  auto metadata = cast<ClassMetadata>(_actor->metadata);
+  const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
   if (isDefaultActorClass(metadata)) {
-    return asImpl((DefaultActor *) _actor)->isDistributedRemote();
+    return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
   } else {
-    return asImpl((NonDefaultDistributedActor *) _actor)->isDistributedRemote(); // NEW
+    return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
 }
 
