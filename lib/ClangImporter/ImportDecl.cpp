@@ -1533,6 +1533,7 @@ namespace {
 
       auto name = importedName.getDeclName().getBaseIdentifier();
 
+
       // Create the enum declaration and record it.
       ImportDiagnosticAdder addDiag(Impl, decl, decl->getLocation());
       StructDecl *errorWrapper = nullptr;
