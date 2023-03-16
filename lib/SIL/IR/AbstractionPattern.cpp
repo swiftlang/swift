@@ -675,15 +675,6 @@ AbstractionPattern AbstractionPattern::getPackExpansionPatternType() const {
   llvm_unreachable("bad kind");
 }
 
-SmallVector<AbstractionPattern, 4>
-AbstractionPattern::getPackExpandedComponents() const {
-  SmallVector<AbstractionPattern, 4> result;
-  forEachPackExpandedComponent([&](AbstractionPattern pattern) {
-    result.push_back(pattern);
-  });
-  return result;
-}
-
 size_t AbstractionPattern::getNumPackExpandedComponents() const {
   assert(isPackExpansion());
   assert(getKind() == Kind::Type || getKind() == Kind::Discard);
@@ -697,40 +688,6 @@ size_t AbstractionPattern::getNumPackExpandedComponents() const {
   auto substShape = cast<PackType>(
     origExpansion.getCountType().subst(GenericSubs)->getCanonicalType());
   return substShape->getNumElements();
-}
-
-void AbstractionPattern::forEachPackExpandedComponent(
-          llvm::function_ref<void (AbstractionPattern)> fn) const {
-  assert(isPackExpansion());
-
-  switch (getKind()) {
-  case Kind::Type:
-  case Kind::Discard: {
-    // If we don't have generic substitutions, just produce this pattern.
-    if (!GenericSubs) return fn(*this);
-    auto origExpansion = cast<PackExpansionType>(getType());
-
-    // Substitute the expansion shape.
-    auto substShape = cast<PackType>(
-      origExpansion.getCountType().subst(GenericSubs)->getCanonicalType());
-
-    // Call the callback with each component of the substituted shape.
-    for (auto substShapeElt : substShape.getElementTypes()) {
-      CanType origEltType = origExpansion.getPatternType();
-      if (auto substShapeEltExpansion =
-            dyn_cast<PackExpansionType>(substShapeElt)) {
-        origEltType = CanPackExpansionType::get(origEltType,
-                                    substShapeEltExpansion.getCountType());
-      }
-      fn(AbstractionPattern(GenericSubs, GenericSig, origEltType));
-    }
-    return;
-  }
-
-  default:
-    llvm_unreachable("not a pack expansion");
-  }
-  llvm_unreachable("bad kind");
 }
 
 AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {

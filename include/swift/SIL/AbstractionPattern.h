@@ -1543,18 +1543,14 @@ public:
   AbstractionPattern getObjCMethodAsyncCompletionHandlerType(
                                      CanType swiftCompletionHandlerType) const;
 
-  /// Given that this is a pack expansion, invoke the given callback for
-  /// each component of the substituted expansion of this pattern.  The
-  /// pattern will be for a pack expansion type over a contextual type if
-  /// the substituted component is still a pack expansion.  If there aren't
-  /// substitutions available, this will just invoke the callback with the
-  /// component.
-  void forEachPackExpandedComponent(
-      llvm::function_ref<void(AbstractionPattern pattern)> fn) const;
-
+  /// Given that this is a pack expansion, return the number of components
+  /// that it should expand to.  This, and the general correctness of
+  /// traversing variadically generic tuple and function types under
+  /// substitution, relies on substitutions having been  set properly
+  /// on the abstraction pattern; without that, AbstractionPattern assumes
+  /// that every component expands to a single pack expansion component,
+  /// which will generally only work in specific situations.
   size_t getNumPackExpandedComponents() const;
-
-  SmallVector<AbstractionPattern, 4> getPackExpandedComponents() const;
 
   /// If this pattern refers to a foreign ObjC method that was imported as 
   /// async, return the bridged-back-to-ObjC completion handler type.
