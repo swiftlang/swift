@@ -16,12 +16,12 @@
 
 static SWIFT_THREAD_LOCAL_TYPE(void *, swift::tls_key::observation_transaction) Value;
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 void *_swift_observation_tls_get() {
   return Value.get();
 }
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 void _swift_observation_tls_set(void *value) {
   Value.set(value);
 }
