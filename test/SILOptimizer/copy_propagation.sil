@@ -851,7 +851,8 @@ bb0(%0 : @owned $C):
 // Test that copy propagation doesn't hoist a destroy_value corresponding to
 // a move value [lexical] over a barrier.
 // CHECK-LABEL: sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[GET_OWNED_C:%.*]] = function_ref @getOwnedC
+// CHECK:         [[INSTANCE:%.*]] = apply [[GET_OWNED_C]]
 // CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
 // CHECK:         [[TAKE_GUARANTEED_C:%[^,]+]] = function_ref @takeGuaranteedC
@@ -859,8 +860,10 @@ bb0(%0 : @owned $C):
 // CHECK:         apply [[BARRIER]]()
 // CHECK:         destroy_value [[LIFETIME]]
 // CHECK-LABEL: } // end sil function 'dont_hoist_move_value_lexical_destroy_over_barrier_apply'
-sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : $@convention(thin) () -> () {
+entry:
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %instance = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
   %lifetime = move_value [lexical] %instance : $C
   %barrier = function_ref @barrier : $@convention(thin) () -> ()
   %takeGuaranteedC = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
