@@ -51,10 +51,6 @@ template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
   return cast<A>(static_cast<SILArgument *>(argument.obj));
 }
 
-inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
-  return static_cast<SILGlobalVariable *>(global.obj);
-}
-
 inline ValueOwnershipKind castToOwnership(BridgedValue::Ownership ownership) {
   switch (ownership) {
     case BridgedValue::Ownership::Unowned:    return OwnershipKind::Unowned;

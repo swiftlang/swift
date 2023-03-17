@@ -363,20 +363,12 @@ bool SILLocation_hasSameSourceLocation(swift::SILDebugLocation lhs, swift::SILDe
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
-llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
-  return castToGlobal(global)->getName();
-}
-
-std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+std::string BridgedGlobalVar::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToGlobal(global)->print(os);
+  getGlobal()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
-}
-
-SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global) {
-  return castToGlobal(global)->isLet();
 }
 
 //===----------------------------------------------------------------------===//

@@ -285,9 +285,21 @@ struct OptionalBridgedFunction {
   OptionalSwiftObject obj;
 };
 
-typedef struct {
+struct BridgedGlobalVar {
   SwiftObject obj;
-} BridgedGlobalVar;
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SILGlobalVariable * _Nonnull getGlobal() const {
+    return static_cast<swift::SILGlobalVariable *>(obj);
+  }
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef getName() const { return getGlobal()->getName(); }
+
+  bool isLet() const { return getGlobal()->isLet(); }
+};
 
 struct BridgedBasicBlock {
   SwiftObject obj;
@@ -457,10 +469,6 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block);
-
-llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
-std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
-SwiftInt SILGlobalVariable_isLet(BridgedGlobalVar global);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
