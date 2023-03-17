@@ -5175,8 +5175,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
         peekToken().is(tok::code_complete) &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       consumeToken();
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeAfterPoundDirective();
+      }
       consumeToken(tok::code_complete);
       DeclResult = makeParserCodeCompletionResult<Decl>();
       break;
@@ -9380,8 +9381,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   auto checkCodeCompletion =
       [&](CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) -> bool {
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeInPrecedenceGroup(SK);
+      }
       consumeToken();
       return true;
     }

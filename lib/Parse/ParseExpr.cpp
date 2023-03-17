@@ -699,8 +699,9 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
         CodeCompletionExpr(pathResult.getPtrOrNull(), Tok.getLoc());
     auto *keypath = KeyPathExpr::createParsed(
         Context, backslashLoc, rootResult.getPtrOrNull(), CC, hasLeadingDot);
-    if (CodeCompletionCallbacks)
+    if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeExprKeyPath(keypath, DotLoc);
+    }
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(keypath);
   }
@@ -734,8 +735,9 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
           Context, keywordLoc, lParenLoc, components, Tok.getLoc());
     }
 
-    if (CodeCompletionCallbacks)
+    if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeExprKeyPath(expr, DotLoc);
+    }
 
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -2565,8 +2567,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           initializer = initializerResult.get();
         } else {
           auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-          if (CodeCompletionCallbacks)
+          if (CodeCompletionCallbacks) {
             CodeCompletionCallbacks->completePostfixExprBeginning(CCE);
+          }
           name = Identifier();
           initializer = CCE;
           consumeToken();
@@ -3135,9 +3138,10 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     } else if (isArgumentList && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCallArg(CCExpr,
                                                  PreviousLoc == leftLoc);
+      }
       consumeIf(tok::code_complete);
       SubExpr = CCExpr;
       Status.setHasCodeCompletionAndIsError();
@@ -3243,9 +3247,10 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
 
       // foo() {} <token>
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeLabeledTrailingClosure(
             CCExpr, Tok.isAtStartOfLine());
+      }
       consumeToken(tok::code_complete);
       result.setHasCodeCompletionAndIsError();
       closures.emplace_back(SourceLoc(), Identifier(), CCExpr);
@@ -3323,8 +3328,9 @@ Parser::parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind) {
   consumeToken(); // '#' token.
   auto CodeCompletionPos = consumeToken();
   auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
-  if (CodeCompletionCallbacks)
+  if (CodeCompletionCallbacks) {
     CodeCompletionCallbacks->completeAfterPoundExpr(Expr, ParentKind);
+  }
   return makeParserCodeCompletionResult(Expr);
 }
 

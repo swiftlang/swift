@@ -140,8 +140,9 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
     consumeToken();
-    if (CodeCompletionCallbacks)
+    if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeAfterPoundDirective();
+    }
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -175,14 +176,16 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
 
-  if (CodeCompletionCallbacks)
+  if (CodeCompletionCallbacks) {
     CodeCompletionCallbacks->setExprBeginning(getParserPosition());
+  }
 
   if (Tok.is(tok::code_complete)) {
     auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
     Result = CCE;
-    if (CodeCompletionCallbacks)
+    if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeStmtOrExpr(CCE);
+    }
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -1896,8 +1899,9 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       }
       ElseBody = parseStmtIf(LabeledStmtInfo(), implicitlyInsertIf);
     } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeAfterIfStmtElse();
+      }
       Status.setHasCodeCompletionAndIsError();
       consumeToken(tok::code_complete);
     } else {
@@ -2336,8 +2340,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     // If there is no "in" keyword, suggest it. Otherwise, complete the
     // sequence.
     if (InLoc.isInvalid()) {
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeForEachInKeyword();
+      }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
     } else {
@@ -2345,9 +2350,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
           makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
       Container.setHasCodeCompletionAndIsError();
       Status |= Container;
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeForEachSequenceBeginning(
             cast<CodeCompletionExpr>(Container.get()));
+      }
       consumeToken(tok::code_complete);
     }
   } else {
@@ -2491,8 +2497,9 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
         cases.emplace_back(PDD);
       }
     } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletionCallbacks)
+      if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCaseStmtKeyword();
+      }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
     } else {
