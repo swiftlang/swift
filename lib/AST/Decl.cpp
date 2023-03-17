@@ -4841,6 +4841,11 @@ bool NominalTypeDecl::isAnyActor() const {
   return isActor() || isDistributedActor();
 }
 
+bool NominalTypeDecl::isMainActor() const {
+  return getName().is("MainActor") &&
+         getParentModule()->getName() == getASTContext().Id_Concurrency;
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,
@@ -9935,6 +9940,15 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+bool ActorIsolation::isMainActor() const {
+  if (isGlobalActor()) {
+    if (auto *nominal = getGlobalActor()->getAnyNominal())
+      return nominal->isMainActor();
+  }
+
+  return false;
 }
 
 bool ActorIsolation::isDistributedActor() const {
