@@ -648,7 +648,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_initStructMetadataWithLayoutString(StructMetadata *self,
                                               StructLayoutFlags flags,
                                               size_t numFields,
-                                              const Metadata *const *fieldTypes,
+                                              const uint8_t *const *fieldTypes,
+                                              const uint8_t *fieldTags,
                                               uint32_t *fieldOffsets);
 
 /// Allocate the metadata for a class and copy fields from the given pattern.

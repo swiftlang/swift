@@ -49,15 +49,6 @@ enum class RefCountingKind : uint8_t {
   // Reserved: 0x81 - 0xFF
 };
 
-// The implemenation of this should be provided by the stdlib when we link this
-// into an executable/library.
-SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift)
-const Metadata *swift_getTypeByMangledNameInContext(
-    const char *typeNameStart, size_t typeNameLength,
-    const TargetContextDescriptor<InProcess> *context,
-    const void *const *genericArgs);
-
 SWIFT_RUNTIME_EXPORT
 void swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
@@ -69,7 +60,9 @@ swift::OpaqueValue *swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::
 SWIFT_RUNTIME_EXPORT
 swift::OpaqueValue *swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata);
 SWIFT_RUNTIME_EXPORT
-void swift_generic_instantiateLayoutString(const uint8_t* layoutStr, Metadata* type);
+void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
+
+void swift_resolve_resilientAccessors(uint8_t *layoutStr, size_t layoutStrOffset, const uint8_t *fieldLayoutStr, size_t refCountBytes, const Metadata *fieldType);
 } // namespace swift
 
 #endif // SWIFT_BYTECODE_LAYOUTS_H

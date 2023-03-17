@@ -51,6 +51,7 @@ enum class ScalarKind : uint8_t {
   BlockStorage,
   ThickFunc,
   ExistentialReference,
+  CustomReference,
 };
 
 /// Convert a ReferenceCounting into the appropriate Scalar reference
