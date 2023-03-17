@@ -8,12 +8,14 @@
 public func variadicFunction<each T, each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {}
 
 public struct VariadicType<each T> {
-  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV14variadicMethod1t1ux_qd__txQp_txxQp_qd__xQptqd__RhzRvd__lF : $@convention(method) <each T><each U where (repeat (each T, each U)) : Any> (@pack_guaranteed Pack{repeat each T}, @pack_guaranteed Pack{repeat each U}, VariadicType<repeat each T>) -> @pack_out Pack{repeat (each T, each U)} {
+  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV14variadicMethod1t1ux_qd__txQp_txxQp_qd__xQptqd__RhzRvd__lF :
+  // CHECK-SAME: $@convention(method) <each T><each U where (repeat (each T, each U)) : Any> (@pack_guaranteed Pack{repeat each T}, @pack_guaranteed Pack{repeat each U}, VariadicType<repeat each T>) -> @pack_out Pack{repeat (each T, each U)} {
   // CHECK: bb0(%0 : $*Pack{repeat (each T, each U)}, %1 : $*Pack{repeat each T}, %2 : $*Pack{repeat each U}, %3 : $VariadicType<repeat each T>):
   public func variadicMethod<each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {}
 
-  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV13takesFunction1tyqd__qd__Qp_txxQpXE_tRvd__lF : $@convention(method) <each T><each U> (@guaranteed @noescape @callee_guaranteed @substituted <each τ_0_0, each τ_0_1, each τ_0_2, each τ_0_3 where (repeat (each τ_0_0, each τ_0_1)) : Any, (repeat (each τ_0_2, each τ_0_3)) : Any> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <Pack{repeat each T}, Pack{repeat each T}, Pack{repeat each U}, Pack{repeat each U}>, VariadicType<repeat each T>) -> () {
-  // CHECK: bb0(%0 : @guaranteed $@noescape @callee_guaranteed @substituted <each τ_0_0, each τ_0_1, each τ_0_2, each τ_0_3 where (repeat (each τ_0_0, each τ_0_1)) : Any, (repeat (each τ_0_2, each τ_0_3)) : Any> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_2} for <Pack{repeat each T}, Pack{repeat each T}, Pack{repeat each U}, Pack{repeat each U}>, %1 : $VariadicType<repeat each T>):
+  // CHECK-LABEL: sil [ossa] @$s19pack_expansion_type12VariadicTypeV13takesFunction1tyqd__qd__Qp_txxQpXE_tRvd__lF :
+  // CHECK-SAME: $@convention(method) <each T><each U> (@guaranteed @noescape @callee_guaranteed @substituted <each τ_0_0, each τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_1} for <Pack{repeat each T}, Pack{repeat each U}>, VariadicType<repeat each T>) -> () {
+  // CHECK: bb0(%0 : @guaranteed $@noescape @callee_guaranteed @substituted <each τ_0_0, each τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_1} for <Pack{repeat each T}, Pack{repeat each U}>, %1 : $VariadicType<repeat each T>):
   public func takesFunction<each U>(t: (repeat each T) -> (repeat each U)) {}
 }
 

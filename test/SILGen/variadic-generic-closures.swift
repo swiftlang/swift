@@ -5,7 +5,7 @@
 
 public struct G<T> {}
 
-// CHECK-LABEL: sil [ossa] @$s4main6caller2fnyyAA1GVyxGxQpXE_tRvzlF : $@convention(thin) <each T> (@guaranteed @noescape @callee_guaranteed @substituted <each τ_0_0, each τ_0_1 where (repeat (each τ_0_0, each τ_0_1)) : Any> (@pack_guaranteed Pack{repeat G<each τ_0_0>}) -> () for <Pack{repeat each T}, Pack{repeat each T}>) -> () {
+// CHECK-LABEL: sil [ossa] @$s4main6caller2fnyyAA1GVyxGxQpXE_tRvzlF : $@convention(thin) <each T> (@guaranteed @noescape @callee_guaranteed @substituted <each τ_0_0> (@pack_guaranteed Pack{repeat G<each τ_0_0>}) -> () for <Pack{repeat each T}>) -> () {
 public func caller<each T>(fn: (repeat G<each T>) -> ()) {
   fn(repeat G<each T>())
 }

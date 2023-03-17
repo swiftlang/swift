@@ -915,7 +915,7 @@ public:
     // don't want to try to unique by Clang node.
     //
     // Even if we support Clang nodes someday, we *cannot* cache
-    // by the open-coded patterns like Tuple and PackExpansion.
+    // by the open-coded patterns like Tuple.
     return getKind() == Kind::Type || getKind() == Kind::Opaque
         || getKind() == Kind::Discard;
   }
@@ -980,7 +980,8 @@ public:
     case Kind::Type:
     case Kind::ClangType:
     case Kind::Discard: {
-      return getType()->isParameterPack();
+      auto ty = getType();
+      return isa<PackArchetypeType>(ty) || ty->isParameterPack();
     }
     default:
       return false;
