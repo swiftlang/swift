@@ -128,6 +128,8 @@ static bool getIncomingJoinedLiveRangeOperands(
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+// This needs `SemanticARCOptVisitor::performGuaranteedCopyValueOptimization` to
+// run before so that joinedOwnedIntroducerToConsumedOperands is populated.
 bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   bool madeChange = false;
 
