@@ -4298,17 +4298,6 @@ public:
   [[nodiscard]]
   bool generateConstraints(StmtCondition condition, DeclContext *dc);
 
-  /// Generate constraints for a case statement.
-  ///
-  /// \param subjectType The type of the "subject" expression in the enclosing
-  /// switch statement.
-  ///
-  /// \returns true if there was an error in constraint generation, false
-  /// if generation succeeded.
-  [[nodiscard]]
-  bool generateConstraints(CaseStmt *caseStmt, DeclContext *dc,
-                           Type subjectType, ConstraintLocator *locator);
-
   /// Generate constraints for a given set of overload choices.
   ///
   /// \param constraints The container of generated constraint choices.
