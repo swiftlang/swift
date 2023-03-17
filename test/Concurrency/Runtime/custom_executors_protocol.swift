@@ -25,18 +25,12 @@ extension WithSpecifiedExecutor {
 }
 
 final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
+  let name: String
   let queue: DispatchQueue
 
-  init(_ queue: DispatchQueue) {
+  init(name: String, _ queue: DispatchQueue) {
+    self.name = name
     self.queue = queue
-  }
-
-  public func enqueue(_ job: UnownedJob) {
-    print("\(self): enqueue")
-    queue.sync {
-      job.runSynchronously(on: self.asUnownedSerialExecutor())
-    }
-    print("\(self): after run")
   }
 
   public func enqueue(_ job: __owned Job) {
@@ -49,7 +43,7 @@ final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
   }
 
   var description: Swift.String {
-    "NaiveQueueExecutor(\(queue))"
+    "NaiveQueueExecutor(\(name))"
   }
 }
 
@@ -74,8 +68,9 @@ actor MyActor: WithSpecifiedExecutor {
 @main struct Main {
   static func main() async {
     print("begin")
-    let queue = DispatchQueue(label: "CustomQueue")
-    let one = NaiveQueueExecutor(queue)
+    let name = "CustomQueue"
+    let queue = DispatchQueue(label: name)
+    let one = NaiveQueueExecutor(name: name, queue)
     let actor = MyActor(executor: one)
     await actor.test(expectedExecutor: one, expectedQueue: queue)
     await actor.test(expectedExecutor: one, expectedQueue: queue)
@@ -85,9 +80,9 @@ actor MyActor: WithSpecifiedExecutor {
 }
 
 // CHECK:      begin
-// CHECK-NEXT: NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>): enqueue
-// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
-// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
-// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>)
-// CHECK-NEXT: NaiveQueueExecutor(<OS_dispatch_queue_serial: CustomQueue>): after run
+// CHECK-NEXT: NaiveQueueExecutor(CustomQueue): enqueue
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: NaiveQueueExecutor(CustomQueue): after run
 // CHECK-NEXT: end
