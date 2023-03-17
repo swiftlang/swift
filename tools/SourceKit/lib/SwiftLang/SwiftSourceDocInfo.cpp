@@ -1915,15 +1915,15 @@ static void deliverCursorInfoResults(
     // TODO: Implement delivery of other result types as more cursor info kinds
     // are migrated to be completion-like.
     CursorInfoData Data;
-    for (auto ResolvedCursorInfo : Results.getResult().ResolvedCursorInfos) {
+    for (auto ResolvedCursorInfo : Results->ResolvedCursorInfos) {
       if (auto Result = dyn_cast_or_null<ResolvedValueRefCursorInfo>(
               ResolvedCursorInfo)) {
         std::string Diagnostic; // Unused
         addCursorInfoForDecl(Data, Result, AddRefactorings, AddSymbolGraph,
                              Lang, Invoc, Diagnostic, /*PreviousSnaps=*/{});
       }
-      Data.DidReuseAST = Results->DidReuseAST;
     }
+    Data.DidReuseAST = Results->DidReuseAST;
     if (!Data.Symbols.empty()) {
       Receiver(RequestResult<CursorInfoData>::fromResult(Data));
     }
@@ -2008,7 +2008,8 @@ void SwiftLangSupport::getCursorInfo(
   std::unique_ptr<llvm::MemoryBuffer> UnresolvedInputFile =
       getASTManager()->getMemoryBuffer(RealInputFilePath, fileSystem,
                                        InputFileError);
-  if (UnresolvedInputFile) {
+  // The solver-based implementation doesn't support range based cursor info.
+  if (UnresolvedInputFile && Length == 0) {
     auto SolverBasedReceiver = [&](const RequestResult<CursorInfoData> &Res) {
       SolverBasedProducedResult = true;
       Receiver(Res);

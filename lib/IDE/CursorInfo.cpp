@@ -121,7 +121,7 @@ public:
 /// Walks the AST, looking for a node at \c LocToResolve. While walking the
 /// AST, also gathers information about shorthand shadows.
 class NodeFinder : ASTWalker {
-  SourceFile &SrcFile;
+  DeclContext &DC;
   SourceLoc LocToResolve;
 
   /// As we are walking the tree, this variable is updated to the last seen
@@ -139,11 +139,10 @@ class NodeFinder : ASTWalker {
   llvm::DenseMap<ValueDecl *, ValueDecl *> ShorthandShadowedDecls;
 
 public:
-  NodeFinder(SourceFile &SrcFile, SourceLoc LocToResolve)
-      : SrcFile(SrcFile), LocToResolve(LocToResolve),
-        DeclContextStack({&SrcFile}) {}
+  NodeFinder(DeclContext &DC, SourceLoc LocToResolve)
+      : DC(DC), LocToResolve(LocToResolve), DeclContextStack({&DC}) {}
 
-  void resolve() { SrcFile.walk(*this); }
+  void resolve() { DC.walkContext(*this); }
 
   std::unique_ptr<NodeFinderResult> takeResult() { return std::move(Result); }
 
@@ -161,9 +160,7 @@ public:
   }
 
 private:
-  SourceManager &getSourceMgr() const {
-    return SrcFile.getASTContext().SourceMgr;
-  }
+  SourceManager &getSourceMgr() const { return DC.getASTContext().SourceMgr; }
 
   /// The decl context that is currently being walked.
   DeclContext *getCurrentDeclContext() { return DeclContextStack.back(); }
@@ -232,7 +229,8 @@ private:
     switch (E->getKind()) {
     case ExprKind::DeclRef:
     case ExprKind::UnresolvedDot:
-    case ExprKind::UnresolvedDeclRef: {
+    case ExprKind::UnresolvedDeclRef:
+    case ExprKind::OverloadedDeclRef: {
       assert(Result == nullptr);
       Result =
           std::make_unique<NodeFinderExprResult>(E, getCurrentDeclContext());
@@ -280,13 +278,33 @@ public:
   };
 
 private:
-  /// The expression for which we want to provide cursor info results.
-  Expr *ResolveExpr;
+  /// The location to resolve and the \c DeclContext to resolve it in.
+  /// Note that we cannot store the expression to resolve directly because an
+  /// \c UnresolvedDeclRefExpr might be replaced by an \c OverloadedDeclRefExpr
+  /// and thus the constraint system solution doesn't know about the
+  /// \c UnresolvedDeclRefExpr. Instead, we find the expression to resolve in
+  /// the source file again after expression pre-check has run.
+  DeclContext &DC;
+  SourceLoc ResolveLoc;
 
   SmallVector<CursorInfoDeclReference, 1> Results;
 
+  Expr *getExprToResolve() {
+    NodeFinder Finder(DC, ResolveLoc);
+    Finder.resolve();
+    auto Result = Finder.takeResult();
+    if (!Result || Result->getKind() != NodeFinderResultKind::Expr) {
+      return nullptr;
+    }
+    return cast<NodeFinderExprResult>(Result.get())->getExpr();
+  }
+
   void sawSolutionImpl(const Solution &S) override {
     auto &CS = S.getConstraintSystem();
+    auto ResolveExpr = getExprToResolve();
+    if (!ResolveExpr) {
+      return;
+    }
 
     auto Locator = CS.getConstraintLocator(ResolveExpr);
     auto CalleeLocator = S.getCalleeLocator(Locator);
@@ -310,8 +328,8 @@ private:
   }
 
 public:
-  CursorInfoTypeCheckSolutionCallback(Expr *ResolveExpr)
-      : ResolveExpr(ResolveExpr) {}
+  CursorInfoTypeCheckSolutionCallback(DeclContext &DC, SourceLoc ResolveLoc)
+      : DC(DC), ResolveLoc(ResolveLoc) {}
 
   ArrayRef<CursorInfoDeclReference> getResults() const { return Results; }
 };
@@ -332,7 +350,7 @@ public:
   getDeclResult(NodeFinderDeclResult *DeclResult, SourceFile *SrcFile,
                 NodeFinder &Finder) const {
     typeCheckDeclAndParentClosures(DeclResult->getDecl());
-    return new ResolvedValueRefCursorInfo(
+    auto CursorInfo = new ResolvedValueRefCursorInfo(
         SrcFile, RequestedLoc, DeclResult->getDecl(),
         /*CtorTyRef=*/nullptr,
         /*ExtTyRef=*/nullptr, /*IsRef=*/false, /*Ty=*/Type(),
@@ -352,7 +370,7 @@ public:
     DeclContext *DC = ExprResult->getDeclContext();
 
     // Type check the statemnt containing E and listen for solutions.
-    CursorInfoTypeCheckSolutionCallback Callback(E);
+    CursorInfoTypeCheckSolutionCallback Callback(*DC, RequestedLoc);
     llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
         DC->getASTContext().SolutionCallback, &Callback);
     typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
