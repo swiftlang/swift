@@ -359,15 +359,15 @@ bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
   // If FunctionSideEffects can be summarized, use that information.
 
   auto b = F->getMemoryBehavior(/*observeRetains*/ false);
-  if (b == SILInstruction::MemoryBehavior::MayHaveSideEffects) {
+  if (b == MemoryBehavior::MayHaveSideEffects) {
     setWorstEffects();
     // May as well consider this a successful summary since there are no
     // instructions to visit anyway.
     return true;
   }
-  if (b >= SILInstruction::MemoryBehavior::MayWrite) {
+  if (b >= MemoryBehavior::MayWrite) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Modify);
-  } else if (b == SILInstruction::MemoryBehavior::MayRead) {
+  } else if (b == MemoryBehavior::MayRead) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Read);
   }
 

@@ -1045,10 +1045,10 @@ visitArgEffects(std::function<void(int, int, bool)> c) const {
   }
 }
 
-SILInstruction::MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
+MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
   if (!getMemBehvaiorFunction)
-    return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+    return MemoryBehavior::MayHaveSideEffects;
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
-  return (SILInstruction::MemoryBehavior)b;
+  return (MemoryBehavior)b;
 }

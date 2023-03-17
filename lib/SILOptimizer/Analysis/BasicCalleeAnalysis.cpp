@@ -377,15 +377,15 @@ void CalleeAnalysis_register(
   getMemBehvaiorFunction = getMemBehvaiorFn;
 }
 
-SILInstruction::MemoryBehavior BasicCalleeAnalysis::
+MemoryBehavior BasicCalleeAnalysis::
 getMemoryBehavior(ApplySite as, bool observeRetains) {
   if (getMemBehvaiorFunction) {
     auto b = getMemBehvaiorFunction({pm->getSwiftPassInvocation()},
                                     {as.getInstruction()->asSILNode()},
                                     observeRetains);
-    return (SILInstruction::MemoryBehavior)b;
+    return (MemoryBehavior)b;
   }
-  return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  return MemoryBehavior::MayHaveSideEffects;
 }
 
 bool swift::isDeinitBarrier(SILInstruction *const instruction,

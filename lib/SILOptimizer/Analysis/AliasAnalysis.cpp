@@ -724,7 +724,7 @@ void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
   canReferenceSameFieldFunction = canReferenceSameFieldFn;
 }
 
-SILInstruction::MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
+MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
             SILValue addr, SILInstruction *toInst) {
   if (getMemEffectsFunction) {
     return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()}, {addr},
