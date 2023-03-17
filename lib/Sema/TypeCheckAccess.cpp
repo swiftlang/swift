@@ -1268,7 +1268,8 @@ public:
       : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
-    if (VD->getFormalAccess() != AccessLevel::Internal)
+    if (VD->getFormalAccess() != AccessLevel::Internal &&
+        VD->getFormalAccess() != AccessLevel::Package)
       return true;
     return !VD->isUsableFromInline();
   };
