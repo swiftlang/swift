@@ -2858,6 +2858,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
+
+    if (Ty.isMoveOnly())
+      usesMoveableValueDebugInfo = true;
+
     ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
                                  hasDynamicLifetime, hasReflection,
                                  usesMoveableValueDebugInfo);
@@ -3612,6 +3616,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (Val->getType().isAddress())
       assert(!poisonRefs && "debug_value w/ address value does not support poison");
+
+    if (Val->getType().isMoveOnly())
+      usesMoveableValueDebugInfo = true;
+
     ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs,
                                    usesMoveableValueDebugInfo, hasTrace);
     break;
@@ -4715,6 +4723,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SILDebugVariable VarInfo;
     if (parseSILDebugVar(VarInfo) || parseSILDebugLocation(InstLoc, B))
       return true;
+
+    if (Ty.isMoveOnly())
+      usesMoveableValueDebugInfo = true;
+
     // It doesn't make sense to attach a debug var info if the name is empty
     if (VarInfo.Name.size())
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
