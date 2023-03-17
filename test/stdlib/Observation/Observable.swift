@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import Observation
+import _Observation
 import _Concurrency
 
 @usableFromInline
@@ -26,17 +26,17 @@ final class UnsafeBox<Contents>: @unchecked Sendable {
 final class TestWithoutMacro: Observable {
   let _registrar = ObservationRegistrar<TestWithoutMacro>()
 
-  public nonisolated func transactions<Delivery>(
+  nonisolated func changes<Isolation>(
     for properties: TrackedProperties<TestWithoutMacro>, 
-    isolation: Delivery
-  ) -> ObservedTransactions<TestWithoutMacro, Delivery> where Delivery: Actor {
-    _registrar.transactions(for: properties, isolation: isolation)
+    isolatedTo isolation: Isolation
+  ) -> ObservedChanges<TestWithoutMacro, Isolation> where Isolation: Actor {
+    _registrar.changes(for: properties, isolatedTo: isolation)
   }
 
-  public nonisolated func changes<Member>(
+  nonisolated func values<Member>(
     for keyPath: KeyPath<TestWithoutMacro, Member>
-  ) -> ObservedChanges<TestWithoutMacro, Member> where Member: Sendable {
-    _registrar.changes(for: keyPath)
+  ) -> ObservedValues<TestWithoutMacro, Member> where Member : Sendable {
+    _registrar.values(for: keyPath)
   }
 
   private struct _Storage {
@@ -149,7 +149,7 @@ extension TriggerSequence: AsyncSequence {
         subject.field3 = i
       }
     }
-#if false // disabled for now
+
     suite.test("unobserved value changes (nonmacro)") {
       let subject = TestWithoutMacro()
       for i in 0..<100 {
@@ -164,9 +164,9 @@ extension TriggerSequence: AsyncSequence {
         t = Task { @MainActor in
           // Note: this must be fully established 
           // so we must await the trigger to fire
-          let changes = subject.changes(for: \.field1)
+          let values = subject.values(for: \.field1)
             .triggerIteration(continuation)
-          for await value in changes {
+          for await value in values {
             return value
           }
           return nil
@@ -184,9 +184,9 @@ extension TriggerSequence: AsyncSequence {
         t = Task { @MainActor in
           // Note: this must be fully established 
           // so we must await the trigger to fire
-          let changes = subject.changes(for: \.field1)
+          let values = subject.values(for: \.field1)
             .triggerIteration(continuation)
-          for await value in changes {
+          for await value in values {
             return value
           }
           return nil
@@ -214,16 +214,16 @@ extension TriggerSequence: AsyncSequence {
       expectEqual(finished, true)
     }
 
-    suite.test("transactions emit values (macro)") { @MainActor in
+    suite.test("emit values (macro)") { @MainActor in
       let subject = TestWithMacro()
-      var t: Task<TrackedProperties<TestWithMacro>?, Never>?
+      var t: Task<String?, Never>?
       await withUnsafeContinuation { continuation in
         t = Task { @MainActor in
           // Note: this must be fully established 
           // so we must await the trigger to fire
-          let transactions = subject.transactions(for: \.field1)
+          let values = subject.values(for: \.field1)
             .triggerIteration(continuation)
-          for await value in transactions {
+          for await value in values {
             return value
           }
           return nil
@@ -231,19 +231,19 @@ extension TriggerSequence: AsyncSequence {
       }
       subject.field1 = "a"
       let value = await t!.value
-      expectEqual(value?.contains(\.field1), true)
+      expectEqual(value, "a")
     }
 
-    suite.test("transactions emit values (nonmacro)") { @MainActor in
+    suite.test("emit values (nonmacro)") { @MainActor in
       let subject = TestWithoutMacro()
-      var t: Task<TrackedProperties<TestWithoutMacro>?, Never>?
+      var t: Task<String?, Never>?
       await withUnsafeContinuation { continuation in
         t = Task { @MainActor in
           // Note: this must be fully established 
           // so we must await the trigger to fire
-          let transactions = subject.transactions(for: \.field1)
+          let values = subject.values(for: \.field1)
             .triggerIteration(continuation)
-          for await value in transactions {
+          for await value in values {
             return value
           }
           return nil
@@ -251,7 +251,7 @@ extension TriggerSequence: AsyncSequence {
       }
       subject.field1 = "a"
       let value = await t!.value
-      expectEqual(value?.contains(\.field1), true)
+      expectEqual(value, "a")
     }
 
     suite.test("tracking") { @MainActor in
@@ -268,7 +268,7 @@ extension TriggerSequence: AsyncSequence {
       subject.field1 = "asdf"
       expectEqual(changed.contents, true)
     }
-#endif
+
     await runAllTestsAsync()
   }
 }
