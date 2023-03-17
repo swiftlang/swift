@@ -2,13 +2,13 @@
 #define TEST_INTEROP_CXX_CLASS_INPUTS_DESTRUCTORS_H
 
 struct
-    __attribute__((swift_attr("conforms_to:Testable")))
+    __attribute__((swift_attr("conforms_to:SwiftTest.Testable")))
     HasTest {
   void test() const;
 };
 
 struct
-    __attribute__((swift_attr("conforms_to:Playable")))
+    __attribute__((swift_attr("conforms_to:SwiftTest.Playable")))
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:immortal")))
     __attribute__((swift_attr("release:immortal")))
@@ -16,5 +16,10 @@ struct
   void play() const;
 };
 
+struct
+    __attribute__((swift_attr("conforms_to:ImportedModule.ProtocolFromImportedModule")))
+    HasImportedConf {
+  void testImported() const;
+};
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_DESTRUCTORS_H
