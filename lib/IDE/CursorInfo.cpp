@@ -328,9 +328,9 @@ public:
       : IDEInspectionCallbacks(P), Consumer(Consumer),
         RequestedLoc(RequestedLoc) {}
 
-  ResolvedCursorInfoPtr getDeclResult(NodeFinderDeclResult *DeclResult,
-                                      SourceFile *SrcFile,
-                                      NodeFinder &Finder) const {
+  SmallVector<ResolvedCursorInfoPtr>
+  getDeclResult(NodeFinderDeclResult *DeclResult, SourceFile *SrcFile,
+                NodeFinder &Finder) const {
     typeCheckDeclAndParentClosures(DeclResult->getDecl());
     return new ResolvedValueRefCursorInfo(
         SrcFile, RequestedLoc, DeclResult->getDecl(),
@@ -342,11 +342,12 @@ public:
         /*IsDynamic=*/false,
         /*ReceiverTypes=*/{},
         Finder.getShorthandShadowedDecls(DeclResult->getDecl()));
+    return {CursorInfo};
   }
 
-  ResolvedCursorInfoPtr getExprResult(NodeFinderExprResult *ExprResult,
-                                      SourceFile *SrcFile,
-                                      NodeFinder &Finder) const {
+  SmallVector<ResolvedCursorInfoPtr>
+  getExprResult(NodeFinderExprResult *ExprResult, SourceFile *SrcFile,
+                NodeFinder &Finder) const {
     Expr *E = ExprResult->getExpr();
     DeclContext *DC = ExprResult->getDeclContext();
 
@@ -359,7 +360,7 @@ public:
 
     if (Callback.getResults().empty()) {
       // No results.
-      return nullptr;
+      return {};
     }
 
     for (auto Info : Callback.getResults()) {
@@ -368,34 +369,33 @@ public:
       typeCheckDeclAndParentClosures(Info.ReferencedDecl);
     }
 
-    if (Callback.getResults().size() != 1) {
-      // FIXME: We need to be able to report multiple results.
-      return nullptr;
-    }
-
     // Deliver results
 
-    auto Res = Callback.getResults()[0];
-    SmallVector<NominalTypeDecl *> ReceiverTypes;
-    if (Res.IsDynamicRef && Res.BaseType) {
-      if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
-        ReceiverTypes = {ReceiverType};
-      } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
-        // Look through metatypes to get the nominal type decl.
-        if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
+    SmallVector<ResolvedCursorInfoPtr> Results;
+    for (auto Res : Callback.getResults()) {
+      SmallVector<NominalTypeDecl *> ReceiverTypes;
+      if (Res.IsDynamicRef && Res.BaseType) {
+        if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
           ReceiverTypes = {ReceiverType};
+        } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
+          // Look through metatypes to get the nominal type decl.
+          if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
+            ReceiverTypes = {ReceiverType};
+          }
         }
       }
-    }
 
-    return new ResolvedValueRefCursorInfo(
-        SrcFile, RequestedLoc, Res.ReferencedDecl,
-        /*CtorTyRef=*/nullptr,
-        /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
-        /*ContainerType=*/Res.BaseType,
-        /*CustomAttrRef=*/None,
-        /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
-        Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
+      auto CursorInfo = new ResolvedValueRefCursorInfo(
+          SrcFile, RequestedLoc, Res.ReferencedDecl,
+          /*CtorTyRef=*/nullptr,
+          /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
+          /*ContainerType=*/Res.BaseType,
+          /*CustomAttrRef=*/None,
+          /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
+          Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
+      Results.push_back(CursorInfo);
+    }
+    return Results;
   }
 
   void doneParsing(SourceFile *SrcFile) override {
@@ -408,7 +408,7 @@ public:
     if (!Result) {
       return;
     }
-    ResolvedCursorInfoPtr CursorInfo;
+    SmallVector<ResolvedCursorInfoPtr> CursorInfo;
     switch (Result->getKind()) {
     case NodeFinderResultKind::Decl:
       CursorInfo = getDeclResult(cast<NodeFinderDeclResult>(Result.get()),
