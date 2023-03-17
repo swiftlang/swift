@@ -79,6 +79,7 @@ enum class RefactorAvailableKind {
   Unavailable_has_no_name,
   Unavailable_has_no_accessibility,
   Unavailable_decl_from_clang,
+  Unavailable_decl_in_macro,
 };
 
 struct RefactorAvailabilityInfo {

@@ -645,10 +645,17 @@ renameAvailabilityInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo) {
     AvailKind = RefactorAvailableKind::Unavailable_system_symbol;
   } else if (VD->getClangDecl()) {
     AvailKind = RefactorAvailableKind::Unavailable_decl_from_clang;
-  } else if (VD->getLoc().isInvalid()) {
-    AvailKind = RefactorAvailableKind::Unavailable_has_no_location;
   } else if (!VD->hasName()) {
     AvailKind = RefactorAvailableKind::Unavailable_has_no_name;
+  }
+
+  if (AvailKind == RefactorAvailableKind::Available) {
+    SourceLoc Loc = VD->getLoc();
+    if (!Loc.isValid()) {
+      AvailKind = RefactorAvailableKind::Unavailable_has_no_location;
+    } else if (VD->getModuleContext()->isInGeneratedBuffer(Loc)) {
+      AvailKind = RefactorAvailableKind::Unavailable_decl_in_macro;
+    }
   }
 
   if (isa<AbstractFunctionDecl>(VD)) {
@@ -1006,6 +1013,9 @@ static Optional<RenameRangeCollector> localRenames(SourceFile *SF,
     return None;
   case RefactorAvailableKind::Unavailable_decl_from_clang:
     diags.diagnose(startLoc, diag::decl_from_clang);
+    return None;
+  case RefactorAvailableKind::Unavailable_decl_in_macro:
+    diags.diagnose(startLoc, diag::decl_in_macro);
     return None;
   }
 
@@ -8838,6 +8848,8 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
       return "cannot decide the accessibility of the symbol";
     case RefactorAvailableKind::Unavailable_decl_from_clang:
       return "cannot rename a Clang symbol from its Swift reference";
+    case RefactorAvailableKind::Unavailable_decl_in_macro:
+      return "cannot rename a symbol declared in a macro";
     }
     llvm_unreachable("unhandled kind");
   }
@@ -8917,6 +8929,15 @@ swift::ide::collectRefactorings(ResolvedCursorInfoPtr CursorInfo,
   DiagnosticEngine DiagEngine(
       CursorInfo->getSourceFile()->getASTContext().SourceMgr);
 
+  // Only macro expansion is available within generated buffers
+  if (CursorInfo->getSourceFile()->Kind == SourceFileKind::MacroExpansion) {
+    if (RefactoringActionExpandMacro::isApplicable(CursorInfo, DiagEngine)) {
+      Infos.emplace_back(RefactoringKind::ExpandMacro,
+                         RefactorAvailableKind::Available);
+    }
+    return Infos;
+  }
+
   if (!ExcludeRename) {
     if (auto Info = getRenameInfo(CursorInfo)) {
       Infos.push_back(std::move(Info->Availability));
@@ -8939,6 +8960,10 @@ swift::ide::collectRefactorings(SourceFile *SF, RangeConfig Range,
   if (Range.Length == 0)
     return collectRefactoringsAtCursor(SF, Range.Line, Range.Column,
                                        DiagConsumers);
+
+  // No refactorings are available within generated buffers
+  if (SF->Kind == SourceFileKind::MacroExpansion)
+    return {};
 
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();

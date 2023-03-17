@@ -899,12 +899,13 @@ static void setLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, Loc);
     }
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+    auto [DeclBufID, DeclLoc] =
+        VD->getModuleContext()->getOriginalLocation(Loc);
     Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
-    Location.Offset = SM.getLocOffsetInBuffer(Loc, DeclBufID);
+    Location.Offset = SM.getLocOffsetInBuffer(DeclLoc, DeclBufID);
     Location.Length = NameLen;
-    std::tie(Location.Line, Location.Column) = SM.getLineAndColumnInBuffer(
-        Loc, DeclBufID);
+    std::tie(Location.Line, Location.Column) =
+        SM.getLineAndColumnInBuffer(DeclLoc, DeclBufID);
     if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(DeclBufID)) {
       if (GeneratedSourceInfo->kind ==
           GeneratedSourceInfo::ReplacedFunctionBody) {
@@ -918,9 +919,8 @@ static void setLocationInfo(const ValueDecl *VD,
         auto GeneratedStartOffset = SM.getLocOffsetInBuffer(
             GeneratedSourceInfo->generatedSourceRange.getStart(), DeclBufID);
         Location.Offset += OriginalStartOffset - GeneratedStartOffset;
-        assert(SM.findBufferContainingLoc(Loc) == DeclBufID);
         std::tie(Location.Line, Location.Column) =
-            SM.getPresumedLineAndColumnForLoc(Loc, DeclBufID);
+            SM.getPresumedLineAndColumnForLoc(DeclLoc, DeclBufID);
       }
     }
   } else if (ClangNode) {
