@@ -6199,6 +6199,21 @@ bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return false;
 }
 
+bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
+  if (!func->hasClangNode())
+    return false;
+  auto clangDecl = func->getClangNode().getAsDecl();
+  if (!clangDecl)
+    return false;
+  auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(clangDecl);
+  if (!cxxMethod)
+    return false;
+  if (!func->hasName())
+    return false;
+  auto id = func->getBaseIdentifier().str();
+  return id.startswith("__") && id.endswith("Unsafe");
+}
+
 bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
                                     StringRef attr) {
   return method->hasAttrs() &&

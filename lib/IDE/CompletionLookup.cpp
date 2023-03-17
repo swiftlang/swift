@@ -1471,6 +1471,10 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
   };
 
+  // Do not add imported C++ methods that are treated as unsafe in Swift.
+  if (Importer->isUnsafeCXXMethod(FD))
+    return;
+
   if (!AFT || IsImplicitlyCurriedInstanceMethod) {
     addMethodImpl();
   } else {

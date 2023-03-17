@@ -33,6 +33,7 @@ namespace swift {
 
 class ConcreteDeclRef;
 class Decl;
+class FuncDecl;
 class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
@@ -266,6 +267,8 @@ public:
                                  SubstitutionMap subst) = 0;
 
   virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
+
+  virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
   virtual Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) = 0;

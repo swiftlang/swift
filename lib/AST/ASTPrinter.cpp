@@ -1952,19 +1952,11 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
       D->isPrivateStdlibDecl(!Options.SkipUnderscoredStdlibProtocols))
     return false;
 
-  auto isUnsafeCxxMethod = [](const Decl* decl) {
-    if (!decl->hasClangNode()) return false;
-    auto clangDecl = decl->getClangNode().getAsDecl();
-    if (!clangDecl) return false;
-    auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(clangDecl);
-    if (!cxxMethod) return false;
-    auto func = dyn_cast<FuncDecl>(decl);
-    if (!func || !func->hasName()) return false;
-    auto id = func->getBaseIdentifier().str();
-    return id.startswith("__") && id.endswith("Unsafe");
-  };
-  if (Options.SkipUnsafeCXXMethods && isUnsafeCxxMethod(D))
-    return false;
+  auto &ctx = D->getASTContext();
+  if (Options.SkipUnsafeCXXMethods)
+    if (auto func = dyn_cast<FuncDecl>(D))
+      if (ctx.getClangModuleLoader()->isUnsafeCXXMethod(func))
+        return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
     auto Ext = cast<ExtensionDecl>(D);
