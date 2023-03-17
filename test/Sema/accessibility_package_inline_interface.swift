@@ -17,7 +17,7 @@
 // CHECK-UTILS:   package init()
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   package var pkgVar: Swift.Double
-// CHECK-UTILS:   @objc @usableFromInline
+// CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }
 // CHECK-UTILS: @usableFromInline
@@ -26,7 +26,7 @@
 // CHECK-UTILS:   package init()
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   package func foo1()
-// CHECK-UTILS:   @objc @usableFromInline
+// CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }
 // CHECK-UTILS: @usableFromInline
@@ -35,7 +35,7 @@
 // CHECK-UTILS:   internal init()
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   internal var internalVar: Swift.Double
-// CHECK-UTILS:   @objc @usableFromInline
+// CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }
 // CHECK-UTILS: @usableFromInline
@@ -44,7 +44,7 @@
 // CHECK-UTILS:   internal init()
 // CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   internal func bar1()
-// CHECK-UTILS:   @objc @usableFromInline
+// CHECK-UTILS:   @usableFromInline
 // CHECK-UTILS:   deinit
 // CHECK-UTILS: }
 // CHECK-UTILS: @inlinable public func publicFunc() {
