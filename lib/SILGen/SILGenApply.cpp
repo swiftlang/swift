@@ -3750,18 +3750,17 @@ private:
       auto expectedEltTy = packTy->getSILElementType(i);
 
       bool isPackExpansion = expectedEltTy.is<PackExpansionType>();
-      AbstractionPattern origFormalType =
-        origExpansionType.getPackExpansionComponentType(isPackExpansion);
 
       auto cleanup = CleanupHandle::invalid();
       if (isPackExpansion) {
         cleanup =
-          emitPackExpansionIntoPack(std::move(arg), origFormalType,
+          emitPackExpansionIntoPack(std::move(arg), origExpansionType,
                                     expectedEltTy, consumed,
                                     packAddr, formalPackType, i);
       } else {
         cleanup =
-          emitScalarIntoPack(std::move(arg), origFormalType,
+          emitScalarIntoPack(std::move(arg),
+                             origExpansionType.getPackExpansionPatternType(),
                              expectedEltTy, consumed,
                              packAddr, formalPackType, i);
       }
@@ -3790,7 +3789,7 @@ private:
   }
 
   CleanupHandle emitPackExpansionIntoPack(ArgumentSource &&arg,
-                                          AbstractionPattern origFormalType,
+                                          AbstractionPattern origExpansionType,
                                           SILType expectedParamType,
                                           bool consumed,
                                           SILValue packAddr,
@@ -3857,15 +3856,30 @@ private:
       auto &eltTL = SGF.getTypeLowering(eltAddr->getType());
 
       // Evaluate the pattern expression into that address.
-      auto pattern = expansionExpr->getPatternExpr();
-      auto init = SGF.useBufferAsTemporary(eltAddr, eltTL);
-      SGF.emitExprInto(pattern, init.get());
+      auto patternExpr = expansionExpr->getPatternExpr();
+      auto bufferInit = SGF.useBufferAsTemporary(eltAddr, eltTL);
+      Initialization *innermostInit = bufferInit.get();
+
+      // Wrap it in a ConversionInitialization if required.
+      Optional<ConvertingInitialization> convertingInit;
+      auto substPatternType = patternExpr->getType()->getCanonicalType();
+      auto loweredPatternTy = SGF.getLoweredRValueType(substPatternType);
+      if (loweredPatternTy != expectedElementType.getASTType()) {
+        convertingInit.emplace(
+            Conversion::getSubstToOrig(
+                origExpansionType.getPackExpansionPatternType(),
+                substPatternType, expectedElementType),
+            SGFContext(innermostInit));
+        innermostInit = &*convertingInit;
+      }
+
+      SGF.emitExprInto(patternExpr, innermostInit);
 
       // Deactivate any cleanup associated with that value.  In later
       // iterations of this loop, we're managing this with our
       // partial-array cleanup; after the loop, we're managing this
       // with our full-tuple cleanup.
-      init->getManagedAddress().forward(SGF);
+      bufferInit->getManagedAddress().forward(SGF);
 
       // Store the element address into the pack.
       SGF.B.createPackElementSet(expansionExpr, eltAddr, packIndex,
