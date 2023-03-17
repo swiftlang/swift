@@ -2219,5 +2219,5 @@ SwiftNameLookupExtension::createExtensionReader(
 }
 
 void swift::dumpSwiftLookupTable(SwiftLookupTable *table) {
-  table->dump();
+  table->dump(llvm::dbgs());
 }
