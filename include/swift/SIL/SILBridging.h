@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
@@ -34,6 +35,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 struct BridgedInstruction;
 struct OptionalBridgedOperand;
 struct OptionalBridgedSuccessor;
+struct BridgedBasicBlock;
+struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
 
 enum ChangeNotificationKind {
@@ -314,13 +317,335 @@ struct BridgedGlobalVar {
   bool isLet() const { return getGlobal()->isLet(); }
 };
 
-struct BridgedInstruction {
+BridgedFunction::ArgumentConvention castToArgumentConvention(swift::SILArgumentConvention convention);
+
+struct BridgedMultiValueResult {
   SwiftObject obj;
 };
 
-typedef struct {
+struct OptionalBridgedInstruction {
   OptionalSwiftObject obj;
-} OptionalBridgedInstruction;
+
+  OptionalBridgedInstruction() : obj(nullptr) {}
+
+  OptionalBridgedInstruction(OptionalSwiftObject obj) : obj(obj) {}
+
+  swift::SILInstruction * _Nullable getInst() const {
+    if (!obj)
+      return nullptr;
+    return llvm::cast<swift::SILInstruction>(static_cast<swift::SILNode *>(obj)->castToInstruction());
+  }
+};
+
+struct BridgedInstruction {
+  SwiftObject obj;
+
+  BridgedInstruction(SwiftObject obj) : obj(obj) {}
+
+  template <class I> I *_Nonnull getAs() const {
+    return llvm::cast<I>(static_cast<swift::SILNode *>(obj)->castToInstruction());
+  }
+
+  swift::SILInstruction * _Nonnull getInst() const { return getAs<swift::SILInstruction>(); }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedInstruction getNext() const {
+    auto iter = std::next(getInst()->getIterator());
+    if (iter == getInst()->getParent()->end())
+      return {nullptr};
+    return {iter->asSILNode()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedInstruction getPrevious() const {
+    auto iter = std::next(getInst()->getReverseIterator());
+    if (iter == getInst()->getParent()->rend())
+      return {nullptr};
+    return {iter->asSILNode()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedBasicBlock getParent() const;
+
+  bool isDeleted() const {
+    return getInst()->isDeleted();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedOperandArray getOperands() const {
+    auto operands = getInst()->getAllOperands();
+    return {{operands.data()}, (SwiftInt)operands.size()};
+  }
+
+  void setOperand(SwiftInt index, BridgedValue value) const {
+    getInst()->setOperand((unsigned)index, value.getSILValue());
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SILDebugLocation getLocation() const {
+    return getInst()->getDebugLocation();
+  }
+
+  BridgedMemoryBehavior getMemBehavior() const {
+    return (BridgedMemoryBehavior)getInst()->getMemoryBehavior();
+  }
+
+  bool mayRelease() const {
+    return getInst()->mayRelease();
+  }
+
+  bool mayHaveSideEffects() const {
+    return getInst()->mayHaveSideEffects();
+  }
+
+  bool mayAccessPointer() const;
+  bool mayLoadWeakOrUnowned() const;
+  bool maySynchronizeNotConsideringSideEffects() const;
+  bool mayBeDeinitBarrierNotConsideringSideEffects() const;
+
+  SwiftInt MultipleValueInstruction_getNumResults() const {
+    return getAs<swift::MultipleValueInstruction>()->getNumResults();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedMultiValueResult MultipleValueInstruction_getResult(SwiftInt index) const {
+    return {getAs<swift::MultipleValueInstruction>()->getResult(index)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedSuccessorArray TermInst_getSuccessors() const;
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef CondFailInst_getMessage() const {
+    return getAs<swift::CondFailInst>()->getMessage();
+  }
+
+  SwiftInt LoadInst_getLoadOwnership() const {
+    return (SwiftInt)getAs<swift::LoadInst>()->getOwnershipQualifier();
+  }
+
+  swift::BuiltinValueKind BuiltinInst_getID() const {
+    return getAs<swift::BuiltinInst>()->getBuiltinInfo().ID;
+  }
+
+  bool AddressToPointerInst_needsStackProtection() const {
+    return getAs<swift::AddressToPointerInst>()->needsStackProtection();
+  }
+
+  bool IndexAddrInst_needsStackProtection() const {
+    return getAs<swift::IndexAddrInst>()->needsStackProtection();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedGlobalVar GlobalAccessInst_getGlobal() const {
+    return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedFunction FunctionRefBaseInst_getReferencedFunction() const {
+    return {getAs<swift::FunctionRefBaseInst>()->getInitiallyReferencedFunction()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::APInt IntegerLiteralInst_getValue() const {
+    return getAs<swift::IntegerLiteralInst>()->getValue();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef StringLiteralInst_getValue() const {
+    return getAs<swift::StringLiteralInst>()->getValue();
+  }
+
+  SwiftInt TupleExtractInst_fieldIndex() const {
+    return getAs<swift::TupleExtractInst>()->getFieldIndex();
+  }
+
+  SwiftInt TupleElementAddrInst_fieldIndex() const {
+    return getAs<swift::TupleElementAddrInst>()->getFieldIndex();
+  }
+
+  SwiftInt StructExtractInst_fieldIndex() const {
+    return getAs<swift::StructExtractInst>()->getFieldIndex();
+  }
+
+  OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue() const {
+    return {getAs<swift::StructInst>()->getUniqueNonTrivialFieldValue()};
+  }
+
+  SwiftInt StructElementAddrInst_fieldIndex() const {
+    return getAs<swift::StructElementAddrInst>()->getFieldIndex();
+  }
+
+  SwiftInt ProjectBoxInst_fieldIndex() const {
+    return getAs<swift::ProjectBoxInst>()->getFieldIndex();
+  }
+
+  SwiftInt EnumInst_caseIndex() const {
+    return getAs<swift::EnumInst>()->getCaseIndex();
+  }
+
+  SwiftInt UncheckedEnumDataInst_caseIndex() const {
+    return getAs<swift::UncheckedEnumDataInst>()->getCaseIndex();
+  }
+
+  SwiftInt InitEnumDataAddrInst_caseIndex() const {
+    return getAs<swift::InitEnumDataAddrInst>()->getCaseIndex();
+  }
+
+  SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex() const {
+    return getAs<swift::UncheckedTakeEnumDataAddrInst>()->getCaseIndex();
+  }
+
+  SwiftInt InjectEnumAddrInst_caseIndex() const {
+    return getAs<swift::InjectEnumAddrInst>()->getCaseIndex();
+  }
+
+  SwiftInt RefElementAddrInst_fieldIndex() const {
+    return getAs<swift::RefElementAddrInst>()->getFieldIndex();
+  }
+
+  SwiftInt RefElementAddrInst_fieldIsLet() const {
+    return getAs<swift::RefElementAddrInst>()->getField()->isLet();
+  }
+
+  SwiftInt PartialApplyInst_numArguments() const {
+    return getAs<swift::PartialApplyInst>()->getNumArguments();
+  }
+
+  SwiftInt ApplyInst_numArguments() const {
+    return getAs<swift::ApplyInst>()->getNumArguments();
+  }
+
+  bool ApplyInst_getNonThrowing() const {
+    return getAs<swift::ApplyInst>()->isNonThrowing();
+  }
+
+  bool ApplyInst_getNonAsync() const {
+    return getAs<swift::ApplyInst>()->isNonAsync();
+  }
+
+  const swift::GenericSpecializationInformation * _Nullable
+
+  SWIFT_IMPORT_UNSAFE
+  ApplyInst_getSpecializationInfo() const {
+    return getAs<swift::ApplyInst>()->getSpecializationInfo();
+  }
+
+  SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg() const {
+    return swift::ApplySite(getInst()).getCalleeArgIndexOfFirstAppliedArg();
+  }
+
+  SwiftInt PartialApplyInst_isOnStack() const {
+    return getAs<swift::PartialApplyInst>()->isOnStack() ? 1 : 0;
+  }
+
+  SwiftInt AllocRefInstBase_isObjc() const {
+    return getAs<swift::AllocRefInstBase>()->isObjC();
+  }
+
+  SwiftInt AllocRefInstBase_canAllocOnStack() const {
+    return getAs<swift::AllocRefInstBase>()->canAllocOnStack();
+  }
+
+  SwiftInt BeginApplyInst_numArguments() const {
+    return getAs<swift::BeginApplyInst>()->getNumArguments();
+  }
+
+  SwiftInt TryApplyInst_numArguments() const {
+    return getAs<swift::TryApplyInst>()->getNumArguments();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline BridgedBasicBlock BranchInst_getTargetBlock() const;
+
+  SwiftInt SwitchEnumInst_getNumCases() const {
+    return getAs<swift::SwitchEnumInst>()->getNumCases();
+  }
+
+  SwiftInt SwitchEnumInst_getCaseIndex(SwiftInt idx) const {
+    auto *seInst = getAs<swift::SwitchEnumInst>();
+    return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
+  }
+
+  SwiftInt StoreInst_getStoreOwnership() const {
+    return (SwiftInt)getAs<swift::StoreInst>()->getOwnershipQualifier();
+  }
+
+  swift::SILAccessKind BeginAccessInst_getAccessKind() const {
+    return getAs<swift::BeginAccessInst>()->getAccessKind();
+  }
+
+  bool BeginAccessInst_isStatic() const {
+    return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Static;
+  }
+
+  SwiftInt CopyAddrInst_isTakeOfSrc() const {
+    return getAs<swift::CopyAddrInst>()->isTakeOfSrc() ? 1 : 0;
+  }
+
+  SwiftInt CopyAddrInst_isInitializationOfDest() const {
+    return getAs<swift::CopyAddrInst>()->isInitializationOfDest() ? 1 : 0;
+  }
+
+  void RefCountingInst_setIsAtomic(bool isAtomic) const {
+    getAs<swift::RefCountingInst>()->setAtomicity(
+        isAtomic ? swift::RefCountingInst::Atomicity::Atomic
+                 : swift::RefCountingInst::Atomicity::NonAtomic);
+  }
+
+  bool RefCountingInst_getIsAtomic() const {
+    return getAs<swift::RefCountingInst>()->getAtomicity() == swift::RefCountingInst::Atomicity::Atomic;
+  }
+
+  SwiftInt CondBranchInst_getNumTrueArgs() const {
+    return getAs<swift::CondBranchInst>()->getNumTrueArgs();
+  }
+
+  SwiftInt KeyPathInst_getNumComponents() const {
+    if (swift::KeyPathPattern *pattern = getAs<swift::KeyPathInst>()->getPattern()) {
+      return (SwiftInt)pattern->getComponents().size();
+    }
+    return 0;
+  }
+
+  struct KeyPathFunctionResults {
+    enum { maxFunctions = 5 };
+    BridgedFunction functions[maxFunctions];
+    SwiftInt numFunctions;
+  };
+
+  void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const {
+    swift::KeyPathPattern *pattern = getAs<swift::KeyPathInst>()->getPattern();
+    const swift::KeyPathPatternComponent &comp = pattern->getComponents()[componentIdx];
+    results->numFunctions = 0;
+
+    comp.visitReferencedFunctionsAndMethods([results](swift::SILFunction *func) {
+        assert(results->numFunctions < KeyPathFunctionResults::maxFunctions);
+        results->functions[results->numFunctions++] = {func};
+      }, [](swift::SILDeclRef) {});
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SubstitutionMap ApplySite_getSubstitutionMap() const {
+    auto as = swift::ApplySite(getInst());
+    return as.getSubstitutionMap();
+  }
+
+  BridgedFunction::ArgumentConvention ApplySite_getArgumentConvention(SwiftInt calleeArgIdx) const {
+    auto as = swift::ApplySite(getInst());
+    auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+    return castToArgumentConvention(conv.Value);
+  }
+
+  SwiftInt ApplySite_getNumArguments() const {
+    return swift::ApplySite(getInst()).getNumArguments();
+  }
+
+  SwiftInt FullApplySite_numIndirectResultArguments() const {
+    auto fas = swift::FullApplySite(getInst());
+    return fas.getNumIndirectSILResults();
+  }
+};
 
 typedef struct {
   SwiftObject obj;
@@ -333,7 +658,7 @@ typedef struct {
 struct OptionalBridgedBasicBlock {
   OptionalSwiftObject obj;
 
-  swift::SILBasicBlock *getBlock() const {
+  swift::SILBasicBlock * _Nullable getBlock() const {
     return obj ? static_cast<swift::SILBasicBlock *>(obj) : nullptr;
   }
 };
@@ -447,10 +772,6 @@ struct BridgedSuccessorArray {
 typedef struct {
   SwiftObject obj;
 } BridgedNode;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedMultiValueResult;
 
 struct BridgedVTableEntry {
   const swift::SILVTableEntry * _Nonnull entry;
@@ -568,89 +889,8 @@ bool SILLocation_hasSameSourceLocation(swift::SILDebugLocation lhs, swift::SILDe
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 BridgedFunction::ArgumentConvention SILArgument_getConvention(BridgedArgument argument);
 
-OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
-OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
-BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst);
-bool SILInstruction_isDeleted(BridgedInstruction inst);
-BridgedOperandArray SILInstruction_getOperands(BridgedInstruction inst);
-void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
-                               BridgedValue value);
-swift::SILDebugLocation SILInstruction_getLocation(BridgedInstruction inst);
-BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
-bool SILInstruction_mayRelease(BridgedInstruction inst);
-bool SILInstruction_hasUnspecifiedSideEffects(BridgedInstruction inst);
-bool swift_mayAccessPointer(BridgedInstruction inst);
-bool swift_mayLoadWeakOrUnowned(BridgedInstruction inst);
-bool swift_maySynchronizeNotConsideringSideEffects(BridgedInstruction inst);
-bool swift_mayBeDeinitBarrierNotConsideringSideEffects(BridgedInstruction inst);
-
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result);
-SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
-BridgedMultiValueResult
-  MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index);
-
-BridgedSuccessorArray TermInst_getSuccessors(BridgedInstruction term);
-
-llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
-SwiftInt LoadInst_getLoadOwnership(BridgedInstruction load);
-swift::BuiltinValueKind BuiltinInst_getID(BridgedInstruction bi);
-SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp);
-SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia);
-BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
-BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
-llvm::APInt IntegerLiteralInst_getValue(BridgedInstruction ili);
-llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);
-SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
-SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
-SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
-OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si);
-SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai);
-SwiftInt ProjectBoxInst_fieldIndex(BridgedInstruction pbi);
-SwiftInt EnumInst_caseIndex(BridgedInstruction ei);
-SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi);
-SwiftInt InitEnumDataAddrInst_caseIndex(BridgedInstruction idea);
-SwiftInt UncheckedTakeEnumDataAddrInst_caseIndex(BridgedInstruction utedi);
-SwiftInt InjectEnumAddrInst_caseIndex(BridgedInstruction ieai);
-SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
-SwiftInt RefElementAddrInst_fieldIsLet(BridgedInstruction reai);
-SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
-SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
-bool ApplyInst_getNonThrowing(BridgedInstruction ai);
-bool ApplyInst_getNonAsync(BridgedInstruction ai);
-const swift::GenericSpecializationInformation * _Nullable
-ApplyInst_getSpecializationInfo(BridgedInstruction ai);
-SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg(BridgedInstruction pai);
-SwiftInt PartialApplyInst_isOnStack(BridgedInstruction pai);
-SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb);
-SwiftInt AllocRefInstBase_canAllocOnStack(BridgedInstruction arb);
-SwiftInt BeginApplyInst_numArguments(BridgedInstruction ai);
-SwiftInt TryApplyInst_numArguments(BridgedInstruction ai);
-BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
-SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
-SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
-SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
-swift::SILAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
-SwiftInt BeginAccessInst_isStatic(BridgedInstruction beginAccess);
-SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
-SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
-void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
-bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
-SwiftInt CondBranchInst_getNumTrueArgs(BridgedInstruction cbr);
-
-struct KeyPathFunctionResults {
-  enum { maxFunctions = 5 };
-  BridgedFunction functions[maxFunctions];
-  SwiftInt numFunctions;
-};
-SwiftInt KeyPathInst_getNumComponents(BridgedInstruction kpi);
-void KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt componentIdx,
-                                            KeyPathFunctionResults * _Nonnull results);
-
-swift::SubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
-BridgedFunction::ArgumentConvention ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
-SwiftInt ApplySite_getNumArguments(BridgedInstruction inst);
-SwiftInt FullApplySite_numIndirectResultArguments(BridgedInstruction inst);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder builder, llvm::StringRef name,
@@ -722,6 +962,21 @@ OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
 
 OptionalBridgedBasicBlock BridgedFunction::getLastBlock() const {
   return {getFunction()->empty() ? nullptr : &*getFunction()->rbegin()};
+}
+
+BridgedBasicBlock BridgedInstruction::getParent() const {
+  assert(!getInst()->isStaticInitializerInst() &&
+         "cannot get the parent of a static initializer instruction");
+  return {getInst()->getParent()};
+}
+
+BridgedSuccessorArray BridgedInstruction::TermInst_getSuccessors() const {
+  auto successors = getAs<swift::TermInst>()->getSuccessors();
+  return {{successors.data()}, (SwiftInt)successors.size()};
+}
+
+BridgedBasicBlock BridgedInstruction::BranchInst_getTargetBlock() const {
+  return {getAs<swift::BranchInst>()->getDestBB()};
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {

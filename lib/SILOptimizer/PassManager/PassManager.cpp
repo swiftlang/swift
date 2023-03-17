@@ -1445,7 +1445,7 @@ BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
 SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst) {
   SwiftPassInvocation *inv = castToPassInvocation(passContext);
-  SILInstruction *i = castToInst(inst);
+  SILInstruction *i = inst.getInst();
   return inv->getPassManager()->continueWithNextSubpassRun(i,
                 inv->getFunction(), inv->getTransform()) ? 1: 0;
 }
@@ -1470,14 +1470,14 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
 }
 
 BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst) {
-  SILInstruction *inst = castToInst(bridgedInst);
+  SILInstruction *inst = bridgedInst.getInst();
   SILBasicBlock *block = inst->getParent();
   return {block->split(inst->getIterator())};
 }
 
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst) {
-  castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
+  castToPassInvocation(passContext)->eraseInstruction(inst.getInst());
 }
 
 void PassContext_eraseBlock(BridgedPassContext passContext,
@@ -1486,7 +1486,7 @@ void PassContext_eraseBlock(BridgedPassContext passContext,
 }
 
 bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
-  return tryDeleteDeadClosure(castToInst<SingleValueInstruction>(closure), InstModCallbacks());
+  return tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
 }
 
 void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context) {
@@ -1604,15 +1604,15 @@ void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
 }
 
 SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->contains(castToInst(inst)->asSILNode()) ? 1 : 0;
+  return castToNodeSet(set)->contains(inst.getInst()->asSILNode()) ? 1 : 0;
 }
 
 SwiftInt NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->insert(castToInst(inst)->asSILNode()) ? 1 : 0;
+  return castToNodeSet(set)->insert(inst.getInst()->asSILNode()) ? 1 : 0;
 }
 
 void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  castToNodeSet(set)->erase(castToInst(inst)->asSILNode());
+  castToNodeSet(set)->erase(inst.getInst()->asSILNode());
 }
 
 BridgedFunction NodeSet_getFunction(BridgedNodeSet set) {
@@ -1620,12 +1620,12 @@ BridgedFunction NodeSet_getFunction(BridgedNodeSet set) {
 }
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
-  castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
+  arb.getAs<AllocRefInstBase>()->setStackAllocatable();
 }
 
 void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
                                   BridgedBasicBlock to) {
-  castToInst<TermInst>(term)->replaceBranchTarget(from.getBlock(), to.getBlock());
+  term.getAs<TermInst>()->replaceBranchTarget(from.getBlock(), to.getBlock());
 }
 
 SubstitutionMap
@@ -1725,7 +1725,7 @@ bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
   if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
     return true;
 
-  StringRef instName = getSILInstructionName(castToInst(inst)->getKind());
+  StringRef instName = getSILInstructionName(inst.getInst()->getKind());
 
   if (SILPassManager::isInstructionPassDisabled(instName))
     return false;

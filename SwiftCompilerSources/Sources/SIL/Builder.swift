@@ -33,7 +33,7 @@ public struct Builder {
                             insertAtEnd: OptionalBridgedBasicBlock.none,
                             loc: location.bridged)
     case .atEndOf(let block):
-      return BridgedBuilder(insertBefore: OptionalBridgedInstruction.none,
+      return BridgedBuilder(insertBefore: OptionalBridgedInstruction(),
                             insertAtEnd: block.bridged.optional,
                             loc: location.bridged)
     }

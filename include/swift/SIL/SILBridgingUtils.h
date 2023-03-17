@@ -29,16 +29,6 @@ inline SILNode *castToSILNode(BridgedNode node) {
   return static_cast<SILNode *>(node.obj);
 }
 
-template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
-  return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
-}
-
-template <class I = SILInstruction> I *castToInst(OptionalBridgedInstruction inst) {
-  if (!inst.obj)
-    return nullptr;
-  return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
-}
-
 template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
   return cast<A>(static_cast<SILArgument *>(argument.obj));
 }

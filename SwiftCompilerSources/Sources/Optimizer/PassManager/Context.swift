@@ -102,7 +102,7 @@ struct FunctionPassContext : MutatingContext {
   var notifyInstructionChanged: (Instruction) -> () { return { inst in } }
 
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
-    let bridgedInst = OptionalBridgedInstruction(obj: inst?.bridged.obj)
+    let bridgedInst = OptionalBridgedInstruction(inst?.bridged.obj)
     return PassContext_continueWithNextSubpassRun(_bridged, bridgedInst) != 0
   }
 
@@ -278,7 +278,7 @@ extension Instruction {
       context.notifyCallsChanged()
     }
     context.notifyInstructionsChanged()
-    SILInstruction_setOperand(bridged, index, value.bridged)
+    bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
   }
 }
@@ -286,7 +286,7 @@ extension Instruction {
 extension RefCountingInst {
   func setAtomicity(isAtomic: Bool, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
-    RefCountingInst_setIsAtomic(bridged, isAtomic)
+    bridged.RefCountingInst_setIsAtomic(isAtomic)
     context.notifyInstructionChanged(self)
   }
 }

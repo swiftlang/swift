@@ -71,7 +71,7 @@ extension ApplySite {
   ///
   /// This does not include the callee function operand.
   public var argumentOperands: OperandArray {
-    let numArgs = ApplySite_getNumArguments(bridged)
+    let numArgs = bridged.ApplySite_getNumArguments()
     let offset = ApplyOperands.firstArgumentIndex
     return operands[offset..<(numArgs + offset)]
   }
@@ -84,7 +84,7 @@ extension ApplySite {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(ApplySite_getSubstitutionMap(bridged))
+    SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
   }
 
   /// Returns the argument index of an operand.
@@ -106,7 +106,7 @@ extension ApplySite {
   }
   
   public func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention {
-    return ApplySite_getArgumentConvention(bridged, calleeArgIndex).convention
+    return bridged.ApplySite_getArgumentConvention(calleeArgIndex).convention
   }
   
   public var referencedFunction: Function? {
@@ -138,6 +138,6 @@ extension FullApplySite {
   ///
   /// 0 if the callee has a direct or no return value and 1, if it has an indirect return value.
   public var numIndirectResultArguments: Int {
-    return FullApplySite_numIndirectResultArguments(bridged)
+    return bridged.FullApplySite_numIndirectResultArguments()
   }
 }
