@@ -4138,22 +4138,6 @@ public:
     return substSILFunctionType(origType, false);
   }
 
-  SubstitutionMap substSubstitutions(SubstitutionMap subs) {
-    // Substitute the substitutions.
-    SubstOptions options = None;
-    if (shouldSubstituteOpaqueArchetypes)
-      options |= SubstFlags::SubstituteOpaqueArchetypes;
-
-    // Expand substituted type according to the expansion context.
-    auto newSubs = subs.subst(Subst, Conformances, options);
-
-    // If we need to look through opaque types in this context, re-substitute
-    // according to the expansion context.
-    newSubs = substOpaqueTypes(newSubs);
-
-    return newSubs;
-  }
-
   SubstitutionMap substOpaqueTypes(SubstitutionMap subs) {
     if (!typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes())
       return subs;
@@ -4572,6 +4556,54 @@ public:
                                    substType);
   }
 
+  struct SubstRespectingExpansions {
+    SILTypeSubstituter *_this;
+    SubstRespectingExpansions(SILTypeSubstituter *_this) : _this(_this) {}
+
+    Type operator()(SubstitutableType *origType) const {
+      auto substType = _this->Subst(origType);
+      if (!substType) return substType;
+      auto substPackType = dyn_cast<PackType>(substType->getCanonicalType());
+      if (!substPackType) return substType;
+      auto activeExpansion = _this->getActivePackExpansion(CanType(origType));
+      if (!activeExpansion) return substType;
+      auto substEltType =
+        substPackType.getElementType(activeExpansion->Index);
+      auto substExpansion = dyn_cast<PackExpansionType>(substEltType);
+      assert((bool) substExpansion ==
+             (bool) activeExpansion->SubstPackExpansionCount);
+      if (substExpansion) {
+        assert(_this->hasSameShape(substExpansion.getCountType(),
+                            activeExpansion->SubstPackExpansionCount));
+        return substExpansion.getPatternType();
+      }
+      return substEltType;
+    }
+  };
+
+  struct SubstConformanceRespectingExpansions {
+    SILTypeSubstituter *_this;
+    SubstConformanceRespectingExpansions(SILTypeSubstituter *_this)
+      : _this(_this) {}
+
+    ProtocolConformanceRef operator()(CanType dependentType,
+                                      Type conformingReplacementType,
+                                      ProtocolDecl *conformingProtocol) const {
+      auto conformance = _this->Conformances(dependentType,
+                                             conformingReplacementType,
+                                             conformingProtocol);
+      if (!conformance || !conformance.isPack()) return conformance;
+      auto activeExpansion = _this->getActivePackExpansion(dependentType);
+      if (!activeExpansion) return conformance;
+      auto pack = conformance.getPack();
+      auto substEltConf =
+        pack->getPatternConformances()[activeExpansion->Index];
+      // There isn't currently a ProtocolConformanceExpansion that
+      // we would need to look through here.
+      return substEltConf;
+    };
+  };
+
   CanType substASTType(CanType origType) {
     SubstOptions substOptions(None);
     if (shouldSubstituteOpaqueArchetypes)
@@ -4582,43 +4614,32 @@ public:
       return origType.subst(Subst, Conformances, substOptions)
         ->getCanonicalType();
 
-    return origType.subst(
-      [&](SubstitutableType *origType) -> Type {
-        auto substType = Subst(origType);
-        if (!substType) return substType;
-        auto substPackType = dyn_cast<PackType>(substType->getCanonicalType());
-        if (!substPackType) return substType;
-        auto activeExpansion = getActivePackExpansion(CanType(origType));
-        if (!activeExpansion) return substType;
-        auto substEltType =
-          substPackType.getElementType(activeExpansion->Index);
-        auto substExpansion = dyn_cast<PackExpansionType>(substEltType);
-        assert((bool) substExpansion ==
-               (bool) activeExpansion->SubstPackExpansionCount);
-        if (substExpansion) {
-          assert(hasSameShape(substExpansion.getCountType(),
-                              activeExpansion->SubstPackExpansionCount));
-          return substExpansion.getPatternType();
-        }
-        return substEltType;
-      },
-      [&](CanType dependentType,
-          Type conformingReplacementType,
-          ProtocolDecl *conformingProtocol) -> ProtocolConformanceRef {
-        auto conformance = Conformances(dependentType,
-                                        conformingReplacementType,
-                                        conformingProtocol);
-        if (!conformance || !conformance.isPack()) return conformance;
-        auto activeExpansion = getActivePackExpansion(dependentType);
-        if (!activeExpansion) return conformance;
-        auto pack = conformance.getPack();
-        auto substEltConf =
-          pack->getPatternConformances()[activeExpansion->Index];
-        // There isn't currently a ProtocolConformanceExpansion that
-        // we would need to look through here.
-        return substEltConf;
-      },
-      substOptions)->getCanonicalType();
+    return origType.subst(SubstRespectingExpansions(this),
+                          SubstConformanceRespectingExpansions(this),
+                          substOptions)->getCanonicalType();
+  }
+
+  SubstitutionMap substSubstitutions(SubstitutionMap subs) {
+    // Substitute the substitutions.
+    SubstOptions options = None;
+    if (shouldSubstituteOpaqueArchetypes)
+      options |= SubstFlags::SubstituteOpaqueArchetypes;
+
+    // Expand substituted type according to the expansion context.
+    SubstitutionMap newSubs;
+
+    if (ActivePackExpansions.empty())
+      newSubs = subs.subst(Subst, Conformances, options);
+    else
+      newSubs = subs.subst(SubstRespectingExpansions(this),
+                           SubstConformanceRespectingExpansions(this),
+                           options);
+
+    // If we need to look through opaque types in this context, re-substitute
+    // according to the expansion context.
+    newSubs = substOpaqueTypes(newSubs);
+
+    return newSubs;
   }
 
   PackExpansion *getActivePackExpansion(CanType dependentType) {
