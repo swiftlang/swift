@@ -484,12 +484,19 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     appendOperator(attr->Name);
     return;
   }
+
+  auto beginManglingClangDecl = [&](const clang::NamedDecl *decl) {
+    beginManglingWithoutPrefix();
+    appendOperator(decl->getName());
+  };
+
   // For imported Clang declarations, use the Clang name in order to match how
   // DifferentiationMangler handles these.
-  auto clangDecl = getClangDeclForMangling(afd);
-  if (clangDecl) {
-    beginManglingWithoutPrefix();
-    appendOperator(clangDecl->getName());
+  if (auto clangDecl = getClangDeclForMangling(afd)) {
+    beginManglingClangDecl(clangDecl);
+    return;
+  } else if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(afd)) {
+    beginManglingClangDecl(typedefType->getDecl());
     return;
   }
   beginMangling();
@@ -2170,7 +2177,13 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
     if (auto *clangDecl = cast_or_null<clang::NamedDecl>(decl->getClangDecl())){
       bool hasNameForLinkage;
       if (auto *tagDecl = dyn_cast<clang::TagDecl>(clangDecl))
-        hasNameForLinkage = tagDecl->hasNameForLinkage();
+        // Clang does not always populate the fields that determine if a tag
+        // decl has a linkage name. This is particularly the case for the
+        // C++ definition of CF_OPTIONS in the sdk. However, we use the
+        // name of the backing typedef as a linkage name, despite
+        // the enum itself not having one.
+        hasNameForLinkage =
+            tagDecl->hasNameForLinkage() || isCXXCFOptionsDefinition(decl);
       else
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
@@ -2510,11 +2523,26 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     appendDeclName(protocol);
 }
 
-const clang::NamedDecl *ASTMangler::getClangDeclForMangling(const ValueDecl *vd) {
-  auto namedDecl =  dyn_cast_or_null<clang::NamedDecl>(vd->getClangDecl());
+bool ASTMangler::isCXXCFOptionsDefinition(const ValueDecl *decl) {
+  return getTypeDefForCXXCFOptionsDefinition(decl);
+}
+
+const clang::TypedefType *
+ASTMangler::getTypeDefForCXXCFOptionsDefinition(const ValueDecl *decl) {
+  const clang::Decl *clangDecl = decl->getClangDecl();
+  if (!clangDecl)
+    return nullptr;
+
+  const auto &clangModuleLoader = decl->getASTContext().getClangModuleLoader();
+  return clangModuleLoader->getTypeDefForCXXCFOptionsDefinition(clangDecl);
+}
+
+const clang::NamedDecl *
+ASTMangler::getClangDeclForMangling(const ValueDecl *vd) {
+  auto namedDecl = dyn_cast_or_null<clang::NamedDecl>(vd->getClangDecl());
   if (!namedDecl)
     return nullptr;
-  
+
   // Use an anonymous enum's enclosing typedef for the mangled name, if
   // present. This matches C++'s rules for linkage names of tag declarations.
   if (namedDecl->getDeclName().isEmpty())
@@ -2576,8 +2604,20 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   auto tryAppendClangName = [this, decl]() -> bool {
     auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
-    if (!namedDecl)
+    if (!namedDecl) {
+      if (auto typedefType = getTypeDefForCXXCFOptionsDefinition(decl)) {
+        // To make sure the C++ definition of CF_OPTIONS mangles the
+        // same way as the Objective-C definition, we mangle using the
+        // name of the backing typedef, but pretend as if it was an enum.
+        // See CFAvailability.h to understand how the definitions differ
+        // in C++ and Objective-C
+        appendIdentifier(typedefType->getDecl()->getName());
+        appendOperator("V");
+        return true;
+      }
+
       return false;
+    }
 
     // Mangle ObjC classes using their runtime names.
     auto interface = dyn_cast<clang::ObjCInterfaceDecl>(namedDecl);
