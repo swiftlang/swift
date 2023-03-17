@@ -28,4 +28,7 @@
 
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
+#define CONFORMS_TO(_name) \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(conforms_to:_name))))
+
 #endif // SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
