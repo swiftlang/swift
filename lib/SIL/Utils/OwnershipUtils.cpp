@@ -2383,21 +2383,62 @@ bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
 }
 
 bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
+  // Check whether the moved-from value's lifetime and the moved-to value's
+  // lifetime have the same (1) ownership, (2) lexicality, and (3) escaping.
+  //
+  // Along the way, also check for cases where they have different values for
+  // those characteristics but it doesn't matter because of how limited the uses
+  // of the original value are (for now, whether the move is the only use).
+
   auto original = mvi->getOperand();
 
-  // If the moved-from value has none ownership, hasPointerEscape can't handle
-  // it, so it can't be used to determine whether escaping matches.
+  // (1) Ownership matches?
+  // (The new value always has owned ownership.)
   if (original->getOwnershipKind() != OwnershipKind::Owned) {
     return false;
   }
 
-  // First, check whether lexicality matches, the cheaper check.
+  // (2) Lexicality matches?
   if (mvi->isLexical() != original->isLexical()) {
     return false;
   }
 
-  // Then, check whether escaping matches, the more expensive check.
-  if (hasPointerEscape(mvi) != hasPointerEscape(original)) {
+  // The move doesn't alter constraints: ownership and lexicality match.
+
+  auto *singleUser =
+      original->getSingleUse() ? original->getSingleUse()->getUser() : nullptr;
+  if (mvi == singleUser && !SILArgument::asPhi(original)) {
+    assert(!hasPointerEscape(original));
+    // The moved-from value's only use is the move_value, and the moved-from
+    // value isn't a phi.  So, it doesn't escape.  (A phi's incoming values
+    // might escape.)
+    //
+    // Still, no optimization is enabled by separating the two lifetimes.
+    // The moved-from value's lifetime could not be shrunk regardless of whether
+    // the moved-to value escapes.
+    return true;
+  }
+
+  auto moveHasEscape = hasPointerEscape(mvi);
+  auto originalHasEscape = hasPointerEscape(original);
+
+  // (3) Escaping matches?  (Expensive check, saved for last.)
+  if (moveHasEscape != originalHasEscape) {
+    if (!originalHasEscape) {
+      auto *singleConsumingUser =
+          original->getSingleConsumingUse()
+              ? original->getSingleConsumingUse()->getUser()
+              : nullptr;
+      if (mvi == singleConsumingUser) {
+        // The moved-from value's only consuming use is the move_value and it
+        // doesn't escape.
+        //
+        // Although the moved-to value escapes, no optimization is enabled by
+        // separating the two lifetimes.  The moved-from value's lifetime
+        // already couldn't be shrunk.
+        return true;
+      }
+    }
     return false;
   }
 
