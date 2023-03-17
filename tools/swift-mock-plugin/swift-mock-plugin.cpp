@@ -1,4 +1,4 @@
-//===--- MockPlugin.cpp ---------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,12 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+// This is a compiler plugin for testing compiler's plugin messaging.
+// Set MOCKPLUGIN_TESTSPEC env variable to a JSON test spec.
+//===----------------------------------------------------------------------===//
 
-#include "swift-c/MockPlugin/MockPlugin.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/JSON.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 namespace {
 struct TestItem {
@@ -255,7 +258,12 @@ int TestRunner::run() {
   }
 }
 
-int _mock_plugin_main(const char *testSpectStr) {
+int main() {
+  const char *testSpectStr = getenv("MOCKPLUGIN_TESTSPEC");
+  if (!testSpectStr) {
+    llvm::errs() << "MOCKPLUGIN_TESTSPEC env variable is required\n";
+    return 1;
+  }
   auto runner = TestRunner::create(testSpectStr);
   if (!runner) {
     return 1;

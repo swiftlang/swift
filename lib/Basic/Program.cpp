@@ -29,6 +29,18 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+#define USE_NSGETENVIRON 1
+#else
+#define USE_NSGETENVIRON 0
+#endif
+
+#if !USE_NSGETENVIRON
+  extern char **environ;
+#else
+#include <crt_externs.h> // _NSGetEnviron
+#endif
+
 using namespace swift;
 
 int swift::ExecuteInPlace(const char *Program, const char **args,
@@ -102,6 +114,12 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   const char **envp = nullptr;
   if (env.has_value()) {
     envp = toNullTerminatedCStringArray(*env, Alloc);
+  } else {
+#if USE_NSGETENVIRON
+    envp = const_cast<const char **>(*_NSGetEnviron());
+#else
+    envp = const_cast<const char **>(environ);
+#endif
   }
   const char *progCStr = args[0] == program
                              ? argv[0]
