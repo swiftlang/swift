@@ -10,6 +10,7 @@ module Test {
 
 //--- Inputs/test.h
 struct Ptr { int *p; };
+struct __attribute__((swift_attr("import_owned"))) StirngLiteral { const char *name; };
 
 struct M {
         int *_Nonnull test1() const;
@@ -17,6 +18,8 @@ struct M {
         Ptr test3() const;
 
         int *begin() const;
+
+        StirngLiteral stringLiteral() const { return StirngLiteral{"M"}; }
 };
 
 //--- test.swift
@@ -40,4 +43,7 @@ public func test(x: M) {
   // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
   // CHECK: note: C++ methods that return iterators are potentially unsafe. Try re-writing to use Swift iterator APIs.
   x.begin()
+
+  // CHECK-NOT: error: value of type 'M' has no member 'stringLiteral'
+  x.stringLiteral()
 }
