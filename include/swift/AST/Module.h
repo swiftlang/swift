@@ -658,10 +658,20 @@ public:
   bool isSystemModule() const {
     return Bits.ModuleDecl.IsSystemModule;
   }
-  void setIsSystemModule(bool flag = true) {
-    Bits.ModuleDecl.IsSystemModule = flag;
-  }
+  void setIsSystemModule(bool flag = true);
 
+  /// \returns true if this module is part of the stdlib or contained within
+  /// the SDK. If no SDK was specified, also falls back to whether the module
+  /// was specified as a system module (ie. it's on the system search path).
+  bool isNonUserModule() const { return Bits.ModuleDecl.IsNonUserModule; }
+
+private:
+  /// Update whether this module is a non-user module, see \c isNonUserModule.
+  /// \p newUnit is the added unit that caused this update, or \c nullptr if
+  /// the update wasn't caused by adding a new unit.
+  void updateNonUserModule(FileUnit *newUnit);
+
+public:
   /// Returns true if the module was rebuilt from a module interface instead
   /// of being built from the full source.
   bool isBuiltFromInterface() const {
@@ -974,10 +984,6 @@ public:
   /// applicable.
   StringRef getModuleLoadedFilename() const;
 
-  /// \returns true if this module is defined under the SDK path.
-  /// If no SDK path is defined, this always returns false.
-  bool isSDKModule() const;
-
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
@@ -1102,6 +1108,7 @@ public:
   std::string getFullName(bool useRealNameIfAliased = false) const;
 
   bool isSystemModule() const;
+  bool isNonUserModule() const;
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
   const clang::Module *getAsClangModule() const;

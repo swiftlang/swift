@@ -611,15 +611,15 @@ public:
 };
 
 static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
-  if (VD->getModuleContext()->isSystemModule())
+  if (VD->getModuleContext()->isNonUserModule())
     return VD;
   for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
-    if (Req->getModuleContext()->isSystemModule())
+    if (Req->getModuleContext()->isNonUserModule())
       return Req;
   }
   for (auto Over = VD->getOverriddenDecl(); Over;
        Over = Over->getOverriddenDecl()) {
-    if (Over->getModuleContext()->isSystemModule())
+    if (Over->getModuleContext()->isNonUserModule())
       return Over;
   }
   return nullptr;

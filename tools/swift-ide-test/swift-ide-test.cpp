@@ -2381,7 +2381,7 @@ private:
     bool IsInSystemModule = false;
     ValueDecl *D = Entity.Dcl;
     if (D) {
-      IsInSystemModule = D->getModuleContext()->isSystemModule();
+      IsInSystemModule = D->getModuleContext()->isNonUserModule();
       if (IsInSystemModule)
         OS << 'i';
       if (isa<ConstructorDecl>(D) && Entity.IsRef) {
@@ -2399,7 +2399,7 @@ private:
       }
 
     } else {
-      if (Entity.Mod.isSystemModule())
+      if (Entity.Mod.isNonUserModule())
         OS << 'i';
       OS << "Mod";
     }
@@ -2421,7 +2421,7 @@ private:
       }
 
     } else {
-      if (Entity.Mod.isSystemModule())
+      if (Entity.Mod.isNonUserModule())
         OS << 'i';
       OS << "Mod";
     }

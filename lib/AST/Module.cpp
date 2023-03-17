@@ -605,6 +605,49 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
+  Bits.ModuleDecl.IsNonUserModule = 0;
+}
+
+void ModuleDecl::setIsSystemModule(bool flag) {
+  Bits.ModuleDecl.IsSystemModule = flag;
+  updateNonUserModule(/*newFile=*/nullptr);
+}
+
+static bool prefixMatches(StringRef prefix, StringRef path) {
+  auto i = llvm::sys::path::begin(prefix), e = llvm::sys::path::end(prefix);
+  for (auto pi = llvm::sys::path::begin(path), pe = llvm::sys::path::end(path);
+       i != e && pi != pe; ++i, ++pi) {
+    if (*i != *pi)
+      return false;
+  }
+  return i == e;
+}
+
+void ModuleDecl::updateNonUserModule(FileUnit *newUnit) {
+  if (isNonUserModule())
+    return;
+
+  SearchPathOptions searchPathOpts = getASTContext().SearchPathOpts;
+  StringRef sdkPath = searchPathOpts.getSDKPath();
+
+  if (isStdlibModule() || (sdkPath.empty() && isSystemModule())) {
+    Bits.ModuleDecl.IsNonUserModule = true;
+    return;
+  }
+
+  // If we loaded a serialized module, check if it was compiler adjacent or in
+  // the SDK.
+
+  auto *LF = dyn_cast_or_null<LoadedFile>(newUnit);
+  if (!LF)
+    return;
+
+  StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
+  StringRef modulePath = LF->getSourceFilename();
+  if ((!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) ||
+      (!sdkPath.empty() && prefixMatches(sdkPath, modulePath))) {
+    Bits.ModuleDecl.IsNonUserModule = true;
+  }
 }
 
 ImplicitImportList ModuleDecl::getImplicitImports() const {
@@ -626,6 +669,8 @@ void ModuleDecl::addFile(FileUnit &newFile) {
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
   Files.push_back(&newFile);
   clearLookupCache();
+
+  updateNonUserModule(&newFile);
 }
 
 void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
@@ -2276,23 +2321,6 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
     }
   }
   return StringRef();
-}
-
-bool ModuleDecl::isSDKModule() const {
-  auto sdkPath = getASTContext().SearchPathOpts.getSDKPath();
-  if (sdkPath.empty())
-    return false;
-
-  auto modulePath = getModuleSourceFilename();
-  auto si = llvm::sys::path::begin(sdkPath),
-       se = llvm::sys::path::end(sdkPath);
-  for (auto mi = llvm::sys::path::begin(modulePath),
-       me = llvm::sys::path::end(modulePath);
-       si != se && mi != me; ++si, ++mi) {
-    if (*si != *mi)
-      return false;
-  }
-  return si == se;
 }
 
 bool ModuleDecl::isStdlibModule() const {
@@ -4046,6 +4074,14 @@ bool ModuleEntity::isSystemModule() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
     return SwiftMod->isSystemModule();
+  return getClangModule(Mod)->IsSystem;
+}
+
+bool ModuleEntity::isNonUserModule() const {
+  assert(!Mod.isNull());
+  if (auto *SwiftMod = Mod.dyn_cast<const ModuleDecl *>())
+    return SwiftMod->isNonUserModule();
+  // TODO: Should handle clang modules as well
   return getClangModule(Mod)->IsSystem;
 }
 

@@ -5757,8 +5757,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
         M->getRealName() == M->getASTContext().Id_ObjectiveC ||
-        M->isSystemModule() ||
-        isLLDBExpressionModule(M))
+        M->isNonUserModule() || isLLDBExpressionModule(M))
       return false;
 
     // Don't print qualifiers for imported types.
