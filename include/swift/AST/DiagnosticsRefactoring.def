@@ -46,6 +46,8 @@ ERROR(decl_no_accessibility, none, "cannot rename as accessibility could not be 
 
 ERROR(decl_from_clang, none, "cannot rename a Clang symbol from its Swift reference", ())
 
+ERROR(decl_in_macro, none, "cannot rename a symbol defined in a macro", ())
+
 ERROR(value_decl_referenced_out_of_range, none, "value decl '%0' is referenced out of range", (DeclName))
 
 ERROR(multi_entry_range, none, "selected range has more than one entry point", ())
