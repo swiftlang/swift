@@ -252,10 +252,10 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
     bool IsSystem;
     if (Ref.Mod) {
       Kind = SwiftLangSupport::getUIDForModuleRef();
-      IsSystem = Ref.Mod.isSystemModule();
+      IsSystem = Ref.Mod.isNonUserModule();
     } else if (Ref.Dcl) {
       Kind = SwiftLangSupport::getUIDForDecl(Ref.Dcl, /*IsRef=*/true);
-      IsSystem = Ref.Dcl->getModuleContext()->isSystemModule();
+      IsSystem = Ref.Dcl->getModuleContext()->isNonUserModule();
     }
     if (Kind.isInvalid())
       continue;
@@ -510,7 +510,7 @@ bool SwiftInterfaceGenContext::matches(StringRef ModuleName,
   if (Invok.getSDKPath() != Impl.Invocation.getSDKPath())
     return false;
 
-  if (Impl.Mod->isSystemModule())
+  if (Impl.Mod->isNonUserModule())
     return true;
 
   const SearchPathOptions &SPOpts = Invok.getSearchPathOptions();

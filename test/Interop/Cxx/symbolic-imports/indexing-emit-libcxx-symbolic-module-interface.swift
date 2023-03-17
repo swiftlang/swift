@@ -32,11 +32,10 @@ import CxxStdlib
 import CxxModule
 
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface{{$}}
-// REMARK_NEW-NEXT: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
-// REMARK_NEW-NEXT: EOF
+// REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
 
-// REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
-// REMARK_NO_UPDATE: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface; skipping because it's up to date{{$}}
+// REMARK_NO_UPDATE-NOT: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface{{$}}
+// REMARK_NO_UPDATE-NOT: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
 
 // FILES: CxxModule-{{.*}}.pcm.symbolicswiftinterface
 // FILES: std-{{.*}}.pcm.symbolicswiftinterface

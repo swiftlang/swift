@@ -131,7 +131,7 @@ void CodeCompletionStringPrinter::printTypeRef(Type T, const TypeDecl *TD,
                                                Identifier Name,
                                                PrintNameContext NameContext) {
 
-  NextChunkKind = TD->getModuleContext()->isSystemModule()
+  NextChunkKind = TD->getModuleContext()->isNonUserModule()
                       ? ChunkKind::TypeIdSystem
                       : ChunkKind::TypeIdUser;
 

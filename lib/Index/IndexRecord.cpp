@@ -640,8 +640,9 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         bool withoutUnitName = true;
         if (FU->getKind() == FileUnitKind::ClangModule) {
           auto clangModUnit = cast<ClangModuleUnit>(LFU);
-          bool shouldIndexModule = indexClangModules &&
-              (!clangModUnit->isSystemModule() || indexSystemModules);
+          bool shouldIndexModule =
+              indexClangModules &&
+              (!mod->isNonUserModule() || indexSystemModules);
           withoutUnitName = !shouldIndexModule;
           if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
             moduleName = clangMod->getTopLevelModuleName();
@@ -662,10 +663,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           // We don't officially support binary swift modules, so normally
           // the index data for user modules would get generated while
           // building them.
-          bool isDistributedModule = mod->isSDKModule() ||
-                    mod->getASTContext().SearchPathOpts.getSDKPath().empty();
-          if (mod->isSystemModule() && indexSystemModules &&
-              (isDistributedModule || mod->isStdlibModule()) &&
+          if (mod->isNonUserModule() && indexSystemModules &&
               (!skipStdlib || !mod->isStdlibModule())) {
             emitDataForSwiftSerializedModule(mod, indexStorePath,
                                              indexClangModules,
@@ -697,7 +695,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
         }
         clang::index::writer::OpaqueModule opaqMod =
             moduleNameScratch.createString(moduleName);
-        unitWriter.addASTFileDependency(*F, mod->isSystemModule(), opaqMod,
+        unitWriter.addASTFileDependency(*F, mod->isNonUserModule(), opaqMod,
                                         withoutUnitName);
 
         break;
@@ -833,7 +831,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   }
 
   auto &fileMgr = clangCI.getFileManager();
-  bool isSystem = module->isSystemModule();
+  bool isSystem = module->isNonUserModule();
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
@@ -848,14 +846,13 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       targetTriple, sysrootPath, clangRemapper, getModuleInfoFromOpaqueModule);
 
   auto FE = fileMgr.getFile(filename);
-  bool isSystemModule = module->isSystemModule();
   for (auto &pair : records) {
     std::string &recordFile = pair.first;
     std::string &groupName = pair.second;
     if (recordFile.empty())
       continue;
     clang::index::writer::OpaqueModule mod = &groupName;
-    unitWriter.addRecordFile(recordFile, *FE, isSystemModule, mod);
+    unitWriter.addRecordFile(recordFile, *FE, isSystem, mod);
   }
 
   SmallVector<ImportedModule, 8> imports;
@@ -887,7 +884,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      DiagnosticEngine &diags) {
   auto &fileMgr = clangCI.getFileManager();
   auto *module = primarySourceFile->getParentModule();
-  bool isSystem = module->isSystemModule();
+  bool isSystem = module->isNonUserModule();
   auto mainFile = fileMgr.getFile(primarySourceFile->getFilename());
   auto clangRemapper = pathRemapper.asClangPathRemapper();
   // FIXME: Get real values for the following.
@@ -920,7 +917,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      auto file = fileMgr.getFile(filename);
                      unitWriter.addRecordFile(
                          recordFile, file ? *file : nullptr,
-                         module->isSystemModule(), /*Module=*/nullptr);
+                         module->isNonUserModule(), /*Module=*/nullptr);
                    });
 
   std::string error;
