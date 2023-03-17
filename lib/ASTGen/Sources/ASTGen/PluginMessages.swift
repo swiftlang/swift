@@ -71,7 +71,7 @@ internal enum PluginToHostMessage: Codable {
     var protocolVersion: Int
 
     /// Optional features this plugin provides.
-    ///  * loadPluginLibrary: 'loadPluginLibrary' message is implemented.
+    ///  * 'load-plugin-library': 'loadPluginLibrary' message is implemented.
     var features: [String]?
   }
 
