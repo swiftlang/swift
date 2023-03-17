@@ -2394,9 +2394,15 @@ namespace {
       }
 
       if (cxxRecordDecl) {
+        auto isNonTrivialForPurposeOfCalls =
+            [](const clang::CXXRecordDecl *decl) -> bool {
+          return decl->hasNonTrivialCopyConstructor() ||
+                 decl->hasNonTrivialMoveConstructor() ||
+                 !decl->hasTrivialDestructor();
+        };
         if (auto structResult = dyn_cast<StructDecl>(result))
           structResult->setIsCxxNonTrivial(
-              !cxxRecordDecl->isTriviallyCopyable());
+              isNonTrivialForPurposeOfCalls(cxxRecordDecl));
 
         for (auto &getterAndSetter : Impl.GetterSetterMap) {
           auto getter = getterAndSetter.second.first;
