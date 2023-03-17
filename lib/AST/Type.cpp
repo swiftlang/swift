@@ -5311,28 +5311,16 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-    auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
-      return ty.findIf([](Type subType) -> bool {
-        if (subType->isTypeErasedGenericClassType())
-          return true;
-        else
-          return false;
-      });
-    };
     auto updateSubs = [&](SubstitutionMap &subs) -> bool {
-      // This interface isn't suitable for updating the substitution map in a
-      // substituted SILFunctionType.
-      // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
+      // This interface isn't suitable for doing most transformations on
+      // a substituted SILFunctionType, but it's too hard to come up with
+      // an assertion that meaningfully captures what restrictions are in
+      // place.  Generally the restriction that you can't naively substitute
+      // a SILFunctionType using AST mechanisms will have to be good enough.
       SmallVector<Type, 4> newReplacements;
       for (Type type : subs.getReplacementTypes()) {
         auto transformed =
             type.transformWithPosition(TypePosition::Invariant, fn);
-        assert((type->isEqual(transformed) ||
-                (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
-                (hasTypeErasedGenericClassType(type) &&
-                 hasTypeErasedGenericClassType(transformed))) &&
-               "Substituted SILFunctionType can't be transformed into a "
-               "concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
         if (!type->isEqual(transformed))
           changed = true;
