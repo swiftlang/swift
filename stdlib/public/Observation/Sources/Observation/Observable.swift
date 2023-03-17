@@ -13,14 +13,14 @@ import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
 public protocol Observable {
-  nonisolated func transactions<Delivery: Actor>(
+  nonisolated func changes<Isolation: Actor>(
     for properties: TrackedProperties<Self>,
-    isolation: Delivery
-  ) -> ObservedTransactions<Self, Delivery>
+    isolatedTo isolation: Isolation
+  ) -> ObservedChanges<Self, Isolation>
   
-  nonisolated func changes<Member: Sendable>(
+  nonisolated func values<Member: Sendable>(
     for keyPath: KeyPath<Self, Member>
-  ) -> ObservedChanges<Self, Member>
+  ) -> ObservedValues<Self, Member>
   
   nonisolated static func dependencies(
     of keyPath: PartialKeyPath<Self>
@@ -30,23 +30,23 @@ public protocol Observable {
 
 @available(SwiftStdlib 5.9, *)
 extension Observable {
-  public nonisolated func transactions<Member, Delivery: Actor>(
+  public nonisolated func changes<Member, Isolation: Actor>(
     for keyPath: KeyPath<Self, Member>,
-    isolation: Delivery
-  ) -> ObservedTransactions<Self, Delivery> {
-    transactions(for: [keyPath], isolation: isolation)
+    isolatedTo isolation: Isolation
+  ) -> ObservedChanges<Self, Isolation> {
+    changes(for: [keyPath], isolatedTo: isolation)
   }
   
-  public nonisolated func transactions(
+  public nonisolated func changes(
     for properties: TrackedProperties<Self>
-  ) -> ObservedTransactions<Self, MainActor.ActorType> {
-    transactions(for: properties, isolation: MainActor.shared)
+  ) -> ObservedChanges<Self, MainActor.ActorType> {
+    changes(for: properties, isolatedTo: MainActor.shared)
   }
   
-  public nonisolated func transactions<Member>(
+  public nonisolated func changes<Member>(
     for keyPath: KeyPath<Self, Member>
-  ) -> ObservedTransactions<Self, MainActor.ActorType> {
-    transactions(for: [keyPath], isolation: MainActor.shared)
+  ) -> ObservedChanges<Self, MainActor.ActorType> {
+    changes(for: [keyPath], isolatedTo: MainActor.shared)
   }
   
   public nonisolated static func dependencies(

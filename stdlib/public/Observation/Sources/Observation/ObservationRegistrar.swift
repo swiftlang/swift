@@ -13,18 +13,11 @@ import _Concurrency
 
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar<Subject: Observable>: Sendable {
-  fileprivate let context = Context()
-  private let lifetime: Lifetime
-  
-  public init() {
-    lifetime = Lifetime(state: context.state)
-  }
-
   internal struct Context: Identifiable {
     fileprivate let state = _ManagedCriticalState(managing: State())
     
     internal var id: ObjectIdentifier { state.id }
-
+    
     fileprivate init() { }
   }
   
@@ -39,46 +32,17 @@ public struct ObservationRegistrar<Subject: Observable>: Sendable {
       state.withCriticalRegion { $0.deinitialize() }
     }
   }
-  
-  fileprivate enum Phase {
-    case willSet
-    case didSet
-    case complete
-  }
-  
-  fileprivate enum ResumeAction {
-    case resumeAndRemove(UnsafeContinuation<Subject?, Never>)
-    case informAndRemove(@Sendable () -> Void)
-  }
-  
-  fileprivate struct Next {
-    enum Kind {
-      case transaction(TrackedProperties<Subject>)
-      case pendingTransaction(TrackedProperties<Subject>, UnsafeContinuation<TrackedProperties<Subject>?, Never>)
-      case change(TrackedProperties<Subject>, UnsafeContinuation<Subject?, Never>)
-      case tracking(TrackedProperties<Subject>, @Sendable () -> Void)
-      case cancelled
-    }
-    
-    fileprivate var kind: Kind
-    fileprivate var collected: TrackedProperties<Subject>?
-  }
-  
-  fileprivate struct State: @unchecked Sendable {
-    fileprivate var generation = 0
-    fileprivate var nexts = [Int: Next]()
-    fileprivate var lookups = [PartialKeyPath<Subject>: Set<Int>]()
-    fileprivate var terminal = false
 
-    fileprivate init() { }
+  fileprivate let context = Context()
+  private let lifetime: Lifetime
+  
+  public init() {
+    lifetime = Lifetime(state: context.state)
   }
-}
 
-@available(SwiftStdlib 5.9, *)
-extension ObservationRegistrar {
   public func access<Member>(
-    _ subject: Subject, 
-    keyPath: KeyPath<Subject, Member>
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
   ) {
     if let trackingPtr = _ThreadLocal.value?
       .assumingMemoryBound(to: ObservationTracking._AccessList?.self) {
@@ -90,29 +54,40 @@ extension ObservationRegistrar {
   }
   
   public func willSet<Member>(
-    _ subject: Subject, 
-    keyPath: KeyPath<Subject, Member>
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
   ) {
-    let observers = context.state.withCriticalRegion { state in
+    let action = context.state.withCriticalRegion { state in
       state.willSet(subject, keyPath: keyPath)
     }
-    for observer in observers {
-      observer()
+    if let action {
+      switch action {
+      case .tracking(let observers):
+        for observer in observers {
+          observer()
+        }
+      }
     }
   }
   
   public func didSet<Member>(
-    _ subject: Subject, 
-    keyPath: KeyPath<Subject, Member>
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
   ) {
-    context.state.withCriticalRegion { state in
+    let actions = context.state.withCriticalRegion { state in
       state.didSet(subject, keyPath: keyPath)
+    }
+    for action in actions {
+      switch action {
+      case .resumeWithMember(let continuation):
+        continuation.resume(returning: subject[keyPath: keyPath])
+      }
     }
   }
   
   public func withMutation<Member, T>(
-    of subject: Subject, 
-    keyPath: KeyPath<Subject, Member>, 
+    of subject: Subject,
+    keyPath: KeyPath<Subject, Member>,
     _ mutation: () throws -> T
   ) rethrows -> T {
     willSet(subject, keyPath: keyPath)
@@ -120,348 +95,308 @@ extension ObservationRegistrar {
     return try mutation()
   }
   
-  public func transactions<Delivery: Actor>(
-    for properties: TrackedProperties<Subject>, 
-    isolation: Delivery
-  ) -> ObservedTransactions<Subject, Delivery> {
-    ObservedTransactions(context, properties: properties, isolation: isolation)
+  public func changes<Isolation: Actor>(
+    for properties: TrackedProperties<Subject>,
+    isolatedTo isolation: Isolation
+  ) -> ObservedChanges<Subject, Isolation> {
+    ObservedChanges(context, properties: properties, isolation: isolation)
   }
   
-  public func changes<Member: Sendable>(
+  public func values<Member: Sendable>(
     for keyPath: KeyPath<Subject, Member>
-  ) -> ObservedChanges<Subject, Member> {
-    ObservedChanges(context, keyPath: keyPath)
+  ) -> ObservedValues<Subject, Member> {
+    ObservedValues(context, keyPath: keyPath)
   }
 }
 
 @available(SwiftStdlib 5.9, *)
-extension ObservationRegistrar.Context {
-  internal func schedule<Delivery: Actor>(
-    _ generation: Int, 
-    isolation: isolated Delivery
-  ) async -> TrackedProperties<Subject>? {
-    return await withUnsafeContinuation { continuation in
-      state.withCriticalRegion { state in
-        state.complete(generation, continuation: continuation)
-      }
-    }
-  }
-  
-  internal func nextTransaction<Delivery: Actor>(
-    for properties: TrackedProperties<Subject>, 
-    isolation: Delivery
-  ) async -> TrackedProperties<Subject>? {
-    let generation = state.withCriticalRegion { state in
-      let generation = state.nextGeneration()
-      state.insert(transaction: properties, generation: generation)
-      return generation
-    }
-    return await withTaskCancellationHandler {
-      return await schedule(generation, isolation: isolation)
-    } onCancel: {
-      state.withCriticalRegion { $0.cancel(generation) }
-    }
-  }
-  
-  internal func nextChange<Member: Sendable>(
-    to keyPath: KeyPath<Subject, Member>, 
-    properties: TrackedProperties<Subject>
-  ) async -> Member? {
-    let generation = state.withCriticalRegion { $0.nextGeneration() }
-    let subject: Subject? = await withTaskCancellationHandler {
-      await withUnsafeContinuation { continuation in
-        state.withCriticalRegion { state in
-          state.insert(change: properties, 
-                       continuation: continuation, generation: generation)
-        }
-      }
-    } onCancel: {
-      state.withCriticalRegion { $0.cancel(generation) }
-    }
-    return subject.map { $0[keyPath: keyPath] }
-  }
-  
-  internal func nextTracking(
-    for properties: TrackedProperties<Subject>, 
-    _ observer: @Sendable @escaping () -> Void
-  ) -> Int {
-    return state.withCriticalRegion { state in
-      let generation = state.nextGeneration()
-      state.insert(properties: properties, 
-                   tracking: observer, generation: generation)
-      return generation
-    }
-  }
-  
-  internal func cancel(_ generation: Int) {
-    state.withCriticalRegion { $0.cancel(generation) }
+extension ObservationRegistrar {
+  enum ObservationKind {
+    case transactions
+    case changes
   }
 }
 
 @available(SwiftStdlib 5.9, *)
-extension ObservationRegistrar.Next {
-  fileprivate mutating func resume(
-    keyPath: PartialKeyPath<Subject>, 
-    phase: ObservationRegistrar.Phase
-  ) -> ObservationRegistrar.ResumeAction? {
-    kind.resume(keyPath: keyPath, phase: phase, collected: &collected)
-  }
-  
-  fileprivate func remove(
-    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
-    generation: Int
-  ) {
-    kind.remove(from: &lookup, generation: generation)
-  }
-  
-  fileprivate func deinitialize() {
-    kind.deinitialize()
-  }
-}
-
-@available(SwiftStdlib 5.9, *)
-extension ObservationRegistrar.Next.Kind {
-  fileprivate mutating func resume(
-    keyPath: PartialKeyPath<Subject>,
-    phase: ObservationRegistrar.Phase, 
-    collected: inout TrackedProperties<Subject>?
-  ) -> ObservationRegistrar.ResumeAction? {
-    switch (self, phase) {
-    case (.transaction(let observedTrackedProperties), .willSet):
-      if observedTrackedProperties.contains(keyPath) {
-        if var properties = collected {
-          properties.insert(keyPath)
-          collected = properties
-        } else {
-          var properties = TrackedProperties<Subject>()
-          properties.insert(keyPath)
-          collected = properties
+extension ObservationRegistrar {
+  struct State: @unchecked Sendable {
+    enum Observation {
+      case idleChanges(IdleChangesState)
+      case pendingChange(PendingChangeState)
+      case activeChange(ActiveChangeState)
+      case idleValues(IdleValuesState)
+      case pendingValue(PendingValueState)
+      case activeValue(ActiveValueState)
+      case tracking(TrackingState)
+      case cancelled
+    }
+    
+    var id: Int = 0
+    var observations = [Int: Observation]()
+    var lookups = [PartialKeyPath<Subject>: Set<Int>]()
+    
+    mutating func insert(
+      _ kind: ObservationRegistrar.ObservationKind, 
+      properties: TrackedProperties<Subject>
+    ) -> Int {
+      let id = self.id
+      self.id = id + 1
+      switch kind {
+      case .transactions:
+        observations[id] = Observation(idleChanges: properties)
+      case .changes:
+        observations[id] = Observation(idleValues: properties)
+      }
+      insert(for: properties, id: id)
+      return id
+    }
+    
+    mutating func removeLookups(
+      _ properties: TrackedProperties<Subject>,
+      id: Int
+    ) {
+      for keyPath in properties.raw {
+        if var observationIds = lookups.removeValue(forKey: keyPath) {
+          observationIds.remove(id)
+          if observationIds.count > 0 {
+            lookups[keyPath] = observationIds
+          }
         }
       }
-      return nil
-    case (.pendingTransaction(let observedTrackedProperties, let continuation), .willSet):
-      if observedTrackedProperties.contains(keyPath) {
-        if var properties = collected {
-          properties.insert(keyPath)
-          continuation.resume(returning: properties)
-        } else {
-          var properties = TrackedProperties<Subject>()
-          properties.insert(keyPath)
-          continuation.resume(returning: properties)
+    }
+    
+    mutating func remove(_ id: Int) {
+      if let observation = observations.removeValue(forKey: id) {
+        switch observation {
+        case .idleChanges(let observation):
+          removeLookups(observation.properties, id: id)
+        case .pendingChange(let observation):
+          removeLookups(observation.properties, id: id)
+        case .activeChange(let observation):
+          removeLookups(observation.properties, id: id)
+          observation.continuation.resume(returning: nil)
+        case .idleValues:
+          break
+        case .pendingValue:
+          break
+        case .activeValue(let observation):
+          removeLookups(observation.properties, id: id)
+          func terminate<Member>(_ valueType: Member.Type) {
+            unsafeBitCast(
+              observation.rawContinuation,
+              to: UnsafeContinuation<Member?, Never>.self
+            ).resume(returning: nil)
+          }
+          _openExistential(type(of: observation.keyPath).valueType, do: terminate)
+        case .tracking(let observation):
+          removeLookups(observation.properties, id: id)
+        case .cancelled:
+          break
         }
-        self = .transaction(observedTrackedProperties)
       }
-      
-      return nil
-    case (.change(let observedTrackedProperties, let continuation), .didSet):
-      if observedTrackedProperties.contains(keyPath) {
-        if var properties = collected {
-          properties.insert(keyPath)
-          collected = properties
-        } else {
-          var properties = TrackedProperties<Subject>()
-          properties.insert(keyPath)
-          collected = properties
+    }
+    
+    enum WillSetAction {
+      case tracking([@Sendable () -> Void])
+    }
+    
+    mutating func willSet<Member>(
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
+    ) -> WillSetAction? {
+      var result = [@Sendable () -> Void]()
+      if let ids = lookups[keyPath] {
+        for id in ids {
+          switch observations[id] {
+          // the only participant of willSet is the tracking
+          case .tracking(let observation):
+            result.append(observation.observer)
+            remove(id)
+          default:
+            break
+          }
         }
-        return .resumeAndRemove(continuation)
       }
-      return nil
-    case (.tracking(let observedTrackedProperties, let observer), .willSet):
-      if observedTrackedProperties.contains(keyPath) {
-        if var properties = collected {
-          properties.insert(keyPath)
-          collected = properties
-        } else {
-          var properties = TrackedProperties<Subject>()
-          properties.insert(keyPath)
-          collected = properties
-        }
-        return .informAndRemove(observer)
+      if result.count > 0 {
+        return .tracking(result)
       } else {
         return nil
       }
-    default:
+    }
+    
+    enum DidSetAction<Member> {
+      case resumeWithMember(UnsafeContinuation<Member?, Never>)
+    }
+    
+    mutating func didSet<Member>(
+      _ subject: Subject,
+      keyPath: KeyPath<Subject, Member>
+    ) -> [DidSetAction<Member>] {
+      var actions = [DidSetAction<Member>]()
+      if let ids = lookups[keyPath] {
+        for id in ids {
+          switch observations[id] {
+          case .idleChanges(let observation):
+            let change =
+              ObservedChange(subject: subject, properties: [keyPath])
+            observations[id] = observation.transitionToPending(change)
+            break
+          case .none:
+            fatalError("Internal inconsistency")
+          case .pendingChange(let observation):
+            observations[id] = observation.inserting(subject, keyPath)
+          case .activeChange(let observation):
+            let change = ObservedChange(subject: subject, properties: [keyPath])
+            observation.continuation.resume(returning: change)
+            observations[id] = observation.transitionToIdle()
+          case .idleValues(let observation):
+            observations[id] = observation.transitionToPending(subject)
+          case .pendingValue:
+            // the placeholder already has the subject of 
+            // observation so no need to update
+            break
+          case .activeValue(let observation):
+            observations[id] = observation.transitionToIdle()
+            actions.append(
+              .resumeWithMember(
+                unsafeBitCast(
+                  observation.rawContinuation,
+                  to: UnsafeContinuation<Member?, Never>.self
+                )
+              )
+            )
+          case .tracking:
+            // Tracking does not interplay with didSet
+            break
+          case .cancelled:
+            // cancelled does not interplay with didSet
+            break
+          }
+        }
+      }
+      return actions
+    }
+    
+    mutating func beginTransaction(
+      for properties: TrackedProperties<Subject>,
+      id: Int
+    ) {
+      switch observations[id] {
+      case .idleChanges(let observation):
+        observations[id] = observation.transitionToPending()
+      case .pendingChange:
+        // beginning more than once just no-ops past the first
+        break
+      case .activeChange: fallthrough
+      case .idleValues: fallthrough
+      case .pendingValue: fallthrough
+      case .activeValue: fallthrough
+      case .tracking: fallthrough
+      case .none:
+        fatalError("Internal inconsistency")
+      case .cancelled:
+        // cancellation can happen at any time
+        break
+      }
+    }
+    
+    mutating func insert(
+      for properties: TrackedProperties<Subject>,
+      id: Int
+    ) {
+      for keyPath in properties.raw {
+        lookups[keyPath, default: []].insert(id)
+      }
+    }
+    
+    mutating func insertNextChange(
+      for properties: TrackedProperties<Subject>,
+      continuation: UnsafeContinuation<ObservedChange<Subject>?, Never>,
+      id: Int
+    ) {
+      switch observations[id] {
+      case .idleChanges(let observation):
+        observations[id] = observation.transitionToActive(continuation)
+      case .pendingChange(let observation):
+        if let change = observation.change {
+          observations[id] = observation.transitionToIdle()
+          continuation.resume(returning: change)
+        } else {
+          observations[id] = observation.transitionToActive(continuation)
+        }
+      case .idleValues: fallthrough
+      case .pendingValue: fallthrough
+      case .activeValue: fallthrough
+      case .tracking: fallthrough
+      case .none:
+        fatalError("Internal inconsistency")
+      case .activeChange:
+        fatalError("attempting to await more than once on a non-sendable iterator")
+      case .cancelled:
+        remove(id)
+        continuation.resume(returning: nil)
+      }
+    }
+    
+    enum InsertChangeAction {
+      case resumeWithMember(Subject)
+    }
+    
+    mutating func insertNextValue<Member: Sendable>(
+        for keyPath: KeyPath<Subject, Member>,
+        properties: TrackedProperties<Subject>,
+        continuation: UnsafeContinuation<Member?, Never>,
+        id: Int
+    ) -> InsertChangeAction? {
+      switch observations[id] {
+      case .idleValues(let observation):
+        observations[id] = 
+          observation.transitionToActive(keyPath, properties, continuation)
+      case .pendingValue(let observation):
+        observations[id] = observation.transitionToIdle()
+        return .resumeWithMember(observation.subject)
+      case .activeValue:
+        fatalError("attempting to await more than once on a non-sendable iterator")
+      case .idleChanges: fallthrough
+      case .pendingChange: fallthrough
+      case .activeChange: fallthrough
+      case .tracking: fallthrough
+      case .none:
+        fatalError("Internal inconsistency")
+      case .cancelled:
+        remove(id)
+        continuation.resume(returning: nil)
+      }
       return nil
     }
-  }
-  
-  fileprivate func invalidate(
-    properties: TrackedProperties<Subject>, 
-    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
-    generation: Int
-  ) {
-    for raw in properties.raw {
-      if var members = lookup[raw] {
-        members.remove(generation)
-        if members.isEmpty {
-          lookup.removeValue(forKey: raw)
-        } else {
-          lookup[raw] = members
-        }
-      }
+    
+    mutating func insertNextTracking(
+      for properties: TrackedProperties<Subject>,
+      _ observer: @Sendable @escaping () -> Void
+    ) -> Int {
+      let id = self.id
+      self.id = id + 1
+      observations[id] = Observation(tracking: properties, observer)
+      insert(for: properties, id: id)
+      return id
     }
-  }
-  
-  fileprivate func remove(
-    from lookup: inout [PartialKeyPath<Subject>: Set<Int>], 
-    generation: Int
-  ) {
-    switch self {
-    case .transaction(let properties):
-      invalidate(properties: properties, from: &lookup, generation: generation)
-    case .pendingTransaction(let properties, _):
-      invalidate(properties: properties, from: &lookup, generation: generation)
-    case .change(let properties, _):
-      invalidate(properties: properties, from: &lookup, generation: generation)
-    case .tracking(let properties, _):
-      invalidate(properties: properties, from: &lookup, generation: generation)
-    default:
-      break
-    }
-  }
-  
-  fileprivate func deinitialize() {
-    switch self {
-    case .pendingTransaction(_, let continuation):
-      continuation.resume(returning: nil)
-    case .change(_, let continuation):
-      continuation.resume(returning: nil)
-    default:
-      break
-    }
-  }
-}
-
-@available(SwiftStdlib 5.9, *)
-extension ObservationRegistrar.State {
-  fileprivate mutating func nextGeneration() -> Int {
-    defer { generation &+= 1 }
-    return generation
-  }
-  
-  fileprivate mutating func cancel(_ generation: Int) {
-    if let existing = nexts.removeValue(forKey: generation) {
-      existing.remove(from: &lookups, generation: generation)
-      existing.deinitialize()
-    } else {
-      nexts[generation] = ObservationRegistrar.Next(kind: .cancelled)
-    }
-  }
-  
-  fileprivate mutating func insert(
-    transaction properties: TrackedProperties<Subject>, 
-    generation: Int
-  ) {
-    if let existing = nexts.removeValue(forKey: generation) {
-      switch existing.kind {
-      case .cancelled:
-        return
-      default:
-        existing.remove(from: &lookups, generation: generation)
-      }
-    }
-    nexts[generation] = ObservationRegistrar.Next(kind: .transaction(properties))
-    for raw in properties.raw {
-      lookups[raw, default: []].insert(generation)
-    }
-  }
-  
-  fileprivate mutating func insert(
-    change properties: TrackedProperties<Subject>, 
-    continuation: UnsafeContinuation<Subject?, Never>, 
-    generation: Int
-  ) {
-    guard !terminal else {
-      continuation.resume(returning: nil)
-      return
-    }
-    if let existing = nexts.removeValue(forKey: generation) {
-      switch existing.kind {
-      case .cancelled:
-        continuation.resume(returning: nil)
-        return
-      default:
-        existing.remove(from: &lookups, generation: generation)
-      }
-    }
-    nexts[generation] = 
-      ObservationRegistrar.Next(kind: .change(properties, continuation))
-    for raw in properties.raw {
-      lookups[raw, default: []].insert(generation)
-    }
-  }
-  
-  fileprivate mutating func insert(
-    properties: TrackedProperties<Subject>, 
-    tracking: @Sendable @escaping () -> Void, 
-    generation: Int
-  ) {
-    nexts[generation] = 
-      ObservationRegistrar.Next(kind: .tracking(properties, tracking))
-    for raw in properties.raw {
-      lookups[raw, default: []].insert(generation)
-    }
-  }
-  
-  fileprivate mutating func complete(
-    _ generation: Int,
-    continuation: UnsafeContinuation<TrackedProperties<Subject>?, Never>
-  ){
-    if let existing = nexts.removeValue(forKey: generation) {
-      switch existing.kind {
-      case .transaction(let properties):
-        if let collected = existing.collected {
-          continuation.resume(returning: collected)
-        } else {
-          nexts[generation] = ObservationRegistrar.Next(kind: .pendingTransaction(properties, continuation))
-        }
-      default:
-        continuation.resume(returning: nil)
-      }
-    }
-  }
-  
-  fileprivate mutating func willSet<Member>(
-    _ subject: Subject, 
-    keyPath: KeyPath<Subject, Member>
-  ) -> [() -> Void] {
-    let raw = keyPath
-    var observers = [() -> Void]()
-    for generation in lookups[raw] ?? [] {
-      if let resume = nexts[generation]?.resume(keyPath: raw, phase: .willSet) {
-        switch resume {
-        case .resumeAndRemove(let continuation):
-          continuation.resume(returning: subject)
-        case .informAndRemove(let observer):
-          observers.append(observer)
-        }
-        if let existing = nexts.removeValue(forKey: generation) {
-          existing.remove(from: &lookups, generation: generation)
-        }
-      }
-    }
-    return observers
-  }
-  
-  fileprivate mutating func didSet<Member>(
-    _ subject: Subject, 
-    keyPath: KeyPath<Subject, Member>
-  ) {
-    let raw = keyPath
-    guard let generations = lookups[raw] else {
-      return
-    }
-    for generation in generations {
-      if let resume = nexts[generation]?.resume(keyPath: raw, phase: .didSet) {
-        switch resume {
-        case .resumeAndRemove(let continuation):
-          continuation.resume(returning: subject)
-        default:
-          break
-        }
-        if let existing = nexts.removeValue(forKey: generation) {
-          existing.remove(from: &lookups, generation: generation)
-        }
+    
+    mutating func cancel(_ id: Int) {
+      switch observations[id] {
+      // Any observation state before active must identify it as cancelled
+      // just in case an active state comes along later
+      case .idleChanges: fallthrough
+      case .pendingChange: fallthrough
+      case .idleValues: fallthrough
+      case .pendingValue:
+        observations[id] = .cancelled
+      case .activeChange: fallthrough
+      case .activeValue:
+        remove(id)
+      case .tracking: fallthrough
+      case .cancelled: fallthrough
+      case .none:
+        break
       }
     }
   }
@@ -469,12 +404,95 @@ extension ObservationRegistrar.State {
 
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar.State: _Deinitializable {
-  fileprivate mutating func deinitialize() {
-    terminal = true
-    for next in nexts.values {
-      next.deinitialize()
+  mutating func deinitialize() {
+    for id in observations.keys {
+      remove(id)
     }
-    nexts.removeAll()
-    lookups.removeAll()
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension ObservationRegistrar.Context {
+  func register(
+    _ kind: ObservationRegistrar.ObservationKind, 
+    properties: TrackedProperties<Subject>
+  ) -> Int {
+    state.withCriticalRegion { $0.insert(kind, properties: properties) }
+  }
+  
+  func unregister(_ id: Int) {
+    state.withCriticalRegion { $0.remove(id) }
+  }
+  
+  private func scheduleNextChange<Isolation: Actor>(
+    for properties: TrackedProperties<Subject>,
+    isolation: isolated Isolation,
+    id: Int
+  ) async -> ObservedChange<Subject>? {
+    return await withUnsafeContinuation { continuation in
+      state.withCriticalRegion { state in
+        state.insertNextChange(
+          for: properties, 
+          continuation: continuation, 
+          id: id
+        )
+      }
+    }
+  }
+  
+  internal func nextChange<Isolation: Actor>(
+      for properties: TrackedProperties<Subject>,
+      isolation: Isolation,
+      id: Int
+  ) async -> ObservedChange<Subject>? {
+    await withTaskCancellationHandler {
+      return await scheduleNextChange(
+        for: properties, 
+        isolation: isolation, 
+        id: id
+      )
+    } onCancel: {
+      state.withCriticalRegion { $0.cancel(id) }
+    }
+  }
+  
+  internal func nextValue<Member: Sendable>(
+      for keyPath: KeyPath<Subject, Member>,
+      properties: TrackedProperties<Subject>,
+      id: Int
+  ) async -> Member? {
+    await withTaskCancellationHandler {
+      await withUnsafeContinuation { continuation in
+        let action = state.withCriticalRegion { state in
+          state.insertNextValue(
+            for: keyPath, 
+            properties: properties, 
+            continuation: continuation, 
+            id: id
+          )
+        }
+        if let action {
+          switch action {
+          case .resumeWithMember(let subject):
+            continuation.resume(returning: subject[keyPath: keyPath])
+          }
+        }
+      }
+    } onCancel: {
+      state.withCriticalRegion { $0.cancel(id) }
+    }
+  }
+  
+  internal func nextTracking(
+    for properties: TrackedProperties<Subject>,
+    _ observer: @Sendable @escaping () -> Void
+  ) -> Int {
+    state.withCriticalRegion { state in
+      state.insertNextTracking(for: properties, observer)
+    }
+  }
+  
+  internal func cancel(_ id: Int) {
+    state.withCriticalRegion { $0.cancel(id) }
   }
 }

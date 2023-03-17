@@ -15,7 +15,7 @@
 
 using namespace swift;
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 size_t _swift_observation_lock_size() {
   size_t bytes = sizeof(Mutex);
 
@@ -26,17 +26,17 @@ size_t _swift_observation_lock_size() {
   return bytes;
 }
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 void _swift_observation_lock_init(Mutex &lock) {
   new (&lock) Mutex();
 }
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 void _swift_observation_lock_lock(Mutex &lock) {
   lock.lock();
 }
 
-extern "C" SWIFT_CC(swift)
+extern "C" SWIFT_CC(swift) __attribute__((visibility("hidden")))
 void _swift_observation_lock_unlock(Mutex &lock) {
   lock.unlock();
 }

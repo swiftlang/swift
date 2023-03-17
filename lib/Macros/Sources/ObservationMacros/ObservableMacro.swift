@@ -51,17 +51,22 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
       let _registrar = ObservationRegistrar<\(parentName)>()
       """
 
-    let transactions: DeclSyntax =
+    let changes: DeclSyntax =
       """
-      public nonisolated func transactions<Delivery>(for properties: TrackedProperties<\(parentName)>, isolation: Delivery) -> ObservedTransactions<\(parentName), Delivery> where Delivery: Actor {
-        _registrar.transactions(for: properties, isolation: isolation)
+      public nonisolated func changes<Isolation: Actor>(
+        for properties: TrackedProperties<\(parentName)>,
+        isolatedTo isolation: Isolation
+      ) -> ObservedChanges<\(parentName), Isolation> {
+        _registrar.changes(for: properties, isolatedTo: isolation)
       }
       """
 
-    let changes: DeclSyntax =
+    let values: DeclSyntax =
       """
-      public nonisolated func changes<Member>(for keyPath: KeyPath<\(parentName), Member>) -> ObservedChanges<\(parentName), Member> where Member: Sendable {
-        _registrar.changes(for: keyPath)
+      public nonisolated func values<Member: Sendable>(
+        for keyPath: KeyPath<\(parentName), Member>
+      ) -> ObservedValues<\(parentName), Member> {
+        _registrar.values(for: keyPath)
       }
       """
 
@@ -85,8 +90,8 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
 
     return [
       registrar,
-      transactions,
       changes,
+      values,
       storageStruct,
       storage,
     ]
