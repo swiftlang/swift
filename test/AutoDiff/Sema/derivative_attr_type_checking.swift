@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s -package-name myPkg
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s -package-name myPkg
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
 
@@ -1001,6 +1001,12 @@ func _public_original_usablefrominline_derivative(_ x: Float) -> (value: Float, 
   fatalError()
 }
 
+package func package_original_package_derivative(_ x: Float) -> Float { x }
+@derivative(of: package_original_package_derivative)
+package func _package_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 func internal_original_internal_derivative(_ x: Float) -> Float { x }
 @derivative(of: internal_original_internal_derivative)
 func _internal_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
@@ -1040,6 +1046,28 @@ func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: F
   fatalError()
 }
 
+
+package func package_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: package_original_usablefrominline_derivative)
+package func _package_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+package func package_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+@derivative(of: package_original_inlinable_derivative)
+package func _package_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+package func package_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: package_original_alwaysemitintoclient_derivative)
+package func _package_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 // MARK: - Original function visibility < derivative function visibility
 
 @usableFromInline
@@ -1051,11 +1079,36 @@ public func _usablefrominline_original_public_derivative(_ x: Float) -> (value: 
   fatalError()
 }
 
+@usableFromInline
+package func package_usablefrominline_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package__usablefrominline_original_public_derivative' is public, but original function 'package_usablefrominline_original_public_derivative' is package}}
+@derivative(of: package_usablefrominline_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-7=package}}
+public func _package__usablefrominline_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+package func package_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package_original_public_derivative' is public, but original function 'package_original_public_derivative' is package}}
+@derivative(of: package_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-7=package}}
+public func _package_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 func internal_original_public_derivative(_ x: Float) -> Float { x }
 // expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_public_derivative' is public, but original function 'internal_original_public_derivative' is internal}}
 @derivative(of: internal_original_public_derivative)
 // expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-7=internal}}
 public func _internal_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_package_derivative' is package, but original function 'internal_original_package_derivative' is internal}}
+@derivative(of: internal_original_package_derivative)
+// expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-8=internal}}
+package func _internal_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 
@@ -1073,6 +1126,14 @@ private func private_original_public_derivative(_ x: Float) -> Float { x }
 @derivative(of: private_original_public_derivative)
 // expected-note @+1 {{mark the derivative function as 'private' to match the original function}} {{1-7=private}}
 public func _private_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_package_derivative' is package, but original function 'private_original_package_derivative' is private}}
+@derivative(of: private_original_package_derivative)
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}}
+package func _private_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 
@@ -1110,11 +1171,27 @@ fileprivate func _public_original_private_derivative(_ x: Float) -> (value: Floa
   fatalError()
 }
 
+public func public_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_package_derivative' is package, but original function 'public_original_package_derivative' is public}}
+@derivative(of: public_original_package_derivative)
+package func _public_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  // expected-note @-1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{-1:1-1=@usableFromInline }}
+  fatalError()
+}
+
 public func public_original_internal_derivative(_ x: Float) -> Float { x }
 // expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_internal_derivative' is internal, but original function 'public_original_internal_derivative' is public}}
 @derivative(of: public_original_internal_derivative)
 func _public_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 // expected-note @-1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{-1:1-1=@usableFromInline }}
+  fatalError()
+}
+
+package func package_original_internal_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package_original_internal_derivative' is internal, but original function 'package_original_internal_derivative' is package}}
+@derivative(of: package_original_internal_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-1=package }}
+func _package_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 

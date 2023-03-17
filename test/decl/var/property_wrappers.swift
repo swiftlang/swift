@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
 
 // ---------------------------------------------------------------------------
 // Property wrapper type definitions
@@ -617,6 +617,21 @@ public struct HasUsableFromInlineWrapper<T> {
   @InternalWrapper
   @usableFromInline
   var y: [T] = []
+  // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+}
+
+public struct HasUsableFromInlinePackageWrapper<T> {
+  @propertyWrapper
+  package struct PackageWrapper<U> { // expected-note{{type declared here}}
+    package var wrappedValue: U
+    package init(wrappedValue initialValue: U) {
+      self.wrappedValue = initialValue
+    }
+  }
+
+  @PackageWrapper
+  @usableFromInline
+  package var y: [T] = []
   // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
