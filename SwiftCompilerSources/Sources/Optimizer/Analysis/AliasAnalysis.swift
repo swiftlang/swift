@@ -18,7 +18,7 @@ struct AliasAnalysis {
 
   func mayRead(_ inst: Instruction, fromAddress: Value) -> Bool {
     switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, fromAddress.bridged) {
-      case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -27,7 +27,7 @@ struct AliasAnalysis {
 
   func mayWrite(_ inst: Instruction, toAddress: Value) -> Bool {
     switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, toAddress.bridged) {
-      case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -36,8 +36,7 @@ struct AliasAnalysis {
 
   func mayReadOrWrite(_ inst: Instruction, address: Value) -> Bool {
     switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, address.bridged) {
-      case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
-           MayHaveSideEffectsBehavior:
+      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -64,7 +63,7 @@ struct AliasAnalysis {
   static func register() {
     AliasAnalysis_register(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
+      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> swift.MemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
@@ -72,16 +71,16 @@ struct AliasAnalysis {
         if let apply = inst as? ApplySite {
           let effect = getMemoryEffect(of: apply, for: val, path: path, context)
           switch (effect.read, effect.write) {
-            case (false, false): return NoneBehavior
-            case (true, false):  return MayReadBehavior
-            case (false, true):  return MayWriteBehavior
-            case (true, true):   return MayReadWriteBehavior
+            case (false, false): return .None
+            case (true, false):  return .MayRead
+            case (false, true):  return .MayWrite
+            case (true, true):   return .MayReadWrite
           }
         }
         if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true), context) {
-          return MayReadWriteBehavior
+          return .MayReadWrite
         }
-        return NoneBehavior
+        return .None
       },
 
       // isObjReleasedFn

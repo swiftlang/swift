@@ -707,11 +707,10 @@ inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
     static_cast<const AliasAnalysis *>(aa.aliasAnalysis));
 }
 
-BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
+MemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
                                                    BridgedInstruction inst,
                                                    BridgedValue addr) {
-  return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
-    computeMemoryBehavior(inst.getInst(), addr.getSILValue());
+  return castToAliasAnalysis(aa)->computeMemoryBehavior(inst.getInst(), addr.getSILValue());
 }
 
 void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,

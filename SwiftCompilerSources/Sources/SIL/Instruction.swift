@@ -75,7 +75,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   final public var mayReadFromMemory: Bool {
     switch bridged.getMemBehavior() {
-      case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -84,7 +84,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   final public var mayWriteToMemory: Bool {
     switch bridged.getMemBehavior() {
-      case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -93,8 +93,7 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   final public var mayReadOrWriteMemory: Bool {
     switch bridged.getMemBehavior() {
-      case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
-           MayHaveSideEffectsBehavior:
+      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false

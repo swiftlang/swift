@@ -146,16 +146,6 @@ struct BridgedOperandArray {
   SwiftInt count;
 };
 
-// Must be in sync with SILInstruction::MemoryBehavior
-// TODO: do this less hacky.
-typedef enum {
-  NoneBehavior,
-  MayReadBehavior,
-  MayWriteBehavior,
-  MayReadWriteBehavior,
-  MayHaveSideEffectsBehavior
-} BridgedMemoryBehavior;
-
 struct BridgedFunction {
   SwiftObject obj;
 
@@ -287,7 +277,7 @@ struct BridgedFunction {
                                            BridgedArrayRef);
   typedef SwiftInt (* _Nonnull CopyEffectsFn)(BridgedFunction, BridgedFunction);
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
-  typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
+  typedef swift::MemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
 
   static void registerBridging(SwiftMetatype metatype,
               RegisterFn initFn, RegisterFn destroyFn,
@@ -386,8 +376,8 @@ struct BridgedInstruction {
     return getInst()->getDebugLocation();
   }
 
-  BridgedMemoryBehavior getMemBehavior() const {
-    return (BridgedMemoryBehavior)getInst()->getMemoryBehavior();
+  swift::MemoryBehavior getMemBehavior() const {
+    return getInst()->getMemoryBehavior();
   }
 
   bool mayRelease() const {

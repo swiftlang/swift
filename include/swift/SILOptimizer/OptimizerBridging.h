@@ -41,7 +41,7 @@ typedef struct {
 } BridgedCalleeAnalysis;
 
 typedef bool (* _Nonnull InstructionIsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
-typedef BridgedMemoryBehavior(* _Nonnull CalleeAnalysisGetMemBehvaiorFn)(
+typedef swift::MemoryBehavior (* _Nonnull CalleeAnalysisGetMemBehvaiorFn)(
       BridgedPassContext context, BridgedInstruction apply, bool observeRetains);
 
 void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn,
@@ -94,9 +94,9 @@ void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
 
-BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
-                                                   BridgedInstruction inst,
-                                                   BridgedValue addr);
+swift::MemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
+                                                                   BridgedInstruction inst,
+                                                                   BridgedValue addr);
 
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
@@ -127,7 +127,7 @@ SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated);
 
-typedef BridgedMemoryBehavior (* _Nonnull AliasAnalysisGetMemEffectFn)(
+typedef swift::MemoryBehavior (* _Nonnull AliasAnalysisGetMemEffectFn)(
       BridgedPassContext context, BridgedValue, BridgedInstruction);
 typedef bool (* _Nonnull AliasAnalysisEscaping2InstFn)(
       BridgedPassContext context, BridgedValue, BridgedInstruction);

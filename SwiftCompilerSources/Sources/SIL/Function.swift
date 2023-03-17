@@ -307,7 +307,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         return BridgedFunction.EffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
       },
       // getMemBehaviorFn
-      { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
+      { (f: BridgedFunction, observeRetains: Bool) -> swift.MemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
       }
@@ -342,15 +342,15 @@ extension OptionalBridgedFunction {
 }
 
 public extension SideEffects.GlobalEffects {
-  func getMemBehavior(observeRetains: Bool) -> BridgedMemoryBehavior {
+  func getMemBehavior(observeRetains: Bool) -> swift.MemoryBehavior {
     if allocates || ownership.destroy || (ownership.copy && observeRetains) {
-      return MayHaveSideEffectsBehavior
+      return .MayHaveSideEffects
     }
     switch (memory.read, memory.write) {
-    case (false, false): return NoneBehavior
-    case (true, false): return MayReadBehavior
-    case (false, true): return MayWriteBehavior
-    case (true, true): return MayReadWriteBehavior
+    case (false, false): return .None
+    case (true, false): return .MayRead
+    case (false, true): return .MayWrite
+    case (true, true): return .MayReadWrite
     }
   }
 }
