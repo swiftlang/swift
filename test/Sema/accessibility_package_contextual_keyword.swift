@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: split-file %s %t
 
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %t/main.swift -package-name myPkg
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %t/A.swift -package-name myPkg
@@ -7,14 +6,16 @@
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %t/D.swift -package-name myPkg
 // RUN: not %target-swift-frontend-typecheck -verify -disable-availability-checking %t/C.swift -package-name myPkg 2>&1 | %FileCheck %s
 
-// BEGIN main.swift
+//--- main.swift
 package(set) public var a: String // should pass when `package` modifier is used at top level decls
 public package(set) var b: String
 package let c: Int
 package var d: Int
 package func f() {}
+package func package() {}
+package()
 
-// BEGIN A.swift
+//--- A.swift
 package class package { // package can be a type name
   package init() {}
   package var package: String?  // package can be a var name
@@ -38,19 +39,19 @@ public class MyClass {
   }
 }
 
-// BEGIN B.swift
+//--- B.swift
 public class Foo {
   package(set) public var x: String?
   public package(set) var y: Int?
 }
 
-// BEGIN C.swift
+//--- C.swift
 public class Bar {
   package package(set) package: String? // CHECK: warning: 'package(set)' modifier is redundant for a package var
   package(set) package package: String? // CHECK: warning: 'package(set)' modifier is redundant for a package var
 }
 
-// BEGIN D.swift
+//--- D.swift
 enum MyColor {
   case red, green, blue
 }
