@@ -2721,9 +2721,9 @@ namespace {
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
       size_t specializationLimit = !isPair ? 1000 : 10000;
-      if (!isPair &&
-          llvm::size(decl->getSpecializedTemplate()->specializations()) >
-              specializationLimit) {
+      if (size_t(
+              llvm::size(decl->getSpecializedTemplate()->specializations())) >
+          specializationLimit) {
         std::string name;
         llvm::raw_string_ostream os(name);
         decl->printQualifiedName(os);
