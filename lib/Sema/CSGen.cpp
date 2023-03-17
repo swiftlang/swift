@@ -2985,7 +2985,14 @@ namespace {
         }
       } collectVarRefs(CS);
 
-      closure->walk(collectVarRefs);
+      // Walk the capture list if this closure has one,  because it could
+      // reference declarations from the outer closure.
+      if (auto *captureList =
+              getAsExpr<CaptureListExpr>(CS.getParentExpr(closure))) {
+        captureList->walk(collectVarRefs);
+      } else {
+        closure->walk(collectVarRefs);
+      }
 
       auto inferredType = inferClosureType(closure);
       if (!inferredType || inferredType->hasError())
@@ -2993,15 +3000,6 @@ namespace {
 
       SmallVector<TypeVariableType *, 4> referencedVars{
           collectVarRefs.varRefs.begin(), collectVarRefs.varRefs.end()};
-
-      if (auto *captureList =
-              getAsExpr<CaptureListExpr>(CS.getParentExpr(closure))) {
-        for (const auto &capture : captureList->getCaptureList()) {
-          if (auto *typeVar =
-                  CS.getType(capture.getVar())->getAs<TypeVariableType>())
-            referencedVars.push_back(typeVar);
-        }
-      }
 
       CS.addUnsolvedConstraint(Constraint::create(
           CS, ConstraintKind::DefaultClosureType, closureType, inferredType,
@@ -4114,13 +4112,6 @@ namespace {
       // Generate constraints for each of the entries in the capture list.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         TypeChecker::diagnoseDuplicateCaptureVars(captureList);
-
-        auto &CS = CG.getConstraintSystem();
-        for (const auto &capture : captureList->getCaptureList()) {
-          SyntacticElementTarget target(capture.PBD);
-          if (CS.generateConstraints(target))
-            return Action::Stop();
-        }
       }
 
       // Both multi- and single-statement closures now behave the same way

@@ -1012,7 +1012,30 @@ private:
   void visitBraceStmt(BraceStmt *braceStmt) {
     auto &ctx = cs.getASTContext();
 
+    CaptureListExpr *captureList = nullptr;
+    {
+      if (locator->directlyAt<ClosureExpr>()) {
+        auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+        captureList = getAsExpr<CaptureListExpr>(cs.getParentExpr(closure));
+      }
+    }
+
     if (context.isSingleExpressionClosure(cs)) {
+      // Generate constraints for the capture list first.
+      //
+      // TODO: This should be a conjunction connected to
+      // the closure body to make sure that each capture
+      // is solved in isolation.
+      if (captureList) {
+        for (const auto &capture : captureList->getCaptureList()) {
+          SyntacticElementTarget target(capture.PBD);
+          if (cs.generateConstraints(target)) {
+            hadError = true;
+            return;
+          }
+        }
+      }
+
       for (auto node : braceStmt->getElements()) {
         if (auto expr = node.dyn_cast<Expr *>()) {
           auto generatedExpr = cs.generateConstraints(
@@ -1028,6 +1051,8 @@ private:
       }
       return;
     }
+
+    SmallVector<ElementInfo, 4> elements;
 
     // If this brace statement represents a body of an empty or
     // multi-statement closure.
@@ -1054,10 +1079,24 @@ private:
             cs.getConstraintLocator(closure, ConstraintLocator::ClosureResult));
       }
 
+      // If this multi-statement closure has captures, let's solve
+      // them first.
+      if (captureList) {
+        for (const auto &capture : captureList->getCaptureList())
+          visitPatternBinding(capture.PBD, elements);
+      }
+
       // Let's not walk into the body if empty or multi-statement closure
       // doesn't participate in inference.
-      if (!cs.participatesInInference(closure))
+      if (!cs.participatesInInference(closure)) {
+        // Although the body doesn't participate in inference we still
+        // want to type-check captures to make sure that the context
+        // is valid.
+        if (captureList)
+          createConjunction(cs, elements, locator);
+
         return;
+      }
     }
 
     if (isChildOf(StmtKind::Case)) {
@@ -1070,7 +1109,6 @@ private:
       }
     }
 
-    SmallVector<ElementInfo, 4> elements;
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
           !cs.containsIDEInspectionTarget(element)) {
