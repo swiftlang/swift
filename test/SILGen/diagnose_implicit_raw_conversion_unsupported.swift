@@ -39,26 +39,3 @@ func test_unsupported<T>(arg: T) {
     writeInt8(&byteArray) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<UInt8>' to expected argument type 'UnsafeMutablePointer<Int8>'}}
                           // expected-note@-1 {{arguments to generic parameter 'Pointee' ('UInt8' and 'Int8') are expected to be equal}}
 }
-
-// Array<T> to C pointer conversion is supported under SE-0324
-func test_array_to_c_pointer_concrete() {
-    let constIntArray: [Int8] = [0]
-    read_uchar(constIntArray)
-
-    let constUIntArray: [UInt8] = [0]
-    read_char(constUIntArray)
-
-    var intArray: [Int8] = [0] // expected-warning {{variable 'intArray' was never mutated; consider changing to 'let' constant}}
-    read_uchar(intArray)
-
-    var uintArray: [UInt8] = [0] // expected-warning {{variable 'uintArray' was never mutated; consider changing to 'let' constant}}
-    read_char(uintArray)
-
-}
-
-// Array<T> to C pointer conversion is supported under SE-0324
-func test_array_to_c_pointer_generic<T>(arg: T) {
-    let constArray: [T] = [arg]
-    read_char(constArray)
-    read_uchar(constArray)
-}

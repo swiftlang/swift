@@ -38,6 +38,8 @@ func test_errors<T>(arg: T, sarg: String) {
 
     let constArray: [T] = [arg]
     readBytes(constArray) // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
+    read_char(constArray) // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
+    read_uchar(constArray) // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
 
     var array: [T] = [arg]
     readBytes(&array)     // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
@@ -81,6 +83,8 @@ func test_explicit<T>(arg: T, sarg: String) {
     let constArray: [T] = [arg]
     constArray.withUnsafeBytes() {
         readBytes($0.baseAddress!)
+        read_char($0.baseAddress!)
+        read_uchar($0.baseAddress!)
     }
     var array: [T] = [arg]
     array.withUnsafeBytes() {
@@ -118,10 +122,10 @@ func test_accepted<I: FixedWidthInteger>(intArg: I, sarg: String, simdArg: SIMD4
     read_uchar(&int)
     write_uchar(&int)
 
-    let constArray: [I] = [intArg]
-    readBytes(constArray)
-    // read_char(constArray) - this case never worked because of a bug in SE-0324
-    // read_uchar(constArray) - this case never worked because of a bug in SE-0324
+    let constIntArray: [I] = [intArg]
+    readBytes(constIntArray)
+    read_char(constIntArray)
+    read_uchar(constIntArray)
 
     var intArray: [I] = [intArg]
     readBytes(&intArray)
@@ -131,6 +135,11 @@ func test_accepted<I: FixedWidthInteger>(intArg: I, sarg: String, simdArg: SIMD4
     read_uchar(&intArray)
     write_uchar(&intArray)
 
+    let constByteArray: [UInt8] = [0]
+    readBytes(constByteArray)
+    read_char(constByteArray)
+    read_uchar(constByteArray)
+
     var byteArray: [UInt8] = [0]
     readBytes(&byteArray)
     writeBytes(&byteArray)
@@ -139,6 +148,19 @@ func test_accepted<I: FixedWidthInteger>(intArg: I, sarg: String, simdArg: SIMD4
     write_char(&byteArray)
     read_uchar(byteArray)
     write_uchar(&byteArray)
+
+    let constInt8Array: [Int8] = [0]
+    readBytes(constInt8Array)
+    read_char(constInt8Array)
+    read_uchar(constInt8Array)
+
+    var int8Array: [Int8] = [0]
+    readBytes(&int8Array)
+    writeBytes(&int8Array)
+    read_char(&int8Array)
+    write_char(&int8Array)
+    read_uchar(&int8Array)
+    write_uchar(&int8Array)
 
     let string: String = sarg
     readBytes(string)
