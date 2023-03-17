@@ -446,7 +446,7 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   if (auto cls = dyn_cast<ClassDecl>(target)) {
     if (cls->isRootDefaultActor()) {
       numFields++;
-    } else if (cls->isRootDefaultActor()) {
+    } else if (cls->isNonDefaultExplicitDistributedActor()) {
       numFields++;
     }
   }
