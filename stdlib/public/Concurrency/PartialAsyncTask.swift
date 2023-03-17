@@ -42,11 +42,13 @@ public struct UnownedJob: Sendable {
     self.context = context
   }
 
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Create an `UnownedJob` whose lifetime must be managed carefully until it is run exactly once.
   @available(SwiftStdlib 5.9, *)
   public init(_ job: __owned Job) {
     self.context = job.context
   }
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// The priority of this job.
   @available(SwiftStdlib 5.9, *)
@@ -102,7 +104,8 @@ extension UnownedJob: CustomStringConvertible {
   }
 }
 
-/// A unit of scheduleable work.
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+//// A unit of scheduleable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -165,6 +168,7 @@ extension Job {
     _swiftJobRun(UnownedJob(self), executor)
   }
 }
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 // ==== -----------------------------------------------------------------------
 // MARK: JobPriority
