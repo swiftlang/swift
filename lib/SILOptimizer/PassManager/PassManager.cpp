@@ -1499,7 +1499,7 @@ bool PassContext_getNeedFixStackNesting(BridgedPassContext context) {
 
 void PassContext_fixStackNesting(BridgedPassContext passContext,
                                  BridgedFunction function) {
-  switch (StackNesting::fixNesting(castToFunction(function))) {
+  switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
       break;
     case StackNesting::Changes::Instructions:
@@ -1640,7 +1640,7 @@ PassContext_getContextSubstitutionMap(BridgedPassContext context,
 }
 
 void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
-  castToPassInvocation(ctxt)->beginTransformFunction(castToFunction(function));
+  castToPassInvocation(ctxt)->beginTransformFunction(function.getFunction());
 }
 
 void PassContext_endTransformFunction(BridgedPassContext ctxt) {
@@ -1657,7 +1657,7 @@ PassContext_firstFunctionInModule(BridgedPassContext context) {
 
 OptionalBridgedFunction
 PassContext_nextFunctionInModule(BridgedFunction function) {
-  auto *f = castToFunction(function);
+  auto *f = function.getFunction();
   auto nextIter = std::next(f->getIterator());
   if (nextIter == f->getModule().getFunctions().end())
     return {nullptr};

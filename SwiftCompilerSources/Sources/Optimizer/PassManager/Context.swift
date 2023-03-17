@@ -301,7 +301,7 @@ extension TermInst {
 extension Function {
   func set(needStackProtection: Bool, _ context: FunctionPassContext) {
     context.notifyEffectsChanged()
-    SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
+    bridged.setNeedStackProtection(needStackProtection)
   }
 
   func fixStackNesting(_ context: FunctionPassContext) {

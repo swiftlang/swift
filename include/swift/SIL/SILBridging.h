@@ -20,6 +20,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILFunctionConventions.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILVTable.h"
@@ -32,6 +34,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 struct BridgedInstruction;
 struct OptionalBridgedOperand;
 struct OptionalBridgedSuccessor;
+struct OptionalBridgedBasicBlock;
 
 enum ChangeNotificationKind {
   instructionsChanged,
@@ -127,6 +130,16 @@ struct BridgedOperandArray {
   SwiftInt count;
 };
 
+// Must be in sync with SILInstruction::MemoryBehavior
+// TODO: do this less hacky.
+typedef enum {
+  NoneBehavior,
+  MayReadBehavior,
+  MayWriteBehavior,
+  MayReadWriteBehavior,
+  MayHaveSideEffectsBehavior
+} BridgedMemoryBehavior;
+
 struct BridgedFunction {
   SwiftObject obj;
 
@@ -134,11 +147,143 @@ struct BridgedFunction {
   swift::SILFunction * _Nonnull getFunction() const {
     return static_cast<swift::SILFunction *>(obj);
   }
+
+  // Unfortunately we need to take a detour over this enum.
+  // Currently it's not possible to switch over `SILArgumentConvention::ConventionType`,
+  // because it's not a class enum.
+  enum class ArgumentConvention {
+    Indirect_In,
+    Indirect_In_Guaranteed,
+    Indirect_Inout,
+    Indirect_InoutAliasable,
+    Indirect_Out,
+    Direct_Owned,
+    Direct_Unowned,
+    Direct_Guaranteed
+  };
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef getName() const { return getFunction()->getName(); }
+
+  std::string getDebugDescription() const;
+
+  bool hasOwnership() const { return getFunction()->hasOwnership(); }
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedBasicBlock getFirstBlock() const;
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedBasicBlock getLastBlock() const;
+
+  SwiftInt getNumIndirectFormalResults() const {
+    return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumIndirectFormalResults();
+  }
+
+  SwiftInt getNumParameters() const {
+    return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumParameters();
+  }
+
+  SwiftInt getSelfArgumentIndex() const {
+    swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
+    swift::CanSILFunctionType fTy = getFunction()->getLoweredFunctionType();
+    if (!fTy->hasSelfParam())
+      return -1;
+    return conv.getNumParameters() + conv.getNumIndirectSILResults() - 1;
+  }
+
+  SwiftInt getNumSILArguments() const {
+    return swift::SILFunctionConventions(getFunction()->getConventionsInContext()).getNumSILArguments();
+  }
+
+  swift::SILType getSILArgumentType(SwiftInt idx) const {
+    swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
+    return conv.getSILArgumentType(idx, getFunction()->getTypeExpansionContext());
+  }
+
+  ArgumentConvention getBridged(swift::SILArgumentConvention conv) const;
+
+  ArgumentConvention getSILArgumentConvention(SwiftInt idx) const {
+    swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
+    return getBridged(swift::SILArgumentConvention(conv.getParamInfoForSILArg(idx).getConvention()));
+  }
+
+  swift::SILType getSILResultType() const {
+    swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
+    return conv.getSILResultType(getFunction()->getTypeExpansionContext());
+  }
+
+  bool isSwift51RuntimeAvailable() const {
+    if (getFunction()->getResilienceExpansion() != swift::ResilienceExpansion::Maximal)
+      return false;
+
+    swift::ASTContext &ctxt = getFunction()->getModule().getASTContext();
+    return swift::AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(ctxt.getSwift51Availability());
+  }
+
+  bool isPossiblyUsedExternally() const {
+    return getFunction()->isPossiblyUsedExternally();
+  }
+
+  bool isAvailableExternally() const {
+    return getFunction()->isAvailableExternally();
+  }
+
+  bool hasSemanticsAttr(llvm::StringRef attrName) const {
+    return getFunction()->hasSemanticsAttr(attrName) ? 1 : 0;
+  }
+
+  swift::EffectsKind getEffectAttribute() const {
+    return getFunction()->getEffectsKind();
+  }
+
+  bool needsStackProtection() const {
+    return getFunction()->needsStackProtection();
+  }
+
+  void setNeedStackProtection(bool needSP) const {
+    getFunction()->setNeedStackProtection(needSP);
+  }
+
+  enum class ParseEffectsMode {
+    argumentEffectsFromSource,
+    argumentEffectsFromSIL,
+    globalEffectsFromSIL,
+    multipleEffectsFromSIL
+  };
+
+  struct ParsingError {
+    const unsigned char * _Nullable message;
+    SwiftInt position;
+  };
+
+  struct EffectInfo {
+    SwiftInt argumentIndex;
+    bool isDerived;
+    bool isEmpty;
+    bool isValid;
+  };
+
+  typedef void (* _Nonnull RegisterFn)(BridgedFunction f, void * _Nonnull data, SwiftInt size);
+  typedef void (* _Nonnull WriteFn)(BridgedFunction, BridgedOStream, SwiftInt);
+  typedef ParsingError (*_Nonnull ParseFn)(BridgedFunction,
+                                           llvm::StringRef,
+                                           ParseEffectsMode, SwiftInt,
+                                           BridgedArrayRef);
+  typedef SwiftInt (* _Nonnull CopyEffectsFn)(BridgedFunction, BridgedFunction);
+  typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
+  typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
+
+  static void registerBridging(SwiftMetatype metatype,
+              RegisterFn initFn, RegisterFn destroyFn,
+              WriteFn writeFn, ParseFn parseFn,
+              CopyEffectsFn copyEffectsFn,
+              GetEffectInfoFn effectInfoFn,
+              GetMemBehaviorFn memBehaviorFn);
 };
 
-typedef struct {
+struct OptionalBridgedFunction {
   OptionalSwiftObject obj;
-} OptionalBridgedFunction;
+};
 
 typedef struct {
   SwiftObject obj;
@@ -176,9 +321,9 @@ struct BridgedSuccessorArray {
   SwiftInt count;
 };
 
-typedef struct {
+struct OptionalBridgedBasicBlock {
   OptionalSwiftObject obj;
-} OptionalBridgedBasicBlock;
+};
 
 typedef struct {
   SwiftObject obj;
@@ -290,43 +435,10 @@ struct OptionalBridgedDefaultWitnessTable {
 };
 
 typedef struct {
-  const unsigned char * _Nullable message;
-  SwiftInt position;
-} BridgedParsingError;
-
-typedef struct {
   OptionalBridgedInstruction insertBefore;
   OptionalBridgedBasicBlock insertAtEnd;
   swift::SILDebugLocation loc;
 } BridgedBuilder;
-
-// Must be in sync with SILInstruction::MemoryBehavior
-// TODO: do this less hacky.
-typedef enum {
-  NoneBehavior,
-  MayReadBehavior,
-  MayWriteBehavior,
-  MayReadWriteBehavior,
-  MayHaveSideEffectsBehavior
-} BridgedMemoryBehavior;
-
-typedef enum {
-  EffectKind_none,
-  EffectKind_readNone,
-  EffectKind_readOnly,
-  EffectKind_releaseNone,
-} BridgedEffectAttributeKind;
-
-typedef enum {
-  ArgumentConvention_Indirect_In,
-  ArgumentConvention_Indirect_In_Guaranteed,
-  ArgumentConvention_Indirect_Inout,
-  ArgumentConvention_Indirect_InoutAliasable,
-  ArgumentConvention_Indirect_Out,
-  ArgumentConvention_Direct_Owned,
-  ArgumentConvention_Direct_Unowned,
-  ArgumentConvention_Direct_Guaranteed,
-} BridgedArgumentConvention;
 
 // AST bridging
 
@@ -334,42 +446,7 @@ struct BridgedNominalTypeDecl {
   swift::NominalTypeDecl * _Nonnull decl;
 };
 
-struct BridgedEffectInfo {
-  SwiftInt argumentIndex;
-  bool isDerived;
-  bool isEmpty;
-  bool isValid;
-};
-
-typedef enum {
-  ParseArgumentEffectsFromSource,
-  ParseArgumentEffectsFromSIL,
-  ParseGlobalEffectsFromSIL,
-  ParseMultipleEffectsFromSIL
-} ParseEffectsMode;
-
 void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
-
-typedef void (* _Nonnull FunctionRegisterFn)(BridgedFunction f,
-                                        void * _Nonnull data,
-                                        SwiftInt size);
-typedef void (* _Nonnull FunctionWriteFn)(BridgedFunction,
-                                          BridgedOStream, SwiftInt);
-typedef BridgedParsingError (*_Nonnull FunctionParseFn)(BridgedFunction,
-                                                        llvm::StringRef,
-                                                        ParseEffectsMode, SwiftInt,
-                                                        BridgedArrayRef);
-typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
-                                                    BridgedFunction);
-typedef BridgedEffectInfo (* _Nonnull FunctionGetEffectInfoFn)(BridgedFunction, SwiftInt);
-typedef BridgedMemoryBehavior (* _Nonnull FunctionGetMemBehviorFn)(BridgedFunction, bool);
-
-void Function_register(SwiftMetatype metatype,
-            FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
-            FunctionWriteFn writeFn, FunctionParseFn parseFn,
-            FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectInfoFn effectInfoFn,
-            FunctionGetMemBehviorFn memBehaviorFn);
 
 SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst);
@@ -380,28 +457,6 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block);
-
-llvm::StringRef SILFunction_getName(BridgedFunction function);
-std::string SILFunction_debugDescription(BridgedFunction function);
-SwiftInt SILFunction_hasOwnership(BridgedFunction function);
-OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
-OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
-SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
-SwiftInt SILFunction_numParameterArguments(BridgedFunction function);
-SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
-SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
-swift::SILType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
-BridgedArgumentConvention SILFunction_getSILArgumentConvention(BridgedFunction function, SwiftInt idx);
-swift::SILType SILFunction_getSILResultType(BridgedFunction function);
-SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
-SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function);
-SwiftInt SILFunction_isAvailableExternally(BridgedFunction function);
-SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
-                                      llvm::StringRef attrName);
-BridgedEffectAttributeKind SILFunction_getEffectAttribute(BridgedFunction function);
-SwiftInt SILFunction_needsStackProtection(BridgedFunction function);
-void SILFunction_setNeedStackProtection(BridgedFunction function,
-                                        SwiftInt needSP);
 
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
@@ -433,7 +488,7 @@ bool SILLocation_equal(swift::SILDebugLocation lhs, swift::SILDebugLocation rhs)
 bool SILLocation_hasSameSourceLocation(swift::SILDebugLocation lhs, swift::SILDebugLocation rhs);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
-BridgedArgumentConvention SILArgument_getConvention(BridgedArgument argument);
+BridgedFunction::ArgumentConvention SILArgument_getConvention(BridgedArgument argument);
 
 OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
 OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
@@ -515,8 +570,7 @@ void KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt compone
                                             KeyPathFunctionResults * _Nonnull results);
 
 swift::SubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
-BridgedArgumentConvention
-ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
+BridgedFunction::ArgumentConvention ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
 SwiftInt ApplySite_getNumArguments(BridgedInstruction inst);
 SwiftInt FullApplySite_numIndirectResultArguments(BridgedInstruction inst);
 
@@ -582,6 +636,14 @@ OptionalBridgedSuccessor BridgedSuccessor::getNext() const {
 
 BridgedInstruction BridgedSuccessor::getContainingInst() const {
   return {succ->getContainingInst()};
+}
+
+OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
+  return {getFunction()->empty() ? nullptr : getFunction()->getEntryBlock()};
+}
+
+OptionalBridgedBasicBlock BridgedFunction::getLastBlock() const {
+  return {getFunction()->empty() ? nullptr : &*getFunction()->rbegin()};
 }
 
 

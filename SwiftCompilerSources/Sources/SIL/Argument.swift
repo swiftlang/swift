@@ -193,17 +193,17 @@ extension BridgedArgument {
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }
 
-extension BridgedArgumentConvention {
+extension BridgedFunction.ArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
-      case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case ArgumentConvention_Indirect_Inout:          return .indirectInout
-      case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable
-      case ArgumentConvention_Indirect_Out:            return .indirectOut
-      case ArgumentConvention_Direct_Owned:            return .directOwned
-      case ArgumentConvention_Direct_Unowned:          return .directUnowned
-      case ArgumentConvention_Direct_Guaranteed:       return .directGuaranteed
+      case .Indirect_In:             return .indirectIn
+      case .Indirect_In_Guaranteed:  return .indirectInGuaranteed
+      case .Indirect_Inout:          return .indirectInout
+      case .Indirect_InoutAliasable: return .indirectInoutAliasable
+      case .Indirect_Out:            return .indirectOut
+      case .Direct_Owned:            return .directOwned
+      case .Direct_Unowned:          return .directUnowned
+      case .Direct_Guaranteed:       return .directGuaranteed
       default:
         fatalError("unsupported argument convention")
     }

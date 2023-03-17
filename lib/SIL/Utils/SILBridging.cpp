@@ -142,149 +142,38 @@ void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
-llvm::StringRef SILFunction_getName(BridgedFunction function) {
-  return castToFunction(function)->getName();
-}
-
-std::string SILFunction_debugDescription(BridgedFunction function) {
+std::string BridgedFunction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToFunction(function)->print(os);
+  getFunction()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
 
-SwiftInt SILFunction_hasOwnership(BridgedFunction function) {
-  return castToFunction(function)->hasOwnership() ? 1 : 0;
-}
-
-OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  if (f->empty())
-    return {nullptr};
-  return {f->getEntryBlock()};
-}
-
-OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  if (f->empty())
-    return {nullptr};
-  return {&*f->rbegin()};
-}
-
-SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function) {
-  return castToFunction(function)->getLoweredFunctionType()->
-          getNumIndirectFormalResults();
-}
-
-SwiftInt SILFunction_numParameterArguments(BridgedFunction function) {
-  return castToFunction(function)->getLoweredFunctionType()->
-          getNumParameters();
-}
-
-SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  SILFunctionConventions conv(f->getConventionsInContext());
-  CanSILFunctionType fTy = castToFunction(function)->getLoweredFunctionType();
-  if (!fTy->hasSelfParam())
-    return -1;
-  return conv.getNumParameters() + conv.getNumIndirectSILResults() - 1;
-}
-
-SwiftInt SILFunction_getNumSILArguments(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  SILFunctionConventions conv(f->getConventionsInContext());
-  return conv.getNumSILArguments();
-}
-
-swift::SILType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx) {
-  SILFunction *f = castToFunction(function);
-  SILFunctionConventions conv(f->getConventionsInContext());
-  return conv.getSILArgumentType(idx, f->getTypeExpansionContext());
-}
-
-BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention conv) {
+BridgedFunction::ArgumentConvention BridgedFunction::getBridged(SILArgumentConvention conv) const {
   switch (conv.Value) {
     case SILArgumentConvention::Indirect_Inout:
-      return ArgumentConvention_Indirect_Inout;
+      return BridgedFunction::ArgumentConvention::Indirect_Inout;
     case SILArgumentConvention::Indirect_InoutAliasable:
-      return ArgumentConvention_Indirect_InoutAliasable;
+      return BridgedFunction::ArgumentConvention::Indirect_InoutAliasable;
     case SILArgumentConvention::Indirect_In_Guaranteed:
-      return ArgumentConvention_Indirect_In_Guaranteed;
+      return BridgedFunction::ArgumentConvention::Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
-      return ArgumentConvention_Indirect_In;
+      return BridgedFunction::ArgumentConvention::Indirect_In;
     case SILArgumentConvention::Indirect_Out:
-      return ArgumentConvention_Indirect_Out;
+      return BridgedFunction::ArgumentConvention::Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:
-      return ArgumentConvention_Direct_Unowned;
+      return BridgedFunction::ArgumentConvention::Direct_Unowned;
     case SILArgumentConvention::Direct_Owned:
-      return ArgumentConvention_Direct_Owned;
+      return BridgedFunction::ArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Direct_Guaranteed:
-      return ArgumentConvention_Direct_Guaranteed;
+      return BridgedFunction::ArgumentConvention::Direct_Guaranteed;
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Out:
     case SILArgumentConvention::Pack_Guaranteed:
     case SILArgumentConvention::Pack_Owned:
       llvm_unreachable("cannot bridge variadic generics");
   }
-}
-
-BridgedArgumentConvention SILFunction_getSILArgumentConvention(BridgedFunction function, SwiftInt idx) {
-  SILFunction *f = castToFunction(function);
-  SILFunctionConventions conv(f->getConventionsInContext());
-  return SILArgumentConvention_getBridged(SILArgumentConvention(conv.getParamInfoForSILArg(idx).getConvention()));
-}
-
-swift::SILType SILFunction_getSILResultType(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  SILFunctionConventions conv(f->getConventionsInContext());
-  return conv.getSILResultType(f->getTypeExpansionContext());
-}
-
-SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  if (f->getResilienceExpansion() != ResilienceExpansion::Maximal)
-    return 0;
-
-  ASTContext &ctxt = f->getModule().getASTContext();
-  return AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(
-    ctxt.getSwift51Availability());
-}
-
-SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function) {
-  return castToFunction(function)->isPossiblyUsedExternally() ? 1 : 0;
-}
-
-SwiftInt SILFunction_isAvailableExternally(BridgedFunction function) {
-  return castToFunction(function)->isAvailableExternally() ? 1 : 0;
-}
-
-SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
-                                      StringRef attrName) {
-  SILFunction *f = castToFunction(function);
-  return f->hasSemanticsAttr(attrName) ? 1 : 0;
-}
-
-BridgedEffectAttributeKind SILFunction_getEffectAttribute(BridgedFunction function) {
-  switch (castToFunction(function)->getEffectsKind()) {
-    case EffectsKind::ReadNone: return EffectKind_readNone;
-    case EffectsKind::ReadOnly: return EffectKind_readOnly;
-    case EffectsKind::ReleaseNone: return EffectKind_releaseNone;
-    default: return EffectKind_none;
-  }
-}
-
-bool SILFunction_hasReadOnlyAttribute(BridgedFunction function) {
-  return castToFunction(function)->getEffectsKind() == EffectsKind::ReadOnly;
-}
-
-SwiftInt SILFunction_needsStackProtection(BridgedFunction function) {
-  return castToFunction(function)->needsStackProtection() ? 1 : 0;
-}
-
-void SILFunction_setNeedStackProtection(BridgedFunction function,
-                                        SwiftInt needSP) {
-  castToFunction(function)->setNeedStackProtection(needSP != 0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -376,24 +265,24 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
   return {castToArgument(argument)->getParent()};
 }
 
-static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention convention) {
+static BridgedFunction::ArgumentConvention bridgeArgumentConvention(SILArgumentConvention convention) {
   switch (convention) {
     case SILArgumentConvention::Indirect_Inout:
-      return ArgumentConvention_Indirect_Inout;
+      return BridgedFunction::ArgumentConvention::Indirect_Inout;
     case SILArgumentConvention::Indirect_InoutAliasable:
-      return ArgumentConvention_Indirect_InoutAliasable;
+      return BridgedFunction::ArgumentConvention::Indirect_InoutAliasable;
     case SILArgumentConvention::Indirect_In_Guaranteed:
-      return ArgumentConvention_Indirect_In_Guaranteed;
+      return BridgedFunction::ArgumentConvention::Indirect_In_Guaranteed;
     case SILArgumentConvention::Indirect_In:
-      return ArgumentConvention_Indirect_In;
+      return BridgedFunction::ArgumentConvention::Indirect_In;
     case SILArgumentConvention::Indirect_Out:
-      return ArgumentConvention_Indirect_Out;
+      return BridgedFunction::ArgumentConvention::Indirect_Out;
     case SILArgumentConvention::Direct_Unowned:
-      return ArgumentConvention_Direct_Unowned;
+      return BridgedFunction::ArgumentConvention::Direct_Unowned;
     case SILArgumentConvention::Direct_Owned:
-      return ArgumentConvention_Direct_Owned;
+      return BridgedFunction::ArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Direct_Guaranteed:
-      return ArgumentConvention_Direct_Guaranteed;
+      return BridgedFunction::ArgumentConvention::Direct_Guaranteed;
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Out:
     case SILArgumentConvention::Pack_Guaranteed:
@@ -402,7 +291,7 @@ static BridgedArgumentConvention bridgeArgumentConvention(SILArgumentConvention 
   }
 }
 
-BridgedArgumentConvention SILArgument_getConvention(BridgedArgument argument) {
+BridgedFunction::ArgumentConvention SILArgument_getConvention(BridgedArgument argument) {
   auto *arg = castToArgument<SILFunctionArgument>(argument);
   return bridgeArgumentConvention(arg->getArgumentConvention());
 }
@@ -827,7 +716,7 @@ SubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
   return as.getSubstitutionMap();
 }
 
-BridgedArgumentConvention
+BridgedFunction::ArgumentConvention
 ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx) {
   auto as = ApplySite(castToInst(inst));
   auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
@@ -929,7 +818,7 @@ SILBuilder_createFunctionRef(BridgedBuilder b,
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   return {builder.createFunctionRef(RegularLocation(b.loc.getLocation()),
-                                    castToFunction(function))};
+                                    function.getFunction())};
 }
 
 BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder b,
