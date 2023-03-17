@@ -82,12 +82,36 @@ CheckRequirementResult Requirement::checkRequirement(
   if (hasError())
     return CheckRequirementResult::SubstitutionFailure;
 
+  auto firstType = getFirstType();
+
+  auto expandPackRequirement = [&](PackType *packType) {
+    for (auto eltType : packType->getElementTypes()) {
+      // FIXME: Doesn't seem right
+      if (auto *expansionType = eltType->getAs<PackExpansionType>())
+        eltType = expansionType->getPatternType();
+
+      auto kind = getKind();
+      if (kind == RequirementKind::Layout) {
+        subReqs.emplace_back(kind, eltType,
+                             getLayoutConstraint());
+      } else {
+        subReqs.emplace_back(kind, eltType,
+                             getSecondType());
+      }
+    }
+    return CheckRequirementResult::PackRequirement;
+  };
+
   switch (getKind()) {
   case RequirementKind::Conformance: {
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
     auto conformance = module->lookupConformance(
-        getFirstType(), proto, allowMissing);
+        firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
 
@@ -99,7 +123,11 @@ CheckRequirementResult Requirement::checkRequirement(
   }
 
   case RequirementKind::Layout: {
-    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
+    if (auto *archetypeType = firstType->getAs<ArchetypeType>()) {
       auto layout = archetypeType->getLayoutConstraint();
       if (layout && layout.merge(getLayoutConstraint()))
         return CheckRequirementResult::Success;
@@ -108,7 +136,7 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     if (getLayoutConstraint()->isClass()) {
-      if (getFirstType()->satisfiesClassConstraint())
+      if (firstType->satisfiesClassConstraint())
         return CheckRequirementResult::Success;
 
       return CheckRequirementResult::RequirementFailure;
@@ -120,19 +148,23 @@ CheckRequirementResult Requirement::checkRequirement(
   }
 
   case RequirementKind::Superclass:
-    if (getSecondType()->isExactSuperclassOf(getFirstType()))
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
+    if (getSecondType()->isExactSuperclassOf(firstType))
       return CheckRequirementResult::Success;
 
     return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameType:
-    if (getFirstType()->isEqual(getSecondType()))
+    if (firstType->isEqual(getSecondType()))
       return CheckRequirementResult::Success;
 
     return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameShape:
-    if (getFirstType()->getReducedShape() ==
+    if (firstType->getReducedShape() ==
         getSecondType()->getReducedShape())
       return CheckRequirementResult::Success;
 

@@ -414,6 +414,11 @@ bool GenericSignatureImpl::isRequirementSatisfied(
     // FIXME: Need to check conditional requirements here.
     return true;
 
+  case CheckRequirementResult::PackRequirement:
+    // FIXME
+    assert(false && "Refactor this");
+    return true;
+
   case CheckRequirementResult::RequirementFailure:
   case CheckRequirementResult::SubstitutionFailure:
     return false;

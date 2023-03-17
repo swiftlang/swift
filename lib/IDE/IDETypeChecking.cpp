@@ -354,6 +354,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           // FIXME: Need to handle conditional requirements here!
           break;
 
+        case CheckRequirementResult::PackRequirement:
+          // FIXME
+          assert(false && "Refactor this");
+          return true;
+
         case CheckRequirementResult::SubstitutionFailure:
           return true;
 

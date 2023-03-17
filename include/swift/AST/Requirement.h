@@ -36,6 +36,10 @@ enum class CheckRequirementResult : uint8_t {
   /// conditional requirements which must be checked.
   ConditionalConformance,
 
+  /// The subject type is a pack type; the sub-requirements are the
+  /// element-wise requirements which must be checked.
+  PackRequirement,
+
   /// The requirement cannot ever be satisfied.
   RequirementFailure,
 

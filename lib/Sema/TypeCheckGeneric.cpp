@@ -789,27 +789,45 @@ static std::string gatherGenericParamBindingsText(
     return "";
 
   SmallString<128> result;
+  llvm::raw_svector_ostream OS(result);
+
   for (auto gp : genericParams) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
     if (!knownGenericParams.count(canonGP))
       continue;
 
     if (result.empty())
-      result += " [with ";
+      OS << " [with ";
     else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
+      OS << "; ";
+
+    if (gp->isParameterPack())
+      OS << "each ";
+
+    OS << gp->getName().str();
+    OS << " = ";
 
     auto type = substitutions(canonGP);
     if (!type)
       return "";
 
-    result += type.getString();
+    if (auto *packType = type->getAs<PackType>()) {
+      bool first = true;
+      for (auto eltType : packType->getElementTypes()) {
+        if (first)
+          first = false;
+        else
+          OS << ", ";
+
+        OS << eltType;
+      }
+    } else {
+      OS << type.getString();
+    }
   }
 
-  result += "]";
-  return result.str().str();
+  OS << "]";
+  return std::string(result.str());
 }
 
 void TypeChecker::diagnoseRequirementFailure(
@@ -828,7 +846,9 @@ void TypeChecker::diagnoseRequirementFailure(
   const auto reqKind = req.getKind();
   switch (reqKind) {
   case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
+    diagnostic = diag::types_not_same_shape;
+    diagnosticNote = diag::same_shape_requirement;
+    break;
 
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
@@ -891,30 +911,31 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     /// (if any).
     Requirement Req;
 
+    /// The substituted requirement.
+    Requirement SubstReq;
+
     /// The chain of conditional conformances that leads to the above
     /// requirement set.
     ParentConditionalConformances Path;
 
-    WorklistItem(Requirement Req, ParentConditionalConformances Path)
-        : Req(Req), Path(Path) {}
+    WorklistItem(Requirement Req, Requirement SubstReq,
+                 ParentConditionalConformances Path)
+        : Req(Req), SubstReq(SubstReq), Path(Path) {}
   };
 
   bool hadSubstFailure = false;
   SmallVector<WorklistItem, 4> worklist;
 
-  for (auto req : llvm::reverse(requirements))
-    worklist.emplace_back(req, ParentConditionalConformances{});
+  for (auto req : llvm::reverse(requirements)) {
+    auto substReq = req.subst(substitutions, LookUpConformanceInModule(module));
+    worklist.emplace_back(req, substReq, ParentConditionalConformances{});
+  }
 
   while (!worklist.empty()) {
     const auto item = worklist.pop_back_val();
 
     auto req = item.Req;
-    auto substReq = item.Req;
-    if (item.Path.empty()) {
-      // Primary requirements do not have substitutions applied.
-      substReq =
-          req.subst(substitutions, LookUpConformanceInModule(module));
-    }
+    auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
     switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
@@ -927,14 +948,23 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       auto reqsPath = item.Path;
       reqsPath.push_back({substReq.getFirstType(), substReq.getProtocolDecl()});
 
-      for (auto subReq : subReqs)
-        worklist.emplace_back(subReq, reqsPath);
+      for (auto subReq : llvm::reverse(subReqs))
+        worklist.emplace_back(subReq, subReq, reqsPath);
+      break;
+    }
+
+    case CheckRequirementResult::PackRequirement: {
+      for (auto subReq : llvm::reverse(subReqs)) {
+        // Note: we keep the original unsubstituted pack requirement here for
+        // the diagnostic
+        worklist.emplace_back(req, subReq, item.Path);
+      }
       break;
     }
 
     case CheckRequirementResult::RequirementFailure:
       return CheckGenericArgumentsResult::createRequirementFailure(
-          req, substReq, std::move(item.Path));
+          req, substReq, item.Path);
 
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
@@ -965,6 +995,7 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
     case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
       break;
 
     case CheckRequirementResult::RequirementFailure:
