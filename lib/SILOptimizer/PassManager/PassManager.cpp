@@ -1482,7 +1482,7 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
 
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block) {
-  castToBasicBlock(block)->eraseFromParent();
+  block.getBlock()->eraseFromParent();
 }
 
 bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
@@ -1541,7 +1541,7 @@ SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
                                  BridgedBasicBlock dominating,
                                  BridgedBasicBlock dominated) {
   DominanceInfo *di = static_cast<DominanceInfo *>(domTree.dt);
-  return di->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
+  return di->dominates(dominating.getBlock(), dominated.getBlock()) ? 1 : 0;
 }
 
 BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context) {
@@ -1554,7 +1554,7 @@ SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
                                          BridgedBasicBlock dominating,
                                          BridgedBasicBlock dominated) {
   auto *pdi = static_cast<PostDominanceInfo *>(pdomTree.pdt);
-  return pdi->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
+  return pdi->dominates(dominating.getBlock(), dominated.getBlock()) ? 1 : 0;
 }
 
 BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
@@ -1567,15 +1567,15 @@ void PassContext_freeBasicBlockSet(BridgedPassContext context,
 }
 
 SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
+  return castToBlockSet(set)->contains(block.getBlock()) ? 1 : 0;
 }
 
 SwiftInt BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->insert(castToBasicBlock(block)) ? 1 : 0;
+  return castToBlockSet(set)->insert(block.getBlock()) ? 1 : 0;
 }
 
 void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  castToBlockSet(set)->erase(castToBasicBlock(block));
+  castToBlockSet(set)->erase(block.getBlock());
 }
 
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
@@ -1625,8 +1625,7 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
 
 void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
                                   BridgedBasicBlock to) {
-  castToInst<TermInst>(term)->replaceBranchTarget(castToBasicBlock(from),
-                                                  castToBasicBlock(to));
+  castToInst<TermInst>(term)->replaceBranchTarget(from.getBlock(), to.getBlock());
 }
 
 SubstitutionMap

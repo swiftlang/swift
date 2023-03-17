@@ -224,24 +224,24 @@ extension Undef {
 extension BasicBlock {
   func addBlockArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> BlockArgument {
     context.notifyInstructionsChanged()
-    return SILBasicBlock_addBlockArgument(bridged, type.bridged, ownership._bridged).blockArgument
+    return bridged.addBlockArgument(type.bridged, ownership._bridged).blockArgument
   }
   
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
-    SILBasicBlock_eraseArgument(bridged, index)
+    bridged.eraseArgument(index)
   }
 
   func moveAllInstructions(toBeginOf otherBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     context.notifyBranchesChanged()
-    SILBasicBlock_moveAllInstructionsToBegin(bridged, otherBlock.bridged)
+    bridged.moveAllInstructionsToBegin(otherBlock.bridged)
   }
 
   func moveAllInstructions(toEndOf otherBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     context.notifyBranchesChanged()
-    SILBasicBlock_moveAllInstructionsToEnd(bridged, otherBlock.bridged)
+    bridged.moveAllInstructionsToEnd(otherBlock.bridged)
   }
 
   func eraseAllArguments(_ context: some MutatingContext) {
@@ -252,7 +252,7 @@ extension BasicBlock {
   }
 
   func moveAllArguments(to otherBlock: BasicBlock, _ context: some MutatingContext) {
-    BasicBlock_moveArgumentsTo(bridged, otherBlock.bridged)
+    bridged.moveArgumentsTo(otherBlock.bridged)
   }
 }
 

@@ -65,5 +65,5 @@ SILAnalysis *swift::createDeadEndBlocksAnalysis(SILModule *) {
 SwiftInt DeadEndBlocksAnalysis_isDeadEnd(BridgedDeadEndBlocksAnalysis debAnalysis,
                                          BridgedBasicBlock block) {
   auto *dea = static_cast<DeadEndBlocks *>(debAnalysis.dea);
-  return dea->isDeadEnd(castToBasicBlock(block));
+  return dea->isDeadEnd(block.getBlock());
 }

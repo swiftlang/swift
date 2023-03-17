@@ -39,25 +39,8 @@ template <class I = SILInstruction> I *castToInst(OptionalBridgedInstruction ins
   return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
 }
 
-inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
-  return static_cast<SILBasicBlock *>(block.obj);
-}
-
-inline SILBasicBlock *castToBasicBlock(OptionalBridgedBasicBlock block) {
-  return block.obj ? static_cast<SILBasicBlock *>(block.obj) : nullptr;
-}
-
 template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
   return cast<A>(static_cast<SILArgument *>(argument.obj));
-}
-
-inline ValueOwnershipKind castToOwnership(BridgedValue::Ownership ownership) {
-  switch (ownership) {
-    case BridgedValue::Ownership::Unowned:    return OwnershipKind::Unowned;
-    case BridgedValue::Ownership::Owned:      return OwnershipKind::Owned;
-    case BridgedValue::Ownership::Guaranteed: return OwnershipKind::Guaranteed;
-    case BridgedValue::Ownership::None:       return OwnershipKind::None;
-  }
 }
 
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,

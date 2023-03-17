@@ -15,13 +15,13 @@ import SILBridging
 
 @_semantics("arc.immortal")
 final public class BasicBlock : CustomStringConvertible, HasShortDescription {
-  public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
-  public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
+  public var next: BasicBlock? { bridged.getNext().block }
+  public var previous: BasicBlock? { bridged.getPrevious().block }
 
-  public var parentFunction: Function { SILBasicBlock_getFunction(bridged).function }
+  public var parentFunction: Function { bridged.getFunction().function }
 
   public var description: String {
-    let stdString = SILBasicBlock_debugDescription(bridged)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
   public var shortDescription: String { name }
@@ -29,17 +29,17 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
   public var instructions: InstructionList {
-    InstructionList(first: SILBasicBlock_firstInst(bridged).instruction)
+    InstructionList(first: bridged.getFirstInst().instruction)
   }
 
   public var terminator: TermInst {
-    SILBasicBlock_lastInst(bridged).instruction as! TermInst
+    bridged.getLastInst().instruction as! TermInst
   }
 
   public var successors: SuccessorArray { terminator.successors }
 
   public var predecessors: PredecessorList {
-    PredecessorList(startAt: SILBasicBlock_getFirstPred(bridged))
+    PredecessorList(startAt: bridged.getFirstPred())
   }
 
   public var singlePredecessor: BasicBlock? {
@@ -98,7 +98,7 @@ public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
 
   public func reversed() -> ReverseInstructionList {
     if let inst = currentInstruction {
-      let lastInst = SILBasicBlock_lastInst(inst.parentBlock.bridged).instruction
+      let lastInst = inst.parentBlock.bridged.getLastInst().instruction
       return ReverseInstructionList(first: lastInst)
     }
     return ReverseInstructionList(first: nil)
@@ -135,10 +135,10 @@ public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILBasicBlock_getNumArguments(block.bridged) }
+  public var endIndex: Int { block.bridged.getNumArguments() }
 
   public subscript(_ index: Int) -> Argument {
-    SILBasicBlock_getArgument(block.bridged, index).argument
+    block.bridged.getArgument(index).argument
   }
 }
 

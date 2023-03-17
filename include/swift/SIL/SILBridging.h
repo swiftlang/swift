@@ -88,6 +88,19 @@ struct BridgedValue {
   }
 };
 
+struct OptionalBridgedValue {
+  OptionalSwiftObject obj;
+};
+
+inline swift::ValueOwnershipKind castToOwnership(BridgedValue::Ownership ownership) {
+  switch (ownership) {
+    case BridgedValue::Ownership::Unowned:    return swift::OwnershipKind::Unowned;
+    case BridgedValue::Ownership::Owned:      return swift::OwnershipKind::Owned;
+    case BridgedValue::Ownership::Guaranteed: return swift::OwnershipKind::Guaranteed;
+    case BridgedValue::Ownership::None:       return swift::OwnershipKind::None;
+  }
+}
+
 // This is the layout of a class existential.
 struct BridgeValueExistential {
   BridgedValue value;
@@ -301,8 +314,106 @@ struct BridgedGlobalVar {
   bool isLet() const { return getGlobal()->isLet(); }
 };
 
+struct BridgedInstruction {
+  SwiftObject obj;
+};
+
+typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedInstruction;
+
+typedef struct {
+  SwiftObject obj;
+} BridgedArgument;
+
+typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedArgument;
+
+struct OptionalBridgedBasicBlock {
+  OptionalSwiftObject obj;
+
+  swift::SILBasicBlock *getBlock() const {
+    return obj ? static_cast<swift::SILBasicBlock *>(obj) : nullptr;
+  }
+};
+
 struct BridgedBasicBlock {
   SwiftObject obj;
+
+  swift::SILBasicBlock * _Nonnull getBlock() const {
+    return static_cast<swift::SILBasicBlock *>(obj);
+  }
+
+  std::string getDebugDescription() const;
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedBasicBlock getNext() const {
+    auto iter = std::next(getBlock()->getIterator());
+    if (iter == getBlock()->getParent()->end())
+      return {nullptr};
+    return {&*iter};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedBasicBlock getPrevious() const {
+    auto iter = std::next(getBlock()->getReverseIterator());
+    if (iter == getBlock()->getParent()->rend())
+      return {nullptr};
+    return {&*iter};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedFunction getFunction() const {
+    return {getBlock()->getParent()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedInstruction getFirstInst() const {
+    if (getBlock()->empty())
+      return {nullptr};
+    return {getBlock()->front().asSILNode()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedInstruction getLastInst() const {
+    if (getBlock()->empty())
+      return {nullptr};
+    return {getBlock()->back().asSILNode()};
+  }
+
+  SwiftInt getNumArguments() const {
+    return getBlock()->getNumArguments();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedArgument getArgument(SwiftInt index) const {
+    return {getBlock()->getArgument(index)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedArgument addBlockArgument(swift::SILType type, BridgedValue::Ownership ownership) const {
+    return {getBlock()->createPhiArgument(type, castToOwnership(ownership))};
+  }
+
+  void eraseArgument(SwiftInt index) const {
+    getBlock()->eraseArgument(index);
+  }
+
+  void moveAllInstructionsToBegin(BridgedBasicBlock dest) const {
+    dest.getBlock()->spliceAtBegin(getBlock());
+  }
+
+  void moveAllInstructionsToEnd(BridgedBasicBlock dest) const {
+    dest.getBlock()->spliceAtEnd(getBlock());
+  }
+
+  void moveArgumentsTo(BridgedBasicBlock dest) const {
+    dest.getBlock()->moveArgumentList(getBlock());
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedSuccessor getFirstPred() const;
 };
 
 struct BridgedSuccessor {
@@ -333,33 +444,9 @@ struct BridgedSuccessorArray {
   SwiftInt count;
 };
 
-struct OptionalBridgedBasicBlock {
-  OptionalSwiftObject obj;
-};
-
-typedef struct {
-  SwiftObject obj;
-} BridgedArgument;
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedArgument;
-
 typedef struct {
   SwiftObject obj;
 } BridgedNode;
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedValue;
-
-struct BridgedInstruction {
-  SwiftObject obj;
-};
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedInstruction;
 
 typedef struct {
   SwiftObject obj;
@@ -469,23 +556,6 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block);
-
-OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
-OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
-BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
-OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
-OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
-SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
-BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index);
-BridgedArgument SILBasicBlock_addBlockArgument(BridgedBasicBlock block,
-                                               swift::SILType type,
-                                               BridgedValue::Ownership ownership);
-void SILBasicBlock_eraseArgument(BridgedBasicBlock block, SwiftInt index);
-void SILBasicBlock_moveAllInstructionsToBegin(BridgedBasicBlock block, BridgedBasicBlock dest);
-void SILBasicBlock_moveAllInstructionsToEnd(BridgedBasicBlock block, BridgedBasicBlock dest);
-void BasicBlock_moveArgumentsTo(BridgedBasicBlock block, BridgedBasicBlock dest);
-OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
 
 std::string SILNode_debugDescription(BridgedNode node);
 
@@ -654,6 +724,9 @@ OptionalBridgedBasicBlock BridgedFunction::getLastBlock() const {
   return {getFunction()->empty() ? nullptr : &*getFunction()->rbegin()};
 }
 
+OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {
+  return {getBlock()->pred_begin().getSuccessorRef()};
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

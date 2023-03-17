@@ -104,7 +104,16 @@ extension Value {
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: parentFunction) }
 
-  public var ownership: Ownership { bridged.getOwnership().ownership }
+  public var ownership: Ownership {
+    switch bridged.getOwnership() {
+    case .Unowned:    return .unowned
+    case .Owned:      return .owned
+    case .Guaranteed: return .guaranteed
+    case .None:       return .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
@@ -197,17 +206,4 @@ final class PlaceholderValue : Value {
 
 extension OptionalBridgedValue {
   var value: Value? { obj.getAs(AnyObject.self) as? Value }
-}
-
-extension BridgedValue.Ownership {
-  var ownership: Ownership {
-    switch self {
-      case .Unowned:    return .unowned
-      case .Owned:      return .owned
-      case .Guaranteed: return .guaranteed
-      case .None:       return .none
-      default:
-        fatalError("unsupported ownership")
-    }
-  }
 }
