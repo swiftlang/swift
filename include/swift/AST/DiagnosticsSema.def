@@ -5310,8 +5310,8 @@ ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
 ERROR(expansion_not_allowed,none,
-      "pack expansion %0 cannot appear outside of a function parameter list, "
-      "function result, tuple element or generic argument list", (Type))
+      "pack expansion %0 can only appear in a function parameter list, "
+      "tuple element, or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
@@ -5320,7 +5320,10 @@ ERROR(pack_reference_outside_expansion,none,
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
-ERROR(pack_expansion_missing_pack_reference,none,
+ERROR(pack_reference_must_be_in_expansion,none,
+      "pack reference %0 requires expansion using keyword 'repeat'",
+      (TypeRepr*))
+ERROR(pack_type_requires_keyword_each,none,
       "pack type %0 must be referenced with 'each'",
       (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
