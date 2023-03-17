@@ -1468,14 +1468,15 @@ public:
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
-  /// module by '-load-plugin-executable'. Note that the returned path might be
-  /// in the current VFS. i.e. use FS.getRealPath() to get the real path.
+  /// module by '-load-plugin-executable'.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
   Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
 
-  /// From paths '-external-plugin-path', look for dylib file that has
-  /// 'lib${moduleName}.dylib' (or equialent depending on the platform) and
-  /// return the found dylib path and the path to the "plugin server" for that.
-  /// Note that the returned path might be in the current VFS.
+  /// Look for dynamic libraries in paths from `-external-plugin-path` and
+  /// return a pair of `(library path, plugin server executable)` if found.
+  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
+  /// underlying path.
   Optional<std::pair<std::string, std::string>>
   lookupExternalLibraryPluginByModuleName(Identifier moduleName);
 

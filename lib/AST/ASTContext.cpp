@@ -6358,15 +6358,11 @@ Optional<std::pair<std::string, std::string>>
 ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
   auto fs = this->SourceMgr.getFileSystem();
   for (auto &pair : SearchPathOpts.ExternalPluginSearchPaths) {
-    StringRef searchPath;
-    StringRef serverPath;
-    std::tie(searchPath, serverPath) = StringRef(pair).split('#');
-
-    SmallString<128> fullPath(searchPath);
+    SmallString<128> fullPath(pair.SearchPath);
     llvm::sys::path::append(fullPath, "lib" + moduleName.str() + LTDL_SHLIB_EXT);
 
     if (fs->exists(fullPath)) {
-      return {{std::string(fullPath), serverPath.str()}};
+      return {{std::string(fullPath), pair.ServerPath}};
     }
   }
   return None;

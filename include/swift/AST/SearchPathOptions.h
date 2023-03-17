@@ -174,6 +174,13 @@ public:
                             llvm::vfs::FileSystem *FS, bool IsOSDarwin);
 };
 
+/// Pair of a plugin search path and the corresponding plugin server executable
+/// path.
+struct ExternalPluginSearchPathAndServerPath {
+  std::string SearchPath;
+  std::string ServerPath;
+};
+
 /// Options for controlling search path behavior.
 class SearchPathOptions {
   /// To call \c addImportSearchPath and \c addFrameworkSearchPath from
@@ -382,10 +389,11 @@ public:
   /// macro implementations.
   std::vector<std::string> PluginSearchPaths;
 
-  /// Paths that contain compiler plugins and the path to the plugin server
-  /// executable.
-  /// e.g. '/path/to/usr/lib/swift/host/plugins#/path/to/usr/bin/plugin-server'.
-  std::vector<std::string> ExternalPluginSearchPaths;
+  /// Pairs of external compiler plugin search paths and the corresponding
+  /// plugin server executables.
+  /// e.g. {"/path/to/usr/lib/swift/host/plugins",
+  ///       "/path/to/usr/bin/plugin-server"}
+  std::vector<ExternalPluginSearchPathAndServerPath> ExternalPluginSearchPaths;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;

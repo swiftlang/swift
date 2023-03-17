@@ -4025,7 +4025,7 @@ public:
   }
 
   void *getAsInProcessPlugin() const {
-    return kind == PluginKind::InProcess ? static_cast<void *>(ptr) : nullptr;
+    return kind == PluginKind::InProcess ? ptr : nullptr;
   }
   LoadedExecutablePlugin *getAsExecutablePlugin() const {
     return kind == PluginKind::Executable

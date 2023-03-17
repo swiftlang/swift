@@ -1,5 +1,5 @@
 if (SWIFT_SWIFT_PARSER)
-  # _swiftCSwiftPluginServer is just a C support library for  wift-plugin-server
+  # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
   # Don't bother to create '.a' for that.
   add_swift_host_library(_swiftCSwiftPluginServer OBJECT
     Sources/CSwiftPluginServer/PluginServer.cpp
