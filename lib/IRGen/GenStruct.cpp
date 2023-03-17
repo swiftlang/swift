@@ -772,6 +772,7 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                         SILType T, bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
+        destroy(IGF, destAddr, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     srcAddr.getAddress(),
                                     destAddr.getAddress());
@@ -800,6 +801,7 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
+        destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     src.getAddress(),
                                     dest.getAddress());

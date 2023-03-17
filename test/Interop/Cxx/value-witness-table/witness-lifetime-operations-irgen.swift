@@ -28,6 +28,7 @@ let h = Holder(holding: NonTrivial())
 // $sSo10NonTrivialVwca ---> assignWithCopy value witness for __C.NonTrivia
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$sSo10NonTrivialVwca"
 // CHECK-NOT: call
+// CHECK: call void @{{_ZN10NonTrivialD(1|2)Ev|"\?\?1NonTrivial@@QEAA@XZ"}}(%struct.NonTrivial* %{{[0-9]+}})
 // CHECK: call {{void|\%struct\.NonTrivial\*}} @{{_ZN10NonTrivialC(1|2)ERKS_|"\?\?0NonTrivial@@QEAA@AEBU0@@Z"}}(%struct.NonTrivial* %{{[0-9]+}}, %struct.NonTrivial* %{{[0-9]+}})
 // CHECK-NOT: call
 // CHECK: ret %swift.opaque*
@@ -44,6 +45,7 @@ let h = Holder(holding: NonTrivial())
 // $sSo10NonTrivialVwta ---> assignWithTake value witness for __C.NonTrivial
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$sSo10NonTrivialVwta"
 // CHECK-NOT: call
+// CHECK: call void @{{_ZN10NonTrivialD(1|2)Ev|"\?\?1NonTrivial@@QEAA@XZ"}}(%struct.NonTrivial* %{{[0-9]+}})
 // CHECK: call {{void|\%struct\.NonTrivial\*}} @{{_ZN10NonTrivialC(1|2)ERKS_|"\?\?0NonTrivial@@QEAA@AEBU0@@Z"}}(%struct.NonTrivial* %{{[0-9]+}}, %struct.NonTrivial* %{{[0-9]+}})
 // CHECK-NOT: call
 // CHECK: call void @{{_ZN10NonTrivialD(1|2)Ev|"\?\?1NonTrivial@@QEAA@XZ"}}(%struct.NonTrivial* %{{[0-9]+}})
