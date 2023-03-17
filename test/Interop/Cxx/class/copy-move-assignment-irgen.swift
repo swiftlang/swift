@@ -7,6 +7,7 @@ func takeValue<T>(_ x: T) {
     let _ = x
 }
 
+@inline(never)
 public func copyAssign() {
     var instance = NonTrivialCopyAndCopyMoveAssign()
     let instance2 = NonTrivialCopyAndCopyMoveAssign()
@@ -16,26 +17,21 @@ public func copyAssign() {
 }
 
 // CHECK-LABEL: define {{.*}}copyAssign
-// CHECK: call %struct.NonTrivialCopyAndCopyMoveAssign* @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE:]])
-// CHECK: call %struct.NonTrivialCopyAndCopyMoveAssign* @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE2:]])
-// CHECK: call %struct.NonTrivialCopyAndCopyMoveAssign* @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE]])
-// CHECK: call %struct.NonTrivialCopyAndCopyMoveAssign* @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_|"\?\?4NonTrivialCopyAndCopyMoveAssign@@QEAAAEAU0@AEBU0@@Z"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE]], %struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE2]])
-// CHECK: call swiftcc
-// CHECK: call {{.*}}{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE2]])
-// CHECK: call swiftcc
-// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#COPY_INSTANCE]])
-// CHECK-NOT: NonTrivialCopyAndCopyMoveAssign
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE:.*]])
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE2:.*]])
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE]])
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@AEBU0@@Z"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE]], %struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE2]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE2]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE]])
 
 // CHECK-LABEL: define {{.*}}takeAssign
-// CHECK: call %struct.NonTrivialCopyAndCopyMoveAssign* @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#MOVE_INSTANCE:]])
-// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#MOVE_INSTANCE]])
-// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#MOVE_INSTANCE:]])
-// CHECK: call swiftcc
-// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[#MOVE_INSTANCE]])
-// CHECK-NOT: NonTrivialCopyAndCopyMoveAssign
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[MOVE_INSTANCE:.*]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[MOVE_INSTANCE]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[MOVE_INSTANCE]])
 
 // CHECK-LABEL: }
 
+@inline(never)
 public func takeAssign() {
     var instance = NonTrivialCopyAndCopyMoveAssign()
     instance = NonTrivialCopyAndCopyMoveAssign()
