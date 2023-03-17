@@ -76,9 +76,12 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
   return getSecondType()->castTo<ProtocolType>()->getDecl();
 }
 
-bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                         bool allowMissing) const {
+CheckRequirementResult Requirement::checkRequirement(
+    SmallVectorImpl<Requirement> &subReqs,
+    bool allowMissing) const {
+  if (hasError())
+    return CheckRequirementResult::SubstitutionFailure;
+
   switch (getKind()) {
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
@@ -86,35 +89,54 @@ Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
     auto conformance = module->lookupConformance(
         getFirstType(), proto, allowMissing);
     if (!conformance)
-      return false;
+      return CheckRequirementResult::RequirementFailure;
 
-    conditionalRequirements = conformance.getConditionalRequirements();
-    return true;
+    auto condReqs = conformance.getConditionalRequirements();
+    if (condReqs.empty())
+      return CheckRequirementResult::Success;
+    subReqs.append(condReqs.begin(), condReqs.end());
+    return CheckRequirementResult::ConditionalConformance;
   }
 
   case RequirementKind::Layout: {
     if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
       auto layout = archetypeType->getLayoutConstraint();
-      return (layout && layout.merge(getLayoutConstraint()));
+      if (layout && layout.merge(getLayoutConstraint()))
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
     }
 
-    if (getLayoutConstraint()->isClass())
-      return getFirstType()->satisfiesClassConstraint();
+    if (getLayoutConstraint()->isClass()) {
+      if (getFirstType()->satisfiesClassConstraint())
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
+    }
 
     // TODO: Statically check other layout constraints, once they can
     // be spelled in Swift.
-    return true;
+    return CheckRequirementResult::Success;
   }
 
   case RequirementKind::Superclass:
-    return getSecondType()->isExactSuperclassOf(getFirstType());
+    if (getSecondType()->isExactSuperclassOf(getFirstType()))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameType:
-    return getFirstType()->isEqual(getSecondType());
+    if (getFirstType()->isEqual(getSecondType()))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameShape:
-    return (getFirstType()->getReducedShape() ==
-            getSecondType()->getReducedShape());
+    if (getFirstType()->getReducedShape() ==
+        getSecondType()->getReducedShape())
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
   }
 
   llvm_unreachable("Bad requirement kind");

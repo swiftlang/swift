@@ -886,66 +886,64 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       SmallVector<ParentConditionalConformance, 2>;
 
   struct WorklistItem {
-    /// The set of requirements to check. These are either the primary set
-    /// of requirements, or the conditional requirements of the last conformance
-    /// in \c ReqsPath (if any).
-    ArrayRef<Requirement> Requirements;
+    /// The requirement to check. This is either a top-level requirement or
+    /// a conditional requirements of the last conformancein \c ReqsPath
+    /// (if any).
+    Requirement Req;
 
     /// The chain of conditional conformances that leads to the above
     /// requirement set.
-    ParentConditionalConformances ReqsPath;
+    ParentConditionalConformances Path;
 
-    WorklistItem(ArrayRef<Requirement> Requirements,
-                 ParentConditionalConformances ReqsPath)
-        : Requirements(Requirements), ReqsPath(ReqsPath) {}
+    WorklistItem(Requirement Req, ParentConditionalConformances Path)
+        : Req(Req), Path(Path) {}
   };
 
   bool hadSubstFailure = false;
   SmallVector<WorklistItem, 4> worklist;
 
-  worklist.emplace_back(requirements, ParentConditionalConformances{});
+  for (auto req : llvm::reverse(requirements))
+    worklist.emplace_back(req, ParentConditionalConformances{});
+
   while (!worklist.empty()) {
     const auto item = worklist.pop_back_val();
 
-    const bool isPrimaryReq = item.ReqsPath.empty();
-    for (const auto &req : item.Requirements) {
-      Requirement substReq = req;
-      if (isPrimaryReq) {
-        // Primary requirements do not have substitutions applied.
-        auto resolved =
-            req.subst(substitutions, LookUpConformanceInModule(module));
-        if (!resolved.hasError()) {
-          substReq = resolved;
-        } else {
-          // Another requirement might fail later; just continue.
-          hadSubstFailure = true;
-          continue;
-        }
-      }
+    auto req = item.Req;
+    auto substReq = item.Req;
+    if (item.Path.empty()) {
+      // Primary requirements do not have substitutions applied.
+      substReq =
+          req.subst(substitutions, LookUpConformanceInModule(module));
+    }
 
-      ArrayRef<Requirement> conditionalRequirements;
-      if (!substReq.isSatisfied(conditionalRequirements,
-                                /*allowMissing=*/true)) {
-        return CheckGenericArgumentsResult::createRequirementFailure(
-            req, substReq, std::move(item.ReqsPath));
-      }
+    SmallVector<Requirement, 2> subReqs;
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+      break;
 
-      if (conditionalRequirements.empty()) {
-        continue;
-      }
+    case CheckRequirementResult::ConditionalConformance: {
+      assert(substReq.getKind() == RequirementKind::Conformance);
 
-      assert(req.getKind() == RequirementKind::Conformance);
-
-      auto reqsPath = item.ReqsPath;
+      auto reqsPath = item.Path;
       reqsPath.push_back({substReq.getFirstType(), substReq.getProtocolDecl()});
 
-      worklist.emplace_back(conditionalRequirements, std::move(reqsPath));
+      for (auto subReq : subReqs)
+        worklist.emplace_back(subReq, reqsPath);
+      break;
+    }
+
+    case CheckRequirementResult::RequirementFailure:
+      return CheckGenericArgumentsResult::createRequirementFailure(
+          req, substReq, std::move(item.Path));
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
     }
   }
 
-  if (hadSubstFailure) {
+  if (hadSubstFailure)
     return CheckGenericArgumentsResult::createSubstitutionFailure();
-  }
 
   return CheckGenericArgumentsResult::createSuccess();
 }
@@ -954,31 +952,34 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
     ModuleDecl *module, ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> worklist;
-  bool valid = true;
+
+  bool hadSubstFailure = false;
 
   for (auto req : requirements) {
-    auto resolved = req.subst(substitutions,
-                              LookUpConformanceInModule(module), options);
-    if (!resolved.hasError()) {
-      worklist.push_back(resolved);
-    } else {
-      valid = false;
-    }
+    worklist.push_back(req.subst(substitutions,
+                              LookUpConformanceInModule(module), options));
   }
 
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
-    ArrayRef<Requirement> conditionalRequirements;
-    if (!req.isSatisfied(conditionalRequirements, /*allowMissing=*/true))
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
       return CheckGenericArgumentsResult::RequirementFailure;
 
-    worklist.append(conditionalRequirements.begin(),
-                    conditionalRequirements.end());
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
   }
 
-  if (valid)
-    return CheckGenericArgumentsResult::Success;
-  return CheckGenericArgumentsResult::SubstitutionFailure;
+  if (hadSubstFailure)
+    return CheckGenericArgumentsResult::SubstitutionFailure;
+
+  return CheckGenericArgumentsResult::Success;
 }
 
 Requirement
