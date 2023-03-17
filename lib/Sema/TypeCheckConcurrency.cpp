@@ -1226,14 +1226,9 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
 }
 
 /// Determine whether this is the main actor type.
-/// FIXME: the diagnostics engine has a copy of this.
 static bool isMainActor(Type type) {
-  if (auto nominal = type->getAnyNominal()) {
-    if (nominal->getName().is("MainActor") &&
-        nominal->getParentModule()->getName() ==
-          nominal->getASTContext().Id_Concurrency)
-      return true;
-  }
+  if (auto nominal = type->getAnyNominal())
+    return nominal->isMainActor();
 
   return false;
 }
