@@ -2640,34 +2640,176 @@ CanSILFunctionType swift::getNativeSILFunctionType(
       substConstant, reqtSubs, witnessMethodConformance);
 }
 
+namespace {
+struct LocalArchetypeRequirementCollector {
+  const ASTContext &Context;
+  unsigned Depth;
+
+  /// The lists of new parameters and requirements to add to the signature.
+  SmallVector<GenericTypeParamType *, 2> Params;
+  SmallVector<Requirement, 2> Requirements;
+
+  /// The list of contextual types from the original function to use as
+  /// substitutions for the new parameters; parallel to Params.
+  SmallVector<Type, 4> ParamSubs;
+
+  /// A mapping of local archetypes to the corresponding type parameters
+  /// created for them.
+  llvm::DenseMap<CanType, Type> ParamsForLocalArchetypes;
+
+  /// The set of element environments we've processed.
+  llvm::SmallPtrSet<GenericEnvironment*, 4> ElementEnvs;
+
+  LocalArchetypeRequirementCollector(const ASTContext &ctx, unsigned depth)
+    : Context(ctx), Depth(depth) {}
+
+  void collect(CanLocalArchetypeType archetype) {
+    if (auto openedExistential = dyn_cast<OpenedArchetypeType>(archetype)) {
+      collect(openedExistential);
+    } else {
+      collect(cast<ElementArchetypeType>(archetype));
+    }
+  }
+
+  void collect(CanOpenedArchetypeType archetype) {
+    auto param = addParameter(archetype);
+
+    assert(archetype->isRoot());
+    auto constraint = archetype->getExistentialType();
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+
+    addRequirement(RequirementKind::Conformance, param, constraint);
+  }
+
+  void collect(CanElementArchetypeType archetype) {
+    size_t startingIndex = Params.size();
+
+    // Check whether we've already handled this environment.
+    // This can happen with opened-element environments because
+    // they can open multiple archetypes.
+    auto env = archetype->getGenericEnvironment();
+    if (!ElementEnvs.insert(env).second) return;
+
+    // Add a parameter for each of the opened elements in this environment.
+    auto sig = env->getGenericSignature();
+    auto elementParams = sig.getInnermostGenericParams();
+#ifndef NDEBUG
+    unsigned nextIndex = 0;
+#endif
+    for (auto elementParam : elementParams) {
+      assert(elementParam->getIndex() == nextIndex++);
+      auto elementArchetype = env->mapTypeIntoContext(elementParam);
+      addParameter(cast<LocalArchetypeType>(CanType(elementArchetype)));
+    }
+
+    // Clone the element requirements.
+
+    // The element parameters should all have the same depth, and their
+    // index values are dense and in order from 0..<N in that depth.
+    // We asserted that above, and we'll use it below to map them to
+    // their new parameters in Params.
+    auto elementDepth = elementParams.front()->getDepth();
+
+    // Helper function: does the given type refer to an opened element
+    // parameter from the opened element generic signature?
+    auto refersToElementType = [=](Type type) {
+      return type.findIf([&](Type t) {
+        if (auto *param = t->getAs<GenericTypeParamType>())
+          return (param->getDepth() == elementDepth);
+        return false;
+      });
+    };
+    // Helper function: replace references to opened element parameters
+    // with one of the type parameters we just created for this
+    // environment.
+    auto rewriteElementType = [=](Type type) {
+      return type.transformRec([&](Type t) -> Optional<Type> {
+        if (auto *param = t->getAs<GenericTypeParamType>()) {
+          if (param->getDepth() == elementDepth)
+            return Type(Params[startingIndex + param->getIndex()]);
+        }
+        return None;
+      });
+    };
+
+    for (auto req : sig.getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementKind::SameShape:
+        // These never involve element types.
+        break;
+      case RequirementKind::Conformance:
+        if (refersToElementType(req.getFirstType())) {
+          addRequirement(RequirementKind::Conformance,
+                         rewriteElementType(req.getFirstType()),
+                         req.getSecondType());
+        }
+        break;
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType:
+        if (refersToElementType(req.getFirstType()) ||
+            refersToElementType(req.getSecondType())) {
+          addRequirement(req.getKind(),
+                         rewriteElementType(req.getFirstType()),
+                         rewriteElementType(req.getSecondType()));
+        }
+        break;
+        break;
+      case RequirementKind::Layout:
+        if (refersToElementType(req.getFirstType())) {
+          addRequirement(RequirementKind::Layout,
+                         rewriteElementType(req.getFirstType()),
+                         req.getLayoutConstraint());
+        }
+        break;
+      }
+    }
+  }
+
+  GenericTypeParamType *addParameter(CanLocalArchetypeType localArchetype) {
+    auto *param = GenericTypeParamType::get(/*pack*/ false, Depth,
+                                            Params.size(), Context);
+    Params.push_back(param);
+    ParamSubs.push_back(localArchetype);
+    ParamsForLocalArchetypes.insert(std::make_pair(localArchetype, param));
+    return param;
+  }
+
+  template <class... Args>
+  void addRequirement(Args &&... args) {
+    Requirements.emplace_back(std::forward<Args>(args)...);
+  }
+};
+} // end anonymous namespace
+
 /// Build a generic signature and environment for a re-abstraction thunk.
 ///
 /// Most thunks share the generic environment with their original function.
 /// The one exception is if the thunk type involves an open existential,
 /// in which case we "promote" the opened existential to a new generic parameter.
 ///
-/// \param SGF - the parent function
-/// \param openedExistential - the opened existential to promote to a generic
-//  parameter, if any
+/// \param localArchetypes - the list of local archetypes to promote
+///   into the signature, if any
 /// \param inheritGenericSig - whether to inherit the generic signature from the
 /// parent function.
 /// \param genericEnv - the new generic environment
-/// \param contextSubs - map old archetypes to new archetypes
+/// \param contextSubs - map non-local archetypes from the original function
+///    to archetypes in the thunk
 /// \param interfaceSubs - map interface types to old archetypes
 static CanGenericSignature
 buildThunkSignature(SILFunction *fn,
                     bool inheritGenericSig,
-                    OpenedArchetypeType *openedExistential,
+                    ArrayRef<CanLocalArchetypeType> localArchetypes,
                     GenericEnvironment *&genericEnv,
                     SubstitutionMap &contextSubs,
                     SubstitutionMap &interfaceSubs,
-                    ArchetypeType *&newArchetype) {
+                    llvm::DenseMap<ArchetypeType*, Type> &contextLocalArchetypes) {
   auto *mod = fn->getModule().getSwiftModule();
   auto &ctx = mod->getASTContext();
 
-  // If there's no opened existential, we just inherit the generic environment
-  // from the parent function.
-  if (openedExistential == nullptr) {
+  // If there are no local archetypes, we just inherit the generic
+  // environment from the parent function.
+  if (localArchetypes.empty()) {
     auto genericSig =
       fn->getLoweredFunctionType()->getInvocationGenericSignature();
     genericEnv = fn->getGenericEnvironment();
@@ -2677,7 +2819,7 @@ buildThunkSignature(SILFunction *fn,
   }
 
   // Add the existing generic signature.
-  int depth = 0;
+  unsigned depth = 0;
   GenericSignature baseGenericSig;
   if (inheritGenericSig) {
     if (auto genericSig =
@@ -2687,25 +2829,26 @@ buildThunkSignature(SILFunction *fn,
     }
   }
 
-  // Add a new generic parameter to replace the opened existential.
-  auto *newGenericParam =
-      GenericTypeParamType::get(/*isParameterPack*/ false, depth, 0, ctx);
+  // Add new generic parameters to replace the local archetypes.
+  LocalArchetypeRequirementCollector collector(ctx, depth);
 
-  assert(openedExistential->isRoot());
-  auto constraint = openedExistential->getExistentialType();
-  if (auto existential = constraint->getAs<ExistentialType>())
-    constraint = existential->getConstraintType();
-
-  Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             constraint);
+  for (auto archetype : localArchetypes) {
+    collector.collect(archetype);
+  }
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
-                                          { newGenericParam },
-                                          { newRequirement });
+                                          collector.Params,
+                                          collector.Requirements);
   genericEnv = genericSig.getGenericEnvironment();
 
-  newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
-    ->castTo<ArchetypeType>();
+  // Map the local archetypes to their new parameter types.
+  for (auto localArchetype : localArchetypes) {
+    auto param =
+      collector.ParamsForLocalArchetypes.find(localArchetype)->second;
+    auto thunkArchetype = genericEnv->mapTypeIntoContext(param);
+    contextLocalArchetypes.insert(std::make_pair(localArchetype,
+                                                 thunkArchetype));
+  }
 
   // Calculate substitutions to map the caller's archetypes to the thunk's
   // archetypes.
@@ -2723,8 +2866,11 @@ buildThunkSignature(SILFunction *fn,
   interfaceSubs = SubstitutionMap::get(
     genericSig,
     [&](SubstitutableType *type) -> Type {
-      if (type->isEqual(newGenericParam))
-        return openedExistential;
+      if (auto param = dyn_cast<GenericTypeParamType>(type)) {
+        if (param->getDepth() == depth) {
+          return collector.ParamSubs[param->getIndex()];
+        }
+      }
       return fn->mapTypeIntoContext(type);
     },
     MakeAbstractConformanceForGenericType());
@@ -2768,18 +2914,16 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
-  // Does the thunk type involve archetypes other than opened existentials?
+  // Does the thunk type involve archetypes other than local archetypes?
   bool hasArchetypes = false;
-  // Does the thunk type involve an open existential type?
-  CanOpenedArchetypeType openedExistential;
+  // Does the thunk type involve a local archetype type?
+  SmallVector<CanLocalArchetypeType, 8> localArchetypes;
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
-      if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
-        const auto root = opened.getRoot();
-        assert((openedExistential == CanArchetypeType() ||
-                openedExistential == root) &&
-               "one too many open existentials");
-        openedExistential = root;
+      if (auto opened = dyn_cast<LocalArchetypeType>(archetypeTy)) {
+        auto root = opened.getRoot();
+        if (llvm::find(localArchetypes, root) == localArchetypes.end())
+          localArchetypes.push_back(root);
       } else {
         hasArchetypes = true;
       }
@@ -2790,7 +2934,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   // generic parameters.
   CanGenericSignature genericSig;
   SubstitutionMap contextSubs;
-  ArchetypeType *newArchetype = nullptr;
+  llvm::DenseMap<ArchetypeType*, Type> contextLocalArchetypes;
 
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     expectedType.visit(archetypeVisitor);
@@ -2798,24 +2942,30 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
     genericSig = buildThunkSignature(fn,
                                      hasArchetypes,
-                                     openedExistential,
+                                     localArchetypes,
                                      genericEnv,
                                      contextSubs,
                                      interfaceSubs,
-                                     newArchetype);
+                                     contextLocalArchetypes);
   }
 
   auto substTypeHelper = [&](SubstitutableType *type) -> Type {
-    // FIXME: Type::subst should not pass in non-root archetypes.
-    // Consider only root archetypes.
-    if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+    // If it's a local archetype, do an ad-hoc mapping through the
+    // map produced by buildThunkSignature.
+    if (auto *archetype = dyn_cast<LocalArchetypeType>(type)) {
+      assert(!contextLocalArchetypes.empty());
+
+      // Decline to map non-root archetypes; subst() will come back
+      // to us later and ask about the root.
       if (!archetype->isRoot())
         return Type();
+
+      auto it = contextLocalArchetypes.find(archetype);
+      assert(it != contextLocalArchetypes.end());
+      return it->second;
     }
 
-    if (CanType(type) == openedExistential)
-      return newArchetype;
-
+    // Otherwise, use the context substitutions.
     return Type(type).subst(contextSubs);
   };
   auto substConformanceHelper =
