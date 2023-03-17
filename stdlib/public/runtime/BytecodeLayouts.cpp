@@ -17,8 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "BytecodeLayouts.h"
-#include "../../public/runtime/WeakReference.h"
-#include "../../public/SwiftShims/swift/shims/HeapObject.h"
+#include "WeakReference.h"
+#include "../SwiftShims/swift/shims/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/Runtime/Error.h"
@@ -35,7 +35,7 @@
 
 using namespace swift;
 
-static const size_t layoutStringHeaderSize = sizeof(size_t);
+static const size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 
 /// Given a pointer and an offset, read the requested data and increment the
 /// offset
@@ -59,16 +59,19 @@ Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
 
 typedef Metadata* (*MetadataAccessor)(const Metadata* const *);
 
-const Metadata *getResilientTypeMetadata(const Metadata* metadata, const uint8_t *layoutStr, size_t &offset) {
-  auto fnPtr = readBytes<uintptr_t>(layoutStr, offset);
+const Metadata *getResilientTypeMetadata(const Metadata* metadata,
+                                         const uint8_t *layoutStr,
+                                         size_t &offset) {
+  auto absolute = layoutStr + offset;
+  auto relativeOffset = (uintptr_t)(intptr_t)(int32_t)readBytes<intptr_t>(layoutStr, offset);
   MetadataAccessor fn;
 
 #if SWIFT_PTRAUTH
   fn = (MetadataAccessor)ptrauth_sign_unauthenticated(
-      (void *)(fnPtr),
+      (void *)((uintptr_t)absolute + relativeOffset),
       ptrauth_key_function_pointer, 0);
 #else
-  fn = (MetadataAccessor)(fnPtr);
+  fn = (MetadataAccessor)((uintptr_t)absolute + relativeOffset);
 #endif
 
   return fn(metadata->getGenericArgs());
@@ -78,7 +81,6 @@ typedef void (*DestrFn)(void*);
 
 struct DestroyFuncAndMask {
   DestrFn fn;
-  uintptr_t mask;
   bool isIndirect;
 };
 
@@ -94,27 +96,27 @@ void existential_destroy(OpaqueValue* object) {
 }
 
 const DestroyFuncAndMask destroyTable[] = {
-  {(DestrFn)&skipDestroy, UINTPTR_MAX, false},
-  {(DestrFn)&swift_errorRelease, UINTPTR_MAX, true},
-  {(DestrFn)&swift_release, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(DestrFn)&swift_unownedRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(DestrFn)&swift_weakDestroy, UINTPTR_MAX, false},
-  {(DestrFn)&swift_unknownObjectRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(DestrFn)&swift_unknownObjectUnownedDestroy, UINTPTR_MAX, false},
-  {(DestrFn)&swift_unknownObjectWeakDestroy, UINTPTR_MAX, false},
-  {(DestrFn)&swift_bridgeObjectRelease, ~heap_object_abi::SwiftSpareBitsMask, true},
+  {(DestrFn)&skipDestroy, false},
+  {(DestrFn)&swift_errorRelease, true},
+  {(DestrFn)&swift_release, true},
+  {(DestrFn)&swift_unownedRelease, true},
+  {(DestrFn)&swift_weakDestroy, false},
+  {(DestrFn)&swift_unknownObjectRelease, true},
+  {(DestrFn)&swift_unknownObjectUnownedDestroy, false},
+  {(DestrFn)&swift_unknownObjectWeakDestroy, false},
+  {(DestrFn)&swift_bridgeObjectRelease, true},
 #if SWIFT_OBJC_INTEROP
-  {(DestrFn)&_Block_release, UINTPTR_MAX, true},
-  {(DestrFn)&swift_unknownObjectRelease, UINTPTR_MAX, true},
+  {(DestrFn)&_Block_release, true},
+  {(DestrFn)&swift_unknownObjectRelease, true},
 #else
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
+  {nullptr, true},
+  {nullptr, true},
 #endif
   // TODO: how to handle Custom?
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
-  {(DestrFn)&existential_destroy, UINTPTR_MAX, false},
+  {nullptr, true},
+  {nullptr, true},
+  {nullptr, true},
+  {(DestrFn)&existential_destroy, false},
 };
 
 extern "C" void
@@ -135,8 +137,7 @@ swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
       return;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       type->vw_destroy((OpaqueValue *)(addr + addrOffset));
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
       auto *type = getResilientTypeMetadata(metadata, typeLayout, offset);
@@ -155,7 +156,6 @@ swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
 
 struct RetainFuncAndMask {
   void* fn;
-  uintptr_t mask;
   bool isSingle;
 };
 
@@ -172,35 +172,37 @@ typedef void* (*CopyInitFn)(void*, void*);
 void* skipRetain(void* ignore) { return nullptr; }
 void* existential_initializeWithCopy(OpaqueValue* dest, OpaqueValue* src) {
   auto* metadata = getExistentialTypeMetadata(src);
-  return metadata->vw_initializeBufferWithCopyOfBuffer((ValueBuffer*)dest, (ValueBuffer*)src);
+  return metadata->vw_initializeBufferWithCopyOfBuffer((ValueBuffer*)dest,
+                                                       (ValueBuffer*)src);
 }
 
 const RetainFuncAndMask retainTable[] = {
-  {(void*)&skipRetain, UINTPTR_MAX, true},
-  {(void*)&swift_errorRetain, UINTPTR_MAX, true},
-  {(void*)&swift_retain, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(void*)&swift_unownedRetain, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(void*)&swift_weakCopyInit, UINTPTR_MAX, false},
-  {(void*)&swift_unknownObjectRetain, ~heap_object_abi::SwiftSpareBitsMask, true},
-  {(void*)&swift_unknownObjectUnownedCopyInit, UINTPTR_MAX, false},
-  {(void*)&swift_unknownObjectWeakCopyInit, UINTPTR_MAX, false},
-  {(void*)&swift_bridgeObjectRetain, ~heap_object_abi::SwiftSpareBitsMask, true},
+  {(void*)&skipRetain, true},
+  {(void*)&swift_errorRetain, true},
+  {(void*)&swift_retain, true},
+  {(void*)&swift_unownedRetain, true},
+  {(void*)&swift_weakCopyInit, false},
+  {(void*)&swift_unknownObjectRetain, true},
+  {(void*)&swift_unknownObjectUnownedCopyInit, false},
+  {(void*)&swift_unknownObjectWeakCopyInit, false},
+  {(void*)&swift_bridgeObjectRetain, true},
 #if SWIFT_OBJC_INTEROP
-  {(void*)&Block_copyForwarder, UINTPTR_MAX, false},
-  {(void*)&objc_retain, UINTPTR_MAX, true},
+  {(void*)&Block_copyForwarder, false},
+  {(void*)&objc_retain, true},
 #else
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
+  {nullptr, true},
+  {nullptr, true},
 #endif
   // TODO: how to handle Custom?
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
-  {nullptr, UINTPTR_MAX, true},
-  {(void*)&existential_initializeWithCopy, UINTPTR_MAX, false},
+  {nullptr, true},
+  {nullptr, true},
+  {nullptr, true},
+  {(void*)&existential_initializeWithCopy, false},
 };
 
 extern "C" swift::OpaqueValue *
-swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
+swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
   uintptr_t addrOffset = 0;
   const uint8_t *typeLayout = metadata->getLayoutString();
 
@@ -219,8 +221,7 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, co
     if (SWIFT_UNLIKELY(tag == RefCountingKind::End)) {
       return dest;
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Metatype)) {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       type->vw_initializeWithCopy((OpaqueValue*)((uintptr_t)dest + addrOffset),
                                   (OpaqueValue*)((uintptr_t)src + addrOffset));
     } else if (SWIFT_UNLIKELY(tag == RefCountingKind::Resilient)) {
@@ -232,14 +233,16 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, co
       if (SWIFT_LIKELY(retainFunc.isSingle)) {
         ((RetainFn)retainFunc.fn)(*(void**)(((uintptr_t)dest + addrOffset)));
       } else {
-        ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset), (void*)((uintptr_t)src + addrOffset));
+        ((CopyInitFn)retainFunc.fn)((void*)((uintptr_t)dest + addrOffset),
+                                    (void*)((uintptr_t)src + addrOffset));
       }
     }
   }
 }
 
 extern "C" swift::OpaqueValue *
-swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
+swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
   const uint8_t *typeLayout = metadata->getLayoutString();
   size_t size = metadata->vw_size();
 
@@ -260,23 +263,26 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, co
 
     switch (tag) {
     case RefCountingKind::UnknownWeak:
-      swift_unknownObjectWeakTakeInit((WeakReference*)((uintptr_t)dest + addrOffset),
-                                      (WeakReference*)((uintptr_t)src + addrOffset));
+      swift_unknownObjectWeakTakeInit(
+          (WeakReference*)((uintptr_t)dest + addrOffset),
+          (WeakReference*)((uintptr_t)src + addrOffset));
       break;
     case RefCountingKind::Metatype: {
-      auto typePtr = readBytes<uintptr_t>(typeLayout, offset);
-      auto *type = reinterpret_cast<Metadata*>(typePtr);
+      auto *type = readBytes<const Metadata*>(typeLayout, offset);
       if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
-        type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
-                                    (OpaqueValue*)((uintptr_t)src + addrOffset));
+        type->vw_initializeWithTake(
+            (OpaqueValue*)((uintptr_t)dest + addrOffset),
+            (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
       break;
     }
     case RefCountingKind::Existential: {
-      auto *type = getExistentialTypeMetadata((OpaqueValue*)((uintptr_t)src + addrOffset));
+      auto *type = getExistentialTypeMetadata(
+          (OpaqueValue*)((uintptr_t)src + addrOffset));
       if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
-        type->vw_initializeWithTake((OpaqueValue*)((uintptr_t)dest + addrOffset),
-                                    (OpaqueValue*)((uintptr_t)src + addrOffset));
+        type->vw_initializeWithTake(
+            (OpaqueValue*)((uintptr_t)dest + addrOffset),
+            (OpaqueValue*)((uintptr_t)src + addrOffset));
       }
       break;
     }
@@ -299,165 +305,50 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, co
 }
 
 extern "C" swift::OpaqueValue *
-swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
+swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithCopy(dest, src, metadata);
 }
 
 extern "C" swift::OpaqueValue *
-swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src, const Metadata *metadata) {
+swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
   swift_generic_destroy(dest, metadata);
   return swift_generic_initWithTake(dest, src, metadata);
 }
 
-extern "C" void
-swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
-                                      Metadata* type) {
-  size_t offset = 0;
-  const auto refCountSize = readBytes<size_t>(layoutStr, offset);
+void swift::swift_resolve_resilientAccessors(
+    uint8_t *layoutStr, size_t layoutStrOffset, const uint8_t *fieldLayoutStr,
+    size_t refCountBytes, const Metadata *fieldType) {
+  size_t i = layoutStringHeaderSize;
+  while (i < (layoutStringHeaderSize + refCountBytes)) {
+    size_t currentOffset = i;
+    uint64_t size = readBytes<uint64_t>(fieldLayoutStr, i);
+    RefCountingKind tag = (RefCountingKind)(size >> 56);
+    size &= ~(0xffULL << 56);
 
-  const size_t genericDescOffset = layoutStringHeaderSize + refCountSize + sizeof(size_t);
-  offset = genericDescOffset;
-
-  size_t genericRefCountSize = 0;
-  while (true) {
-    const auto tagAndOffset = readBytes<uint64_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndOffset >> 56);
-
-    if (tag == 0) {
+    switch (tag) {
+    case RefCountingKind::Resilient: {
+      auto *type = getResilientTypeMetadata(fieldType, fieldLayoutStr,
+                                            i);
+      uint8_t *curPos = (layoutStr + layoutStrOffset + currentOffset - layoutStringHeaderSize);
+      *((uint64_t*)curPos) =
+          (((uint64_t)RefCountingKind::Metatype) << 56) | size;
+      *((Metadata const* *)(curPos + sizeof(uint64_t))) = type;
       break;
-    } else if (tag == 1 || tag == 4) {
-      continue;
-    } else {
-      const Metadata *genericType;
-      if (tag == 2) {
-        auto index = readBytes<uint32_t>(layoutStr, offset);
-        genericType = type->getGenericArgs()[index];
-      } else {
-        genericType = getResilientTypeMetadata(type, layoutStr, offset);
-      }
-
-      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
-        const uint8_t *genericLayoutStr = genericType->getLayoutString();
-        size_t countOffset = 0;
-        genericRefCountSize += readBytes<size_t>(genericLayoutStr, countOffset);
-      } else if (genericType->isClassObject()) {
-        genericRefCountSize += sizeof(uint64_t);
-      } else {
-        genericRefCountSize += sizeof(uint64_t) + sizeof(uintptr_t);
-      }
+    }
+    case RefCountingKind::Metatype:
+      i += sizeof(uintptr_t);
+      break;
+    default:
+      break;
     }
   }
+}
 
-  const auto instancedLayoutStrSize = layoutStringHeaderSize + refCountSize + genericRefCountSize + sizeof(size_t) + 1;
-
-  uint8_t *instancedLayoutStr = (uint8_t*)calloc(instancedLayoutStrSize, sizeof(uint8_t));
-
-  writeBytes<size_t>(instancedLayoutStr, 0, refCountSize + genericRefCountSize);
-
-  offset = genericDescOffset;
-  size_t layoutStrOffset = layoutStringHeaderSize;
-  size_t instancedLayoutStrOffset = layoutStringHeaderSize;
-  size_t skipBytes = 0;
-  while (true) {
-    const auto tagAndOffset = readBytes<uint64_t>(layoutStr, offset);
-    const auto tag = (uint8_t)(tagAndOffset >> 56);
-    const auto sizeOrOffset = tagAndOffset & ~(0xffULL << 56);
-
-    if (tag == 0) {
-      break;
-    } else if (tag == 1) {
-      memcpy((void*)(instancedLayoutStr + instancedLayoutStrOffset), (void*)(layoutStr + layoutStrOffset), sizeOrOffset);
-      if (skipBytes) {
-        size_t firstRCOffset = instancedLayoutStrOffset;
-        auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
-        firstRCOffset = instancedLayoutStrOffset;
-        firstRC += skipBytes;
-        writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
-        skipBytes = 0;
-      }
-
-      layoutStrOffset += sizeOrOffset;
-      instancedLayoutStrOffset += sizeOrOffset;
-    } else if (tag == 4) {
-      auto *alignmentType = getResilientTypeMetadata(type, layoutStr, offset);
-      auto alignment = alignmentType->vw_alignment();
-      auto alignmentMask = alignment - 1;
-      skipBytes += sizeOrOffset;
-      skipBytes += alignmentMask;
-      skipBytes &= ~alignmentMask;
-    } else {
-      skipBytes += sizeOrOffset;
-      const Metadata *genericType;
-      if (tag == 2) {
-        auto index = readBytes<uint32_t>(layoutStr, offset);
-        genericType = type->getGenericArgs()[index];
-      } else {
-        genericType = getResilientTypeMetadata(type, layoutStr, offset);
-      }
-
-      if (genericType->getTypeContextDescriptor()->hasLayoutString()) {
-        const uint8_t *genericLayoutStr = genericType->getLayoutString();
-        size_t countOffset = 0;
-        auto genericRefCountSize = readBytes<size_t>(genericLayoutStr, countOffset);
-        if (genericRefCountSize > 0) {
-          memcpy((void*)(instancedLayoutStr + instancedLayoutStrOffset), (void*)(genericLayoutStr + layoutStringHeaderSize), genericRefCountSize);
-          if (skipBytes) {
-            size_t firstRCOffset = instancedLayoutStrOffset;
-            auto firstRC = readBytes<uint64_t>(instancedLayoutStr, firstRCOffset);
-            firstRC += skipBytes;
-            writeBytes(instancedLayoutStr, firstRCOffset, firstRC);
-            skipBytes = 0;
-          }
-
-          instancedLayoutStrOffset += genericRefCountSize;
-          size_t trailingBytesOffset = layoutStringHeaderSize + genericRefCountSize;
-          skipBytes += readBytes<size_t>(genericLayoutStr, trailingBytesOffset);
-        }
-      } else if (genericType->isClassObject()) {
-        uint64_t op = static_cast<uint64_t>(RefCountingKind::Unknown) << 56;
-        op |= (skipBytes & ~(0xffULL << 56));
-
-        writeBytes<uint64_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
-
-        instancedLayoutStrOffset += sizeof(uint64_t);
-
-        skipBytes = sizeof(uintptr_t);
-      } else {
-        const ValueWitnessTable *vwt = genericType->getValueWitnesses();
-        if (vwt->isPOD()) {
-          skipBytes += vwt->getSize();
-          continue;
-        }
-
-        uint64_t op = static_cast<uint64_t>(RefCountingKind::Metatype) << 56;
-        op |= (skipBytes & ~(0xffULL << 56));
-
-        writeBytes<uint64_t>(instancedLayoutStr, instancedLayoutStrOffset, op);
-
-        instancedLayoutStrOffset += sizeof(uint64_t);
-
-        writeBytes<uintptr_t>(instancedLayoutStr, instancedLayoutStrOffset, reinterpret_cast<uintptr_t>(genericType));
-        instancedLayoutStrOffset += sizeof(uintptr_t);
-
-        skipBytes = 0;
-      }
-    }
-  };
-
-  // TODO: this should not really happen once we instantiate resilient types
-  if (instancedLayoutStrOffset == layoutStringHeaderSize) {
-    free(instancedLayoutStr);
-    type->setLayoutString(layoutStr);
-    return;
-  }
-
-  size_t trailingBytesOffset = layoutStringHeaderSize + refCountSize;
-  skipBytes += readBytes<uint64_t>(layoutStr, trailingBytesOffset);
-
-  if (skipBytes > 0) {
-    writeBytes<size_t>(instancedLayoutStr, layoutStringHeaderSize + refCountSize + genericRefCountSize, skipBytes);
-  }
-
-  type->setLayoutString(instancedLayoutStr);
+extern "C"
+void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
+                                           Metadata* type) {
+  type->setLayoutString(layoutStr);
 }

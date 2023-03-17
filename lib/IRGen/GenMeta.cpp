@@ -2585,12 +2585,31 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
                                           RequireMetadata_t requireMetadata) {
   eraseExistingTypeContextDescriptor(IGM, type);
 
+  bool hasLayoutString = false;
+  auto lowered = getLoweredTypeInPrimaryContext(
+          IGM, type->getDeclaredType()->getCanonicalType());
+  auto &ti = IGM.getTypeInfo(lowered);
+  auto *typeLayoutEntry =
+      ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
+  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+
+    auto genericSig =
+        lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
+    hasLayoutString = !!typeLayoutEntry->layoutString(IGM, genericSig);
+  }
+
   if (auto sd = dyn_cast<StructDecl>(type)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+      hasLayoutString |= requiresForeignTypeMetadata(type) ||
+        needsSingletonMetadataInitialization(IGM, type) ||
+        (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
+    }
+
     StructContextDescriptorBuilder(IGM, sd, requireMetadata,
-                                   /*hasLayoutString*/ false).emit();
+                                   hasLayoutString).emit();
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
     EnumContextDescriptorBuilder(IGM, ed, requireMetadata,
-                                 /*hasLayoutString*/ false)
+                                 hasLayoutString)
         .emit();
   } else if (auto cd = dyn_cast<ClassDecl>(type)) {
     ClassContextDescriptorBuilder(IGM, cd, requireMetadata).emit();
@@ -2873,8 +2892,8 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 }
 
 static void emitInitializeFieldOffsetVectorWithLayoutString(
-    IRGenFunction &IGF, SILType T, llvm::Value *metadata, bool isVWTMutable,
-    MetadataDependencyCollector *collector) {
+    IRGenFunction &IGF, SILType T, llvm::Value *metadata,
+    bool isVWTMutable, MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   assert(IGM.Context.LangOpts.hasFeature(
       Feature::LayoutStringValueWitnessesInstantiation));
@@ -2892,11 +2911,17 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 
   // Fill out an array with the field type metadata records.
   Address fieldsMetadata =
-      IGF.createAlloca(llvm::ArrayType::get(IGM.TypeMetadataPtrTy, numFields),
+      IGF.createAlloca(llvm::ArrayType::get(IGM.Int8PtrPtrTy, numFields),
                        IGM.getPointerAlignment(), "fieldsMetadata");
   IGF.Builder.CreateLifetimeStart(fieldsMetadata,
                                   IGM.getPointerSize() * numFields);
   fieldsMetadata = IGF.Builder.CreateStructGEP(fieldsMetadata, 0, Size(0));
+
+  Address fieldTags =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.Int8Ty, numFields),
+                       Alignment(1), "fieldTags");
+  IGF.Builder.CreateLifetimeStart(fieldTags, Size(numFields));
+  fieldTags = IGF.Builder.CreateStructGEP(fieldTags, 0, Size(0));
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
@@ -2904,26 +2929,50 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
            "initializing offset vector for type with missing member?");
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldMetatype;
+    llvm::Value *fieldTag;
     if (auto ownership = propTy.getReferenceStorageOwnership()) {
+      auto &ti = IGF.getTypeInfo(propTy.getObjectType());
+      auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
+      assert(fixedTI && "Reference should have fixed layout");
+      auto fixedSize = fixedTI->getFixedSize();
+      fieldMetatype = emitTypeLayoutRef(IGF, propTy, collector);
       switch (*ownership) {
+      case ReferenceOwnership::Unowned:
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x1 : 0x2));
+        break;
       case ReferenceOwnership::Weak:
-        fieldMetatype = llvm::Constant::getIntegerValue(
-            IGM.TypeMetadataPtrTy, APInt(IGM.IntPtrTy->getBitWidth(), 0x7));
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x3 : 0x4));
+        break;
+      case ReferenceOwnership::Unmanaged:
+        fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(),
+                              fixedSize == IGM.getPointerSize() ? 0x5 : 0x6));
         break;
       case ReferenceOwnership::Strong:
-      case ReferenceOwnership::Unowned:
-      case ReferenceOwnership::Unmanaged:
-        llvm_unreachable("Unmanaged reference should have been lowered");
+        llvm_unreachable("Strong reference should have been lowered");
+        break;
       }
     } else {
+      fieldTag = llvm::Constant::getIntegerValue(
+            IGM.Int8Ty, APInt(IGM.Int8Ty->getBitWidth(), 0x0));
       auto request = DynamicMetadataRequest::getNonBlocking(
           MetadataState::LayoutComplete, collector);
       fieldMetatype = IGF.emitTypeMetadataRefForLayout(propTy, request);
+      fieldMetatype = IGF.Builder.CreateBitCast(fieldMetatype, IGM.Int8PtrPtrTy);
     }
+
+    Address fieldTagAddr = IGF.Builder.CreateConstArrayGEP(
+        fieldTags, index, Size::forBits(IGM.Int8Ty->getBitWidth()));
+    IGF.Builder.CreateStore(fieldTag, fieldTagAddr);
 
     Address fieldMetatypeAddr = IGF.Builder.CreateConstArrayGEP(
         fieldsMetadata, index, IGM.getPointerSize());
     IGF.Builder.CreateStore(fieldMetatype, fieldMetatypeAddr);
+
     ++index;
   });
   assert(index == numFields);
@@ -2937,8 +2986,10 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
   IGF.Builder.CreateCall(
       IGM.getInitStructMetadataWithLayoutStringFunctionPointer(),
       {metadata, IGM.getSize(Size(uintptr_t(flags))), numFieldsV,
-       fieldsMetadata.getAddress(), fieldVector});
+       fieldsMetadata.getAddress(), fieldTags.getAddress(), fieldVector});
 
+  IGF.Builder.CreateLifetimeEnd(fieldTags,
+                                IGM.getPointerSize() * numFields);
   IGF.Builder.CreateLifetimeEnd(fieldsMetadata,
                                 IGM.getPointerSize() * numFields);
 }
@@ -5133,8 +5184,10 @@ namespace {
         return false;
       }
       return !!getLayoutString() ||
-             IGM.Context.LangOpts.hasFeature(
-                 Feature::LayoutStringValueWitnessesInstantiation);
+             (IGM.Context.LangOpts.hasFeature(
+                 Feature::LayoutStringValueWitnessesInstantiation) &&
+                    (HasDependentVWT || HasDependentMetadata) &&
+                      !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {

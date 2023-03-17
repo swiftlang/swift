@@ -153,12 +153,12 @@ CastsTests.test("Cast from Swift existential to Protocol") {
 /// test these paths on Linux as well.
 protocol P4 {}
 CastsTests.test("struct -> Obj-C -> Protocol") {
-  struct S: P4 {
+  struct SFUUUHREEEEEFFFF: P4 {
     let value: Int
     let tracker = LifetimeTracked(13)
   }
 
-  let a: P4 = S(value: 13)
+  let a: P4 = SFUUUHREEEEEFFFF(value: 13)
 
   let b = _bridgeAnythingToObjectiveC(a)
   let d = b as? Any

@@ -308,6 +308,64 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
+
+public struct ComplexNesting<A, B, C, D> {
+    let pre: Filler = Filler()
+    let a: NestedA<A>
+    let b: NestedB<B>
+    let c: NestedC<C>
+    let d: NestedD<D>
+
+    struct Filler {
+        let x: Int16 = 23
+        let y: Bool = false
+    }
+
+    struct NestedA<T> {
+        let x: Int = 32
+        let y: NestedB<T>
+        let z: Bool = false
+
+        init(y: T) {
+            self.y = NestedB(y: y)
+        }
+    }
+
+    struct NestedB<T> {
+        let x: Bool = false
+        let y: NestedC<T>
+        let z: Int = 32
+
+        init(y: T) {
+            self.y = NestedC(y: y)
+        }
+    }
+
+    enum NestedC<T> {
+        case a(Int, T, Bool)
+        case b(Int, Bool)
+        case c
+
+        init(y: T) {
+            self = .a(32, y, false)
+        }
+    }
+
+    struct NestedD<T> {
+        let x: Bool = false
+        let y: T
+        let z: Int = 32
+    }
+
+    public init(_ a: A, _ b: B, _ c: C, _ d: D) {
+        self.a = NestedA(y: a)
+        self.b = NestedB(y: b)
+        self.c = NestedC(y: c)
+        self.d = NestedD(y: d)
+    }
+}
+
+
 @inline(never)
 public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
     ptr.pointee = x

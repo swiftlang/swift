@@ -760,7 +760,7 @@ namespace {
         case ReferenceCounting::Bridge:  kind = ScalarKind::BridgeReference; break; \
         case ReferenceCounting::Error:   kind = ScalarKind::ErrorReference; break; \
         case ReferenceCounting::None:    kind = ScalarKind::TriviallyDestroyable; break; \
-        case ReferenceCounting::Custom:  kind = ScalarKind::UnknownReference; break; \
+        case ReferenceCounting::Custom:  kind = ScalarKind::CustomReference; break; \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, kind); \
     } \
