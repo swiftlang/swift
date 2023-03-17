@@ -6489,9 +6489,8 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
       }))
     return false;
 
-  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor();
-  });
+  // TODO: this should probably check to make sure we actually have a copy ctor.
+  return true;
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
