@@ -71,7 +71,35 @@ types.test("ConformanceReq") {
   expectEqual("main.ConformanceReq<Pack{Swift.Int, Swift.String, Swift.Float}>", _typeName(ConformanceReq<Int, String, Float>.self))
 }
 
-// FIXME: Test superclass, layout and same-type pack requirements once more stuff is plumbed through
+public class Base {}
+public class Derived: Base {}
+
+public struct SuperclassReq<each T: Base> {}
+
+types.test("SuperclassReq") {
+  expectEqual("main.SuperclassReq<Pack{}>", _typeName(SuperclassReq< >.self))
+  expectEqual("main.SuperclassReq<Pack{main.Base}>", _typeName(SuperclassReq<Base>.self))
+  expectEqual("main.SuperclassReq<Pack{main.Derived, main.Base}>", _typeName(SuperclassReq<Derived, Base>.self))
+}
+
+public struct LayoutReq<each T: AnyObject> {}
+
+types.test("LayoutReq") {
+  expectEqual("main.LayoutReq<Pack{}>", _typeName(LayoutReq< >.self))
+  expectEqual("main.LayoutReq<Pack{Swift.AnyObject}>", _typeName(LayoutReq<AnyObject>.self))
+  expectEqual("main.LayoutReq<Pack{Swift.AnyObject, main.Base}>", _typeName(LayoutReq<AnyObject, Base>.self))
+}
+
+public struct OuterSeq<each T: Sequence> {
+  public struct InnerSeq<each U: Sequence> where each T.Element == each U.Element {}
+}
+
+types.test("SameTypeReq") {
+  expectEqual("main.OuterSeq<Pack{}>.InnerSeq<Pack{}>", _typeName(OuterSeq< >.InnerSeq< >.self))
+  expectEqual("main.OuterSeq<Pack{Swift.Array<Swift.Int>}>.InnerSeq<Pack{Swift.Set<Swift.Int>}>", _typeName(OuterSeq<Array<Int>>.InnerSeq<Set<Int>>.self))
+  expectEqual("main.OuterSeq<Pack{Swift.Array<Swift.Int>, Swift.Set<Swift.String>}>.InnerSeq<Pack{Swift.Set<Swift.Int>, Swift.Array<Swift.String>}>", _typeName(OuterSeq<Array<Int>, Set<String>>.InnerSeq<Set<Int>, Array<String>>.self))
+}
+
 
 //
 // Stored property layout tests

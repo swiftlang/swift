@@ -76,45 +76,99 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
   return getSecondType()->castTo<ProtocolType>()->getDecl();
 }
 
-bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                         bool allowMissing) const {
+CheckRequirementResult Requirement::checkRequirement(
+    SmallVectorImpl<Requirement> &subReqs,
+    bool allowMissing) const {
+  if (hasError())
+    return CheckRequirementResult::SubstitutionFailure;
+
+  auto firstType = getFirstType();
+
+  auto expandPackRequirement = [&](PackType *packType) {
+    for (auto eltType : packType->getElementTypes()) {
+      // FIXME: Doesn't seem right
+      if (auto *expansionType = eltType->getAs<PackExpansionType>())
+        eltType = expansionType->getPatternType();
+
+      auto kind = getKind();
+      if (kind == RequirementKind::Layout) {
+        subReqs.emplace_back(kind, eltType,
+                             getLayoutConstraint());
+      } else {
+        subReqs.emplace_back(kind, eltType,
+                             getSecondType());
+      }
+    }
+    return CheckRequirementResult::PackRequirement;
+  };
+
   switch (getKind()) {
   case RequirementKind::Conformance: {
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
     auto *proto = getProtocolDecl();
     auto *module = proto->getParentModule();
     auto conformance = module->lookupConformance(
-        getFirstType(), proto, allowMissing);
+        firstType, proto, allowMissing);
     if (!conformance)
-      return false;
+      return CheckRequirementResult::RequirementFailure;
 
-    conditionalRequirements = conformance.getConditionalRequirements();
-    return true;
+    auto condReqs = conformance.getConditionalRequirements();
+    if (condReqs.empty())
+      return CheckRequirementResult::Success;
+    subReqs.append(condReqs.begin(), condReqs.end());
+    return CheckRequirementResult::ConditionalConformance;
   }
 
   case RequirementKind::Layout: {
-    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
-      auto layout = archetypeType->getLayoutConstraint();
-      return (layout && layout.merge(getLayoutConstraint()));
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
     }
 
-    if (getLayoutConstraint()->isClass())
-      return getFirstType()->satisfiesClassConstraint();
+    if (auto *archetypeType = firstType->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      if (layout && layout.merge(getLayoutConstraint()))
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
+    }
+
+    if (getLayoutConstraint()->isClass()) {
+      if (firstType->satisfiesClassConstraint())
+        return CheckRequirementResult::Success;
+
+      return CheckRequirementResult::RequirementFailure;
+    }
 
     // TODO: Statically check other layout constraints, once they can
     // be spelled in Swift.
-    return true;
+    return CheckRequirementResult::Success;
   }
 
   case RequirementKind::Superclass:
-    return getSecondType()->isExactSuperclassOf(getFirstType());
+    if (auto packType = firstType->getAs<PackType>()) {
+      return expandPackRequirement(packType);
+    }
+
+    if (getSecondType()->isExactSuperclassOf(firstType))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameType:
-    return getFirstType()->isEqual(getSecondType());
+    if (firstType->isEqual(getSecondType()))
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
 
   case RequirementKind::SameShape:
-    return (getFirstType()->getReducedShape() ==
-            getSecondType()->getReducedShape());
+    if (firstType->getReducedShape() ==
+        getSecondType()->getReducedShape())
+      return CheckRequirementResult::Success;
+
+    return CheckRequirementResult::RequirementFailure;
   }
 
   llvm_unreachable("Bad requirement kind");

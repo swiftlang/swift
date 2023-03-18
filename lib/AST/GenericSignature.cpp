@@ -405,10 +405,24 @@ bool GenericSignatureImpl::isRequirementSatisfied(
         LookUpConformanceInSignature(this));
   }
 
-  // FIXME: Need to check conditional requirements here.
-  ArrayRef<Requirement> conditionalRequirements;
+  SmallVector<Requirement, 2> subReqs;
+  switch (requirement.checkRequirement(subReqs, allowMissing)) {
+  case CheckRequirementResult::Success:
+    return true;
 
-  return requirement.isSatisfied(conditionalRequirements, allowMissing);
+  case CheckRequirementResult::ConditionalConformance:
+    // FIXME: Need to check conditional requirements here.
+    return true;
+
+  case CheckRequirementResult::PackRequirement:
+    // FIXME
+    assert(false && "Refactor this");
+    return true;
+
+  case CheckRequirementResult::RequirementFailure:
+  case CheckRequirementResult::SubstitutionFailure:
+    return false;
+  }
 }
 
 SmallVector<Requirement, 4>
