@@ -715,6 +715,11 @@ bool swift_task_isOnExecutor(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
+/// Return the 64bit TaskID (if the job is an AsyncTask),
+/// or the 32bits of the job Id otherwise.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getJobTaskId(Job *job);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.

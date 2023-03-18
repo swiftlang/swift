@@ -136,6 +136,10 @@ public:
     return Flags.getPriority();
   }
 
+  uint32_t getJobId() const {
+    return Id;
+  }
+
   /// Given that we've fully established the job context in the current
   /// thread, actually start running this job.  To establish the context
   /// correctly, call swift_job_run or runJobInExecutorContext.

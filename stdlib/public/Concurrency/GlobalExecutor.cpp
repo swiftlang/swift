@@ -150,6 +150,17 @@ bool swift::swift_task_isOnExecutor(HeapObject *executor,
     return swift_task_isOnExecutorImpl(executor, selfType, wtable);
 }
 
+uint64_t swift::swift_task_getJobTaskId(Job *job) {
+  if (auto task = dyn_cast<AsyncTask>(job)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else {
+    return job->getJobId();
+  }
+}
+
 /*****************************************************************************/
 /****************************** MAIN EXECUTOR  *******************************/
 /*****************************************************************************/

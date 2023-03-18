@@ -6408,6 +6408,11 @@ WARNING(hashvalue_implementation,Deprecation,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
+WARNING(executor_enqueue_unowned_implementation,Deprecation,
+        "'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Executor' by implementing 'func enqueue(Job)' instead",
+        (Type))
+
 //------------------------------------------------------------------------------
 // MARK: property wrapper diagnostics
 //------------------------------------------------------------------------------

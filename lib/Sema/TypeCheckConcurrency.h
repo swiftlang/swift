@@ -280,6 +280,9 @@ void diagnoseMissingSendableConformance(
 /// state whether it conforms to Sendable, provide a diagnostic.
 void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 
+/// Warn about deprecated `Executor.enqueue` implementations.
+void tryDiagnoseExecutorConformance(ASTContext &C, const NominalTypeDecl *nominal, ProtocolDecl *proto);
+
 /// How the Sendable check should be performed.
 enum class SendableCheck {
   /// Sendable conformance was explicitly stated and should be

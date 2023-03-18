@@ -62,4 +62,14 @@ Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer
 Protocol Actor has added inherited protocol AnyActor
 Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+
+// SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
+Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
+
+// We deprecated `enqueue(_: UnownedJob)` and annotate it as such for all platforms,
+// while adding a new overload that accepts `Job` with new availability.
+// The ABI checker seems to be confused by this case.
+// rdar://106833284 (ABI checker confused with overload getting deprecated)
+Func Executor.enqueue(_:) is a new API without @available attribute
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

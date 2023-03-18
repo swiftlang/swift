@@ -301,6 +301,7 @@ static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
+  // TODO(ktoso): checking the "is main thread" is not correct, main executor can be not main thread, relates to rdar://106188692
   return executor.isMainExecutor() && isExecutingOnMainThread();
 }
 

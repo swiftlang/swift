@@ -34,7 +34,7 @@ import SwiftShims
 ///   programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *) 
 public
 func preconditionTaskOnExecutor(
     _ executor: some SerialExecutor,
@@ -71,7 +71,7 @@ func preconditionTaskOnExecutor(
 ///   programming error.
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *) 
 public
 func preconditionTaskOnActorExecutor(
     _ actor: some Actor,
@@ -108,7 +108,7 @@ func preconditionTaskOnActorExecutor(
 ///   assumption is a serious programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *) 
 public
 func assertTaskOnExecutor(
     _ executor: some SerialExecutor,
@@ -143,7 +143,7 @@ func assertTaskOnExecutor(
 ///
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *) 
 public
 func assertTaskOnActorExecutor(
     _ actor: some Actor,
@@ -180,7 +180,7 @@ func assertTaskOnActorExecutor(
 /// if another actor uses the same serial executor--by using ``MainActor/sharedUnownedExecutor``
 /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-@available(SwiftStdlib 5.9, *) // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+@available(SwiftStdlib 5.9, *) 
 @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
 public
 func assumeOnMainActorExecutor<T>(
