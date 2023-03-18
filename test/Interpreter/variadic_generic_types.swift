@@ -71,7 +71,18 @@ types.test("ConformanceReq") {
   expectEqual("main.ConformanceReq<Pack{Swift.Int, Swift.String, Swift.Float}>", _typeName(ConformanceReq<Int, String, Float>.self))
 }
 
-// FIXME: Test superclass, layout and same-type pack requirements once more stuff is plumbed through
+public class Base {}
+public class Derived: Base {}
+
+public struct SuperclassReq<each T: Base> {}
+
+types.test("SuperclassReq") {
+  expectEqual("main.SuperclassReq<Pack{}>", _typeName(SuperclassReq< >.self))
+  expectEqual("main.SuperclassReq<Pack{main.Base}>", _typeName(SuperclassReq<Base>.self))
+  expectEqual("main.SuperclassReq<Pack{main.Derived, main.Base}>", _typeName(SuperclassReq<Derived, Base>.self))
+}
+
+// FIXME: Test layout and same-type pack requirements once more stuff is plumbed through
 
 //
 // Stored property layout tests

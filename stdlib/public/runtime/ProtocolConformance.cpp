@@ -1275,6 +1275,20 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
                                       });
 }
 
+static bool isSubclassOrExistential(const Metadata *subclass,
+                                    const Metadata *superclass) {
+  // If the type which is constrained to a base class is an existential
+  // type, and if that existential type includes a superclass constraint,
+  // just require that the superclass by which the existential is
+  // constrained is a subclass of the base class.
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subclass)) {
+    if (auto *superclassConstraint = existential->getSuperclassConstraint())
+      subclass = superclassConstraint;
+  }
+
+  return isSubclass(subclass, superclass);
+}
+
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift::_swift_class_isSubclass(const Metadata *subclass,
@@ -1367,16 +1381,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
       return *result.getError();
     auto baseType = result.getType().getMetadata();
 
-    // If the type which is constrained to a base class is an existential 
-    // type, and if that existential type includes a superclass constraint,
-    // just require that the superclass by which the existential is
-    // constrained is a subclass of the base class.
-    if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subjectType)) {
-      if (auto *superclassConstraint = existential->getSuperclassConstraint())
-        subjectType = superclassConstraint;
-    }
-
-    if (!isSubclass(subjectType, baseType))
+    if (!isSubclassOrExistential(subjectType, baseType))
       return TYPE_LOOKUP_ERROR_FMT(
           "%.*s is not subclass of %.*s", (int)req.getParam().size(),
           req.getParam().data(), (int)req.getMangledTypeName().size(),
@@ -1464,7 +1469,26 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::BaseClass: {
-    llvm_unreachable("Implement me");
+    // Demangle the base type under the given substitutions.
+    auto result = swift_getTypeByMangledName(
+        MetadataState::Abstract, req.getMangledTypeName(),
+        extraArguments.data(), substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    auto baseType = result.getType().getMetadata();
+
+    // Check that each pack element inherits from the base class.
+    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      const Metadata *elt = subjectType.getElements()[i];
+
+      if (!isSubclassOrExistential(elt, baseType))
+      return TYPE_LOOKUP_ERROR_FMT(
+          "%.*s is not subclass of %.*s", (int)req.getParam().size(),
+          req.getParam().data(), (int)req.getMangledTypeName().size(),
+          req.getMangledTypeName().data());
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::SameConformance: {
