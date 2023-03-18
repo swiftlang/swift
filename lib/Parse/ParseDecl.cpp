@@ -4886,6 +4886,50 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   if (Tok.isContextualKeyword("macro") && Tok2.is(tok::identifier))
     return true;
 
+  if (Tok.isContextualKeyword("package")) {
+    // If `case` is the next token after `return package` statement,
+    // E.g.
+    // switch package {
+    //   case .x: return package
+    //   case .y: return nil
+    // }
+    // currently it errors (this is also true for `open`).
+    //
+    // If a non-contextual keyword was used in the above example, this
+    // function hits the line from above:
+    // ```
+    // if (!Tok.isContextualDeclKeyword())
+    //   return false;
+    // ```
+    // thus we return false here as well, i.e. treat it as a non-contextual
+    // keyword.
+    if (Tok2.getKind() == tok::kw_case)
+      return false;
+    
+    // Handle 'package(set)' access modifier
+    auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (DAK != DAK_Count && DeclAttribute::isDeclModifier(DAK)) {
+      BacktrackingScope backtrack(*this);
+      // First consume `package`
+      consumeToken();
+      // Eat paren after modifier name; e.g. `package(set)`, similar to
+      // `private(set)` described above in the `if (Tok.isKeyword())` block
+      if (consumeIf(tok::l_paren)) {
+        while (Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
+          if (consumeIf(tok::r_paren))
+            break;
+          // If we found the start of a decl while trying to skip over the
+          // paren, then we have something incomplete like 'package('. Return
+          // true for better recovery.
+          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false))
+            return true;
+          skipSingle();
+        }
+      }
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
+    }
+  }
+
   // If the next token is obviously not the start of a decl, bail early.
   if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok2))
     return false;
