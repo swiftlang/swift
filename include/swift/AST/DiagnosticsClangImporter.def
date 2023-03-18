@@ -233,15 +233,20 @@ ERROR(foreign_reference_types_invalid_release,none,
       "specified release function '%0' is invalid. Release must have exactly "
       "one argument of type '%1'", (StringRef, StringRef))
 
+
+ERROR(conforms_to_missing_dot,none,
+      "expected module name and protocol name separated by '.' in protocol conformance; '%0' is invalid", (StringRef))
+ERROR(cannot_find_conforms_to_module,none,
+      "module '%1' in specified protocol conformance '%0' is not found; did you mean to import it first?", (StringRef, StringRef))
+
 ERROR(cannot_find_conforms_to,none,
-      "specified protocol conformance could not be found '%0'.", (StringRef))
+      "protocol '%0' in specified protocol conformance is not found in module '%1'", (StringRef, StringRef))
 
 ERROR(conforms_to_ambiguous,none,
-      "specified protocol conformance is ambiguous. "
-      "Found multiple protocols named '%0'.", (StringRef))
+      "ambiguous reference to protocol '%0' in specified protocol conformance; module '%1' contains multiple protocols named '%0'", (StringRef, StringRef))
 
 ERROR(conforms_to_not_protocol,none,
-      "specified protocol conformance '%0' is not a protocol.", (StringRef))
+      "%0 %1 referenced in protocol conformance '%2' is not a protocol", (DescriptiveDeclKind, ValueDecl *, StringRef))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
