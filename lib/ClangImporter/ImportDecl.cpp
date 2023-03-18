@@ -2658,23 +2658,38 @@ namespace {
       if (conformsToAttr == clangDecl->getAttrs().end())
         return;
 
-      auto name = cast<clang::SwiftAttrAttr>(*conformsToAttr)
-                      ->getAttribute()
-                      .drop_front(StringRef("conforms_to:").size())
-                      .str();
-
-      for (auto &module : Impl.SwiftContext.getLoadedModules()) {
-        module.second->lookupValue(Impl.SwiftContext.getIdentifier(name),
-                                   NLKind::UnqualifiedLookup, results);
+      auto conformsToValue = cast<clang::SwiftAttrAttr>(*conformsToAttr)
+                                 ->getAttribute()
+                                 .drop_front(StringRef("conforms_to:").size())
+                                 .str();
+      auto names = StringRef(conformsToValue).split('.');
+      auto moduleName = names.first;
+      auto protocolName = names.second;
+      if (protocolName.empty()) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::conforms_to_missing_dot, conformsToValue);
+        return;
       }
 
+      auto *mod = Impl.SwiftContext.getModuleByIdentifier(
+          Impl.SwiftContext.getIdentifier(moduleName));
+      if (!mod) {
+        HeaderLoc attrLoc((*conformsToAttr)->getLocation());
+        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to_module,
+                      conformsToValue, moduleName);
+        return;
+      }
+      mod->lookupValue(Impl.SwiftContext.getIdentifier(protocolName),
+                       NLKind::UnqualifiedLookup, results);
       if (results.empty()) {
         HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, name);
+        Impl.diagnose(attrLoc, diag::cannot_find_conforms_to, protocolName,
+                      moduleName);
         return;
       } else if (results.size() != 1) {
         HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, name);
+        Impl.diagnose(attrLoc, diag::conforms_to_ambiguous, protocolName,
+                      moduleName);
         return;
       }
 
@@ -2684,7 +2699,8 @@ namespace {
             new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
       } else {
         HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol, name);
+        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol,
+                      result->getDescriptiveKind(), result, conformsToValue);
       }
     }
 
