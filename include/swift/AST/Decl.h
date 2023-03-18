@@ -4297,6 +4297,12 @@ public:
     Bits.StructDecl.HasUnreferenceableStorage = v;
   }
 
+  /// Does this struct represent a non-trivial (for the purpose of calls, as
+  /// defined by Itanium ABI) C++ record. A C++ record is considered non-trivial
+  /// for the purpose of calls if either its constructor, copy-constructor, or
+  /// destructor is non-trivial. As such, a C++ record with a non-trivial
+  /// copy-assignment operator but other trivial members is considered to be
+  /// trivial.
   bool isCxxNonTrivial() const { return Bits.StructDecl.IsCxxNonTrivial; }
 
   void setIsCxxNonTrivial(bool v) { Bits.StructDecl.IsCxxNonTrivial = v; }
