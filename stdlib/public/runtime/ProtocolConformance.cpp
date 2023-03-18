@@ -1289,6 +1289,23 @@ static bool isSubclassOrExistential(const Metadata *subclass,
   return isSubclass(subclass, superclass);
 }
 
+static llvm::Optional<TypeLookupError>
+satisfiesLayoutConstraint(const GenericRequirementDescriptor &req,
+                          const Metadata *subjectType) {
+  switch (req.getLayout()) {
+  case GenericRequirementLayoutKind::Class:
+    if (!subjectType->satisfiesClassConstraint()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+          "subject type %.*s does not satisfy class constraint",
+          (int)req.getParam().size(), req.getParam().data());
+    }
+    return llvm::None;
+  }
+
+  // Unknown layout.
+  return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+}
+
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift::_swift_class_isSubclass(const Metadata *subclass,
@@ -1358,18 +1375,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::Layout: {
-    switch (req.getLayout()) {
-    case GenericRequirementLayoutKind::Class:
-      if (!subjectType->satisfiesClassConstraint()) {
-        return TYPE_LOOKUP_ERROR_FMT(
-            "subject type %.*s does not satisfy class constraint",
-            (int)req.getParam().size(), req.getParam().data());
-      }
-      return llvm::None;
-    }
-
-    // Unknown layout.
-    return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+    return satisfiesLayoutConstraint(req, subjectType);
   }
 
   case GenericRequirementKind::BaseClass: {
@@ -1465,7 +1471,13 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::Layout: {
-    llvm_unreachable("Implement me");
+    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      const Metadata *elt = subjectType.getElements()[i];
+      if (auto result = satisfiesLayoutConstraint(req, elt))
+        return result;
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::BaseClass: {

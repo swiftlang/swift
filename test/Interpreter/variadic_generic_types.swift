@@ -82,7 +82,15 @@ types.test("SuperclassReq") {
   expectEqual("main.SuperclassReq<Pack{main.Derived, main.Base}>", _typeName(SuperclassReq<Derived, Base>.self))
 }
 
-// FIXME: Test layout and same-type pack requirements once more stuff is plumbed through
+public struct LayoutReq<each T: AnyObject> {}
+
+types.test("LayoutReq") {
+  expectEqual("main.LayoutReq<Pack{}>", _typeName(LayoutReq< >.self))
+  expectEqual("main.LayoutReq<Pack{Swift.AnyObject}>", _typeName(LayoutReq<AnyObject>.self))
+  expectEqual("main.LayoutReq<Pack{Swift.AnyObject, main.Base}>", _typeName(LayoutReq<AnyObject, Base>.self))
+}
+
+// FIXME: Test same-type pack requirements once more stuff is plumbed through
 
 //
 // Stored property layout tests
