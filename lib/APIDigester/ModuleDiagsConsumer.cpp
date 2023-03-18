@@ -159,8 +159,12 @@ bool swift::ide::api::FilteringDiagnosticConsumer::shouldProceed(const Diagnosti
 
 void swift::ide::api::
 FilteringDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
-                                              const DiagnosticInfo &Info) {
-  if (shouldProceed(Info)) {
+                                              const DiagnosticInfo &RawInfo) {
+  if (shouldProceed(RawInfo)) {
+    DiagnosticInfo Info = RawInfo;
+    if (DowngradeToWarning && Info.Kind == DiagnosticKind::Error) {
+      Info.Kind = DiagnosticKind::Warning;
+    }
     if (Info.Kind == DiagnosticKind::Error) {
       HasError = true;
     }
