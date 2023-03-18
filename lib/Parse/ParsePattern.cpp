@@ -245,9 +245,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (paramContext != ParameterContextKind::EnumElement) {
       auto AttrStatus = parseDeclAttributeList(param.Attrs);
       if (AttrStatus.hasCodeCompletion()) {
-        if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->setAttrTargetDeclKind(DeclKind::Param);
-        }
+        if (this->CodeCompletionCallbacks)
+          this->CodeCompletionCallbacks->setAttrTargetDeclKind(DeclKind::Param);
         status.setHasCodeCompletionAndIsError();
       }
     }

@@ -9381,9 +9381,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   auto checkCodeCompletion =
       [&](CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) -> bool {
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeInPrecedenceGroup(SK);
-      }
+      if (this->CodeCompletionCallbacks)
+        this->CodeCompletionCallbacks->completeInPrecedenceGroup(SK);
       consumeToken();
       return true;
     }
