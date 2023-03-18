@@ -1,3 +1,4 @@
+// RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %t/main.swift -package-name myPkg
