@@ -2784,8 +2784,12 @@ static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
   if (VD->hasClangNode())
     return true;
   auto *mc = VD->getModuleContext();
-  if (mc == &M || mc->isStdlibModule())
+  if (mc == &M)
     return true;
+  // Only certain declarations are exposed from
+  // the standard library.
+  if (mc->isStdlibModule())
+    return hasExposeAttr(VD);
   return exposedModules.count(mc->getName().str());
 }
 
