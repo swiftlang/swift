@@ -1104,10 +1104,10 @@ public:
           llvm::Value *Shape = emitPackShapeExpression(t);
           if (PackShapeExpressions.insert(Shape).second) {
               llvm::SmallString<8> Buf;
-              llvm::raw_svector_ostream OS(Buf);
               unsigned Position = PackShapeExpressions.size() - 1;
-              OS << "$pack_count_" << Position;
-              SILDebugVariable Var(OS.str(), true, 0);
+              llvm::raw_svector_ostream(Buf) << "$pack_count_" << Position;
+              auto Name = IGM.Context.getIdentifier(Buf.str());
+              SILDebugVariable Var(Name.str(), true, 0);
               Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
                                              false /*was move*/);
               if (IGM.DebugInfo)
