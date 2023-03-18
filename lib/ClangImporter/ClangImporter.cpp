@@ -6589,6 +6589,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
 
         if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
             !cxxRecordReturnType->hasUserDeclaredMoveConstructor() &&
+            !hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
           return false;
         }
