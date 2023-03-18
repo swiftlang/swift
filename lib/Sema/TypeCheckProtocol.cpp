@@ -6496,6 +6496,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
       sendableConformanceIsUnchecked = true;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
+      tryDiagnoseExecutorConformance(Context, nominal, proto);
     }
   }
 

@@ -3860,6 +3860,9 @@ public:
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl *getDistributedRemoteCallArgumentInitFunction() const;
 
+  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorOwnedEnqueueFunction() const;
+
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
