@@ -1958,37 +1958,50 @@ public:
       return BuiltType();
 #endif
 
-    // FIXME: variadic-generics
-
     auto swiftProtocol = protocol.getSwiftProtocol();
-    auto witnessTable = swift_conformsToProtocol(base.getMetadata(), swiftProtocol);
-    if (!witnessTable)
-      return BuiltType();
 
     // Look for the named associated type within the protocol.
     auto assocType = findAssociatedTypeByName(swiftProtocol, name);
     if (!assocType) return BuiltType();
 
-    // Call the associated type access function.
-#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
-    auto tbl = reinterpret_cast<RelativeWitnessTable *>(
-      const_cast<WitnessTable *>(witnessTable));
-    return BuiltType(
-        swift_getAssociatedTypeWitnessRelative(
-                                 MetadataState::Abstract,
-                                 tbl,
-                                 base.getMetadata(),
-                                 swiftProtocol->getRequirementBaseDescriptor(),
-                                 *assocType));
-#else
-    return BuiltType(
-        swift_getAssociatedTypeWitness(
-                                 MetadataState::Abstract,
-                                 const_cast<WitnessTable *>(witnessTable),
-                                 base.getMetadata(),
-                                 swiftProtocol->getRequirementBaseDescriptor(),
-                                 *assocType));
-#endif
+    auto projectDependentMemberType = [&](const Metadata *baseMetadata) -> const Metadata * {
+      auto witnessTable = swift_conformsToProtocol(baseMetadata, swiftProtocol);
+      if (!witnessTable)
+        return nullptr;
+
+      // Call the associated type access function.
+  #if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+      auto tbl = reinterpret_cast<RelativeWitnessTable *>(
+        const_cast<WitnessTable *>(witnessTable));
+      return swift_getAssociatedTypeWitnessRelative(
+                                   MetadataState::Abstract,
+                                   tbl,
+                                   baseMetadata,
+                                   swiftProtocol->getRequirementBaseDescriptor(),
+                                   *assocType).Value;
+  #else
+      return swift_getAssociatedTypeWitness(
+                                   MetadataState::Abstract,
+                                   const_cast<WitnessTable *>(witnessTable),
+                                   baseMetadata,
+                                   swiftProtocol->getRequirementBaseDescriptor(),
+                                   *assocType).Value;
+  #endif
+    };
+
+    if (base.isMetadata()) {
+      return BuiltType(projectDependentMemberType(base.getMetadata()));
+    } else {
+      MetadataPackPointer basePack = base.getMetadataPack();
+
+      llvm::SmallVector<const Metadata *, 4> packElts;
+      for (size_t i = 0, e = basePack.getNumElements(); i < e; ++i) {
+        auto *projectedElt = projectDependentMemberType(basePack.getElements()[i]);
+        packElts.push_back(projectedElt);
+      }
+
+      return BuiltType(swift_allocateMetadataPack(packElts.data(), packElts.size()));
+    }
   }
 
 #define REF_STORAGE(Name, ...)                                                 \

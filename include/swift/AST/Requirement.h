@@ -27,6 +27,28 @@
 
 namespace swift {
 
+/// Return type of Requirement::checkRequirement().
+enum class CheckRequirementResult : uint8_t {
+  /// The requirement was fully satisfied.
+  Success,
+
+  /// The subject type conforms conditionally; the sub-requirements are
+  /// conditional requirements which must be checked.
+  ConditionalConformance,
+
+  /// The subject type is a pack type; the sub-requirements are the
+  /// element-wise requirements which must be checked.
+  PackRequirement,
+
+  /// The requirement cannot ever be satisfied.
+  RequirementFailure,
+
+  /// Some other requirement is expected to fail, or there was an invalid
+  /// conformance and an error should be diagnosed elsewhere, so this
+  /// requirement does not need to be diagnosed.
+  SubstitutionFailure
+};
+
 /// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
@@ -155,11 +177,12 @@ public:
 
   /// Determines if this substituted requirement is satisfied.
   ///
-  /// \param conditionalRequirements An out parameter initialized to an
-  /// array of requirements that the caller must check to ensure this
+  /// \param subReqs An out parameter initialized to a list of simpler
+  /// requirements which the caller must check to ensure this
   /// requirement is completely satisfied.
-  bool isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                   bool allowMissing = false) const;
+  CheckRequirementResult checkRequirement(
+      SmallVectorImpl<Requirement> &subReqs,
+      bool allowMissing = false) const;
 
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.

@@ -1275,6 +1275,37 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
                                       });
 }
 
+static bool isSubclassOrExistential(const Metadata *subclass,
+                                    const Metadata *superclass) {
+  // If the type which is constrained to a base class is an existential
+  // type, and if that existential type includes a superclass constraint,
+  // just require that the superclass by which the existential is
+  // constrained is a subclass of the base class.
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subclass)) {
+    if (auto *superclassConstraint = existential->getSuperclassConstraint())
+      subclass = superclassConstraint;
+  }
+
+  return isSubclass(subclass, superclass);
+}
+
+static llvm::Optional<TypeLookupError>
+satisfiesLayoutConstraint(const GenericRequirementDescriptor &req,
+                          const Metadata *subjectType) {
+  switch (req.getLayout()) {
+  case GenericRequirementLayoutKind::Class:
+    if (!subjectType->satisfiesClassConstraint()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+          "subject type %.*s does not satisfy class constraint",
+          (int)req.getParam().size(), req.getParam().data());
+    }
+    return llvm::None;
+  }
+
+  // Unknown layout.
+  return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+}
+
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift::_swift_class_isSubclass(const Metadata *subclass,
@@ -1344,18 +1375,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::Layout: {
-    switch (req.getLayout()) {
-    case GenericRequirementLayoutKind::Class:
-      if (!subjectType->satisfiesClassConstraint()) {
-        return TYPE_LOOKUP_ERROR_FMT(
-            "subject type %.*s does not satisfy class constraint",
-            (int)req.getParam().size(), req.getParam().data());
-      }
-      return llvm::None;
-    }
-
-    // Unknown layout.
-    return TYPE_LOOKUP_ERROR_FMT("unknown layout kind %u", req.getLayout());
+    return satisfiesLayoutConstraint(req, subjectType);
   }
 
   case GenericRequirementKind::BaseClass: {
@@ -1367,16 +1387,7 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
       return *result.getError();
     auto baseType = result.getType().getMetadata();
 
-    // If the type which is constrained to a base class is an existential 
-    // type, and if that existential type includes a superclass constraint,
-    // just require that the superclass by which the existential is
-    // constrained is a subclass of the base class.
-    if (auto *existential = dyn_cast<ExistentialTypeMetadata>(subjectType)) {
-      if (auto *superclassConstraint = existential->getSuperclassConstraint())
-        subjectType = superclassConstraint;
-    }
-
-    if (!isSubclass(subjectType, baseType))
+    if (!isSubclassOrExistential(subjectType, baseType))
       return TYPE_LOOKUP_ERROR_FMT(
           "%.*s is not subclass of %.*s", (int)req.getParam().size(),
           req.getParam().data(), (int)req.getMangledTypeName().size(),
@@ -1427,7 +1438,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
     llvm::SmallVector<const WitnessTable *, 4> witnessTables;
 
     // Look up the conformance of each pack element to the protocol.
-    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
       const Metadata *elt = subjectType.getElements()[i];
 
       const WitnessTable *witnessTable = nullptr;
@@ -1436,8 +1447,8 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
         return TYPE_LOOKUP_ERROR_FMT(
-            "subject type %.*s does not conform to protocol %s",
-            (int)req.getParam().size(), req.getParam().data(), protoName);
+            "subject type %.*s does not conform to protocol %s at pack index %lu",
+            (int)req.getParam().size(), req.getParam().data(), protoName, i);
       }
 
       if (req.getProtocol().needsWitnessTable())
@@ -1456,15 +1467,70 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::SameType: {
-    llvm_unreachable("Implement me");
+    // Resolve the constraint generic parameter.
+    auto result = swift::getTypePackByMangledName(
+        req.getMangledTypeName(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    MetadataPackPointer constraintType = result.getType();
+    assert(constraintType.getLifetime() == PackLifetime::OnHeap);
+
+    if (subjectType.getNumElements() != constraintType.getNumElements()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+            "mismatched pack lengths in same-type pack requirement %.*s: %lu vs %lu",
+            (int)req.getParam().size(), req.getParam().data(),
+            subjectType.getNumElements(), constraintType.getNumElements());
+    }
+
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      auto *subjectElt = subjectType.getElements()[i];
+      auto *constraintElt = constraintType.getElements()[i];
+
+      if (subjectElt != constraintElt) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "subject type %.*s does not match %.*s at pack index %lu",
+            (int)req.getParam().size(),
+            req.getParam().data(), (int)req.getMangledTypeName().size(),
+            req.getMangledTypeName().data(), i);
+      }
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::Layout: {
-    llvm_unreachable("Implement me");
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      const Metadata *elt = subjectType.getElements()[i];
+      if (auto result = satisfiesLayoutConstraint(req, elt))
+        return result;
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::BaseClass: {
-    llvm_unreachable("Implement me");
+    // Demangle the base type under the given substitutions.
+    auto result = swift_getTypeByMangledName(
+        MetadataState::Abstract, req.getMangledTypeName(),
+        extraArguments.data(), substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    auto baseType = result.getType().getMetadata();
+
+    // Check that each pack element inherits from the base class.
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      const Metadata *elt = subjectType.getElements()[i];
+
+      if (!isSubclassOrExistential(elt, baseType))
+      return TYPE_LOOKUP_ERROR_FMT(
+          "%.*s is not subclass of %.*s at pack index %lu",
+          (int)req.getParam().size(),
+          req.getParam().data(), (int)req.getMangledTypeName().size(),
+          req.getMangledTypeName().data(), i);
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::SameConformance: {
