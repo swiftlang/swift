@@ -4,6 +4,9 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Enums -enable-experimental-cxx-interop -emit-clang-header-path %t/enums-default.h
+// RUN: %FileCheck %s < %t/enums-default.h
+
 public enum E {
     case x(Double)
     case y(UnsafeRawPointer?)
@@ -23,6 +26,11 @@ public enum E {
     public func printSelf() {
         print("self")
     }
+}
+
+public enum E2 {
+    case foobar
+    case baz
 }
 
 public struct S {
@@ -166,6 +174,15 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
+
+// CHECK: class SWIFT_SYMBOL({{.*}}) E2 final {
+// CHECK: SWIFT_INLINE_THUNK operator cases() const {
+// CHECK: }
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getHashValue() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: private:
+
 // CHECK:      namespace Enums SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        SWIFT_INLINE_THUNK E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
