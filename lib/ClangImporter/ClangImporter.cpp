@@ -6502,7 +6502,6 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
-  auto &clangSema = desc.ctx.getClangModuleLoader()->getClangSema();
 
   if (hasImportAsRefAttr(decl)) {
     return CxxRecordSemanticsKind::Reference;
@@ -6590,6 +6589,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
 
         if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
             !cxxRecordReturnType->hasUserDeclaredMoveConstructor() &&
+            !hasOwnedValueAttr(cxxRecordReturnType) &&
             hasPointerInSubobjects(cxxRecordReturnType)) {
           return false;
         }
