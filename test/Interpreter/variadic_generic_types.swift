@@ -90,7 +90,16 @@ types.test("LayoutReq") {
   expectEqual("main.LayoutReq<Pack{Swift.AnyObject, main.Base}>", _typeName(LayoutReq<AnyObject, Base>.self))
 }
 
-// FIXME: Test same-type pack requirements once more stuff is plumbed through
+public struct OuterSeq<each T: Sequence> {
+  public struct InnerSeq<each U: Sequence> where each T.Element == each U.Element {}
+}
+
+types.test("SameTypeReq") {
+  expectEqual("main.OuterSeq<Pack{}>.InnerSeq<Pack{}>", _typeName(OuterSeq< >.InnerSeq< >.self))
+  expectEqual("main.OuterSeq<Pack{Swift.Array<Swift.Int>}>.InnerSeq<Pack{Swift.Set<Swift.Int>}>", _typeName(OuterSeq<Array<Int>>.InnerSeq<Set<Int>>.self))
+  expectEqual("main.OuterSeq<Pack{Swift.Array<Swift.Int>, Swift.Set<Swift.String>}>.InnerSeq<Pack{Swift.Set<Swift.Int>, Swift.Array<Swift.String>}>", _typeName(OuterSeq<Array<Int>, Set<String>>.InnerSeq<Set<Int>, Array<String>>.self))
+}
+
 
 //
 // Stored property layout tests

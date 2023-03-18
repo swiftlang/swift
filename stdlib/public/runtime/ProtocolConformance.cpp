@@ -1438,7 +1438,7 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
     llvm::SmallVector<const WitnessTable *, 4> witnessTables;
 
     // Look up the conformance of each pack element to the protocol.
-    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
       const Metadata *elt = subjectType.getElements()[i];
 
       const WitnessTable *witnessTable = nullptr;
@@ -1447,8 +1447,8 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
         return TYPE_LOOKUP_ERROR_FMT(
-            "subject type %.*s does not conform to protocol %s",
-            (int)req.getParam().size(), req.getParam().data(), protoName);
+            "subject type %.*s does not conform to protocol %s at pack index %lu",
+            (int)req.getParam().size(), req.getParam().data(), protoName, i);
       }
 
       if (req.getProtocol().needsWitnessTable())
@@ -1467,11 +1467,40 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::SameType: {
-    llvm_unreachable("Implement me");
+    // Resolve the constraint generic parameter.
+    auto result = swift::getTypePackByMangledName(
+        req.getMangledTypeName(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+    if (result.getError())
+      return *result.getError();
+    MetadataPackPointer constraintType = result.getType();
+    assert(constraintType.getLifetime() == PackLifetime::OnHeap);
+
+    if (subjectType.getNumElements() != constraintType.getNumElements()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+            "mismatched pack lengths in same-type pack requirement %.*s: %lu vs %lu",
+            (int)req.getParam().size(), req.getParam().data(),
+            subjectType.getNumElements(), constraintType.getNumElements());
+    }
+
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+      auto *subjectElt = subjectType.getElements()[i];
+      auto *constraintElt = constraintType.getElements()[i];
+
+      if (subjectElt != constraintElt) {
+        return TYPE_LOOKUP_ERROR_FMT(
+            "subject type %.*s does not match %.*s at pack index %lu",
+            (int)req.getParam().size(),
+            req.getParam().data(), (int)req.getMangledTypeName().size(),
+            req.getMangledTypeName().data(), i);
+      }
+    }
+
+    return llvm::None;
   }
 
   case GenericRequirementKind::Layout: {
-    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
       const Metadata *elt = subjectType.getElements()[i];
       if (auto result = satisfiesLayoutConstraint(req, elt))
         return result;
@@ -1490,14 +1519,15 @@ checkGenericPackRequirement(const GenericRequirementDescriptor &req,
     auto baseType = result.getType().getMetadata();
 
     // Check that each pack element inherits from the base class.
-    for (unsigned i = 0, e = subjectType.getNumElements(); i < e; ++i) {
+    for (size_t i = 0, e = subjectType.getNumElements(); i < e; ++i) {
       const Metadata *elt = subjectType.getElements()[i];
 
       if (!isSubclassOrExistential(elt, baseType))
       return TYPE_LOOKUP_ERROR_FMT(
-          "%.*s is not subclass of %.*s", (int)req.getParam().size(),
+          "%.*s is not subclass of %.*s at pack index %lu",
+          (int)req.getParam().size(),
           req.getParam().data(), (int)req.getMangledTypeName().size(),
-          req.getMangledTypeName().data());
+          req.getMangledTypeName().data(), i);
     }
 
     return llvm::None;
