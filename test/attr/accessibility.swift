@@ -35,15 +35,10 @@ fileprivate(set)
 public
 var customSetter2 = 0
 
-// FIXME: rdar://104931420 folowing should not error
-// expected-error @+2{{cannot find 'package' in scope}}{{none}}
-// expected-error @+1{{cannot find 'set' in scope; did you mean 'Set'?}}{{9-12=Set}}
 package(set)
 public
 var customSetter3 = 0
 
-// FIXME: rdar://104931420 folowing should not error
-// expected-error @+1{{expected expression}}
 public
 package(set)
 var customSetter4 = 0
@@ -66,6 +61,14 @@ public(set) // expected-error {{duplicate modifier}}
 private // expected-error {{duplicate modifier}}
 var customSetterDuplicateAttrsAllAround = 0
 
+private(set) // expected-note {{modifier already specified here}}
+package(set) // expected-error {{duplicate modifier}}
+var customSetterDuplicateAttr2 = 0
+
+package(set) // expected-note {{modifier already specified here}}
+public(set) // expected-error {{duplicate modifier}}
+public var customSetterDuplicateAttr3 = 0
+
 private(get) // expected-error{{expected 'set' as subject of 'private' modifier}}
 var invalidSubject = 0
 
@@ -74,6 +77,13 @@ var invalidSubject2 = 0
 
 private(a bunch of random tokens) // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
 var invalidSubject3 = 0
+
+
+package(get) // expected-error{{expected 'set' as subject of 'package' modifier}}
+var invalidSubject4 = 0
+
+package(42) // expected-error{{expected 'set' as subject of 'package' modifier}}
+var invalidSubject5 = 0
 
 private(set // expected-error{{expected ')' in 'private' modifier}}
 var unterminatedSubject = 0
@@ -132,7 +142,9 @@ private protocol TestProtocol {
 public(set) func publicSetFunc() {} // expected-error {{'public' modifier cannot be applied to this declaration}} {{1-13=}}
 
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
-
+package(set) var defaultVisPkg = 0 // expected-error {{internal variable cannot have a package setter}}
+package(set) package var defaultVisPkgPkg = 0 // expected-warning {{'package(set)' modifier is redundant for a package var}}
+package(set) public var defaultVisPkgOK = 0 // OK
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
 private(set) var defaultVisOK = 0
 private(set) public var publicVis = 0
@@ -144,7 +156,14 @@ private(set) var computedRW: Int {
   get { return 42 }
   set { }
 }
+
+package(set) public var computedPkg: Int { // expected-error {{'package(set)' modifier cannot be applied to read-only variables}} {{1-14=}}
+  return 42
+}
+
 private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to constants}} {{1-14=}}
+
+package(set) public let constantPkg = 42 // expected-error {{'package(set)' modifier cannot be applied to constants}} {{1-14=}}
 
 public struct Properties {
   private(set) var stored = 42
@@ -155,11 +174,27 @@ public struct Properties {
     get { return 42 }
     set { }
   }
+
+  package(set) public var computedRWPkg: Int {
+    get { return 42 }
+    set { }
+  }
+
+  public package(set) var computedR: Int { // expected-error {{'package(set)' modifier cannot be applied to read-only properties}} {{10-23=}}
+    return 42
+  }
+
   private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
+  package(set) public let constantPkg = 42 // expected-error {{'package(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
+  package(set) var defaultVisPkg = 42 // expected-error {{internal property cannot have a package setter}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
   open(set) var defaultVis2 = 0 // expected-error {{internal property cannot have an open setter}}
 
   public(set) subscript(a a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
+    get { return 0 }
+    set {}
+  }
+  package(set) subscript(p p: Int) -> Int { // expected-error {{internal subscript cannot have a package setter}}
     get { return 0 }
     set {}
   }
@@ -180,6 +215,10 @@ public struct Properties {
 }
 
 private extension Properties {
+  package(set) var extPropPkg: Int { // expected-error {{private property cannot have a package setter}}
+    get { return 42 }
+    set { }
+  }
   public(set) var extProp: Int { // expected-error {{private property cannot have a public setter}}
     get { return 42 }
     set { }
@@ -198,11 +237,13 @@ private(set) extension Properties : EmptyProto2 {} // expected-error {{'private'
 package protocol EmptyProto3 {}
 package protocol EmptyProto4 {}
 public protocol EmptyProto5 {}
+public protocol EmptyProto6 {}
 
 private extension Properties : EmptyProto3 {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
 private(set) extension Properties : EmptyProto4 {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 package extension Properties : EmptyProto5 {} // expected-error {{'package' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
+package(set) extension Properties : EmptyProto6 {} // expected-error {{'package' modifier cannot be applied to this declaration}} {{1-14=}}
 
 public struct PublicStruct {}
 package struct PackageStruct {} // expected-note * {{declared here}}
