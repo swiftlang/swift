@@ -9,6 +9,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-error)
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftToCxxTest -I %t -source-filename=x -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
+
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
 //--- header.h
