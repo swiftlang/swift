@@ -3277,6 +3277,10 @@ static bool usesFeatureReferenceBindings(Decl *decl) {
   return vd && vd->getIntroducer() == VarDecl::Introducer::InOut;
 }
 
+static bool usesFeaturePatternMatchingBooleanExpression (Decl *decl) {
+  return false;
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
