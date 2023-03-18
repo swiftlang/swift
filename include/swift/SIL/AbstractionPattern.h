@@ -915,7 +915,7 @@ public:
     // don't want to try to unique by Clang node.
     //
     // Even if we support Clang nodes someday, we *cannot* cache
-    // by the open-coded patterns like Tuple and PackExpansion.
+    // by the open-coded patterns like Tuple.
     return getKind() == Kind::Type || getKind() == Kind::Opaque
         || getKind() == Kind::Discard;
   }
@@ -980,7 +980,8 @@ public:
     case Kind::Type:
     case Kind::ClangType:
     case Kind::Discard: {
-      return getType()->isParameterPack();
+      auto ty = getType();
+      return isa<PackArchetypeType>(ty) || ty->isParameterPack();
     }
     default:
       return false;
@@ -1469,6 +1470,18 @@ public:
   /// component.
   AbstractionPattern getPackExpansionComponentType(CanType substType) const;
   AbstractionPattern getPackExpansionComponentType(bool isExpansion) const;
+
+  /// Given that the value being abstracted is a metatype type, return
+  /// the abstraction pattern for its instance type.
+  AbstractionPattern getMetatypeInstanceType() const;
+
+  /// Given that the value being abstracted is a dynamic self type, return
+  /// the abstraction pattern for its self type.
+  AbstractionPattern getDynamicSelfSelfType() const;
+
+  /// Given that the value being abstracted is a parameterized protocol
+  /// type, return the abstraction pattern for one of its argument types.
+  AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.

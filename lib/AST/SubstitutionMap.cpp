@@ -458,6 +458,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
       continue;
     }
     newSubs.push_back(type.subst(subs, conformances, options));
+    assert(type->is<PackType>() == newSubs.back()->is<PackType>() &&
+           "substitution changed the pack-ness of a replacement type");
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
