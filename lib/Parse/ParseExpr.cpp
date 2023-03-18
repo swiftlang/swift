@@ -699,9 +699,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
         CodeCompletionExpr(pathResult.getPtrOrNull(), Tok.getLoc());
     auto *keypath = KeyPathExpr::createParsed(
         Context, backslashLoc, rootResult.getPtrOrNull(), CC, hasLeadingDot);
-    if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeExprKeyPath(keypath, DotLoc);
-    }
+    if (this->CodeCompletionCallbacks)
+      this->CodeCompletionCallbacks->completeExprKeyPath(keypath, DotLoc);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(keypath);
   }
@@ -3138,10 +3137,9 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     } else if (isArgumentList && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeCallArg(CCExpr,
-                                                 PreviousLoc == leftLoc);
-      }
+      if (this->CodeCompletionCallbacks)
+        this->CodeCompletionCallbacks->completeCallArg(CCExpr,
+                                                       PreviousLoc == leftLoc);
       consumeIf(tok::code_complete);
       SubExpr = CCExpr;
       Status.setHasCodeCompletionAndIsError();
