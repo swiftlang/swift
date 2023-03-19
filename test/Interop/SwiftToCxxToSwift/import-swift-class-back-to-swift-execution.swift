@@ -10,6 +10,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: OS=windows-msvc
+
 //--- header.h
 #ifndef FIRSTPASS
 

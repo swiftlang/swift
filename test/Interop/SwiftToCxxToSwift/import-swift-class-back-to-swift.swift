@@ -9,6 +9,8 @@
 
 // RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -DSECOND_PASS -emit-sil -o - | %FileCheck --check-prefix=SIL %s
 
+// UNSUPPORTED: OS=windows-msvc
+
 //--- header.h
 #ifndef FIRSTPASS
 #include "swiftMod.h"
