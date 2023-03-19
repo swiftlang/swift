@@ -12,7 +12,7 @@
 // CHECK: class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField;
 // CHECK-NEXT: } // end namespace
 
-// CHECK: namespace swift {
+// CHECK: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -85,7 +85,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>

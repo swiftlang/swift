@@ -6498,6 +6498,29 @@ static bool hasRequiredValueTypeOperations(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
+  // Swift type must be annotated with external_source_symbol attribute.
+  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!essAttr || essAttr->getLanguage() != "Swift" ||
+      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
+    return false;
+
+  // Ensure that the baseclass is swift::RefCountedClass.
+  auto baseDecl = decl;
+  do {
+    if (baseDecl->getNumBases() != 1)
+      return false;
+    auto baseClassSpecifier = *baseDecl->bases_begin();
+    auto Ty = baseClassSpecifier.getType();
+    auto nextBaseDecl = Ty->getAsCXXRecordDecl();
+    if (!nextBaseDecl)
+      return false;
+    baseDecl = nextBaseDecl;
+  } while (baseDecl->getName() != "RefCountedClass");
+
+  return true;
+}
+
 CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
@@ -6511,6 +6534,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (!cxxDecl) {
     return CxxRecordSemanticsKind::Trivial;
   }
+
+  if (isSwiftClassType(cxxDecl))
+    return CxxRecordSemanticsKind::SwiftClassType;
 
   if (!hasRequiredValueTypeOperations(cxxDecl)) {
     if (hasUnsafeAPIAttr(cxxDecl))
@@ -6549,6 +6575,34 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   return CxxRecordSemanticsKind::Owned;
 }
 
+ValueDecl *
+CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
+                               CxxRecordSemanticsDescriptor desc) const {
+  auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
+  if (!cxxDecl)
+    return nullptr;
+  if (!isSwiftClassType(cxxDecl))
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
+  if (!mod) {
+    // TODO: warn about missing 'import'.
+    return nullptr;
+  }
+  // FIXME: Support renamed declarations.
+  auto swiftName = cxxDecl->getName();
+  // FIXME: handle nested Swift types once they're supported.
+  mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
+                   results);
+  if (results.size() == 1) {
+    if (dyn_cast<ClassDecl>(results[0]))
+      return results[0];
+  }
+  return nullptr;
+}
+
 bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
                                   SafeUseOfCxxDeclDescriptor desc) const {
   const clang::Decl *decl = desc.decl;
@@ -6577,6 +6631,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
             method->getReturnType().getCanonicalType())) {
       if (auto cxxRecordReturnType =
               dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
+        if (isSwiftClassType(cxxRecordReturnType))
+          return true;
         if (hasIteratorAPIAttr(cxxRecordReturnType) ||
             isIterator(cxxRecordReturnType)) {
           return false;

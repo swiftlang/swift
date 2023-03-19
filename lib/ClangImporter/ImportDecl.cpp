@@ -1106,6 +1106,9 @@ namespace {
         auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
         auto parent =
             Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
+        // The parent namespace might not be imported if it's `swift_private`.
+        if (!parent)
+            return nullptr;
         dc = cast<EnumDecl>(parent);
       }
 
@@ -2619,6 +2622,11 @@ namespace {
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
                        "does not have a copy constructor or destructor"),
             decl->getLocation());
+        return nullptr;
+      }
+      if (semanticsKind == CxxRecordSemanticsKind::SwiftClassType) {
+        // FIXME: add a diagnostic here for unsupported imported use of Swift
+        // type?
         return nullptr;
       }
 

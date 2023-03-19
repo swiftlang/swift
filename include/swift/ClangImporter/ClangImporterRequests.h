@@ -311,7 +311,9 @@ enum class CxxRecordSemanticsKind {
   // A record that is either not copyable or not destructible.
   MissingLifetimeOperation,
   // A record that contains a pointer (aka non-trivial type).
-  UnsafePointerMember
+  UnsafePointerMember,
+  // A C++ record that represents a Swift class type exposed to C++ from Swift.
+  SwiftClassType
 };
 
 struct CxxRecordSemanticsDescriptor final {
@@ -364,6 +366,23 @@ private:
   // Evaluation.
   CxxRecordSemanticsKind evaluate(Evaluator &evaluator,
                                   CxxRecordSemanticsDescriptor) const;
+};
+
+/// Does this C++ record represent a Swift type.
+class CxxRecordAsSwiftType
+    : public SimpleRequest<CxxRecordAsSwiftType,
+                           ValueDecl *(CxxRecordSemanticsDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
 };
 
 struct SafeUseOfCxxDeclDescriptor final {

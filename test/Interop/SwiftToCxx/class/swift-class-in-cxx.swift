@@ -34,7 +34,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: } // end namespace
 
 // CHECK: namespace
-// CHECK-SAME: swift {
+// CHECK-SAME: swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -84,7 +84,7 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>

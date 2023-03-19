@@ -166,7 +166,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 
 // CHECK: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateInt
@@ -205,7 +205,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateTrivial

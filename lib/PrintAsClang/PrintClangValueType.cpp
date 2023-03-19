@@ -544,7 +544,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
-  os << "namespace swift {\n";
+  os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
@@ -570,7 +570,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
-  os << "namespace swift {\n";
+  os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
 
   if (typeDecl->hasClangNode()) {
     /// Print a reference to the type metadata fucntion for a C++ type.
