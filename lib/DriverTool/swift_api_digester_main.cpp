@@ -1932,7 +1932,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
       createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
-      std::move(allowedBreakages));
+      std::move(allowedBreakages),
+      /*DowngradeToWarning*/false);
   SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
