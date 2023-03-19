@@ -261,7 +261,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 
-// CHECK: namespace swift {
+// CHECK: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
