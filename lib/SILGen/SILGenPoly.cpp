@@ -842,782 +842,784 @@ static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
 }
 
 namespace {
-  class TranslateIndirect : public Cleanup {
-    AbstractionPattern InputOrigType, OutputOrigType;
-    CanType InputSubstType, OutputSubstType;
-    SILValue Input, Output;
 
-  public:
-    TranslateIndirect(AbstractionPattern inputOrigType, CanType inputSubstType,
-                      AbstractionPattern outputOrigType, CanType outputSubstType,
-                      SILValue input, SILValue output)
-      : InputOrigType(inputOrigType), OutputOrigType(outputOrigType),
-        InputSubstType(inputSubstType), OutputSubstType(outputSubstType),
-        Input(input), Output(output) {
-      assert(input->getType().isAddress());
-      assert(output->getType().isAddress());
-    }
+class TranslateIndirect : public Cleanup {
+  AbstractionPattern InputOrigType, OutputOrigType;
+  CanType InputSubstType, OutputSubstType;
+  SILValue Input, Output;
 
-    void emit(SILGenFunction &SGF, CleanupLocation loc,
-              ForUnwind_t forUnwind) override {
-      FullExpr scope(SGF.Cleanups, loc);
+public:
+  TranslateIndirect(AbstractionPattern inputOrigType, CanType inputSubstType,
+                    AbstractionPattern outputOrigType, CanType outputSubstType,
+                    SILValue input, SILValue output)
+    : InputOrigType(inputOrigType), OutputOrigType(outputOrigType),
+      InputSubstType(inputSubstType), OutputSubstType(outputSubstType),
+      Input(input), Output(output) {
+    assert(input->getType().isAddress());
+    assert(output->getType().isAddress());
+  }
 
-      // Re-assert ownership of the input value.
-      auto inputMV = SGF.emitManagedBufferWithCleanup(Input);
+  void emit(SILGenFunction &SGF, CleanupLocation loc,
+            ForUnwind_t forUnwind) override {
+    FullExpr scope(SGF.Cleanups, loc);
 
-      // Set up an initialization of the output buffer.
-      auto &outputTL = SGF.getTypeLowering(Output->getType());
-      auto outputInit = SGF.useBufferAsTemporary(Output, outputTL);
+    // Re-assert ownership of the input value.
+    auto inputMV = SGF.emitManagedBufferWithCleanup(Input);
 
-      // Transform into the output buffer.
-      auto mv = SGF.emitTransformedValue(loc, inputMV,
-                                         InputOrigType, InputSubstType,
-                                         OutputOrigType, OutputSubstType,
-                                         Output->getType().getObjectType(),
-                                         SGFContext(outputInit.get()));
-      emitForceInto(SGF, loc, mv, *outputInit);
+    // Set up an initialization of the output buffer.
+    auto &outputTL = SGF.getTypeLowering(Output->getType());
+    auto outputInit = SGF.useBufferAsTemporary(Output, outputTL);
 
-      // Disable the cleanup; we've kept our promise to leave the inout
-      // initialized.
-      outputInit->getManagedAddress().forward(SGF);
-    }
+    // Transform into the output buffer.
+    auto mv = SGF.emitTransformedValue(loc, inputMV,
+                                       InputOrigType, InputSubstType,
+                                       OutputOrigType, OutputSubstType,
+                                       Output->getType().getObjectType(),
+                                       SGFContext(outputInit.get()));
+    emitForceInto(SGF, loc, mv, *outputInit);
 
-    void dump(SILGenFunction &SGF) const override {
-      llvm::errs() << "TranslateIndirect("
-        << InputOrigType << ", " << InputSubstType << ", "
-        << OutputOrigType << ", " << OutputSubstType << ", "
-        << Output << ", " << Input << ")\n";
-    }
-  };
+    // Disable the cleanup; we've kept our promise to leave the inout
+    // initialized.
+    outputInit->getManagedAddress().forward(SGF);
+  }
 
-  class TranslateArguments {
-    SILGenFunction &SGF;
-    SILLocation Loc;
-    ArrayRef<ManagedValue> Inputs;
-    SmallVectorImpl<ManagedValue> &Outputs;
-    CanSILFunctionType OutputTypesFuncTy;
-    ArrayRef<SILParameterInfo> OutputTypes;
-  public:
-    TranslateArguments(SILGenFunction &SGF, SILLocation loc,
-                       ArrayRef<ManagedValue> inputs,
-                       SmallVectorImpl<ManagedValue> &outputs,
-                       CanSILFunctionType outputTypesFuncTy,
-                       ArrayRef<SILParameterInfo> outputTypes)
-      : SGF(SGF), Loc(loc), Inputs(inputs), Outputs(outputs),
-        OutputTypesFuncTy(outputTypesFuncTy), OutputTypes(outputTypes) {}
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "TranslateIndirect("
+      << InputOrigType << ", " << InputSubstType << ", "
+      << OutputOrigType << ", " << OutputSubstType << ", "
+      << Output << ", " << Input << ")\n";
+  }
+};
 
-    void translate(AbstractionPattern inputOrigFunctionType,
-                   AnyFunctionType::CanParamArrayRef inputSubstTypes,
-                   AbstractionPattern outputOrigFunctionType,
-                   AnyFunctionType::CanParamArrayRef outputSubstTypes) {
-      if (inputSubstTypes.size() == 1 &&
-          outputSubstTypes.size() != 1) {
-        // SE-0110 tuple splat. Turn the output into a single value of tuple
-        // type, and translate.
-        auto inputOrigType = inputOrigFunctionType.getFunctionParamType(0);
-        auto inputSubstType = inputSubstTypes[0].getPlainType();
+class TranslateArguments {
+  SILGenFunction &SGF;
+  SILLocation Loc;
+  ArrayRef<ManagedValue> Inputs;
+  SmallVectorImpl<ManagedValue> &Outputs;
+  CanSILFunctionType OutputTypesFuncTy;
+  ArrayRef<SILParameterInfo> OutputTypes;
+public:
+  TranslateArguments(SILGenFunction &SGF, SILLocation loc,
+                     ArrayRef<ManagedValue> inputs,
+                     SmallVectorImpl<ManagedValue> &outputs,
+                     CanSILFunctionType outputTypesFuncTy,
+                     ArrayRef<SILParameterInfo> outputTypes)
+    : SGF(SGF), Loc(loc), Inputs(inputs), Outputs(outputs),
+      OutputTypesFuncTy(outputTypesFuncTy), OutputTypes(outputTypes) {}
 
-        // Build an abstraction pattern for the output.
-        SmallVector<AbstractionPattern, 8> outputOrigTypes;
-        for (unsigned i = 0, e = outputOrigFunctionType.getNumFunctionParams();
-             i < e; ++i) {
-          outputOrigTypes.push_back(
-            outputOrigFunctionType.getFunctionParamType(i));
-        }
-        auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
+  void translate(AbstractionPattern inputOrigFunctionType,
+                 AnyFunctionType::CanParamArrayRef inputSubstTypes,
+                 AbstractionPattern outputOrigFunctionType,
+                 AnyFunctionType::CanParamArrayRef outputSubstTypes) {
+    if (inputSubstTypes.size() == 1 &&
+        outputSubstTypes.size() != 1) {
+      // SE-0110 tuple splat. Turn the output into a single value of tuple
+      // type, and translate.
+      auto inputOrigType = inputOrigFunctionType.getFunctionParamType(0);
+      auto inputSubstType = inputSubstTypes[0].getPlainType();
 
-        // Build the substituted output tuple type. Note that we deliberately
-        // don't use composeTuple() because we want to drop ownership
-        // qualifiers.
-        SmallVector<TupleTypeElt, 8> elts;
-        for (auto param : outputSubstTypes) {
-          assert(!param.isVariadic());
-          assert(!param.isInOut());
-          elts.emplace_back(param.getParameterType());
-        }
-        auto outputSubstType = CanTupleType(
-          TupleType::get(elts, SGF.getASTContext()));
-
-        // Translate the input tuple value into the output tuple value. Note
-        // that the output abstraction pattern is a tuple, and we explode tuples
-        // into multiple parameters, so if the input abstraction pattern is
-        // opaque, this will explode the input value. Otherwise, the input
-        // parameters will be mapped one-to-one to the output parameters.
-        translate(inputOrigType, inputSubstType,
-                  outputOrigType, outputSubstType);
-        return;
-      }
-
-      // Otherwise, parameters are always reabstracted one-to-one.
-      assert(inputSubstTypes.size() == outputSubstTypes.size());
-
-      SmallVector<AbstractionPattern, 8> inputOrigTypes;
+      // Build an abstraction pattern for the output.
       SmallVector<AbstractionPattern, 8> outputOrigTypes;
-      for (auto i : indices(inputSubstTypes)) {
-        inputOrigTypes.push_back(inputOrigFunctionType.getFunctionParamType(i));
-        outputOrigTypes.push_back(outputOrigFunctionType.getFunctionParamType(i));
+      for (unsigned i = 0, e = outputOrigFunctionType.getNumFunctionParams();
+           i < e; ++i) {
+        outputOrigTypes.push_back(
+          outputOrigFunctionType.getFunctionParamType(i));
       }
+      auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
 
-      translate(inputOrigTypes, inputSubstTypes,
-                outputOrigTypes, outputSubstTypes);
+      // Build the substituted output tuple type. Note that we deliberately
+      // don't use composeTuple() because we want to drop ownership
+      // qualifiers.
+      SmallVector<TupleTypeElt, 8> elts;
+      for (auto param : outputSubstTypes) {
+        assert(!param.isVariadic());
+        assert(!param.isInOut());
+        elts.emplace_back(param.getParameterType());
+      }
+      auto outputSubstType = CanTupleType(
+        TupleType::get(elts, SGF.getASTContext()));
+
+      // Translate the input tuple value into the output tuple value. Note
+      // that the output abstraction pattern is a tuple, and we explode tuples
+      // into multiple parameters, so if the input abstraction pattern is
+      // opaque, this will explode the input value. Otherwise, the input
+      // parameters will be mapped one-to-one to the output parameters.
+      translate(inputOrigType, inputSubstType,
+                outputOrigType, outputSubstType);
+      return;
     }
 
-    void translate(ArrayRef<AbstractionPattern> inputOrigTypes,
-                   AnyFunctionType::CanParamArrayRef inputSubstTypes,
-                   ArrayRef<AbstractionPattern> outputOrigTypes,
-                   AnyFunctionType::CanParamArrayRef outputSubstTypes) {
-      assert(inputOrigTypes.size() == inputSubstTypes.size());
-      assert(outputOrigTypes.size() == outputSubstTypes.size());
-      assert(inputOrigTypes.size() == outputOrigTypes.size());
+    // Otherwise, parameters are always reabstracted one-to-one.
+    assert(inputSubstTypes.size() == outputSubstTypes.size());
 
-      for (auto i : indices(inputOrigTypes)) {
-        translate(inputOrigTypes[i], inputSubstTypes[i],
-                  outputOrigTypes[i], outputSubstTypes[i]);
-      }
+    SmallVector<AbstractionPattern, 8> inputOrigTypes;
+    SmallVector<AbstractionPattern, 8> outputOrigTypes;
+    for (auto i : indices(inputSubstTypes)) {
+      inputOrigTypes.push_back(inputOrigFunctionType.getFunctionParamType(i));
+      outputOrigTypes.push_back(outputOrigFunctionType.getFunctionParamType(i));
     }
 
-    void translate(AbstractionPattern inputOrigType,
-                   AnyFunctionType::CanParam inputSubstType,
-                   AbstractionPattern outputOrigType,
-                   AnyFunctionType::CanParam outputSubstType) {
-      // Note that it's OK for the input to be inout but not the output;
-      // this means we're just going to load the inout and pass it on as a
-      // scalar.
-      if (outputSubstType.isInOut()) {
-        assert(inputSubstType.isInOut());
-        auto inputValue = claimNextInput();
-        auto outputLoweredTy = claimNextOutputType();
+    translate(inputOrigTypes, inputSubstTypes,
+              outputOrigTypes, outputSubstTypes);
+  }
 
-        translateInOut(inputOrigType, inputSubstType.getParameterType(),
-                       outputOrigType, outputSubstType.getParameterType(),
-                       inputValue, outputLoweredTy);
-      } else {
-        translate(inputOrigType, inputSubstType.getParameterType(),
-                  outputOrigType, outputSubstType.getParameterType());
-      }
+  void translate(ArrayRef<AbstractionPattern> inputOrigTypes,
+                 AnyFunctionType::CanParamArrayRef inputSubstTypes,
+                 ArrayRef<AbstractionPattern> outputOrigTypes,
+                 AnyFunctionType::CanParamArrayRef outputSubstTypes) {
+    assert(inputOrigTypes.size() == inputSubstTypes.size());
+    assert(outputOrigTypes.size() == outputSubstTypes.size());
+    assert(inputOrigTypes.size() == outputOrigTypes.size());
+
+    for (auto i : indices(inputOrigTypes)) {
+      translate(inputOrigTypes[i], inputSubstTypes[i],
+                outputOrigTypes[i], outputSubstTypes[i]);
     }
+  }
+
+  void translate(AbstractionPattern inputOrigType,
+                 AnyFunctionType::CanParam inputSubstType,
+                 AbstractionPattern outputOrigType,
+                 AnyFunctionType::CanParam outputSubstType) {
+    // Note that it's OK for the input to be inout but not the output;
+    // this means we're just going to load the inout and pass it on as a
+    // scalar.
+    if (outputSubstType.isInOut()) {
+      assert(inputSubstType.isInOut());
+      auto inputValue = claimNextInput();
+      auto outputLoweredTy = claimNextOutputType();
+
+      translateInOut(inputOrigType, inputSubstType.getParameterType(),
+                     outputOrigType, outputSubstType.getParameterType(),
+                     inputValue, outputLoweredTy);
+    } else {
+      translate(inputOrigType, inputSubstType.getParameterType(),
+                outputOrigType, outputSubstType.getParameterType());
+    }
+  }
 
 
-    void translate(AbstractionPattern inputOrigType,
-                   CanType inputSubstType,
-                   AbstractionPattern outputOrigType,
-                   CanType outputSubstType) {
-      // Most of this function is about tuples: tuples can be represented
-      // as one or many values, with varying levels of indirection.
-      auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
-      auto outputTupleType = dyn_cast<TupleType>(outputSubstType);
+  void translate(AbstractionPattern inputOrigType,
+                 CanType inputSubstType,
+                 AbstractionPattern outputOrigType,
+                 CanType outputSubstType) {
+    // Most of this function is about tuples: tuples can be represented
+    // as one or many values, with varying levels of indirection.
+    auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
+    auto outputTupleType = dyn_cast<TupleType>(outputSubstType);
 
-      // Case where the input type is an exploded tuple.
-      if (inputOrigType.isTuple()) {
-        if (outputOrigType.isTuple()) {
-          // Both input and output are exploded tuples, easy case.
-          return translateParallelExploded(inputOrigType,
-                                           inputTupleType,
-                                           outputOrigType,
-                                           outputTupleType);
-        }
-
-        // Tuple types are subtypes of their optionals
-        if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
-          auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
-
-          if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
-            // The input is exploded and the output is an optional tuple.
-            // Translate values and collect them into a single optional
-            // payload.
-
-            auto result =
-                translateAndImplodeIntoOptional(inputOrigType,
-                                                inputTupleType,
-                                                outputOrigObjectType,
-                                                outputTupleType);
-            Outputs.push_back(result);
-            return;
-          }
-
-          // Tuple types are subtypes of optionals of Any, too.
-          assert(outputObjectType->isAny());
-
-          // First, construct the existential.
-          auto result =
-              translateAndImplodeIntoAny(inputOrigType,
-                                         inputTupleType,
-                                         outputOrigObjectType,
-                                         outputObjectType);
-
-          // Now, convert it to an optional.
-          translateSingle(outputOrigObjectType, outputObjectType,
-                          outputOrigType, outputSubstType,
-                          result, claimNextOutputType());
-          return;
-        }
-
-        if (outputSubstType->isAny()) {
-          claimNextOutputType();
-
-          auto result =
-              translateAndImplodeIntoAny(inputOrigType,
+    // Case where the input type is an exploded tuple.
+    if (inputOrigType.isTuple()) {
+      if (outputOrigType.isTuple()) {
+        // Both input and output are exploded tuples, easy case.
+        return translateParallelExploded(inputOrigType,
                                          inputTupleType,
                                          outputOrigType,
-                                         outputSubstType);
+                                         outputTupleType);
+      }
+
+      // Tuple types are subtypes of their optionals
+      if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
+        auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
+
+        if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
+          // The input is exploded and the output is an optional tuple.
+          // Translate values and collect them into a single optional
+          // payload.
+
+          auto result =
+              translateAndImplodeIntoOptional(inputOrigType,
+                                              inputTupleType,
+                                              outputOrigObjectType,
+                                              outputTupleType);
           Outputs.push_back(result);
           return;
         }
 
-        if (outputTupleType) {
-          // The input is exploded and the output is not. Translate values
-          // and store them to a result tuple in memory.
-          assert(outputOrigType.isTypeParameter() &&
-                 "Output is not a tuple and is not opaque?");
+        // Tuple types are subtypes of optionals of Any, too.
+        assert(outputObjectType->isAny());
 
-          auto outputTy = SGF.getSILType(claimNextOutputType(),
-                                         OutputTypesFuncTy);
-          auto &outputTL = SGF.getTypeLowering(outputTy);
-          if (SGF.silConv.useLoweredAddresses()) {
-            auto temp = SGF.emitTemporary(Loc, outputTL);
-            translateAndImplodeInto(inputOrigType, inputTupleType,
-                                    outputOrigType, outputTupleType, *temp);
+        // First, construct the existential.
+        auto result =
+            translateAndImplodeIntoAny(inputOrigType,
+                                       inputTupleType,
+                                       outputOrigObjectType,
+                                       outputObjectType);
 
-            Outputs.push_back(temp->getManagedAddress());
-          } else {
-            auto result = translateAndImplodeIntoValue(
-                inputOrigType, inputTupleType, outputOrigType, outputTupleType,
-                outputTL.getLoweredType());
-            Outputs.push_back(result);
-          }
-          return;
-        }
-
-        llvm_unreachable("Unhandled conversion from exploded tuple");
+        // Now, convert it to an optional.
+        translateSingle(outputOrigObjectType, outputObjectType,
+                        outputOrigType, outputSubstType,
+                        result, claimNextOutputType());
+        return;
       }
 
-      // Handle output being an exploded tuple when the input is opaque.
-      if (outputOrigType.isTuple()) {
-        if (inputTupleType) {
-          // The input is exploded and the output is not. Translate values
-          // and store them to a result tuple in memory.
-          assert(inputOrigType.isTypeParameter() &&
-                 "Input is not a tuple and is not opaque?");
+      if (outputSubstType->isAny()) {
+        claimNextOutputType();
 
-          return translateAndExplodeOutOf(inputOrigType,
-                                          inputTupleType,
-                                          outputOrigType,
-                                          outputTupleType,
-                                          claimNextInput());
-        }
-
-        // FIXME: IUO<Tuple> to Tuple
-        llvm_unreachable("Unhandled conversion to exploded tuple");
+        auto result =
+            translateAndImplodeIntoAny(inputOrigType,
+                                       inputTupleType,
+                                       outputOrigType,
+                                       outputSubstType);
+        Outputs.push_back(result);
+        return;
       }
 
-      // Okay, we are now working with a single value turning into a
-      // single value.
-      auto inputElt = claimNextInput();
-      auto outputEltType = claimNextOutputType();
-      translateSingle(inputOrigType, inputSubstType,
-                      outputOrigType, outputSubstType,
-                      inputElt, outputEltType);
-    }
+      if (outputTupleType) {
+        // The input is exploded and the output is not. Translate values
+        // and store them to a result tuple in memory.
+        assert(outputOrigType.isTypeParameter() &&
+               "Output is not a tuple and is not opaque?");
 
-  private:
-    /// Take a tuple that has been exploded in the input and turn it into
-    /// a tuple value in the output.
-    ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
-                                              CanTupleType inputType,
-                                              AbstractionPattern outputOrigType,
-                                              CanTupleType outputType,
-                                              SILType loweredOutputTy) {
-      assert(loweredOutputTy.is<TupleType>());
-
-      SmallVector<ManagedValue, 4> elements;
-      assert(outputType->getNumElements() == inputType->getNumElements());
-      assert(loweredOutputTy.castTo<TupleType>()->getNumElements() ==
-             outputType->getNumElements());
-      for (unsigned i : indices(outputType->getElementTypes())) {
-        auto inputOrigEltType = inputOrigType.getTupleElementType(i);
-        auto inputEltType = inputType.getElementType(i);
-        auto outputOrigEltType = outputOrigType.getTupleElementType(i);
-        auto outputEltType = outputType.getElementType(i);
-        SILType loweredOutputEltTy = loweredOutputTy.getTupleElementType(i);
-
-        ManagedValue elt;
-        if (auto inputEltTupleType = dyn_cast<TupleType>(inputEltType)) {
-          elt = translateAndImplodeIntoValue(inputOrigEltType,
-                                             inputEltTupleType,
-                                             outputOrigEltType,
-                                             cast<TupleType>(outputEltType),
-                                             loweredOutputEltTy);
-        } else {
-          elt = claimNextInput();
-
-          // Load if necessary.
-          if (elt.getType().isAddress()) {
-            // This code assumes that we have each element at +1. So, if we do
-            // not have a cleanup, we emit a load [copy]. This can occur if we
-            // are translating in_guaranteed parameters.
-            IsTake_t isTakeVal = elt.isPlusZero() ? IsNotTake : IsTake;
-            elt = SGF.emitLoad(Loc, elt.forward(SGF),
-                               SGF.getTypeLowering(elt.getType()), SGFContext(),
-                               isTakeVal);
-          }
-        }
-
-        if (elt.getType() != loweredOutputEltTy)
-          elt = translatePrimitive(inputOrigEltType, inputEltType,
-                                   outputOrigEltType, outputEltType,
-                                   elt, loweredOutputEltTy);
-
-        // Aggregation of address-only values requires ownership.
-        if (loweredOutputTy.isAddressOnly(SGF.F)) {
-          elt = elt.ensurePlusOne(SGF, Loc);
-        }
-        elements.push_back(elt);
-      }
-
-      SmallVector<SILValue, 4> forwarded;
-      for (auto &elt : elements)
-        forwarded.push_back(elt.forward(SGF));
-
-      auto tuple = SGF.B.createTuple(Loc, loweredOutputTy, forwarded);
-      if (tuple->getOwnershipKind() == OwnershipKind::Owned)
-        return SGF.emitManagedRValueWithCleanup(tuple);
-
-      return ManagedValue::forUnmanaged(tuple);
-    }
-
-    /// Handle a tuple that has been exploded in the input but wrapped in
-    /// an optional in the output.
-    ManagedValue
-    translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
-                                    CanTupleType inputTupleType,
-                                    AbstractionPattern outputOrigType,
-                                    CanTupleType outputTupleType) {
-      assert(inputTupleType->getNumElements() ==
-             outputTupleType->getNumElements());
-
-      // Collect the tuple elements.
-      auto &loweredTL = SGF.getTypeLowering(outputOrigType, outputTupleType);
-      auto loweredTy = loweredTL.getLoweredType();
-      auto optionalTy = SGF.getSILType(claimNextOutputType(),
+        auto outputTy = SGF.getSILType(claimNextOutputType(),
                                        OutputTypesFuncTy);
-      auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
-      if (loweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
-        auto payload =
-          translateAndImplodeIntoValue(inputOrigType, inputTupleType,
-                                       outputOrigType, outputTupleType,
-                                       loweredTy);
+        auto &outputTL = SGF.getTypeLowering(outputTy);
+        if (SGF.silConv.useLoweredAddresses()) {
+          auto temp = SGF.emitTemporary(Loc, outputTL);
+          translateAndImplodeInto(inputOrigType, inputTupleType,
+                                  outputOrigType, outputTupleType, *temp);
 
-        return SGF.B.createEnum(Loc, payload, someDecl, optionalTy);
-      } else {
-        auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
-        auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
-                                                     loweredTy);
-        
-        auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, loweredTL);
-
-        translateAndImplodeInto(inputOrigType, inputTupleType,
-                                outputOrigType, outputTupleType,
-                                *tupleTemp);
-
-        SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
-
-        auto payload = tupleTemp->getManagedAddress();
-        if (payload.hasCleanup()) {
-          payload.forward(SGF);
-          return SGF.emitManagedBufferWithCleanup(optionalBuf);
+          Outputs.push_back(temp->getManagedAddress());
+        } else {
+          auto result = translateAndImplodeIntoValue(
+              inputOrigType, inputTupleType, outputOrigType, outputTupleType,
+              outputTL.getLoweredType());
+          Outputs.push_back(result);
         }
-        return ManagedValue::forUnmanaged(optionalBuf);
+        return;
       }
+
+      llvm_unreachable("Unhandled conversion from exploded tuple");
     }
 
-    /// Handle a tuple that has been exploded in the input but wrapped
-    /// in an existential in the output.
-    ManagedValue
-    translateAndImplodeIntoAny(AbstractionPattern inputOrigType,
-                               CanTupleType inputTupleType,
-                               AbstractionPattern outputOrigType,
-                               CanType outputSubstType) {
-      auto existentialTy = SGF.getLoweredType(outputOrigType, outputSubstType);
-      auto existentialBuf = SGF.emitTemporaryAllocation(Loc, existentialTy);
+    // Handle output being an exploded tuple when the input is opaque.
+    if (outputOrigType.isTuple()) {
+      if (inputTupleType) {
+        // The input is exploded and the output is not. Translate values
+        // and store them to a result tuple in memory.
+        assert(inputOrigType.isTypeParameter() &&
+               "Input is not a tuple and is not opaque?");
 
-      auto opaque = AbstractionPattern::getOpaque();
-      auto &concreteTL = SGF.getTypeLowering(opaque, inputTupleType);
-
-      auto tupleBuf =
-        SGF.B.createInitExistentialAddr(Loc, existentialBuf,
+        return translateAndExplodeOutOf(inputOrigType,
                                         inputTupleType,
-                                        concreteTL.getLoweredType(),
-                                        /*conformances=*/{});
+                                        outputOrigType,
+                                        outputTupleType,
+                                        claimNextInput());
+      }
 
-      auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
+      // FIXME: IUO<Tuple> to Tuple
+      llvm_unreachable("Unhandled conversion to exploded tuple");
+    }
+
+    // Okay, we are now working with a single value turning into a
+    // single value.
+    auto inputElt = claimNextInput();
+    auto outputEltType = claimNextOutputType();
+    translateSingle(inputOrigType, inputSubstType,
+                    outputOrigType, outputSubstType,
+                    inputElt, outputEltType);
+  }
+
+private:
+  /// Take a tuple that has been exploded in the input and turn it into
+  /// a tuple value in the output.
+  ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
+                                            CanTupleType inputType,
+                                            AbstractionPattern outputOrigType,
+                                            CanTupleType outputType,
+                                            SILType loweredOutputTy) {
+    assert(loweredOutputTy.is<TupleType>());
+
+    SmallVector<ManagedValue, 4> elements;
+    assert(outputType->getNumElements() == inputType->getNumElements());
+    assert(loweredOutputTy.castTo<TupleType>()->getNumElements() ==
+           outputType->getNumElements());
+    for (unsigned i : indices(outputType->getElementTypes())) {
+      auto inputOrigEltType = inputOrigType.getTupleElementType(i);
+      auto inputEltType = inputType.getElementType(i);
+      auto outputOrigEltType = outputOrigType.getTupleElementType(i);
+      auto outputEltType = outputType.getElementType(i);
+      SILType loweredOutputEltTy = loweredOutputTy.getTupleElementType(i);
+
+      ManagedValue elt;
+      if (auto inputEltTupleType = dyn_cast<TupleType>(inputEltType)) {
+        elt = translateAndImplodeIntoValue(inputOrigEltType,
+                                           inputEltTupleType,
+                                           outputOrigEltType,
+                                           cast<TupleType>(outputEltType),
+                                           loweredOutputEltTy);
+      } else {
+        elt = claimNextInput();
+
+        // Load if necessary.
+        if (elt.getType().isAddress()) {
+          // This code assumes that we have each element at +1. So, if we do
+          // not have a cleanup, we emit a load [copy]. This can occur if we
+          // are translating in_guaranteed parameters.
+          IsTake_t isTakeVal = elt.isPlusZero() ? IsNotTake : IsTake;
+          elt = SGF.emitLoad(Loc, elt.forward(SGF),
+                             SGF.getTypeLowering(elt.getType()), SGFContext(),
+                             isTakeVal);
+        }
+      }
+
+      if (elt.getType() != loweredOutputEltTy)
+        elt = translatePrimitive(inputOrigEltType, inputEltType,
+                                 outputOrigEltType, outputEltType,
+                                 elt, loweredOutputEltTy);
+
+      // Aggregation of address-only values requires ownership.
+      if (loweredOutputTy.isAddressOnly(SGF.F)) {
+        elt = elt.ensurePlusOne(SGF, Loc);
+      }
+      elements.push_back(elt);
+    }
+
+    SmallVector<SILValue, 4> forwarded;
+    for (auto &elt : elements)
+      forwarded.push_back(elt.forward(SGF));
+
+    auto tuple = SGF.B.createTuple(Loc, loweredOutputTy, forwarded);
+    if (tuple->getOwnershipKind() == OwnershipKind::Owned)
+      return SGF.emitManagedRValueWithCleanup(tuple);
+
+    return ManagedValue::forUnmanaged(tuple);
+  }
+
+  /// Handle a tuple that has been exploded in the input but wrapped in
+  /// an optional in the output.
+  ManagedValue
+  translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
+                                  CanTupleType inputTupleType,
+                                  AbstractionPattern outputOrigType,
+                                  CanTupleType outputTupleType) {
+    assert(inputTupleType->getNumElements() ==
+           outputTupleType->getNumElements());
+
+    // Collect the tuple elements.
+    auto &loweredTL = SGF.getTypeLowering(outputOrigType, outputTupleType);
+    auto loweredTy = loweredTL.getLoweredType();
+    auto optionalTy = SGF.getSILType(claimNextOutputType(),
+                                     OutputTypesFuncTy);
+    auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+    if (loweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+      auto payload =
+        translateAndImplodeIntoValue(inputOrigType, inputTupleType,
+                                     outputOrigType, outputTupleType,
+                                     loweredTy);
+
+      return SGF.B.createEnum(Loc, payload, someDecl, optionalTy);
+    } else {
+      auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
+      auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
+                                                   loweredTy);
+      
+      auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, loweredTL);
+
       translateAndImplodeInto(inputOrigType, inputTupleType,
-                              opaque, inputTupleType,
+                              outputOrigType, outputTupleType,
                               *tupleTemp);
 
+      SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
+
       auto payload = tupleTemp->getManagedAddress();
-      if (SGF.silConv.useLoweredAddresses()) {
-        // We always need to return the existential buf with a cleanup even if
-        // we stored trivial values, since SILGen maintains the invariant that
-        // forwarding a non-trivial value (i.e. an Any) into memory must be done
-        // at +1.
+      if (payload.hasCleanup()) {
         payload.forward(SGF);
-        return SGF.emitManagedBufferWithCleanup(existentialBuf);
+        return SGF.emitManagedBufferWithCleanup(optionalBuf);
       }
+      return ManagedValue::forUnmanaged(optionalBuf);
+    }
+  }
 
-      // We are under opaque value(s) mode - load the any and init an opaque
-      auto loadedPayload = SGF.B.createLoadCopy(Loc, payload);
-      auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
-      return SGF.B.createInitExistentialValue(
-          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload,
-          /*Conformances=*/{});
+  /// Handle a tuple that has been exploded in the input but wrapped
+  /// in an existential in the output.
+  ManagedValue
+  translateAndImplodeIntoAny(AbstractionPattern inputOrigType,
+                             CanTupleType inputTupleType,
+                             AbstractionPattern outputOrigType,
+                             CanType outputSubstType) {
+    auto existentialTy = SGF.getLoweredType(outputOrigType, outputSubstType);
+    auto existentialBuf = SGF.emitTemporaryAllocation(Loc, existentialTy);
+
+    auto opaque = AbstractionPattern::getOpaque();
+    auto &concreteTL = SGF.getTypeLowering(opaque, inputTupleType);
+
+    auto tupleBuf =
+      SGF.B.createInitExistentialAddr(Loc, existentialBuf,
+                                      inputTupleType,
+                                      concreteTL.getLoweredType(),
+                                      /*conformances=*/{});
+
+    auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
+    translateAndImplodeInto(inputOrigType, inputTupleType,
+                            opaque, inputTupleType,
+                            *tupleTemp);
+
+    auto payload = tupleTemp->getManagedAddress();
+    if (SGF.silConv.useLoweredAddresses()) {
+      // We always need to return the existential buf with a cleanup even if
+      // we stored trivial values, since SILGen maintains the invariant that
+      // forwarding a non-trivial value (i.e. an Any) into memory must be done
+      // at +1.
+      payload.forward(SGF);
+      return SGF.emitManagedBufferWithCleanup(existentialBuf);
     }
 
-    /// Handle a tuple that has been exploded in both the input and
-    /// the output.
-    void translateParallelExploded(AbstractionPattern inputOrigType,
-                                   CanTupleType inputSubstType,
-                                   AbstractionPattern outputOrigType,
-                                   CanTupleType outputSubstType) {
-      assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(inputSubstType->getNumElements() ==
-             outputSubstType->getNumElements());
+    // We are under opaque value(s) mode - load the any and init an opaque
+    auto loadedPayload = SGF.B.createLoadCopy(Loc, payload);
+    auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
+    return SGF.B.createInitExistentialValue(
+        Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload,
+        /*Conformances=*/{});
+  }
 
-      for (auto index : indices(outputSubstType.getElementTypes())) {
-        translate(inputOrigType.getTupleElementType(index),
-                  inputSubstType.getElementType(index),
-                  outputOrigType.getTupleElementType(index),
-                  outputSubstType.getElementType(index));
-      }
-    }
-
-    /// Given that a tuple value is being passed indirectly in the
-    /// input, explode it and translate the elements.
-    void translateAndExplodeOutOf(AbstractionPattern inputOrigType,
-                                  CanTupleType inputSubstType,
-                                  AbstractionPattern outputOrigType,
-                                  CanTupleType outputSubstType,
-                                  ManagedValue inputTupleAddr) {
-      assert(inputOrigType.isTypeParameter());
-      assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(inputSubstType->getNumElements() ==
-             outputSubstType->getNumElements());
-
-      SmallVector<ManagedValue, 4> inputEltAddrs;
-      explodeTuple(SGF, Loc, inputTupleAddr, inputEltAddrs);
-      assert(inputEltAddrs.size() == outputSubstType->getNumElements());
-
-      for (auto index : indices(outputSubstType.getElementTypes())) {
-        auto inputEltOrigType = inputOrigType.getTupleElementType(index);
-        auto inputEltSubstType = inputSubstType.getElementType(index);
-        auto outputEltOrigType = outputOrigType.getTupleElementType(index);
-        auto outputEltSubstType = outputSubstType.getElementType(index);
-        auto inputEltAddr = inputEltAddrs[index];
-        assert(inputEltAddr.getType().isAddress() ||
-               !SGF.silConv.useLoweredAddresses());
-
-        if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
-          assert(outputEltOrigType.isTuple());
-          auto inputEltTupleType = cast<TupleType>(inputEltSubstType);
-          translateAndExplodeOutOf(inputEltOrigType,
-                                   inputEltTupleType,
-                                   outputEltOrigType,
-                                   outputEltTupleType,
-                                   inputEltAddr);
-        } else {
-          auto outputType = claimNextOutputType();
-          translateSingle(inputEltOrigType,
-                          inputEltSubstType,
-                          outputEltOrigType,
-                          outputEltSubstType,
-                          inputEltAddr,
-                          outputType);
-        }
-      }
-    }
-
-    /// Given that a tuple value is being passed indirectly in the
-    /// output, translate the elements and implode it.
-    void translateAndImplodeInto(AbstractionPattern inputOrigType,
+  /// Handle a tuple that has been exploded in both the input and
+  /// the output.
+  void translateParallelExploded(AbstractionPattern inputOrigType,
                                  CanTupleType inputSubstType,
                                  AbstractionPattern outputOrigType,
-                                 CanTupleType outputSubstType,
-                                 TemporaryInitialization &tupleInit) {
-      assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(inputSubstType->getNumElements() ==
-             outputSubstType->getNumElements());
+                                 CanTupleType outputSubstType) {
+    assert(inputOrigType.matchesTuple(inputSubstType));
+    assert(outputOrigType.matchesTuple(outputSubstType));
+    assert(inputSubstType->getNumElements() ==
+           outputSubstType->getNumElements());
 
-      auto outputLoweredTy = tupleInit.getAddress()->getType();
-      assert(outputLoweredTy.castTo<TupleType>()->getNumElements() ==
-             outputSubstType->getNumElements());
+    for (auto index : indices(outputSubstType.getElementTypes())) {
+      translate(inputOrigType.getTupleElementType(index),
+                inputSubstType.getElementType(index),
+                outputOrigType.getTupleElementType(index),
+                outputSubstType.getElementType(index));
+    }
+  }
 
-      SmallVector<CleanupHandle, 4> cleanups;
+  /// Given that a tuple value is being passed indirectly in the
+  /// input, explode it and translate the elements.
+  void translateAndExplodeOutOf(AbstractionPattern inputOrigType,
+                                CanTupleType inputSubstType,
+                                AbstractionPattern outputOrigType,
+                                CanTupleType outputSubstType,
+                                ManagedValue inputTupleAddr) {
+    assert(inputOrigType.isTypeParameter());
+    assert(outputOrigType.matchesTuple(outputSubstType));
+    assert(inputSubstType->getNumElements() ==
+           outputSubstType->getNumElements());
 
-      for (auto index : indices(outputSubstType.getElementTypes())) {
-        auto inputEltOrigType = inputOrigType.getTupleElementType(index);
-        auto inputEltSubstType = inputSubstType.getElementType(index);
-        auto outputEltOrigType = outputOrigType.getTupleElementType(index);
-        auto outputEltSubstType = outputSubstType.getElementType(index);
-        auto eltAddr =
-          SGF.B.createTupleElementAddr(Loc, tupleInit.getAddress(), index);
+    SmallVector<ManagedValue, 4> inputEltAddrs;
+    explodeTuple(SGF, Loc, inputTupleAddr, inputEltAddrs);
+    assert(inputEltAddrs.size() == outputSubstType->getNumElements());
 
-        auto &outputEltTL = SGF.getTypeLowering(eltAddr->getType());
-        CleanupHandle eltCleanup =
-          SGF.enterDormantTemporaryCleanup(eltAddr, outputEltTL);
-        if (eltCleanup.isValid()) cleanups.push_back(eltCleanup);
+    for (auto index : indices(outputSubstType.getElementTypes())) {
+      auto inputEltOrigType = inputOrigType.getTupleElementType(index);
+      auto inputEltSubstType = inputSubstType.getElementType(index);
+      auto outputEltOrigType = outputOrigType.getTupleElementType(index);
+      auto outputEltSubstType = outputSubstType.getElementType(index);
+      auto inputEltAddr = inputEltAddrs[index];
+      assert(inputEltAddr.getType().isAddress() ||
+             !SGF.silConv.useLoweredAddresses());
 
-        TemporaryInitialization eltInit(eltAddr, eltCleanup);
-        if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
-          auto inputEltTupleType = cast<TupleType>(inputEltSubstType);
-          translateAndImplodeInto(inputEltOrigType, inputEltTupleType,
-                                  outputEltOrigType, outputEltTupleType,
-                                  eltInit);
-        } else {
-          // Otherwise, we come from a single value.
-          auto input = claimNextInput();
-          translateSingleInto(inputEltOrigType, inputEltSubstType,
-                              outputEltOrigType, outputEltSubstType,
-                              input, eltInit);
-        }
+      if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
+        assert(outputEltOrigType.isTuple());
+        auto inputEltTupleType = cast<TupleType>(inputEltSubstType);
+        translateAndExplodeOutOf(inputEltOrigType,
+                                 inputEltTupleType,
+                                 outputEltOrigType,
+                                 outputEltTupleType,
+                                 inputEltAddr);
+      } else {
+        auto outputType = claimNextOutputType();
+        translateSingle(inputEltOrigType,
+                        inputEltSubstType,
+                        outputEltOrigType,
+                        outputEltSubstType,
+                        inputEltAddr,
+                        outputType);
       }
-
-      // Deactivate all the element cleanups and activate the tuple cleanup.
-      for (auto cleanup : cleanups)
-        SGF.Cleanups.forwardCleanup(cleanup);
-      tupleInit.finishInitialization(SGF);
     }
+  }
 
-    // Translate into a temporary.
-    void translateIndirect(AbstractionPattern inputOrigType,
-                           CanType inputSubstType,
-                           AbstractionPattern outputOrigType,
-                           CanType outputSubstType, ManagedValue input,
-                           SILType resultTy) {
-      auto &outputTL = SGF.getTypeLowering(resultTy);
-      auto temp = SGF.emitTemporary(Loc, outputTL);
-      translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
-                          outputSubstType, input, *temp);
-      Outputs.push_back(temp->getManagedAddress());
-    }
+  /// Given that a tuple value is being passed indirectly in the
+  /// output, translate the elements and implode it.
+  void translateAndImplodeInto(AbstractionPattern inputOrigType,
+                               CanTupleType inputSubstType,
+                               AbstractionPattern outputOrigType,
+                               CanTupleType outputSubstType,
+                               TemporaryInitialization &tupleInit) {
+    assert(inputOrigType.matchesTuple(inputSubstType));
+    assert(outputOrigType.matchesTuple(outputSubstType));
+    assert(inputSubstType->getNumElements() ==
+           outputSubstType->getNumElements());
 
-    // Translate into an owned argument.
-    void translateIntoOwned(AbstractionPattern inputOrigType,
-                            CanType inputSubstType,
-                            AbstractionPattern outputOrigType,
-                            CanType outputSubstType,
-                            ManagedValue input,
-                            SILType outputLoweredTy) {
-      auto output = translatePrimitive(inputOrigType, inputSubstType,
-                                       outputOrigType, outputSubstType,
-                                       input, outputLoweredTy);
+    auto outputLoweredTy = tupleInit.getAddress()->getType();
+    assert(outputLoweredTy.castTo<TupleType>()->getNumElements() ==
+           outputSubstType->getNumElements());
 
-      // If our output is guaranteed or unowned, we need to create a copy here.
-      if (output.getOwnershipKind() != OwnershipKind::Owned)
-        output = output.copyUnmanaged(SGF, Loc);
+    SmallVector<CleanupHandle, 4> cleanups;
 
-      Outputs.push_back(output);
-    }
+    for (auto index : indices(outputSubstType.getElementTypes())) {
+      auto inputEltOrigType = inputOrigType.getTupleElementType(index);
+      auto inputEltSubstType = inputSubstType.getElementType(index);
+      auto outputEltOrigType = outputOrigType.getTupleElementType(index);
+      auto outputEltSubstType = outputSubstType.getElementType(index);
+      auto eltAddr =
+        SGF.B.createTupleElementAddr(Loc, tupleInit.getAddress(), index);
 
-    // Translate into a guaranteed argument.
-    void translateIntoGuaranteed(AbstractionPattern inputOrigType,
-                                 CanType inputSubstType,
-                                 AbstractionPattern outputOrigType,
-                                 CanType outputSubstType,
-                                 ManagedValue input,
-                                 SILType outputLoweredTy) {
-      auto output = translatePrimitive(inputOrigType, inputSubstType,
-                                       outputOrigType, outputSubstType,
-                                       input, outputLoweredTy);
+      auto &outputEltTL = SGF.getTypeLowering(eltAddr->getType());
+      CleanupHandle eltCleanup =
+        SGF.enterDormantTemporaryCleanup(eltAddr, outputEltTL);
+      if (eltCleanup.isValid()) cleanups.push_back(eltCleanup);
 
-      // If our output value is not guaranteed, we need to:
-      //
-      // 1. Unowned - Copy + Borrow.
-      // 2. Owned - Borrow.
-      // 3. Trivial - do nothing.
-      //
-      // This means we can first transition unowned => owned and then handle
-      // the new owned value using the same code path as values that are
-      // initially owned.
-      if (output.getOwnershipKind() == OwnershipKind::Unowned) {
-        assert(!output.hasCleanup());
-        output = SGF.emitManagedRetain(Loc, output.getValue());
+      TemporaryInitialization eltInit(eltAddr, eltCleanup);
+      if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
+        auto inputEltTupleType = cast<TupleType>(inputEltSubstType);
+        translateAndImplodeInto(inputEltOrigType, inputEltTupleType,
+                                outputEltOrigType, outputEltTupleType,
+                                eltInit);
+      } else {
+        // Otherwise, we come from a single value.
+        auto input = claimNextInput();
+        translateSingleInto(inputEltOrigType, inputEltSubstType,
+                            outputEltOrigType, outputEltSubstType,
+                            input, eltInit);
       }
-
-      // If the output is unowned or owned, create a borrow.
-      if (output.getOwnershipKind() != OwnershipKind::Guaranteed) {
-        output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
-      }
-
-      Outputs.push_back(output);
     }
 
-    /// Translate a single value and add it as an output.
-    void translateSingle(AbstractionPattern inputOrigType,
+    // Deactivate all the element cleanups and activate the tuple cleanup.
+    for (auto cleanup : cleanups)
+      SGF.Cleanups.forwardCleanup(cleanup);
+    tupleInit.finishInitialization(SGF);
+  }
+
+  // Translate into a temporary.
+  void translateIndirect(AbstractionPattern inputOrigType,
                          CanType inputSubstType,
                          AbstractionPattern outputOrigType,
-                         CanType outputSubstType,
-                         ManagedValue input,
-                         SILParameterInfo result) {
-      auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
-      // Easy case: we want to pass exactly this value.
-      if (input.getType() == resultTy) {
-        switch (result.getConvention()) {
-        case ParameterConvention::Direct_Owned:
-        case ParameterConvention::Indirect_In:
-          if (!input.hasCleanup() &&
-              input.getOwnershipKind() != OwnershipKind::None)
-            input = input.copyUnmanaged(SGF, Loc);
-          break;
+                         CanType outputSubstType, ManagedValue input,
+                         SILType resultTy) {
+    auto &outputTL = SGF.getTypeLowering(resultTy);
+    auto temp = SGF.emitTemporary(Loc, outputTL);
+    translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
+                        outputSubstType, input, *temp);
+    Outputs.push_back(temp->getManagedAddress());
+  }
 
-        default:
-          break;
-        }
+  // Translate into an owned argument.
+  void translateIntoOwned(AbstractionPattern inputOrigType,
+                          CanType inputSubstType,
+                          AbstractionPattern outputOrigType,
+                          CanType outputSubstType,
+                          ManagedValue input,
+                          SILType outputLoweredTy) {
+    auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                     outputOrigType, outputSubstType,
+                                     input, outputLoweredTy);
 
-        Outputs.push_back(input);
-        return;
-      }
-      
+    // If our output is guaranteed or unowned, we need to create a copy here.
+    if (output.getOwnershipKind() != OwnershipKind::Owned)
+      output = output.copyUnmanaged(SGF, Loc);
+
+    Outputs.push_back(output);
+  }
+
+  // Translate into a guaranteed argument.
+  void translateIntoGuaranteed(AbstractionPattern inputOrigType,
+                               CanType inputSubstType,
+                               AbstractionPattern outputOrigType,
+                               CanType outputSubstType,
+                               ManagedValue input,
+                               SILType outputLoweredTy) {
+    auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                     outputOrigType, outputSubstType,
+                                     input, outputLoweredTy);
+
+    // If our output value is not guaranteed, we need to:
+    //
+    // 1. Unowned - Copy + Borrow.
+    // 2. Owned - Borrow.
+    // 3. Trivial - do nothing.
+    //
+    // This means we can first transition unowned => owned and then handle
+    // the new owned value using the same code path as values that are
+    // initially owned.
+    if (output.getOwnershipKind() == OwnershipKind::Unowned) {
+      assert(!output.hasCleanup());
+      output = SGF.emitManagedRetain(Loc, output.getValue());
+    }
+
+    // If the output is unowned or owned, create a borrow.
+    if (output.getOwnershipKind() != OwnershipKind::Guaranteed) {
+      output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+    }
+
+    Outputs.push_back(output);
+  }
+
+  /// Translate a single value and add it as an output.
+  void translateSingle(AbstractionPattern inputOrigType,
+                       CanType inputSubstType,
+                       AbstractionPattern outputOrigType,
+                       CanType outputSubstType,
+                       ManagedValue input,
+                       SILParameterInfo result) {
+    auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
+    // Easy case: we want to pass exactly this value.
+    if (input.getType() == resultTy) {
       switch (result.getConvention()) {
-      // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Unowned:
-        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
-                           outputSubstType, input, resultTy);
-        return;
-      case ParameterConvention::Direct_Guaranteed:
-        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
-                                outputSubstType, input, resultTy);
-        return;
-      case ParameterConvention::Indirect_In: {
-        if (SGF.silConv.useLoweredAddresses()) {
-          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
-                            outputSubstType, input, resultTy);
-          return;
-        }
-        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
-                           outputSubstType, input, resultTy);
-        return;
-      }
-      case ParameterConvention::Indirect_In_Guaranteed: {
-        if (SGF.silConv.useLoweredAddresses()) {
-          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
-                            outputSubstType, input, resultTy);
-          return;
-        }
-        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
-                                outputSubstType, input, resultTy);
-        return;
-      }
-      case ParameterConvention::Pack_Guaranteed:
-      case ParameterConvention::Pack_Owned:
-        SGF.SGM.diagnose(Loc, diag::not_implemented,
-                         "reabstraction of pack values");
-        return;
-      case ParameterConvention::Indirect_Inout:
-      case ParameterConvention::Pack_Inout:
-        llvm_unreachable("inout reabstraction handled elsewhere");
-      case ParameterConvention::Indirect_InoutAliasable:
-        llvm_unreachable("abstraction difference in aliasable argument not "
-                         "allowed");
+      case ParameterConvention::Indirect_In:
+        if (!input.hasCleanup() &&
+            input.getOwnershipKind() != OwnershipKind::None)
+          input = input.copyUnmanaged(SGF, Loc);
+        break;
+
+      default:
+        break;
       }
 
-      llvm_unreachable("Covered switch isn't covered?!");
+      Outputs.push_back(input);
+      return;
     }
-
-    void translateInOut(AbstractionPattern inputOrigType,
-                        CanType inputSubstType,
-                        AbstractionPattern outputOrigType,
-                        CanType outputSubstType,
-                        ManagedValue input,
-                        SILParameterInfo result) {
-      auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
-      assert(input.isLValue());
-      if (input.getType() == resultTy) {
-        Outputs.push_back(input);
+    
+    switch (result.getConvention()) {
+    // Direct translation is relatively easy.
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+      translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                         outputSubstType, input, resultTy);
+      return;
+    case ParameterConvention::Direct_Guaranteed:
+      translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                              outputSubstType, input, resultTy);
+      return;
+    case ParameterConvention::Indirect_In: {
+      if (SGF.silConv.useLoweredAddresses()) {
+        translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                          outputSubstType, input, resultTy);
         return;
       }
-
-      // Create a temporary of the right type.
-      auto &temporaryTL = SGF.getTypeLowering(resultTy);
-      auto temporary = SGF.emitTemporary(Loc, temporaryTL);
-
-      // Take ownership of the input value.  This leaves the input l-value
-      // effectively uninitialized, but we'll push a cleanup that will put
-      // a value back into it.
-      FullExpr scope(SGF.Cleanups, CleanupLocation(Loc));
-      auto ownedInput =
-        SGF.emitManagedBufferWithCleanup(input.getLValueAddress());
-
-      // Translate the input value into the temporary.
-      translateSingleInto(inputOrigType, inputSubstType,
-                          outputOrigType, outputSubstType,
-                          ownedInput, *temporary);
-
-      // Forward the cleanup on the temporary.  We're about to push a new
-      // cleanup that will re-assert ownership of this value.
-      auto temporaryAddr = temporary->getManagedAddress().forward(SGF);
-
-      // Leave the scope in which we did the forward translation.  This
-      // ensures that the value in the input buffer is destroyed
-      // immediately rather than (potentially) arbitrarily later
-      // at a point where we want to put new values in the input buffer.
-      scope.pop();
-
-      // Push the cleanup to perform the reverse translation.  This cleanup
-      // asserts ownership of the value of the temporary.
-      SGF.Cleanups.pushCleanup<TranslateIndirect>(outputOrigType,
-                                                  outputSubstType,
-                                                  inputOrigType,
-                                                  inputSubstType,
-                                                  temporaryAddr,
-                                                  input.getLValueAddress());
-
-      // Add the temporary as an l-value argument.
-      Outputs.push_back(ManagedValue::forLValue(temporaryAddr));
+      translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                         outputSubstType, input, resultTy);
+      return;
+    }
+    case ParameterConvention::Indirect_In_Guaranteed: {
+      if (SGF.silConv.useLoweredAddresses()) {
+        translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                          outputSubstType, input, resultTy);
+        return;
+      }
+      translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                              outputSubstType, input, resultTy);
+      return;
+    }
+    case ParameterConvention::Pack_Guaranteed:
+    case ParameterConvention::Pack_Owned:
+      SGF.SGM.diagnose(Loc, diag::not_implemented,
+                       "reabstraction of pack values");
+      return;
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Pack_Inout:
+      llvm_unreachable("inout reabstraction handled elsewhere");
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("abstraction difference in aliasable argument not "
+                       "allowed");
     }
 
-    /// Translate a single value and initialize the given temporary with it.
-    void translateSingleInto(AbstractionPattern inputOrigType,
-                             CanType inputSubstType,
-                             AbstractionPattern outputOrigType,
-                             CanType outputSubstType,
-                             ManagedValue input,
-                             TemporaryInitialization &temp) {
-      auto output = translatePrimitive(inputOrigType, inputSubstType,
-                                       outputOrigType, outputSubstType,
-                                       input, temp.getAddress()->getType(),
-                                       SGFContext(&temp));
-      forceInto(output, temp);
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  void translateInOut(AbstractionPattern inputOrigType,
+                      CanType inputSubstType,
+                      AbstractionPattern outputOrigType,
+                      CanType outputSubstType,
+                      ManagedValue input,
+                      SILParameterInfo result) {
+    auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
+    assert(input.isLValue());
+    if (input.getType() == resultTy) {
+      Outputs.push_back(input);
+      return;
     }
 
-    /// Apply primitive translation to the given value.
-    ManagedValue translatePrimitive(AbstractionPattern inputOrigType,
-                                    CanType inputSubstType,
-                                    AbstractionPattern outputOrigType,
-                                    CanType outputSubstType,
-                                    ManagedValue input,
-                                    SILType loweredOutputTy,
-                                    SGFContext context = SGFContext()) {
-      return SGF.emitTransformedValue(Loc, input,
-                                      inputOrigType, inputSubstType,
-                                      outputOrigType, outputSubstType,
-                                      loweredOutputTy, context);
-    }
+    // Create a temporary of the right type.
+    auto &temporaryTL = SGF.getTypeLowering(resultTy);
+    auto temporary = SGF.emitTemporary(Loc, temporaryTL);
 
-    /// Force the given result into the given initialization.
-    void forceInto(ManagedValue result, TemporaryInitialization &temp) {
-      emitForceInto(SGF, Loc, result, temp);
-    }
+    // Take ownership of the input value.  This leaves the input l-value
+    // effectively uninitialized, but we'll push a cleanup that will put
+    // a value back into it.
+    FullExpr scope(SGF.Cleanups, CleanupLocation(Loc));
+    auto ownedInput =
+      SGF.emitManagedBufferWithCleanup(input.getLValueAddress());
 
-    ManagedValue claimNextInput() {
-      return claimNext(Inputs);
-    }
+    // Translate the input value into the temporary.
+    translateSingleInto(inputOrigType, inputSubstType,
+                        outputOrigType, outputSubstType,
+                        ownedInput, *temporary);
 
-    SILParameterInfo claimNextOutputType() {
-      return claimNext(OutputTypes);
-    }
-  };
+    // Forward the cleanup on the temporary.  We're about to push a new
+    // cleanup that will re-assert ownership of this value.
+    auto temporaryAddr = temporary->getManagedAddress().forward(SGF);
+
+    // Leave the scope in which we did the forward translation.  This
+    // ensures that the value in the input buffer is destroyed
+    // immediately rather than (potentially) arbitrarily later
+    // at a point where we want to put new values in the input buffer.
+    scope.pop();
+
+    // Push the cleanup to perform the reverse translation.  This cleanup
+    // asserts ownership of the value of the temporary.
+    SGF.Cleanups.pushCleanup<TranslateIndirect>(outputOrigType,
+                                                outputSubstType,
+                                                inputOrigType,
+                                                inputSubstType,
+                                                temporaryAddr,
+                                                input.getLValueAddress());
+
+    // Add the temporary as an l-value argument.
+    Outputs.push_back(ManagedValue::forLValue(temporaryAddr));
+  }
+
+  /// Translate a single value and initialize the given temporary with it.
+  void translateSingleInto(AbstractionPattern inputOrigType,
+                           CanType inputSubstType,
+                           AbstractionPattern outputOrigType,
+                           CanType outputSubstType,
+                           ManagedValue input,
+                           TemporaryInitialization &temp) {
+    auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                     outputOrigType, outputSubstType,
+                                     input, temp.getAddress()->getType(),
+                                     SGFContext(&temp));
+    forceInto(output, temp);
+  }
+
+  /// Apply primitive translation to the given value.
+  ManagedValue translatePrimitive(AbstractionPattern inputOrigType,
+                                  CanType inputSubstType,
+                                  AbstractionPattern outputOrigType,
+                                  CanType outputSubstType,
+                                  ManagedValue input,
+                                  SILType loweredOutputTy,
+                                  SGFContext context = SGFContext()) {
+    return SGF.emitTransformedValue(Loc, input,
+                                    inputOrigType, inputSubstType,
+                                    outputOrigType, outputSubstType,
+                                    loweredOutputTy, context);
+  }
+
+  /// Force the given result into the given initialization.
+  void forceInto(ManagedValue result, TemporaryInitialization &temp) {
+    emitForceInto(SGF, Loc, result, temp);
+  }
+
+  ManagedValue claimNextInput() {
+    return claimNext(Inputs);
+  }
+
+  SILParameterInfo claimNextOutputType() {
+    return claimNext(OutputTypes);
+  }
+};
+
 } // end anonymous namespace
 
 /// Apply trivial conversions to a value to handle differences between the inner
