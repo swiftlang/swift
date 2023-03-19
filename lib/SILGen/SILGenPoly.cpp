@@ -1135,78 +1135,12 @@ public:
                                          outputTupleType);
       }
 
-      // Tuple types are subtypes of their optionals
-      if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
-        auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
-
-        if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
-          // The input is exploded and the output is an optional tuple.
-          // Translate values and collect them into a single optional
-          // payload.
-
-          auto result =
-              translateAndImplodeIntoOptional(inputOrigType,
-                                              inputTupleType,
-                                              outputOrigObjectType,
-                                              outputTupleType);
-          Outputs.push_back(result);
-          return;
-        }
-
-        // Tuple types are subtypes of optionals of Any, too.
-        assert(outputObjectType->isAny());
-
-        // First, construct the existential.
-        auto result =
-            translateAndImplodeIntoAny(inputOrigType,
-                                       inputTupleType,
-                                       outputOrigObjectType,
-                                       outputObjectType);
-
-        // Now, convert it to an optional.
-        translateSingle(outputOrigObjectType, outputObjectType,
-                        outputOrigType, outputSubstType,
-                        result, claimNextOutputType());
-        return;
-      }
-
-      if (outputSubstType->isAny()) {
-        claimNextOutputType();
-
-        auto result =
-            translateAndImplodeIntoAny(inputOrigType,
-                                       inputTupleType,
-                                       outputOrigType,
-                                       outputSubstType);
-        Outputs.push_back(result);
-        return;
-      }
-
-      if (outputTupleType) {
-        // The input is exploded and the output is not. Translate values
-        // and store them to a result tuple in memory.
-        assert(outputOrigType.isTypeParameter() &&
-               "Output is not a tuple and is not opaque?");
-
-        auto outputTy = SGF.getSILType(claimNextOutputType(),
-                                       OutputTypesFuncTy);
-        auto &outputTL = SGF.getTypeLowering(outputTy);
-        if (SGF.silConv.useLoweredAddresses()) {
-          auto temp = SGF.emitTemporary(Loc, outputTL);
-          translateAndImplodeInto(inputOrigType, inputTupleType,
-                                  outputOrigType, outputTupleType, *temp);
-
-          Outputs.push_back(temp->getManagedAddress());
-        } else {
-          auto result = translateAndImplodeIntoValue(
-              inputOrigType, inputTupleType, outputOrigType, outputTupleType,
-              outputTL.getLoweredType());
-          Outputs.push_back(result);
-        }
-        return;
-      }
-
-      llvm_unreachable("Unhandled conversion from exploded tuple");
+      auto outputParam = claimNextOutputType();
+      return translateTupleIntoSingle(inputOrigType,
+                                      inputTupleType,
+                                      outputOrigType,
+                                      outputSubstType,
+                                      outputParam);
     }
 
     // Handle output being an exploded tuple when the input is opaque.
@@ -1238,6 +1172,85 @@ public:
   }
 
 private:
+  void translateTupleIntoSingle(AbstractionPattern inputOrigType,
+                                CanTupleType inputSubstType,
+                                AbstractionPattern outputOrigType,
+                                CanType outputSubstType,
+                                SILParameterInfo outputParam) {
+    // Tuple types are subtypes of their optionals
+    if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
+      auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
+
+      if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
+        // The input is exploded and the output is an optional tuple.
+        // Translate values and collect them into a single optional
+        // payload.
+
+        auto result =
+            translateAndImplodeIntoOptional(inputOrigType,
+                                            inputSubstType,
+                                            outputOrigObjectType,
+                                            outputTupleType,
+                                            outputParam);
+        Outputs.push_back(result);
+        return;
+      }
+
+      // Tuple types are subtypes of optionals of Any, too.
+      assert(outputObjectType->isAny());
+
+      // First, construct the existential.
+      auto result =
+          translateAndImplodeIntoAny(inputOrigType,
+                                     inputSubstType,
+                                     outputOrigObjectType,
+                                     outputObjectType);
+
+      // Now, convert it to an optional.
+      translateSingle(outputOrigObjectType, outputObjectType,
+                      outputOrigType, outputSubstType,
+                      result, outputParam);
+      return;
+    }
+
+    if (outputSubstType->isAny()) {
+      // We don't need outputParam on this path.
+
+      auto result =
+          translateAndImplodeIntoAny(inputOrigType,
+                                     inputSubstType,
+                                     outputOrigType,
+                                     outputSubstType);
+      Outputs.push_back(result);
+      return;
+    }
+
+    if (auto outputTupleType = dyn_cast<TupleType>(outputSubstType)) {
+      // The input is exploded and the output is not. Translate values
+      // and store them to a result tuple in memory.
+      assert(outputOrigType.isTypeParameter() &&
+             "Output is not a tuple and is not opaque?");
+
+      auto outputTy = SGF.getSILType(outputParam, OutputTypesFuncTy);
+      auto &outputTL = SGF.getTypeLowering(outputTy);
+      if (SGF.silConv.useLoweredAddresses()) {
+        auto temp = SGF.emitTemporary(Loc, outputTL);
+        translateAndImplodeInto(inputOrigType, inputSubstType,
+                                outputOrigType, outputTupleType, *temp);
+
+        Outputs.push_back(temp->getManagedAddress());
+      } else {
+        auto result = translateAndImplodeIntoValue(
+            inputOrigType, inputSubstType, outputOrigType, outputTupleType,
+            outputTL.getLoweredType());
+        Outputs.push_back(result);
+      }
+      return;
+    }
+
+    llvm_unreachable("Unhandled conversion from exploded tuple");
+  }
+
   /// Take a tuple that has been exploded in the input and turn it into
   /// a tuple value in the output.
   ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
@@ -1309,15 +1322,15 @@ private:
   translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
                                   CanTupleType inputTupleType,
                                   AbstractionPattern outputOrigType,
-                                  CanTupleType outputTupleType) {
+                                  CanTupleType outputTupleType,
+                                  SILParameterInfo outputParam) {
     assert(inputTupleType->getNumElements() ==
            outputTupleType->getNumElements());
 
     // Collect the tuple elements.
     auto &loweredTL = SGF.getTypeLowering(outputOrigType, outputTupleType);
     auto loweredTy = loweredTL.getLoweredType();
-    auto optionalTy = SGF.getSILType(claimNextOutputType(),
-                                     OutputTypesFuncTy);
+    auto optionalTy = SGF.getSILType(outputParam, OutputTypesFuncTy);
     auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
     if (loweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
       auto payload =
