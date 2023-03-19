@@ -32,33 +32,29 @@ using namespace swift;
                 "Patterns are BumpPtrAllocated; the d'tor is never called");
 #include "swift/AST/PatternNodes.def"
 
-/// Diagnostic printing of PatternKinds.
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
-  switch (kind) {
-  case PatternKind::Paren:
-    return OS << "parenthesized pattern";
-  case PatternKind::Tuple:
-    return OS << "tuple pattern";
-  case PatternKind::Named:
-    return OS << "pattern variable binding";
-  case PatternKind::Any:
-    return OS << "'_' pattern";
-  case PatternKind::Typed:
-    return OS << "pattern type annotation";
-  case PatternKind::Is:
-    return OS << "prefix 'is' pattern";
-  case PatternKind::Expr:
-    return OS << "expression pattern";
+DescriptivePatternKind Pattern::getDescriptiveKind() const {
+#define TRIVIAL_PATTERN_KIND(Kind)                                             \
+  case PatternKind::Kind:                                                      \
+    return DescriptivePatternKind::Kind
+
+  switch (getKind()) {
+    TRIVIAL_PATTERN_KIND(Paren);
+    TRIVIAL_PATTERN_KIND(Tuple);
+    TRIVIAL_PATTERN_KIND(Named);
+    TRIVIAL_PATTERN_KIND(Any);
+    TRIVIAL_PATTERN_KIND(Typed);
+    TRIVIAL_PATTERN_KIND(Is);
+    TRIVIAL_PATTERN_KIND(EnumElement);
+    TRIVIAL_PATTERN_KIND(OptionalSome);
+    TRIVIAL_PATTERN_KIND(Bool);
+    TRIVIAL_PATTERN_KIND(Expr);
+
   case PatternKind::Binding:
-    return OS << "'var' binding pattern";
-  case PatternKind::EnumElement:
-    return OS << "enum case matching pattern";
-  case PatternKind::OptionalSome:
-    return OS << "optional .Some matching pattern";
-  case PatternKind::Bool:
-    return OS << "bool matching pattern";
+    return cast<BindingPattern>(this)->isLet() ? DescriptivePatternKind::Let
+                                               : DescriptivePatternKind::Var;
   }
-  llvm_unreachable("bad PatternKind");
+#undef TRIVIAL_PATTERN_KIND
+  llvm_unreachable("bad DescriptivePatternKind");
 }
 
 StringRef Pattern::getKindName(PatternKind K) {
@@ -67,6 +63,28 @@ StringRef Pattern::getKindName(PatternKind K) {
 #include "swift/AST/PatternNodes.def"
   }
   llvm_unreachable("bad PatternKind");
+}
+
+StringRef Pattern::getDescriptivePatternKindName(DescriptivePatternKind K) {
+#define ENTRY(Kind, String)                                                    \
+  case DescriptivePatternKind::Kind:                                           \
+    return String
+  switch (K) {
+    ENTRY(Paren, "parenthesized pattern");
+    ENTRY(Tuple, "tuple pattern");
+    ENTRY(Named, "pattern variable binding");
+    ENTRY(Any, "'_' pattern");
+    ENTRY(Typed, "pattern type annotation");
+    ENTRY(Is, "prefix 'is' pattern");
+    ENTRY(EnumElement, "enum case matching pattern");
+    ENTRY(OptionalSome, "optional pattern");
+    ENTRY(Bool, "bool matching pattern");
+    ENTRY(Expr, "expression pattern");
+    ENTRY(Var, "'var' binding pattern");
+    ENTRY(Let, "'let' binding pattern");
+  }
+#undef ENTRY
+  llvm_unreachable("bad DescriptivePatternKind");
 }
 
 // Metaprogram to verify that every concrete class implements

@@ -46,7 +46,7 @@ namespace swift {
   class ValueDecl;
   class SourceFile;
 
-  enum class PatternKind : uint8_t;
+  enum class DescriptivePatternKind : uint8_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
@@ -113,7 +113,7 @@ namespace swift {
     Type,
     TypeRepr,
     FullyQualifiedType,
-    PatternKind,
+    DescriptivePatternKind,
     SelfAccessKind,
     ReferenceOwnership,
     StaticSpellingKind,
@@ -147,7 +147,7 @@ namespace swift {
       Type TypeVal;
       TypeRepr *TyR;
       FullyQualified<Type> FullyQualifiedTypeVal;
-      PatternKind PatternKindVal;
+      DescriptivePatternKind DescriptivePatternKindVal;
       SelfAccessKind SelfAccessKindVal;
       ReferenceOwnership ReferenceOwnershipVal;
       StaticSpellingKind StaticSpellingKindVal;
@@ -220,8 +220,9 @@ namespace swift {
       }
     }
 
-    DiagnosticArgument(PatternKind K)
-        : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {}
+    DiagnosticArgument(DescriptivePatternKind DPK)
+        : Kind(DiagnosticArgumentKind::DescriptivePatternKind),
+          DescriptivePatternKindVal(DPK) {}
 
     DiagnosticArgument(ReferenceOwnership RO)
         : Kind(DiagnosticArgumentKind::ReferenceOwnership),
@@ -324,9 +325,9 @@ namespace swift {
       return FullyQualifiedTypeVal;
     }
 
-    PatternKind getAsPatternKind() const {
-      assert(Kind == DiagnosticArgumentKind::PatternKind);
-      return PatternKindVal;
+    DescriptivePatternKind getAsDescriptivePatternKind() const {
+      assert(Kind == DiagnosticArgumentKind::DescriptivePatternKind);
+      return DescriptivePatternKindVal;
     }
 
     ReferenceOwnership getAsReferenceOwnership() const {

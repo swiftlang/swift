@@ -1212,7 +1212,7 @@ ERROR(optional_chain_isnt_chaining,none,
       "'?' must be followed by a call, member lookup, or subscript",
       ())
 ERROR(pattern_in_expr,none,
-      "%0 cannot appear in an expression", (PatternKind))
+      "%0 cannot appear in an expression", (DescriptivePatternKind))
 NOTE(note_call_to_operator,none,
      "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,

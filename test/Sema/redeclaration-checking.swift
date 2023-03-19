@@ -123,11 +123,10 @@ let issue63750 = {
     // expected-note@-2 {{'x' previously declared here}}
     ()
   }
-  // FIXME: We should really say 'let' instead of 'var' in "'var' binding pattern cannot appear in an expression"
-  // https://github.com/apple/swift/issues/63993
+  
   func bar(_ x: Int) -> Int { x }
   if case (bar(let x), let x) = (0,0) {}
-  // expected-error@-1 {{'var' binding pattern cannot appear in an expression}}
+  // expected-error@-1 {{'let' binding pattern cannot appear in an expression}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
   // expected-note@-3 {{'x' previously declared here}}
 }
@@ -149,7 +148,7 @@ func issue63750fn() {
   }
   func bar(_ x: Int) -> Int { x }
   if case (bar(let x), let x) = (0,0) {}
-  // expected-error@-1 {{'var' binding pattern cannot appear in an expression}}
+  // expected-error@-1 {{'let' binding pattern cannot appear in an expression}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
   // expected-note@-3 {{'x' previously declared here}}
 }
