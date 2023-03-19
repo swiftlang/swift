@@ -1106,9 +1106,11 @@ public:
       auto inputValue = claimNextInput();
       auto outputLoweredTy = claimNextOutputType();
 
-      translateInOut(inputOrigType, inputSubstType.getParameterType(),
-                     outputOrigType, outputSubstType.getParameterType(),
-                     inputValue, outputLoweredTy);
+      ManagedValue output =
+        translateInOut(inputOrigType, inputSubstType.getParameterType(),
+                       outputOrigType, outputSubstType.getParameterType(),
+                       inputValue, outputLoweredTy);
+      Outputs.push_back(output);
     } else {
       translate(inputOrigType, inputSubstType.getParameterType(),
                 outputOrigType, outputSubstType.getParameterType());
@@ -1136,11 +1138,13 @@ public:
       }
 
       auto outputParam = claimNextOutputType();
-      return translateTupleIntoSingle(inputOrigType,
-                                      inputTupleType,
-                                      outputOrigType,
-                                      outputSubstType,
-                                      outputParam);
+      auto output = translateTupleIntoSingle(inputOrigType,
+                                             inputTupleType,
+                                             outputOrigType,
+                                             outputSubstType,
+                                             outputParam);
+      Outputs.push_back(output);
+      return;
     }
 
     // Handle output being an exploded tuple when the input is opaque.
@@ -1166,17 +1170,19 @@ public:
     // single value.
     auto inputElt = claimNextInput();
     auto outputEltType = claimNextOutputType();
-    translateSingle(inputOrigType, inputSubstType,
-                    outputOrigType, outputSubstType,
-                    inputElt, outputEltType);
+    auto output = translateSingle(inputOrigType, inputSubstType,
+                                  outputOrigType, outputSubstType,
+                                  inputElt, outputEltType);
+    Outputs.push_back(output);
   }
 
 private:
-  void translateTupleIntoSingle(AbstractionPattern inputOrigType,
-                                CanTupleType inputSubstType,
-                                AbstractionPattern outputOrigType,
-                                CanType outputSubstType,
-                                SILParameterInfo outputParam) {
+  ManagedValue
+  translateTupleIntoSingle(AbstractionPattern inputOrigType,
+                           CanTupleType inputSubstType,
+                           AbstractionPattern outputOrigType,
+                           CanType outputSubstType,
+                           SILParameterInfo outputParam) {
     // Tuple types are subtypes of their optionals
     if (auto outputObjectType = outputSubstType.getOptionalObjectType()) {
       auto outputOrigObjectType = outputOrigType.getOptionalObjectType();
@@ -1192,8 +1198,7 @@ private:
                                             outputOrigObjectType,
                                             outputTupleType,
                                             outputParam);
-        Outputs.push_back(result);
-        return;
+        return result;
       }
 
       // Tuple types are subtypes of optionals of Any, too.
@@ -1207,22 +1212,18 @@ private:
                                      outputObjectType);
 
       // Now, convert it to an optional.
-      translateSingle(outputOrigObjectType, outputObjectType,
-                      outputOrigType, outputSubstType,
-                      result, outputParam);
-      return;
+      return translateSingle(outputOrigObjectType, outputObjectType,
+                             outputOrigType, outputSubstType,
+                             result, outputParam);
     }
 
     if (outputSubstType->isAny()) {
       // We don't need outputParam on this path.
 
-      auto result =
-          translateAndImplodeIntoAny(inputOrigType,
-                                     inputSubstType,
-                                     outputOrigType,
-                                     outputSubstType);
-      Outputs.push_back(result);
-      return;
+      return translateAndImplodeIntoAny(inputOrigType,
+                                        inputSubstType,
+                                        outputOrigType,
+                                        outputSubstType);
     }
 
     if (auto outputTupleType = dyn_cast<TupleType>(outputSubstType)) {
@@ -1238,14 +1239,13 @@ private:
         translateAndImplodeInto(inputOrigType, inputSubstType,
                                 outputOrigType, outputTupleType, *temp);
 
-        Outputs.push_back(temp->getManagedAddress());
+        return temp->getManagedAddress();
       } else {
         auto result = translateAndImplodeIntoValue(
             inputOrigType, inputSubstType, outputOrigType, outputTupleType,
             outputTL.getLoweredType());
-        Outputs.push_back(result);
+        return result;
       }
-      return;
     }
 
     llvm_unreachable("Unhandled conversion from exploded tuple");
@@ -1457,12 +1457,13 @@ private:
                                  inputEltAddr);
       } else {
         auto outputType = claimNextOutputType();
-        translateSingle(inputEltOrigType,
-                        inputEltSubstType,
-                        outputEltOrigType,
-                        outputEltSubstType,
-                        inputEltAddr,
-                        outputType);
+        auto output = translateSingle(inputEltOrigType,
+                                      inputEltSubstType,
+                                      outputEltOrigType,
+                                      outputEltSubstType,
+                                      inputEltAddr,
+                                      outputType);
+        Outputs.push_back(output);
       }
     }
   }
@@ -1520,25 +1521,25 @@ private:
   }
 
   // Translate into a temporary.
-  void translateIndirect(AbstractionPattern inputOrigType,
-                         CanType inputSubstType,
-                         AbstractionPattern outputOrigType,
-                         CanType outputSubstType, ManagedValue input,
-                         SILType resultTy) {
+  ManagedValue translateIndirect(AbstractionPattern inputOrigType,
+                                 CanType inputSubstType,
+                                 AbstractionPattern outputOrigType,
+                                 CanType outputSubstType, ManagedValue input,
+                                 SILType resultTy) {
     auto &outputTL = SGF.getTypeLowering(resultTy);
     auto temp = SGF.emitTemporary(Loc, outputTL);
     translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
                         outputSubstType, input, *temp);
-    Outputs.push_back(temp->getManagedAddress());
+    return temp->getManagedAddress();
   }
 
   // Translate into an owned argument.
-  void translateIntoOwned(AbstractionPattern inputOrigType,
-                          CanType inputSubstType,
-                          AbstractionPattern outputOrigType,
-                          CanType outputSubstType,
-                          ManagedValue input,
-                          SILType outputLoweredTy) {
+  ManagedValue translateIntoOwned(AbstractionPattern inputOrigType,
+                                  CanType inputSubstType,
+                                  AbstractionPattern outputOrigType,
+                                  CanType outputSubstType,
+                                  ManagedValue input,
+                                  SILType outputLoweredTy) {
     auto output = translatePrimitive(inputOrigType, inputSubstType,
                                      outputOrigType, outputSubstType,
                                      input, outputLoweredTy);
@@ -1547,16 +1548,16 @@ private:
     if (output.getOwnershipKind() != OwnershipKind::Owned)
       output = output.copyUnmanaged(SGF, Loc);
 
-    Outputs.push_back(output);
+    return output;
   }
 
   // Translate into a guaranteed argument.
-  void translateIntoGuaranteed(AbstractionPattern inputOrigType,
-                               CanType inputSubstType,
-                               AbstractionPattern outputOrigType,
-                               CanType outputSubstType,
-                               ManagedValue input,
-                               SILType outputLoweredTy) {
+  ManagedValue translateIntoGuaranteed(AbstractionPattern inputOrigType,
+                                       CanType inputSubstType,
+                                       AbstractionPattern outputOrigType,
+                                       CanType outputSubstType,
+                                       ManagedValue input,
+                                       SILType outputLoweredTy) {
     auto output = translatePrimitive(inputOrigType, inputSubstType,
                                      outputOrigType, outputSubstType,
                                      input, outputLoweredTy);
@@ -1580,16 +1581,16 @@ private:
       output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
     }
 
-    Outputs.push_back(output);
+    return output;
   }
 
   /// Translate a single value and add it as an output.
-  void translateSingle(AbstractionPattern inputOrigType,
-                       CanType inputSubstType,
-                       AbstractionPattern outputOrigType,
-                       CanType outputSubstType,
-                       ManagedValue input,
-                       SILParameterInfo result) {
+  ManagedValue translateSingle(AbstractionPattern inputOrigType,
+                               CanType inputSubstType,
+                               AbstractionPattern outputOrigType,
+                               CanType outputSubstType,
+                               ManagedValue input,
+                               SILParameterInfo result) {
     auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
     // Easy case: we want to pass exactly this value.
     if (input.getType() == resultTy) {
@@ -1605,46 +1606,45 @@ private:
         break;
       }
 
-      Outputs.push_back(input);
-      return;
+      return input;
     }
     
     switch (result.getConvention()) {
     // Direct translation is relatively easy.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
-      translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
-                         outputSubstType, input, resultTy);
-      return;
+      return translateIntoOwned(inputOrigType, inputSubstType,
+                                outputOrigType, outputSubstType,
+                                input, resultTy);
     case ParameterConvention::Direct_Guaranteed:
-      translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
-                              outputSubstType, input, resultTy);
-      return;
+      return translateIntoGuaranteed(inputOrigType, inputSubstType,
+                                     outputOrigType, outputSubstType,
+                                     input, resultTy);
     case ParameterConvention::Indirect_In: {
       if (SGF.silConv.useLoweredAddresses()) {
-        translateIndirect(inputOrigType, inputSubstType, outputOrigType,
-                          outputSubstType, input, resultTy);
-        return;
+        return translateIndirect(inputOrigType, inputSubstType,
+                                 outputOrigType, outputSubstType,
+                                 input, resultTy);
       }
-      translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
-                         outputSubstType, input, resultTy);
-      return;
+      return translateIntoOwned(inputOrigType, inputSubstType,
+                                outputOrigType, outputSubstType,
+                                input, resultTy);
     }
     case ParameterConvention::Indirect_In_Guaranteed: {
       if (SGF.silConv.useLoweredAddresses()) {
-        translateIndirect(inputOrigType, inputSubstType, outputOrigType,
-                          outputSubstType, input, resultTy);
-        return;
+        return translateIndirect(inputOrigType, inputSubstType,
+                                 outputOrigType, outputSubstType,
+                                 input, resultTy);
       }
-      translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
-                              outputSubstType, input, resultTy);
-      return;
+      return translateIntoGuaranteed(inputOrigType, inputSubstType,
+                                     outputOrigType, outputSubstType,
+                                     input, resultTy);
     }
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
       SGF.SGM.diagnose(Loc, diag::not_implemented,
                        "reabstraction of pack values");
-      return;
+      return SGF.emitUndef(resultTy);
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Pack_Inout:
       llvm_unreachable("inout reabstraction handled elsewhere");
@@ -1656,17 +1656,16 @@ private:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  void translateInOut(AbstractionPattern inputOrigType,
-                      CanType inputSubstType,
-                      AbstractionPattern outputOrigType,
-                      CanType outputSubstType,
-                      ManagedValue input,
-                      SILParameterInfo result) {
+  ManagedValue translateInOut(AbstractionPattern inputOrigType,
+                              CanType inputSubstType,
+                              AbstractionPattern outputOrigType,
+                              CanType outputSubstType,
+                              ManagedValue input,
+                              SILParameterInfo result) {
     auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
     assert(input.isLValue());
     if (input.getType() == resultTy) {
-      Outputs.push_back(input);
-      return;
+      return input;
     }
 
     // Create a temporary of the right type.
@@ -1705,7 +1704,7 @@ private:
                                                 input.getLValueAddress());
 
     // Add the temporary as an l-value argument.
-    Outputs.push_back(ManagedValue::forLValue(temporaryAddr));
+    return ManagedValue::forLValue(temporaryAddr);
   }
 
   /// Translate a single value and initialize the given temporary with it.
@@ -1745,6 +1744,11 @@ private:
     return claimNext(Inputs);
   }
 
+  /// Claim the next lowered parameter in the output.  The conventions in
+  /// this class are set up such that the place that claims an output type
+  /// is also responsible for adding the output to Outputs.  This allows
+  /// readers to easily verify that this is done on all paths.  (It'd
+  /// sure be nice if we had better language mode for that, though.)
   SILParameterInfo claimNextOutputType() {
     return claimNext(OutputTypes);
   }
