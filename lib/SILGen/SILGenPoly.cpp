@@ -891,6 +891,123 @@ public:
   }
 };
 
+/// Given a list of inputs that are suited to the parameters of one
+/// function, translate them into a list of outputs that are suited
+/// for the parameters of another function, given that the two
+/// functions differ only by abstraction differences and/or a small
+/// a small set of subtyping-esque conversions tolerated by the
+/// type checker.
+///
+/// This is a conceptually rich transformation, and there are several
+/// different concepts of expansion and transformation going on at
+/// once here.  We will briefly review these concepts in order to
+/// explain what has to happen here.
+///
+/// Swift functions have *formal* parameters.  These are represented here
+/// as the list of input and and output `CanParam` structures.  The
+/// type-checker requires function types to be formally related to each
+/// in specific ways in order for a conversion to be accepted; this
+/// includes the parameter lists being the same length (other than
+/// the exception of SE-0110's tuple-splat behavior).
+///
+/// SIL functions have *lowered* parameters.  These correspond to the
+/// SIL values we receive in Inputs and must generate in Outputs.
+///
+/// A single formal parameter can correspond to any number of
+/// lowered parameters because SIL function type lowering recursively
+/// expands tuples that aren't being passed inout.
+///
+/// The lowering of generic Swift function types must be independent
+/// of the actual types substituted for generic parameters, which means
+/// that decisions about when to expand must be made according to the
+/// orig (unsubstituted) function type, not the substituted types.
+/// But the type checker only cares that function types are related
+/// as substituted types, so we may need to combine or expand tuples
+/// because of the differences between abstraction.
+///
+/// This translation therefore recursively walks the orig parameter
+/// types of the input and output function type and expects the
+/// corresponding lowered parameter lists to match with the structure
+/// we see there.  When the walk reaches a non-tuple orig type on the
+/// input side, we know that the input function receives a lowered
+/// parameter and therefore there is a corresponding value in Inputs.
+/// When the walk reaches a non-tuple orig type on the output side,
+/// we know that the output function receives a lowered parameter
+/// and therefore there is a corresponding type in OutputTypes (and
+/// a need to produce an argument value in Outputs).
+///
+/// Variadic generics complicate this because both tuple element
+/// lists and function formal parameter lists can contain pack
+/// expansions.  Again, the relevant question is where expansions
+/// appear in the orig type; the substituted parameters / tuple
+/// elements are still required to be related by the type-checker.
+/// Like any other non-tuple pattern, an expansion always corresponds
+/// to a single lowered parameter, which may then include multiple
+/// formal parameters or tuple elements from the substituted type's
+/// perspective.  The orig type should carry precise substitutions
+/// that will tell us how many components the expansion expands to,
+/// which we must use to inform our recursive walk.  These components
+/// may or may not still contain pack expansions in the substituted
+/// types; if they do, they will have the same shape.
+///
+/// An example might help.  Suppose that we have a generic function
+/// that returns a function value:
+///
+///   func produceFunction<T_0, each T_1>() ->
+///     (Optional<T_0>, (B, C), repeat Array<each T_1>) -> ()
+///
+/// And suppose we call this with generic arguments <A, Pack{D, E}>.
+/// Then formally we now have a function of type:
+///
+///     (Optional<A>, (B, C), Array<D>, Array<E>) -> ()
+///
+/// These are the orig and subst formal parameter sequences.  The
+/// lowered parameter sequence of this type (assuming all the concrete
+/// types A,B,... are non-trivial but loadable) is:
+///
+///     (@in_guaranteed Optional<A>,
+///      @guaranteed B,
+///      @guaranteed C,
+///      @pack_guaranteed Pack{Array<D>, Array<E>})
+///
+/// Just for edification, if we had written this function type in a
+/// non-generic context, it would have this lowered parameter sequence:
+///
+///     (@guaranteed Optional<A>,
+///      @guaranteed B,
+///      @guaranteed C,
+///      @guaranteed Array<D>,
+///      @guaranteed Array<E>)
+///
+/// Now suppose we also have a function that takes a function value:
+///
+///   func consumeFunction<T_out_0, each T_out_1>(
+///      _ function: (A, T_out_0, repeat each T_out_1, Array<E>) -> ()
+///   )
+///
+/// If we call this with the generic arguments <(B, C), Pack{Array<D>}>,
+/// then it will expect a value of type:
+///
+///     (A, (B, C), Array<D>, Array<E>) -> ()
+///
+/// This is a supertype of the function type above (because of the
+/// contravariance of function parameters), and so the type-checker will
+/// permit the result of one call to be passed to the other.  The
+/// lowered parameter sequence of this type will be:
+///
+///     (@guaranteed A,
+///      @in_guaranteed (B, C),
+///      @in_guaranteed Array<D>,
+///      @guaranteeed Array<E>)
+///
+/// We will then end up in this code with the second type as the input
+/// type and the first type as the output type.  (The second type is
+/// the input because of contravariance again: we do this conversion
+/// by capturing a value of the first function type in a closure which
+/// presents the interface of the second function type.  In this code,
+/// we are emitting the body of that closure, and therefore the inputs
+/// we receive are the parameters of that closure, matching the lowered
+/// signature of the second function type.)
 class TranslateArguments {
   SILGenFunction &SGF;
   SILLocation Loc;
