@@ -47,8 +47,20 @@ enum class PatternKind : uint8_t {
 enum : unsigned { NumPatternKindBits =
   countBitsUsed(static_cast<unsigned>(PatternKind::Last_Pattern)) };
 
-/// Diagnostic printing of PatternKinds.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
+enum class DescriptivePatternKind : uint8_t {
+  Paren,
+  Tuple,
+  Named,
+  Any,
+  Typed,
+  Is,
+  EnumElement,
+  OptionalSome,
+  Bool,
+  Expr,
+  Var,
+  Let
+};
 
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern : public ASTAllocated<Pattern> {
@@ -105,12 +117,19 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(Bits.Pattern.Kind); }
 
+  /// Retrieve the descriptive pattern kind for this pattern.
+  DescriptivePatternKind getDescriptiveKind() const;
+
   /// Retrieve the name of the given pattern kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(PatternKind K);
+
+  /// Produce a name for the given descriptive pattern kind, which
+  /// is suitable for use in diagnostics.
+  static StringRef getDescriptivePatternKindName(DescriptivePatternKind K);
 
   /// A pattern is implicit if it is compiler-generated and there
   /// exists no source code for it.

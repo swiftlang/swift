@@ -747,9 +747,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
 
-  case DiagnosticArgumentKind::PatternKind:
-    assert(Modifier.empty() && "Improper modifier for PatternKind argument");
-    Out << Arg.getAsPatternKind();
+  case DiagnosticArgumentKind::DescriptivePatternKind:
+    assert(Modifier.empty() &&
+           "Improper modifier for DescriptivePatternKind argument");
+    Out << Pattern::getDescriptivePatternKindName(
+        Arg.getAsDescriptivePatternKind());
     break;
 
   case DiagnosticArgumentKind::SelfAccessKind:

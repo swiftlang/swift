@@ -4558,7 +4558,7 @@ namespace {
           && !cs.getType(simplified)->is<UnresolvedType>()) {
         auto &de = cs.getASTContext().Diags;
         de.diagnose(simplified->getLoc(), diag::pattern_in_expr,
-                    expr->getSubPattern()->getKind());
+                    expr->getSubPattern()->getDescriptiveKind());
       }
       return simplified;
     }
