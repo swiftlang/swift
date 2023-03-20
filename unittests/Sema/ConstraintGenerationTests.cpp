@@ -116,7 +116,7 @@ TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
               ->isEqual(getStdlibType("Int")));
 }
 
-TEST_F(SemaTest, TestCaptureListIsConnectedToTheClosure) {
+TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
   ConstraintSystem cs(DC, ConstraintSystemOptions());
 
   DeclAttributes attrs;
@@ -160,19 +160,19 @@ TEST_F(SemaTest, TestCaptureListIsConnectedToTheClosure) {
   auto *processed = cs.generateConstraints(assign, DC);
   ASSERT_NE(processed, nullptr);
 
+  for (const auto &capture : captureList->getCaptureList()) {
+    ASSERT_FALSE(cs.hasType(capture.getVar()));
+  }
+
   auto *closureType = cs.getType(closure)->castTo<TypeVariableType>();
-  auto &CG = cs.getConstraintGraph();
 
-  for (auto *constraint : CG[closureType].getConstraints()) {
-    if (constraint->getKind() != ConstraintKind::DefaultClosureType)
-      continue;
+  ASTExtInfo extInfo;
+  ASSERT_TRUE(cs.resolveClosure(
+      closureType,
+      FunctionType::get(/*params*/ {}, Context.TheEmptyTupleType, extInfo),
+      cs.getConstraintLocator(closure)));
 
-    for (const auto &capture : captureList->getCaptureList()) {
-      auto *capturedVar =
-          cs.getType(capture.getVar())->castTo<TypeVariableType>();
-
-      ASSERT_TRUE(
-          llvm::is_contained(constraint->getTypeVariables(), capturedVar));
-    }
+  for (const auto &capture : captureList->getCaptureList()) {
+    ASSERT_TRUE(cs.hasType(capture.getVar()));
   }
 }
