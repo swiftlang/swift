@@ -171,14 +171,14 @@ public final class MultipleValueInstructionResult : Value {
   }
 
   public var parentInstruction: MultipleValueInstruction {
-    MultiValueInstResult_getParent(bridged).getAs(MultipleValueInstruction.self)
+    bridged.getParent().getAs(MultipleValueInstruction.self)
   }
 
   public var definingInstruction: Instruction? { parentInstruction }
 
   public var parentBlock: BasicBlock { parentInstruction.parentBlock }
 
-  public var index: Int { MultiValueInstResult_getIndex(bridged) }
+  public var index: Int { bridged.getIndex() }
 
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))

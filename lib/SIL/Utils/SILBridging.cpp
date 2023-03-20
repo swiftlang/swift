@@ -306,15 +306,6 @@ bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
   return ::mayBeDeinitBarrierNotConsideringSideEffects(getInst());
 }
 
-BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
-  return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
-}
-
-SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result) {
-  auto *rs = static_cast<MultipleValueInstructionResult *>(result.obj);
-  return (SwiftInt)rs->getIndex();
-}
-
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//
