@@ -947,6 +947,21 @@ bool AllowMemberRefOnExistential::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool AllowInvalidMemberRef::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix =
+      static_cast<const AllowInvalidMemberRef *>(commonFixes.front().second);
+
+  Type baseTy = primaryFix->getBaseType();
+  for (const auto &entry : commonFixes) {
+    auto *memberFix = static_cast<const AllowInvalidMemberRef *>(entry.second);
+    if (!baseTy->isEqual(memberFix->getBaseType()))
+      return false;
+  }
+
+  return diagnose(*commonFixes.front().first);
+}
+
 bool AllowTypeOrInstanceMember::diagnose(const Solution &solution,
                                          bool asNote) const {
   AllowTypeOrInstanceMemberFailure failure(solution, getBaseType(), getMember(),

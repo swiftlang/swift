@@ -471,3 +471,18 @@ func testAnyObjectConstruction(_ x: AnyObject) {
   // FIXME: This should also be rejected.
   _ = type(of: x).init()
 }
+
+// rdar://102412006 - failed to produce a diagnostic for invalid member ref
+class AmbiguityA : NSObject {
+  @objc class var testProp: A { get { A() } }
+}
+
+
+class AmbuguityB : NSObject {
+  @objc class var testProp: B { get { B() } }
+}
+
+do {
+  func test(_: AnyObject?) {}
+  test(.testProp) // expected-error {{static member 'testProp' cannot be used on protocol metatype '(any AnyObject).Type'}}
+}
