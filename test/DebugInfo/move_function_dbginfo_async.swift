@@ -395,37 +395,37 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 // correctly.
 // SIL-LABEL: sil @$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF : $@convention(thin) @async <T where T : P> (@inout T) -> () {
 // SIL: bb0([[ARG:%[0-9]+]] : $*T):
-// SIL:   debug_value [moved] [[ARG]]
+// SIL:   debug_value [moveable_value_debuginfo] [[ARG]]
 // SIL:   [[FORCE_SPLIT_1:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit1yyYaF : $@convention(thin) @async () -> ()
 // SIL:   apply [[FORCE_SPLIT_1]]
-// SIL-NEXT: debug_value [moved] [[ARG]]
+// SIL-NEXT: debug_value [moveable_value_debuginfo] [[ARG]]
 // SIL:   hop_to_executor
-// SIL-NEXT: debug_value [moved] [[ARG]]
+// SIL-NEXT: debug_value [moveable_value_debuginfo] [[ARG]]
 // SIL:   cond_br {{%[0-9]+}}, bb1, bb2
 //
 // SIL: bb1:
-// SIL:   debug_value [moved] undef
+// SIL:   debug_value [moveable_value_debuginfo] undef
 // SIL:   [[FORCE_SPLIT_2:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit2yyYaF : $@convention(thin) @async () -> ()
 // SIL:   apply [[FORCE_SPLIT_2]]()
-// SIL-NEXT:  debug_value [moved] undef
+// SIL-NEXT:  debug_value [moveable_value_debuginfo] undef
 // SIL:   hop_to_executor
-// SIL-NEXT: debug_value [moved] undef
+// SIL-NEXT: debug_value [moveable_value_debuginfo] undef
 // SIL:   br bb3
 //
 // SIL: bb2:
 // SIL:   [[FORCE_SPLIT_3:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit3yyYaF : $@convention(thin) @async () -> ()
 // SIL:   apply [[FORCE_SPLIT_3]]
-// SIL-NEXT: debug_value [moved] [[ARG]]
-// SIL:   debug_value [moved] undef
+// SIL-NEXT: debug_value [moveable_value_debuginfo] [[ARG]]
+// SIL:   debug_value [moveable_value_debuginfo] undef
 // SIL:   hop_to_executor
-// SIL-NEXT: debug_value [moved] undef
+// SIL-NEXT: debug_value [moveable_value_debuginfo] undef
 //
 // SIL: bb3:
-// SIL-NEXT: debug_value [moved] undef
-// SIL: debug_value [moved] [[ARG]]
+// SIL-NEXT: debug_value [moveable_value_debuginfo] undef
+// SIL: debug_value [moveable_value_debuginfo] [[ARG]]
 // SIL: [[FORCE_SPLIT_4:%[0-9]+]] = function_ref @$s27move_function_dbginfo_async11forceSplit4yyYaF : $@convention(thin) @async () -> ()
 // SIL: apply [[FORCE_SPLIT_4]]
-// SIL-NEXT: debug_value [moved] %0
+// SIL-NEXT: debug_value [moveable_value_debuginfo] %0
 // SIL: } // end sil function '$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF'
 
 // CHECK-LABEL: define swifttailcc void @"$s27move_function_dbginfo_async20varArgCCFlowTrueTestyyxzYaAA1PRzlF"(

@@ -174,6 +174,7 @@ protected:
 #define SHARED_TEMPLATE4_FIELD(T1, T2, T3, T4, I, ...) \
   class { template <T1, T2, T3, T4> friend class I; __VA_ARGS__; } I;
 
+  // clang-format off
   union SharedUInt8Fields {
     uint8_t opaque;
 
@@ -203,15 +204,20 @@ protected:
     SHARED_FIELD(BeginCOWMutationInst, bool native);
 
     SHARED_FIELD(DebugValueInst, uint8_t
-      poisonRefs : 1,
-      operandWasMoved : 1,
-      trace : 1);
+                 poisonRefs : 1,
+                 usesMoveableValueDebugInfo : 1,
+                 trace : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
-      dynamicLifetime : 1,
-      lexical : 1,
-      wasMoved : 1,
-      hasInvalidatedVarInfo : 1);
+                 dynamicLifetime : 1,
+                 lexical : 1,
+                 usesMoveableValueDebugInfo : 1,
+                 hasInvalidatedVarInfo : 1);
+
+    SHARED_FIELD(AllocBoxInst, uint8_t
+                 dynamicLifetime : 1,
+                 reflection : 1,
+                 usesMoveableValueDebugInfo : 1);
 
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
@@ -243,10 +249,12 @@ protected:
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
+  // clang-format on
 
   static_assert(sizeof(SharedUInt8Fields) == sizeof(uint8_t),
     "A SILNode's shared uint8 field is too large");
 
+  // clang-format off
   union SharedUInt32Fields {
     uint32_t opaque;
 
@@ -272,6 +280,7 @@ protected:
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;
+  // clang-format on
 
   static_assert(sizeof(SharedUInt32Fields) == sizeof(uint32_t),
     "A SILNode's shared uint32 field is too large");

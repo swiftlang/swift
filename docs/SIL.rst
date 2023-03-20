@@ -3745,7 +3745,10 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? '[moved]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' alloc-stack-option* sil-type (',' debug-var-attr)*
+  alloc-stack-option ::= '[dynamic_lifetime]'
+  alloc-stack-option ::= '[lexical]'
+  alloc-stack-option ::= '[moveable_value_debuginfo]'
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3767,11 +3770,11 @@ This is the case, e.g. for conditionally initialized objects.
 The optional ``lexical`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
-The optional ``moved`` attribute specifies that at the source level, the
-variable associated with this alloc_stack was moved and furthermore that at the
-SIL level it passed move operator checking. This means that one can not assume
-that the value in the alloc_stack can be semantically valid over the entire
-function frame when emitting debug info.
+The optional ``moveable_value_debuginfo`` attribute specifies that when emitting
+debug info, the code generator can not assume that the value in the alloc_stack
+can be semantically valid over the entire function frame when emitting debug
+info. NOTE: This is implicitly set to true if the alloc_stack's type is
+noncopyable. This is just done to make SIL less verbose.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3865,7 +3868,8 @@ alloc_box
 `````````
 ::
 
-  sil-instruction ::= 'alloc_box' sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_box' alloc-box-option* sil-type (',' debug-var-attr)*
+  alloc-box-option ::= moveable_value_debuginfo
 
   %1 = alloc_box $T
   //   %1 has type $@box T
@@ -3882,6 +3886,12 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
+
+The optional ``moveable_value_debuginfo`` attribute specifies that when emitting
+debug info, the code generator can not assume that the value in the alloc_stack
+can be semantically valid over the entire function frame when emitting debug
+info. NOTE: This is implicitly set to true if the alloc_stack's type is
+noncopyable. This is just done to make SIL less verbose.
 
 alloc_global
 ````````````
@@ -4155,7 +4165,10 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? '[moved]'? '[trace]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-debug-value-option ::= [poison]
+  sil-debug-value-option ::= [moveable_value_debuginfo]
+  sil-debug-value-option ::= [trace]
 
   debug_value %1 : $Int
 
@@ -4164,10 +4177,12 @@ specified operand.  The declaration in question is identified by either the
 SILLocation attached to the debug_value instruction or the SILLocation specified
 in the advanced debug variable attributes.
 
-If the '[moved]' flag is set, then one knows that the debug_value's operand is
-moved at some point of the program, so one can not model the debug_value using
-constructs that assume that the value is live for the entire function (e.x.:
-llvm.dbg.declare).
+If the ``moveable_value_debuginfo`` flag is set, then one knows that the
+debug_value's operand is moved at some point of the program, so one can not
+model the debug_value using constructs that assume that the value is live for
+the entire function (e.x.: llvm.dbg.declare). NOTE: This is implicitly set to
+true if the alloc_stack's type is noncopyable. This is just done to make SIL
+less verbose.
 
 ::
 

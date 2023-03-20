@@ -1308,13 +1308,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::TestSpecificationInst:
     llvm_unreachable("not supported");
 
-  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    bool hasDynamicLifetime = Attr & 0x1;
+    bool reflection = (Attr >> 1) & 0x1;
+    bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        /*bool hasDynamicLifetime*/ Attr & 1,
-        /*bool reflection*/ Attr & 2);
+        hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
     break;
+  }
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     bool hasDynamicLifetime = Attr & 0x1;

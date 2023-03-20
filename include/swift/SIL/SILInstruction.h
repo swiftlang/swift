@@ -2094,12 +2094,12 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical, bool wasMoved);
+                 bool isLexical, bool usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F, Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime, bool isLexical,
-                                bool wasMoved);
+                                bool usesMoveableValueDebugInfo);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -2116,11 +2116,15 @@ public:
     }
   }
 
-  void markAsMoved() { sharedUInt8().AllocStackInst.wasMoved = true; }
+  void markUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool getWasMoved() const { return sharedUInt8().AllocStackInst.wasMoved; }
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
+  }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
   /// be ascertained from uses.
@@ -2452,32 +2456,38 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
-  unsigned HasDynamicLifetime : 1;
-  unsigned Reflection : 1;
+  USE_SHARED_UINT8;
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false);
+               bool reflection = false,
+               bool usesMoveableValueDebugInfo = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F,
-                              Optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime,
-                              bool reflection = false);
+                              SILFunction &F, Optional<SILDebugVariable> Var,
+                              bool hasDynamicLifetime, bool reflection = false,
+                              bool usesMoveableValueDebugInfo = false);
 
 public:
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
 
-  void setDynamicLifetime() { HasDynamicLifetime = true; }
-  bool hasDynamicLifetime() const { return HasDynamicLifetime; }
+  void setDynamicLifetime() {
+    sharedUInt8().AllocBoxInst.dynamicLifetime = true;
+  }
+
+  bool hasDynamicLifetime() const {
+    return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  }
 
   /// True if the box should be emitted with reflection metadata for its
   /// contents.
-  bool emitReflectionMetadata() const { return Reflection; }
-  
+  bool emitReflectionMetadata() const {
+    return sharedUInt8().AllocBoxInst.reflection;
+  }
+
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
 
@@ -2485,6 +2495,14 @@ public:
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
+
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
+  }
+
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo;
+  }
 };
 
 /// This represents the allocation of a heap box for an existential container.
@@ -5012,14 +5030,17 @@ class DebugValueInst final
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
 public:
-  void markAsMoved() { sharedUInt8().DebugValueInst.operandWasMoved = true; }
+  /// Sets a bool that states this debug_value is supposed to use the
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// True if this debug_value is on an SSA value that was moved.
   ///
   /// IRGen uses this information to determine if we should use llvm.dbg.addr or
   /// llvm.dbg.declare.
-  bool getWasMoved() const {
-    return sharedUInt8().DebugValueInst.operandWasMoved;
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo;
   }
 
   /// Return the underlying variable declaration that this denotes,
