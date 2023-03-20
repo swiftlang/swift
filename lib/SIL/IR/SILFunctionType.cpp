@@ -1569,7 +1569,8 @@ private:
     maybeAddForeignParameters();
 
     // Process all the non-self parameters.
-    origType.forEachFunctionParam(params, hasSelf,
+    origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
+                                  /*ignore final orig param*/ hasSelf,
         [&](unsigned origParamIndex, unsigned substParamIndex,
             ParameterTypeFlags origFlags,
             AbstractionPattern origParamType,

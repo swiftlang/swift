@@ -1203,7 +1203,7 @@ unsigned AbstractionPattern::getNumFunctionParams() const {
 
 void AbstractionPattern::
 forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
-                     bool ignoreFinalParam,
+                     bool ignoreFinalOrigParam,
          llvm::function_ref<void(unsigned origParamIndex,
                                  unsigned substParamIndex,
                                  ParameterTypeFlags origFlags,
@@ -1216,7 +1216,7 @@ forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
                                  AbstractionPattern origExpansionType,
                         AnyFunctionType::CanParamArrayRef substParams)>
              handleExpansion) const {
-  FunctionParamGenerator generator(*this, substParams, ignoreFinalParam);
+  FunctionParamGenerator generator(*this, substParams, ignoreFinalOrigParam);
 
   for (; !generator.isFinished(); generator.advance()) {
     if (generator.isPackExpansion()) {
@@ -1239,7 +1239,7 @@ forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
 FunctionParamGenerator::FunctionParamGenerator(
                               AbstractionPattern origFunctionType,
                               AnyFunctionType::CanParamArrayRef substParams,
-                              bool ignoreFinalParam)
+                              bool ignoreFinalOrigParam)
     : origFunctionType(origFunctionType), allSubstParams(substParams) {
   origFunctionTypeIsOpaque =
     (origFunctionType.isTypeParameterOrOpaqueArchetype() ||
@@ -1249,11 +1249,8 @@ FunctionParamGenerator::FunctionParamGenerator(
     numOrigParams = allSubstParams.size();
   } else {
     numOrigParams = origFunctionType.getNumFunctionParams();
-  }
-
-  if (ignoreFinalParam) {
-    allSubstParams = allSubstParams.drop_back();
-    numOrigParams--;
+    if (ignoreFinalOrigParam)
+      numOrigParams--;
   }
 
   if (!isFinished()) loadParameter();
