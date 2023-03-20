@@ -654,6 +654,8 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swiftdocc)
         builder.add_product(products.SwiftDocCRender,
                             is_enabled=self.args.install_swiftdocc)
+        builder.add_product(products.MinimalStdlib,
+                            is_enabled=self.args.build_minimalstdlib)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
