@@ -1492,6 +1492,16 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.PluginSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
+  for (const Arg *A : Args.filtered(OPT_external_plugin_path)) {
+    // '<plugin directory>#<plugin server executable path>'.
+    // FIXME: '#' can be used in the paths.
+    StringRef dylibPath;
+    StringRef serverPath;
+    std::tie(dylibPath, serverPath) = StringRef(A->getValue()).split('#');
+    Opts.ExternalPluginSearchPaths.push_back(
+        {resolveSearchPath(dylibPath), resolveSearchPath(serverPath)});
+  }
+
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }

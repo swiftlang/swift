@@ -303,6 +303,11 @@ def plugin_path : Separate<["-"], "plugin-path">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path">;
 
+def external_plugin_path : Separate<["-"], "external-plugin-path">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Add directory to the plugin search path with a plugin server executable">,
+  MetaVarName<"<path>#<plugin-server-path>">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;

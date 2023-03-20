@@ -24,7 +24,7 @@ extension String {
 public struct LLVMJSON {
   /// Encode an `Encodable` value to JSON data, and call `body` is the buffer.
   /// Note that the buffer is valid onlu in `body`.
-  public static func encoding<T: Encodable, R>(_ value: T, body: (UnsafeBufferPointer<Int8>) -> R) throws -> R {
+  public static func encoding<T: Encodable, R>(_ value: T, body: (UnsafeBufferPointer<Int8>) throws -> R) throws -> R {
     let valuePtr = JSON_newValue()
     defer { JSON_value_delete(valuePtr) }
 
@@ -36,7 +36,7 @@ public struct LLVMJSON {
     assert(data.baseAddress != nil)
     defer { BridgedData_free(data) }
     let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.size)
-    return body(buffer)
+    return try body(buffer)
   }
 
   /// Decode a JSON data to a Swift value.
