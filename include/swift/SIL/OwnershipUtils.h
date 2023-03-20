@@ -1349,10 +1349,17 @@ bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 
 /// Whether specified move_value is redundant.
 ///
-/// A move_value is redundant if the lifetimes that it separates both have the
+/// A move_value is redundant if it doesn't
+/// - alter constraints (lexicality, ownership)
+/// - enable optimizations (e.g, separate smaller scopes within which a value
+///   escapes)
+///
+/// For example, if the lifetimes that a move_value separates both have the
 /// same characteristics with respect to
+/// - ownership
 /// - lexicality
 /// - escaping
+/// then the move_value is redundant.
 bool isRedundantMoveValue(MoveValueInst *mvi);
 
 } // namespace swift
