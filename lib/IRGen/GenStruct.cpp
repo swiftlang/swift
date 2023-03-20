@@ -558,7 +558,8 @@ namespace {
         if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
           if (ctor->isCopyConstructor() &&
               ctor->getAccess() == clang::AS_public &&
-              ctor->doesThisDeclarationHaveABody() &&
+              // rdar://106964356
+              // ctor->doesThisDeclarationHaveABody() &&
               !ctor->isDeleted())
             return ctor;
         }
@@ -809,6 +810,7 @@ namespace {
         emitCopyWithCopyConstructor(IGF, T, moveConstructor,
                                     src.getAddress(),
                                     dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
         return;
       }
 
@@ -828,9 +830,11 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
       if (auto moveConstructor = findMoveConstructor()) {
+        destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, moveConstructor,
                                     src.getAddress(),
                                     dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
         return;
       }
 
