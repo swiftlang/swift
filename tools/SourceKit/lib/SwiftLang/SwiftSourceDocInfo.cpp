@@ -696,34 +696,35 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   }
 
   CursorInfoData Data;
-  Data.Symbols = llvm::makeArrayRef(Symbols);
+  Data.Symbols = Symbols;
   Receiver(RequestResult<CursorInfoData>::fromResult(Data));
   return false;
 }
 
-static void
-collectAvailableRenameInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
-                           SmallVectorImpl<RefactoringInfo> &Refactorings) {
+static Optional<RefactoringInfo>
+collectAvailableRenameInfo(const ValueDecl *VD,
+                           Optional<RenameRefInfo> RefInfo) {
   Optional<RenameAvailabilityInfo> Info = renameAvailabilityInfo(VD, RefInfo);
   if (!Info)
-    return;
+    return None;
 
-  Refactorings.emplace_back(
+  return RefactoringInfo(
       SwiftLangSupport::getUIDForRefactoringKind(Info->Kind),
       ide::getDescriptiveRefactoringKindName(Info->Kind),
       ide::getDescriptiveRenameUnavailableReason(Info->AvailableKind));
 }
 
-static void collectAvailableRefactoringsOtherThanRename(
-    ResolvedCursorInfoPtr CursorInfo,
-    SmallVectorImpl<RefactoringInfo> &Refactorings) {
+static SmallVector<RefactoringInfo>
+collectAvailableRefactoringsOtherThanRename(ResolvedCursorInfoPtr CursorInfo) {
   SmallVector<RefactoringKind, 8> Kinds;
   collectAvailableRefactorings(CursorInfo, Kinds, /*ExcludeRename*/ true);
+  SmallVector<RefactoringInfo> Refactorings;
   for (auto Kind : Kinds) {
     Refactorings.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
                               ide::getDescriptiveRefactoringKindName(Kind),
                               StringRef());
   }
+  return Refactorings;
 }
 
 static Optional<unsigned>
@@ -1151,14 +1152,12 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   return llvm::Error::success();
 }
 
-/// Returns true on success, false on error (and sets `Diagnostic` accordingly).
-static bool passCursorInfoForDecl(
-    ResolvedValueRefCursorInfoPtr Info, bool AddRefactorings,
-    bool AddSymbolGraph, ArrayRef<RefactoringInfo> KnownRefactoringInfo,
-    SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
-    std::string &Diagnostic, ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
-    bool DidReuseAST,
-    std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
+static bool
+addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
+                     bool AddRefactorings, bool AddSymbolGraph,
+                     SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
+                     std::string &Diagnostic,
+                     ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
   DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
                     Info->isDynamic(), Info->getReceiverTypes(), Invoc);
   DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
@@ -1169,16 +1168,13 @@ static bool passCursorInfoForDecl(
     return false;
   }
 
-  llvm::BumpPtrAllocator Allocator;
-
-  SmallVector<CursorSymbolInfo, 2> Symbols;
-  CursorSymbolInfo &MainSymbol = Symbols.emplace_back();
+  CursorSymbolInfo &MainSymbol = Data.Symbols.emplace_back();
   // The primary result for constructor calls, eg. `MyType()` should be
   // the type itself, rather than the constructor. The constructor will be
   // added as a secondary result.
   if (auto Err =
           fillSymbolInfo(MainSymbol, MainInfo, Info->getLoc(), AddSymbolGraph,
-                         Lang, Invoc, PreviousSnaps, Allocator)) {
+                         Lang, Invoc, PreviousSnaps, Data.Allocator)) {
     llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
       Diagnostic = E.message();
     });
@@ -1186,13 +1182,13 @@ static bool passCursorInfoForDecl(
   }
 
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
-    CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
+    CursorSymbolInfo &CtorSymbol = Data.Symbols.emplace_back();
     if (auto Err =
             fillSymbolInfo(CtorSymbol, OrigInfo, Info->getLoc(), AddSymbolGraph,
-                           Lang, Invoc, PreviousSnaps, Allocator)) {
+                           Lang, Invoc, PreviousSnaps, Data.Allocator)) {
       // Ignore but make sure to remove the partially-filled symbol
       llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
-      Symbols.pop_back();
+      Data.Symbols.pop_back();
     }
   }
 
@@ -1200,34 +1196,66 @@ static bool passCursorInfoForDecl(
   // actual declaration.
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
-      CursorSymbolInfo &SymbolInfo = Symbols.emplace_back();
+      CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
       DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
                      ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
-                             Lang, Invoc, PreviousSnaps, Allocator)) {
+                             Lang, Invoc, PreviousSnaps, Data.Allocator)) {
         // Ignore but make sure to remove the partially-filled symbol
         llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
-        Symbols.pop_back();
+        Data.Symbols.pop_back();
       }
     }
   }
 
-  SmallVector<RefactoringInfo, 8> Refactorings;
   if (AddRefactorings) {
     Optional<RenameRefInfo> RefInfo;
     if (Info->isRef())
       RefInfo = {Info->getSourceFile(), Info->getLoc(),
                  Info->isKeywordArgument()};
-    collectAvailableRenameInfo(MainInfo.VD, RefInfo, Refactorings);
-    collectAvailableRefactoringsOtherThanRename(Info, Refactorings);
-  }
-  Refactorings.insert(Refactorings.end(), KnownRefactoringInfo.begin(),
-                      KnownRefactoringInfo.end());
 
+    /// Adds an action to \c Data if no action with the same UID exists.
+    auto AddAction = [&Data](const RefactoringInfo &NewRefactoring) {
+      bool HasRefactoringWithSameUID = llvm::any_of(
+          Data.AvailableActions, [&](RefactoringInfo &ExistingRefactoring) {
+            return ExistingRefactoring.Kind == NewRefactoring.Kind;
+          });
+      if (HasRefactoringWithSameUID) {
+        return;
+      }
+      Data.AvailableActions.push_back(NewRefactoring);
+    };
+    if (auto Rename = collectAvailableRenameInfo(MainInfo.VD, RefInfo)) {
+      AddAction(*Rename);
+    }
+    llvm::for_each(collectAvailableRefactoringsOtherThanRename(Info),
+                   AddAction);
+  }
+
+  return true;
+}
+
+/// Returns true on success, false on error (and sets `Diagnostic` accordingly).
+static bool passCursorInfoForDecl(
+    ResolvedValueRefCursorInfoPtr Info, bool AddRefactorings,
+    bool AddSymbolGraph, ArrayRef<RefactoringInfo> KnownRefactoringInfo,
+    SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
+    std::string &Diagnostic, ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
+    bool DidReuseAST,
+    std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   CursorInfoData Data;
-  Data.Symbols = llvm::makeArrayRef(Symbols);
-  Data.AvailableActions = llvm::makeArrayRef(Refactorings);
+
+  bool success =
+      addCursorInfoForDecl(Data, Info, AddRefactorings, AddSymbolGraph, Lang,
+                           Invoc, Diagnostic, PreviousSnaps);
+  if (!success) {
+    return false;
+  }
+
+  Data.AvailableActions.append(KnownRefactoringInfo.begin(),
+                               KnownRefactoringInfo.end());
+
   Data.DidReuseAST = DidReuseAST;
   Receiver(RequestResult<CursorInfoData>::fromResult(Data));
   return true;
@@ -1539,7 +1567,7 @@ static void resolveCursor(
           // return straight away unless we need cursor based refactorings as
           // well.
           CursorInfoData Data;
-          Data.AvailableActions = llvm::makeArrayRef(Actions);
+          Data.AvailableActions = Actions;
           Receiver(RequestResult<CursorInfoData>::fromResult(Data));
           return;
         }
@@ -1588,10 +1616,11 @@ static void resolveCursor(
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
         if (Actionables) {
-          collectAvailableRefactoringsOtherThanRename(CursorInfo, Actions);
+          Actions.append(
+              collectAvailableRefactoringsOtherThanRename(CursorInfo));
           if (!Actions.empty()) {
             CursorInfoData Data;
-            Data.AvailableActions = llvm::makeArrayRef(Actions);
+            Data.AvailableActions = Actions;
             Receiver(RequestResult<CursorInfoData>::fromResult(Data));
             return;
           }
@@ -1606,7 +1635,7 @@ static void resolveCursor(
       case CursorInfoKind::Invalid:
         CursorInfoData Data;
         if (Actionables) {
-          Data.AvailableActions = llvm::makeArrayRef(Actions);
+          Data.AvailableActions = Actions;
         } else {
           Data.InternalDiagnostic = "Unable to resolve cursor info.";
         }
@@ -1884,12 +1913,18 @@ static void deliverCursorInfoResults(
   case CancellableResultKind::Success: {
     // TODO: Implement delivery of other result types as more cursor info kinds
     // are migrated to be completion-like.
-    if (auto Result = dyn_cast_or_null<ResolvedValueRefCursorInfo>(
-            Results.getResult().Result)) {
-      std::string Diagnostic; // Unused
-      passCursorInfoForDecl(Result, AddRefactorings, AddSymbolGraph, {}, Lang,
-                            Invoc, Diagnostic, /*PreviousSnaps=*/{},
-                            Results->DidReuseAST, Receiver);
+    CursorInfoData Data;
+    for (auto ResolvedCursorInfo : Results->ResolvedCursorInfos) {
+      if (auto Result = dyn_cast_or_null<ResolvedValueRefCursorInfo>(
+              ResolvedCursorInfo)) {
+        std::string Diagnostic; // Unused
+        addCursorInfoForDecl(Data, Result, AddRefactorings, AddSymbolGraph,
+                             Lang, Invoc, Diagnostic, /*PreviousSnaps=*/{});
+      }
+    }
+    Data.DidReuseAST = Results->DidReuseAST;
+    if (!Data.Symbols.empty()) {
+      Receiver(RequestResult<CursorInfoData>::fromResult(Data));
     }
     break;
   }
@@ -1972,7 +2007,8 @@ void SwiftLangSupport::getCursorInfo(
   std::unique_ptr<llvm::MemoryBuffer> UnresolvedInputFile =
       getASTManager()->getMemoryBuffer(RealInputFilePath, fileSystem,
                                        InputFileError);
-  if (UnresolvedInputFile) {
+  // The solver-based implementation doesn't support range based cursor info.
+  if (UnresolvedInputFile && Length == 0) {
     auto SolverBasedReceiver = [&](const RequestResult<CursorInfoData> &Res) {
       SolverBasedProducedResult = true;
       Receiver(Res);
