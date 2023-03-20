@@ -233,7 +233,8 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
-        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, SEI->getOperand());
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
+                             SEI->getOperand());
       }
     } else {
       Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
@@ -3688,6 +3689,19 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *Use = *A->use_begin();
   auto *User = Use->getUser();
 
+  auto disableInOSSA = [](SingleValueInstruction *inst) {
+    assert(isa<StructInst>(inst) || isa<TupleInst>(inst) ||
+           isa<EnumInst>(inst));
+    if (!inst->getFunction()->hasOwnership()) {
+      return false;
+    }
+    if (inst->getOwnershipKind() == OwnershipKind::Owned)
+      return !inst->getSingleUse();
+    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
+      return borrow.isLocalScope();
+    return false;
+  };
+
   // Handle projections.
   if (!isa<StructExtractInst>(User) &&
       !isa<TupleExtractInst>(User) &&
@@ -3702,15 +3716,17 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
       return false;
     auto *Branch = cast<BranchInst>(Pred->getTerminator());
     SILValue BranchArg = Branch->getArg(i);
-    if (isa<StructInst>(BranchArg))
-      continue;
-    if (isa<TupleInst>(BranchArg))
-      continue;
-    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
-      if (EI->getElement() == cast<UncheckedEnumDataInst>(proj)->getElement())
-        continue;
+    if (!isa<StructInst>(BranchArg) && !isa<TupleInst>(BranchArg) &&
+        !isa<EnumInst>(BranchArg)) {
+      return false;
     }
-    return false;
+    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
+      if (EI->getElement() != cast<UncheckedEnumDataInst>(proj)->getElement())
+        return false;
+    }
+    if (disableInOSSA(cast<SingleValueInstruction>(BranchArg))) {
+      return false;
+    }
   }
 
   // Okay, we'll replace the BB arg with one with the right type, replace

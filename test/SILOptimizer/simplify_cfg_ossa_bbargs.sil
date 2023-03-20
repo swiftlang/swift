@@ -11,6 +11,10 @@ enum FakeOptional<T> {
   case none
 }
 
+struct NonTrivialStruct {
+  var val: Klass
+}
+
 sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args1 :
@@ -172,7 +176,7 @@ bb4:
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_args8 :
-// CHECK-NOT: unchecked_enum_date
+// CHECK-NOT: unchecked_enum_data
 // CHECK-LABEL: } // end sil function 'test_simplify_args8'
 sil [ossa] @test_simplify_args8 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -233,5 +237,79 @@ bb2(%default : @guaranteed $AnyKlass):
 bb3(%4 : $Builtin.Int32):
   %5 = tuple ()
   return %5 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_owned : 
+// CHECK: bb1([[ARG:%.*]] : @owned $FakeOptional<Klass>)
+// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_owned'
+sil [ossa] @test_simplify_enum_arg_owned : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-argument @block[1] 0"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  %c = copy_value %1 : $FakeOptional<Klass>
+  br bb1(%1 : $FakeOptional<Klass>)
+
+bb1(%3 : @owned $FakeOptional<Klass>):
+  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb2
+
+bb2:
+  destroy_value %4 : $Klass
+  br bb3
+
+bb3:
+  destroy_value %c : $FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed1 : 
+// CHECK: bb1([[ARG:%.*]] : @guaranteed $FakeOptional<Klass>)
+// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_guaranteed1'
+sil [ossa] @test_simplify_enum_arg_guaranteed1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-argument @block[1] 0"
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  %c = copy_value %1 : $FakeOptional<Klass>
+  br bb1(%1 : $FakeOptional<Klass>)
+
+bb1(%3 : @guaranteed $FakeOptional<Klass>):
+  %4 = unchecked_enum_data %3 : $FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb2
+
+bb2:
+  destroy_value %c : $FakeOptional<Klass>
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: bb1([[ARG:%.*]] : @guaranteed $NonTrivialStruct)
+sil [ossa] @test_simplify_enum_arg_guaranteed2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-argument @block[1] 0"
+  %b = begin_borrow %0 : $Klass
+  %1 = struct $NonTrivialStruct(%b : $Klass) 
+  %c = copy_value %1 : $NonTrivialStruct
+  br bb1(%1 : $NonTrivialStruct)
+
+bb1(%3 : @guaranteed $NonTrivialStruct):
+  %4 = struct_extract %3 : $NonTrivialStruct, #NonTrivialStruct.val
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb2
+
+bb2:
+  destroy_value %c : $NonTrivialStruct
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
 }
 
