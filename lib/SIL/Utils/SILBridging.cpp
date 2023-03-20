@@ -15,7 +15,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILBridgingUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/MemAccessUtils.h"

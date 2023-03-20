@@ -17,7 +17,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"

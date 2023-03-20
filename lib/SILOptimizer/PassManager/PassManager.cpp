@@ -17,7 +17,6 @@
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"

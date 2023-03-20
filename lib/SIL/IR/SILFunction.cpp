@@ -14,7 +14,7 @@
 
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBridgingUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
