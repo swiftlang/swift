@@ -1712,7 +1712,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isPackageOnly()) {
     // Package dependencies are usually loaded only for import from the same
     // package.
-    if (packageName == getModulePackageName()) {
+    if (!packageName.empty() && packageName == getModulePackageName()) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
       return ModuleLoadingBehavior::Optional;
