@@ -81,8 +81,8 @@ struct ConformingMethodListResults {
 
 /// The results returned from \c IDEInspectionInstance::cursorInfo.
 struct CursorInfoResults {
-  /// The actual results. If \c nullptr, no results were found.
-  ResolvedCursorInfoPtr Result;
+  /// The actual results.
+  std::vector<ResolvedCursorInfoPtr> ResolvedCursorInfos;
   /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };

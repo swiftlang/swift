@@ -586,11 +586,14 @@ struct CursorInfoData {
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
   StringRef InternalDiagnostic;
-  llvm::ArrayRef<CursorSymbolInfo> Symbols;
+  llvm::SmallVector<CursorSymbolInfo, 1> Symbols;
   /// All available actions on the code under cursor.
-  llvm::ArrayRef<RefactoringInfo> AvailableActions;
+  llvm::SmallVector<RefactoringInfo, 8> AvailableActions;
   /// Whether the ASTContext was reused for this cursor info.
   bool DidReuseAST = false;
+  /// An allocator that can be used to allocate data that is referenced by this
+  /// \c CursorInfoData.
+  llvm::BumpPtrAllocator Allocator;
 
   void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
