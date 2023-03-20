@@ -167,10 +167,10 @@ std::string BridgedBasicBlock::getDebugDescription() const {
 //                                SILValue
 //===----------------------------------------------------------------------===//
 
-std::string SILNode_debugDescription(BridgedNode node) {
+std::string BridgedValue::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  castToSILNode(node)->print(os);
+  getSILValue()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
@@ -252,6 +252,14 @@ std::string BridgedDefaultWitnessTable::getDebugDescription() const {
 //===----------------------------------------------------------------------===//
 //                               SILInstruction
 //===----------------------------------------------------------------------===//
+
+std::string BridgedInstruction::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  getInst()->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
 
 bool BridgedInstruction::mayAccessPointer() const {
   return ::mayAccessPointer(getInst());

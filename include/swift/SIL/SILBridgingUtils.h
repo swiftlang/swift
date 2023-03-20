@@ -25,10 +25,6 @@
 
 namespace swift {
 
-inline SILNode *castToSILNode(BridgedNode node) {
-  return static_cast<SILNode *>(node.obj);
-}
-
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,
                                 SmallVectorImpl<SILValue> &storage);
 

@@ -73,6 +73,8 @@ struct BridgedValue {
 
   swift::SILValue getSILValue() const { return static_cast<swift::ValueBase *>(obj); }
 
+  std::string getDebugDescription() const;
+
   SWIFT_IMPORT_UNSAFE
   inline OptionalBridgedOperand getFirstUse() const;
 
@@ -352,6 +354,8 @@ struct BridgedInstruction {
   }
 
   swift::SILInstruction * _Nonnull getInst() const { return getAs<swift::SILInstruction>(); }
+
+  std::string getDebugDescription() const;
 
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedInstruction getNext() const {
@@ -786,10 +790,6 @@ struct BridgedSuccessorArray {
   SwiftInt count;
 };
 
-typedef struct {
-  SwiftObject obj;
-} BridgedNode;
-
 struct BridgedVTableEntry {
   const swift::SILVTableEntry * _Nonnull entry;
 
@@ -894,8 +894,6 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block);
-
-std::string SILNode_debugDescription(BridgedNode node);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder builder, llvm::StringRef name,

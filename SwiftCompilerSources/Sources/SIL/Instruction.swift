@@ -34,7 +34,7 @@ public class Instruction : CustomStringConvertible, Hashable {
   final public var parentFunction: Function { parentBlock.parentFunction }
 
   final public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
 
@@ -138,7 +138,6 @@ public class Instruction : CustomStringConvertible, Hashable {
   public var bridged: BridgedInstruction {
     BridgedInstruction(SwiftObject(self))
   }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
 }
 
 extension BridgedInstruction {
@@ -165,11 +164,6 @@ public class SingleValueInstruction : Instruction, Value {
 }
 
 public final class MultipleValueInstructionResult : Value {
-  final public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
-    return String(_cxxString: stdString)
-  }
-
   public var parentInstruction: MultipleValueInstruction {
     bridged.getParent().getAs(MultipleValueInstruction.self)
   }
@@ -183,7 +177,6 @@ public final class MultipleValueInstructionResult : Value {
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))
   }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
 }
 
 extension BridgedMultiValueResult {

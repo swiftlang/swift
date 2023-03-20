@@ -88,7 +88,7 @@ public enum Ownership {
 
 extension Value {
   public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
 
@@ -119,9 +119,6 @@ extension Value {
 
   public var bridged: BridgedValue {
     BridgedValue(obj: SwiftObject(self as AnyObject))
-  }
-  var bridgedNode: BridgedNode {
-    BridgedNode(obj: SwiftObject(self as AnyObject))
   }
 }
 
