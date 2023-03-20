@@ -494,8 +494,9 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     if (ArgumentKind == IsInvalid) {
       diagnose(ArgumentLoc, diag::attr_availability_expected_option, AttrName)
           .highlight(SourceRange(ArgumentLoc));
-      if (Tok.is(tok::code_complete) && IDECallbacks) {
-        IDECallbacks->completeDeclAttrParam(DAK_Available, ParamIndex);
+      if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeDeclAttrParam(DAK_Available,
+                                                       ParamIndex);
         consumeToken(tok::code_complete);
       } else {
         consumeIf(tok::identifier);
@@ -925,8 +926,8 @@ bool Parser::parseAvailability(
   //   identifier
   if (!Tok.is(tok::identifier) &&
       !(Tok.isAnyOperator() && Tok.getText() == "*")) {
-    if (Tok.is(tok::code_complete) && IDECallbacks) {
-      IDECallbacks->completeDeclAttrParam(DAK_Available, 0);
+    if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeDeclAttrParam(DAK_Available, 0);
       consumeToken(tok::code_complete);
     }
     diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -3532,10 +3533,10 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
     if (peekToken().is(tok::code_complete)) {
       consumeToken(tok::l_paren);
-      if (IDECallbacks) {
+      if (CodeCompletionCallbacks) {
         auto typeE = new (Context) TypeExpr(type.get());
         auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-        IDECallbacks->completePostfixExprParen(typeE, CCE);
+        CodeCompletionCallbacks->completePostfixExprParen(typeE, CCE);
       }
       consumeToken(tok::code_complete);
       skipUntil(tok::r_paren);
@@ -3569,8 +3570,8 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   auto *TE = new (Context) TypeExpr(type.get());
   auto *customAttr = CustomAttr::create(Context, atLoc, TE, initContext,
                                         argList);
-  if (status.hasCodeCompletion() && IDECallbacks) {
-    IDECallbacks->setCompletingInAttribute(customAttr);
+  if (status.hasCodeCompletion() && CodeCompletionCallbacks) {
+    CodeCompletionCallbacks->setCompletingInAttribute(customAttr);
   }
   return makeParserResult(status, customAttr);
 }
@@ -3609,12 +3610,13 @@ ParserStatus Parser::parseDeclAttribute(
       Tok.isNot(tok::kw_rethrows)) {
 
     if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks) {
+      if (CodeCompletionCallbacks) {
         // If the next token is not on the same line, this attribute might be
         // starting new declaration instead of adding attribute to existing
         // decl.
         auto isIndependent = peekToken().isAtStartOfLine();
-        IDECallbacks->completeDeclAttrBeginning(isInSILMode(), isIndependent);
+        CodeCompletionCallbacks->completeDeclAttrBeginning(isInSILMode(),
+                                                           isIndependent);
       }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
@@ -3972,8 +3974,8 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
 
     if (Tok.is(tok::code_complete)) {
       if (!justChecking) {
-        if (IDECallbacks) {
-          IDECallbacks->completeTypeAttrBeginning();
+        if (CodeCompletionCallbacks) {
+          CodeCompletionCallbacks->completeTypeAttrBeginning();
         }
       }
       consumeToken(tok::code_complete);
@@ -5217,8 +5219,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
         peekToken().is(tok::code_complete) &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       consumeToken();
-      if (IDECallbacks)
-        IDECallbacks->completeAfterPoundDirective();
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeAfterPoundDirective();
+      }
       consumeToken(tok::code_complete);
       DeclResult = makeParserCodeCompletionResult<Decl>();
       break;
@@ -5348,7 +5351,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   }
 
   if (DeclResult.isParseErrorOrHasCompletion() && Tok.is(tok::code_complete)) {
-    if (MayNeedOverrideCompletion && IDECallbacks) {
+    if (MayNeedOverrideCompletion && CodeCompletionCallbacks) {
       // If we need to complete an override, collect the keywords already
       // specified so that we do not duplicate them in code completion
       // strings.
@@ -5375,7 +5378,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       for (auto attr : Attributes) {
         Keywords.push_back(attr->getAttrName());
       }
-      IDECallbacks->completeNominalMemberBeginning(Keywords, introducerLoc);
+      CodeCompletionCallbacks->completeNominalMemberBeginning(Keywords,
+                                                              introducerLoc);
     }
 
     DeclResult = makeParserCodeCompletionStatus();
@@ -5392,11 +5396,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
       return makeParserError();
     }
-    if (AttrStatus.hasCodeCompletion() && IDECallbacks) {
+    if (AttrStatus.hasCodeCompletion() && CodeCompletionCallbacks) {
       Optional<DeclKind> DK;
       if (DeclResult.isNonNull())
         DK = DeclResult.get()->getKind();
-      IDECallbacks->setAttrTargetDeclKind(DK);
+      CodeCompletionCallbacks->setAttrTargetDeclKind(DK);
     }
     DeclResult.setHasCodeCompletionAndIsError();
     if (isIDEInspectionFirstPass())
@@ -5538,7 +5542,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   DebuggerContextChange DCC (*this);
 
-  if (!IDECallbacks && !DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
+  if (!CodeCompletionCallbacks && !DCC.movedToTopLevel() &&
+      !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;
   }
@@ -5583,8 +5588,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   do {
     if (Tok.is(tok::code_complete)) {
       consumeToken();
-      if (IDECallbacks) {
-        IDECallbacks->completeImportDecl(importPath);
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeImportDecl(importPath);
       }
       return makeParserCodeCompletionStatus();
     }
@@ -6054,8 +6059,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
-  if (trailingWhereHadCodeCompletion && IDECallbacks)
-    IDECallbacks->setParsedDecl(ext);
+  if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
+    CodeCompletionCallbacks->setParsedDecl(ext);
 
   SourceLoc LBLoc, RBLoc;
 
@@ -6344,7 +6349,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   GenericParamList *genericParams = nullptr;
   if (startsWithLess(Tok)) {
     auto Result = parseGenericParameters();
-    if (Result.hasCodeCompletion() && !IDECallbacks)
+    if (Result.hasCodeCompletion() && !CodeCompletionCallbacks)
       return makeParserCodeCompletionStatus();
     genericParams = Result.getPtrOrNull();
 
@@ -6492,7 +6497,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhere, /*isProtocol=*/false);
     Status |= whereStatus;
-    if (whereStatus.hasCodeCompletion() && !IDECallbacks) {
+    if (whereStatus.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
@@ -7061,9 +7066,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
         // If it's the first accessor, it's handled in function body parsing
         // because it might be an implicit getter.
         if (!IsFirstAccessor || parsingLimitedSyntax) {
-          if (IDECallbacks) {
-            IDECallbacks->setParsedDecl(storage);
-            IDECallbacks->completeAccessorBeginning(nullptr);
+          if (CodeCompletionCallbacks) {
+            CodeCompletionCallbacks->setParsedDecl(storage);
+            CodeCompletionCallbacks->completeAccessorBeginning(nullptr);
           }
           consumeToken(tok::code_complete);
           accessorHasCodeCompletion = true;
@@ -7855,7 +7860,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   GenericParams = GenericParamResult.getPtrOrNull();
   if (GenericParamResult.hasCodeCompletion()) {
     Status.setHasCodeCompletionAndIsError();
-    if (!IDECallbacks)
+    if (!CodeCompletionCallbacks)
       return Status;
   }
 
@@ -7872,7 +7877,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                                    asyncLoc, reasync,
                                    throwsLoc, rethrows,
                                    FuncRetTy);
-  if (Status.hasCodeCompletion() && !IDECallbacks) {
+  if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;
   }
@@ -7914,7 +7919,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     ContextChange CC(*this, FD);
 
     Status |= parseFreestandingGenericWhereClause(FD);
-    if (Status.hasCodeCompletion() && !IDECallbacks) {
+    if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return Status;
     }
@@ -7940,8 +7945,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
   // Pass the function signature to code completion.
   if (Status.hasCodeCompletion()) {
-    assert(IDECallbacks && "must be code completion second pass");
-    IDECallbacks->setParsedDecl(FD);
+    assert(CodeCompletionCallbacks && "must be code completion second pass");
+    CodeCompletionCallbacks->setParsedDecl(FD);
   }
 
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
@@ -7973,15 +7978,15 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   // In implicit getter, if a CC token is the first token after '{', it might
   // be a start of an accessor block. Perform special completion for that.
   if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
-    if (IDECallbacks && peekToken().is(tok::code_complete) &&
+    if (CodeCompletionCallbacks && peekToken().is(tok::code_complete) &&
         accessor->isImplicitGetter()) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
       auto *Return =
           new (Context) ReturnStmt(SourceLoc(), CCE, /*implicit=*/true);
-      IDECallbacks->setParsedDecl(accessor);
-      IDECallbacks->completeAccessorBeginning(CCE);
+      CodeCompletionCallbacks->setParsedDecl(accessor);
+      CodeCompletionCallbacks->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
       consumeToken(tok::code_complete);
       auto *BS =
@@ -8194,7 +8199,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(ED);
-    if (whereStatus.hasCodeCompletion() && !IDECallbacks) {
+    if (whereStatus.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
@@ -8318,8 +8323,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
       {
-        IDEInspectionCallbacks::InEnumElementRawValueRAII
-            InEnumElementRawValue(IDECallbacks);
+        CodeCompletionCallbacks::InEnumElementRawValueRAII
+            InEnumElementRawValue(CodeCompletionCallbacks);
         RawValueExpr = parseExpr(diag::expected_expr_enum_case_raw_value);
       }
       if (RawValueExpr.hasCodeCompletion()) {
@@ -8457,7 +8462,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(SD);
-    if (whereStatus.hasCodeCompletion() && !IDECallbacks) {
+    if (whereStatus.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
@@ -8573,7 +8578,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(CD);
-    if (whereStatus.hasCodeCompletion() && !IDECallbacks) {
+    if (whereStatus.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }
@@ -8710,8 +8715,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   Proto->getAttrs() = Attributes;
-  if (whereClauseHadCodeCompletion && IDECallbacks)
-    IDECallbacks->setParsedDecl(Proto);
+  if (whereClauseHadCodeCompletion && CodeCompletionCallbacks)
+    CodeCompletionCallbacks->setParsedDecl(Proto);
 
   ContextChange CC(*this, Proto);
 
@@ -8782,7 +8787,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   GenericParams = Result.getPtrOrNull();
   if (Result.hasCodeCompletion()) {
     Status.setHasCodeCompletionAndIsError();
-    if (!IDECallbacks)
+    if (!CodeCompletionCallbacks)
       return Status;
   }
 
@@ -8793,7 +8798,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames, &DefaultArgs);
   Status |= Indices;
-  if (Status.hasCodeCompletion() && !IDECallbacks)
+  if (Status.hasCodeCompletion() && !CodeCompletionCallbacks)
     return Status;
   
   SourceLoc ArrowLoc;
@@ -8816,7 +8821,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     // type
     ElementTy = parseDeclResultType(diag::expected_type_subscript);
     Status |= ElementTy;
-    if (Status.hasCodeCompletion() && !IDECallbacks)
+    if (Status.hasCodeCompletion() && !CodeCompletionCallbacks)
       return Status;
 
     if (ElementTy.isNull()) {
@@ -8856,7 +8861,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     ContextChange CC(*this, Subscript);
 
     Status |= parseFreestandingGenericWhereClause(Subscript);
-    if (Status.hasCodeCompletion() && !IDECallbacks) {
+    if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return Status;
     }
@@ -8864,8 +8869,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   // Pass the function signature to code completion.
   if (Status.hasCodeCompletion()) {
-    assert(IDECallbacks && "must be code completion second pass");
-    IDECallbacks->setParsedDecl(Subscript);
+    assert(CodeCompletionCallbacks && "must be code completion second pass");
+    CodeCompletionCallbacks->setParsedDecl(Subscript);
   }
 
   Decls.push_back(Subscript);
@@ -8952,7 +8957,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   GenericParamList *GenericParams = GPResult.getPtrOrNull();
   if (GPResult.hasCodeCompletion()) {
     Status.setHasCodeCompletionAndIsError();
-    if (!IDECallbacks)
+    if (!CodeCompletionCallbacks)
       return Status;
   }
 
@@ -8970,7 +8975,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                    asyncLoc, reasync,
                                    throwsLoc, rethrows,
                                    FuncRetTy);
-  if (Status.hasCodeCompletion() && !IDECallbacks) {
+  if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;
   }
@@ -9023,7 +9028,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange(*this, CD);
 
     Status |= parseFreestandingGenericWhereClause(CD);
-    if (Status.hasCodeCompletion() && !IDECallbacks) {
+    if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return Status;
     }
@@ -9035,8 +9040,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Pass the function signature to code completion.
   if (Status.hasCodeCompletion()) {
-    assert(IDECallbacks && "must be code completion second pass");
-    IDECallbacks->setParsedDecl(CD);
+    assert(CodeCompletionCallbacks && "must be code completion second pass");
+    CodeCompletionCallbacks->setParsedDecl(CD);
   }
 
   if (ConstructorsNotAllowed) {
@@ -9223,9 +9228,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   if (Tok.is(tok::colon)) {
     colonLoc = consumeToken();
     if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks && !isPrefix && !isPostfix) {
-        IDECallbacks->completeInPrecedenceGroup(
-            IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Relation);
+      if (CodeCompletionCallbacks && !isPrefix && !isPostfix) {
+        CodeCompletionCallbacks->completeInPrecedenceGroup(
+            CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Relation);
       }
       consumeToken();
 
@@ -9322,8 +9327,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   SourceLoc precedenceGroupLoc = consumeToken(tok::kw_precedencegroup);
   DebuggerContextChange DCC (*this);
 
-  if (!IDECallbacks &&
-      !DCC.movedToTopLevel() &&
+  if (!CodeCompletionCallbacks && !DCC.movedToTopLevel() &&
       !(flags & PD_AllowTopLevel)) {
     diagnose(precedenceGroupLoc, diag::decl_inner_scope);
     return nullptr;
@@ -9419,10 +9423,10 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   };
 
   auto checkCodeCompletion =
-      [&](IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) -> bool {
+      [&](CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) -> bool {
     if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks)
-        IDECallbacks->completeInPrecedenceGroup(SK);
+      if (this->CodeCompletionCallbacks)
+        this->CodeCompletionCallbacks->completeInPrecedenceGroup(SK);
       consumeToken();
       return true;
     }
@@ -9440,7 +9444,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
 
   // Parse the attributes in the body.
   while (Tok.isNot(tok::r_brace)) {
-    if (checkCodeCompletion(IDEInspectionCallbacks::
+    if (checkCodeCompletion(CodeCompletionCallbacks::
                                 PrecedenceGroupCompletionKind::AttributeList)) {
       hasCodeCompletion = true;
       continue;
@@ -9456,7 +9460,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
                                            tok::contextual_keyword);
       parseAttributePrefix(associativityKeywordLoc);
 
-      if (checkCodeCompletion(IDEInspectionCallbacks::
+      if (checkCodeCompletion(CodeCompletionCallbacks::
                                   PrecedenceGroupCompletionKind::Associativity))
         return abortBody(/*hasCodeCompletion*/true);
 
@@ -9495,7 +9499,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
       // "assignment" is considered as a contextual keyword.
       TokReceiver->registerTokenKindChange(assignmentKeywordLoc,
                                            tok::contextual_keyword);
-      if (checkCodeCompletion(IDEInspectionCallbacks::
+      if (checkCodeCompletion(CodeCompletionCallbacks::
                                   PrecedenceGroupCompletionKind::Assignment))
         return abortBody(/*hasCodeCompletion*/true);
 
@@ -9523,7 +9527,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
       auto &relations = (isLowerThan ? lowerThan : higherThan);
 
       do {
-        if (checkCodeCompletion(IDEInspectionCallbacks::
+        if (checkCodeCompletion(CodeCompletionCallbacks::
                                     PrecedenceGroupCompletionKind::Relation)) {
           return abortBody(/*hasCodeCompletion*/true);
         }
@@ -9629,7 +9633,7 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseFreestandingGenericWhereClause(macro);
-    if (whereStatus.hasCodeCompletion() && !IDECallbacks) {
+    if (whereStatus.hasCodeCompletion() && !CodeCompletionCallbacks) {
       // Trigger delayed parsing, no need to continue.
       return whereStatus;
     }

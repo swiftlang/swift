@@ -126,9 +126,9 @@ bool IDEInspectionSecondPassRequest::evaluate(
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
   Parser TheParser(BufferID, *SF, nullptr, parserState);
 
-  std::unique_ptr<IDEInspectionCallbacks> IDECallbacks(
-      Factory->createIDEInspectionCallbacks(TheParser));
-  TheParser.setIDECallbacks(IDECallbacks.get());
+  auto Callbacks = Factory->createCallbacks(TheParser);
+  TheParser.setCodeCompletionCallbacks(Callbacks.CompletionCallbacks.get());
+  TheParser.setDoneParsingCallback(Callbacks.DoneParsingCallback.get());
 
   TheParser.performIDEInspectionSecondPassImpl(*state);
   return true;
@@ -203,7 +203,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   assert(!State->hasIDEInspectionDelayedDeclState() &&
          "Second pass should not set any code completion info");
 
-  IDECallbacks->doneParsing(DC->getParentSourceFile());
+  DoneParsingCallback->doneParsing(DC->getParentSourceFile());
 
   State->restoreIDEInspectionDelayedDeclState(info);
 }
@@ -504,8 +504,8 @@ Parser::~Parser() {
 bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
 
 bool Parser::isDelayedParsingEnabled() const {
-  // Do not delay parsing during code completion's second pass.
-  if (IDECallbacks)
+  // Do not delay parsing during IDE inspection's second pass.
+  if (DoneParsingCallback)
     return false;
 
   return SF.hasDelayedBodyParsing();

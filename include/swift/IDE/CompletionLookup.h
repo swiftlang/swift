@@ -614,7 +614,7 @@ public:
   void collectPrecedenceGroups();
 
   void getPrecedenceGroupCompletions(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK);
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK);
 
   void getPoundAvailablePlatformCompletions();
 

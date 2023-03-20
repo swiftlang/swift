@@ -25,7 +25,8 @@ using namespace swift;
 using namespace ide;
 
 namespace {
-class ConformingMethodListCallbacks : public IDEInspectionCallbacks {
+class ConformingMethodListCallbacks : public CodeCompletionCallbacks,
+                                      public DoneParsingCallback {
   ArrayRef<const char *> ExpectedTypeNames;
   ConformingMethodListConsumer &Consumer;
   SourceLoc Loc;
@@ -40,8 +41,8 @@ public:
   ConformingMethodListCallbacks(Parser &P,
                                 ArrayRef<const char *> ExpectedTypeNames,
                                 ConformingMethodListConsumer &Consumer)
-      : IDEInspectionCallbacks(P), ExpectedTypeNames(ExpectedTypeNames),
-        Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
 
   // Only handle callbacks for suffix completions.
   // {
@@ -190,8 +191,10 @@ swift::ide::makeConformingMethodListCallbacksFactory(
         ConformingMethodListConsumer &Consumer)
         : ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new ConformingMethodListCallbacks(P, ExpectedTypeNames, Consumer);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callback = std::make_shared<ConformingMethodListCallbacks>(
+          P, ExpectedTypeNames, Consumer);
+      return {Callback, Callback};
     }
   };
 

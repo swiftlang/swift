@@ -280,8 +280,9 @@ ParserStatus Parser::parseGenericWhereClause(
   bool HasNextReq;
   do {
     if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks)
-        IDECallbacks->completeGenericRequirement();
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeGenericRequirement();
+      }
       EndLoc = consumeToken(tok::code_complete);
       Status.setHasCodeCompletionAndIsError();
       break;
