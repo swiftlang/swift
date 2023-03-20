@@ -91,6 +91,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -892,47 +893,11 @@ public:
   }
 };
 
-/// A class for generating the elements of a collecttion.
-template <class CollectionType>
-class CollectionGenerator {
-  typename CollectionType::iterator i, e;
-
-  using reference =
-    typename std::iterator_traits<typename CollectionType::iterator>::reference;
-
-public:
-  CollectionGenerator(const CollectionType &collection)
-    : i(collection.begin()), e(collection.end()) {}
-
-  reference getCurrent() const {
-    assert(!isFinished());
-    return *i;
-  }
-
-  reference claimNext() {
-    assert(!isFinished());
-    return *i++;
-  }
-
-  bool isFinished() const {
-    return i == e;
-  }
-
-  void advance() {
-    assert(!isFinished());
-    ++i;
-  }
-
-  void finish() {
-    assert(isFinished() && "didn't finish generating the collection");
-  }
-};
-
 /// A class for destructuring a list of formal input parameters given
 /// an abstraction pattern for it.
 class InputParamGenerator {
   const ASTContext &ctx;
-  CollectionGenerator<ArrayRef<ManagedValue>> &inputs;
+  ArrayRefGenerator<ArrayRef<ManagedValue>> &inputs;
   FunctionParamGenerator inputParam;
 
   /// If inputParam.isPackExpansion(), this is the pack currently
@@ -996,7 +961,7 @@ class InputParamGenerator {
 
 public:
   InputParamGenerator(const ASTContext &ctx,
-                      CollectionGenerator<ArrayRef<ManagedValue>> &inputs,
+                      ArrayRefGenerator<ArrayRef<ManagedValue>> &inputs,
                       AbstractionPattern inputOrigFunctionType,
                       AnyFunctionType::CanParamArrayRef inputSubstParams,
                       bool ignoreFinalParam)
@@ -1190,7 +1155,7 @@ public:
 class TranslateArguments {
   SILGenFunction &SGF;
   SILLocation Loc;
-  CollectionGenerator<ArrayRef<ManagedValue>> Inputs;
+  ArrayRefGenerator<ArrayRef<ManagedValue>> Inputs;
   SmallVectorImpl<ManagedValue> &Outputs;
   CanSILFunctionType OutputTypesFuncTy;
   ArrayRef<SILParameterInfo> OutputTypes;
