@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
@@ -1215,42 +1216,47 @@ forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
                                  AbstractionPattern origExpansionType,
                         AnyFunctionType::CanParamArrayRef substParams)>
              handleExpansion) const {
-  // Honor ignoreFinalParam for the substituted parameters on all paths.
-  if (ignoreFinalParam) substParams = substParams.drop_back();
+  FunctionParamGenerator generator(*this, substParams, ignoreFinalParam);
 
-  // If we don't have a function type, use the substituted type.
-  if (isTypeParameterOrOpaqueArchetype() ||
-      getKind() == Kind::OpaqueFunction ||
-      getKind() == Kind::OpaqueDerivativeFunction) {
-    for (auto substParamIndex : indices(substParams)) {
-      handleScalar(substParamIndex, substParamIndex,
-                   substParams[substParamIndex].getParameterFlags(),
-                   AbstractionPattern::getOpaque(),
-                   substParams[substParamIndex]);
-    }
-    return;
-  }
-
-  size_t numOrigParams = getNumFunctionParams();
-  if (ignoreFinalParam) numOrigParams--;
-
-  size_t substParamIndex = 0;
-  for (auto origParamIndex : range(numOrigParams)) {
-    auto origParamType = getFunctionParamType(origParamIndex);
-    if (origParamType.isPackExpansion()) {
-      unsigned numComponents = origParamType.getNumPackExpandedComponents();
-      handleExpansion(origParamIndex, substParamIndex,
-                      getFunctionParamFlags(origParamIndex), origParamType,
-                      substParams.slice(substParamIndex, numComponents));
-      substParamIndex += numComponents;
+  for (; !generator.isFinished(); generator.advance()) {
+    if (generator.isPackExpansion()) {
+      handleExpansion(generator.getOrigIndex(),
+                      generator.getSubstIndex(),
+                      generator.getOrigFlags(),
+                      generator.getOrigType(),
+                      generator.getSubstParams());
     } else {
-      handleScalar(origParamIndex, substParamIndex,
-                   getFunctionParamFlags(origParamIndex), origParamType,
-                   substParams[substParamIndex]);
-      substParamIndex++;
+      handleScalar(generator.getOrigIndex(),
+                   generator.getSubstIndex(),
+                   generator.getOrigFlags(),
+                   generator.getOrigType(),
+                   generator.getSubstParams()[0]);
     }
   }
-  assert(substParamIndex == substParams.size());
+  generator.finish();
+}
+
+FunctionParamGenerator::FunctionParamGenerator(
+                              AbstractionPattern origFunctionType,
+                              AnyFunctionType::CanParamArrayRef substParams,
+                              bool ignoreFinalParam)
+    : origFunctionType(origFunctionType), allSubstParams(substParams) {
+  origFunctionTypeIsOpaque =
+    (origFunctionType.isTypeParameterOrOpaqueArchetype() ||
+     origFunctionType.isOpaqueFunctionOrOpaqueDerivativeFunction());
+
+  if (origFunctionTypeIsOpaque) {
+    numOrigParams = allSubstParams.size();
+  } else {
+    numOrigParams = origFunctionType.getNumFunctionParams();
+  }
+
+  if (ignoreFinalParam) {
+    allSubstParams = allSubstParams.drop_back();
+    numOrigParams--;
+  }
+
+  if (!isFinished()) loadParameter();
 }
 
 static CanType getOptionalObjectType(CanType type) {
