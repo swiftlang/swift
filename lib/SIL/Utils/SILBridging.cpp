@@ -151,32 +151,6 @@ std::string BridgedFunction::getDebugDescription() const {
   return str;
 }
 
-BridgedFunction::ArgumentConvention BridgedFunction::getBridged(SILArgumentConvention conv) const {
-  switch (conv.Value) {
-    case SILArgumentConvention::Indirect_Inout:
-      return BridgedFunction::ArgumentConvention::Indirect_Inout;
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return BridgedFunction::ArgumentConvention::Indirect_InoutAliasable;
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-      return BridgedFunction::ArgumentConvention::Indirect_In_Guaranteed;
-    case SILArgumentConvention::Indirect_In:
-      return BridgedFunction::ArgumentConvention::Indirect_In;
-    case SILArgumentConvention::Indirect_Out:
-      return BridgedFunction::ArgumentConvention::Indirect_Out;
-    case SILArgumentConvention::Direct_Unowned:
-      return BridgedFunction::ArgumentConvention::Direct_Unowned;
-    case SILArgumentConvention::Direct_Owned:
-      return BridgedFunction::ArgumentConvention::Direct_Owned;
-    case SILArgumentConvention::Direct_Guaranteed:
-      return BridgedFunction::ArgumentConvention::Direct_Guaranteed;
-    case SILArgumentConvention::Pack_Inout:
-    case SILArgumentConvention::Pack_Out:
-    case SILArgumentConvention::Pack_Guaranteed:
-    case SILArgumentConvention::Pack_Owned:
-      llvm_unreachable("cannot bridge variadic generics");
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
@@ -187,45 +161,6 @@ std::string BridgedBasicBlock::getDebugDescription() const {
   getBlock()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
-}
-
-//===----------------------------------------------------------------------===//
-//                                SILArgument
-//===----------------------------------------------------------------------===//
-
-BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
-  return {castToArgument(argument)->getParent()};
-}
-
-BridgedFunction::ArgumentConvention castToArgumentConvention(SILArgumentConvention convention) {
-  switch (convention) {
-    case SILArgumentConvention::Indirect_Inout:
-      return BridgedFunction::ArgumentConvention::Indirect_Inout;
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return BridgedFunction::ArgumentConvention::Indirect_InoutAliasable;
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-      return BridgedFunction::ArgumentConvention::Indirect_In_Guaranteed;
-    case SILArgumentConvention::Indirect_In:
-      return BridgedFunction::ArgumentConvention::Indirect_In;
-    case SILArgumentConvention::Indirect_Out:
-      return BridgedFunction::ArgumentConvention::Indirect_Out;
-    case SILArgumentConvention::Direct_Unowned:
-      return BridgedFunction::ArgumentConvention::Direct_Unowned;
-    case SILArgumentConvention::Direct_Owned:
-      return BridgedFunction::ArgumentConvention::Direct_Owned;
-    case SILArgumentConvention::Direct_Guaranteed:
-      return BridgedFunction::ArgumentConvention::Direct_Guaranteed;
-    case SILArgumentConvention::Pack_Inout:
-    case SILArgumentConvention::Pack_Out:
-    case SILArgumentConvention::Pack_Guaranteed:
-    case SILArgumentConvention::Pack_Owned:
-      llvm_unreachable("cannot bridge variadic generics");
-  }
-}
-
-BridgedFunction::ArgumentConvention SILArgument_getConvention(BridgedArgument argument) {
-  auto *arg = castToArgument<SILFunctionArgument>(argument);
-  return castToArgumentConvention(arg->getArgumentConvention());
 }
 
 //===----------------------------------------------------------------------===//

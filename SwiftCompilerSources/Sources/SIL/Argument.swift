@@ -20,7 +20,7 @@ public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {
-    return SILArgument_getParent(bridged).block
+    return bridged.getParent().block
   }
 
   var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
@@ -40,7 +40,7 @@ public class Argument : Value, Hashable {
 
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
-    SILArgument_getConvention(bridged).convention
+    bridged.getConvention().convention
   }
 }
 
@@ -193,7 +193,7 @@ extension BridgedArgument {
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }
 
-extension BridgedFunction.ArgumentConvention {
+extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
       case .Indirect_In:             return .indirectIn
