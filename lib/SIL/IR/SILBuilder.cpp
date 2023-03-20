@@ -612,6 +612,7 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              bool operandWasMoved,
                                              bool trace) {
   llvm::SmallString<4> Name;
+
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::create(
@@ -624,6 +625,7 @@ DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
                                                  SILDebugVariable Var,
                                                  bool wasMoved, bool trace) {
   llvm::SmallString<4> Name;
+
   // Debug location overrides cannot apply to debug addr instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::createAddr(

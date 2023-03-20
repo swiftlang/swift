@@ -84,9 +84,10 @@ public struct Builder {
   }
 
   public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
-                               isLexical: Bool = false, wasMoved: Bool = false) -> AllocStackInst {
+                               isLexical: Bool = false,
+                               usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
     let dr = SILBuilder_createAllocStack(bridged, type.bridged, hasDynamicLifetime ? 1 : 0,
-                                         isLexical ? 1 : 0, wasMoved ? 1 : 0)
+                                         isLexical ? 1 : 0, usesMoveableValueDebugInfo ? 1 : 0)
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
 

@@ -2030,6 +2030,9 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // If we're in no_consume_or_assign mode, we don't insert destroys, as we've
   // already checked that there are no consumes. There can only be borrow uses,
   // which means no destruction is needed at all.
+  //
+  // NOTE: This also implies that we do not need to insert invalidating
+  // debug_value undef since our value will not be invalidated.
   if (markedValue->getCheckKind() ==
       MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
     LLVM_DEBUG(llvm::dbgs()
@@ -2040,6 +2043,30 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
   LLVM_DEBUG(llvm::dbgs() << "    Visiting users!\n");
 
+  auto debugVar = DebugVarCarryingInst::getFromValue(
+      stripAccessMarkers(markedValue->getOperand()));
+
+  // Local helper that insert a debug_value undef to invalidate a noncopyable
+  // value that has been moved. Importantly, for LLVM to recognize that we are
+  // referring to the same debug variable as the original definition, we have to
+  // use the same debug scope and location as the original debug var.
+  auto insertUndefDebugValue = [&debugVar](SILInstruction *insertPt) {
+    if (!debugVar) {
+      return;
+    }
+    auto varInfo = debugVar.getVarInfo();
+    if (!varInfo) {
+      return;
+    }
+    SILBuilderWithScope debugInfoBuilder(insertPt);
+    debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
+    debugInfoBuilder.createDebugValue(
+        debugVar->getLoc(),
+        SILUndef::get(debugVar.getOperandForDebugValueClone()->getType(),
+                      insertPt->getModule()),
+        *varInfo, false, true);
+  };
+
   for (auto &pair : boundary.getLastUsers()) {
     auto *inst = pair.first;
     auto &bv = pair.second;
@@ -2048,11 +2075,23 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 
     auto interestingUse = liveness.isInterestingUser(inst);
     switch (interestingUse.first) {
-    case IsInterestingUser::LifetimeEndingUse:
+    case IsInterestingUser::LifetimeEndingUse: {
       LLVM_DEBUG(llvm::dbgs()
                  << "        Lifetime ending use! Recording final consume!\n");
+      // If we have a consuming use, when we stop at the consuming use we want
+      // the value to still be around. We only want the value to be invalidated
+      // once the consume operation has occured. Thus we always place the
+      // debug_value undef strictly after the consuming operation.
+      if (auto *ti = dyn_cast<TermInst>(inst)) {
+        for (auto *succBlock : ti->getSuccessorBlocks()) {
+          insertUndefDebugValue(&succBlock->front());
+        }
+      } else {
+        insertUndefDebugValue(inst->getNextInstruction());
+      }
       consumes.recordFinalConsume(inst, *interestingUse.second);
       continue;
+    }
     case IsInterestingUser::NonLifetimeEndingUse:
     case IsInterestingUser::NonUser:
       LLVM_DEBUG(llvm::dbgs() << "        NoneUser or NonLifetimeEndingUse! "
@@ -2066,6 +2105,9 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
           auto *insertPt = &*succBlock->begin();
           insertDestroyBeforeInstruction(addressUseState, insertPt,
                                          liveness.getRootValue(), bv, consumes);
+          // We insert the debug_value undef /after/ the last use since we want
+          // the value to be around when we stop at the last use instruction.
+          insertUndefDebugValue(insertPt);
         }
         continue;
       }
@@ -2073,6 +2115,9 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       auto *insertPt = inst->getNextInstruction();
       insertDestroyBeforeInstruction(addressUseState, insertPt,
                                      liveness.getRootValue(), bv, consumes);
+      // We insert the debug_value undef /after/ the last use since we want
+      // the value to be around when we stop at the last use instruction.
+      insertUndefDebugValue(insertPt);
       continue;
     }
   }
@@ -2082,6 +2127,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
     insertDestroyBeforeInstruction(addressUseState, insertPt,
                                    liveness.getRootValue(), pair.second,
                                    consumes);
+    insertUndefDebugValue(insertPt);
     LLVM_DEBUG(llvm::dbgs() << "    Inserting destroy on edge bb"
                             << pair.first->getDebugID() << "\n");
   }
@@ -2095,6 +2141,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       insertDestroyBeforeInstruction(addressUseState, insertPt,
                                      liveness.getRootValue(), defPair.second,
                                      consumes);
+      insertUndefDebugValue(insertPt);
     } else {
       auto *inst = cast<SILInstruction>(defPair.first);
       auto *insertPt = inst->getNextInstruction();
@@ -2102,6 +2149,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       insertDestroyBeforeInstruction(addressUseState, insertPt,
                                      liveness.getRootValue(), defPair.second,
                                      consumes);
+      insertUndefDebugValue(insertPt);
     }
   }
 

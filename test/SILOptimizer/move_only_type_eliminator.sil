@@ -76,7 +76,7 @@ bb0(%0 : $Trivial):
 // CHECK: bb0(%0 : $Trivial):
 // CHECK-NEXT: function_ref use_trivial
 // CHECK-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// CHECK-NEXT:  %2 = alloc_stack $Trivial
+// CHECK-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
 // CHECK-NEXT:  store %0 to [trivial] %2 : $*Trivial
 // CHECK-NEXT:  %4 = load [trivial] %2 : $*Trivial
 // CHECK-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
@@ -92,7 +92,7 @@ bb0(%0 : $Trivial):
 // TRIVIAL: bb0(%0 : $Trivial):
 // TRIVIAL-NEXT: function_ref use_trivial
 // TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %2 = alloc_stack $Trivial
+// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
 // TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
 // TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
 // TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
@@ -133,7 +133,7 @@ bb0(%0 : $Trivial):
 // CHECK: bb0(%0 : $Trivial):
 // CHECK-NEXT: function_ref use_trivial
 // CHECK-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// CHECK-NEXT:  %2 = alloc_stack $Trivial
+// CHECK-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
 // CHECK-NEXT:  store %0 to [trivial] %2 : $*Trivial
 // CHECK-NEXT:  %4 = load [trivial] %2 : $*Trivial
 // CHECK-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
@@ -148,7 +148,7 @@ bb0(%0 : $Trivial):
 // TRIVIAL: bb0(%0 : $Trivial):
 // TRIVIAL-NEXT: function_ref use_trivial
 // TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %2 = alloc_stack $Trivial
+// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
 // TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
 // TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
 // TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()

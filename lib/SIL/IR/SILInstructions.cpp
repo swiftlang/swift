@@ -229,7 +229,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical,
-                               bool wasMoved)
+                               bool usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.has_value() : false,
@@ -240,20 +240,22 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
       VarInfo(0) {
   sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = isLexical;
-  sharedUInt8().AllocStackInst.wasMoved = wasMoved;
+  sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
+      usesMoveableValueDebugInfo || elementType.isMoveOnly();
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
-  // VarInfo must be initialized after `sharedUInt32().AllocStackInst.numOperands`!
-  // Otherwise the trailing object addresses are wrong.
-  VarInfo = TailAllocatedDebugVariable(Var,
-               getTrailingObjects<char>(),
-               getTrailingObjects<SILType>(),
-               getTrailingObjects<SILLocation>(),
-               getTrailingObjects<const SILDebugScope *>(),
-               getTrailingObjects<SILDIExprElement>());
+  // VarInfo must be initialized after
+  // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
+  // addresses are wrong.
+  VarInfo = TailAllocatedDebugVariable(
+      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      getTrailingObjects<SILLocation>(),
+      getTrailingObjects<const SILDebugScope *>(),
+      getTrailingObjects<SILDIExprElement>());
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
-         TypeDependentOperands.size() && "Truncation");
+             TypeDependentOperands.size() &&
+         "Truncation");
   auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
   if (Var && VD) {
     VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
@@ -373,27 +375,35 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
-                           bool hasDynamicLifetime,
-                           bool reflection)
+                           bool hasDynamicLifetime, bool reflection,
+                           bool usesMoveableValueDebugInfo)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, getTrailingObjects<char>()),
-      HasDynamicLifetime(hasDynamicLifetime),
-      Reflection(reflection) {}
+      VarInfo(Var, getTrailingObjects<char>()) {
+  sharedUInt8().AllocBoxInst.dynamicLifetime = hasDynamicLifetime;
+  sharedUInt8().AllocBoxInst.reflection = reflection;
 
-AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
-                                   CanSILBoxType BoxType,
+  // If we have a noncopyable type, always set uses mvoeable value debug info.
+  usesMoveableValueDebugInfo |=
+      BoxType->getLayout()->getFields()[0].getObjectType().isMoveOnly();
+
+  sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
+      usesMoveableValueDebugInfo;
+}
+
+AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    SILFunction &F,
                                    Optional<SILDebugVariable> Var,
-                                   bool hasDynamicLifetime,
-                                   bool reflection) {
+                                   bool hasDynamicLifetime, bool reflection,
+                                   bool usesMoveableValueDebugInfo) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
-                                  hasDynamicLifetime, reflection);
+  return ::new (Buf)
+      AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                   hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
 }
 
 SILType AllocBoxInst::getAddressType() const {
@@ -404,7 +414,7 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs,
-                               bool wasMoved, bool trace)
+                               bool usesMoveableValueDebugInfo, bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -416,8 +426,8 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
   if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
     VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
-  if (wasMoved)
-    markAsMoved();
+  if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
+    setUsesMoveableValueDebugInfo();
   setTrace(trace);
 }
 

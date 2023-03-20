@@ -1393,8 +1393,8 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
-    if (AVI->getWasMoved())
-      *this << "[moved] ";
+    if (AVI->getUsesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
+      *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
@@ -1434,6 +1434,12 @@ public:
     if (ABI->emitReflectionMetadata()) {
       *this << "[reflection] ";
     }
+
+    if (ABI->getUsesMoveableValueDebugInfo() &&
+        !ABI->getAddressType().isMoveOnly()) {
+      *this << "[moveable_value_debuginfo] ";
+    }
+
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -1764,8 +1770,9 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
-    if (DVI->getWasMoved())
-      *this << "[moved] ";
+    if (DVI->getUsesMoveableValueDebugInfo() &&
+        !DVI->getOperand()->getType().isMoveOnly())
+      *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
       *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
