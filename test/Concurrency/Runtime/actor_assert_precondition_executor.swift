@@ -15,11 +15,11 @@
 import StdlibUnittest
 
 func checkPreconditionMainActor() /* synchronous! */ {
-  preconditionTaskOnActorExecutor(MainActor.shared)
+  preconditionOnExecutor(of: MainActor.shared)
 }
 
 func checkPreconditionFamousActor() /* synchronous! */ {
-  preconditionTaskOnActorExecutor(FamousActor.shared)
+  preconditionOnExecutor(of: FamousActor.shared)
 }
 
 @MainActor

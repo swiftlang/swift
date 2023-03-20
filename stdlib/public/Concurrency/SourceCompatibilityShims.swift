@@ -566,3 +566,81 @@ public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, renamed: "UnownedJob")
 public typealias PartialAsyncTask = UnownedJob
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.9, *)
+@available(*, deprecated, renamed: "preconditionOnExecutor(_:_:file:line:)")
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func preconditionTaskOnExecutor(
+    _ executor: some SerialExecutor,
+    message: @autoclosure () -> String = String(),
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  preconditionOnExecutor(
+      executor,
+      message(),
+      file: file, line: line
+  )
+}
+
+@available(SwiftStdlib 5.9, *)
+@available(*, deprecated, renamed: "preconditionOnExecutor(of:_:file:line:)")
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func preconditionTaskOnActorExecutor(
+    _ actor: some Actor,
+    message: @autoclosure () -> String = String(),
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  preconditionOnExecutor(
+      of: actor,
+      message(),
+      file: file, line: line
+  )
+}
+
+@available(SwiftStdlib 5.9, *)
+@available(*, deprecated, renamed: "assertOnExecutor(_:_:file:line:)")
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func assertTaskOnExecutor(
+    _ executor: some SerialExecutor,
+    _ message: @autoclosure () -> String = String(),
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  assertOnExecutor(
+      executor,
+      message(),
+      file: file, line: line
+  )
+}
+
+@available(SwiftStdlib 5.9, *)
+@available(*, deprecated, renamed: "assertOnExecutor(of:_:file:line:)")
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func assertTaskOnActorExecutor(
+    of actor: some Actor,
+    _ message: @autoclosure () -> String = String(),
+    file: StaticString = #fileID, line: UInt = #line
+) {
+  assertOnExecutor(
+      of: actor,
+      message(),
+      file: file, line: line
+  )
+}
+
+@available(SwiftStdlib 5.9, *)
+@available(*, deprecated, renamed: "assumeOnExecutor(of:_:file:line:)")
+@_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
+@_alwaysEmitIntoClient
+public func assumeOnActorExecutor<Act: Actor, T>(
+    _ actor: Act,
+    _ operation: (isolated Act) throws -> T,
+    file: StaticString = #fileID, line: UInt = #line
+) rethrows -> T {
+  try assumeOnExecutor(
+      of: actor,
+      operation,
+      file: file, line: line
+  )
+}
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

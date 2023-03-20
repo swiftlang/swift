@@ -34,11 +34,11 @@ import SwiftShims
 ///   programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) 
-public
-func preconditionTaskOnExecutor(
+@available(SwiftStdlib 5.9, *)
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func preconditionOnExecutor(
     _ executor: some SerialExecutor,
-    message: @autoclosure () -> String = String(),
+    _ message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line
 ) {
   guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
@@ -47,7 +47,6 @@ func preconditionTaskOnExecutor(
 
   let expectationCheck = _taskIsCurrentExecutor(executor.asUnownedSerialExecutor().executor)
 
-  /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
   precondition(expectationCheck,
       // TODO: offer information which executor we actually got
       "Incorrect actor executor assumption; Expected '\(executor)' executor. \(message())",
@@ -71,11 +70,11 @@ func preconditionTaskOnExecutor(
 ///   programming error.
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) 
-public
-func preconditionTaskOnActorExecutor(
-    _ actor: some Actor,
-    message: @autoclosure () -> String = String(),
+@available(SwiftStdlib 5.9, *)
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func preconditionOnExecutor(
+    of actor: some Actor,
+    _ message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line
 ) {
   guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
@@ -108,9 +107,9 @@ func preconditionTaskOnActorExecutor(
 ///   assumption is a serious programming error.
 ///
 /// - Parameter executor: the expected current executor
-@available(SwiftStdlib 5.9, *) 
-public
-func assertTaskOnExecutor(
+@available(SwiftStdlib 5.9, *)
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func assertOnExecutor(
     _ executor: some SerialExecutor,
     _ message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line
@@ -143,10 +142,10 @@ func assertTaskOnExecutor(
 ///
 ///
 /// - Parameter actor: the actor whose serial executor we expect to be the current executor
-@available(SwiftStdlib 5.9, *) 
-public
-func assertTaskOnActorExecutor(
-    _ actor: some Actor,
+@available(SwiftStdlib 5.9, *)
+@_transparent // for the is debug/release mode checks to detect the appropriate configuration
+public func assertOnExecutor(
+    of actor: some Actor,
     _ message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line
 ) {
@@ -180,10 +179,9 @@ func assertTaskOnActorExecutor(
 /// if another actor uses the same serial executor--by using ``MainActor/sharedUnownedExecutor``
 /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-@available(SwiftStdlib 5.9, *) 
+@available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
-public
-func assumeOnMainActorExecutor<T>(
+public func assumeOnMainActorExecutor<T>(
     _ operation: @MainActor () throws -> T,
     file: StaticString = #fileID, line: UInt = #line
 ) rethrows -> T {
@@ -220,9 +218,8 @@ func assumeOnMainActorExecutor<T>(
 /// perspective, the serial executor guarantees mutual exclusion of those two actors.
 @available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
-public
-func assumeOnActorExecutor<Act: Actor, T>(
-    _ actor: Act,
+public func assumeOnExecutor<Act: Actor, T>(
+    of actor: Act,
     _ operation: (isolated Act) throws -> T,
     file: StaticString = #fileID, line: UInt = #line
 ) rethrows -> T {
