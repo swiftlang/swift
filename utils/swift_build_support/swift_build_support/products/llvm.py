@@ -230,9 +230,18 @@ class LLVM(cmake_product.CMakeProduct):
             build_targets = ['clean']
 
         if self.args.skip_build or not self.args.build_llvm:
+            # We can't skip the build completely because the standalone
+            # build of Swift depends on these.
             build_targets = ['llvm-tblgen', 'clang-resource-headers',
                              'intrinsics_gen', 'clang-tablegen-targets']
-            if not self.args.build_toolchain_only:
+
+            # If we are not performing a toolchain-only build or generating
+            # Xcode projects, then we also want to include the following
+            # targets for testing purposes.
+            if (
+                not self.args.build_toolchain_only
+                and self.args.cmake_generator != 'Xcode'
+            ):
                 build_targets.extend([
                     'FileCheck',
                     'not',
