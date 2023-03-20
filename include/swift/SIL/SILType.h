@@ -549,6 +549,8 @@ public:
   /// NOTE: Takes the type expansion context from \p fn.
   SILType getEnumElementType(EnumElementDecl *elt, SILFunction *fn) const;
 
+  EnumElementDecl *getEnumElement(int caseIndex) const;
+
   /// Given that this is an enum type, return true if this type is effectively
   /// exhausted.
   bool isEffectivelyExhaustiveEnumType(SILFunction *f);

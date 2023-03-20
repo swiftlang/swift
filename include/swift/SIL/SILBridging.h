@@ -20,6 +20,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
@@ -112,10 +113,12 @@ struct BridgeValueExistential {
   void * _Nonnull conformance;
 };
 
-typedef struct {
+struct BridgedValueArray {
   const BridgeValueExistential * _Nullable base;
   size_t count;
-} BridgedValueArray;
+
+  llvm::ArrayRef<swift::SILValue> getValues(llvm::SmallVectorImpl<swift::SILValue> &storage);
+};
 
 struct BridgedOperand {
   swift::Operand * _Nonnull op;
@@ -871,11 +874,177 @@ struct OptionalBridgedDefaultWitnessTable {
   const swift::SILDefaultWitnessTable * _Nullable table;
 };
 
-typedef struct {
+struct BridgedBuilder{
   OptionalBridgedInstruction insertBefore;
   OptionalBridgedBasicBlock insertAtEnd;
   swift::SILDebugLocation loc;
-} BridgedBuilder;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createBuiltinBinaryFunction(llvm::StringRef name,
+                                                 swift::SILType operandType, swift::SILType resultType,
+                                                 BridgedValueArray arguments) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    llvm::SmallVector<swift::SILValue, 16> argValues;
+    return {builder.createBuiltinBinaryFunction(swift::RegularLocation(loc.getLocation()),
+                                                name, operandType, resultType,
+                                                arguments.getValues(argValues))};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createCondFail(BridgedValue condition, llvm::StringRef message) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createCondFail(swift::RegularLocation(loc.getLocation()),
+                                   condition.getSILValue(), message)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createIntegerLiteral(swift::SILType type, SwiftInt value) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createIntegerLiteral(swift::RegularLocation(loc.getLocation()),
+                                         type, value)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createAllocStack(swift::SILType type,
+                                      bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createAllocStack(swift::RegularLocation(loc.getLocation()),
+                                     type, llvm::None, hasDynamicLifetime, isLexical, wasMoved)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDeallocStack(BridgedValue operand) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createDeallocStack(swift::RegularLocation(loc.getLocation()),
+                                       operand.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDeallocStackRef(BridgedValue operand) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createDeallocStackRef(swift::RegularLocation(loc.getLocation()),
+                                          operand.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createUncheckedRefCast(BridgedValue op, swift::SILType type) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createUncheckedRefCast(swift::RegularLocation(loc.getLocation()),
+                                           op.getSILValue(), type)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createSetDeallocating(BridgedValue op, bool isAtomic) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createSetDeallocating(swift::RegularLocation(loc.getLocation()),
+                                          op.getSILValue(),
+                                          isAtomic ? swift::RefCountingInst::Atomicity::Atomic
+                                                   : swift::RefCountingInst::Atomicity::NonAtomic)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createFunctionRef(BridgedFunction function) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createFunctionRef(swift::RegularLocation(loc.getLocation()),
+                                      function.getFunction())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createCopyValue(BridgedValue op) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createCopyValue(swift::RegularLocation(loc.getLocation()),
+                                    op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createCopyAddr(BridgedValue from, BridgedValue to,
+                                    bool takeSource, bool initializeDest) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createCopyAddr(swift::RegularLocation(loc.getLocation()),
+                                   from.getSILValue(), to.getSILValue(),
+                                   swift::IsTake_t(takeSource),
+                                   swift::IsInitialization_t(initializeDest))};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDestroyValue(BridgedValue op) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createDestroyValue(swift::RegularLocation(loc.getLocation()),
+                                       op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createDebugStep() const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createDebugStep(swift::RegularLocation(loc.getLocation()))};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createApply(
+            BridgedValue function, swift::SubstitutionMap subMap,
+            BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+            const swift::GenericSpecializationInformation * _Nullable specInfo) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    llvm::SmallVector<swift::SILValue, 16> argValues;
+    swift::ApplyOptions applyOpts;
+    if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
+    if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
+
+    return {builder.createApply(swift::RegularLocation(loc.getLocation()),
+                                function.getSILValue(), subMap,
+                                arguments.getValues(argValues),
+                                applyOpts, specInfo)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createSwitchEnumInst(
+            BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+            const void * _Nullable enumCases, SwiftInt numEnumCases) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
+    llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
+                                (unsigned)numEnumCases);
+    llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
+    swift::SILValue en = enumVal.getSILValue();
+    swift::EnumDecl *enumDecl = en->getType().getEnumOrBoundGenericEnum();
+    for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+      mappedElements[elemWithIndex.index()] = elemWithIndex.value();
+    }
+    llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
+    for (auto c : cases) {
+      assert(mappedElements.count(c.first) && "wrong enum element index");
+      convertedCases.push_back({mappedElements[c.first], c.second.getBlock()});
+    }
+    return {builder.createSwitchEnum(swift::RegularLocation(loc.getLocation()),
+                                     enumVal.getSILValue(),
+                                     defaultBlock.getBlock(), convertedCases)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
+                                             swift::SILType resultType) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    swift::SILValue en = enumVal.getSILValue();
+    return {builder.createUncheckedEnumData(swift::RegularLocation(loc.getLocation()),
+                                            enumVal.getSILValue(),
+                                            en->getType().getEnumElement(caseIdx), resultType)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    llvm::SmallVector<swift::SILValue, 16> argValues;
+    return {builder.createBranch(swift::RegularLocation(loc.getLocation()),
+                                 destBlock.getBlock(),
+                                 arguments.getValues(argValues))};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createUnreachable() const {
+    swift::SILBuilder builder(insertBefore.getInst(), insertAtEnd.getBlock(), loc.getScope());
+    return {builder.createUnreachable(swift::RegularLocation(loc.getLocation()))};
+  }
+};
 
 // AST bridging
 
@@ -895,49 +1064,9 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
 void PassContext_eraseBlock(BridgedPassContext passContext,
                             BridgedBasicBlock block);
 
-BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedBuilder builder, llvm::StringRef name,
-          swift::SILType operandType, swift::SILType resultType,
-          BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createCondFail(BridgedBuilder builder,
-          BridgedValue condition, llvm::StringRef message);
-BridgedInstruction SILBuilder_createIntegerLiteral(BridgedBuilder builder,
-          swift::SILType type, SwiftInt value);
-BridgedInstruction SILBuilder_createAllocStack(BridgedBuilder builder,
-          swift::SILType type, SwiftInt hasDynamicLifetime, SwiftInt isLexical,
-          SwiftInt wasMoved);
-BridgedInstruction SILBuilder_createDeallocStack(BridgedBuilder builder,
-          BridgedValue operand);
-BridgedInstruction SILBuilder_createDeallocStackRef(BridgedBuilder builder,
-          BridgedValue operand);
-BridgedInstruction SILBuilder_createUncheckedRefCast(BridgedBuilder builder,
-          BridgedValue op, swift::SILType type);
-BridgedInstruction SILBuilder_createSetDeallocating(BridgedBuilder builder,
-          BridgedValue op, bool isAtomic);
-BridgedInstruction SILBuilder_createFunctionRef(BridgedBuilder builder,
-          BridgedFunction function);
-BridgedInstruction SILBuilder_createCopyValue(BridgedBuilder builder,
-          BridgedValue op);
-BridgedInstruction SILBuilder_createCopyAddr(BridgedBuilder builder,
-          BridgedValue from, BridgedValue to,
-          SwiftInt takeSource, SwiftInt initializeDest);
-BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder builder,
-          BridgedValue op);
-BridgedInstruction SILBuilder_createDebugStep(BridgedBuilder builder);
-BridgedInstruction SILBuilder_createApply(BridgedBuilder builder,
-          BridgedValue function, swift::SubstitutionMap subMap,
-          BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
-          const swift::GenericSpecializationInformation * _Nullable specInfo);
-BridgedInstruction SILBuilder_createSwitchEnumInst(BridgedBuilder builder,
-          BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
-          const void * _Nullable enumCases, SwiftInt numEnumCases);
-BridgedInstruction SILBuilder_createUncheckedEnumData(BridgedBuilder builder,
-          BridgedValue enumVal, SwiftInt caseIdx,
-          swift::SILType resultType);
-BridgedInstruction SILBuilder_createBranch(
-          BridgedBuilder builder, BridgedBasicBlock destBlock,
-          BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createUnreachable(BridgedBuilder builder);
+//===----------------------------------------------------------------------===//
+//                             Inline functions
+//===----------------------------------------------------------------------===//
 
 OptionalBridgedOperand BridgedOperand::getNextUse() const {
   return {op->getNextUse()};

@@ -391,6 +391,15 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
                             fn->getTypeExpansionContext());
 }
 
+EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
+  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    if ((int)elemWithIndex.index() == caseIndex)
+      return elemWithIndex.value();
+  }
+  llvm_unreachable("invalid enum case index");
+}
+
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
   SILModule &M = F.getModule();
   return isLoadable(F) || !SILModuleConventions(M).useLoweredAddresses();
