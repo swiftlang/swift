@@ -2383,7 +2383,9 @@ bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
 }
 
 bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
-  // Check whether the moved-from value's lifetime and the moved-to value's
+  // Given: %moved_to_value = move_value %original_value
+  //
+  // Check whether the original value's lifetime and the moved-to value's
   // lifetime have the same (1) ownership, (2) lexicality, and (3) escaping.
   //
   // Along the way, also check for cases where they have different values for
@@ -2405,42 +2407,51 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
 
   // The move doesn't alter constraints: ownership and lexicality match.
 
+  // Before checking whether escaping matches, check whether the move_value is
+  // redundant regardless on account of how its uses are limited.
+  //
+  // At this point, ownership and lexicality are known to match.  If the
+  // original value doesn't escape, then merging the two lifetimes won't make
+  // it harder to optimize the portion of the merged lifetime corresponding to
+  // the moved-to value.  If the original's only consuming use is the
+  // move_value, then the original value's lifetime couldn't be shortened
+  // anyway.
+  //
+  // Summary: !escaping(original)
+  //       && singleConsumingUser(original) == move
+  //       => redundant(mvi)
+  //
+  // Check this in two ways, one cheaper than the other.
+
+  // First, avoid calling hasPointerEscape(original).
+  //
+  // If the original value is not a phi (a phi's incoming values might have
+  // escaping uses) and its only user is the move, then it doesn't escape. Also
+  // if its only user is the move, then its only _consuming_ user is the move.
   auto *singleUser =
       original->getSingleUse() ? original->getSingleUse()->getUser() : nullptr;
   if (mvi == singleUser && !SILArgument::asPhi(original)) {
     assert(!hasPointerEscape(original));
-    // The moved-from value's only use is the move_value, and the moved-from
-    // value isn't a phi.  So, it doesn't escape.  (A phi's incoming values
-    // might escape.)
-    //
-    // Still, no optimization is enabled by separating the two lifetimes.
-    // The moved-from value's lifetime could not be shrunk regardless of whether
-    // the moved-to value escapes.
+    assert(original->getSingleConsumingUse()->getUser() == mvi);
+    // - !escaping(original)
+    // - singleConsumingUser(original) == move
     return true;
   }
 
-  auto moveHasEscape = hasPointerEscape(mvi);
+  // Second, call hasPointerEscape(original).
+  //
+  // Explicitly check both
+  // - !escaping(original)
+  // - singleConsumingUser(original) == move
   auto originalHasEscape = hasPointerEscape(original);
-
-  // (3) Escaping matches?  (Expensive check, saved for last.)
-  if (moveHasEscape != originalHasEscape) {
-    if (!originalHasEscape) {
-      auto *singleConsumingUser =
-          original->getSingleConsumingUse()
-              ? original->getSingleConsumingUse()->getUser()
-              : nullptr;
-      if (mvi == singleConsumingUser) {
-        // The moved-from value's only consuming use is the move_value and it
-        // doesn't escape.
-        //
-        // Although the moved-to value escapes, no optimization is enabled by
-        // separating the two lifetimes.  The moved-from value's lifetime
-        // already couldn't be shrunk.
-        return true;
-      }
-    }
-    return false;
+  auto *singleConsumingUser = original->getSingleConsumingUse()
+                                  ? original->getSingleConsumingUse()->getUser()
+                                  : nullptr;
+  if (mvi == singleConsumingUser && !originalHasEscape) {
+    return true;
   }
 
-  return true;
+  // (3) Escaping matches?  (Expensive check, saved for last.)
+  auto moveHasEscape = hasPointerEscape(mvi);
+  return moveHasEscape == originalHasEscape;
 }
