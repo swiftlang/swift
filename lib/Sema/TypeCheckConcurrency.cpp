@@ -1248,7 +1248,6 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (funcDecl->getName() != enqueueDeclName)
       continue;
 
-
     // look for the first parameter being a Job or UnownedJob
     if (funcDecl->getParameters()->size() != 1)
       continue;
