@@ -1204,34 +1204,10 @@ unsigned AbstractionPattern::getNumFunctionParams() const {
 void AbstractionPattern::
 forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
                      bool ignoreFinalOrigParam,
-         llvm::function_ref<void(unsigned origParamIndex,
-                                 unsigned substParamIndex,
-                                 ParameterTypeFlags origFlags,
-                                 AbstractionPattern origParamType,
-                                 AnyFunctionType::CanParam substParam)>
-             handleScalar,
-         llvm::function_ref<void(unsigned origParamIndex,
-                                 unsigned substParamIndex,
-                                 ParameterTypeFlags origFlags,
-                                 AbstractionPattern origExpansionType,
-                        AnyFunctionType::CanParamArrayRef substParams)>
-             handleExpansion) const {
+    llvm::function_ref<void(FunctionParamGenerator &param)> function) const {
   FunctionParamGenerator generator(*this, substParams, ignoreFinalOrigParam);
-
   for (; !generator.isFinished(); generator.advance()) {
-    if (generator.isPackExpansion()) {
-      handleExpansion(generator.getOrigIndex(),
-                      generator.getSubstIndex(),
-                      generator.getOrigFlags(),
-                      generator.getOrigType(),
-                      generator.getSubstParams());
-    } else {
-      handleScalar(generator.getOrigIndex(),
-                   generator.getSubstIndex(),
-                   generator.getOrigFlags(),
-                   generator.getOrigType(),
-                   generator.getSubstParams()[0]);
-    }
+    function(generator);
   }
   generator.finish();
 }
@@ -2242,21 +2218,20 @@ public:
     };
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
-        [&](unsigned origParamIndex, unsigned substParamIndex,
-            ParameterTypeFlags origFlags, AbstractionPattern origParamType,
-            AnyFunctionType::CanParam substParam) {
-      auto newParamTy = visit(substParam.getParameterType(), origParamType);
-      addParam(origFlags, newParamTy);
-    },  [&](unsigned origParamIndex, unsigned substParamIndex,
-            ParameterTypeFlags origFlags,
-            AbstractionPattern origExpansionType,
-            AnyFunctionType::CanParamArrayRef substParams) {
-      CanType candidateSubstType;
-      if (!substParams.empty())
-        candidateSubstType = substParams[0].getParameterType();
-      auto expansionType =
-        handlePackExpansion(origExpansionType, candidateSubstType);
-      addParam(origFlags, expansionType);
+                                 [&](FunctionParamGenerator &param) {
+      if (!param.isPackExpansion()) {
+        auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
+                                param.getOrigType());
+        addParam(param.getOrigFlags(), newParamTy);
+      } else {
+        auto substParams = param.getSubstParams();
+        CanType candidateSubstType;
+        if (!substParams.empty())
+          candidateSubstType = substParams[0].getParameterType();
+        auto expansionType =
+          handlePackExpansion(param.getOrigType(), candidateSubstType);
+        addParam(param.getOrigFlags(), expansionType);
+      }
     });
     
     if (yieldType) {
