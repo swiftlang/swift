@@ -556,7 +556,10 @@ namespace {
         return nullptr;
       for (auto method : cxxRecordDecl->methods()) {
         if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor())
+          if (ctor->isCopyConstructor() &&
+              ctor->getAccess() == clang::AS_public &&
+              ctor->doesThisDeclarationHaveABody() &&
+              !ctor->isDeleted())
             return ctor;
         }
       }
@@ -570,7 +573,10 @@ namespace {
         return nullptr;
       for (auto method : cxxRecordDecl->methods()) {
         if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isMoveConstructor())
+          if (ctor->isMoveConstructor() &&
+              ctor->getAccess() == clang::AS_public &&
+              ctor->doesThisDeclarationHaveABody() &&
+              !ctor->isDeleted())
             return ctor;
         }
       }

@@ -2610,12 +2610,11 @@ namespace {
         }
         clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
-        if (decl->needsImplicitMoveConstructor()) {
-          moveCtor = clangSema.DeclareImplicitMoveConstructor(
-              const_cast<clang::CXXRecordDecl *>(decl));
-        }
         if (decl->needsImplicitCopyConstructor()) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        } else if (decl->needsImplicitMoveConstructor()) {
+          moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         } else {
           // We may have a defaulted copy constructor that needs to be defined.
