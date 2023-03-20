@@ -29,10 +29,6 @@ inline SILNode *castToSILNode(BridgedNode node) {
   return static_cast<SILNode *>(node.obj);
 }
 
-template <class A = SILArgument> A *castToArgument(BridgedArgument argument) {
-  return cast<A>(static_cast<SILArgument *>(argument.obj));
-}
-
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,
                                 SmallVectorImpl<SILValue> &storage);
 
