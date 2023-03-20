@@ -725,6 +725,12 @@ bool isFunctionAttr(Node::Kind kind);
 /// contain symbolic references.
 llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
+/// Produce the mangled name for the nominal type descriptor of a type
+/// referenced by its module and type name.
+std::string mangledNameForTypeMetadataAccessor(llvm::StringRef moduleName,
+                                               llvm::StringRef typeName,
+                                               Node::Kind typeKind);
+
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift

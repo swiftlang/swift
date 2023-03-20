@@ -49,6 +49,7 @@ struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
+class LoadedExecutablePlugin;
 class MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
@@ -4000,19 +4001,51 @@ public:
 /// Load a plugin module with the given name.
 ///
 ///
+class LoadedCompilerPlugin {
+  enum class PluginKind : uint8_t {
+    None,
+    InProcess,
+    Executable,
+  };
+  PluginKind kind;
+  void *ptr;
+
+  LoadedCompilerPlugin(PluginKind kind, void *ptr) : kind(kind), ptr(ptr) {
+    assert(ptr != nullptr || kind == PluginKind::None);
+  }
+
+public:
+  LoadedCompilerPlugin(std::nullptr_t) : kind(PluginKind::None), ptr(nullptr) {}
+
+  static LoadedCompilerPlugin inProcess(void *ptr) {
+    return {PluginKind::InProcess, ptr};
+  }
+  static LoadedCompilerPlugin executable(LoadedExecutablePlugin *ptr) {
+    return {PluginKind::Executable, ptr};
+  }
+
+  void *getAsInProcessPlugin() const {
+    return kind == PluginKind::InProcess ? ptr : nullptr;
+  }
+  LoadedExecutablePlugin *getAsExecutablePlugin() const {
+    return kind == PluginKind::Executable
+               ? static_cast<LoadedExecutablePlugin *>(ptr)
+               : nullptr;
+  }
+};
+
 class CompilerPluginLoadRequest
-  : public SimpleRequest<CompilerPluginLoadRequest,
-                         void *(ASTContext *, Identifier),
-                         RequestFlags::Cached> {
+    : public SimpleRequest<CompilerPluginLoadRequest,
+                           LoadedCompilerPlugin(ASTContext *, Identifier),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  void *evaluate(
-      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
-  ) const;
+  LoadedCompilerPlugin evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                Identifier moduleName) const;
 
 public:
   // Source location

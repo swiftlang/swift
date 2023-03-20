@@ -72,43 +72,9 @@ extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
 
 extern "C" void swift_ASTGen_initializePlugin(void *handle);
 extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
-
-/// Produce the mangled name for the nominal type descriptor of a type
-/// referenced by its module and type name.
-static std::string mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
-  using namespace Demangle;
-
-  //  kind=Global
-  //    kind=NominalTypeDescriptor
-  //      kind=Type
-  //        kind=Structure|Enum|Class
-  //          kind=Module, text=moduleName
-  //          kind=Identifier, text=typeName
-  Demangle::Demangler D;
-  auto *global = D.createNode(Node::Kind::Global);
-  {
-    auto *nominalDescriptor =
-        D.createNode(Node::Kind::TypeMetadataAccessFunction);
-    {
-      auto *type = D.createNode(Node::Kind::Type);
-      {
-        auto *module = D.createNode(Node::Kind::Module, moduleName);
-        auto *identifier = D.createNode(Node::Kind::Identifier, typeName);
-        auto *structNode = D.createNode(typeKind);
-        structNode->addChild(module, D);
-        structNode->addChild(identifier, D);
-        type->addChild(structNode, D);
-      }
-      nominalDescriptor->addChild(type, D);
-    }
-    global->addChild(nominalDescriptor, D);
-  }
-
-  auto mangleResult = mangleNode(global);
-  assert(mangleResult.isSuccess());
-  return mangleResult.result();
-}
+extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
+    void *handle, const char *libraryPath, const char *moduleName,
+    void *diagEngine);
 
 #if SWIFT_SWIFT_PARSER
 /// Look for macro's type metadata given its external module and type name.
@@ -125,7 +91,7 @@ static void const *lookupMacroTypeMetadataByExternalName(
 
   void *accessorAddr = nullptr;
   for (auto typeKind : typeKinds) {
-    auto symbolName = mangledNameForTypeMetadataAccessor(
+    auto symbolName = Demangle::mangledNameForTypeMetadataAccessor(
         moduleName, typeName, typeKind);
     accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str(), libraryHint);
     if (accessorAddr)
@@ -320,10 +286,9 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadPluginByName(StringRef searchPath,
-                              StringRef moduleName,
-                              llvm::vfs::FileSystem &fs,
-                              PluginRegistry *registry) {
+static void *loadLibraryPluginByName(StringRef searchPath, StringRef moduleName,
+                                     llvm::vfs::FileSystem &fs,
+                                     PluginRegistry *registry) {
   SmallString<128> fullPath(searchPath);
   llvm::sys::path::append(fullPath, "lib" + moduleName + LTDL_SHLIB_EXT);
   if (fs.getRealPath(fullPath, fullPath))
@@ -332,15 +297,76 @@ static void *loadPluginByName(StringRef searchPath,
   return loadResult ? *loadResult : nullptr;
 }
 
-void *CompilerPluginLoadRequest::evaluate(
-    Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
-) const {
+static LoadedExecutablePlugin *
+loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
+  // Find an executable plugin.
+  std::string libraryPath;
+  std::string executablePluginPath;
+
+  if (auto found = ctx.lookupExternalLibraryPluginByModuleName(moduleName)) {
+    // Found in '-external-plugin-path'.
+    std::tie(libraryPath, executablePluginPath) = found.value();
+  } else if (auto found = ctx.lookupExecutablePluginByModuleName(moduleName)) {
+    // Found in '-load-plugin-executable'.
+    executablePluginPath = found->str();
+  }
+  if (executablePluginPath.empty())
+    return nullptr;
+
+  // Launch the plugin.
+  LoadedExecutablePlugin *executablePlugin =
+      ctx.loadExecutablePlugin(executablePluginPath);
+  if (!executablePlugin)
+    return nullptr;
+
+  // FIXME: Ideally this should be done right after invoking the plugin.
+  // But plugin loading is in libAST and it can't link ASTGen symbols.
+  if (!executablePlugin->isInitialized()) {
+#if SWIFT_SWIFT_PARSER
+    swift_ASTGen_initializePlugin(executablePlugin);
+    executablePlugin->setCleanup([executablePlugin] {
+      swift_ASTGen_deinitializePlugin(executablePlugin);
+    });
+#endif
+  }
+
+  // If this is a plugin server, load the library.
+  if (!libraryPath.empty()) {
+#if SWIFT_SWIFT_PARSER
+    llvm::SmallString<128> resolvedLibraryPath;
+    auto fs = ctx.SourceMgr.getFileSystem();
+    if (fs->getRealPath(libraryPath, resolvedLibraryPath)) {
+      return nullptr;
+    }
+    bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
+        executablePlugin, resolvedLibraryPath.c_str(), moduleName.str().data(),
+        &ctx.Diags);
+    if (!loaded)
+      return nullptr;
+#endif
+  }
+
+  return executablePlugin;
+}
+
+LoadedCompilerPlugin
+CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                    Identifier moduleName) const {
   auto fs = ctx->SourceMgr.getFileSystem();
   auto &searchPathOpts = ctx->SearchPathOpts;
   auto *registry = ctx->getPluginRegistry();
+
+  // First, check '-plugin-path' paths.
   for (const auto &path : searchPathOpts.PluginSearchPaths) {
-    if (auto found = loadPluginByName(path, moduleName.str(), *fs, registry))
-      return found;
+    if (auto found =
+            loadLibraryPluginByName(path, moduleName.str(), *fs, registry))
+      return LoadedCompilerPlugin::inProcess(found);
+  }
+
+  // Fall back to executable plugins.
+  // i.e. '-external-plugin-path', and '-load-plugin-executable'.
+  if (auto *found = loadExecutablePluginByName(*ctx, moduleName)) {
+    return LoadedCompilerPlugin::executable(found);
   }
 
   return nullptr;
@@ -372,24 +398,10 @@ resolveInProcessMacro(
 }
 
 static Optional<ExternalMacroDefinition>
-resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
-                      Identifier typeName) {
+resolveExecutableMacro(ASTContext &ctx,
+                       LoadedExecutablePlugin *executablePlugin,
+                       Identifier moduleName, Identifier typeName) {
 #if SWIFT_SWIFT_PARSER
-  // Find macros in exectuable plugins.
-  auto *executablePlugin =
-      ctx.lookupExecutablePluginByModuleName(moduleName);
-  if (!executablePlugin)
-    return None;
-
-  // FIXME: Ideally this should be done right after invoking the plugin.
-  // But plugin loading is in libAST and it can't link ASTGen symbols.
-  if (!executablePlugin->isInitialized()) {
-    swift_ASTGen_initializePlugin(executablePlugin);
-    executablePlugin->setCleanup([executablePlugin] {
-      swift_ASTGen_deinitializePlugin(executablePlugin);
-    });
-  }
-
   if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
           moduleName.str().data(), moduleName.str().size(),
           typeName.str().data(), typeName.str().size(), executablePlugin)) {
@@ -400,7 +412,6 @@ resolveExecutableMacro(ASTContext &ctx, Identifier moduleName,
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
 #endif
-
   return None;
 }
 
@@ -411,8 +422,9 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   // Try to load a plugin module from the plugin search paths. If it
   // succeeds, resolve in-process from that plugin
   CompilerPluginLoadRequest loadRequest{ctx, moduleName};
-  if (auto loadedLibrary = evaluateOrDefault(
-          evaluator, loadRequest, nullptr)) {
+  LoadedCompilerPlugin loaded =
+      evaluateOrDefault(evaluator, loadRequest, nullptr);
+  if (auto loadedLibrary = loaded.getAsInProcessPlugin()) {
     if (auto inProcess = resolveInProcessMacro(
             *ctx, moduleName, typeName, loadedLibrary))
       return *inProcess;
@@ -423,9 +435,11 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     return *inProcess;
 
   // Try executable plugins.
-  if (auto executableMacro =
-          resolveExecutableMacro(*ctx, moduleName, typeName)) {
-    return executableMacro;
+  if (auto *executablePlugin = loaded.getAsExecutablePlugin()) {
+    if (auto executableMacro = resolveExecutableMacro(*ctx, executablePlugin,
+                                                      moduleName, typeName)) {
+      return executableMacro;
+    }
   }
 
   return None;

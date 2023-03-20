@@ -28,6 +28,7 @@ if (SWIFT_SWIFT_PARSER)
     SwiftOperators
     SwiftSyntaxBuilder
     SwiftSyntaxMacros
+    SwiftCompilerPluginMessageHandling
   )
 
   # Compute the list of SwiftSyntax targets that we will link against.

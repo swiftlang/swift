@@ -14,14 +14,17 @@
 // NOTE: Types in this file should be self-contained and should not depend on any non-stdlib types.
 
 internal enum HostToPluginMessage: Codable {
+  /// Get capability of this plugin.
   case getCapability
 
+  /// Expand a '@freestanding' macro.
   case expandFreestandingMacro(
     macro: PluginMessage.MacroReference,
     discriminator: String,
     syntax: PluginMessage.Syntax
   )
 
+  /// Expand an '@attached' macro.
   case expandAttachedMacro(
     macro: PluginMessage.MacroReference,
     macroRole: PluginMessage.MacroRole,
@@ -30,9 +33,21 @@ internal enum HostToPluginMessage: Codable {
     declSyntax: PluginMessage.Syntax,
     parentDeclSyntax: PluginMessage.Syntax?
   )
+
+  /// Optionally implemented message to load a dynamic link library.
+  /// 'moduleName' can be used as a hint indicating that the library
+  /// provides the specified module.
+  case loadPluginLibrary(
+    libraryPath: String,
+    moduleName: String
+  )
 }
 
 internal enum PluginToHostMessage: Codable {
+  case getCapabilityResult(
+    capability: PluginMessage.PluginCapability
+  )
+
   case expandFreestandingMacroResult(
     expandedSource: String?,
     diagnostics: [PluginMessage.Diagnostic]
@@ -43,18 +58,21 @@ internal enum PluginToHostMessage: Codable {
     diagnostics: [PluginMessage.Diagnostic]
   )
 
-  case getCapabilityResult(capability: PluginMessage.PluginCapability)
+  case loadPluginLibraryResult(
+    loaded: Bool,
+    diagnostics: [PluginMessage.Diagnostic]
+  )
 }
 
 /*namespace*/ internal enum PluginMessage {
-  static var PROTOCOL_VERSION_NUMBER: Int { 3 }  // Renamed 'customAttributeSyntax' to 'attributeSyntax'.
+  static var PROTOCOL_VERSION_NUMBER: Int { 4 }  // Added 'loadPluginLibrary'.
 
   struct PluginCapability: Codable {
     var protocolVersion: Int
-  }
 
-  static var capability: PluginCapability {
-    PluginCapability(protocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER)
+    /// Optional features this plugin provides.
+    ///  * 'load-plugin-library': 'loadPluginLibrary' message is implemented.
+    var features: [String]?
   }
 
   struct MacroReference: Codable {

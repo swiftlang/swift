@@ -112,6 +112,9 @@ public func resolveExecutableMacro(
   typeNameLength: Int,
   pluginOpaqueHandle: UnsafeMutableRawPointer
 ) -> UnsafeRawPointer {
+  // NOTE: This doesn't actually resolve anything.
+  // Executable plugins is "trusted" to have the macro implementation. If not,
+  // the actual expansion fails.
   let exportedPtr = UnsafeMutablePointer<ExportedExecutableMacro>.allocate(capacity: 1)
   exportedPtr.initialize(to: .init(
     moduleName: String(bufferStart: moduleName, count: moduleNameLength),

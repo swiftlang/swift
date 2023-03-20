@@ -1467,8 +1467,25 @@ public:
   
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  LoadedExecutablePlugin *
-  lookupExecutablePluginByModuleName(Identifier moduleName);
+  /// Lookup an executable plugin that is declared to handle \p moduleName
+  /// module by '-load-plugin-executable'.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
+
+  /// Look for dynamic libraries in paths from `-external-plugin-path` and
+  /// return a pair of `(library path, plugin server executable)` if found.
+  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
+  /// underlying path.
+  Optional<std::pair<std::string, std::string>>
+  lookupExternalLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Launch the specified executable plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
 
   /// Get the plugin registry this ASTContext is using.
   PluginRegistry *getPluginRegistry() const;

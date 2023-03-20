@@ -37,7 +37,54 @@ public func _deinitializePlugin(
   plugin.deinitialize()
 }
 
+/// Load the library plugin in the plugin server.
+@_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
+func swift_ASTGen_pluginServerLoadLibraryPlugin(
+  opaqueHandle: UnsafeMutableRawPointer,
+  libraryPath: UnsafePointer<Int8>,
+  moduleName: UnsafePointer<Int8>,
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+) -> Bool {
+  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
+  let libraryPath = String(cString: libraryPath)
+  let moduleName = String(cString: moduleName)
+  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+
+  do {
+    let result = try plugin.sendMessageAndWait(
+      .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
+    )
+    guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
+      throw PluginError.invalidReponseKind
+    }
+    diagEngine.emit(diagnostics);
+    return loaded
+  } catch {
+    diagEngine.diagnose(error: error)
+    return false
+  }
+}
+
 struct CompilerPlugin {
+  struct Capability {
+    enum Feature: String {
+      case loadPluginLibrary = "load-plugin-library"
+    }
+
+    var protocolVersion: Int
+    var features: Set<Feature>
+
+    init(_ message: PluginMessage.PluginCapability) {
+      self.protocolVersion = message.protocolVersion
+      if let features = message.features {
+        self.features = Set(features.compactMap(Feature.init(rawValue:)))
+      } else {
+        self.features = []
+      }
+    }
+  }
+
   let opaqueHandle: UnsafeMutableRawPointer
 
   private func withLock<R>(_ body: () throws -> R) rethrows -> R {
@@ -82,26 +129,26 @@ struct CompilerPlugin {
   }
 
   func initialize() {
-    self.withLock {
-      // Get capability.
-      let response: PluginToHostMessage
-      do {
+    // Don't use `sendMessageAndWait` because we want to keep the lock until
+    // setting the returned value.
+    do {
+      try self.withLock {
+        // Get capability.
         try self.sendMessage(.getCapability)
-        response = try self.waitForNextMessage()
-      } catch {
-        assertionFailure(String(describing: error))
-        return
-      }
-      switch response {
-      case .getCapabilityResult(capability: let capability):
-        let ptr = UnsafeMutablePointer<PluginMessage.PluginCapability>.allocate(capacity: 1)
-        ptr.initialize(to: capability)
+        let response = try self.waitForNextMessage()
+        guard case .getCapabilityResult(let capability) = response else {
+          throw PluginError.invalidReponseKind
+        }
+        let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+        ptr.initialize(to: .init(capability))
         Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
-      default:
-        assertionFailure("invalid response")
       }
+    } catch {
+      assertionFailure(String(describing: error))
+      return
     }
   }
+
   func deinitialize() {
     self.withLock {
       if let ptr = Plugin_getCapability(opaqueHandle) {
@@ -113,11 +160,11 @@ struct CompilerPlugin {
     }
   }
 
-  var capability: PluginMessage.PluginCapability {
+  var capability: Capability? {
     if let ptr = Plugin_getCapability(opaqueHandle) {
-      return ptr.assumingMemoryBound(to: PluginMessage.PluginCapability.self).pointee
+      return ptr.assumingMemoryBound(to: Capability.self).pointee
     }
-    return PluginMessage.PluginCapability(protocolVersion: 0)
+    return nil
   }
 }
 
@@ -222,6 +269,14 @@ class PluginDiagnosticsEngine {
     for diagnostic in diagnostics {
       self.emit(diagnostic)
     }
+  }
+
+  func diagnose(error: Error) {
+    self.emitSingle(
+      message: String(describing: error),
+      severity: .error,
+      position: .invalid
+    )
   }
 
   /// Produce the C++ source location for a given position based on a
