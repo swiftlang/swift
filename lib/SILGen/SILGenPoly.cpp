@@ -100,6 +100,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/Compiler.h"
@@ -832,13 +833,12 @@ void SILGenFunction::collectThunkParams(
   }
 }
 
-/// Force a ManagedValue to be stored into a temporary initialization
-/// if it wasn't emitted that way directly.
-static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
-                          ManagedValue result, TemporaryInitialization &temp) {
-  if (result.isInContext()) return;
-  result.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, temp.getAddress());
-  temp.finishInitialization(SGF);
+static CanPackType getInducedPackType(const ASTContext &ctx,
+                                AnyFunctionType::CanParamArrayRef params) {
+  SmallVector<CanType, 8> elts;
+  elts.reserve(params.size());
+  for (auto param : params) elts.push_back(param.getParameterType());
+  return CanPackType::get(ctx, elts);
 }
 
 namespace {
@@ -876,7 +876,8 @@ public:
                                        OutputOrigType, OutputSubstType,
                                        Output->getType().getObjectType(),
                                        SGFContext(outputInit.get()));
-    emitForceInto(SGF, loc, mv, *outputInit);
+    if (!mv.isInContext())
+      mv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, outputInit.get());
 
     // Disable the cleanup; we've kept our promise to leave the inout
     // initialized.
@@ -889,6 +890,184 @@ public:
       << OutputOrigType << ", " << OutputSubstType << ", "
       << Output << ", " << Input << ")\n";
   }
+};
+
+/// A class for generating the elements of a collecttion.
+template <class CollectionType>
+class CollectionGenerator {
+  typename CollectionType::iterator i, e;
+
+  using reference =
+    typename std::iterator_traits<typename CollectionType::iterator>::reference;
+
+public:
+  CollectionGenerator(const CollectionType &collection)
+    : i(collection.begin()), e(collection.end()) {}
+
+  reference getCurrent() const {
+    assert(!isFinished());
+    return *i;
+  }
+
+  reference claimNext() {
+    assert(!isFinished());
+    return *i++;
+  }
+
+  bool isFinished() const {
+    return i == e;
+  }
+
+  void advance() {
+    assert(!isFinished());
+    ++i;
+  }
+
+  void finish() {
+    assert(isFinished() && "didn't finish generating the collection");
+  }
+};
+
+/// A class for destructuring a list of formal input parameters given
+/// an abstraction pattern for it.
+class InputParamGenerator {
+  const ASTContext &ctx;
+  CollectionGenerator<ArrayRef<ManagedValue>> &inputs;
+  FunctionParamGenerator inputParam;
+
+  /// If inputParam.isPackExpansion(), this is the pack currently
+  /// being destructured.  The cleanup on it is only for the components
+  /// starting at inputSubstParamIndex.
+  ManagedValue inputPackValue;
+
+  /// If inputParam.isPackExpansion(), this is the formal type
+  /// of the orig parameter pack.
+  CanPackType inputFormalPackType;
+
+  /// The current index within inputParam.getSubstParams().
+  unsigned inputSubstParamIndex;
+
+  /// Precondition: we aren't finished visiting orig parameters,
+  /// and we've already readied the current orig parameter.
+  ///
+  /// Ready the next subst parameter (the one at inputSubstParamIndex)
+  /// from the current orig parameter.  If we've exhausted the supply
+  /// of subst parameters from this orig parameter, advance to the
+  /// next orig parameter and repeat.
+  ///
+  /// Postcondition: we're either finished or properly configured
+  /// with a subst parameter that hasn't been presented before.
+  void readyNextSubstParameter() {
+    while (true) {
+      assert(!inputParam.isFinished());
+      assert(inputSubstParamIndex <= inputParam.getSubstParams().size());
+
+      // If we haven't reached the limit of the current parameter yet,
+      // continue.
+      if (inputSubstParamIndex != inputParam.getSubstParams().size())
+        return;
+
+      // Otherwise, advance, and ready the next orig parameter if we
+      // didn't finish.
+      inputParam.advance();
+      if (inputParam.isFinished()) return;
+      readyOrigParameter();
+    }
+  }
+
+  /// Ready the current orig parameter.
+  void readyOrigParameter() {
+    inputSubstParamIndex = 0;
+    if (inputParam.isPackExpansion()) {
+      // The pack value exists in the lowered parameters and must be
+      // claimed whether it contains formal parameters or not.
+      inputPackValue = inputs.claimNext();
+
+      // We don't need to do any other set up if we're going to
+      // immediately move past it, though.
+      if (inputParam.getSubstParams().empty())
+        return;
+
+      // Compute a formal pack type for the pack.
+      inputFormalPackType =
+        getInducedPackType(ctx, inputParam.getSubstParams());
+    }
+  }
+
+public:
+  InputParamGenerator(const ASTContext &ctx,
+                      CollectionGenerator<ArrayRef<ManagedValue>> &inputs,
+                      AbstractionPattern inputOrigFunctionType,
+                      AnyFunctionType::CanParamArrayRef inputSubstParams,
+                      bool ignoreFinalParam)
+    : ctx(ctx), inputs(inputs),
+      inputParam(inputOrigFunctionType, inputSubstParams, ignoreFinalParam) {
+
+    if (!inputParam.isFinished()) {
+      readyOrigParameter();
+      readyNextSubstParameter();
+    }
+  }
+
+  /// Is this generator finished?  If so, the getters below may not be used.
+  bool isFinished() const {
+    return inputParam.isFinished();
+  }
+
+  bool isPackExpansion() const {
+    return inputParam.isPackExpansion();
+  }
+
+  AbstractionPattern getOrigType() const {
+    return inputParam.getOrigType();
+  }
+
+  AnyFunctionType::CanParam getSubstParam() const {
+    return inputParam.getSubstParams()[inputSubstParamIndex];
+  }
+
+  ManagedValue getPackValue() const {
+    assert(isPackExpansion());
+    return inputPackValue;
+  }
+
+  void updatePackValue(ManagedValue packValue) {
+    assert(isPackExpansion());
+    inputPackValue = packValue;
+  }
+
+  unsigned getPackComponentIndex() const {
+    assert(isPackExpansion());
+    return inputSubstParamIndex;
+  }
+
+  CanPackType getFormalPackType() const {
+    assert(isPackExpansion());
+    return inputFormalPackType;
+  }
+
+  /// Given that we just processed an input, advance to the next,
+  /// if there is on.
+  ///
+  /// Postcondition: either isFinished() or all of the invariants
+  /// for the mutable state have been established.
+  void advance() {
+    assert(!isFinished());
+    assert(inputSubstParamIndex < inputParam.getSubstParams().size());
+    inputSubstParamIndex++;
+
+    readyNextSubstParameter();
+  }
+
+  void finish() {
+    inputParam.finish();
+  }
+
+  /// Project out the next input scalar pack component.
+  ManagedValue emitInputScalarPackComponent();
+
+  /// "Project" out the next input pack-expansion pack component.
+  ManagedValue emitInputPackPackComponent();
 };
 
 /// Given a list of inputs that are suited to the parameters of one
@@ -1011,7 +1190,7 @@ public:
 class TranslateArguments {
   SILGenFunction &SGF;
   SILLocation Loc;
-  ArrayRef<ManagedValue> Inputs;
+  CollectionGenerator<ArrayRef<ManagedValue>> Inputs;
   SmallVectorImpl<ManagedValue> &Outputs;
   CanSILFunctionType OutputTypesFuncTy;
   ArrayRef<SILParameterInfo> OutputTypes;
@@ -1027,7 +1206,8 @@ public:
   void translate(AbstractionPattern inputOrigFunctionType,
                  AnyFunctionType::CanParamArrayRef inputSubstTypes,
                  AbstractionPattern outputOrigFunctionType,
-                 AnyFunctionType::CanParamArrayRef outputSubstTypes) {
+                 AnyFunctionType::CanParamArrayRef outputSubstTypes,
+                 bool ignoreFinalInputOrigParam = false) {
     if (inputSubstTypes.size() == 1 &&
         outputSubstTypes.size() != 1) {
       // SE-0110 tuple splat. Turn the output into a single value of tuple
@@ -1063,23 +1243,66 @@ public:
       // parameters will be mapped one-to-one to the output parameters.
       translate(inputOrigType, inputSubstType,
                 outputOrigType, outputSubstType);
+      Inputs.finish();
       return;
     }
 
-    // Otherwise, parameters are always reabstracted one-to-one.
+    // Otherwise, formal parameters are always reabstracted one-to-one,
+    // at least in substituted types.  (They can differ in the orig types
+    // because of pack expansions in the parameters.)  As a result, if we
+    // generate the substituted parameters for both the input and
+    // output function types, and we pull a substituted formal parameter
+    // off of one whenever we pull a substituted formal parameter off the
+    // other, we should end up exhausting both sequences.
     assert(inputSubstTypes.size() == outputSubstTypes.size());
 
-    SmallVector<AbstractionPattern, 8> inputOrigTypes;
-    SmallVector<AbstractionPattern, 8> outputOrigTypes;
-    for (auto i : indices(inputSubstTypes)) {
-      inputOrigTypes.push_back(inputOrigFunctionType.getFunctionParamType(i));
-      outputOrigTypes.push_back(outputOrigFunctionType.getFunctionParamType(i));
-    }
+    // It's more straightforward for generating packs if we allow
+    // ourselves to be driven by the output sequence.  This requires us
+    // to invert control for the input sequence, pulling off one
+    // component at a time while looping over the output sequence.
 
-    translate(inputOrigTypes, inputSubstTypes,
-              outputOrigTypes, outputSubstTypes);
+    InputParamGenerator inputParams(SGF.getASTContext(), Inputs,
+                                    inputOrigFunctionType,
+                                    inputSubstTypes,
+                                    ignoreFinalInputOrigParam);
+
+    FunctionParamGenerator outputParams(outputOrigFunctionType,
+                                        outputSubstTypes,
+                                        /*drop self*/ false);
+
+    // Loop over the *orig* formal parameters.  We'll pull off
+    // *substituted* formal parameters in parallel for both inputs
+    // and outputs.
+    for (; !outputParams.isFinished(); outputParams.advance()) {
+      // If we have a pack expansion formal parameter in the orig
+      // output type, it corresponds to N formal parameters in the
+      // substituted output type.  translateToPackParam will pull off
+      // N substituted formal parameters from the input type.
+      if (outputParams.isPackExpansion()) {
+        auto outputPackParam = claimNextOutputType();
+        auto output =
+          translateToPackParam(inputParams,
+                               outputParams.getOrigType(),
+                               outputParams.getSubstParams(),
+                               outputPackParam);
+        Outputs.push_back(output);
+
+      // Otherwise, we have a single, non-pack formal parameter
+      // in the output type.  translateToSingleParam will pull
+      // off a single formal parameter from the input type.
+      } else {
+        translateToSingleParam(inputParams,
+                               outputParams.getOrigType(),
+                               outputParams.getSubstParams()[0]);
+      }
+    }
+    outputParams.finish();
+    inputParams.finish();
+
+    Inputs.finish();
   }
 
+  /// This is used for translating yields.
   void translate(ArrayRef<AbstractionPattern> inputOrigTypes,
                  AnyFunctionType::CanParamArrayRef inputSubstTypes,
                  ArrayRef<AbstractionPattern> outputOrigTypes,
@@ -1092,8 +1315,11 @@ public:
       translate(inputOrigTypes[i], inputSubstTypes[i],
                 outputOrigTypes[i], outputSubstTypes[i]);
     }
+
+    Inputs.finish();
   }
 
+private:
   void translate(AbstractionPattern inputOrigType,
                  AnyFunctionType::CanParam inputSubstType,
                  AbstractionPattern outputOrigType,
@@ -1117,19 +1343,21 @@ public:
     }
   }
 
-
   void translate(AbstractionPattern inputOrigType,
                  CanType inputSubstType,
                  AbstractionPattern outputOrigType,
                  CanType outputSubstType) {
-    // Most of this function is about tuples: tuples can be represented
-    // as one or many values, with varying levels of indirection.
-    auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
-    auto outputTupleType = dyn_cast<TupleType>(outputSubstType);
-
-    // Case where the input type is an exploded tuple.
+    // Handle the input pattern being a tuple, which will have been
+    // expanded in the input parameters.
     if (inputOrigType.isTuple()) {
+      auto inputTupleType = cast<TupleType>(inputSubstType);
+
+      // If the output pattern is also a tuple, it needs to be expanded
+      // in the output arguments.  Do a parallel translation of the
+      // expanded elements.
       if (outputOrigType.isTuple()) {
+        auto outputTupleType = cast<TupleType>(outputSubstType);
+
         // Both input and output are exploded tuples, easy case.
         return translateParallelExploded(inputOrigType,
                                          inputTupleType,
@@ -1147,23 +1375,23 @@ public:
       return;
     }
 
-    // Handle output being an exploded tuple when the input is opaque.
+    // Handle the output pattern being a tuple, which needs to be
+    // expanded in the output parameters.
     if (outputOrigType.isTuple()) {
-      if (inputTupleType) {
-        // The input is exploded and the output is not. Translate values
-        // and store them to a result tuple in memory.
-        assert(inputOrigType.isTypeParameter() &&
-               "Input is not a tuple and is not opaque?");
+      auto outputTupleType = cast<TupleType>(outputSubstType);
 
-        return translateAndExplodeOutOf(inputOrigType,
-                                        inputTupleType,
-                                        outputOrigType,
-                                        outputTupleType,
-                                        claimNextInput());
-      }
+      // The input type must also be a tuple, because there aren't
+      // any conversions that *add* tuple-ness.  It's just not
+      // expanded in the input parameters.
+      // FIXME: IUO<Tuple> to Tuple, maybe?
+      assert(inputOrigType.isTypeParameter() &&
+             "Input is not a tuple and is not opaque?");
+      auto inputTupleType = cast<TupleType>(inputSubstType);
 
-      // FIXME: IUO<Tuple> to Tuple
-      llvm_unreachable("Unhandled conversion to exploded tuple");
+      translateAndExplodeOutOf(inputOrigType, inputTupleType,
+                               outputOrigType, outputTupleType,
+                               claimNextInput());
+      return;
     }
 
     // Okay, we are now working with a single value turning into a
@@ -1176,7 +1404,34 @@ public:
     Outputs.push_back(output);
   }
 
-private:
+  void translateToSingleParam(InputParamGenerator &inputParam,
+                              AbstractionPattern outputOrigType,
+                              AnyFunctionType::CanParam outputSubstParam);
+
+  ManagedValue translateToPackParam(InputParamGenerator &inputParams,
+                       AbstractionPattern outputOrigExpansionType,
+                       AnyFunctionType::CanParamArrayRef outputSubstParams,
+                       SILParameterInfo outputParam);
+
+  ManagedValue translateIntoSingle(AbstractionPattern inputOrigType,
+                                   CanType inputSubstType,
+                                   AbstractionPattern outputOrigType,
+                                   CanType outputSubstType,
+                                   SILParameterInfo outputParam) {
+    if (inputOrigType.isTuple()) {
+      return translateTupleIntoSingle(inputOrigType,
+                                      cast<TupleType>(inputSubstType),
+                                      outputOrigType,
+                                      outputSubstType,
+                                      outputParam);
+    }
+
+    auto input = claimNextInput();
+    return translateSingle(inputOrigType, inputSubstType,
+                           outputOrigType, outputSubstType,
+                           input, outputParam);
+  }
+
   ManagedValue
   translateTupleIntoSingle(AbstractionPattern inputOrigType,
                            CanTupleType inputSubstType,
@@ -1251,6 +1506,37 @@ private:
     llvm_unreachable("Unhandled conversion from exploded tuple");
   }
 
+  void translateFromSingle(AbstractionPattern inputOrigType,
+                           AnyFunctionType::CanParam inputSubstParam,
+                           AbstractionPattern outputOrigType,
+                           AnyFunctionType::CanParam outputSubstParam,
+                           ManagedValue inputValue) {
+    CanType inputSubstType = inputSubstParam.getParameterType();
+    CanType outputSubstType = outputSubstParam.getParameterType();
+
+    if (outputSubstParam.isInOut()) {
+      assert(inputSubstParam.isInOut());
+      auto outputLoweredTy = claimNextOutputType();
+
+      ManagedValue output = translateInOut(inputOrigType, inputSubstType,
+                                           outputOrigType, outputSubstType,
+                                           inputValue, outputLoweredTy);
+      Outputs.push_back(output);
+    } else if (outputOrigType.isTuple()) {
+      translateAndExplodeOutOf(inputOrigType,
+                               cast<TupleType>(inputSubstType),
+                               outputOrigType,
+                               cast<TupleType>(outputSubstType),
+                               inputValue);
+    } else {
+      auto outputParam = claimNextOutputType();
+      ManagedValue output = translateSingle(inputOrigType, inputSubstType,
+                                            outputOrigType, outputSubstType,
+                                            inputValue, outputParam);
+      Outputs.push_back(output);
+    }
+  }
+
   /// Take a tuple that has been exploded in the input and turn it into
   /// a tuple value in the output.
   ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
@@ -1315,6 +1601,7 @@ private:
 
     return ManagedValue::forUnmanaged(tuple);
   }
+
 
   /// Handle a tuple that has been exploded in the input but wrapped in
   /// an optional in the output.
@@ -1510,7 +1797,7 @@ private:
         auto input = claimNextInput();
         translateSingleInto(inputEltOrigType, inputEltSubstType,
                             outputEltOrigType, outputEltSubstType,
-                            input, eltInit);
+                            input, eltAddr->getType(), eltInit);
       }
     }
 
@@ -1529,7 +1816,8 @@ private:
     auto &outputTL = SGF.getTypeLowering(resultTy);
     auto temp = SGF.emitTemporary(Loc, outputTL);
     translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
-                        outputSubstType, input, *temp);
+                        outputSubstType, input, resultTy.getAddressType(),
+                        *temp);
     return temp->getManagedAddress();
   }
 
@@ -1592,24 +1880,29 @@ private:
                                ManagedValue input,
                                SILParameterInfo result) {
     auto resultTy = SGF.getSILType(result, OutputTypesFuncTy);
+
+    return translateSingle(inputOrigType, inputSubstType,
+                           outputOrigType, outputSubstType,
+                           input, resultTy, result.getConvention());
+  }
+
+  ManagedValue translateSingle(AbstractionPattern inputOrigType,
+                               CanType inputSubstType,
+                               AbstractionPattern outputOrigType,
+                               CanType outputSubstType,
+                               ManagedValue input,
+                               SILType resultTy,
+                               ParameterConvention resultConvention) {
     // Easy case: we want to pass exactly this value.
     if (input.getType() == resultTy) {
-      switch (result.getConvention()) {
-      case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Indirect_In:
-        if (!input.hasCleanup() &&
-            input.getOwnershipKind() != OwnershipKind::None)
-          input = input.copyUnmanaged(SGF, Loc);
-        break;
-
-      default:
-        break;
+      if (isConsumedParameter(resultConvention) && !input.isPlusOne(SGF)) {
+        input = input.copyUnmanaged(SGF, Loc);
       }
 
       return input;
     }
-    
-    switch (result.getConvention()) {
+
+    switch (resultConvention) {
     // Direct translation is relatively easy.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
@@ -1682,7 +1975,7 @@ private:
     // Translate the input value into the temporary.
     translateSingleInto(inputOrigType, inputSubstType,
                         outputOrigType, outputSubstType,
-                        ownedInput, *temporary);
+                        ownedInput, resultTy, *temporary);
 
     // Forward the cleanup on the temporary.  We're about to push a new
     // cleanup that will re-assert ownership of this value.
@@ -1703,7 +1996,7 @@ private:
                                                 temporaryAddr,
                                                 input.getLValueAddress());
 
-    // Add the temporary as an l-value argument.
+    // Use the temporary as the argument.
     return ManagedValue::forLValue(temporaryAddr);
   }
 
@@ -1713,12 +2006,15 @@ private:
                            AbstractionPattern outputOrigType,
                            CanType outputSubstType,
                            ManagedValue input,
-                           TemporaryInitialization &temp) {
+                           SILType outputTy,
+                           Initialization &init) {
+    assert(outputTy.isAddress());
     auto output = translatePrimitive(inputOrigType, inputSubstType,
                                      outputOrigType, outputSubstType,
-                                     input, temp.getAddress()->getType(),
-                                     SGFContext(&temp));
-    forceInto(output, temp);
+                                     input, outputTy,
+                                     SGFContext(&init));
+    if (!output.isInContext())
+      output.ensurePlusOne(SGF, Loc).forwardInto(SGF, Loc, &init);
   }
 
   /// Apply primitive translation to the given value.
@@ -1735,13 +2031,8 @@ private:
                                     loweredOutputTy, context);
   }
 
-  /// Force the given result into the given initialization.
-  void forceInto(ManagedValue result, TemporaryInitialization &temp) {
-    emitForceInto(SGF, Loc, result, temp);
-  }
-
   ManagedValue claimNextInput() {
-    return claimNext(Inputs);
+    return Inputs.claimNext();
   }
 
   /// Claim the next lowered parameter in the output.  The conventions in
@@ -1755,6 +2046,289 @@ private:
 };
 
 } // end anonymous namespace
+
+static ManagedValue claimScalarPackComponent(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             InputParamGenerator &inputParam) {
+  assert(inputParam.isPackExpansion());
+
+  auto formalPackType = inputParam.getFormalPackType();
+  auto componentIndex = inputParam.getPackComponentIndex();
+  assert(!isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
+
+  auto packMV = inputParam.getPackValue();
+  auto packTy = packMV.getType().castTo<SILPackType>();
+  auto eltTy = packTy->getSILElementType(componentIndex);
+  assert(!eltTy.is<PackExpansionType>());
+
+  // Deactivate the cleanup for the input pack value.
+  CleanupCloner cloner(SGF, packMV);
+  auto packAddr = packMV.forward(SGF);
+
+  // Project the scalar element from the pack.
+  auto packIndex =
+    SGF.B.createScalarPackIndex(loc, componentIndex, formalPackType);
+  auto eltAddr =
+    SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
+
+  // Re-enter cleanups for the element and the remaining pack components.
+  auto elt = cloner.clone(eltAddr);
+  packMV = cloner.cloneForRemainingPackComponents(packAddr,
+                                                  formalPackType,
+                                                  componentIndex + 1);
+  inputParam.updatePackValue(packMV);
+
+  return elt;
+}
+
+static ManagedValue claimPackExpansionComponent(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                          InputParamGenerator &inputParam) {
+  assert(inputParam.isPackExpansion());
+
+  auto formalPackType = inputParam.getFormalPackType();
+  auto componentIndex = inputParam.getPackComponentIndex();
+  assert(isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
+
+  auto packMV = inputParam.getPackValue();
+  auto packTy = packMV.getType().castTo<SILPackType>();
+  auto expansionTy = packTy->getSILElementType(componentIndex);
+  assert(expansionTy.is<PackExpansionType>());
+
+  // Deactivate the cleanup for the input pack value.  This should be
+  // for the current component and beyond.
+  CleanupCloner cloner(SGF, packMV);
+  auto packAddr = packMV.forward(SGF);
+
+  // We can't project the component pack in SIL currently,
+  // so this is just managing cleanups.
+
+  // Re-enter cleanups for the expansion component and the
+  // remaining pack components.
+  auto component = cloner.cloneForPackPackExpansionComponent(packAddr,
+                                                             formalPackType,
+                                                             componentIndex);
+  packMV = cloner.cloneForRemainingPackComponents(packAddr,
+                                                  formalPackType,
+                                                  componentIndex + 1);
+  inputParam.updatePackValue(packMV);
+
+  return component;
+}
+
+void TranslateArguments::translateToSingleParam(
+                            InputParamGenerator &inputParam,
+                            AbstractionPattern outputOrigType,
+                            AnyFunctionType::CanParam outputSubstParam) {
+  // If we're not processing a pack expansion, do a normal translation.
+  if (!inputParam.isPackExpansion()) {
+    translate(inputParam.getOrigType(), inputParam.getSubstParam(),
+              outputOrigType, outputSubstParam);
+
+  // Pull out a scalar component from the pack and translate that.
+  } else {
+    auto inputValue = claimScalarPackComponent(SGF, Loc, inputParam);
+    translateFromSingle(inputParam.getOrigType(), inputParam.getSubstParam(),
+                        outputOrigType, outputSubstParam,
+                        inputValue);
+  }
+
+  inputParam.advance();
+}
+
+static ParameterConvention
+getScalarConventionForPackConvention(ParameterConvention conv) {
+  switch (conv) {
+  case ParameterConvention::Pack_Owned:
+    return ParameterConvention::Indirect_In;
+  case ParameterConvention::Pack_Guaranteed:
+    return ParameterConvention::Indirect_In_Guaranteed;
+  case ParameterConvention::Pack_Inout:
+    return ParameterConvention::Indirect_Inout;
+  default:
+    llvm_unreachable("not a pack convention");
+  }
+  llvm_unreachable("bad convention");
+}
+
+ManagedValue TranslateArguments::translateToPackParam(
+                       InputParamGenerator &inputParam,
+                       AbstractionPattern outputOrigExpansionType,
+                       AnyFunctionType::CanParamArrayRef outputSubstParams,
+                       SILParameterInfo outputPackParam) {
+  assert(outputPackParam.isPack());
+  auto outputTy = SGF.getSILType(outputPackParam, OutputTypesFuncTy);
+  auto outputPackTy = outputTy.castTo<SILPackType>();
+  assert(outputPackTy->getNumElements() == outputSubstParams.size());
+
+  // TODO: try to just forward the entire pack, or a slice of it.
+
+  // Allocate a pack of the expected type.
+  auto outputPackAddr =
+    SGF.emitTemporaryPackAllocation(Loc, outputTy.getObjectType());
+  auto outputFormalPackType =
+    getInducedPackType(SGF.getASTContext(), outputSubstParams);
+  auto outputOrigPatternType =
+    outputOrigExpansionType.getPackExpansionPatternType();
+
+  SmallVector<CleanupHandle, 4> outputComponentCleanups;
+
+  for (auto outputComponentIndex : indices(outputSubstParams)) {
+    SILType outputComponentTy =
+      outputPackTy->getSILElementType(outputComponentIndex);
+    auto outputSubstType =
+      outputSubstParams[outputComponentIndex].getParameterType();
+
+    auto inputSubstType = inputParam.getSubstParam().getParameterType();
+    auto inputOrigPatternType =
+      inputParam.getOrigType().getPackExpansionPatternType();
+
+    auto insertScalarIntoPack = [&](ManagedValue output) {
+      assert(!outputComponentTy.is<PackExpansionType>());
+      auto outputPackIndex =
+        SGF.B.createScalarPackIndex(Loc, outputComponentIndex,
+                                    outputFormalPackType);
+      SGF.B.createPackElementSet(Loc, output.getValue(),
+                                 outputPackIndex, outputPackAddr);
+      if (output.hasCleanup())
+        outputComponentCleanups.push_back(output.getCleanup());
+    };
+
+    // If we're not translating from a pack expansion, translate into a
+    // single component.  This may claim any number of input values.
+    if (!inputParam.isPackExpansion()) {
+      // Fake up a lowered parameter as if we could pass just this
+      // component.
+      SILParameterInfo outputComponentParam(outputComponentTy.getASTType(),
+        getScalarConventionForPackConvention(outputPackParam.getConvention()));
+
+      ManagedValue output = translateIntoSingle(inputOrigPatternType,
+                                                inputSubstType,
+                                                outputOrigPatternType,
+                                                outputSubstType,
+                                                outputComponentParam);
+      insertScalarIntoPack(output);
+
+    // Otherwise, we're starting with the input value from the pack.
+    } else {
+      auto inputComponentIndex = inputParam.getPackComponentIndex();
+      auto inputPackValue = inputParam.getPackValue();
+      auto inputPackTy = inputPackValue.getType().castTo<SILPackType>();
+      auto inputComponentTy =
+        inputPackTy->getSILElementType(inputComponentIndex);
+
+      // If we have a pack expansion component, emit a pack loop.
+      if (auto outputExpansionTy =
+            outputComponentTy.getAs<PackExpansionType>()) {
+        auto inputExpansionTy = inputComponentTy.castTo<PackExpansionType>();
+
+        // Claim the pack-expansion component and set up to clone its
+        // cleanup onto the elements.
+        auto inputComponent =
+          claimPackExpansionComponent(SGF, Loc, inputParam);
+
+        // We can only do direct forwarding of of the pack elements in
+        // one very specific case right now.  That isn't great, but we
+        // have to live with it.
+        bool forwardInputToOutput =
+          (inputExpansionTy.getPatternType()
+             == outputExpansionTy.getPatternType());
+
+        // The result of the transformation will be +1 unless we do that.
+        bool outputIsPlusOne = !forwardInputToOutput;
+
+        ManagedValue output =
+          SGF.emitPackTransform(Loc, inputComponent,
+                                inputParam.getFormalPackType(),
+                                inputComponentIndex,
+                                outputPackAddr,
+                                outputFormalPackType,
+                                outputComponentIndex,
+                                /*is trivial*/ forwardInputToOutput,
+                                outputIsPlusOne,
+            [&](ManagedValue inputEltAddr, SILType outputEltTy,
+                SGFContext ctxt) {
+          // If we decided to just forward, we can do that now.
+          if (forwardInputToOutput)
+            return inputEltAddr;
+
+          // Otherwise, map the subst pattern types into element context.
+          CanType outputSubstEltType =
+            cast<PackExpansionType>(outputSubstType).getPatternType();
+          CanType inputSubstEltType =
+            cast<PackExpansionType>(inputSubstType).getPatternType();
+          if (auto openedEnv =
+                SGF.getInnermostPackExpansion()->OpenedElementEnv) {
+            inputSubstEltType = openedEnv
+              ->mapContextualPackTypeIntoElementContext(inputSubstEltType);
+            outputSubstEltType = openedEnv
+              ->mapContextualPackTypeIntoElementContext(outputSubstEltType);
+          }
+
+          auto init = ctxt.getEmitInto();
+          assert(init);
+          translateSingleInto(inputOrigPatternType, inputSubstEltType,
+                              outputOrigPatternType, outputSubstEltType,
+                              inputEltAddr, outputEltTy, *init);
+          return ManagedValue::forInContext();
+        });
+
+        if (output.hasCleanup())
+          outputComponentCleanups.push_back(output.getCleanup());
+
+      // Otherwise, claim the next pack component and translate it.
+      } else {
+        SILParameterInfo outputComponentParam(outputComponentTy.getASTType(),
+          getScalarConventionForPackConvention(outputPackParam.getConvention()));
+
+        ManagedValue input = claimScalarPackComponent(SGF, Loc, inputParam);
+        ManagedValue output =
+          translateSingle(inputOrigPatternType, inputSubstType,
+                          outputOrigPatternType, outputSubstType,
+                          input, outputComponentParam);
+        insertScalarIntoPack(output);
+      }
+    }
+
+    inputParam.advance();
+  }
+
+  // Wrap up the value.
+  switch (outputPackParam.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+    llvm_unreachable("not a pack parameter convention");
+
+  case ParameterConvention::Pack_Inout:
+    llvm_unreachable("pack inout reabstraction not supported");
+
+  // For guaranteed, leave the cleanups in place and produce a
+  // borrowed value.
+  case ParameterConvention::Pack_Guaranteed:
+    return ManagedValue::forBorrowedAddressRValue(outputPackAddr);
+
+  // For owned, forward all the cleanups and enter a new cleanup
+  // for the entire pack.
+  case ParameterConvention::Pack_Owned: {
+    if (outputComponentCleanups.empty())
+      return ManagedValue::forTrivialAddressRValue(outputPackAddr);
+
+    for (auto cleanup : outputComponentCleanups) {
+      SGF.Cleanups.forwardCleanup(cleanup);
+    }
+
+    auto packCleanup =
+      SGF.enterDestroyPackCleanup(outputPackAddr, outputFormalPackType);
+    return ManagedValue::forOwnedAddressRValue(outputPackAddr, packCleanup);
+  }
+  }
+  llvm_unreachable("bad convention");
+}
 
 /// Apply trivial conversions to a value to handle differences between the inner
 /// and outer types of a function conversion thunk.
@@ -4668,6 +5242,8 @@ void SILGenFunction::emitProtocolWitness(
                                          witnessUnsubstTy->getSelfParameter());
   }
 
+  bool ignoreFinalInputOrigParam = false;
+
   // For static C++ methods and constructors, we need to drop the (metatype)
   // "self" param. The "native" SIL representation will look like this:
   //    @convention(method) (@thin Foo.Type) -> () but the "actual" SIL function
@@ -4676,14 +5252,19 @@ void SILGenFunction::emitProtocolWitness(
   // . We do this by simply omitting the last params.
   // TODO: fix this for static C++ methods.
   if (witness.getDecl()->getClangDecl() &&
-      isa<clang::CXXConstructorDecl>(witness.getDecl()->getClangDecl()))
+      isa<clang::CXXConstructorDecl>(witness.getDecl()->getClangDecl())) {
+    origParams.pop_back();
     reqtSubstParams = reqtSubstParams.drop_back();
+    ignoreFinalInputOrigParam = true;
+  }
 
   // For a free function witness, discard the 'self' parameter of the
-  // requirement.
+  // requirement.  We'll also have to tell the traversal to ignore the
+  // final orig parameter.
   if (isFree) {
     origParams.pop_back();
     reqtSubstParams = reqtSubstParams.drop_back();
+    ignoreFinalInputOrigParam = true;
   }
 
   // Translate the argument values from the requirement abstraction level to
@@ -4696,7 +5277,8 @@ void SILGenFunction::emitProtocolWitness(
     .translate(reqtOrigTy,
                reqtSubstParams,
                witnessOrigTy,
-               witnessSubstParams);
+               witnessSubstParams,
+               ignoreFinalInputOrigParam);
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
                                                 origWitnessFTy,

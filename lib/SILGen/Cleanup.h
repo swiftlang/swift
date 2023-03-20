@@ -342,6 +342,14 @@ public:
                                                    CanPackType inducedPackType,
                                                    unsigned componentIndex) const;
 
+  ManagedValue cloneForPackPackExpansionComponent(SILValue packAddr,
+                                                  CanPackType formalPackType,
+                                                  unsigned componentIndex) const;
+
+  ManagedValue cloneForRemainingPackComponents(SILValue packAddr,
+                                               CanPackType formalPackType,
+                                               unsigned firstComponentIndex) const;
+
   static void
   getClonersForRValue(SILGenFunction &SGF, const RValue &rvalue,
                       SmallVectorImpl<CleanupCloner> &resultingCloners);

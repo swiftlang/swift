@@ -444,3 +444,58 @@ CleanupCloner::cloneForTuplePackExpansionComponent(SILValue tupleAddr,
                                                  /*start at */ SILValue());
   return ManagedValue(tupleAddr, cleanup);
 }
+
+ManagedValue
+CleanupCloner::cloneForPackPackExpansionComponent(SILValue packAddr,
+                                                  CanPackType formalPackType,
+                                                  unsigned componentIndex) const {
+  if (isLValue) {
+    return ManagedValue::forLValue(packAddr);
+  }
+
+  if (!hasCleanup) {
+    return ManagedValue::forUnmanaged(packAddr);
+  }
+
+  assert(!writebackBuffer.has_value());
+  auto expansionTy = packAddr->getType().getPackElementType(componentIndex);
+  if (expansionTy.getPackExpansionPatternType().isTrivial(SGF.F))
+    return ManagedValue::forUnmanaged(packAddr);
+
+  auto cleanup =
+    SGF.enterPartialDestroyRemainingPackCleanup(packAddr, formalPackType,
+                                                componentIndex,
+                                                /*start at */ SILValue());
+  return ManagedValue(packAddr, cleanup);
+}
+
+ManagedValue
+CleanupCloner::cloneForRemainingPackComponents(SILValue packAddr,
+                                               CanPackType formalPackType,
+                                               unsigned firstComponentIndex) const {
+  if (isLValue) {
+    return ManagedValue::forLValue(packAddr);
+  }
+
+  if (!hasCleanup) {
+    return ManagedValue::forUnmanaged(packAddr);
+  }
+
+  assert(!writebackBuffer.has_value());
+  bool isTrivial = true;
+  auto packTy = packAddr->getType().castTo<SILPackType>();
+  for (auto eltTy : packTy->getElementTypes().slice(firstComponentIndex)) {
+    if (!SILType::getPrimitiveObjectType(eltTy).isTrivial(SGF.F)) {
+      isTrivial = false;
+      break;
+    }
+  }
+
+  if (isTrivial)
+    return ManagedValue::forUnmanaged(packAddr);
+
+  auto cleanup =
+    SGF.enterDestroyRemainingPackComponentsCleanup(packAddr, formalPackType,
+                                                   firstComponentIndex);
+  return ManagedValue(packAddr, cleanup);
+}
