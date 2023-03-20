@@ -280,6 +280,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   // Create a new Clang compiler invocation.
   clang::CreateInvocationOptions CIOpts;
   CIOpts.Diags = ClangDiags;
+  CIOpts.ProbePrecompiled = true;
   std::unique_ptr<clang::CompilerInvocation> ClangInvok =
       clang::createInvocation(ClangArgList, std::move(CIOpts));
   if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
