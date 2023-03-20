@@ -1231,7 +1231,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   }
 
   emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
-                  interfaceType, dc, /*throws=*/ false,SourceLoc());
+                  interfaceType, dc, /*throws=*/ false,SourceLoc(),
+                  /*ignored parameters*/ 0);
   prepareEpilog(interfaceType, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();

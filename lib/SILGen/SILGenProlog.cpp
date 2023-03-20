@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILInstruction.h"
@@ -76,13 +77,14 @@ public:
   SILBasicBlock *parent;
   SILLocation loc;
   CanSILFunctionType fnTy;
-  ArrayRef<SILParameterInfo> &parameters;
+  ArrayRefGenerator<ArrayRef<SILParameterInfo>> &parameters;
   bool isNoImplicitCopy;
   LifetimeAnnotation lifetimeAnnotation;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
                   CanSILFunctionType fnTy,
-                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy,
+                  ArrayRefGenerator<ArrayRef<SILParameterInfo>> &parameters,
+                  bool isNoImplicitCopy,
                   LifetimeAnnotation lifetimeAnnotation)
       : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters),
         isNoImplicitCopy(isNoImplicitCopy),
@@ -90,8 +92,7 @@ public:
 
   ManagedValue claimNextParameter() {
     // Pop the next parameter info.
-    auto parameterInfo = parameters.front();
-    parameters = parameters.slice(1);
+    auto parameterInfo = parameters.claimNext();
 
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
@@ -408,28 +409,48 @@ namespace {
 
 /// A helper for creating SILArguments and binding variables to the argument
 /// names.
-struct ArgumentInitHelper {
+class ArgumentInitHelper {
   SILGenFunction &SGF;
   SILFunction &f;
-  SILGenBuilder &initB;
 
-  /// An ArrayRef that we use in our SILParameterList queue. Parameters are
-  /// sliced off of the front as they're emitted.
-  ArrayRef<SILParameterInfo> parameters;
+  ArrayRefGenerator<ArrayRef<SILParameterInfo>> parameters;
   uint16_t ArgNo = 0;
 
   Optional<AbstractionPattern> OrigFnType;
 
+public:
   ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f,
-                     Optional<AbstractionPattern> origFnType)
-      : SGF(SGF), f(f), initB(SGF.B),
+                     Optional<AbstractionPattern> origFnType,
+                     unsigned numIgnoredTrailingParameters)
+      : SGF(SGF), f(f),
         parameters(
             f.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
-                ->getParameters()),
+                ->getParameters().drop_back(numIgnoredTrailingParameters)),
         OrigFnType(origFnType)
   {}
 
-  unsigned getNumArgs() const { return ArgNo; }
+  /// Emit the given list of parameters.
+  unsigned emitParams(ParameterList *paramList, ParamDecl *selfParam) {
+    if (paramList) {
+      for (auto *param : *paramList)
+        emitParam(param);
+    }
+
+    // The self parameter follows the formal parameters in all of
+    // our representations.
+    if (selfParam) {
+      emitParam(selfParam);
+    }
+
+    finish();
+
+    return ArgNo;
+  }
+
+private:
+  void finish() {
+    parameters.finish();
+  }
 
   ManagedValue makeArgument(Type ty, bool isInOut, bool isNoImplicitCopy,
                             LifetimeAnnotation lifetime, SILBasicBlock *parent,
@@ -845,13 +866,17 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 bool throws,
                                 SourceLoc throwsLoc,
                                 Optional<AbstractionPattern> origClosureType) {
-  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
-                                   DC, throws, throwsLoc, origClosureType);
-  
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
+
+  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
+                                   DC, throws, throwsLoc,
+                                   /*ignored parameters*/
+                                     captureInfo.getCaptures().size(),
+                                   origClosureType);
+
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
@@ -1335,6 +1360,7 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
                                  DeclContext *DC,
                                  bool throws,
                                  SourceLoc throwsLoc,
+                                 unsigned numIgnoredTrailingParameters,
                                  Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -1348,18 +1374,12 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   // Emit the argument variables in calling convention order.
-  ArgumentInitHelper emitter(*this, F, origClosureType);
-
-  // Add the SILArguments and use them to initialize the local argument
-  // values.
-  if (paramList)
-    for (auto *param : *paramList)
-      emitter.emitParam(param);
-  if (selfParam)
-    emitter.emitParam(selfParam);
+  unsigned ArgNo =
+    ArgumentInitHelper(*this, F, origClosureType,
+                       numIgnoredTrailingParameters)
+      .emitParams(paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
-  unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
      auto NativeErrorTy = SILType::getExceptionType(getASTContext());
     ManagedValue Undef = emitUndef(NativeErrorTy);
