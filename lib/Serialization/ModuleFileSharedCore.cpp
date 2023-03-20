@@ -1714,6 +1714,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // package.
     if (packageName == getModulePackageName()) {
       return ModuleLoadingBehavior::Required;
+    } else if (debuggerMode) {
+      return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;
     }
