@@ -2659,7 +2659,10 @@ namespace {
       auto semanticsKind =
           evaluateOrDefault(Impl.SwiftContext.evaluator,
                             CxxRecordSemantics({decl, Impl.SwiftContext}), {});
-      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation) {
+      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation &&
+          // Let un-specialized class templates through. We'll sort out their
+          // members once they're instranciated.
+          !Impl.importSymbolicCXXDecls) {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::record_not_automatically_importable,
