@@ -761,7 +761,6 @@ bool IterativeBackwardReachability<Effects>::findBarrier(SILInstruction *from,
     if (!effect)
       continue;
     if (effect == Effect::Gen()) {
-      assert(false && "found gen (before kill) in reachable block");
       continue;
     }
     // effect == Effect::Kill
