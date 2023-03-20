@@ -3053,26 +3053,26 @@ void CompletionLookup::collectPrecedenceGroups() {
 }
 
 void CompletionLookup::getPrecedenceGroupCompletions(
-    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
+    CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   switch (SK) {
-  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Associativity:
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Associativity:
     addKeyword(getAssociativitySpelling(Associativity::None));
     addKeyword(getAssociativitySpelling(Associativity::Left));
     addKeyword(getAssociativitySpelling(Associativity::Right));
     return;
-  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Assignment:
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Assignment:
     addKeyword(getTokenText(tok::kw_false), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_false);
     addKeyword(getTokenText(tok::kw_true), Type(), SemanticContextKind::None,
                CodeCompletionKeywordKind::kw_true);
     return;
-  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::AttributeList:
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::AttributeList:
     addKeyword("associativity");
     addKeyword("higherThan");
     addKeyword("lowerThan");
     addKeyword("assignment");
     return;
-  case IDEInspectionCallbacks::PrecedenceGroupCompletionKind::Relation:
+  case CodeCompletionCallbacks::PrecedenceGroupCompletionKind::Relation:
     collectPrecedenceGroups();
     return;
   }

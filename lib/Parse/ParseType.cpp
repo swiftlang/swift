@@ -199,8 +199,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       ty = parseTypeIdentifier();
       if (auto *ITR = cast_or_null<IdentTypeRepr>(ty.getPtrOrNull())) {
         if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
-          if (IDECallbacks)
-            IDECallbacks->completeTypeSimpleWithoutDot(ITR);
+          if (CodeCompletionCallbacks) {
+            CodeCompletionCallbacks->completeTypeSimpleWithoutDot(ITR);
+          }
 
           ty.setHasCodeCompletionAndIsError();
           consumeToken(tok::code_complete);
@@ -216,8 +217,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     ty = parseTypeTupleBody();
     break;
   case tok::code_complete:
-    if (IDECallbacks)
-      IDECallbacks->completeTypeSimpleBeginning();
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeSimpleBeginning();
+    }
     return makeParserCodeCompletionResult<TypeRepr>(
         new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
   case tok::l_square: {
@@ -256,8 +258,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       if (peekToken().is(tok::code_complete)) {
         consumeToken();
 
-        if (IDECallbacks) {
-          IDECallbacks->completeTypeSimpleWithDot(ty.get());
+        if (CodeCompletionCallbacks) {
+          CodeCompletionCallbacks->completeTypeSimpleWithDot(ty.get());
         }
 
         ty.setHasCodeCompletionAndIsError();
@@ -286,8 +288,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
 
     if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
-      if (IDECallbacks) {
-        IDECallbacks->completeTypeSimpleWithoutDot(ty.get());
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeTypeSimpleWithoutDot(ty.get());
       }
 
       ty.setHasCodeCompletionAndIsError();
@@ -630,8 +632,9 @@ ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   if (Tok.is(tok::code_complete)) {
-    if (IDECallbacks)
-      IDECallbacks->completeTypeDeclResultBeginning();
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeDeclResultBeginning();
+    }
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
@@ -721,8 +724,9 @@ ParserResult<TypeRepr> Parser::parseQualifiedDeclNameBaseType() {
     if (Tok.is(tok::kw_Any)) {
       return parseAnyType();
     } else if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks)
-        IDECallbacks->completeTypeSimpleBeginning();
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeTypeSimpleBeginning();
+      }
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<DeclRefTypeRepr>();
@@ -788,11 +792,13 @@ ParserResult<TypeRepr> Parser::parseQualifiedDeclNameBaseType() {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      if (IDECallbacks)
-        IDECallbacks->completeTypeSimpleWithDot(DeclRefTR);
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeTypeSimpleWithDot(DeclRefTR);
+      }
     } else {
-      if (IDECallbacks)
-        IDECallbacks->completeTypeSimpleWithoutDot(DeclRefTR);
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeTypeSimpleWithoutDot(DeclRefTR);
+      }
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);

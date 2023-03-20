@@ -103,7 +103,8 @@ std::string swift::ide::removeCodeCompletionTokens(
 
 namespace {
 
-class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
+                                    public DoneParsingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -123,7 +124,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  IDEInspectionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -233,9 +234,8 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : IDEInspectionCallbacks(P), CompletionContext(CompletionContext),
-        Consumer(Consumer) {
-  }
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        CompletionContext(CompletionContext), Consumer(Consumer) {}
 
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
@@ -273,7 +273,7 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) override;
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -484,7 +484,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
-    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
+    CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -1480,7 +1480,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::KeyPathExprSwift: {
     assert(CurDeclContext);
 
-    // IDEInspectionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
+    // CodeCompletionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
     // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
     auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
@@ -2040,8 +2040,10 @@ public:
                                      CodeCompletionConsumer &Consumer)
       : CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-      IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-    return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
+  Callbacks createCallbacks(Parser &P) override {
+    auto callbacks = std::make_shared<CodeCompletionCallbacksImpl>(
+        P, CompletionContext, Consumer);
+    return {callbacks, callbacks};
   }
 };
 } // end anonymous namespace

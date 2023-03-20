@@ -26,7 +26,8 @@
 using namespace swift;
 using namespace ide;
 
-class ContextInfoCallbacks : public IDEInspectionCallbacks {
+class ContextInfoCallbacks : public CodeCompletionCallbacks,
+                             public DoneParsingCallback {
   TypeContextInfoConsumer &Consumer;
   SourceLoc Loc;
   Expr *ParsedExpr = nullptr;
@@ -36,7 +37,7 @@ class ContextInfoCallbacks : public IDEInspectionCallbacks {
 
 public:
   ContextInfoCallbacks(Parser &P, TypeContextInfoConsumer &Consumer)
-      : IDEInspectionCallbacks(P), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), DoneParsingCallback(), Consumer(Consumer) {}
 
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
@@ -211,8 +212,9 @@ IDEInspectionCallbacksFactory *swift::ide::makeTypeContextInfoCallbacksFactory(
     ContextInfoCallbacksFactoryImpl(TypeContextInfoConsumer &Consumer)
         : Consumer(Consumer) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new ContextInfoCallbacks(P, Consumer);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callbacks = std::make_shared<ContextInfoCallbacks>(P, Consumer);
+      return {Callbacks, Callbacks};
     }
   };
 

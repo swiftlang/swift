@@ -318,15 +318,14 @@ public:
 
 // MARK: - CursorInfoDoneParsingCallback
 
-class CursorInfoDoneParsingCallback : public IDEInspectionCallbacks {
+class CursorInfoDoneParsingCallback : public DoneParsingCallback {
   CursorInfoConsumer &Consumer;
   SourceLoc RequestedLoc;
 
 public:
   CursorInfoDoneParsingCallback(Parser &P, CursorInfoConsumer &Consumer,
                                 SourceLoc RequestedLoc)
-      : IDEInspectionCallbacks(P), Consumer(Consumer),
-        RequestedLoc(RequestedLoc) {}
+      : DoneParsingCallback(), Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
   ResolvedCursorInfoPtr getDeclResult(NodeFinderDeclResult *DeclResult,
                                       SourceFile *SrcFile,
@@ -439,8 +438,10 @@ swift::ide::makeCursorInfoCallbacksFactory(CursorInfoConsumer &Consumer,
                                    SourceLoc RequestedLoc)
         : Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new CursorInfoDoneParsingCallback(P, Consumer, RequestedLoc);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callback = std::make_shared<CursorInfoDoneParsingCallback>(
+          P, Consumer, RequestedLoc);
+      return {nullptr, Callback};
     }
   };
 
