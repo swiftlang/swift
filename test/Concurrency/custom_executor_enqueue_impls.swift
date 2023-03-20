@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-move-only -disable-availability-checking
 // REQUIRES: concurrency
 
+// rdar://106849189 move-only types should be supported in freestanding mode
+// UNSUPPORTED: freestanding
+
 // Such type may be encountered since Swift 5.5 (5.1 backdeployed) if someone implemented the
 // not documented, but public Executor types back then already.
 //

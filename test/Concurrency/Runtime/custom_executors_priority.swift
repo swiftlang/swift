@@ -1,7 +1,9 @@
-// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
 // UNSUPPORTED: back_deployment_runtime
