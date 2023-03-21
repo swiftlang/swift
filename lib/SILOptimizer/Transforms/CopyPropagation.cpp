@@ -282,13 +282,16 @@ static bool convertExtractsToDestructures(CanonicalDefWorklist &copiedDefs,
 /// the lifetime at it), replace its uses with uses of the moved-from value and
 /// delete it.
 static bool eliminateRedundantMove(MoveValueInst *mvi,
-                                   InstructionDeleter &deleter) {
+                                   InstructionDeleter &deleter,
+                                   CanonicalDefWorklist &defWorklist) {
   if (!isRedundantMoveValue(mvi))
     return false;
-  mvi->replaceAllUsesWith(mvi->getOperand());
+  auto original = mvi->getOperand();
+  mvi->replaceAllUsesWith(original);
   // Call InstructionDeleter::forceDeleteWithUsers to avoid "fixing up"
   // ownership of the moved-from value, i.e. inserting a destroy_value.
   deleter.forceDeleteWithUsers(mvi);
+  defWorklist.updateForCopy(original);
   return true;
 }
 
@@ -512,12 +515,12 @@ void CopyPropagation::run() {
           hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
-      eliminateRedundantMove(folded, deleter);
+      eliminateRedundantMove(folded, deleter, defWorklist);
       firstRun = false;
     }
   }
   for (auto *mvi : moveValues) {
-    eliminateRedundantMove(mvi, deleter);
+    eliminateRedundantMove(mvi, deleter, defWorklist);
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
