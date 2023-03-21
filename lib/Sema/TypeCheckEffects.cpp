@@ -155,7 +155,7 @@ static bool classifyWitness(ModuleDecl *module,
     case PolymorphicEffectKind::ByConformance: {
       // Witness has the effect if the concrete type's conformances
       // recursively have the effect.
-      auto substitutions = conformance->getSubstitutions(module);
+      auto substitutions = conformance->getSubstitutionMap();
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.hasEffect(kind)) {
           return true;

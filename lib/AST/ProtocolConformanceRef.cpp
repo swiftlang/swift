@@ -286,8 +286,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
     return true;
 
   // Check the conformances in the substitution map.
-  auto module = concrete->getDeclContext()->getParentModule();
-  auto subMap = concrete->getSubstitutions(module);
+  auto subMap = concrete->getSubstitutionMap();
   for (auto subConformance : subMap.getConformances()) {
     if (subConformance.hasUnavailableConformance())
       return true;
@@ -327,7 +326,7 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   }
 
   // Check conformances that are part of this conformance.
-  auto subMap = concreteConf->getSubstitutions(module);
+  auto subMap = concreteConf->getSubstitutionMap();
   for (auto conformance : subMap.getConformances()) {
     if (conformance.forEachMissingConformance(module, fn))
       return true;

@@ -254,8 +254,8 @@ public:
   /// interface type.
   GenericSignature getGenericSignature() const;
 
-  /// Get the substitutions associated with this conformance.
-  SubstitutionMap getSubstitutions(ModuleDecl *M) const;
+  /// Get the conformance substitution map.
+  SubstitutionMap getSubstitutionMap() const;
 
   /// Get the underlying normal conformance.
   /// FIXME: remove uses of this.
@@ -342,6 +342,9 @@ public:
   /// Retrieve the witness corresponding to the given value requirement.
   /// TODO: maybe this should return a Witness?
   ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement) const;
+
+  /// Get the conformance substitution map.
+  SubstitutionMap getSubstitutionMap() const;
 
   /// Apply the given function object to each value witness within this
   /// protocol conformance.
@@ -908,6 +911,11 @@ public:
   /// Retrieve the conformance for the inherited type.
   ProtocolConformance *getInheritedConformance() const {
     return InheritedConformance;
+  }
+
+  /// Get the conformance substitution map.
+  SubstitutionMap getSubstitutionMap() const {
+    return InheritedConformance->getSubstitutionMap();
   }
 
   /// Get the protocol being conformed to.
