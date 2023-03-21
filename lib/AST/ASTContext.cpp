@@ -103,6 +103,86 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 #undef PROTOCOL_WITH_NAME
 }
 
+bool swift::isSuppressibleProtocol(KnownProtocolKind kind) {
+  switch (kind) {
+  case KnownProtocolKind::Copyable:
+    return true;
+
+  case KnownProtocolKind::Actor:
+  case KnownProtocolKind::AnyActor:
+  case KnownProtocolKind::Sequence:
+  case KnownProtocolKind::Identifiable:
+  case KnownProtocolKind::IteratorProtocol:
+  case KnownProtocolKind::RawRepresentable:
+  case KnownProtocolKind::Equatable:
+  case KnownProtocolKind::Hashable:
+  case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::Error:
+  case KnownProtocolKind::ErrorCodeProtocol:
+  case KnownProtocolKind::Executor:
+  case KnownProtocolKind::OptionSet:
+  case KnownProtocolKind::CaseIterable:
+  case KnownProtocolKind::SIMD:
+  case KnownProtocolKind::SIMDScalar:
+  case KnownProtocolKind::BinaryInteger:
+  case KnownProtocolKind::FixedWidthInteger:
+  case KnownProtocolKind::RangeReplaceableCollection:
+  case KnownProtocolKind::SerialExecutor:
+  case KnownProtocolKind::GlobalActor:
+  case KnownProtocolKind::BridgedNSError:
+  case KnownProtocolKind::BridgedStoredNSError:
+  case KnownProtocolKind::CFObject:
+  case KnownProtocolKind::SwiftNewtypeWrapper:
+  case KnownProtocolKind::CodingKey:
+  case KnownProtocolKind::Encodable:
+  case KnownProtocolKind::Decodable:
+  case KnownProtocolKind::Sendable:
+  case KnownProtocolKind::UnsafeSendable:
+  case KnownProtocolKind::ObjectiveCBridgeable:
+  case KnownProtocolKind::DestructorSafeContainer:
+  case KnownProtocolKind::StringInterpolationProtocol:
+  case KnownProtocolKind::AdditiveArithmetic:
+  case KnownProtocolKind::Differentiable:
+  case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::DistributedActorSystem:
+  case KnownProtocolKind::DistributedTargetInvocationEncoder:
+  case KnownProtocolKind::DistributedTargetInvocationDecoder:
+  case KnownProtocolKind::DistributedTargetInvocationResultHandler:
+  case KnownProtocolKind::CxxConvertibleToCollection:
+  case KnownProtocolKind::CxxDictionary:
+  case KnownProtocolKind::CxxOptional:
+  case KnownProtocolKind::CxxPair:
+  case KnownProtocolKind::CxxSet:
+  case KnownProtocolKind::CxxRandomAccessCollection:
+  case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::UnsafeCxxInputIterator:
+  case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
+  case KnownProtocolKind::AsyncSequence:
+  case KnownProtocolKind::AsyncIteratorProtocol:
+  case KnownProtocolKind::FloatingPoint:
+  case KnownProtocolKind::ExpressibleByArrayLiteral:
+  case KnownProtocolKind::ExpressibleByBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
+  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByFloatLiteral:
+  case KnownProtocolKind::ExpressibleByIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByStringInterpolation:
+  case KnownProtocolKind::ExpressibleByStringLiteral:
+  case KnownProtocolKind::ExpressibleByNilLiteral:
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByColorLiteral:
+  case KnownProtocolKind::ExpressibleByImageLiteral:
+  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
+    return false;
+  }
+}
+
 namespace {
   enum class SearchPathKind : uint8_t {
     Import = 1 << 0,

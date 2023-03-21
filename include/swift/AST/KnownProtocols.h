@@ -44,6 +44,10 @@ enum : unsigned { NumKnownProtocolKindBits =
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);
 
+/// Determine whether this protocol's conformance is implicitly derived
+/// yet that derivation is suppressible.
+bool isSuppressibleProtocol(KnownProtocolKind kind);
+
 } // end namespace swift
 
 #endif
