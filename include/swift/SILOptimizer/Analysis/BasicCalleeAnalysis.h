@@ -104,6 +104,22 @@ public:
     }
   }
 
+  size_t getCount() const {
+    switch (kind) {
+      case Kind::empty:           return 0;
+      case Kind::singleFunction:  return 1;
+      case Kind::multipleCallees: return ((Callees *)functionOrCallees)->size();
+    }
+  }
+
+  SILFunction *get(unsigned index) const {
+    switch (kind) {
+      case Kind::empty:           llvm_unreachable("empty callee list");
+      case Kind::singleFunction:  return (SILFunction *)functionOrCallees;
+      case Kind::multipleCallees: return ((Callees *)functionOrCallees)->operator[](index);
+    }
+  }
+
   bool isIncomplete() const { return incomplete; }
 
   /// Returns true if all callees are known and not external.
@@ -175,6 +191,8 @@ public:
   BasicCalleeAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
 
+  ~BasicCalleeAnalysis();
+
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::BasicCallee;
   }
@@ -234,7 +252,7 @@ public:
     return Cache->getDestructors(type, isExactType);
   }
 
-  SILInstruction::MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
+  MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
 };
 
 bool isDeinitBarrier(SILInstruction *const instruction,

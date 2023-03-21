@@ -135,6 +135,28 @@ class SILPrintContext;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+enum class MemoryBehavior {
+  None,
+  /// The instruction may read memory.
+  MayRead,
+  /// The instruction may write to memory.
+  /// This includes destroying or taking from memory (e.g. destroy_addr,
+  /// copy_addr [take], load [take]).
+  /// Although, physically, destroying or taking does not modify the memory,
+  /// it is important to model it is a write. Optimizations must not assume
+  /// that the value stored in memory is still available for loading after
+  /// the memory is destroyed or taken.
+  MayWrite,
+  /// The instruction may read or write memory.
+  MayReadWrite,
+  /// The instruction may have side effects not captured
+  ///        solely by its users. Specifically, it can return,
+  ///        release memory, or store. Note, alloc is not considered
+  ///        to have side effects because its result/users represent
+  ///        its effect.
+  MayHaveSideEffects,
+};
+
 // An enum class for SILInstructions that enables exhaustive switches over
 // instructions.
 enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type {
@@ -445,28 +467,6 @@ public:
   /// scheduled to be deleted.
   bool isDeleted() const { return asSILNode()->isMarkedAsDeleted(); }
 
-  enum class MemoryBehavior {
-    None,
-    /// The instruction may read memory.
-    MayRead,
-    /// The instruction may write to memory.
-    /// This includes destroying or taking from memory (e.g. destroy_addr,
-    /// copy_addr [take], load [take]).
-    /// Although, physically, destroying or taking does not modify the memory,
-    /// it is important to model it is a write. Optimizations must not assume
-    /// that the value stored in memory is still available for loading after
-    /// the memory is destroyed or taken.
-    MayWrite,
-    /// The instruction may read or write memory.
-    MayReadWrite,
-    /// The instruction may have side effects not captured
-    ///        solely by its users. Specifically, it can return,
-    ///        release memory, or store. Note, alloc is not considered
-    ///        to have side effects because its result/users represent
-    ///        its effect.
-    MayHaveSideEffects,
-  };
-
   /// Enumeration representing whether the execution of an instruction can
   /// result in memory being released.
   enum class ReleasingBehavior {
@@ -776,7 +776,7 @@ public:
   /// Returns true if the instruction may write to memory, deinitialize memory,
   /// or have other unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayWriteToMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayWrite ||
@@ -787,7 +787,7 @@ public:
   /// Returns true if the instruction may read from memory, or have other
   /// unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadFromMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayRead ||
@@ -798,7 +798,7 @@ public:
   /// Returns true if the instruction may read from memory, write to memory,
   /// deinitialize memory, or have other unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
   }
@@ -1061,23 +1061,23 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 }
 
 /// Returns the combined behavior of \p B1 and \p B2.
-inline SILInstruction::MemoryBehavior
-combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
-                  SILInstruction::MemoryBehavior B2) {
+inline MemoryBehavior
+combineMemoryBehavior(MemoryBehavior B1,
+                  MemoryBehavior B2) {
   // Basically the combined behavior is the maximum of both operands.
   auto Result = std::max(B1, B2);
 
   // With one exception: MayRead, MayWrite -> MayReadWrite.
-  if (Result == SILInstruction::MemoryBehavior::MayWrite &&
-        (B1 == SILInstruction::MemoryBehavior::MayRead ||
-         B2 == SILInstruction::MemoryBehavior::MayRead))
-    return SILInstruction::MemoryBehavior::MayReadWrite;
+  if (Result == MemoryBehavior::MayWrite &&
+        (B1 == MemoryBehavior::MayRead ||
+         B2 == MemoryBehavior::MayRead))
+    return MemoryBehavior::MayReadWrite;
   return Result;
 }
 
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              SILInstruction::MemoryBehavior B);
+                              MemoryBehavior B);
 /// Pretty-print the ReleasingBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::ReleasingBehavior B);

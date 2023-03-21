@@ -22,7 +22,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"

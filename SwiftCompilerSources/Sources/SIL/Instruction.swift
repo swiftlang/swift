@@ -20,30 +20,31 @@ import SILBridging
 @_semantics("arc.immortal")
 public class Instruction : CustomStringConvertible, Hashable {
   final public var next: Instruction? {
-    SILInstruction_next(bridged).instruction
+    bridged.getNext().instruction
   }
 
   final public var previous: Instruction? {
-    SILInstruction_previous(bridged).instruction
+    bridged.getPrevious().instruction
   }
 
   final public var parentBlock: BasicBlock {
-    SILInstruction_getParent(bridged).block
+    bridged.getParent().block
   }
 
   final public var parentFunction: Function { parentBlock.parentFunction }
 
   final public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
 
   final public var isDeleted: Bool {
-    return SILInstruction_isDeleted(bridged)
+    return bridged.isDeleted()
   }
 
   final public var operands: OperandArray {
-    return OperandArray(opArray: SILInstruction_getOperands(bridged))
+    let operands = bridged.getOperands()
+    return OperandArray(base: operands.base, count: operands.count)
   }
 
   fileprivate var resultCount: Int { 0 }
@@ -63,7 +64,7 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   final public var location: Location {
-    return Location(bridged: SILInstruction_getLocation(bridged))
+    return Location(bridged: bridged.getLocation())
   }
 
   public var mayTrap: Bool { false }
@@ -73,8 +74,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   final public var mayReadFromMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
-      case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+    switch bridged.getMemBehavior() {
+      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -82,8 +83,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   final public var mayWriteToMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
-      case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+    switch bridged.getMemBehavior() {
+      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -91,9 +92,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   final public var mayReadOrWriteMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
-      case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
-           MayHaveSideEffectsBehavior:
+    switch bridged.getMemBehavior() {
+      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
         return false
@@ -101,27 +101,27 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   public final var mayRelease: Bool {
-    return SILInstruction_mayRelease(bridged)
+    return bridged.mayRelease()
   }
 
   public final var hasUnspecifiedSideEffects: Bool {
-    return SILInstruction_hasUnspecifiedSideEffects(bridged)
+    return bridged.mayHaveSideEffects()
   }
 
   public final var mayAccessPointer: Bool {
-    return swift_mayAccessPointer(bridged)
+    return bridged.mayAccessPointer()
   }
 
   public final var mayLoadWeakOrUnowned: Bool {
-    return swift_mayLoadWeakOrUnowned(bridged)
+    return bridged.mayLoadWeakOrUnowned()
   }
 
   public final var maySynchronizeNotConsideringSideEffects: Bool {
-    return swift_maySynchronizeNotConsideringSideEffects(bridged)
+    return bridged.maySynchronizeNotConsideringSideEffects()
   }
 
   public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
-    return swift_mayBeDeinitBarrierNotConsideringSideEffects(bridged)
+    return bridged.mayBeDeinitBarrierNotConsideringSideEffects()
   }
 
   public func visitReferencedFunctions(_ cl: (Function) -> ()) {
@@ -136,24 +136,20 @@ public class Instruction : CustomStringConvertible, Hashable {
   }
 
   public var bridged: BridgedInstruction {
-    BridgedInstruction(obj: SwiftObject(self))
+    BridgedInstruction(SwiftObject(self))
   }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
 }
 
 extension BridgedInstruction {
   public var instruction: Instruction { obj.getAs(Instruction.self) }
   public func getAs<T: Instruction>(_ instType: T.Type) -> T { obj.getAs(T.self) }
   public var optional: OptionalBridgedInstruction {
-    OptionalBridgedInstruction(obj: self.obj)
+    OptionalBridgedInstruction(self.obj)
   }
 }
 
 extension OptionalBridgedInstruction {
   var instruction: Instruction? { obj.getAs(Instruction.self) }
-  public static var none: OptionalBridgedInstruction {
-    OptionalBridgedInstruction(obj: nil)
-  }
 }
 
 public class SingleValueInstruction : Instruction, Value {
@@ -168,25 +164,19 @@ public class SingleValueInstruction : Instruction, Value {
 }
 
 public final class MultipleValueInstructionResult : Value {
-  final public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
-    return String(_cxxString: stdString)
-  }
-
   public var parentInstruction: MultipleValueInstruction {
-    MultiValueInstResult_getParent(bridged).getAs(MultipleValueInstruction.self)
+    bridged.getParent().getAs(MultipleValueInstruction.self)
   }
 
   public var definingInstruction: Instruction? { parentInstruction }
 
   public var parentBlock: BasicBlock { parentInstruction.parentBlock }
 
-  public var index: Int { MultiValueInstResult_getIndex(bridged) }
+  public var index: Int { bridged.getIndex() }
 
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))
   }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
 }
 
 extension BridgedMultiValueResult {
@@ -197,10 +187,10 @@ extension BridgedMultiValueResult {
 
 public class MultipleValueInstruction : Instruction {
   fileprivate final override var resultCount: Int {
-    return MultipleValueInstruction_getNumResults(bridged)
+    bridged.MultipleValueInstruction_getNumResults()
   }
   fileprivate final override func getResult(index: Int) -> Value {
-    MultipleValueInstruction_getResult(bridged, index).result
+    bridged.MultipleValueInstruction_getResult(index).result
   }
 }
 
@@ -240,7 +230,7 @@ final public class StoreInst : Instruction, StoringInstruction {
     case unqualified = 0, initialize = 1, assign = 2, trivial = 3
   }
   public var destinationOwnership: StoreOwnership {
-    StoreOwnership(rawValue: StoreInst_getStoreOwnership(bridged))!
+    StoreOwnership(rawValue: bridged.StoreInst_getStoreOwnership())!
   }
 }
 
@@ -254,10 +244,10 @@ final public class CopyAddrInst : Instruction {
   public var destination: Value { return destinationOperand.value }
   
   public var isTakeOfSrc: Bool {
-    CopyAddrInst_isTakeOfSrc(bridged) != 0
+    bridged.CopyAddrInst_isTakeOfSrc() != 0
   }
   public var isInitializationOfDest: Bool {
-    CopyAddrInst_isInitializationOfDest(bridged) != 0
+    bridged.CopyAddrInst_isInitializationOfDest() != 0
   }
 }
 
@@ -286,7 +276,7 @@ final public class CondFailInst : Instruction, UnaryInstruction {
   public var condition: Value { operand.value }
   public override var mayTrap: Bool { true }
 
-  public var message: String { CondFailInst_getMessage(bridged).string }
+  public var message: String { bridged.CondFailInst_getMessage().string }
 }
 
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
@@ -307,7 +297,7 @@ final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
-  public var isAtomic: Bool { RefCountingInst_getIsAtomic(bridged) }
+  public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
 }
 
 final public class StrongRetainInst : RefCountingInst {
@@ -333,7 +323,7 @@ final public class DestroyAddrInst : Instruction, UnaryInstruction {
 }
 
 final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
-  public var caseIndex: Int { InjectEnumAddrInst_caseIndex(bridged) }
+  public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
 }
 
 final public class UnimplementedRefCountingInst : RefCountingInst {}
@@ -355,7 +345,7 @@ final public class LoadInst : SingleValueInstruction, UnaryInstruction {
     case unqualified = 0, take = 1, copy = 2, trivial = 3
   }
   public var ownership: LoadOwnership {
-    LoadOwnership(rawValue: LoadInst_getLoadOwnership(bridged))!
+    LoadOwnership(rawValue: bridged.LoadInst_getLoadOwnership())!
   }
 }
 
@@ -367,7 +357,7 @@ final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = swift.BuiltinValueKind
 
   public var id: ID {
-    return BuiltinInst_getID(bridged)
+    return bridged.BuiltinInst_getID()
   }
 }
 
@@ -390,7 +380,7 @@ class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {
   public var address: Value { operand.value }
 
   public var needsStackProtection: Bool {
-    AddressToPointerInst_needsStackProtection(bridged) != 0
+    bridged.AddressToPointerInst_needsStackProtection()
   }
 }
 
@@ -405,7 +395,7 @@ class IndexAddrInst : SingleValueInstruction {
   public var index: Value { operands[1].value }
   
   public var needsStackProtection: Bool {
-    IndexAddrInst_needsStackProtection(bridged) != 0
+    bridged.IndexAddrInst_needsStackProtection()
   }
 }
 
@@ -453,13 +443,13 @@ class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 public class GlobalAccessInst : SingleValueInstruction {
   final public var global: GlobalVariable {
-    GlobalAccessInst_getGlobal(bridged).globalVar
+    bridged.GlobalAccessInst_getGlobal().globalVar
   }
 }
 
 public class FunctionRefBaseInst : SingleValueInstruction {
   public var referencedFunction: Function {
-    FunctionRefBaseInst_getReferencedFunction(bridged).function
+    bridged.FunctionRefBaseInst_getReferencedFunction().function
   }
 
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
@@ -481,11 +471,11 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 final public class GlobalValueInst : GlobalAccessInst {}
 
 final public class IntegerLiteralInst : SingleValueInstruction {
-  public var value: llvm.APInt { IntegerLiteralInst_getValue(bridged) }
+  public var value: llvm.APInt { bridged.IntegerLiteralInst_getValue() }
 }
 
 final public class StringLiteralInst : SingleValueInstruction {
-  public var string: String { StringLiteralInst_getValue(bridged).string }
+  public var string: String { bridged.StringLiteralInst_getValue().string }
 }
 
 final public class TupleInst : SingleValueInstruction {
@@ -493,13 +483,13 @@ final public class TupleInst : SingleValueInstruction {
 
 final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
-  public var fieldIndex: Int { TupleExtractInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.TupleExtractInst_fieldIndex() }
 }
 
 final public
 class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
-  public var fieldIndex: Int { TupleElementAddrInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.TupleElementAddrInst_fieldIndex() }
 }
 
 final public class StructInst : SingleValueInstruction {
@@ -507,13 +497,13 @@ final public class StructInst : SingleValueInstruction {
 
 final public class StructExtractInst : SingleValueInstruction, UnaryInstruction {
   public var `struct`: Value { operand.value }
-  public var fieldIndex: Int { StructExtractInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.StructExtractInst_fieldIndex() }
 }
 
 final public
 class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var `struct`: Value { operand.value }
-  public var fieldIndex: Int { StructElementAddrInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.StructElementAddrInst_fieldIndex() }
 }
 
 public protocol EnumInstruction : AnyObject {
@@ -521,7 +511,7 @@ public protocol EnumInstruction : AnyObject {
 }
 
 final public class EnumInst : SingleValueInstruction, EnumInstruction {
-  public var caseIndex: Int { EnumInst_caseIndex(bridged) }
+  public var caseIndex: Int { bridged.EnumInst_caseIndex() }
 
   public var operand: Operand? { operands.first }
   public var payload: Value? { operand?.value }
@@ -529,24 +519,24 @@ final public class EnumInst : SingleValueInstruction, EnumInstruction {
 
 final public class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
-  public var caseIndex: Int { UncheckedEnumDataInst_caseIndex(bridged) }
+  public var caseIndex: Int { bridged.UncheckedEnumDataInst_caseIndex() }
 }
 
 final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
-  public var caseIndex: Int { InitEnumDataAddrInst_caseIndex(bridged) }
+  public var caseIndex: Int { bridged.InitEnumDataAddrInst_caseIndex() }
 }
 
 final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
-  public var caseIndex: Int { UncheckedTakeEnumDataAddrInst_caseIndex(bridged) }
+  public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
 }
 
 final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
-  public var fieldIndex: Int { RefElementAddrInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
-  public var fieldIsLet: Bool { RefElementAddrInst_fieldIsLet(bridged) != 0 }
+  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() != 0 }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -555,9 +545,9 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
 
 final public class KeyPathInst : SingleValueInstruction {
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
-    var results = KeyPathFunctionResults()
-    for componentIdx in 0..<KeyPathInst_getNumComponents(bridged) {
-      KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
+    var results = BridgedInstruction.KeyPathFunctionResults()
+    for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {
+      bridged.KeyPathInst_getReferencedFunctions(componentIdx, &results)
       let numFuncs = results.numFunctions
       withUnsafePointer(to: &results) {
         $0.withMemoryRebound(to: BridgedFunction.self, capacity: numFuncs) {
@@ -614,9 +604,9 @@ public typealias AccessKind = swift.SILAccessKind
 
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged) }
+  public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
 
-  public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
+  public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
 }
 
 // An instruction that is always paired with a scope ending instruction
@@ -646,7 +636,7 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var box: Value { operand.value }
-  public var fieldIndex: Int { ProjectBoxInst_fieldIndex(bridged) }
+  public var fieldIndex: Int { bridged.ProjectBoxInst_fieldIndex() }
 }
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {
@@ -669,15 +659,15 @@ final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
-  public var numArguments: Int { PartialApplyInst_numArguments(bridged) }
-  public var isOnStack: Bool { PartialApplyInst_isOnStack(bridged) != 0 }
+  public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
+  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() != 0 }
 
   public func calleeArgIndex(callerArgIndex: Int) -> Int {
-    PartialApply_getCalleeArgIndexOfFirstAppliedArg(bridged) + callerArgIndex
+    bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
   }
 
   public func callerArgIndex(calleeArgIndex: Int) -> Int? {
-    let firstIdx = PartialApply_getCalleeArgIndexOfFirstAppliedArg(bridged)
+    let firstIdx = bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg()
     if calleeArgIndex >= firstIdx {
       let callerIdx = calleeArgIndex - firstIdx
       if callerIdx < numArguments {
@@ -689,16 +679,16 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
-  public var numArguments: Int { ApplyInst_numArguments(bridged) }
+  public var numArguments: Int { bridged.ApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { self }
 
-  public var isNonThrowing: Bool { ApplyInst_getNonThrowing(bridged) }
-  public var isNonAsync: Bool { ApplyInst_getNonAsync(bridged) }
+  public var isNonThrowing: Bool { bridged.ApplyInst_getNonThrowing() }
+  public var isNonAsync: Bool { bridged.ApplyInst_getNonAsync() }
 
   public typealias SpecializationInfo = UnsafePointer<swift.GenericSpecializationInformation>?
 
-  public var specializationInfo: SpecializationInfo { ApplyInst_getSpecializationInfo(bridged) }
+  public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 }
 
 final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
@@ -728,10 +718,10 @@ final public class AllocStackInst : SingleValueInstruction, Allocation {
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
-  final public var isObjC: Bool { AllocRefInstBase_isObjc(bridged) != 0 }
+  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() != 0 }
 
   final public var canAllocOnStack: Bool {
-    AllocRefInstBase_canAllocOnStack(bridged) != 0
+    bridged.AllocRefInstBase_canAllocOnStack() != 0
   }
 }
 
@@ -767,7 +757,7 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 }
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
-  public var numArguments: Int { BeginApplyInst_numArguments(bridged) }
+  public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { nil }
 }
@@ -778,7 +768,8 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
 public class TermInst : Instruction {
   final public var successors: SuccessorArray {
-    SuccessorArray(succArray: TermInst_getSuccessors(bridged))
+    let succArray = bridged.TermInst_getSuccessors()
+    return SuccessorArray(base: succArray.base, count: succArray.count)
   }
   
   public var isFunctionExiting: Bool { false }
@@ -805,7 +796,7 @@ final public class UnwindInst : TermInst {
 }
 
 final public class TryApplyInst : TermInst, FullApplySite {
-  public var numArguments: Int { TryApplyInst_numArguments(bridged) }
+  public var numArguments: Int { bridged.TryApplyInst_numArguments() }
 
   public var normalBlock: BasicBlock { successors[0] }
   public var errorBlock: BasicBlock { successors[1] }
@@ -814,7 +805,7 @@ final public class TryApplyInst : TermInst, FullApplySite {
 }
 
 final public class BranchInst : TermInst {
-  public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
+  public var targetBlock: BasicBlock { bridged.BranchInst_getTargetBlock().block }
 
   /// Returns the target block argument for the cond_br `operand`.
   public func getArgument(for operand: Operand) -> Argument {
@@ -828,10 +819,10 @@ final public class CondBranchInst : TermInst {
 
   public var condition: Value { operands[0].value }
 
-  public var trueOperands: OperandArray { operands[1..<(CondBranchInst_getNumTrueArgs(bridged) &+ 1)] }
+  public var trueOperands: OperandArray { operands[1..<(bridged.CondBranchInst_getNumTrueArgs() &+ 1)] }
   public var falseOperands: OperandArray {
     let ops = operands
-    return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
+    return ops[(bridged.CondBranchInst_getNumTrueArgs() &+ 1)..<ops.count]
   }
 
   /// Returns the true or false block argument for the cond_br `operand`.
@@ -843,7 +834,7 @@ final public class CondBranchInst : TermInst {
       return nil
     }
     let argIdx = opIdx - 1
-    let numTrueArgs = CondBranchInst_getNumTrueArgs(bridged)
+    let numTrueArgs = bridged.CondBranchInst_getNumTrueArgs()
     if (0..<numTrueArgs).contains(argIdx) {
       return trueBlock.arguments[argIdx]
     } else {
@@ -863,10 +854,10 @@ final public class SwitchEnumInst : TermInst {
     fileprivate let switchEnum: SwitchEnumInst
 
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { SwitchEnumInst_getNumCases(switchEnum.bridged) }
+    public var endIndex: Int { switchEnum.bridged.SwitchEnumInst_getNumCases() }
 
     public subscript(_ index: Int) -> Int {
-      SwitchEnumInst_getCaseIndex(switchEnum.bridged, index)
+      switchEnum.bridged.SwitchEnumInst_getCaseIndex(index)
     }
   }
 

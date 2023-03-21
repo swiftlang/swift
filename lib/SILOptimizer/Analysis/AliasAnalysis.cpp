@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -522,10 +521,10 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
 //===----------------------------------------------------------------------===//
 
 // Bridging functions.
-static AliasAnalysisGetMemEffectFn getMemEffectsFunction = nullptr;
-static AliasAnalysisEscaping2InstFn isObjReleasedFunction = nullptr;
-static AliasAnalysisEscaping2ValIntFn isAddrVisibleFromObjFunction = nullptr;
-static AliasAnalysisEscaping2ValFn canReferenceSameFieldFunction = nullptr;
+static BridgedAliasAnalysis::GetMemEffectFn getMemEffectsFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2InstFn isObjReleasedFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2ValIntFn isAddrVisibleFromObjFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2ValFn canReferenceSameFieldFunction = nullptr;
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
@@ -702,29 +701,17 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
-  return  const_cast<AliasAnalysis *>(
-    static_cast<const AliasAnalysis *>(aa.aliasAnalysis));
-}
-
-BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
-                                                   BridgedInstruction inst,
-                                                   BridgedValue addr) {
-  return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
-    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
-}
-
-void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
-                            AliasAnalysisEscaping2InstFn isObjReleasedFn,
-                            AliasAnalysisEscaping2ValIntFn isAddrVisibleFromObjFn,
-                            AliasAnalysisEscaping2ValFn canReferenceSameFieldFn) {
+void BridgedAliasAnalysis::registerAnalysis(GetMemEffectFn getMemEffectsFn,
+                                            Escaping2InstFn isObjReleasedFn,
+                                            Escaping2ValIntFn isAddrVisibleFromObjFn,
+                                            Escaping2ValFn canReferenceSameFieldFn) {
   getMemEffectsFunction = getMemEffectsFn;
   isObjReleasedFunction = isObjReleasedFn;
   isAddrVisibleFromObjFunction = isAddrVisibleFromObjFn;
   canReferenceSameFieldFunction = canReferenceSameFieldFn;
 }
 
-SILInstruction::MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
+MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
             SILValue addr, SILInstruction *toInst) {
   if (getMemEffectsFunction) {
     return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()}, {addr},

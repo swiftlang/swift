@@ -181,8 +181,7 @@ struct DumpFunction : UnitTest {
 struct FunctionGetSelfArgumentIndex : UnitTest {
   FunctionGetSelfArgumentIndex(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
-    auto index =
-        SILFunction_getSelfArgumentIndex(BridgedFunction{getFunction()});
+    auto index = BridgedFunction{getFunction()}.getSelfArgumentIndex();
     llvm::errs() << "self argument index = " << index << "\n";
   }
 };

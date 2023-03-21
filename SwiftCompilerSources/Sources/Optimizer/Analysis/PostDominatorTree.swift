@@ -19,7 +19,7 @@ public struct PostDominatorTree {
 
 extension BasicBlock {
   func postDominates(_ other: BasicBlock, _ pdomTree: PostDominatorTree) -> Bool {
-    PostDominatorTree_postDominates(pdomTree.bridged, self.bridged, other.bridged) != 0
+    pdomTree.bridged.postDominates(self.bridged, other.bridged)
   }
   
   func strictlyPostDominates(_ other: BasicBlock, _ pdomTree: PostDominatorTree) -> Bool {

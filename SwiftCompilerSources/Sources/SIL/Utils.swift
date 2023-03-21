@@ -189,9 +189,11 @@ public struct ParsingError : Error {
 
 extension Array where Element == Value {
   public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
-    return self.withUnsafeBytes { valPtr in
-      assert(valPtr.count == self.count * 16)
-      return c(BridgedValueArray(data: valPtr.baseAddress, count: self.count))
+    return self.withUnsafeBufferPointer { bufPtr in
+      assert(bufPtr.count == self.count)
+      return bufPtr.withMemoryRebound(to: BridgeValueExistential.self) { valPtr in
+        return c(BridgedValueArray(base: valPtr.baseAddress, count: self.count))
+      }
     }
   }
 }
