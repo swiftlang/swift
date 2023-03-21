@@ -2427,6 +2427,28 @@ public:
                                                unsigned componentIndex,
                                                SILValue limitWithinComponent);
 
+  /// Enter a cleanup to destroy the following values in a
+  /// pack-expansion component of a pack.  Note that this only destroys
+  /// the values *in that specific component*, not all the other values
+  /// in the pack.
+  ///
+  /// \param currentIndexWithinComponent - the current index in the
+  ///   pack expansion component; any elements in the component that
+  ///   *follow* this component will be destroyed. If nil, all the
+  ///   elements in the component will be destroyed
+  CleanupHandle
+  enterPartialDestroyRemainingPackCleanup(SILValue addr,
+                                          CanPackType formalPackType,
+                                          unsigned componentIndex,
+                                          SILValue currentIndexWithinComponent);
+
+  /// Enter a cleanup to destroy all of the components in a pack starting
+  /// at a particular component index.
+  CleanupHandle
+  enterDestroyRemainingPackComponentsCleanup(SILValue addr,
+                                             CanPackType formalPackType,
+                                             unsigned componentIndex);
+
   /// Enter a cleanup to destroy the preceding values in a pack-expansion
   /// component of a tuple.
   ///
@@ -2439,7 +2461,9 @@ public:
                                                 SILValue limitWithinComponent);
 
   /// Enter a cleanup to destroy the following values in a
-  /// pack-expansion component of a tuple
+  /// pack-expansion component of a tuple.  Note that this only destroys
+  /// the values *in that specific component*, not all the other values
+  /// in the tuple.
   ///
   /// \param currentIndexWithinComponent - the current index in the
   ///   pack expansion component; any elements in the component that
@@ -2560,6 +2584,10 @@ public:
   std::pair<GenericEnvironment*, SILType>
   createOpenedElementValueEnvironment(SILType packExpansionTy);
 
+  GenericEnvironment *
+  createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
+                                      ArrayRef<SILType*> eltTys);
+
   /// Emit a dynamic loop over a single pack-expansion component of a pack.
   ///
   /// \param formalPackType - a pack type with the right shape for the
@@ -2610,6 +2638,26 @@ public:
                                                 SILValue packExpansionIndex,
                                                 SILValue packIndex)> emitBody);
 
+  /// Emit a transform on each element of a pack-expansion component
+  /// of a pack, write the result into a pack-expansion component of
+  /// another pack.
+  ///
+  /// \param inputPackAddr - the address of the input pack; the cleanup
+  ///   on this pack should be a cleanup for just the pack component,
+  ///   not for the entire pack
+  ManagedValue emitPackTransform(SILLocation loc,
+                                 ManagedValue inputPackAddr,
+                                 CanPackType inputFormalPackType,
+                                 unsigned inputComponentIndex,
+                                 SILValue outputPackAddr,
+                                 CanPackType outputFormalPackType,
+                                 unsigned outputComponentIndex,
+                                 bool isSimpleProjection,
+                                 bool outputIsPlusOne,
+              llvm::function_ref<ManagedValue(ManagedValue input,
+                                              SILType outputTy,
+                                              SGFContext context)> emitBody);
+
   /// Emit a loop which destroys a prefix of a pack expansion component
   /// of a pack value.
   ///
@@ -2634,7 +2682,8 @@ public:
   ///   overall pack value
   void emitDestroyPack(SILLocation loc,
                        SILValue packAddr,
-                       CanPackType formalPackType);
+                       CanPackType formalPackType,
+                       unsigned firstComponentIndex = 0);
 
   /// Emit a loop which destroys a prefix of a pack expansion component
   /// of a tuple value.
@@ -2669,6 +2718,23 @@ public:
                                         CanPackType inducedPackType,
                                         unsigned componentIndex,
                                         SILValue currentIndexWithinComponent);
+
+  /// Emit a loop which destroys a suffix of a pack expansion component
+  /// of a pack value.
+  ///
+  /// \param packAddr - the address of the overall pack value
+  /// \param formalPackType - a pack type with the same shape as the
+  ///   component types of the overall pack value
+  /// \param componentIndex - the index of the pack expansion component
+  ///   within the pack
+  /// \param currentIndexWithinComponent - the current index in the
+  ///   pack expansion component; all elements *following* this index will
+  ///   be destroyed
+  void emitPartialDestroyRemainingPack(SILLocation loc,
+                                       SILValue packAddr,
+                                       CanPackType formalPackType,
+                                       unsigned componentIndex,
+                                       SILValue currentIndexWithinComponent);
 };
 
 

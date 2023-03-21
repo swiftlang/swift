@@ -32,6 +32,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
@@ -1569,22 +1570,22 @@ private:
     maybeAddForeignParameters();
 
     // Process all the non-self parameters.
-    origType.forEachFunctionParam(params, hasSelf,
-        [&](unsigned origParamIndex, unsigned substParamIndex,
-            ParameterTypeFlags origFlags,
-            AbstractionPattern origParamType,
-            AnyFunctionType::CanParam substParam) {
+    origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
+                                  /*ignore final orig param*/ hasSelf,
+                                  [&](FunctionParamGenerator &param) {
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
-      visit(origParamType, substParam, /*forSelf*/false);
-    },  [&](unsigned origParamIndex, unsigned substParamIndex,
-            ParameterTypeFlags origFlags,
-            AbstractionPattern origExpansionType,
-            AnyFunctionType::CanParamArrayRef substParams) {
+      if (!param.isPackExpansion()) {
+        visit(param.getOrigType(), param.getSubstParams()[0],
+              /*forSelf*/false);
+        return;
+      }
+
       // Otherwise, collect the substituted components into a pack.
+      auto origExpansionType = param.getOrigType();
       SmallVector<CanType, 8> packElts;
-      for (auto substParam : substParams) {
+      for (auto substParam : param.getSubstParams()) {
         auto substParamType = substParam.getParameterType();
         auto origParamType =
           origExpansionType.getPackExpansionComponentType(substParamType);
@@ -1597,6 +1598,7 @@ private:
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
+      auto origFlags = param.getOrigFlags();
       addPackParameter(packTy, origFlags.getValueOwnership(),
                        origFlags.isNoDerivative());
     });
