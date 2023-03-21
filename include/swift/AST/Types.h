@@ -3103,6 +3103,8 @@ public:
         return true;
       return false;
     }
+
+    Param getCanonical(CanGenericSignature genericSig) const;
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
