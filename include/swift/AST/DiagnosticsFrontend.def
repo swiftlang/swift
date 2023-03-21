@@ -526,5 +526,8 @@ WARNING(enable_interop_flag_deprecated,none,
         "the -enable-experimental-cxx-interop flag is deprecated. Please pass "
         "'-cxx-interoperability-mode=' instead.", ())
 
+ERROR(swift_lang_must_be_five,none,
+      "Swift language mode must be set to '5' to be able to use C++ interoperability.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
