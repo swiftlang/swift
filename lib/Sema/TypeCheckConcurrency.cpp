@@ -192,9 +192,27 @@ bool IsDefaultActorRequest::evaluate(
   // If we synthesized the unownedExecutor property, we should've
   // added a semantics attribute to it (if it was actually a default
   // actor).
+  bool foundExecutorPropertyImpl = false;
+  bool isDefaultActor = false;
   if (auto executorProperty = classDecl->getUnownedExecutorProperty()) {
-    bool isDefaultActor =
+    foundExecutorPropertyImpl = true;
+    isDefaultActor = isDefaultActor ||
         executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+  }
+
+  // Maybe it was a distributed actor, let's double-check it's localUnownedExecutor property.
+  // If we synthesized that one with appropriate semantics we may still be a default actor.
+  if (!isDefaultActor && classDecl->isDistributedActor()) {
+    if (auto localExecutorProperty = classDecl->getLocalUnownedExecutorProperty()) {
+      foundExecutorPropertyImpl = true;
+      isDefaultActor = isDefaultActor ||
+          localExecutorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+    }
+  }
+
+  // Only if we found one of the executor properties, do we return the status of default or not,
+  // based on the findings of the semantics attribute of that located property.
+  if (foundExecutorPropertyImpl) {
     if (!isDefaultActor &&
         classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
         !AvailableAttr::isUnavailable(classDecl)) {
@@ -202,9 +220,11 @@ bool IsDefaultActorRequest::evaluate(
           diag::concurrency_task_to_thread_model_custom_executor,
           "task-to-thread concurrency model");
     }
+
     return isDefaultActor;
   }
 
+  // Otherwise, we definitely are a default actor.
   return true;
 }
 

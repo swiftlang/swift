@@ -101,7 +101,8 @@ public struct UnownedSerialExecutor: Sendable {
   @usableFromInline
   internal var executor: Builtin.Executor
 
-  @_spi(ConcurrencyExecutors)
+  /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
+  /// which needs to reach for this from an @_transparent function which prevents @_spi use.
   @available(SwiftStdlib 5.9, *)
   public var _executor: Builtin.Executor {
     self.executor
@@ -109,7 +110,7 @@ public struct UnownedSerialExecutor: Sendable {
   #endif
 
   @inlinable
-  internal init(_ executor: Builtin.Executor) {
+  public init(_ executor: Builtin.Executor) {
     #if compiler(>=5.5) && $BuiltinExecutor
     self.executor = executor
     #endif
