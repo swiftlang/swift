@@ -10,13 +10,13 @@ func debugPrint<each T>(_ items: repeat each T)
   }*/
 }
 
-func max<each T>(_ values: repeat each T) -> T?
+func max<each T>(_ values: repeat each T) -> (repeat each T)?
   where each T: Comparable
 {
   return nil
 }
 
-func min<each T: Comparable>(_ values: repeat each T) -> T? {
+func min<each T: Comparable>(_ values: repeat each T) -> (repeat each T)? {
   return nil
 }
 
