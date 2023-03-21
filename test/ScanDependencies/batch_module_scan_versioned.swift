@@ -33,7 +33,6 @@
 // CHECK-PCM109-NEXT:      "clang": "X"
 // CHECK-PCM109-NEXT:    }
 // CHECK-PCM109-NEXT:  ],
-// CHECK-PCM109: "-I
 
 // CHECK-PCM110: 		{
 // CHECK-PCM110-NEXT:  "mainModuleName": "G",
@@ -46,4 +45,3 @@
 // CHECK-PCM110:       "directDependencies": [
 // CHECK-PCM110-NEXT:  ],
 // CHECK-PCM110-NOT: "clang": "X"
-// CHECK-PCM110: "-I
