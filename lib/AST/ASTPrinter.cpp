@@ -137,6 +137,11 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
+static bool isInObjCImpl(const ValueDecl *VD) {
+  auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  return ED && ED->isObjCImplementation();
+}
+
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -208,9 +213,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (!options.PrintSPIs && D->isSPI())
         return false;
 
-      // Skip anything that isn't 'public' or '@usableFromInline' or has a
-      // _specialize attribute with a targetFunction parameter.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        // Skip anything that isn't 'public' or '@usableFromInline' or has a
+        // _specialize attribute with a targetFunction parameter.
         if (!isPublicOrUsableFromInline(VD) &&
             !isPrespecilizationDeclWithTarget(VD)) {
           // We do want to print private stored properties, without their
@@ -219,6 +224,13 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (contributesToParentTypeStorage(ASD))
               return true;
 
+          return false;
+        }
+
+        // Skip member implementations and @objc overrides in @objcImpl
+        // extensions.
+        if (VD->isObjCMemberImplementation()
+            || (isInObjCImpl(VD) && VD->getOverriddenDecl() && VD->isObjC())) {
           return false;
         }
       }
@@ -312,6 +324,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
     DAK_AccessControl,
     DAK_SetterAccess,
     DAK_Lazy,
+    DAK_ObjCImplementation,
     DAK_StaticInitializeObjCMetadata,
     DAK_RestatedObjCConformance,
     DAK_NonSendable,
@@ -1125,8 +1138,10 @@ void PrintAST::printAttributes(const Decl *D) {
 
     if (auto vd = dyn_cast<VarDecl>(D)) {
       // Don't print @_hasInitialValue if we're printing an initializer
-      // expression or if the storage is resilient.
-      if (vd->isInitExposedToClients() || vd->isResilient())
+      // expression, if the storage is resilient, or if it's in an
+      // @objcImplementation extension (where final properties should appear
+      // computed).
+      if (vd->isInitExposedToClients() || vd->isResilient() || isInObjCImpl(vd))
         Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
 
       if (!Options.PrintForSIL) {
@@ -2105,8 +2120,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
-    //    trivial properties
-    if (Options.PrintForSIL) {
+    //    trivial properties, or in an @objcImpl extension, which treats
+    //    final stored properties as computed.
+    if (Options.PrintForSIL || isInObjCImpl(ASD)) {
       Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");
     }
     // ...or you're private/internal(set), at which point we'll print
