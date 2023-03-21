@@ -687,7 +687,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     SILDeclRef(ace));
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
-             SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
+             OrigFnType);
   prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
 
   emitProfilerIncrement(ace);
