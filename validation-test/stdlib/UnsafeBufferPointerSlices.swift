@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+
+// rdar://106875095
+// UNSUPPORTED: asan && target={{(x86_64|x86_64h)-.*}}
 // END.
 
 import StdlibUnittest
