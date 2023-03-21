@@ -276,6 +276,10 @@ struct PrintOptions {
   /// Whether to skip printing 'import' declarations.
   bool SkipImports = false;
 
+  /// Whether to skip over the C++ inline namespace when printing its members or
+  /// when printing it out as a qualifier.
+  bool SkipInlineCXXNamespace = false;
+
   /// Whether to skip printing overrides and witnesses for
   /// protocol requirements.
   bool SkipOverrides = false;

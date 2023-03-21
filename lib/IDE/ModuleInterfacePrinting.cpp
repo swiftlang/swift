@@ -1149,6 +1149,7 @@ void swift::ide::printSymbolicSwiftClangModuleInterface(
       PrintOptions::printModuleInterface(/*printFullConvention=*/false);
   popts.PrintDocumentationComments = false;
   popts.PrintRegularClangComments = false;
+  popts.SkipInlineCXXNamespace = true;
 
   auto &SwiftContext = M->getTopLevelModule()->getASTContext();
   auto &Importer =
