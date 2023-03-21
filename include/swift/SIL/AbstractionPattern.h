@@ -35,6 +35,7 @@ namespace clang {
 
 namespace swift {
 namespace Lowering {
+class FunctionParamGenerator;
 
 /// A pattern for the abstraction of a value.
 ///
@@ -1501,29 +1502,20 @@ public:
   /// parameters in the pattern.
   unsigned getNumFunctionParams() const;
 
-  /// Perform a parallel visitation of the parameters of a function.
-  ///
-  /// If this is a function pattern, calls handleScalar or
-  /// handleExpansion as appropriate for each parameter of the
-  /// original function, in order.
+  /// Traverses the parameters of a function, where this is the
+  /// abstraction pattern for the function (its "original type")
+  /// and the given parameters are the substituted formal parameters.
+  /// Calls the callback once for each parameter in the abstraction
+  /// pattern.
   ///
   /// If this is not a function pattern, calls handleScalar for each
-  /// parameter of the substituted function type.  Functions with
-  /// pack expansions cannot be abstracted legally this way.
+  /// parameter of the substituted function type.  Note that functions
+  /// with pack expansions cannot be legally abstracted this way; it
+  /// is not possible in Swift's ABI to support this without some sort
+  /// of dynamic argument-forwarding thunk.
   void forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
                             bool ignoreFinalParam,
-           llvm::function_ref<void(unsigned origParamIndex,
-                                   unsigned substParamIndex,
-                                   ParameterTypeFlags origFlags,
-                                   AbstractionPattern origParamType,
-                                   AnyFunctionType::CanParam substParam)>
-               handleScalar,
-           llvm::function_ref<void(unsigned origParamIndex,
-                                   unsigned substParamIndex,
-                                   ParameterTypeFlags origFlags,
-                                   AbstractionPattern origExpansionType,
-                          AnyFunctionType::CanParamArrayRef substParams)>
-               handleExpansion) const;
+    llvm::function_ref<void(FunctionParamGenerator &param)> function) const;
 
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.

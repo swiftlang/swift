@@ -537,6 +537,13 @@ public:
     return SILType(castTo<TupleType>().getElementType(index), getCategory());
   }
 
+  /// Given that this is a pack type, return the lowered type of the
+  /// given pack element.  The result will have the same value
+  /// category as the base type.
+  SILType getPackElementType(unsigned index) const {
+    return SILType(castTo<SILPackType>()->getElementType(index), getCategory());
+  }
+
   /// Given that this is a pack expansion type, return the lowered type
   /// of the pattern type.  The result will have the same value category
   /// as the base type.
