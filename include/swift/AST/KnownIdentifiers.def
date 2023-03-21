@@ -232,6 +232,7 @@ IDENTIFIER(_defaultActorInitialize)
 IDENTIFIER(_defaultActorDestroy)
 IDENTIFIER(unownedExecutor)
 IDENTIFIER(localUnownedExecutor)
+IDENTIFIER(_unwrapLocalUnownedExecutor)
 
 IDENTIFIER_(ErrorType)
 IDENTIFIER(Code)

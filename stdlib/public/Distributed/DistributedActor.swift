@@ -262,29 +262,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   @available(SwiftStdlib 5.9, *)
   nonisolated var localUnownedExecutor: UnownedSerialExecutor? { get }
 
-  // Implementation note:
-  // The compiler since the first introduction of `distributed actor` would synthesize
-  // an `unownedExecutor` for it, however with the official introduction of custom executors,
-  // we decided to allow implementations to customize it via `localUnownedExecutor` on distributed actors
-  // instead, because for a remote reference the executor is rather meaningless.
-  //
-  // We instead now gain a default implementation of unownedExecutor which delegates to the local one,
-  // and defaults to creating a default executor, just like it would have done usually.
-  //
-  // Do note however that the "default actor" detection is now moved to detecting if the `localUnownedExecutor`
-  // was synthesized. We still double check and look for the default actor semantics on `unownedExecutor` implementations,
-  // just in case though, to make sure we don't regress the is-default-actor devirtualization in LowerHopToActor.
-  /// The executor of this distributed actor.
-  ///
-  /// If the localUnownedExecutor returns `nil` this will return the default actor executor,
-  /// which may be the case for remote distributed actor references. However an executor of a
-  /// remote reference is practically speaking never used.
-  @available(macOS, introduced: 13.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
-  @available(iOS, introduced: 16.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
-  @available(watchOS, introduced: 9.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
-  @available(tvOS, introduced: 16.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
-  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
-
   /// Resolves the passed in `id` against the `system`, returning
   /// either a local or remote actor reference.
   ///
@@ -301,29 +278,20 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
 
+  // FIXME: figure out how to remove this so LowerHopToActor can call the extension method directly on the protocol
+  @available(SwiftStdlib 5.9, *)
+  var _unwrapLocalUnownedExecutor: UnownedSerialExecutor { get }
 }
 
-#if compiler(>=5.9.0) // since this compiler version, we synthesize the `localUnownedExecutor` instead.
-@available(SwiftStdlib 5.7, *)
+
+@available(SwiftStdlib 5.9, *)
 extension DistributedActor {
-  @available(SwiftStdlib 5.7, *)
-  public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-    // In these versions, we moved to asking developers to implement
-    // `localUnownedExecutor` and as such delegate to it. The `??` fallback
-    // is likely to never be triggered, but technically could be if someone queried
-    // the `unownedExecutor` property directly on a default distributed remote actor reference,
-    // in previous language versions, so we keep these semantics for compatibility.
-    return self.localUnownedExecutor ??
-        UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
-    } else {
-      // pessimistic reimplementation of the semantics the synthesized body would have had.
-      // semantically, this is the only implementation possible on older Swift's here.
-      return UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
-    }
+
+  @available(SwiftStdlib 5.9, *)
+  public var _unwrapLocalUnownedExecutor: UnownedSerialExecutor {
+    self.localUnownedExecutor!
   }
 }
-#endif // swift 5.9
 
 // ==== Hashable conformance ---------------------------------------------------
 
