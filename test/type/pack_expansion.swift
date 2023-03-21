@@ -3,7 +3,7 @@
 // REQUIRES: asserts
 
 func f1<each T>() -> repeat each T {}
-// expected-error@-1 {{pack expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+// expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
 func f2<each T>() -> (repeat each T) {}
 // okay
@@ -19,12 +19,12 @@ protocol P<T> {
 func f4<each T>() -> any P<repeat each T> {}
 
 typealias T1<each T> = repeat each T
-// expected-error@-1 {{pack expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+// expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
 typealias T2<each T> = (repeat each T)
 
 func f4<each T>() -> repeat () -> each T {}
-// expected-error@-1 {{pack expansion '() -> T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+// expected-error@-1 {{pack expansion 'repeat () -> each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
 func f5<each T>() -> () -> (repeat each T) {}
 
@@ -36,20 +36,20 @@ enum E<each T> {
   case f2(_: G<repeat each T>)
 
   var x: repeat each T { fatalError() }
-  // expected-error@-1 {{pack expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+  // expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
   var x: (repeat each T) { fatalError() }
 
   subscript(_: repeat each T) -> Int { fatalError() }
 
   subscript() -> repeat each T { fatalError() }
-  // expected-error@-1 {{pack expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+  // expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
   subscript() -> (repeat each T) { fatalError() }
 }
 
 func withWhereClause<each T>(_ x: repeat each T) where repeat each T: P {}
-// expected-error@-1 {{pack expansion 'T' cannot appear outside of a function parameter list, function result, tuple element or generic argument list}}
+// expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
 struct Outer<each T> {
   struct Bad<each U> {
@@ -70,10 +70,25 @@ func packRef<each T>(_: repeat each T) where each T: P {}
 func packMemberRef<each T>(_: repeat each T.T) where each T: P {}
 
 // expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}
-func invalidPackRef(_: each Int) {}
+func invalidPackRefEachInt(_: each Int) {}
 
-// expected-error@+1 {{pack reference 'T' can only appear in pack expansion or generic requirement}}
+// expected-error@+1 {{pack expansion 'Int' must contain at least one pack reference}}
+func invalidPackRefRepeatInt(_: repeat Int) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
 func packRefOutsideExpansion<each T>(_: each T) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansion<each T>(_: Array<each T>) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansion<each T>(_: Array<(each T) -> ()>) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansion<each T>(_: (each T)) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansion<each T>(_: each T.Type) {}
 
 // coverage to ensure a 'repeat each' type is considered Copyable
 func golden<Z>(_ z: Z) {}

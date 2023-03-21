@@ -4077,11 +4077,24 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                              silContext, identBase);
 
     if (result && result->isParameterPack() &&
-        options.contains(TypeResolutionFlags::AllowPackReferences) &&
-        !options.contains(TypeResolutionFlags::FromPackReference)) {
-      diagnose(repr->getLoc(), diag::pack_expansion_missing_pack_reference,
-               repr);
-      return ErrorType::get(result);
+        // Workaround to allow 'shape' type checking of SIL.
+        // TODO: Explicitly pass along whether in a 'shape' context.
+        !options.contains(TypeResolutionFlags::SILMode)) {
+      bool invalid = false;
+      if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+        diagnose(repr->getLoc(), diag::pack_reference_must_be_in_expansion,
+                 repr);
+        invalid = true;
+      }
+      if (!options.contains(TypeResolutionFlags::FromPackReference)) {
+        diagnose(repr->getLoc(), diag::pack_type_requires_keyword_each,
+                 repr)
+            .fixItInsert(repr->getLoc(), "each ");
+        invalid = true;
+      }
+      if (invalid) {
+        return ErrorType::get(result);
+      }
     }
   } else {
     result = resolveType(baseComp, options);
@@ -4548,27 +4561,33 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
   }
 
+  PackExpansionType *result{};
+  GenericSignature genericSig;
+  Type shapeType;
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    genericSig = resolution.getGenericSignature();
+    shapeType = genericSig->getReducedShape(rootParameterPacks[0]);
+    result = PackExpansionType::get(patternType, shapeType);
+  } else {
+    result = PackExpansionType::get(patternType, rootParameterPacks[0]);
+  }
+
   // We might not allow variadic expansions here at all.
   if (!options.isPackExpansionSupported(getDeclContext())) {
-    diagnose(repr->getLoc(), diag::expansion_not_allowed, patternType);
+    diagnose(repr->getLoc(), diag::expansion_not_allowed, result);
     return ErrorType::get(ctx);
   }
 
   if (resolution.getStage() == TypeResolutionStage::Interface) {
-    auto genericSig = resolution.getGenericSignature();
-    auto shapeType = genericSig->getReducedShape(rootParameterPacks[0]);
-    auto result = PackExpansionType::get(patternType, shapeType);
-
     for (auto type : rootParameterPacks) {
       if (!genericSig->haveSameShape(type, shapeType)) {
         ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
                            result, shapeType, type);
       }
     }
-    return result;
   }
 
-  return PackExpansionType::get(patternType, rootParameterPacks[0]);
+  return result;
 }
 
 NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
@@ -4592,6 +4611,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
         }
       }
     }
+    // TODO: else 'each' probably should be removed preceding repr
     return packReference;
   }
 
