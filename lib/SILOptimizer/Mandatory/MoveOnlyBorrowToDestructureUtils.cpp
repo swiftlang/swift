@@ -1516,7 +1516,7 @@ void Implementation::cleanup() {
       if (result->getType().isTrivial(*fn))
         continue;
       SWIFT_DEFER {
-        liveness.clear();
+        liveness.invalidate();
         discoveredBlocks.clear();
         boundary.clear();
       };
@@ -1534,7 +1534,7 @@ void Implementation::cleanup() {
       continue;
 
     SWIFT_DEFER {
-      liveness.clear();
+      liveness.invalidate();
       discoveredBlocks.clear();
       boundary.clear();
     };
@@ -1888,7 +1888,7 @@ bool BorrowToDestructureTransform::transform() {
             // If we have a copyable type, we need to insert compensating
             // destroys.
             SWIFT_DEFER {
-              liveness.clear();
+              liveness.invalidate();
               discoveredBlocks.clear();
               boundary.clear();
             };

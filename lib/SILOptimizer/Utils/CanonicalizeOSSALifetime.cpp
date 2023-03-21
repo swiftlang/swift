@@ -1017,7 +1017,7 @@ bool CanonicalizeOSSALifetime::computeLiveness(SILValue def) {
   // Step 1: compute liveness
   if (!computeCanonicalLiveness()) {
     LLVM_DEBUG(llvm::errs() << "Failed to compute canonical liveness?!\n");
-    clearLiveness();
+    invalidateLiveness();
     return false;
   }
   if (accessBlockAnalysis) {
@@ -1051,7 +1051,7 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
   // Step 6: rewrite copies and delete extra destroys
   rewriteCopies();
 
-  clearLiveness();
+  invalidateLiveness();
   consumes.clear();
 }
 

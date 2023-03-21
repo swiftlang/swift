@@ -78,7 +78,7 @@ struct CheckerLivenessInfo {
 
   void clear() {
     defUseWorklist.clear();
-    liveness.clear();
+    liveness.invalidate();
     consumingUse.clear();
     interiorPointerTransitiveUses.clear();
     nonLifetimeEndingUsesInLiveOut.clear();

@@ -115,9 +115,9 @@ public:
     : deleter(deleter), deBlocks(deBlocks),
       guaranteedLiveness(function), ownedLifetime(function) {}
 
-  void clear() {
-    guaranteedLiveness.clear();
-    ownedLifetime.clear();
+  void invalidate() {
+    guaranteedLiveness.invalidate();
+    ownedLifetime.invalidate();
     ownedConsumeBlocks.clear();
     beginBorrow = nullptr;
   }

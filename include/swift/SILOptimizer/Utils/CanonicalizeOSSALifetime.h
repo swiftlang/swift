@@ -302,10 +302,10 @@ public:
     liveness.initializeDef(def);
   }
 
-  void clearLiveness() {
+  void invalidateLiveness() {
     consumingBlocks.clear();
     debugValues.clear();
-    liveness.clear();
+    liveness.invalidate();
     discoveredBlocks.clear();
   }
 

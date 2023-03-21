@@ -488,8 +488,8 @@ public:
     return liveBlocks.empty();
   }
 
-  void clear() {
-    liveBlocks.clear();
+  void invalidate() {
+    liveBlocks.invalidate();
     users.clear();
   }
 
@@ -752,10 +752,10 @@ public:
 
   SILValue getDef() const { return def; }
 
-  void clear() {
+  void invalidate() {
     def = SILValue();
     defInst = nullptr;
-    PrunedLiveRange::clear();
+    PrunedLiveRange::invalidate();
   }
 
   void initializeDef(SILValue def) {
@@ -820,8 +820,10 @@ public:
       : PrunedLiveRange(function, discoveredBlocks), defs(function),
         defBlocks(function) {}
 
-  void clear() {
-    llvm_unreachable("multi-def liveness cannot be reused");
+  void invalidate() {
+    defs.invalidate();
+    defBlocks.invalidate();
+    PrunedLiveRange::invalidate();
   }
 
   void initializeDef(SILInstruction *defInst) {
@@ -895,8 +897,8 @@ public:
       : SSAPrunedLiveness(function, discoveredBlocks),
         nonLifetimeEndingUsesInLiveOut(nonLifetimeEndingUsesInLiveOut) {}
 
-  void clear() {
-    SSAPrunedLiveness::clear();
+  void invalidate() {
+    SSAPrunedLiveness::invalidate();
     if (nonLifetimeEndingUsesInLiveOut)
       nonLifetimeEndingUsesInLiveOut->clear();
   }

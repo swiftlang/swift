@@ -1292,7 +1292,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
-    SWIFT_DEFER { liveness.clear(); };
+    SWIFT_DEFER { liveness.invalidate(); };
 
     LLVM_DEBUG(llvm::dbgs() << "Checking for exclusivity hazards for: " << *li);
 

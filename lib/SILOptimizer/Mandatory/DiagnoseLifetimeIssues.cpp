@@ -326,7 +326,7 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
 /// Reports a warning if the stored object \p storedObj is never loaded within
 /// the lifetime of the stored object.
 void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
-  liveness.clear();
+  liveness.invalidate();
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
