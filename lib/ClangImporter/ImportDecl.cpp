@@ -1960,10 +1960,21 @@ namespace {
           !Impl.SwiftContext.LangOpts.CForeignReferenceTypes)
         return false;
 
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_reference" ||
+                        // TODO: Remove this once libSwift hosttools no longer
+                        // requires it.
+                        swiftAttr->getAttribute() == "import_as_ref";
+               return false;
+             });
+    }
+
+    bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext}), {});
-      return semanticsKind == CxxRecordSemanticsKind::Reference;
+      return semanticsKind == CxxRecordSemanticsKind::MoveOnly;
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2117,6 +2128,20 @@ namespace {
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, AccessLevel::Public, loc, name, loc, None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+
+      if (recordHasMoveOnlySemantics(decl)) {
+        if (!Impl.SwiftContext.LangOpts.hasFeature(Feature::MoveOnly)) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(
+                        diag::move_only_requires_move_only,
+                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl->getLocation());
+          return nullptr;
+        }
+
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   MoveOnlyAttr(/*Implicit=*/true));
+      }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -2573,33 +2598,42 @@ namespace {
       // default). Make sure we only do this if the class has been fully defined
       // and we're not in a dependent context (this is equivalent to the logic
       // in CanDeclareSpecialMemberFunction in Clang's SemaLookup.cpp).
-      if (decl->getDefinition() && !decl->isBeingDefined() &&
-          !decl->isDependentContext()) {
+      // TODO: I suspect this if-statement does not need to be here.
+      if (!decl->isBeingDefined() && !decl->isDependentContext()) {
         if (decl->needsImplicitDefaultConstructor()) {
           clang::CXXConstructorDecl *ctor =
               clangSema.DeclareImplicitDefaultConstructor(
-                  const_cast<clang::CXXRecordDecl *>(decl->getDefinition()));
+                  const_cast<clang::CXXRecordDecl *>(decl));
           if (!ctor->isDeleted())
             clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
                                                        ctor);
         }
         clang::CXXConstructorDecl *copyCtor = nullptr;
+        clang::CXXConstructorDecl *moveCtor = nullptr;
         if (decl->needsImplicitCopyConstructor()) {
           copyCtor = clangSema.DeclareImplicitCopyConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        } else if (decl->needsImplicitMoveConstructor()) {
+          moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         } else {
           // We may have a defaulted copy constructor that needs to be defined.
           // Try to find it.
           for (auto methods : decl->methods()) {
             if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-              if (declCtor->isCopyConstructor() && declCtor->isDefaulted() &&
+              if (declCtor->isDefaulted() &&
                   declCtor->getAccess() == clang::AS_public &&
                   !declCtor->isDeleted() &&
                   // Note: we use "doesThisDeclarationHaveABody" here because
                   // that's what "DefineImplicitCopyConstructor" checks.
                   !declCtor->doesThisDeclarationHaveABody()) {
-                copyCtor = declCtor;
-                break;
+                if (declCtor->isCopyConstructor()) {
+                  copyCtor = declCtor;
+                  break;
+                } else if (declCtor->isMoveConstructor()) {
+                  moveCtor = declCtor;
+                  break;
+                }
               }
             }
           }
@@ -2608,6 +2642,16 @@ namespace {
           clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
                                                   copyCtor);
         }
+        if (moveCtor) {
+          clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
+                                                  moveCtor);
+        }
+
+        if (decl->needsImplicitDestructor()) {
+          auto dtor = clangSema.DeclareImplicitDestructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+          clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
+        }
       }
 
       // It is import that we bail on an unimportable record *before* we import
@@ -2615,7 +2659,10 @@ namespace {
       auto semanticsKind =
           evaluateOrDefault(Impl.SwiftContext.evaluator,
                             CxxRecordSemantics({decl, Impl.SwiftContext}), {});
-      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation) {
+      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation &&
+          // Let un-specialized class templates through. We'll sort out their
+          // members once they're instranciated.
+          !Impl.importSymbolicCXXDecls) {
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::record_not_automatically_importable,
