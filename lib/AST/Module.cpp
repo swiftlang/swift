@@ -2124,7 +2124,7 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     else if (desc.options.contains(ImportFlags::ImplementationOnly) ||
              (desc.accessLevel <= AccessLevel::Internal && moduleIsResilient))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    else if (desc.accessLevel <= AccessLevel::Package && moduleIsResilient)
+    else if (desc.accessLevel <= AccessLevel::Package)
       requiredFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;

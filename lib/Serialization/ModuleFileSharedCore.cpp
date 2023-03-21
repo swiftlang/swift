@@ -1694,6 +1694,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     return ModuleLoadingBehavior::Required;
   }
 
+  bool moduleIsResilient = getResilienceStrategy() ==
+                             ResilienceStrategy::Resilient;
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
@@ -1712,7 +1714,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isPackageOnly()) {
     // Package dependencies are usually loaded only for import from the same
     // package.
-    if (!packageName.empty() && packageName == getModulePackageName()) {
+    if ((!packageName.empty() && packageName == getModulePackageName()) ||
+        !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
       return ModuleLoadingBehavior::Optional;
