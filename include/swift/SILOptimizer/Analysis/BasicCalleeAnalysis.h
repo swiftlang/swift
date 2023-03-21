@@ -191,6 +191,8 @@ public:
   BasicCalleeAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
 
+  ~BasicCalleeAnalysis();
+
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::BasicCallee;
   }

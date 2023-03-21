@@ -1444,3 +1444,13 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
   }
   return false;
 }
+
+// TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
+CalleeList BridgedCalleeAnalysis::getCallees(BridgedValue callee) const {
+  return ca->getCalleeListOfValue(callee.getSILValue());
+}
+
+// TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
+CalleeList BridgedCalleeAnalysis::getDestructors(SILType type, bool isExactType) const {
+  return ca->getDestructors(type, isExactType);
+}

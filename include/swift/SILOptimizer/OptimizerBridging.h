@@ -50,14 +50,10 @@ struct BridgedCalleeAnalysis {
   swift::BasicCalleeAnalysis * _Nonnull ca;
 
   SWIFT_IMPORT_UNSAFE
-  swift::CalleeList getCallees(BridgedValue callee) const {
-    return ca->getCalleeListOfValue(callee.getSILValue());
-  }
+  swift::CalleeList getCallees(BridgedValue callee) const;
 
   SWIFT_IMPORT_UNSAFE
-  swift::CalleeList getDestructors(swift::SILType type, bool isExactType) const {
-    return ca->getDestructors(type, isExactType);
-  }
+  swift::CalleeList getDestructors(swift::SILType type, bool isExactType) const;
 
   SWIFT_IMPORT_UNSAFE
   static BridgedFunction getCallee(swift::CalleeList cl, SwiftInt index) {
