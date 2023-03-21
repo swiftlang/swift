@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines a basic generator concept and some useful common
-// implementations of it.
+// This file defines a few types for defining types that follow this
+// simple generator concept:
 //
 // concept Generator {
 //   // ...some number of accessors for the current value...
@@ -27,6 +27,25 @@
 //   /// produced.
 //   void finish();
 // };
+//
+// concept SimpleGenerator : Generator {
+//   type reference;
+//
+//   reference claimNext();
+// }
+//
+// Generators are useful when some structure needs to be traversed but
+// that traversal can't be done in a simple lexical loop.  For example,
+// you can't do two traversals in parallel with a single loop unless you
+// break down all the details of the traversal.  This is a minor problem
+// for simple traversals like walking a flat array, but it's a significant
+// problem when traversals get more complex, like when different components
+// of an array are grouped together according to some additional structure
+// (such as the abstraction pattern of a function's parameter list).
+// It's tempting to write those traversals as higher-order functions that
+// invoke a callback for each element, but this breaks down when parallel
+// traversal is required.  Expressing the traversal as a generator
+// allows the traversal logic to to be reused without that limitation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -120,6 +139,72 @@ public:
   /// Perform any final work required to complete the generation.
   void finish() {
     assert(isFinished() && "didn't finish generating the collection");
+  }
+};
+
+/// An abstracting reference to an existing generator.
+///
+/// The implementation of this type holds the reference to the existing
+/// generator without allocating any additional storage; it is sufficient
+/// for the caller ensures that the object passed to the constructor
+/// stays valid.  Values of this type can otherwise be safely copied
+/// around.
+template <class T>
+class SimpleGeneratorRef {
+public:
+  using reference = T;
+
+private:
+  struct VTable {
+    bool (*isFinished)(const void *impl);
+    reference (*claimNext)(void *impl);
+    void (*advance)(void *impl);
+    void (*finish)(void *impl);
+  };
+
+  template <class G> struct VTableImpl {
+    static constexpr VTable vtable = {
+      [](const void *p) { return static_cast<const G*>(p)->isFinished(); },
+      [](void *p) -> reference { return static_cast<G*>(p)->claimNext(); },
+      [](void *p) { static_cast<G*>(p)->advance(); },
+      [](void *p) { static_cast<G*>(p)->finish(); },
+    };
+  };
+
+  const VTable *vtable;
+  void *pointer;
+
+public:
+  constexpr SimpleGeneratorRef() : vtable(nullptr), pointer(nullptr) {}
+
+  template <class G>
+  constexpr SimpleGeneratorRef(G &generator)
+    : vtable(&VTableImpl<G>::vtable), pointer(&generator) {}
+
+  /// Test whether this generator ref was initialized with a
+  /// valid reference to a generator.
+  explicit operator bool() const {
+    return pointer != nullptr;
+  }
+
+  bool isFinished() const {
+    assert(pointer);
+    return vtable->isFinished(pointer);
+  }
+
+  reference claimNext() {
+    assert(pointer);
+    return vtable->claimNext(pointer);
+  }
+
+  void advance() {
+    assert(pointer);
+    vtable->advance(pointer);
+  }
+
+  void finish() {
+    assert(pointer);
+    vtable->finish(pointer);
   }
 };
 
