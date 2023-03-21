@@ -565,6 +565,8 @@ public:
 
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
+
+  SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
