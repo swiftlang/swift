@@ -194,23 +194,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       continue;
     }
 
-    // If this module file is being installed into the main module, it's treated
-    // as a partial module.
-    auto isPartialModule = M->isMainModule();
+    ModuleLoadingBehavior transitiveBehavior =
+      getTransitiveLoadingBehavior(dependency);
 
-    if (dependency.isImplementationOnly() &&
-        !(isPartialModule || ctx.LangOpts.DebuggerSupport)) {
-      // When building normally (and not merging partial modules), we don't
-      // want to bring in the implementation-only module, because that might
-      // change the set of visible declarations. However, when debugging we
-      // want to allow getting at the internals of this module when possible,
-      // and so we'll try to reference the implementation-only module if it's
-      // available.
-      continue;
-    }
-
-    if (dependency.isPackageOnly() &&
-        ctx.LangOpts.PackageName != this->getModulePackageName())
+    // Skip this dependency?
+    if (transitiveBehavior == ModuleLoadingBehavior::Ignored)
       continue;
 
     ImportPath::Builder builder(ctx, dependency.Core.RawPath,
@@ -230,11 +218,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
           modulePath.front().Item == file->getParentModule()->getName()) {
         return error(Status::MissingUnderlyingModule);
       }
-
       // Otherwise, continue trying to load dependencies, so that we can list
       // everything that's missing.
-      if (!(dependency.isImplementationOnly() && ctx.LangOpts.DebuggerSupport))
+
+      // Report a missing dependency only when really needed.
+      if (transitiveBehavior == ModuleLoadingBehavior::Required)
         missingDependency = true;
+
       continue;
     }
 
@@ -267,6 +257,21 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   }
 
   return status;
+}
+
+ModuleLoadingBehavior
+ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency) const {
+  ASTContext &ctx = getContext();
+  ModuleDecl *mod = FileContext->getParentModule();
+
+  // If this module file is being installed into the main module, it's treated
+  // as a partial module.
+  auto isPartialModule = mod->isMainModule();
+
+  return Core->getTransitiveLoadingBehavior(dependency.Core,
+                                            ctx.LangOpts.DebuggerSupport,
+                                            isPartialModule,
+                                            ctx.LangOpts.PackageName);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -462,6 +467,10 @@ void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
         // load it.
         continue;
       }
+
+    } else if (dep.isPackageOnly()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::PackageOnly))
+        continue;
 
     } else {
       if (!filter.contains(ModuleDecl::ImportFilterKind::Default))

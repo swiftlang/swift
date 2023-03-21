@@ -1680,3 +1680,48 @@ ModuleFileSharedCore::ModuleFileSharedCore(
 bool ModuleFileSharedCore::hasSourceInfo() const {
   return !!DeclUSRsTable;
 }
+
+ModuleLoadingBehavior
+ModuleFileSharedCore::getTransitiveLoadingBehavior(
+                                          const Dependency &dependency,
+                                          bool debuggerMode,
+                                          bool isPartialModule,
+                                          StringRef packageName) const {
+  if (isPartialModule) {
+    // Keep the merge-module behavior for legacy support. In that case
+    // we load all transitive dependencies from partial modules and
+    // error if it fails.
+    return ModuleLoadingBehavior::Required;
+  }
+
+  if (dependency.isImplementationOnly()) {
+    // Implementation-only dependencies are not usually loaded from
+    // transitive imports.
+    if (debuggerMode) {
+      // In the debugger, try to load the module if possible.
+      // Same in the case of a testable import, try to load the dependency
+      // but don't fail if it's missing as this could be source breaking.
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      // When building normally, ignore transitive implementation-only
+      // imports.
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
+  if (dependency.isPackageOnly()) {
+    // Package dependencies are usually loaded only for import from the same
+    // package.
+    if (!packageName.empty() && packageName == getModulePackageName()) {
+      return ModuleLoadingBehavior::Required;
+    } else if (debuggerMode) {
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
+  // By default, imports are required dependencies.
+  return ModuleLoadingBehavior::Required;
+}
+
