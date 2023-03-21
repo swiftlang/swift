@@ -6146,6 +6146,12 @@ bool InvalidPackElement::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPackReference::diagnoseAsError() {
+  emitDiagnostic(diag::pack_reference_outside_expansion,
+                 packType, /*inExpression*/true);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();

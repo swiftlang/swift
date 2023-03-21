@@ -4294,6 +4294,23 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
+  // If we're attempting to bind a PackType or PackArchetypeType to a type
+  // variable that doesn't support it, we have a pack reference outside of a
+  // pack expansion expression.
+  if (!typeVar->getImpl().canBindToPack() &&
+      (type->is<PackArchetypeType>() || type->is<PackType>())) {
+    if (shouldAttemptFixes()) {
+      auto *fix = AllowInvalidPackReference::create(*this, type,
+                                                    getConstraintLocator(locator));
+      if (!recordFix(fix)) {
+        recordPotentialHole(typeVar);
+        return getTypeMatchSuccess();
+      }
+    }
+
+    return getTypeMatchFailure(locator);
+  }
+
   // We do not allow keypaths to go through AnyObject. Let's create a fix
   // so this can be diagnosed later.
   if (auto loc = typeVar->getImpl().getLocator()) {
@@ -14151,6 +14168,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MustBeCopyable:
   case FixKind::AllowInvalidPackElement:
+  case FixKind::AllowInvalidPackReference:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::GenericArgumentsMismatch: {

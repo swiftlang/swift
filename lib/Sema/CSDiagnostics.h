@@ -1851,6 +1851,19 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose pack references outside of pack expansion expressions.
+class InvalidPackReference final : public FailureDiagnostic {
+  Type packType;
+
+public:
+  InvalidPackReference(const Solution &solution, Type packType,
+                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        packType(packType) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
