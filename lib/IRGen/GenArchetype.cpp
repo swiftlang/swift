@@ -441,8 +441,8 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto arg = emitGenericRequirementFromSubstitutions(
-              IGF, reqt, archetype->getSubstitutions(),
-              MetadataState::Abstract);
+              IGF, reqt, MetadataState::Abstract,
+              archetype->getSubstitutions());
           args.push_back(arg);
           types.push_back(args.back()->getType());
         });

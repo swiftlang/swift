@@ -43,18 +43,16 @@ namespace swift {
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
   llvm::SetVector<GenericRequirement> RequirementsSet;
-  llvm::DenseMap<GenericRequirement, ProtocolConformanceRef> Conformances;
-
-  void addRequirement(GenericRequirement requirement) {
-    RequirementsSet.insert(requirement);
-  }
-
-  void addAbstractConditionalRequirements(
-      SpecializedProtocolConformance *specializedConformance);
+  SubstitutionMap SubMap;
 
 public:
-  NecessaryBindings() = default;
+  NecessaryBindings() {}
+  NecessaryBindings(SubstitutionMap subs) : SubMap(subs) {}
   
+  SubstitutionMap getSubstitutionMap() const {
+    return SubMap;
+  }
+
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
@@ -62,25 +60,20 @@ public:
                                                     SubstitutionMap subs,
                                                     bool considerParameterSources = true);
 
-  /// Add whatever information is necessary to reconstruct type metadata
-  /// for the given type.
-  void addTypeMetadata(CanType type);
+  void addRequirement(GenericRequirement requirement) {
+    auto type = requirement.getTypeParameter().subst(SubMap);
+    if (!type->hasArchetype())
+      return;
+
+    RequirementsSet.insert(requirement);
+  }
 
   /// Get the requirement from the bindings at index i.
   const GenericRequirement &operator[](size_t i) const {
     return RequirementsSet[i];
   }
 
-  ProtocolConformanceRef
-  getConformance(const GenericRequirement &requirement) const {
-    return Conformances.lookup(requirement);
-  }
-
   size_t size() const { return getRequirements().size(); }
-
-  /// Add whatever information is necessary to reconstruct a witness table
-  /// reference for the given type.
-  void addProtocolConformance(CanType type, ProtocolConformanceRef conf);
 
   /// Is the work to do trivial?
   bool empty() const { return getRequirements().empty(); }
@@ -91,8 +84,6 @@ public:
 
   /// Save the necessary bindings to the given buffer.
   void save(IRGenFunction &IGF, Address buffer) const;
-
-  void save(IRGenFunction &IGF, Address buffer, Explosion &source) const;
 
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
@@ -105,7 +96,7 @@ private:
   static NecessaryBindings computeBindings(IRGenModule &IGM,
                                            CanSILFunctionType origType,
                                            SubstitutionMap subs,
-                                           bool considerParameterSources = true);
+                                           bool considerParameterSources);
 };
 
 } // end namespace irgen
