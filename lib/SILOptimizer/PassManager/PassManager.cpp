@@ -1256,9 +1256,6 @@ void SILPassManager::viewCallGraph() {
 //                           SwiftPassInvocation
 //===----------------------------------------------------------------------===//
 
-static_assert(BridgedSlabCapacity == FixedSizeSlab::capacity,
-              "wrong bridged slab capacity");
-
 FixedSizeSlab *SwiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
   FixedSizeSlab *slab = passManager->getModule()->allocSlab();
   if (afterSlab) {
@@ -1393,333 +1390,42 @@ void SwiftPassInvocation::endTransformFunction() {
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-inline SwiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
-  return const_cast<SwiftPassInvocation *>(
-    static_cast<const SwiftPassInvocation *>(ctxt.opaqueCtxt));
-}
-
-inline FixedSizeSlab *castToSlab(BridgedSlab slab) {
-  if (slab.data)
-    return static_cast<FixedSizeSlab *>((FixedSizeSlabPayload *)slab.data);
-  return nullptr;
-}
-
-inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
-  if (slab) {
-    FixedSizeSlabPayload *payload = slab;
-    assert((void *)payload == slab->dataFor<void>());
-    return {payload};
-  }
-  return {nullptr};
-}
-
-inline BasicBlockSet *castToBlockSet(BridgedBasicBlockSet blockSet) {
-  return static_cast<BasicBlockSet *>(blockSet.bbs);
-}
-
-inline NodeSet *castToNodeSet(BridgedNodeSet nodeSet) {
-  return static_cast<NodeSet *>(nodeSet.nds);
-}
-
-BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
-  return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
-}
-
-BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab) {
-  return toBridgedSlab(&*std::prev(castToSlab(slab)->getIterator()));
-}
-
-BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
-                                  BridgedSlab afterSlab) {
-  auto *inv = castToPassInvocation(passContext);
-  return toBridgedSlab(inv->allocSlab(castToSlab(afterSlab)));
-}
-
-BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
-                                 BridgedSlab slab) {
-  auto *inv = castToPassInvocation(passContext);
-  return toBridgedSlab(inv->freeSlab(castToSlab(slab)));
-}
-
-SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
-                                                OptionalBridgedInstruction inst) {
-  SwiftPassInvocation *inv = castToPassInvocation(passContext);
-  SILInstruction *i = inst.getInst();
-  return inv->getPassManager()->continueWithNextSubpassRun(i,
-                inv->getFunction(), inv->getTransform()) ? 1: 0;
-}
-
-void PassContext_notifyChanges(BridgedPassContext passContext,
-                               enum ChangeNotificationKind changeKind) {
-  SwiftPassInvocation *inv = castToPassInvocation(passContext);
+void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
   switch (changeKind) {
-  case instructionsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
+  case Kind::instructionsChanged:
+    invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
     break;
-  case callsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
+  case Kind::callsChanged:
+    invocation->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
     break;
-  case branchesChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+  case Kind::branchesChanged:
+    invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     break;
-  case effectsChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::Effects);
+  case Kind::effectsChanged:
+    invocation->notifyChanges(SILAnalysis::InvalidationKind::Effects);
     break;
   }
 }
 
-BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst) {
-  SILInstruction *inst = bridgedInst.getInst();
-  SILBasicBlock *block = inst->getParent();
-  return {block->split(inst->getIterator())};
+bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
+  return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
 }
 
-void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                  BridgedInstruction inst) {
-  castToPassInvocation(passContext)->eraseInstruction(inst.getInst());
-}
-
-void PassContext_eraseBlock(BridgedPassContext passContext,
-                            BridgedBasicBlock block) {
-  block.getBlock()->eraseFromParent();
-}
-
-bool PassContext_tryDeleteDeadClosure(BridgedPassContext context, BridgedInstruction closure) {
-  return tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
-}
-
-void PassContext_notifyInvalidatedStackNesting(BridgedPassContext context) {
-  castToPassInvocation(context)->setNeedFixStackNesting(true);
-}
-
-bool PassContext_getNeedFixStackNesting(BridgedPassContext context) {
-  return castToPassInvocation(context)->getNeedFixStackNesting();
-}
-
-void PassContext_fixStackNesting(BridgedPassContext passContext,
-                                 BridgedFunction function) {
+void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
       break;
     case StackNesting::Changes::Instructions:
-      PassContext_notifyChanges(passContext, instructionsChanged);
+      invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
       break;
     case StackNesting::Changes::CFG:
-      PassContext_notifyChanges(passContext, branchesChanged);
+      invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
       break;
   }
-  castToPassInvocation(passContext)->setNeedFixStackNesting(false);
+  invocation->setNeedFixStackNesting(false);
 }
 
-BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<AliasAnalysis>(invocation->getFunction())};
-}
-
-BridgedCalleeAnalysis
-PassContext_getCalleeAnalysis(BridgedPassContext context) {
-  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
-  return {pm->getAnalysis<BasicCalleeAnalysis>()};
-}
-
-BridgedDeadEndBlocksAnalysis
-PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<DeadEndBlocksAnalysis>(invocation->getFunction())};
-}
-
-BridgedDomTree PassContext_getDomTree(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<DominanceAnalysis>(invocation->getFunction())};
-}
-
-SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
-                                 BridgedBasicBlock dominating,
-                                 BridgedBasicBlock dominated) {
-  DominanceInfo *di = static_cast<DominanceInfo *>(domTree.dt);
-  return di->dominates(dominating.getBlock(), dominated.getBlock()) ? 1 : 0;
-}
-
-BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context) {
-  SwiftPassInvocation *invocation = castToPassInvocation(context);
-  SILPassManager *pm = invocation->getPassManager();
-  return {pm->getAnalysis<PostDominanceAnalysis>(invocation->getFunction())};
-}
-
-SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
-                                         BridgedBasicBlock dominating,
-                                         BridgedBasicBlock dominated) {
-  auto *pdi = static_cast<PostDominanceInfo *>(pdomTree.pdt);
-  return pdi->dominates(dominating.getBlock(), dominated.getBlock()) ? 1 : 0;
-}
-
-BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
-  return {castToPassInvocation(context)->allocBlockSet()};
-}
-
-void PassContext_freeBasicBlockSet(BridgedPassContext context,
-                                   BridgedBasicBlockSet set) {
-  castToPassInvocation(context)->freeBlockSet(castToBlockSet(set));
-}
-
-SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->contains(block.getBlock()) ? 1 : 0;
-}
-
-SwiftInt BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  return castToBlockSet(set)->insert(block.getBlock()) ? 1 : 0;
-}
-
-void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
-  castToBlockSet(set)->erase(block.getBlock());
-}
-
-BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
-  return {castToBlockSet(set)->getFunction()};
-}
-
-BridgedNodeSet PassContext_allocNodeSet(BridgedPassContext context) {
-  return {castToPassInvocation(context)->allocNodeSet()};
-}
-
-void PassContext_freeNodeSet(BridgedPassContext context,
-                                   BridgedNodeSet set) {
-  castToPassInvocation(context)->freeNodeSet(castToNodeSet(set));
-}
-
-SwiftInt NodeSet_containsValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->contains(value.getSILValue()) ? 1 : 0;
-}
-
-SwiftInt NodeSet_insertValue(BridgedNodeSet set, BridgedValue value) {
-  return castToNodeSet(set)->insert(value.getSILValue()) ? 1 : 0;
-}
-
-void NodeSet_eraseValue(BridgedNodeSet set, BridgedValue value) {
-  castToNodeSet(set)->erase(value.getSILValue());
-}
-
-SwiftInt NodeSet_containsInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->contains(inst.getInst()->asSILNode()) ? 1 : 0;
-}
-
-SwiftInt NodeSet_insertInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  return castToNodeSet(set)->insert(inst.getInst()->asSILNode()) ? 1 : 0;
-}
-
-void NodeSet_eraseInstruction(BridgedNodeSet set, BridgedInstruction inst) {
-  castToNodeSet(set)->erase(inst.getInst()->asSILNode());
-}
-
-BridgedFunction NodeSet_getFunction(BridgedNodeSet set) {
-  return {castToNodeSet(set)->getFunction()};
-}
-
-void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
-  arb.getAs<AllocRefInstBase>()->setStackAllocatable();
-}
-
-void TermInst_replaceBranchTarget(BridgedInstruction term, BridgedBasicBlock from,
-                                  BridgedBasicBlock to) {
-  term.getAs<TermInst>()->replaceBranchTarget(from.getBlock(), to.getBlock());
-}
-
-SubstitutionMap
-PassContext_getContextSubstitutionMap(BridgedPassContext context,
-                                      SILType type) {
-  auto *ntd = type.getASTType()->getAnyNominal();
-  auto *pm = castToPassInvocation(context)->getPassManager();
-  auto *m = pm->getModule()->getSwiftModule();
-
-  return type.getASTType()->getContextSubstitutionMap(m, ntd);
-}
-
-void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
-  castToPassInvocation(ctxt)->beginTransformFunction(function.getFunction());
-}
-
-void PassContext_endTransformFunction(BridgedPassContext ctxt) {
-  castToPassInvocation(ctxt)->endTransformFunction();
-}
-
-OptionalBridgedFunction
-PassContext_firstFunctionInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getFunctions().empty())
-    return {nullptr};
-  return {&*mod->getFunctions().begin()};
-}
-
-OptionalBridgedFunction
-PassContext_nextFunctionInModule(BridgedFunction function) {
-  auto *f = function.getFunction();
-  auto nextIter = std::next(f->getIterator());
-  if (nextIter == f->getModule().getFunctions().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-BridgedVTableArray PassContext_getVTables(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  auto vTables = mod->getVTables();
-  return {(const BridgedVTable *)vTables.data(), (SwiftInt)vTables.size()};
-}
-
-OptionalBridgedWitnessTable
-PassContext_firstWitnessTableInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getWitnessTables().empty())
-    return {nullptr};
-  return {&*mod->getWitnessTables().begin()};
-}
-
-OptionalBridgedWitnessTable
-PassContext_nextWitnessTableInModule(BridgedWitnessTable table) {
-  auto *t = table.table;
-  auto nextIter = std::next(t->getIterator());
-  if (nextIter == t->getModule().getWitnessTables().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-OptionalBridgedDefaultWitnessTable
-PassContext_firstDefaultWitnessTableInModule(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  if (mod->getDefaultWitnessTables().empty())
-    return {nullptr};
-  return {&*mod->getDefaultWitnessTables().begin()};
-}
-
-OptionalBridgedDefaultWitnessTable
-PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
-  auto *t = table.table;
-  auto nextIter = std::next(t->getIterator());
-  if (nextIter == t->getModule().getDefaultWitnessTables().end())
-    return {nullptr};
-  return {&*nextIter};
-}
-
-OptionalBridgedFunction
-PassContext_loadFunction(BridgedPassContext context, StringRef name) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  SILFunction *f = mod->loadFunction(name, SILModule::LinkingMode::LinkNormal);
-  return {f};
-}
-
-SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  return mod->getOptions().EnableStackProtection;
-}
-
-SwiftInt SILOptions_enableMoveInoutStackProtection(BridgedPassContext context) {
-  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
-  return mod->getOptions().EnableMoveInoutStackProtection;
-}
-
-bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
+bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
   // Fast-path check.
   if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
     return true;
@@ -1737,9 +1443,4 @@ bool SILOptions_enableSimplificationFor(BridgedInstruction inst) {
       return true;
   }
   return false;
-}
-
-BridgedValue SILUndef_get(SILType type, BridgedPassContext context) {
-  SILUndef *undef = SILUndef::get(type, *castToPassInvocation(context)->getFunction());
-  return {undef};
 }

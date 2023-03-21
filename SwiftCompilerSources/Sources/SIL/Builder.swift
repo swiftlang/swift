@@ -23,7 +23,7 @@ public struct Builder {
 
   let insertAt: InsertionPoint
   let location: Location
-  private let passContext: BridgedPassContext
+  private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
   private var bridged: BridgedBuilder {
@@ -40,12 +40,12 @@ public struct Builder {
   }
 
   private func notifyNew<I: Instruction>(_ instruction: I) -> I {
-    PassContext_notifyChanges(passContext, instructionsChanged)
+    notificationHandler.notifyChanges(.instructionsChanged)
     if instruction is FullApplySite {
-      PassContext_notifyChanges(passContext, callsChanged)
+      notificationHandler.notifyChanges(.callsChanged)
     }
     if instruction is TermInst {
-      PassContext_notifyChanges(passContext, branchesChanged)
+      notificationHandler.notifyChanges(.branchesChanged)
     }
     notifyNewInstruction(instruction)
     return instruction
@@ -53,11 +53,11 @@ public struct Builder {
 
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
-              _ passContext: BridgedPassContext) {
+              _ notificationHandler: BridgedChangeNotificationHandler) {
     self.insertAt = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
-    self.passContext = passContext
+    self.notificationHandler = notificationHandler
   }
 
   public func createBuiltinBinaryFunction(name: String,

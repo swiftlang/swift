@@ -40,16 +40,7 @@ struct BridgedBasicBlock;
 struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
 
-enum ChangeNotificationKind {
-  instructionsChanged,
-  callsChanged,
-  branchesChanged,
-  effectsChanged
-};
-
-typedef struct {
-  const void * _Nonnull opaqueCtxt;
-} BridgedPassContext;
+void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
 
 struct BridgedValue {
   SwiftObject obj;
@@ -613,6 +604,12 @@ struct BridgedInstruction {
     return getAs<swift::CondBranchInst>()->getNumTrueArgs();
   }
 
+  void AllocRefInstBase_setIsStackAllocatable() const {
+    getAs<swift::AllocRefInstBase>()->setStackAllocatable();
+  }
+
+  inline void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
+
   SwiftInt KeyPathInst_getNumComponents() const {
     if (swift::KeyPathPattern *pattern = getAs<swift::KeyPathInst>()->getPattern()) {
       return (SwiftInt)pattern->getComponents().size();
@@ -1052,17 +1049,24 @@ struct BridgedNominalTypeDecl {
   swift::NominalTypeDecl * _Nonnull decl;
 };
 
-void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
+// Passmanager and Context
 
-SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
-                                                OptionalBridgedInstruction inst);
-void PassContext_notifyChanges(BridgedPassContext passContext,
-                               enum ChangeNotificationKind changeKind);
-BridgedBasicBlock PassContext_splitBlock(BridgedInstruction bridgedInst);
-void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                  BridgedInstruction inst);
-void PassContext_eraseBlock(BridgedPassContext passContext,
-                            BridgedBasicBlock block);
+namespace swift {
+  class SwiftPassInvocation;
+}
+
+struct BridgedChangeNotificationHandler {
+  swift::SwiftPassInvocation * _Nonnull invocation;
+
+  enum class Kind {
+    instructionsChanged,
+    callsChanged,
+    branchesChanged,
+    effectsChanged
+  };
+
+  void notifyChanges(Kind changeKind) const;
+};
 
 //===----------------------------------------------------------------------===//
 //                             Inline functions
@@ -1113,6 +1117,10 @@ BridgedSuccessorArray BridgedInstruction::TermInst_getSuccessors() const {
 
 BridgedBasicBlock BridgedInstruction::BranchInst_getTargetBlock() const {
   return {getAs<swift::BranchInst>()->getDestBB()};
+}
+
+void BridgedInstruction::TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const {
+  getAs<swift::TermInst>()->replaceBranchTarget(from.getBlock(), to.getBlock());
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {

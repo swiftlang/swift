@@ -17,7 +17,7 @@ struct AliasAnalysis {
   let bridged: BridgedAliasAnalysis
 
   func mayRead(_ inst: Instruction, fromAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, fromAddress.bridged) {
+    switch bridged.getMemBehavior(inst.bridged, fromAddress.bridged) {
       case .MayRead, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
@@ -26,7 +26,7 @@ struct AliasAnalysis {
   }
 
   func mayWrite(_ inst: Instruction, toAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, toAddress.bridged) {
+    switch bridged.getMemBehavior(inst.bridged, toAddress.bridged) {
       case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
@@ -35,7 +35,7 @@ struct AliasAnalysis {
   }
 
   func mayReadOrWrite(_ inst: Instruction, address: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, address.bridged) {
+    switch bridged.getMemBehavior(inst.bridged, address.bridged) {
       case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
         return true
       default:
@@ -61,7 +61,7 @@ struct AliasAnalysis {
   }
   
   static func register() {
-    AliasAnalysis_register(
+    BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
       { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> swift.MemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
