@@ -306,9 +306,7 @@ void CompletionLookup::collectImportedModules(
   SmallVector<ImportedModule, 16> Imported;
   SmallVector<ImportedModule, 16> FurtherImported;
   CurrDeclContext->getParentSourceFile()->getImportedModules(
-      Imported, {ModuleDecl::ImportFilterKind::Exported,
-                 ModuleDecl::ImportFilterKind::Default,
-                 ModuleDecl::ImportFilterKind::ImplementationOnly});
+      Imported, ModuleDecl::getImportFilterLocal());
 
   for (ImportedModule &imp : Imported)
     directImportedModules.insert(imp.importedModule->getNameStr());

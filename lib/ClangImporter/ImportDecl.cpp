@@ -4511,14 +4511,8 @@ namespace {
         llvm::SmallVector<ValueDecl *> results;
         llvm::SmallVector<ImportedModule> importedModules;
 
-        ModuleDecl::ImportFilter moduleImportFilter = ModuleDecl::ImportFilterKind::Default;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::Exported;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
-        moduleImportFilter |= ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay;
-
-        mainModule->getImportedModules(importedModules, moduleImportFilter);
+        mainModule->getImportedModules(importedModules,
+                                       ModuleDecl::getImportFilterAll());
 
         for (auto &import : importedModules) {
           if (import.importedModule->isNonSwiftModule())

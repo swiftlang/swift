@@ -1284,9 +1284,7 @@ void swift::ide::deliverCompletionResults(
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
-    SF.getImportedModules(directImport,
-                          {ModuleDecl::ImportFilterKind::Default,
-                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    SF.getImportedModules(directImport, ModuleDecl::getImportFilterLocal());
     for (auto import : directImport)
       explictlyImportedModules.insert(import.importedModule);
 
@@ -1383,14 +1381,7 @@ void swift::ide::deliverCompletionResults(
 
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
-      SF.getImportedModules(
-          Imports, {
-                       ModuleDecl::ImportFilterKind::Exported,
-                       ModuleDecl::ImportFilterKind::Default,
-                       ModuleDecl::ImportFilterKind::ImplementationOnly,
-                       ModuleDecl::ImportFilterKind::PackageOnly,
-                       ModuleDecl::ImportFilterKind::SPIOnly,
-                   });
+      SF.getImportedModules(Imports, ModuleDecl::getImportFilterLocal());
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))

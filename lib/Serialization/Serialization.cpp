@@ -1206,13 +1206,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   if (!options.ModuleInterface.empty())
     ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
-  SmallVector<ImportedModule, 8> allImports;
-  M->getImportedModules(allImports,
-                        {ModuleDecl::ImportFilterKind::Exported,
-                         ModuleDecl::ImportFilterKind::Default,
-                         ModuleDecl::ImportFilterKind::ImplementationOnly,
-                         ModuleDecl::ImportFilterKind::PackageOnly});
-  ImportedModule::removeDuplicates(allImports);
+  SmallVector<ImportedModule, 8> allLocalImports;
+  M->getImportedModules(allLocalImports, ModuleDecl::getImportFilterLocal());
+  ImportedModule::removeDuplicates(allLocalImports);
 
   // Collect the public and private imports as a subset so that we can
   // distinguish them.
@@ -1232,7 +1228,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
   // compiling source files.
-  if (llvm::is_contained(allImports, bridgingHeaderImport)) {
+  if (llvm::is_contained(allLocalImports, bridgingHeaderImport)) {
     off_t importedHeaderSize = 0;
     time_t importedHeaderModTime = 0;
     std::string contents;
@@ -1252,7 +1248,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   }
 
   ModuleDecl *theBuiltinModule = M->getASTContext().TheBuiltinModule;
-  for (auto import : allImports) {
+  for (auto import : allLocalImports) {
     if (import.importedModule == theBuiltinModule ||
         import.importedModule == bridgingHeaderModule) {
       continue;

@@ -110,13 +110,7 @@ static bool contains(const SetLike &setLike, Item item) {
 /// By default, all imports are included.
 static void getImmediateImports(
     ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &imports,
-    ModuleDecl::ImportFilter importFilter = {
-        ModuleDecl::ImportFilterKind::Exported,
-        ModuleDecl::ImportFilterKind::Default,
-        ModuleDecl::ImportFilterKind::ImplementationOnly,
-        ModuleDecl::ImportFilterKind::PackageOnly,
-        ModuleDecl::ImportFilterKind::SPIOnly,
-        ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay}) {
+    ModuleDecl::ImportFilter importFilter = ModuleDecl::getImportFilterAll()) {
   SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 

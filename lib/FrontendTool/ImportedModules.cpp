@@ -83,11 +83,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, mainModule)) {
       SmallVector<ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(
-          imported, {ModuleDecl::ImportFilterKind::Exported,
-                     ModuleDecl::ImportFilterKind::Default,
-                     ModuleDecl::ImportFilterKind::ImplementationOnly,
-                     ModuleDecl::ImportFilterKind::PackageOnly,
-                     ModuleDecl::ImportFilterKind::SPIOnly});
+          imported, ModuleDecl::getImportFilterLocal());
 
       for (auto IM : imported) {
         if (auto clangModule = IM.importedModule->findUnderlyingClangModule())
