@@ -971,6 +971,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setLifetimeAnnotation(lifetime);
       bool isClosureCapture = (Args[I + 1] >> 19) & 0x1;
       fArg->setClosureCapture(isClosureCapture);
+      bool isFormalParameterPack = (Args[I + 1] >> 20) & 0x1;
+      fArg->setFormalParameterPack(isFormalParameterPack);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
