@@ -2289,7 +2289,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // to categorize the uses of this address into their ownership behavior (e.x.:
   // init, reinit, take, destroy, etc.).
   SmallVector<SILBasicBlock *, 32> gatherUsesDiscoveredBlocks;
-  SSAPrunedLiveness gatherUsesLiveness(&gatherUsesDiscoveredBlocks);
+  SSAPrunedLiveness gatherUsesLiveness(fn, &gatherUsesDiscoveredBlocks);
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter, gatherUsesLiveness);
   SWIFT_DEFER { visitor.clear(); };

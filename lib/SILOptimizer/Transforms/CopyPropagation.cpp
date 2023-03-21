@@ -472,7 +472,7 @@ void CopyPropagation::run() {
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(
       pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
-      accessBlockAnalysis, domTree, deleter);
+      getFunction(), accessBlockAnalysis, domTree, deleter);
   auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
 
   // NOTE: We assume that the function is in reverse post order so visiting the
@@ -536,7 +536,7 @@ void CopyPropagation::run() {
   }
   // borrowCanonicalizer performs all modifications through deleter's
   // callbacks, so we don't need to explicitly check for changes.
-  CanonicalizeBorrowScope borrowCanonicalizer(deleter);
+  CanonicalizeBorrowScope borrowCanonicalizer(f, deleter);
   // The utilities in this loop cannot delete borrows before they are popped
   // from the worklist.
   while (true) {

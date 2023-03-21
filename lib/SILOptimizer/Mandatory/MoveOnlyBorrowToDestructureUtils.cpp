@@ -1507,7 +1507,7 @@ void Implementation::cleanup() {
   // not actually completely consume.
   auto *fn = getMarkedValue()->getFunction();
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(fn, &discoveredBlocks);
   PrunedLivenessBoundary boundary;
   while (!interface.createdDestructures.empty()) {
     auto *inst = interface.createdDestructures.pop_back_val();
@@ -1868,7 +1868,7 @@ bool BorrowToDestructureTransform::transform() {
       // copy_value in each destination block that we originally inserted.
       {
         SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-        SSAPrunedLiveness liveness(&discoveredBlocks);
+        SSAPrunedLiveness liveness(fn, &discoveredBlocks);
         PrunedLivenessBoundary boundary;
 
         SILBuilderWithScope builder(s);

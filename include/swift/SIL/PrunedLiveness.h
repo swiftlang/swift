@@ -479,8 +479,9 @@ class PrunedLiveness {
   llvm::SmallMapVector<SILInstruction *, bool, 8> users;
 
 public:
-  PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : liveBlocks(1 /*num bits*/, discoveredBlocks) {}
+  PrunedLiveness(SILFunction *function,
+                 SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : liveBlocks(function, discoveredBlocks) {}
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
@@ -745,8 +746,9 @@ class SSAPrunedLiveness : public PrunedLiveRange<SSAPrunedLiveness> {
 
 public:
   SSAPrunedLiveness(
+      SILFunction *function,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : PrunedLiveRange(discoveredBlocks) {}
+      : PrunedLiveRange(function, discoveredBlocks) {}
 
   SILValue getDef() const { return def; }
 
@@ -815,8 +817,8 @@ public:
   MultiDefPrunedLiveness(
       SILFunction *function,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : PrunedLiveRange(discoveredBlocks), defs(function), defBlocks(function) {
-  }
+      : PrunedLiveRange(function, discoveredBlocks), defs(function),
+        defBlocks(function) {}
 
   void clear() {
     llvm_unreachable("multi-def liveness cannot be reused");
@@ -886,10 +888,11 @@ class DiagnosticPrunedLiveness : public SSAPrunedLiveness {
 
 public:
   DiagnosticPrunedLiveness(
+      SILFunction *function,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
       SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut =
           nullptr)
-      : SSAPrunedLiveness(discoveredBlocks),
+      : SSAPrunedLiveness(function, discoveredBlocks),
         nonLifetimeEndingUsesInLiveOut(nonLifetimeEndingUsesInLiveOut) {}
 
   void clear() {

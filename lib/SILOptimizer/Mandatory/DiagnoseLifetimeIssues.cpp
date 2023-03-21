@@ -63,6 +63,8 @@ class DiagnoseLifetimeIssues {
   /// callgraphs, with pass down references.
   static constexpr int maxCallDepth = 8;
 
+  SILFunction *function = nullptr;
+
   /// The liveness of the object in question, computed in visitUses.
   SSAPrunedLiveness liveness;
 
@@ -84,9 +86,10 @@ class DiagnoseLifetimeIssues {
   void reportDeadStore(SILInstruction *allocationInst);
 
 public:
-  DiagnoseLifetimeIssues() {}
+  DiagnoseLifetimeIssues(SILFunction *function)
+    : function(function), liveness(function) {}
 
-  void diagnose(SILFunction *function);
+  void diagnose();
 };
 
 /// Returns true if def is an owned value resulting from an object allocation.
@@ -352,7 +355,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
 }
 
 /// Prints warnings for dead weak stores in \p function.
-void DiagnoseLifetimeIssues::diagnose(SILFunction *function) {
+void DiagnoseLifetimeIssues::diagnose() {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       // Only for allocations we know that a destroy will actually deallocate

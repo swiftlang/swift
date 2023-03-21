@@ -281,12 +281,13 @@ public:
   }
 
   CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
+                           SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceInfo *domTree, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
         deleter(deleter),
-        liveness(maximizeLifetime ? &discoveredBlocks : nullptr) {}
+        liveness(function, maximizeLifetime ? &discoveredBlocks : nullptr) {}
 
   SILValue getCurrentDef() const { return liveness.getDef(); }
 

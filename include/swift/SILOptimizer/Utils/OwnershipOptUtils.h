@@ -113,7 +113,7 @@ public:
   GuaranteedOwnershipExtension(InstructionDeleter &deleter,
                                DeadEndBlocks &deBlocks, SILFunction *function)
     : deleter(deleter), deBlocks(deBlocks),
-      guaranteedLiveness(function) {}
+      guaranteedLiveness(function), ownedLifetime(function) {}
 
   void clear() {
     guaranteedLiveness.clear();

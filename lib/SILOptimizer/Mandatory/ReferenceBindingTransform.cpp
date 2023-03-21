@@ -164,7 +164,7 @@ static bool runTransform(SILFunction *fn) {
     // Ok, we have our initialization. Now gather our destroys of our value and
     // initialize an SSAPrunedLiveness, using our initInst as our def.
     SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-    SSAPrunedLiveness liveness(&discoveredBlocks);
+    SSAPrunedLiveness liveness(fn, &discoveredBlocks);
     StackList<DestroyValueInst *> destroyValueInst(fn);
     liveness.initializeDef(mark);
     for (auto *consume : mark->getConsumingUses()) {

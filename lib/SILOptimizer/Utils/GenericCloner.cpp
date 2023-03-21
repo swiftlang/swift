@@ -248,7 +248,7 @@ void GenericCloner::postFixUp(SILFunction *f) {
     // FIXME: Call OSSA lifetime fixup on all values used within the unreachable
     // code. This will recursively fixup nested scopes from the inside out so
     // that transitive liveness is not required.
-    SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+    SSAPrunedLiveness storeBorrowLiveness(getCloned(), &discoveredBlocks);
     AddressUseKind useKind =
         scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
     if (useKind == AddressUseKind::NonEscaping) {
