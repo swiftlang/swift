@@ -662,6 +662,19 @@ ConstraintLocator::isForSingleValueStmtBranch() const {
   return SingleValueStmtBranchKind::Regular;
 }
 
+bool ConstraintLocator::isMemberRef() const {
+  if (isLastElement<LocatorPathElt::Member>()) {
+    return true;
+  } else if (isLastElement<LocatorPathElt::KeyPathDynamicMember>()) {
+    auto path = getPath();
+    if (path.size() >= 2 &&
+        path[path.size() - 2].is<LocatorPathElt::Member>()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?

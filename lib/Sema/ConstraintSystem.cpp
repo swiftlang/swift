@@ -5469,6 +5469,15 @@ void constraints::simplifyLocator(ASTNode &anchor,
       LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
+      if (auto UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+        path = path.slice(1);
+        continue;
+      }
+      if (anchor.is<Pattern *>()) {
+        path = path.slice(1);
+        continue;
+      }
+      break;
     case ConstraintLocator::MemberRefBase:
       if (auto UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
         range = UDE->getNameLoc().getSourceRange();
