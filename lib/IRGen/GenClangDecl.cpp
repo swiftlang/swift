@@ -67,6 +67,13 @@ public:
     return true;
   }
 
+  bool VisitCXXDeleteExpr(clang::CXXDeleteExpr *deleteExpr) {
+    if (auto cxxRecord = deleteExpr->getDestroyedType()->getAsCXXRecordDecl())
+      if (auto dtor = cxxRecord->getDestructor())
+        callback(dtor);
+    return true;
+  }
+
   bool VisitVarDecl(clang::VarDecl *VD) {
     if (auto cxxRecord = VD->getType()->getAsCXXRecordDecl())
       if (auto dtor = cxxRecord->getDestructor())
