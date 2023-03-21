@@ -2755,6 +2755,14 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                        allowUsableFromInline);
   }
 
+  // FIXME: shouldn't all of the SpecifierTypeReprs, like Isolated, use this?
+  case TypeReprKind::Suppressed: {
+    auto specifierRepr = cast<SpecifierTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       specifierRepr->getBase(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
@@ -2816,9 +2824,12 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index) const {
 
+  const InheritedEntry &entry = getInheritedEntryAtIndex(decl, index);
+  if (entry.isSuppressed)
+    return { }; // not an inherited type in the clause, so no referenced decls.
+
   // Prefer syntactic information when we have it.
-  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto typeRepr = entry.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
     if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
@@ -2833,7 +2844,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
   // Fall back to semantic types.
   // FIXME: In the long run, we shouldn't need this. Non-syntactic results
   // should be cached.
-  if (auto type = typeLoc.getType()) {
+  if (auto type = entry.getType()) {
     return directReferencesForType(type);
   }
 
@@ -2884,7 +2895,12 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
         return classDecl;
   }
 
-  for (unsigned i : indices(subject->getInherited())) {
+  auto allEntries = subject->getAllInheritedEntries();
+  for (unsigned i : indices(allEntries)) {
+    // skip suppressed entries
+    if (allEntries[i].isSuppressed)
+      continue;
+
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
       InheritedDeclsReferencedRequest{subject, i}, {});
@@ -3147,12 +3163,12 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
               InheritedEntry inherited[1] = {
                   { TypeLoc(opaque->getConstraint()) }
               };
-              gp->setInherited(ctx.AllocateCopy(inherited));
+        gp->setAllInheritedEntries(ctx.AllocateCopy(inherited));
       } else {
             InheritedEntry inherited[1] = {
                 { TypeLoc(repr) }
             };
-            gp->setInherited(ctx.AllocateCopy(inherited));
+        gp->setAllInheritedEntries(ctx.AllocateCopy(inherited));
       }
       implicitGenericParams.push_back(gp);
     }
@@ -3191,7 +3207,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       auto protoType = proto->getDeclaredInterfaceType();
       InheritedEntry selfInherited[1] = {
         InheritedEntry(TypeLoc::withoutLoc(protoType)) };
-      genericParams->getParams().front()->setInherited(
+      genericParams->getParams().front()->setAllInheritedEntries(
         ctx.AllocateCopy(selfInherited));
     }
 
@@ -3214,7 +3230,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
-    selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
+    selfDecl->setAllInheritedEntries(ctx.AllocateCopy(selfInherited));
     selfDecl->setImplicit();
 
     // The generic parameter list itself.
@@ -3376,6 +3392,10 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
                              : extDecl->getASTContext();
 
+  llvm::ArrayRef<InheritedEntry> allEntries =
+      typeDecl ? typeDecl->getAllInheritedEntries()
+               : extDecl->getAllInheritedEntries();
+
   // Find inherited declarations.
   auto referenced = evaluateOrDefault(ctx.evaluator,
     InheritedDeclsReferencedRequest{decl, i}, {});
@@ -3391,8 +3411,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
   SourceLoc uncheckedLoc;
-  if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
-                                    : extDecl->getInherited()[i].getTypeRepr()){
+  if (TypeRepr *typeRepr = allEntries[i].getTypeRepr()){
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findUncheckedAttrLoc();
   }
@@ -3407,18 +3426,26 @@ SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
-  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
+  llvm::ArrayRef<InheritedEntry> allEntries;
+  ProtocolDecl const *protoDecl = nullptr;
+
+  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
+    allEntries = typeDecl->getAllInheritedEntries();
+    protoDecl = dyn_cast<ProtocolDecl>(typeDecl);
+  } else if (auto extDecl = decl.dyn_cast<const ExtensionDecl *>()) {
+    allEntries = extDecl->getAllInheritedEntries();
+  }
 
   // Gather results from all of the inherited types.
-  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
-                                   : extDecl->getInherited().size();
   SmallVector<InheritedNominalEntry, 4> result;
-  for (unsigned i : range(numInherited)) {
+  for (unsigned i : range(allEntries.size())) {
+    if (allEntries[i].isSuppressed)
+      continue; // skip suppressed
+
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
 
-  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
+  // Only need to look further if we have a protocol.
   if (protoDecl == nullptr)
     return result;
 

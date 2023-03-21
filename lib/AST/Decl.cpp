@@ -1510,9 +1510,15 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
-    : TypeLoc(typeLoc), isUnchecked(false) {
-  if (auto typeRepr = typeLoc.getTypeRepr())
+    : TypeLoc(typeLoc), isUnchecked(false), isSuppressed(false) {
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    // make note of whether this is a suppressed entry, and look past it.
+    if (auto suppressed = dyn_cast<SuppressedTypeRepr>(typeRepr)) {
+      isSuppressed = true;
+      typeRepr = suppressed->getBase();
+    }
     isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
+  }
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
@@ -3418,9 +3424,38 @@ bool ValueDecl::isFinal() const {
 }
 
 bool ValueDecl::isMoveOnly() const {
+  // Default answer if a cycle is detected is to say it is noncopyable.
+  // My reasoning is that permitting copying when the user _might_ have intended
+  // for it to be noncopyable is unacceptable as it can lead to silent problems.
+  // At least they'll get unexpected errors if they were expecting to copy!
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsMoveOnlyRequest{const_cast<ValueDecl *>(this)},
-                           getAttrs().hasAttribute<MoveOnlyAttr>());
+                           IsNoncopyableRequest{const_cast<ValueDecl *>(this)},
+                           /*noncopyable=*/true);
+}
+
+bool TypeDecl::isSuppressingConformance(KnownProtocolKind kp) const {
+  auto allEntries = getAllInheritedEntries();
+
+  for (unsigned i : indices(allEntries)) {
+    // skip non-suppressed entries.
+    if (!allEntries[i].isSuppressed)
+      continue;
+
+    // In some cases, we may be asking if the conformance is suppressed
+    // prior to having resolved the type in the suppressed list, so we
+    // make a request rather than directly querying the entries here.
+    auto type = evaluateOrDefault(getASTContext().evaluator,
+                            InheritedTypeRequest{
+                                this, i, TypeResolutionStage::Interface},
+                            Type());
+    if (type)
+      if (auto proto = type->getAs<ProtocolType>())
+        if (auto protoDecl = proto->getDecl())
+          if (protoDecl->isSpecificProtocol(kp))
+            return true;
+  }
+
+  return false;
 }
 
 bool ValueDecl::isDynamic() const {
@@ -5054,8 +5089,8 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
   if (const auto eachLoc = getEachLoc())
     startLoc = eachLoc;
 
-  if (!getInherited().empty())
-    endLoc = getInherited().back().getSourceRange().End;
+  if (!getAllInheritedEntries().empty())
+    endLoc = getAllInheritedEntries().back().getSourceRange().End;
 
   return {startLoc, endLoc};
 }
@@ -5092,8 +5127,8 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = TWC->getSourceRange().End;
   } else if (auto defaultDefinition = getDefaultDefinitionTypeRepr()) {
     endLoc = defaultDefinition->getEndLoc();
-  } else if (!getInherited().empty()) {
-    endLoc = getInherited().back().getSourceRange().End;
+  } else if (!getAllInheritedEntries().empty()) {
+    endLoc = getAllInheritedEntries().back().getSourceRange().End;
   } else {
     endLoc = getNameLoc();
   }

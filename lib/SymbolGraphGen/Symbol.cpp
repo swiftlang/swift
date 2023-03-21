@@ -859,7 +859,7 @@ AccessLevel Symbol::getEffectiveAccessLevel(const ExtensionDecl *ED) {
   }
 
   AccessLevel maxInheritedAL = AccessLevel::Private;
-  for (auto Inherited : ED->getInherited()) {
+  for (auto Inherited : ED->getAllInheritedEntries()) {
     if (const auto Type = Inherited.getType()) {
       if (const auto *Proto = dyn_cast_or_null<ProtocolDecl>(
               Type->getAnyNominal())) {

@@ -5619,7 +5619,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///
 /// \verbatim
 ///   inheritance:
-///      ':' inherited (',' inherited)*
+///      ':' inherited-or-suppressed (',' inherited-or-suppressed)*
 ///
 ///   inherited:
 ///     'class'
@@ -5627,7 +5627,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 /// \endverbatim
 ParserStatus Parser::parseInheritance(
     SmallVectorImpl<InheritedEntry> &Inherited,
-    bool allowClassRequirement, bool allowAnyObject) {
+    ParseInheritanceOptions options) {
   consumeToken(tok::colon);
 
   SourceLoc classRequirementLoc;
@@ -5644,14 +5644,14 @@ ParserStatus Parser::parseInheritance(
     if (Tok.is(tok::kw_class)) {
       // If we aren't allowed to have a class requirement here, complain.
       auto classLoc = consumeToken();
-      if (!allowClassRequirement) {
+      if (!options.contains(PI_AllowClassRequirement)) {
         diagnose(classLoc, diag::unexpected_class_constraint);
 
         // Note that it makes no sense to suggest fixing
         // 'struct S : class' to 'struct S : AnyObject' for
         // example; in that case we just complain about
         // 'class' being invalid here.
-        if (allowAnyObject) {
+        if (options.contains(PI_AllowAnyObject)) {
           diagnose(classLoc, diag::suggest_anyobject)
             .fixItReplace(classLoc, "AnyObject");
         }
@@ -5686,12 +5686,31 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
+    // parse the "without" operator
+    SourceLoc withoutLoc;
+    if (Tok.isTilde()) {
+      auto loc = consumeToken();
+
+      if (!options.contains(PI_AllowSuppression))
+        diagnose(loc, diag::suppress_illegal_here);
+      else
+        withoutLoc = loc;
+    }
+
     auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
 
-    // Record the type if its a single type.
-    if (ParsedTypeResult.isNonNull())
-      Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
+    // If it's a single type, record the type under the appropriate entry.
+    if (ParsedTypeResult.isNonNull()) {
+      TypeRepr *typeRepr = ParsedTypeResult.get();
+
+      // is the parsed type meant to be a suppressed entry?
+      if (withoutLoc) {
+        typeRepr = new (Context) SuppressedTypeRepr(typeRepr, withoutLoc);
+      }
+
+      Inherited.push_back(InheritedEntry(typeRepr));
+    }
   } while (HasNextType);
 
   return Status;
@@ -6001,9 +6020,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse optional inheritance clause.
   SmallVector<InheritedEntry, 2> Inherited;
   if (Tok.is(tok::colon))
-    status |= parseInheritance(Inherited,
-                               /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false);
+    status |= parseInheritance(Inherited, {});
 
   // Parse the optional where-clause.
   TrailingWhereClause *trailingWhereClause = nullptr;
@@ -6447,10 +6464,8 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // FIXME: Allow class requirements here.
   SmallVector<InheritedEntry, 2> Inherited;
   if (Tok.is(tok::colon))
-    Status |= parseInheritance(Inherited,
-                               /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/true);
-  
+    Status |= parseInheritance(Inherited, {PI_AllowAnyObject});
+
   ParserResult<TypeRepr> UnderlyingTy;
   if (Tok.is(tok::equal)) {
     consumeToken(tok::equal);
@@ -6484,7 +6499,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
                          UnderlyingTy.getPtrOrNull(), TrailingWhere);
   assocType->getAttrs() = Attributes;
   if (!Inherited.empty())
-    assocType->setInherited(Context.AllocateCopy(Inherited));
+    assocType->setAllInheritedEntries(Context.AllocateCopy(Inherited));
   return makeParserResult(Status, assocType);
 }
 
@@ -8156,10 +8171,8 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited,
-                               /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false);
-    ED->setInherited(Context.AllocateCopy(Inherited));
+    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    ED->setAllInheritedEntries(Context.AllocateCopy(Inherited));
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -8419,10 +8432,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited,
-                               /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false);
-    SD->setInherited(Context.AllocateCopy(Inherited));
+    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    SD->setAllInheritedEntries(Context.AllocateCopy(Inherited));
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -8512,10 +8523,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited,
-                               /*allowClassRequirement=*/false,
-                               /*allowAnyObject=*/false);
-    CD->setInherited(Context.AllocateCopy(Inherited));
+    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    CD->setAllInheritedEntries(Context.AllocateCopy(Inherited));
 
   // Parse python style inheritance clause and replace parentheses with a colon
   } else if (Tok.is(tok::l_paren)) {
@@ -8659,8 +8668,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::colon)) {
     colonLoc = Tok.getLoc();
     Status |= parseInheritance(InheritedProtocols,
-                               /*allowClassRequirement=*/true,
-                               /*allowAnyObject=*/true);
+                               {PI_AllowClassRequirement, PI_AllowAnyObject});
   }
 
   TrailingWhereClause *TrailingWhere = nullptr;

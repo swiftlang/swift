@@ -164,7 +164,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto *typeRepr = ED->getExtendedTypeRepr())
       if (doIt(typeRepr))
         return true;
-    for (auto &Inherit : ED->getInherited()) {
+    for (auto &Inherit : ED->getAllInheritedEntries()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
@@ -2139,6 +2139,10 @@ bool Traversal::visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
 }
 
 bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitSuppressedTypeRepr(SuppressedTypeRepr *T) {
   return doIt(T->getBase());
 }
 

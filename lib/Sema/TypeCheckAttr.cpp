@@ -2171,19 +2171,19 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
-  if (!D->getASTContext().supportsMoveOnlyTypes())
-    D->diagnose(diag::moveOnly_requires_lexical_lifetimes);
-
-  if (isa<StructDecl>(D) || isa<EnumDecl>(D))
-    return;
-
-  // for development purposes, allow it if specifically requested for classes.
-  if (D->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
-    if (isa<ClassDecl>(D))
-      return;
+  if (auto typeDecl = dyn_cast<TypeDecl>(D)) {
+    diagnose(attr->getLocation(), diag::moveOnly_attr_deprecated)
+        .warnUntilSwiftVersion(6);
+    // TODO: a fancy fix-it to remove the attribute and add the suppression.
   }
 
-  diagnose(attr->getLocation(), diag::moveOnly_not_allowed_here)
+  // avoid giving an error if the attr is otherwise on the right kind of decl
+  if (isa<StructDecl>(D) || isa<EnumDecl>(D) ||
+      (isa<ClassDecl>(D) &&
+       D->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses)))
+    return;
+
+  diagnose(attr->getLocation(), diag::noncopyable_only_struct_enum)
     .fixItRemove(attr->getRange());
 }
 
@@ -7479,7 +7479,12 @@ GetRuntimeDiscoverableAttributes::evaluate(Evaluator &evaluator,
 
   // Gather any attributes inferred from (explicit) protocol conformances
   // associated with the declaration of the type.
-  for (unsigned i : indices(NTD->getInherited())) {
+  auto allEntries = NTD->getAllInheritedEntries();
+  for (unsigned i : indices(allEntries)) {
+    // skip suppressed entries.
+    if (allEntries[i].isSuppressed)
+      continue;
+
     auto inheritedType = evaluateOrDefault(
         ctx.evaluator,
         InheritedTypeRequest{NTD, i, TypeResolutionStage::Interface}, Type());

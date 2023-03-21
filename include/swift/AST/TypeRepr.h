@@ -1066,7 +1066,8 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst;
+           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::Suppressed;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1105,6 +1106,22 @@ public:
     return T->getKind() == TypeReprKind::Ownership;
   }
   static bool classof(const OwnershipTypeRepr *T) { return true; }
+};
+
+/// A representation of a suppressed conformance to a type. That is, "without T"
+/// means "implicit conformance to T is suppressed".
+/// \code
+///   x : ~Copyable
+/// \endcode
+class SuppressedTypeRepr : public SpecifierTypeRepr {
+public:
+  SuppressedTypeRepr(TypeRepr *Base, SourceLoc WithoutLoc)
+      : SpecifierTypeRepr(TypeReprKind::Suppressed, Base, WithoutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Suppressed;
+  }
+  static bool classof(const SuppressedTypeRepr *T) { return true; }
 };
   
 /// An 'isolated' type.
@@ -1420,6 +1437,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
   case TypeReprKind::PackElement:
+  case TypeReprKind::Suppressed:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

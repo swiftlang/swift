@@ -911,16 +911,54 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
-  // For now only do this for nominal type decls.
-  if (isa<NominalTypeDecl>(decl)) {
+bool IsNoncopyableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  // In older versions of Swift, look for the '@_moveOnly' attribute.
+  if (!ctx.isSwiftVersionAtLeast(6)) {
+    if (isa<StructDecl>(decl) || isa<EnumDecl>(decl) ||
+        (isa<ClassDecl>(decl) &&
+            ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
       if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+        // check for required sil option.
         if (!decl->getASTContext().supportsMoveOnlyTypes())
-            decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+          decl->diagnose(diag::noncopyable_requires_sil_option);
 
         return true;
       }
+    }
   }
+
+  // otherwise, look for suppression of implicit Copyable conformance
+
+  // must be a type decl
+  if (!isa<TypeDecl>(decl))
+    return false;
+
+  auto typeDecl = cast<TypeDecl>(decl);
+
+  // must be suppressing Copyable
+  if (!typeDecl->isSuppressingConformance(KnownProtocolKind::Copyable))
+    return false;
+
+  // must be compiling with support for noncopyable types
+  if (!ctx.supportsMoveOnlyTypes())
+    decl->diagnose(diag::noncopyable_requires_sil_option);
+
+  // a struct or enum without Copyable is noncopyable
+  if (isa<StructDecl>(decl) || isa<EnumDecl>(decl))
+    return true;
+
+  // for development purposes, allow it if specifically requested for classes.
+  if (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
+    if (isa<ClassDecl>(decl))
+      return true;
+  }
+
+  // At this point, we have Copyable suppressed on some type decl that isn't
+  // allowed to have it suppressed, so diagnose!
+
+  decl->diagnose(diag::noncopyable_only_struct_enum);
   return false;
 }
 

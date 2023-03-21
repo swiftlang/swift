@@ -602,15 +602,41 @@ SelfBounds getSelfBoundsFromWhereClause(
 /// given protocol or protocol extension.
 SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
 
+/// Retrieve the InheritedEntry at the given \c index from among the list of
+/// all inherited entries.
+inline const InheritedEntry &getInheritedEntryAtIndex(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    unsigned index) {
+  llvm::ArrayRef<InheritedEntry> allEntries;
+
+  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
+    allEntries = typeDecl->getAllInheritedEntries();
+  else
+    allEntries = decl.get<const ExtensionDecl *>()->getAllInheritedEntries();
+
+  return allEntries[index];
+}
+
 /// Retrieve the TypeLoc at the given \c index from among the set of
 /// type declarations that are directly "inherited" by the given declaration.
 inline const TypeLoc &getInheritedTypeLocAtIndex(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned index) {
-  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
-    return typeDecl->getInherited()[index];
+  InheritedEntry const& entry = getInheritedEntryAtIndex(decl, index);
 
-  return decl.get<const ExtensionDecl *>()->getInherited()[index];
+  if (entry.isSuppressed) {
+#ifndef NDEBUG
+    llvm::dbgs() << "index " << index << " of inherited entries of \n";
+    if (auto td = decl.dyn_cast<const TypeDecl *>())
+      td->dump(llvm::dbgs(), 1);
+    else
+      decl.dyn_cast<const ExtensionDecl *>()->dump(llvm::dbgs(), 1);
+    llvm::dbgs() << "\n";
+#endif
+    llvm_unreachable("index unexpectedly refers to a suppressed entry");
+  }
+
+  return entry;
 }
 
 namespace namelookup {

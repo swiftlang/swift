@@ -1194,9 +1194,20 @@ public:
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
+
+  /// Flags that control the parsing of inheritance clauses.
+  enum ParseInheritanceFlags {
+    PI_Default               = 0,
+    PI_AllowClassRequirement = 1 << 1,
+    PI_AllowAnyObject        = 1 << 2,
+    PI_AllowSuppression      = 1 << 3,
+  };
+
+  using ParseInheritanceOptions = OptionSet<ParseInheritanceFlags>;
+
   ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
-                                bool allowClassRequirement,
-                                bool allowAnyObject);
+                                ParseInheritanceOptions options);
+
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);

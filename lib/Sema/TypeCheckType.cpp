@@ -2373,6 +2373,11 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
+  case TypeReprKind::Suppressed:
+      // Currently, parsing and other type checking code prevents invalid
+      // suppressed types from being formed, so just resolve the base.
+      return resolveType(cast<SuppressedTypeRepr>(repr)->getBase(), options);
+
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::Member: {
@@ -3385,6 +3390,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           compileTimeConst = true;
           nestedRepr = specifierRepr->getBase();
           continue;
+        case TypeReprKind::Suppressed:
+          llvm_unreachable("unexpected suppressed type for function param");
         default:
           break;
         }
@@ -5170,6 +5177,7 @@ public:
     case TypeReprKind::Array:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:
+    case TypeReprKind::Suppressed:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:
     case TypeReprKind::Vararg:

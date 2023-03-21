@@ -2518,6 +2518,11 @@ void PrintAST::printInherited(const Decl *decl) {
   Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
+    // Printing a SuppressedTypeRepr will add the '~', so only print it
+    // if we will not be using the Repr's print method for this type.
+    if (!Options.PreferTypeRepr && inherited.isSuppressed)
+      Printer << "~";
+
     if (inherited.isUnchecked)
       Printer << "@unchecked ";
 
@@ -2915,7 +2920,7 @@ static bool usesFeatureRethrowsProtocol(
   };
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    if (checkInherited(nominal->getInherited()))
+    if (checkInherited(nominal->getAllInheritedEntries()))
       return true;
   }
 
@@ -2929,7 +2934,7 @@ static bool usesFeatureRethrowsProtocol(
       if (usesFeatureRethrowsProtocol(nominal, checked))
         return true;
 
-    if (checkInherited(ext->getInherited()))
+    if (checkInherited(ext->getAllInheritedEntries()))
       return true;
   }
 
@@ -7537,24 +7542,25 @@ swift::getInheritedForPrinting(
     llvm::SmallVectorImpl<InheritedEntry> &Results) {
   ArrayRef<InheritedEntry> inherited;
   if (auto td = dyn_cast<TypeDecl>(decl)) {
-    inherited = td->getInherited();
+    inherited = td->getAllInheritedEntries();
   } else if (auto ed = dyn_cast<ExtensionDecl>(decl)) {
-    inherited = ed->getInherited();
+    inherited = ed->getAllInheritedEntries();
   }
 
-  // Collect explicit inherited types.
+  auto unprintable = [&options](Type subTy) {
+    if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
+      return !options.shouldPrint(aliasTy->getDecl());
+    if (auto NTD = subTy->getAnyNominal()) {
+      if (!options.shouldPrint(NTD))
+        return true;
+    }
+    return false;
+  };
+
+  // Collect types / suppressed entries written in the inheritance clause.
   for (auto entry: inherited) {
     if (auto ty = entry.getType()) {
-      bool foundUnprintable = ty.findIf([&](Type subTy) {
-        if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
-          return !options.shouldPrint(aliasTy->getDecl());
-        if (auto NTD = subTy->getAnyNominal()) {
-          if (!options.shouldPrint(NTD))
-            return true;
-        }
-        return false;
-      });
-      if (foundUnprintable)
+      if (ty.findIf(unprintable))
         continue;
     }
 
@@ -7602,7 +7608,7 @@ swift::getInheritedForPrinting(
     }
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked});
+                       isUnchecked, /*isSuppressed=*/false});
   }
 }
 
@@ -7682,10 +7688,10 @@ void GenericParamList::print(ASTPrinter &Printer,
       *this,
       [&](const GenericTypeParamDecl *P) {
         Printer << P->getName();
-        if (!P->getInherited().empty()) {
+        if (!P->getAllInheritedEntries().empty()) {
           Printer << " : ";
 
-          auto loc = P->getInherited()[0];
+          auto loc = P->getAllInheritedEntries()[0];
           if (willUseTypeReprPrinting(loc, nullptr, PO)) {
             loc.getTypeRepr()->print(Printer, PO);
           } else {

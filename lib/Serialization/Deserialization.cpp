@@ -2902,9 +2902,10 @@ class DeclDeserializer {
                        ArrayRef<uint64_t> rawInheritedIDs) {
     SmallVector<InheritedEntry, 2> inheritedTypes;
     for (auto rawID : rawInheritedIDs) {
-      // The low bit indicates "@unchecked".
-      bool isUnchecked = rawID & 0x01;
-      TypeID typeID = rawID >> 1;
+      // The first bit indicates "@unchecked", second bit indicates suppression.
+      bool isUnchecked = rawID & 0b01;
+      bool isSuppressed = rawID & 0b10;
+      TypeID typeID = rawID >> 2;
 
       auto maybeType = MF.getTypeChecked(typeID);
       if (!maybeType) {
@@ -2912,14 +2913,16 @@ class DeclDeserializer {
         continue;
       }
       inheritedTypes.push_back(
-          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked));
+          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()),
+                         isUnchecked,
+                         isSuppressed));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
     if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
-      typeDecl->setInherited(inherited);
+      typeDecl->setAllInheritedEntries(inherited);
     else
-      decl.get<ExtensionDecl *>()->setInherited(inherited);
+      decl.get<ExtensionDecl *>()->setAllInheritedEntries(inherited);
   }
 
 public:

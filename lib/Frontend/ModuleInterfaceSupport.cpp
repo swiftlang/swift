@@ -468,7 +468,7 @@ class InheritedProtocolCollector {
   /// If \p skipExtra is true then avoid recording any extra protocols to
   /// print, such as synthesized conformances or conformances to non-public
   /// protocols.
-  void recordProtocols(ArrayRef<InheritedEntry> directlyInherited,
+  void recordProtocols(InheritedEntryRange directlyInherited,
                        const Decl *D, bool skipExtra = false) {
     Optional<AvailableAttrList> availableAttrs;
 
@@ -515,7 +515,7 @@ class InheritedProtocolCollector {
   /// For each type directly inherited by \p extension, record any protocols
   /// that we would have printed in ConditionalConformanceProtocols.
   void recordConditionalConformances(const ExtensionDecl *extension) {
-    for (TypeLoc inherited : extension->getInherited()) {
+    for (TypeLoc inherited : extension->getAllInheritedEntries()) {
       Type inheritedTy = inherited.getType();
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
@@ -540,7 +540,7 @@ public:
   ///
   /// \sa recordProtocols
   static void collectProtocols(PerTypeMap &map, const Decl *D) {
-    ArrayRef<InheritedEntry> directlyInherited;
+    Optional<InheritedEntryRange> directlyInherited;
     const NominalTypeDecl *nominal;
     const IterableDeclContext *memberContext;
 
@@ -571,7 +571,7 @@ public:
     if (!isPublicOrUsableFromInline(nominal))
       return;
 
-    map[nominal].recordProtocols(directlyInherited, D);
+    map[nominal].recordProtocols(*directlyInherited, D);
     // Collect protocols inherited from super classes
     if (auto *CD = dyn_cast<ClassDecl>(D)) {
       for (auto *SD = CD->getSuperclassDecl(); SD;
@@ -720,7 +720,8 @@ public:
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
-        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked)));
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+        isUnchecked, /*isSuppressed=*/false)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);

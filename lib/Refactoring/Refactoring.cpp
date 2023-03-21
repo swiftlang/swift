@@ -3542,7 +3542,7 @@ public:
   AddEquatableContext(NominalTypeDecl *Decl)
       : DC(Decl), Adopter(Decl->getDeclaredType()),
         StartLoc(Decl->getBraces().Start),
-        ProtocolsLocations(Decl->getInherited()),
+        ProtocolsLocations(Decl->getAllInheritedEntries()),
         Protocols(getAllProtocols(Decl)),
         ProtInsertStartLoc(Decl->getNameLoc()),
         StoredProperties(Decl->getStoredProperties()),
@@ -3551,7 +3551,7 @@ public:
   AddEquatableContext(ExtensionDecl *Decl)
       : DC(Decl), Adopter(Decl->getExtendedType()),
         StartLoc(Decl->getBraces().Start),
-        ProtocolsLocations(Decl->getInherited()),
+        ProtocolsLocations(Decl->getAllInheritedEntries()),
         Protocols(getAllProtocols(Decl->getExtendedNominal())),
         ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
         StoredProperties(Decl->getExtendedNominal()->getStoredProperties()),

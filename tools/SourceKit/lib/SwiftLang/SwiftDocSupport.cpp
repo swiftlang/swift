@@ -561,25 +561,29 @@ static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
-static void passInherits(ArrayRef<InheritedEntry> InheritedTypes,
+static void passInherits(ArrayRef<InheritedEntry> TypeClause,
                          DocInfoConsumer &Consumer) {
-  for (auto Inherited : InheritedTypes) {
-    if (!Inherited.getType())
+  for (auto Entry : TypeClause) {
+    if (!Entry.getType())
       continue;
 
-    if (auto Proto = Inherited.getType()->getAs<ProtocolType>()) {
+    // Skip suppressed entries, as they do not describe type inheritance.
+    if (Entry.isSuppressed)
+      continue;
+
+    if (auto Proto = Entry.getType()->getAs<ProtocolType>()) {
       passConforms(Proto->getDecl(), Consumer);
       continue;
     }
 
     if (auto ProtoComposition
-               = Inherited.getType()->getAs<ProtocolCompositionType>()) {
+               = Entry.getType()->getAs<ProtocolCompositionType>()) {
       for (auto T : ProtoComposition->getMembers())
         passInherits(InheritedEntry(TypeLoc::withoutLoc(T)), Consumer);
       continue;
     }
 
-    if (auto TD = getTypeDeclFromType(Inherited.getType())) {
+    if (auto TD = getTypeDeclFromType(Entry.getType())) {
       passInherits(TD, Consumer);
       continue;
     }
@@ -620,7 +624,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
         passExtends(TD, Consumer);
     }
 
-    passInherits(ED->getInherited(), Consumer);
+    passInherits(ED->getAllInheritedEntries(), Consumer);
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
@@ -628,7 +632,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
       if (auto NM = Ty->getAnyNominal()) {
-        passInherits(NM->getInherited(), Consumer);
+        passInherits(NM->getAllInheritedEntries(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);
         return;

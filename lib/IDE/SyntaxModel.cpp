@@ -978,7 +978,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       NSR = repr->getSourceRange();
     SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
 
-    for (const TypeLoc &TL : ED->getInherited()) {
+    for (const TypeLoc &TL : ED->getAllInheritedEntries()) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);

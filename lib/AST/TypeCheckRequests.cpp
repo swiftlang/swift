@@ -102,8 +102,8 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
 
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
+  auto &typeLoc = getInheritedEntryAtIndex(std::get<0>(storage),
+                                           std::get<1>(storage));
   return typeLoc.getLoc();
 }
 
@@ -113,8 +113,8 @@ bool InheritedTypeRequest::isCached() const {
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
+  auto &typeLoc = getInheritedEntryAtIndex(std::get<0>(storage),
+                                           std::get<1>(storage));
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -123,9 +123,9 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
-  const_cast<TypeLoc &>(typeLoc).setType(value);
+  auto &typeLoc = getInheritedEntryAtIndex(std::get<0>(storage),
+                                           std::get<1>(storage));
+  const_cast<InheritedEntry &>(typeLoc).setType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -313,26 +313,38 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isMoveOnly computation.
+// isNoncopyable computation.
 //----------------------------------------------------------------------------//
 
-Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+Optional<bool> IsNoncopyableRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isMoveOnlyComputed)
-    return decl->LazySemanticInfo.isMoveOnly;
+  if (decl->LazySemanticInfo.isNoncopyableComputed)
+    return decl->LazySemanticInfo.isNoncopyable;
 
   return None;
 }
 
-void IsMoveOnlyRequest::cacheResult(bool value) const {
+void IsNoncopyableRequest::cacheResult(bool isNoncopyable) const {
   auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isMoveOnlyComputed = true;
-  decl->LazySemanticInfo.isMoveOnly = value;
+  decl->LazySemanticInfo.isNoncopyableComputed = true;
+  decl->LazySemanticInfo.isNoncopyable = isNoncopyable;
 
-  // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
-    decl->getAttrs().add(new (decl->getASTContext())
-                             MoveOnlyAttr(/*Implicit=*/true));
+  // Ensure the ~Copyable appears in the suppressed list, or it'll be missing
+  // in the swiftinterface, etc.
+  if (isNoncopyable) {
+    // for Swift <6, a '@_moveOnly' decl attribute is OK.
+    if (!decl->getASTContext().isSwiftVersionAtLeast(6)
+        && decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+      return;
+
+    // NOTE: I'm choosing to crash instead of adding a new suppressed entry, as
+    //  there is future potential for dangling pointers to creep in. If the
+    //  entry ArrayRef is non-null, we'd need to reallocate the memory it points
+    //  to in order to append another entry.
+    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
+      if (!typeDecl->isSuppressingConformance(KnownProtocolKind::Copyable))
+        llvm_unreachable("missing suppression of Copyable in noncopyable type");
+  }
 }
 
 //----------------------------------------------------------------------------//

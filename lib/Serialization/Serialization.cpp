@@ -3664,8 +3664,9 @@ public:
       assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       TypeID typeRef = S.addTypeRef(inherited.getType());
 
-      // Encode "unchecked" in the low bit.
-      typeRef = (typeRef << 1) | (inherited.isUnchecked ? 0x01 : 0x00);
+      // Store metadata in the low bits.
+      typeRef = (typeRef << 2) | (inherited.isUnchecked  ? 0b01 : 0)
+                               | (inherited.isSuppressed ? 0b10 : 0);
 
       result.push_back(typeRef);
     }
@@ -3700,7 +3701,7 @@ public:
       data.push_back(S.addConformanceRef(conformance));
 
     size_t numInherited = addInherited(
-        extension->getInherited(), data);
+        extension->getAllInheritedEntries(), data);
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
@@ -3932,7 +3933,8 @@ public:
     for (auto conformance : conformances)
       data.push_back(S.addConformanceRef(conformance));
 
-    unsigned numInherited = addInherited(theStruct->getInherited(), data);
+    unsigned numInherited = addInherited(theStruct->getAllInheritedEntries(),
+                                         data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
@@ -3976,7 +3978,8 @@ public:
     for (auto conformance : conformances)
       data.push_back(S.addConformanceRef(conformance));
 
-    unsigned numInherited = addInherited(theEnum->getInherited(), data);
+    unsigned numInherited = addInherited(theEnum->getAllInheritedEntries(),
+                                         data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -4033,7 +4036,8 @@ public:
     for (auto conformance : conformances)
       data.push_back(S.addConformanceRef(conformance));
 
-    unsigned numInherited = addInherited(theClass->getInherited(), data);
+    unsigned numInherited = addInherited(theClass->getAllInheritedEntries(),
+                                         data);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
@@ -4088,7 +4092,7 @@ public:
     llvm::SmallSetVector<Type, 4> dependencyTypes;
 
     unsigned numInherited = addInherited(
-        proto->getInherited(), inheritedAndDependencyTypes);
+        proto->getAllInheritedEntries(), inheritedAndDependencyTypes);
 
     // Separately collect inherited protocol types as dependencies.
     for (auto element : proto->getInherited()) {

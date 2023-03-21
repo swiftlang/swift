@@ -1713,7 +1713,7 @@ private:
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       SourceLoc ContextLoc = NTD->getStartLoc();
 
-      if (auto Ctx = getIndentContextFromInherits(NTD->getInherited(), ContextLoc))
+      if (auto Ctx = getIndentContextFromInherits(NTD->getAllInheritedEntries(), ContextLoc))
         return Ctx;
       if (auto Ctx = getIndentContextFromBraces(NTD->getBraces(), ContextLoc, NTD))
         return Ctx;
@@ -1730,7 +1730,7 @@ private:
     if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       SourceLoc ContextLoc = ED->getStartLoc();
 
-      if (auto Ctx = getIndentContextFromInherits(ED->getInherited(), ContextLoc))
+      if (auto Ctx = getIndentContextFromInherits(ED->getAllInheritedEntries(), ContextLoc))
         return Ctx;
       if (auto Ctx = getIndentContextFromBraces(ED->getBraces(), ContextLoc, ED))
         return Ctx;
@@ -1888,7 +1888,7 @@ private:
     if (auto *ATD = dyn_cast<AssociatedTypeDecl>(D)) {
       SourceLoc ContextLoc = ATD->getStartLoc();
 
-      if (auto Ctx = getIndentContextFromInherits(ATD->getInherited(),
+      if (auto Ctx = getIndentContextFromInherits(ATD->getAllInheritedEntries(),
                                                   ContextLoc)) {
         return Ctx;
       }

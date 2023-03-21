@@ -124,7 +124,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         CurDeclContext, Name, NameLoc, EachLoc,
         /*index*/ GenericParams.size(), isParameterPack);
     if (!Inherited.empty())
-      Param->setInherited(Context.AllocateCopy(Inherited));
+      Param->setAllInheritedEntries(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
 
     // Attach attributes.

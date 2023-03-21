@@ -595,7 +595,7 @@ void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto entries = Context.AllocateCopy(
       ArrayRef<InheritedEntry>{InheritedEntry{(TypeRepr *)ty}});
-  ((GenericTypeParamDecl *)Param)->setInherited(entries);
+  ((GenericTypeParamDecl *)Param)->setAllInheritedEntries(entries);
 }
 
 DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext,

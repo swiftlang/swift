@@ -334,8 +334,8 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
   }
 
   auto inherited = enumDecl->getInherited();
-  if (!inherited.empty() && inherited.front().wasValidated() &&
-      inherited.front().isError())
+  if (!inherited.empty() && inherited.begin()->wasValidated() &&
+      inherited.begin()->isError())
     return false;
 
   // If it meets all of those requirements, we can synthesize CodingKey

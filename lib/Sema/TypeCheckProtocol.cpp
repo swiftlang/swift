@@ -5550,7 +5550,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
       auto rawType = enumDecl->getRawType();
 
-      diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
+      diags.diagnose(enumDecl->getInherited().begin()->getSourceRange().Start,
                      diag::enum_raw_type_nonconforming_and_nonsynthable,
                      T, rawType);
 
@@ -5558,7 +5558,8 @@ void swift::diagnoseConformanceFailure(Type T,
       // Equatable, say so.
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
-        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
+        SourceLoc loc =
+            enumDecl->getInherited().begin()->getSourceRange().Start;
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
       }
@@ -5580,9 +5581,12 @@ void swift::diagnoseConformanceFailure(Type T,
       if (!classDecl)
         return;
 
-      auto inheritedClause = classDecl->getInherited();
+      auto inheritedClause = classDecl->getAllInheritedEntries();
       for (unsigned i : indices(inheritedClause)) {
         auto &inherited = inheritedClause[i];
+
+        if (inherited.isSuppressed)
+          continue;
 
         // Find the inherited type.
         InheritedTypeRequest request{classDecl, i, TypeResolutionStage::Interface};
@@ -6625,8 +6629,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           DerivedConformance::derivesProtocolConformance(dc, enumDecl,
                                                          diag.Protocol) &&
           enumDecl->hasRawType() &&
-          enumDecl->getInherited()[0].getSourceRange().isValid()) {
-        auto inheritedLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+          enumDecl->getInherited().begin()->getSourceRange().isValid()) {
+        auto inheritedLoc =
+            enumDecl->getInherited().begin()->getSourceRange().Start;
         Context.Diags.diagnose(
             inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
             dc->getDeclaredInterfaceType(), enumDecl->getRawType());

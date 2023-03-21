@@ -65,6 +65,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
+#include <unordered_map>
 
 using namespace swift;
 
@@ -85,6 +86,115 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
   return Type();
 }
 
+// Check the entries in the clause list corresponding to the suppression of
+// implicit conformances.
+static void checkSuppressedEntries(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
+  if (declUnion.is<const ExtensionDecl*>())
+    return; // nothing to check; extensions don't carry suppressed conformances
+
+  auto typeDecl = declUnion.dyn_cast<const TypeDecl *>();
+  assert(typeDecl);
+
+#ifndef NDEBUG
+  if (isa<AssociatedTypeDecl>(typeDecl)
+      || isa<GenericTypeParamDecl>(typeDecl)) {
+    assert(typeDecl->getSuppressed().empty()
+               && "unexpected suppressed conformances");
+  }
+#endif
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  auto &diags = ctx.Diags;
+
+  using EntryTracker = std::unordered_map<KnownProtocolKind,
+                                          InheritedEntry const *>;
+  EntryTracker seenEntries;
+
+  bool haveMoveOnlyClasses =
+      typeDecl->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
+
+  // TODO: this pattern of iterating over the indicies of all entries is
+  //  an all too common pattern throughout the type-checker. It's a symptom of
+  //  an overdue refactoring that allows you to iterate over the entries and
+  //  either automatically perform these type resolution requests, or know
+  //  the requests have already been performed very early on. It's the primary
+  //  thing preventing us from using the InheritedEntryRange accessors.
+  ArrayRef<InheritedEntry> allEntries = typeDecl->getAllInheritedEntries();
+  for (unsigned i : indices(allEntries)) {
+    auto &suppressed = allEntries[i];
+
+    if (!suppressed.isSuppressed)
+      continue;
+
+    // Resolve and validate the type if needed.
+    InheritedTypeRequest request{typeDecl, i, TypeResolutionStage::Interface};
+    Type suppressedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+
+    // If we couldn't resolve the type or it contains an error, ignore it.
+    if (!suppressedTy || suppressedTy->hasError())
+      continue;
+
+    // only structs, enums, and some classes can have suppressed entries
+    if (!(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl)
+        || (isa<ClassDecl>(typeDecl) && haveMoveOnlyClasses))) {
+      diags.diagnose(suppressed.getLoc(),
+                     diag::suppress_on_wrong_decl,
+                     typeDecl->getDescriptiveKind());
+      // FIXME: a great fix-it would be to remove the entire entry,
+      //  including any trailing comma. See checkInheritedEntry
+      //  for an example of the logic to do that. You'll need to update it
+      //  using MergedArrayRef so it understands source locations for both
+      //  suppressed and inherited entries.
+      continue;
+    }
+
+    // Ensure it is a suppressible protocol.
+    if (auto protocolTy = dyn_cast<ProtocolType>(suppressedTy))
+      if (auto protocolDecl = protocolTy->getDecl())
+        if (auto knownProtocol = protocolDecl->getKnownProtocolKind())
+          if (isSuppressibleProtocol(*knownProtocol)) {
+            // remember that we've seen this suppression for the type
+            EntryTracker::iterator iter;
+            bool uniqueEntry;
+            std::tie(iter, uniqueEntry) =
+                seenEntries.insert({*knownProtocol, &suppressed});
+
+            // check if already encountered an entry suppressing this protocol
+            if (!uniqueEntry) {
+              assert(suppressedTy->getCanonicalType()
+                         == iter->second->getType()->getCanonicalType());
+
+              // Emit a diagnostic about the duplicate suppression.
+              diags.diagnose(suppressed.getLoc(),
+                             diag::suppress_duplicate,
+                             suppressedTy);
+              // FIXME: a great fix-it would be to remove the entire entry.
+
+              diags.diagnose(iter->second->getLoc(),
+                             diag::suppress_previously_here,
+                             suppressedTy);
+            }
+
+            continue;
+          }
+
+    // At this point, the suppressed type is wrong. Tailor the error messages.
+
+    if (suppressedTy->isConstraintType()) {
+      diags.diagnose(suppressed.getLoc(),
+                     diag::suppress_cannot_suppress,
+                     suppressedTy);
+      // FIXME: a great fix-it would be to remove the entire entry.
+    } else {
+      diags.diagnose(suppressed.getLoc(),
+                     diag::suppress_not_protocol,
+                     suppressedTy);
+      // FIXME: a great fix-it would be to remove the entire entry.
+    }
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -96,10 +206,14 @@ static void checkInheritanceClause(
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
+
+  // Establish which implicit conformances are suppressed for this decl.
+  checkSuppressedEntries(declUnion);
+
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
 
-    inheritedClause = ext->getInherited();
+    inheritedClause = ext->getAllInheritedEntries();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
@@ -114,7 +228,7 @@ static void checkInheritanceClause(
   } else {
     typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
-    inheritedClause = typeDecl->getInherited();
+    inheritedClause = typeDecl->getAllInheritedEntries();
   }
 
   // Can this declaration's inheritance clause contain a class or
@@ -171,6 +285,9 @@ static void checkInheritanceClause(
   Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
+
+    if (inherited.isSuppressed)
+      continue; // suppressed entries are checked elsewhere.
 
     // Validate the type.
     InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
@@ -2570,14 +2687,15 @@ public:
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
         if (!rawTy->is<ErrorType>()) {
-          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
-                      diag::raw_type_not_literal_convertible, rawTy);
+          DE.diagnose(
+              ED->getInherited().begin()->getSourceRange().Start,
+              diag::raw_type_not_literal_convertible, rawTy);
         }
       }
       
       // We need at least one case to have a raw value.
       if (ED->getAllElements().empty()) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+        DE.diagnose(ED->getInherited().begin()->getSourceRange().Start,
                     diag::empty_enum_raw_type);
       }
     }
@@ -2587,7 +2705,7 @@ public:
     //
 
     if (ED->isObjC() && ED->isMoveOnly()) {
-      ED->diagnose(diag::moveonly_objc_enum_banned);
+      ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
@@ -2601,7 +2719,7 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+    if (ED->isMoveOnly()) {
       if (ED->isIndirect())
         ED->diagnose(diag::moveonly_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
@@ -2794,7 +2912,7 @@ public:
           return;
 
         // go over the all types directly conformed-to by the extension
-        for (auto entry : extension->getInherited()) {
+        for (auto entry : extension->getAllInheritedEntries()) {
           diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
                                                entry.getType());
         }
@@ -3287,7 +3405,7 @@ public:
     if (EED->hasAssociatedValues()) {
       if (auto rawTy = ED->getRawType()) {
         EED->diagnose(diag::enum_with_raw_type_case_with_argument);
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+        DE.diagnose(ED->getInherited().begin()->getSourceRange().Start,
                     diag::enum_raw_type_here, rawTy);
         EED->setInvalid();
       }

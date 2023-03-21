@@ -149,14 +149,15 @@ GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest::evaluate(
 /// Add Fix-It text for the given protocol type to inherit DistributedActor.
 void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
     const ProtocolDecl *proto, InFlightDiagnostic &diag) {
-  if (proto->getInherited().empty()) {
+  if (proto->getAllInheritedEntries().empty()) {
     SourceLoc fixItLoc = proto->getBraces().Start;
     diag.fixItInsert(fixItLoc, ": DistributedActor");
   } else {
     // Similar to how Sendable FitIts do this, we insert at the end of
     // the inherited types.
     ASTContext &ctx = proto->getASTContext();
-    SourceLoc fixItLoc = proto->getInherited().back().getSourceRange().End;
+    SourceLoc fixItLoc =
+        proto->getAllInheritedEntries().back().getSourceRange().End;
     fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
     diag.fixItInsert(fixItLoc, ", DistributedActor");
   }
@@ -169,12 +170,13 @@ void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
 /// function parameter or return value type is detected.
 void swift::addCodableFixIt(
     const NominalTypeDecl *nominal, InFlightDiagnostic &diag) {
-  if (nominal->getInherited().empty()) {
+  if (nominal->getAllInheritedEntries().empty()) {
     SourceLoc fixItLoc = nominal->getBraces().Start;
     diag.fixItInsert(fixItLoc, ": Codable");
   } else {
     ASTContext &ctx = nominal->getASTContext();
-    SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
+    SourceLoc fixItLoc =
+        nominal->getAllInheritedEntries().back().getSourceRange().End;
     fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
     diag.fixItInsert(fixItLoc, ", Codable");
   }

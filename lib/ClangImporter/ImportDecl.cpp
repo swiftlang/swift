@@ -1690,7 +1690,7 @@ namespace {
         SmallVector<InheritedEntry, 2> inheritedTypes;
         inheritedTypes.push_back(
             InheritedEntry(TypeLoc::withoutLoc(underlyingType)));
-        enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
+        enumDecl->setAllInheritedEntries(C.AllocateCopy(inheritedTypes));
 
         if (errorWrapper) {
           Impl.addSynthesizedProtocolAttrs(
@@ -4422,7 +4422,8 @@ namespace {
       SmallVector<InheritedEntry, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
-      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+      result->setAllInheritedEntries(Impl.SwiftContext.AllocateCopy(
+          inheritedTypes));
       result->setMemberLoader(&Impl, 0);
 
       return result;
@@ -4708,7 +4709,8 @@ namespace {
       SmallVector<InheritedEntry, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
-      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+      result->setAllInheritedEntries(Impl.SwiftContext.AllocateCopy(
+          inheritedTypes));
 
       result->setMemberLoader(&Impl, 0);
 
@@ -4901,7 +4903,8 @@ namespace {
       // Import protocols this class conforms to.
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
-      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+      result->setAllInheritedEntries(Impl.SwiftContext.AllocateCopy(
+          inheritedTypes));
 
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)               \
@@ -5321,7 +5324,8 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   if (superclass) {
     SmallVector<InheritedEntry, 4> inheritedTypes;
     inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
-    theClass->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+    theClass->setAllInheritedEntries(Impl.SwiftContext.AllocateCopy(
+        inheritedTypes));
   }
 
   Impl.addSynthesizedProtocolAttrs(theClass, {KnownProtocolKind::CFObject});
@@ -6885,7 +6889,7 @@ void SwiftDeclConverter::importObjCProtocols(
       inheritedTypes.push_back(
         InheritedEntry(
           TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-          /*isUnchecked=*/false));
+          /*isUnchecked=*/false, /*isSuppressed=*/false));
     }
   }
 
@@ -6948,7 +6952,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       inherited.push_back(
         TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectConstraint()));
     }
-    genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
+    genericParamDecl->setAllInheritedEntries(Impl.SwiftContext.AllocateCopy(
+        inherited));
 
     genericParams.push_back(genericParamDecl);
   }

@@ -404,9 +404,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration is 'moveOnly'.
-class IsMoveOnlyRequest
-    : public SimpleRequest<IsMoveOnlyRequest, bool(ValueDecl *),
+/// Determine whether the given declaration is noncopyable (i.e., does not
+/// offer the ability to copy values of that type.)
+class IsNoncopyableRequest
+    : public SimpleRequest<IsNoncopyableRequest, bool(ValueDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;

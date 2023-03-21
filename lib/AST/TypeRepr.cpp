@@ -607,6 +607,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
     break;
+  case TypeReprKind::Suppressed:
+    Printer.printKeyword("~", Opts, "");
+    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }

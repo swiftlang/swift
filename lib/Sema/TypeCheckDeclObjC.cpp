@@ -1311,7 +1311,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         // If the user has not spelled out a superclass, offer to insert
         // 'NSObject'. We could also offer to replace the existing superclass,
         // but that's a touch aggressive.
-         if (CD->getInherited().empty()) {
+         if (CD->getAllInheritedEntries().empty()) {
            auto nameEndLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                                         CD->getNameLoc());
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
@@ -1319,8 +1319,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
              .limitBehavior(behavior);
          } else if (CD->getSuperclass().isNull()) {
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ")
-             .limitBehavior(behavior);
+               .fixItInsert(CD->getAllInheritedEntries().front().getLoc(),
+                            "NSObject, ")
+               .limitBehavior(behavior);
          }
       }
 
@@ -1592,8 +1593,9 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   // The raw type must be one of the C integer types.
   if (!isCIntegerType(rawType)) {
     SourceRange errorRange;
-    if (!enumDecl->getInherited().empty())
-      errorRange = enumDecl->getInherited().front().getSourceRange();
+    auto allInheritedEntries = enumDecl->getAllInheritedEntries();
+    if (!allInheritedEntries.empty())
+      errorRange = allInheritedEntries.front().getSourceRange();
     enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, rawType)
       .highlight(errorRange);
     return false;

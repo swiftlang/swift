@@ -26,10 +26,17 @@
 
 using namespace swift;
 
-Type InheritedTypeRequest::evaluate(
-    Evaluator &evaluator,
-    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned index, TypeResolutionStage stage) const {
+using TypeOrExtensionDeclPointer = llvm::PointerUnion<const TypeDecl *,
+                                                      const ExtensionDecl *>;
+using TypeLocLoader = llvm::function_ref<
+    const TypeLoc &(TypeOrExtensionDeclPointer, unsigned)>;
+
+/// Resolves a TypeLoc to a Type and returns that type. The TypeLoc is
+/// obtained using \c fn when applied to the \c decl and \c index.
+static Type resolveTypeLocWithin(TypeOrExtensionDeclPointer decl,
+                                 unsigned index,
+                                 TypeResolutionStage stage,
+                                 TypeLocLoader fn) {
   // Figure out how to resolve types.
   DeclContext *dc;
   TypeResolverContext context;
@@ -71,7 +78,7 @@ Type InheritedTypeRequest::evaluate(
     break;
   }
 
-  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = fn(decl, index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
@@ -80,6 +87,13 @@ Type InheritedTypeRequest::evaluate(
     inheritedType = typeLoc.getType();
 
   return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
+}
+
+Type InheritedTypeRequest::evaluate(
+    Evaluator &evaluator,
+    TypeOrExtensionDeclPointer decl,
+    unsigned index, TypeResolutionStage stage) const {
+  return resolveTypeLocWithin(decl, index, stage, getInheritedEntryAtIndex);
 }
 
 Type
@@ -103,7 +117,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       return Type();
   }
 
-  for (unsigned int idx : indices(nominalDecl->getInherited())) {
+  auto allEntries = nominalDecl->getAllInheritedEntries();
+  for (unsigned int idx : indices(allEntries)) {
+    // skip suppressed entries
+    if (allEntries[idx].isSuppressed)
+      continue;
+
     auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
 
     if (auto err = result.takeError()) {
@@ -140,7 +159,12 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 
 Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
                                   EnumDecl *enumDecl) const {
-  for (unsigned int idx : indices(enumDecl->getInherited())) {
+  auto allEntries = enumDecl->getAllInheritedEntries();
+  for (unsigned int idx : indices(allEntries)) {
+    // skip suppressed entries.
+    if (allEntries[idx].isSuppressed)
+      continue;
+
     auto inheritedTypeResult = evaluator(
         InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface});
 

@@ -711,17 +711,24 @@ void swift::rewriting::realizeInheritedRequirements(
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
   auto &ctx = decl->getASTContext();
-  auto inheritedTypes = decl->getInherited();
+  auto inheritedEntries = decl->getAllInheritedEntries();
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
 
-  for (unsigned index : indices(inheritedTypes)) {
+  for (unsigned index : indices(inheritedEntries)) {
     Type inheritedType
       = evaluateOrDefault(ctx.evaluator,
                           InheritedTypeRequest{decl, index,
                           TypeResolutionStage::Structural},
                           Type());
     if (!inheritedType) continue;
+
+    // handle suppressed requirements
+    if (inheritedEntries[index].isSuppressed) {
+      // TODO: we should be adding a requirement for Copyable if not suppressed.
+      assert(false && "unexpected suppressed entry");
+      continue;
+    }
 
     // Ignore trivially circular protocol refinement (protocol P : P)
     // since we diagnose that elsewhere. Adding a rule here would emit
@@ -731,7 +738,7 @@ void swift::rewriting::realizeInheritedRequirements(
         continue;
     }
 
-    auto *typeRepr = inheritedTypes[index].getTypeRepr();
+    auto *typeRepr = inheritedEntries[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
     if (shouldInferRequirements) {
       inferRequirements(inheritedType, loc, moduleForInference,
@@ -940,7 +947,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
       return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
     // Inheritance clause.
-    return { " where ", proto->getInherited().back().getSourceRange().End };
+    return {" where ",
+            proto->getAllInheritedEntries().back().getSourceRange().End};
   };
 
   // Retrieve the set of requirements that a given associated type declaration

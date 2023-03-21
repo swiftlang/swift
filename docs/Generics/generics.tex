@@ -3107,7 +3107,7 @@ The last four utility methods operate on the requirement signature, so are safe 
 An associated type declaration.
 \begin{itemize}
 \item \texttt{getTrailingWhereClause()} returns the associated type's trailing \texttt{where} clause, or \texttt{nullptr}.
-\item \texttt{getInherited()} returns the associated type's inheritance clause.
+\item \texttt{getAllInheritedEntries()} returns the associated type's inheritance clause.
 \end{itemize}
 
 Trailing \texttt{where} clauses and inheritance clauses are not preserved in serialized associated type declarations. Requirements on associated types are part of a protocol's requirement signature, so except when actually building the requirement signature, most code uses \texttt{getRequirementSignature()} from Section~\ref{genericsigsourceref} instead.

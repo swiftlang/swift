@@ -6888,8 +6888,26 @@ ERROR(moveonly_cast,none,
       "move-only types cannot be conditionally cast", ())
 ERROR(moveonly_failable_init,none,
       "move-only types cannot have failable initializers yet", ())
-ERROR(moveonly_objc_enum_banned, none,
-      "@objc enums cannot be marked as move-only", ())
+ERROR(noncopyable_objc_enum, none,
+      "@objc enums cannot be noncopyable", ())
+
+//------------------------------------------------------------------------------
+// MARK: Conformance suppression diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(suppress_cannot_suppress,none,
+      "cannot suppress implicit conformance to %0", (Type))
+
+ERROR(suppress_on_wrong_decl,none,
+      "cannot suppress conformance on %0", (DescriptiveDeclKind))
+
+ERROR(suppress_duplicate,none,
+      "implicit conformance to %0 already suppressed", (Type))
+NOTE(suppress_previously_here,none,
+      "%0 previously suppressed here", (Type))
+
+ERROR(suppress_not_protocol,none,
+      "suppression of non-protocol type %0", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
@@ -6948,16 +6966,20 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
       "annotating a type with a global actor %0 is not permitted within %1",
       (TypeRepr*, StringRef))
 
-ERROR(moveOnly_not_allowed_here,none,
-      "'moveOnly' only applies to structs or enums", ())
+ERROR(noncopyable_only_struct_enum,none,
+      "only structs or enums can be noncopyable", ())
 ERROR(move_expression_not_passed_lvalue,none,
       "'consume' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
 
-ERROR(moveOnly_requires_lexical_lifetimes,none,
+ERROR(noncopyable_requires_sil_option,none,
       "noncopyable types require lexical borrow scopes "
       "(add -enable-lexical-borrow-scopes=true)", ())
+
+ERROR(moveOnly_attr_deprecated,none,
+      "'@_moveOnly' attribute is deprecated; "
+      "use the ~Copyable constraint suppression instead", ())
 
 //------------------------------------------------------------------------------
 // MARK: #_hasSymbol

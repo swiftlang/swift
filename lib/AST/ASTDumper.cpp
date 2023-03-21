@@ -574,7 +574,11 @@ namespace {
         return;
       OS << " inherits: ";
       interleave(Inherited,
-                 [&](InheritedEntry Super) { Super.getType().print(OS); },
+                 [&](InheritedEntry Super) {
+                   if (Super.isSuppressed)
+                     OS << "~";
+                   Super.getType().print(OS);
+                 },
                  [&] { OS << ", "; });
     }
 
@@ -777,13 +781,13 @@ namespace {
       switch (IDC->getIterableContextKind()) {
       case IterableDeclContextKind::NominalTypeDecl: {
         const auto NTD = cast<NominalTypeDecl>(IDC);
-        printInherited(NTD->getInherited());
+        printInherited(NTD->getAllInheritedEntries());
         printWhereRequirements(NTD);
         break;
       }
       case IterableDeclContextKind::ExtensionDecl:
         const auto ED = cast<ExtensionDecl>(IDC);
-        printInherited(ED->getInherited());
+        printInherited(ED->getAllInheritedEntries());
         printWhereRequirements(ED);
         break;
       }
@@ -3267,6 +3271,12 @@ public:
       << ' '
       << T->getSpecifierSpelling()
       << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitSuppressedTypeRepr(SuppressedTypeRepr *T) {
+    printCommon("suppressing") << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

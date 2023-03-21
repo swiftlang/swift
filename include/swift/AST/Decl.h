@@ -1471,13 +1471,33 @@ public:
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
   /// Whether there was an @unchecked attribute.
-  bool isUnchecked = false;
+  bool isUnchecked;
 
+  /// Whether this entry represents the suppression of implicit conformance to
+  /// the type in this entry.
+  bool isSuppressed;
+
+  /// This constructor will automatically try to determine the "isUnchecked"
+  /// and "isSuppressed" statuses based on the \c typeLoc.
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked)
-    : TypeLoc(typeLoc), isUnchecked(isUnchecked) { }
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isSuppressed)
+      : TypeLoc(typeLoc), isUnchecked(isUnchecked), isSuppressed(isSuppressed)
+      {}
 };
+
+// A predicate Callable used to filter a collection of InheritedEntry
+struct InheritedEntryFilter {
+  bool WantSuppressed;
+  InheritedEntryFilter(bool wantSuppressed)
+      : WantSuppressed(wantSuppressed) {}
+  bool operator()(InheritedEntry result) const {
+    return result.isSuppressed == WantSuppressed;
+  }
+};
+using InheritedEntryIter =
+    llvm::filter_iterator<const InheritedEntry *, InheritedEntryFilter>;
+using InheritedEntryRange = iterator_range<InheritedEntryIter>;
 
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
@@ -1591,12 +1611,26 @@ public:
   /// Repr would not be available if the extension was been loaded
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
-                              
-  /// Retrieve the set of protocols that this type inherits (i.e,
-  /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
 
-  void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
+  /// Retrieve the list of all protocols that this type either inherits from
+  /// (i.e, explicitly conforms to) or is suppressing implicit conformance to.
+  ArrayRef<InheritedEntry> getAllInheritedEntries() const { return Inherited; }
+
+  void setAllInheritedEntries(ArrayRef<InheritedEntry> i) { Inherited = i; }
+
+  /// Retrieve an iterator range of protocols that this type is suppressing
+  /// implicit conformances to.
+  InheritedEntryRange getSuppressed() const {
+    return llvm::make_filter_range(getAllInheritedEntries(),
+                                   InheritedEntryFilter(/*wantSuppressed*/true));
+  }
+
+  /// Retrieve an iterator range of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  InheritedEntryRange getInherited() const {
+    return llvm::make_filter_range(getAllInheritedEntries(),
+                                   InheritedEntryFilter(/*wantSuppressed*/false));
+  }
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -2451,18 +2485,18 @@ private:
     /// optional result.
     unsigned isIUO : 1;
 
-    /// Whether the "isMoveOnly" bit has been computed yet.
-    unsigned isMoveOnlyComputed : 1;
+    /// Whether the "isNoncopyable" bit has been computed yet.
+    unsigned isNoncopyableComputed : 1;
 
-    /// Whether this declaration can not be copied and thus is move only.
-    unsigned isMoveOnly : 1;
+    /// Whether this declaration is noncopyable.
+    unsigned isNoncopyable : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsMoveOnlyRequest;
+  friend class IsNoncopyableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2952,11 +2986,29 @@ public:
   /// metatype.
   Type getDeclaredInterfaceType() const;
 
-  /// Retrieve the set of protocols that this type inherits (i.e,
-  /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
+  /// Retrieve the list of all protocols that this type either inherits from
+  /// (i.e, explicitly conforms to) or is suppressing implicit conformance to.
+  ArrayRef<InheritedEntry> getAllInheritedEntries() const { return Inherited; }
 
-  void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
+  void setAllInheritedEntries(ArrayRef<InheritedEntry> i) { Inherited = i; }
+
+  /// Retrieve an iterator range of protocols that this type is suppressing
+  /// implicit conformances to.
+  InheritedEntryRange getSuppressed() const {
+    return llvm::make_filter_range(getAllInheritedEntries(),
+                                   InheritedEntryFilter(/*wantSuppressed*/true));
+  }
+
+  /// Retrieve an iterator range of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  InheritedEntryRange getInherited() const {
+    return llvm::make_filter_range(getAllInheritedEntries(),
+                                   InheritedEntryFilter(/*wantSuppressed*/false));
+  }
+
+  /// Does this decl suppress implicit conformance to the given protocol?
+  /// That is, it is "without KP"
+  bool isSuppressingConformance(KnownProtocolKind kp) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&

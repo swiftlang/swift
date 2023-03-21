@@ -1813,7 +1813,7 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
     //        inherit from other internal protocols. It should also consider
     //        conditional conformances with internal requirements that are still
     //        part of the ABI.
-    if (!Ext->getInherited().empty())
+    if (!Ext->getAllInheritedEntries().empty())
       anyConformancesAdded = true;
   }
 

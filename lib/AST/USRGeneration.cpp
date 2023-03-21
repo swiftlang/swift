@@ -342,7 +342,7 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   }
   OS << getUSRSpacePrefix() << "e:";
   printValueDeclUSR(nominal, OS);
-  for (auto Inherit : ED->getInherited()) {
+  for (auto Inherit : ED->getAllInheritedEntries()) {
     if (auto T = Inherit.getType()) {
       if (T->getAnyNominal())
         return printValueDeclUSR(T->getAnyNominal(), OS);

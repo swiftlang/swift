@@ -623,12 +623,12 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
 /// Add Fix-It text for the given nominal type to adopt Sendable.
 static void addSendableFixIt(
     const NominalTypeDecl *nominal, InFlightDiagnostic &diag, bool unchecked) {
-  if (nominal->getInherited().empty()) {
+  if (nominal->getAllInheritedEntries().empty()) {
     SourceLoc fixItLoc = nominal->getBraces().Start;
     diag.fixItInsert(fixItLoc,
                      unchecked ? ": @unchecked Sendable" : ": Sendable");
   } else {
-    auto fixItLoc = nominal->getInherited().back().getLoc();
+    auto fixItLoc = nominal->getAllInheritedEntries().back().getLoc();
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ", @unchecked Sendable" : ", Sendable");
   }
@@ -638,12 +638,12 @@ static void addSendableFixIt(
 /// Sendable.
 static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
                              InFlightDiagnostic &diag, bool unchecked) {
-  if (genericArgument->getInherited().empty()) {
+  if (genericArgument->getAllInheritedEntries().empty()) {
     auto fixItLoc = genericArgument->getLoc();
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ": @unchecked Sendable" : ": Sendable");
   } else {
-    auto fixItLoc = genericArgument->getInherited().back().getLoc();
+    auto fixItLoc = genericArgument->getAllInheritedEntries().back().getLoc();
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ", @unchecked Sendable" : ", Sendable");
   }
@@ -4792,7 +4792,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
       // FIXME: This is a hack--we should give conformances real availability.
       auto inherits = ctx.AllocateCopy(makeArrayRef(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                         /*isUnchecked*/true)));
+                         /*isUnchecked*/true, /*isSuppressed*/false)));
       // If you change the use of AtLoc in the ExtensionDecl, make sure you
       // update isNonSendableExtension() in ASTPrinter.
       auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
