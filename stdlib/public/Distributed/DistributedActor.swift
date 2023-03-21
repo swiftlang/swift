@@ -303,13 +303,24 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
 
 }
 
-#if swift(>=5.9.0)
-@available(SwiftStdlib 5.9, *)
+#if compiler(>=5.9.0) // since this compiler version, we synthesize the `localUnownedExecutor` instead.
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.7, *)
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // In these versions, we moved to asking developers to implement
+    // `localUnownedExecutor` and as such delegate to it. The `??` fallback
+    // is likely to never be triggered, but technically could be if someone queried
+    // the `unownedExecutor` property directly on a default distributed remote actor reference,
+    // in previous language versions, so we keep these semantics for compatibility.
     return self.localUnownedExecutor ??
         UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+    } else {
+      // pessimistic reimplementation of the semantics the synthesized body would have had.
+      // semantically, this is the only implementation possible on older Swift's here.
+      return UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+    }
   }
 }
 #endif // swift 5.9

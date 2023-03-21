@@ -101,7 +101,7 @@ public func assertOnExecutor(
         file: file, line: line)
   }
 
-  guard _taskIsCurrentExecutor(unownedExecutor._executor) else { // FIXME: !!!!!
+  guard _taskIsCurrentExecutor(unownedExecutor._executor) else {
     // TODO: offer information which executor we actually got
     // TODO: figure out a way to get the typed repr out of the unowned executor
     let msg = "Incorrect actor executor assumption; Expected '\(unownedExecutor)' executor. \(message())"
