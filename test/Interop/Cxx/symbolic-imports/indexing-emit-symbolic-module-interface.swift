@@ -81,6 +81,15 @@ namespace ns {
 
         InnerTemplate<int> returnsTemplateMethod();
     };
+
+    inline namespace __1 {
+        struct StructInInlineNamespace {
+        };
+
+        using TypealiasInInlineNamespace = TemplateRecord<StructInInlineNamespace>;
+    }
+
+    using TypealiasOfInlineNamespace = __1::StructInInlineNamespace;
 }
 
 using MyType = ns::TemplateRecord<int>;
@@ -128,6 +137,15 @@ import CxxModule
 // CHECK-EMPTY:
 // CHECK-NEXT:    mutating func returnsTemplateMethod()
 // CHECK-NEXT:  }
+// CHECK:       public struct StructInInlineNamespace {
+// CHECK-EMPTY:
+// CHECK-NEXT:    public init()
+// CHECK-NEXT:  }
+// CHECK-EMPTY:
+// CHECK-NEXT:  public typealias TypealiasInInlineNamespace = ns.TemplateRecord
+// CHECK-EMPTY:
+// CHECK-EMPTY:
+// CHECK-NEXT:  public typealias TypealiasOfInlineNamespace = ns.StructInInlineNamespace
 // CHECK-EMPTY:
 // CHECK-NEXT:  static func freeFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK-NEXT: }
