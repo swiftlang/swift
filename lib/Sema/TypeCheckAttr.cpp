@@ -1945,17 +1945,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       AvailabilityInference::availableRange(attr, Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
-    if (auto enclosingUnavailable = parent->getSemanticUnavailableAttr()) {
-      if (!AttrRange.isKnownUnreachable()) {
-        const Decl *enclosingDecl = enclosingUnavailable.value().second;
-        diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : attr->getLocation(),
-                 diag::availability_decl_more_than_unavailable_enclosing,
-                 D->getDescriptiveKind());
-        diagnose(parent->getLoc(),
-                 diag::availability_decl_more_than_unavailable_enclosing_here);
-      }
-    } else if (auto enclosingAvailable =
+    if (auto enclosingAvailable =
                    parent->getSemanticAvailableRangeAttr()) {
       const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
       const Decl *enclosingDecl = enclosingAvailable.value().second;
