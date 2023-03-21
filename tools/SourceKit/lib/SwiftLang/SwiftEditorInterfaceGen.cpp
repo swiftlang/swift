@@ -291,9 +291,12 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
   PrintOptions Options = PrintOptions::printModuleInterface(
       Ctx.TypeCheckerOpts.PrintFullConvention);
   if (Mod->findUnderlyingClangModule()) {
-    // Show unavailable C++ APIs.
-    if (Ctx.LangOpts.EnableCXXInterop)
+    if (Ctx.LangOpts.EnableCXXInterop) {
+      // Show unavailable C++ APIs.
       Options.SkipUnavailable = false;
+      // Skip over inline namespaces.
+      Options.SkipInlineCXXNamespace = true;
+    }
   }
   ModuleTraversalOptions TraversalOptions = None; // Don't print submodules.
   SmallString<128> Text;

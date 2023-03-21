@@ -913,10 +913,12 @@ private:
   void printPatternType(const Pattern *P);
   void printAccessors(const AbstractStorageDecl *ASD);
   void printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD);
-  void printMembersOfDecl(Decl * NTD, bool needComma = false,
-                          bool openBracket = true, bool closeBracket = true);
+  void printMembersOfDecl(Decl *NTD, bool needComma = false,
+                          bool openBracket = true, bool closeBracket = true,
+                          bool doIndent = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
-                    bool openBracket = true, bool closeBracket = true);
+                    bool openBracket = true, bool closeBracket = true,
+                    bool doIndent = true);
   void printGenericDeclGenericParams(GenericContext *decl);
   void printDeclGenericRequirements(GenericContext *decl);
   void printPrimaryAssociatedTypes(ProtocolDecl *decl);
@@ -2378,9 +2380,8 @@ static void addNamespaceMembers(Decl *decl,
   }
 }
 
-void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
-                                  bool openBracket,
-                                  bool closeBracket) {
+void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
+                                  bool closeBracket, bool doIndent) {
   llvm::SmallVector<Decl *, 16> Members;
   auto AddMembers = [&](IterableDeclContext *idc) {
     if (Options.PrintCurrentMembersOnly) {
@@ -2413,18 +2414,19 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
     if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
       addNamespaceMembers(D, Members);
   }
-  printMembers(Members, needComma, openBracket, closeBracket);
+  printMembers(Members, needComma, openBracket, closeBracket, doIndent);
 }
 
 void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
-                            bool openBracket, bool closeBracket) {
+                            bool openBracket, bool closeBracket,
+                            bool doIndent) {
   if (openBracket) {
     Printer << " {";
     if (!Options.PrintEmptyMembersOnSameLine || !members.empty())
       Printer.printNewline();
   }
   {
-    IndentRAII indentMore(*this);
+    IndentRAII indentMore(*this, /*DoIndent=*/doIndent);
     for (auto i = members.begin(), iEnd = members.end(); i != iEnd; ++i) {
       auto member = *i;
 
@@ -3713,6 +3715,13 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     if (!Printer.shouldPrintRedeclaredClangDecl(
             namespaceDecl->getOriginalNamespace()))
       return;
+
+    if (Options.SkipInlineCXXNamespace && namespaceDecl->isInline()) {
+      // Print members directly if this is an inline namespace.
+      printMembersOfDecl(decl, false, /*openBracket=*/false,
+                         /*closeBracket=*/false, /*doIndent=*/false);
+      return;
+    }
   }
   printDocumentationComment(decl);
   printAttributes(decl);
@@ -6002,6 +6011,20 @@ public:
          if (currentType->isEqual(printingType))
            return;
        }
+    }
+    if (Options.SkipInlineCXXNamespace) {
+      // Don't print the parent type if it's a reference to an inline C++
+      // namespace.
+      if (auto *enumTy = T->getAs<EnumType>()) {
+        if (const auto *namespaceDecl = dyn_cast_or_null<clang::NamespaceDecl>(
+                enumTy->getDecl()->getClangDecl())) {
+          if (namespaceDecl->isInline()) {
+            if (auto parent = enumTy->getParent())
+              visitParentType(parent);
+            return;
+          }
+        }
+      }
     }
     PrintOptions innerOptions = Options;
     innerOptions.SynthesizeSugarOnTypes = false;

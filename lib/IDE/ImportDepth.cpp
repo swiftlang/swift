@@ -34,12 +34,8 @@ ImportDepth::ImportDepth(ASTContext &context,
     auxImports.insert(pair.first);
 
   // Private imports from this module.
-  // FIXME: only the private imports from the current source file.
-  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports,
-                           {ModuleDecl::ImportFilterKind::Default,
-                            ModuleDecl::ImportFilterKind::ImplementationOnly});
+  main->getImportedModules(mainImports, ModuleDecl::getImportFilterLocal());
   for (auto &import : mainImports) {
     uint8_t depth = 1;
     if (auxImports.count(import.importedModule->getName().str()))
