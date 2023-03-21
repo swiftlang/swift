@@ -14,13 +14,13 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 // ==== ----------------------------------------------------------------------------------------------------------------
 
 distributed actor MyDistActor {
-    nonisolated var unownedExecutor: UnownedSerialExecutor {
+    nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
         return MainActor.sharedUnownedExecutor
     }
 
 // // MyDistActor.init(actorSystem:)
 // CHECK: sil hidden @$s14default_deinit11MyDistActorC11actorSystemAC015FakeDistributedE7Systems0h9RoundtripeG0C_tcfc : $@convention(method) (@owned FakeRoundtripActorSystem, @owned MyDistActor) -> @owned MyDistActor
-// CHECK-NOT: [[BAD:%[0-9]+]] = builtin "initializeDefaultActor"(%1 : $MyDistActor) : $()
+// CHECK-NOT: {{%[0-9]+}} = builtin "initializeDefaultActor"(%1 : $MyDistActor) : $()
 // CHECK: [[ACTOR_INSTANCE:%[0-9]+]] = builtin "initializeNonDefaultDistributedActor"(%1 : $MyDistActor) : $()
 }
 

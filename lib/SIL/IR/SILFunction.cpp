@@ -533,6 +533,13 @@ SILBasicBlock *SILFunction::createBasicBlock() {
   return newBlock;
 }
 
+SILBasicBlock *SILFunction::createBasicBlock(llvm::StringRef debugName) {
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  newBlock->setDebugName(debugName);
+  BlockList.push_back(newBlock);
+  return newBlock;
+}
+
 SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   BlockList.insertAfter(afterBB->getIterator(), newBlock);

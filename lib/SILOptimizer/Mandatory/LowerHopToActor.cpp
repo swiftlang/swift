@@ -154,6 +154,28 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
   return nullptr;
 }
 
+static AccessorDecl *getUnwrapLocalUnownedExecutorGetter(ASTContext &ctx,
+                                              ProtocolDecl *actorProtocol) {
+  for (auto member: actorProtocol->getAllMembers()) { // FIXME: remove this, just go to the extension
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor)
+        return var->getAccessor(AccessorKind::Get);
+    }
+  }
+
+  for (auto extension: actorProtocol->getExtensions()) {
+    for (auto member: extension->getAllMembers()) {
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor) {
+          return var->getAccessor(AccessorKind::Get);
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
                                           SILLocation loc, SILValue actor,
                                           bool makeOptional) {
@@ -186,11 +208,36 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     unmarkedExecutor =
       B.createBuiltin(loc, builtinName, resultType, subs, {actor});
 
-  // Otherwise, go through Actor.unownedExecutor.
+    // Otherwise, go through Actor.unownedExecutor.
+  } else if (actorType->isDistributedActor()) {
+    auto actorKind = KnownProtocolKind::DistributedActor;
+    auto actorProtocol = ctx.getProtocol(actorKind);
+    auto req = getUnwrapLocalUnownedExecutorGetter(ctx, actorProtocol);
+    assert(req && "Distributed library broken");
+    SILDeclRef fn(req, SILDeclRef::Kind::Func);
+
+    auto actorConf = module->lookupConformance(actorType, actorProtocol);
+    assert(actorConf &&
+           "hop_to_executor with distributed actor that doesn't conform to DistributedActor");
+
+    auto subs = SubstitutionMap::get(req->getGenericSignature(),
+                                     {actorType}, {actorConf});
+    auto fnType = F->getModule().Types.getConstantFunctionType(*F, fn);
+
+    auto witness =
+      B.createWitnessMethod(loc, actorType, actorConf, fn,
+                            SILType::getPrimitiveObjectType(fnType));
+    auto witnessCall = B.createApply(loc, witness, subs, {actor});
+
+    // The protocol requirement returns an Optional<UnownedSerialExecutor>;
+    // extract the Builtin.Executor from it.
+    auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+    auto executorProps = executorDecl->getStoredProperties();
+    assert(executorProps.size() == 1);
+    unmarkedExecutor =
+      B.createStructExtract(loc, witnessCall, executorProps[0]);
   } else {
-    auto actorKind = actorType->isDistributedActor() ?
-                     KnownProtocolKind::DistributedActor :
-                     KnownProtocolKind::Actor;
+    auto actorKind = KnownProtocolKind::Actor;
     auto actorProtocol = ctx.getProtocol(actorKind);
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");

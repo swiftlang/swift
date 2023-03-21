@@ -9625,6 +9625,29 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   return nullptr;
 }
 
+const VarDecl *ClassDecl::getLocalUnownedExecutorProperty() const {
+  auto &C = getASTContext();
+
+  if (!isDistributedActor())
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  this->lookupQualified(getSelfNominalTypeDecl(),
+                        DeclNameRef(C.Id_localUnownedExecutor),
+                        NL_ProtocolMembers,
+                        results);
+
+  for (auto candidate: results) {
+    if (isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (VarDecl *var = dyn_cast<VarDecl>(candidate))
+      return var;
+  }
+
+  return nullptr;
+}
+
 bool ClassDecl::isRootDefaultActor() const {
   return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }

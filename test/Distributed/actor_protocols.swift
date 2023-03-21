@@ -73,6 +73,9 @@ final class DA2: DistributedActor {
   nonisolated var actorSystem: ActorSystem {
     fatalError()
   }
+  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+    fatalError()
+  }
 
   required init(system: FakeActorSystem) {
     fatalError()
