@@ -556,7 +556,28 @@ namespace {
         return nullptr;
       for (auto method : cxxRecordDecl->methods()) {
         if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor())
+          if (ctor->isCopyConstructor() &&
+              ctor->getAccess() == clang::AS_public &&
+              // rdar://106964356
+              // ctor->doesThisDeclarationHaveABody() &&
+              !ctor->isDeleted())
+            return ctor;
+        }
+      }
+      return nullptr;
+    }
+
+    const clang::CXXConstructorDecl *findMoveConstructor() const {
+      const clang::CXXRecordDecl *cxxRecordDecl =
+          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      if (!cxxRecordDecl)
+        return nullptr;
+      for (auto method : cxxRecordDecl->methods()) {
+        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
+          if (ctor->isMoveConstructor() &&
+              ctor->getAccess() == clang::AS_public &&
+              ctor->doesThisDeclarationHaveABody() &&
+              !ctor->isDeleted())
             return ctor;
         }
       }
@@ -785,6 +806,14 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     src.getAddress(),
@@ -800,6 +829,15 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        destroy(IGF, dest, T, isOutlined);
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,

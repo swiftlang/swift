@@ -303,6 +303,7 @@ private:
 enum class CxxRecordSemanticsKind {
   Trivial,
   Owned,
+  MoveOnly,
   Reference,
   Iterator,
   // An API that has be annotated as explicitly unsafe, but still importable.
