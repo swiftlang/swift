@@ -620,81 +620,14 @@ static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
   return nullptr;
 }
 
-//static Expr *constructOptionalSome(ASTContext &ctx,
-//                                   Expr *arg) {
-//  auto optionalDecl = ctx.getOptionalDecl();
-//  if (!optionalDecl) return nullptr;
-//
-//  for (auto member: optionalDecl->getAllMembers()) {
-//    auto ctor = dyn_cast<ConstructorDecl>(member);
-//    if (!ctor) continue;
-//
-//    // Find the init(_:) which initialized as `some`
-//    auto params = ctor->getParameters();
-//    if (params->size() != 1 ||
-//        params->get(0)->getArgumentName() != Identifier())
-//      continue;
-//
-//    ctor->dump();
-//
-//
-////    Type optionalType = optionalDecl->getDeclaredInterfaceType();
-////    fprintf(stderr, "[%s:%d](%s) optionalDecl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-////    optionalType.dump();
-//
-//    Type optionalType = BoundGenericEnumType::get(optionalDecl, Type(), {arg->getType()});
-//    fprintf(stderr, "[%s:%d](%s) better optionalType\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    optionalType->dump();
-//
-//    Type ctorType = ctor->getInterfaceType();
-//    fprintf(stderr, "[%s:%d](%s) ctor type\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    ctorType->dump();
-//
-//    // We have the right initializer. Build a reference to it of type:
-//    //   (Optional.Type)
-//    //      -> (T) -> T
-//    auto initRef = new (ctx) DeclRefExpr(ctor, DeclNameLoc(), /*implicit*/true,
-//                                         AccessSemantics::Ordinary,
-//                                         ctorType);
-//
-//    // Apply the initializer to the metatype, building an expression of type:
-//    //   (Builtin.Executor) -> Optional<UnownedSerialExecutor>
-//    // auto metatypeRef = TypeExpr::createImplicit(optionalType, ctx);
-//    auto metatypeRef = TypeExpr::createImplicit(optionalType, ctx);
-//    GenericIdentTypeRepr::create(ctx, DeclNameLoc(optionalDecl->getNameLoc()),
-//                                 DeclNameRef(optionalDecl->getBaseName()),
-//                                 {arg->getType()}, SourceRange());
-////
-////    auto ctorAppliedType = new (ctx) TypeRepr(
-////        GenericIdentTypeRepr::create(ctx, DeclNameLoc(), )
-////        );
-//
-////    TypeExpr::createForSpecializedDecl(optionalType.get, {arg->getType()}, SourceRange(), ctx);
-////    Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
-//    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef
-////                                                    ,
-////                                                    ctorAppliedType
-//                                                    );
-//    selfApply->setImplicit(true);
-//    selfApply->setThrows(false);
-//
-//    // Call the constructor, building an expression of type
-//    // Optional<T>.
-//    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
-//    auto call = CallExpr::createImplicit(ctx, selfApply, argList);
-//    call->setType(optionalType);
-//    call->setThrows(false);
-//    return call;
-//  }
-//
-//  assert(false);
-//}
-
 static std::pair<BraceStmt *, bool>
-deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
-  // var unownedExecutor: UnownedSerialExecutor? {
+deriveBodyDistributedActor_localUnownedExecutor(AbstractFunctionDecl *getter, void *) {
+  // var localUnownedExecutor: UnownedSerialExecutor? {
   //   get {
-  //     return Builtin.buildDefaultActorExecutorRef(self)
+  //     guard __isLocalActor(self) else {
+  //       return nil
+  //     }
+  //     return Optional(Builtin.buildDefaultActorExecutorRef(self))
   //   }
   // }
   ASTContext &ctx = getter->getASTContext();
@@ -751,16 +684,11 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
   auto body = BraceStmt::create(
       ctx, SourceLoc(), { returnNilIfRemoteStmt, ret }, SourceLoc(), /*implicit=*/true);
-
-  fprintf(stderr, "[%s:%d](%s) ================================================================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-  body->dump();
-  fprintf(stderr, "[%s:%d](%s) ================================================================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
   return { body, /*isTypeChecked=*/true };
 }
 
-/// Derive the declaration of DistributedActor's unownedExecutor property.
-static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &derived) {
+/// Derive the declaration of DistributedActor's localUnownedExecutor property.
+static ValueDecl *deriveDistributedActor_localUnownedExecutor(DerivedConformance &derived) {
   ASTContext &ctx = derived.Context;
 
   // Retrieve the types and declarations we'll need to form this operation.
@@ -774,7 +702,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   Type optionalExecutorType = executorType->wrapInOptionalType();
 
   if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
-    if (auto existing = classDecl->getUnownedExecutorProperty()) {
+    if (auto existing = classDecl->getLocalUnownedExecutorProperty()) {
       if (existing->getInterfaceType()->isEqual(optionalExecutorType)) {
         return const_cast<VarDecl *>(existing);
       } else {
@@ -785,7 +713,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   }
 
   auto propertyPair = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
+      DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_localUnownedExecutor,
       optionalExecutorType, optionalExecutorType,
       /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
@@ -811,7 +739,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
   auto getter =
       derived.addGetterToReadOnlyDerivedProperty(property, optionalExecutorType);
-  getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
+  getter->setBodySynthesizer(deriveBodyDistributedActor_localUnownedExecutor);
 
   // IMPORTANT: MUST BE AFTER [id, actorSystem].
   if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
@@ -854,8 +782,8 @@ static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, 
     if (auto id = Nominal->getDistributedActorIDProperty()) {
       if (auto system = Nominal->getDistributedActorSystemProperty()) {
         if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
-          if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
-            int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
+          if (auto localUnownedExecutor = classDecl->getLocalUnownedExecutorProperty()) {
+            int idIdx, actorSystemIdx, localUnownedExecutorIdx = 0;
             int idx = 0;
             for (auto member: Nominal->getMembers()) {
               if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
@@ -863,15 +791,15 @@ static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, 
                   idIdx = idx;
                 } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
                   actorSystemIdx = idx;
-                } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
-                  unownedExecutorIdx = idx;
+                } else if (binding->getSingleVar()->getName() == Context.Id_localUnownedExecutor) {
+                  localUnownedExecutorIdx = idx;
                 }
                 idx += 1;
               }
             }
-            if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+            if (idIdx + actorSystemIdx + localUnownedExecutorIdx >= 0 + 1 + 2) {
               // we have found all the necessary fields, let's assert their order
-              assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+              assert(idIdx < actorSystemIdx < localUnownedExecutorIdx && "order of fields MUST be exact.");
             }
           }
         }
@@ -893,8 +821,8 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
       derivedValue = deriveDistributedActor_id(*this);
     } else if (var->getName() == Context.Id_actorSystem) {
       derivedValue = deriveDistributedActor_actorSystem(*this);
-    } else if (var->getName() == Context.Id_unownedExecutor) {
-      derivedValue = deriveDistributedActor_unownedExecutor(*this);
+    } else if (var->getName() == Context.Id_localUnownedExecutor) {
+      derivedValue = deriveDistributedActor_localUnownedExecutor(*this);
     }
 
     assertRequiredSynthesizedPropertyOrder(*this, derivedValue);

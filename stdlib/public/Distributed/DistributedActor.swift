@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-import _Concurrency
+@_spi(ConcurrencyExecutors) import _Concurrency
 
 // ==== Distributed Actor -----------------------------------------------------
 
@@ -242,8 +242,13 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// the default initializer is not synthesized, and all the user-defined initializers must take care to initialize this property.
   nonisolated var actorSystem: ActorSystem { get }
 
-  /// Retrieve the executor for this actor as an optimized, unowned
-  /// reference.
+  /// Retrieve the executor for this distributed actor as an optimized,
+  /// unowned reference. This API is equivalent to ``Actor/unownedExecutor``,
+  /// however, by default, it intentionally returns `nil` if this actor is a reference
+  /// to a remote distributed actor, because the executor for remote references
+  /// is effectively never g
+  ///
+  /// ## Custom implementation requirements
   ///
   /// This property must always evaluate to the same executor for a
   /// given actor instance, and holding on to the actor must keep the
@@ -254,11 +259,31 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// eliminated, and rearranged with other work, and they may even
   /// be introduced when not strictly required.  Visible side effects
   /// are therefore strongly discouraged within this property.
-//  @available(SwiftStdlib 5.9, *)
-//  nonisolated var localUnownedExecutor: UnownedSerialExecutor? { get }
-
   @available(SwiftStdlib 5.9, *)
-  nonisolated var unownedExecutor: UnownedSerialExecutor? { get }
+  nonisolated var localUnownedExecutor: UnownedSerialExecutor? { get }
+
+  // Implementation note:
+  // The compiler since the first introduction of `distributed actor` would synthesize
+  // an `unownedExecutor` for it, however with the official introduction of custom executors,
+  // we decided to allow implementations to customize it via `localUnownedExecutor` on distributed actors
+  // instead, because for a remote reference the executor is rather meaningless.
+  //
+  // We instead now gain a default implementation of unownedExecutor which delegates to the local one,
+  // and defaults to creating a default executor, just like it would have done usually.
+  //
+  // Do note however that the "default actor" detection is now moved to detecting if the `localUnownedExecutor`
+  // was synthesized. We still double check and look for the default actor semantics on `unownedExecutor` implementations,
+  // just in case though, to make sure we don't regress the is-default-actor devirtualization in LowerHopToActor.
+  /// The executor of this distributed actor.
+  ///
+  /// If the localUnownedExecutor returns `nil` this will return the default actor executor,
+  /// which may be the case for remote distributed actor references. However an executor of a
+  /// remote reference is practically speaking never used.
+  @available(macOS, introduced: 13.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
+  @available(iOS, introduced: 16.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
+  @available(watchOS, introduced: 9.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
+  @available(tvOS, introduced: 16.0, deprecated: 9999, message: "Use `localUnownedExecutor` for a more accurate representation of executor of a distributed actor")
+  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 
   /// Resolves the passed in `id` against the `system`, returning
   /// either a local or remote actor reference.
@@ -277,6 +302,17 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
 
 }
+
+#if swift(>=5.9.0)
+@available(SwiftStdlib 5.9, *)
+extension DistributedActor {
+  @available(SwiftStdlib 5.9, *)
+  public nonisolated var unownedExecutor: UnownedSerialExecutor {
+    return self.localUnownedExecutor ??
+        UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+  }
+}
+#endif // swift 5.9
 
 // ==== Hashable conformance ---------------------------------------------------
 

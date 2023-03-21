@@ -110,7 +110,8 @@ public struct UnownedSerialExecutor: Sendable {
   #endif
 
   @inlinable
-  internal init(_ executor: Builtin.Executor) {
+  // @_spi(ConcurrencyExecutors) // FIXME:!!!!
+  public init(_ executor: Builtin.Executor) {
     #if compiler(>=5.5) && $BuiltinExecutor
     self.executor = executor
     #endif

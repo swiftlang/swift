@@ -22,7 +22,7 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor Worker {
-  nonisolated var unownedExecutor: UnownedSerialExecutor {
+  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }

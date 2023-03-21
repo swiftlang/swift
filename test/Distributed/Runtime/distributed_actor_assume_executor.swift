@@ -20,27 +20,27 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-func checkAssumeLocalDistributedActor(actor: MainFriend) /* synchronous! */ -> String {
-  assumeOnLocalDistributedActorExecutor(actor) { dist in
+func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchronous! */ -> String {
+  assumeOnLocalDistributedActorExecutor(of: actor) { dist in
     print("gained access to: \(dist.isolatedProperty)")
     return dist.isolatedProperty
   }
 }
 
-func checkAssumeMainActor(actor: MainFriend) /* synchronous! */ {
+func checkAssumeMainActor(actor: MainDistributedFriend) /* synchronous! */ {
   assumeOnMainActorExecutor {
     print("yay")
   }
 }
 
 @MainActor
-func check(actor: MainFriend) {
+func check(actor: MainDistributedFriend) {
   _ = checkAssumeLocalDistributedActor(actor: actor)
   checkAssumeMainActor(actor: actor)
 }
 
-distributed actor MainFriend {
-  nonisolated var unownedExecutor: UnownedSerialExecutor {
+distributed actor MainDistributedFriend {
+  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }
@@ -62,8 +62,8 @@ actor OtherMain {
     return MainActor.sharedUnownedExecutor
   }
 
-  func checkAssumeLocalDistributedActor(actor: MainFriend) /* synchronous! */ {
-    _ = assumeOnLocalDistributedActorExecutor(actor) { dist in
+  func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchronous! */ {
+    _ = assumeOnLocalDistributedActorExecutor(of: actor) { dist in
       print("gained access to: \(dist.isolatedProperty)")
       return dist.isolatedProperty
     }
@@ -75,16 +75,16 @@ actor OtherMain {
     let tests = TestSuite("AssumeLocalDistributedActorExecutor")
 
     let system = FakeRoundtripActorSystem()
-    let distLocal = MainFriend(actorSystem: system)
+    let distLocal = MainDistributedFriend(actorSystem: system)
 
     if #available(SwiftStdlib 5.9, *) {
 
-      tests.test("assumeOnLocalDistributedActorExecutor: assume the main executor, inside the DistributedMainFriend local actor") {
+      tests.test("assumeOnLocalDistributedActorExecutor: assume the main executor, inside the DistributedMainDistributedFriend local actor") {
         _ = checkAssumeLocalDistributedActor(actor: distLocal)
         try! await distLocal.test(x: 42)
       }
 
-      tests.test("assumeOnLocalDistributedActorExecutor: assume same actor as the DistributedMainFriend") {
+      tests.test("assumeOnLocalDistributedActorExecutor: assume same actor as the DistributedMainDistributedFriend") {
         await OtherMain().checkAssumeLocalDistributedActor(actor: distLocal)
         try! await distLocal.test(x: 42)
       }
@@ -94,8 +94,8 @@ actor OtherMain {
       }
 
       tests.test("assumeOnLocalDistributedActorExecutor: on remote actor reference") {
-        expectCrashLater(withMessage: "Cannot assume to be 'isolated MainFriend' since distributed actor 'a.MainFriend' is remote.")
-        let remoteRef = try! MainFriend.resolve(id: distLocal.id, using: system)
+        expectCrashLater(withMessage: "Cannot assume to be 'isolated MainDistributedFriend' since distributed actor 'a.MainDistributedFriend' is remote.")
+        let remoteRef = try! MainDistributedFriend.resolve(id: distLocal.id, using: system)
         await OtherMain().checkAssumeLocalDistributedActor(actor: remoteRef)
       }
 

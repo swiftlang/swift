@@ -335,11 +335,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // Actor.unownedExecutor
     if (name.isSimpleName(ctx.Id_unownedExecutor)) {
-      if (nominal->isDistributedActor()) {
-        return getRequirement(KnownProtocolKind::DistributedActor);
-      } else {
+//      if (nominal->isDistributedActor()) {
+//        return getRequirement(KnownProtocolKind::DistributedActor);
+//      } else {
         return getRequirement(KnownProtocolKind::Actor);
-      }
+//      }
     }
 
     // DistributedActor.id
@@ -349,6 +349,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // DistributedActor.actorSystem
     if (name.isSimpleName(ctx.Id_actorSystem))
       return getRequirement(KnownProtocolKind::DistributedActor);
+
+    // DistributedActor.localUnownedExecutor
+    if (name.isSimpleName(ctx.Id_localUnownedExecutor)) {
+      return getRequirement(KnownProtocolKind::DistributedActor);
+    }
 
     return nullptr;
   }
@@ -682,7 +687,6 @@ GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
 GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
                                         Expr *testExpr,
                                         Type optionalWrappedType) {
-  auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(), /*implicit=*/true);
   auto nilExpr = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
   nilExpr->setType(optionalWrappedType->wrapInOptionalType());
 

@@ -192,6 +192,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
                      KnownProtocolKind::DistributedActor :
                      KnownProtocolKind::Actor;
     auto actorProtocol = ctx.getProtocol(actorKind);
+    bool optionalExecutor = false;
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");
     SILDeclRef fn(req, SILDeclRef::Kind::Func);
@@ -214,8 +215,6 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     auto executorDecl = ctx.getUnownedSerialExecutorDecl();
     auto executorProps = executorDecl->getStoredProperties();
     assert(executorProps.size() == 1);
-    fprintf(stderr, "[%s:%d](%s) executorProps = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    executorProps[0]->dump();
     unmarkedExecutor =
       B.createStructExtract(loc, witnessCall, executorProps[0]);
   }

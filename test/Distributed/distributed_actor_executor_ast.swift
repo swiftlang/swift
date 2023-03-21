@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -typecheck -dump-ast -I %t %s %S/Inputs/FakeDistributedActorSystems.swift 2>&1 | %FileCheck %s --dump-input=always
+// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -typecheck -dump-ast -I %t %s %S/Inputs/FakeDistributedActorSystems.swift 2>&1 | %FileCheck %s --dump-input=fail
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
@@ -26,8 +26,8 @@ distributed actor DefaultWorker {
 // Check DefaultWorker, the DefaultActor version of the synthesis:
 // CHECK:  (class_decl range=[{{.*}}] "DefaultWorker" interface type='DefaultWorker.Type' access=internal non-resilient actor
 // The unowned executor property:
-// CHECK:    (var_decl implicit "unownedExecutor" type='Optional<UnownedSerialExecutor>' interface type='Optional<UnownedSerialExecutor>' access=internal final readImpl=getter immutable
-// CHECK:     (accessor_decl implicit 'anonname={{.*}}' interface type='(DefaultWorker) -> () -> Optional<UnownedSerialExecutor>' access=internal final get_for=unownedExecutor
+// CHECK:    (var_decl implicit "localUnownedExecutor" type='Optional<UnownedSerialExecutor>' interface type='Optional<UnownedSerialExecutor>' access=internal final readImpl=getter immutable
+// CHECK:     (accessor_decl implicit 'anonname={{.*}}' interface type='(DefaultWorker) -> () -> Optional<UnownedSerialExecutor>' access=internal final get_for=localUnownedExecutor
 // CHECK:       (parameter "self" type='DefaultWorker' interface type='DefaultWorker')
 // CHECK:       (parameter_list)
 // CHECK:       (brace_stmt implicit
@@ -60,10 +60,5 @@ distributed actor DefaultWorker {
 // CHECK:                         (declref_expr implicit type='DefaultWorker' decl=main.(file).DefaultWorker.<anonymous>.self function_ref=unapplied))))))))))))
 // CHECK:   (pattern_binding_decl implicit
 // CHECK:     (pattern_typed implicit type='Optional<UnownedSerialExecutor>'
-// CHECK:       (pattern_named implicit type='Optional<UnownedSerialExecutor>' 'unownedExecutor')))
+// CHECK:       (pattern_named implicit type='Optional<UnownedSerialExecutor>' 'localUnownedExecutor')))
 
-//distributed actor MainWorker: Worker {
-//  nonisolated var unownedExecutor: UnownedSerialExecutor? {
-//    return MainActor.sharedUnownedExecutor
-//  }
-//}

@@ -23,7 +23,7 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor MainWorker: Worker {
-  nonisolated var unownedExecutor: UnownedSerialExecutor? {
+  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }
@@ -69,7 +69,7 @@ extension Worker {
 //        }
 //
 //        tests.test("remote actor reference should have nil executor") {
-          precondition(normalRemoteWorker.unownedExecutor == nil,
+          precondition(normalRemoteWorker.localUnownedExecutor == nil,
               "Expected nil executor but was: \(String(describing: normalRemoteWorker.unownedExecutor))")
 //        }
 //      }

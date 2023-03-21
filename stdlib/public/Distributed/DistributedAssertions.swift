@@ -47,13 +47,13 @@ public func preconditionOnExecutor(
     return
   }
 
-  guard let unownedExecutor = actor.unownedExecutor else {
+  guard let unownedExecutor = actor.localUnownedExecutor else {
     preconditionFailure(
         "Incorrect actor executor assumption; Distributed actor \(actor) is 'local' but has no executor!",
         file: file, line: line)
   }
 
-  let expectationCheck = _taskIsCurrentExecutor(unownedExecutor._executor) // FIXME: !!!!!!
+  let expectationCheck = _taskIsCurrentExecutor(unownedExecutor._executor)
 
   // TODO: offer information which executor we actually got
   precondition(expectationCheck,
@@ -95,8 +95,7 @@ public func assertOnExecutor(
     return
   }
 
-
-  guard let unownedExecutor = actor.unownedExecutor else {
+  guard let unownedExecutor = actor.localUnownedExecutor else {
     preconditionFailure(
         "Incorrect actor executor assumption; Distributed actor \(actor) is 'local' but has no executor!",
         file: file, line: line)
@@ -132,10 +131,10 @@ public func assumeOnLocalDistributedActorExecutor<Act: DistributedActor, T>(
 
   /// This is guaranteed to be fatal if the check fails,
   /// as this is our "safe" version of this API.
-  guard let executor: Builtin.Executor = actor.unownedExecutor?._executor else {
+  guard let executor = actor.localUnownedExecutor else {
     fatalError("Distributed local actor MUST have executor, but was nil")
   }
-  guard _taskIsCurrentExecutor(executor) else {
+  guard _taskIsCurrentExecutor(executor._executor) else {
     // TODO: offer information which executor we actually got when
     fatalError("Incorrect actor executor assumption; Expected same executor as \(actor).", file: file, line: line)
   }
