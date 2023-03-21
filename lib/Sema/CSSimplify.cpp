@@ -4570,7 +4570,7 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
   return true;
 }
 
-static bool
+static ConstraintSystem::TypeMatchResult
 repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
                         ConstraintKind matchKind,
                         SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
@@ -4578,13 +4578,13 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   fromType = fromType->getWithoutSpecifierType();
 
   if (!fromType->getOptionalObjectType() || toType->is<TypeVariableType>())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If we have an optional type, try to force-unwrap it.
   // FIXME: Should we also try '?'?
   auto *anchor = locator.trySimplifyToExpr();
   if (!anchor)
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If this is a conversion to a non-optional contextual type e.g.
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
@@ -4620,7 +4620,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // First, let's check whether it has been determined that
     // it was incorrect to use `?` in this position.
     if (cs.hasFixFor(cs.getConstraintLocator(subExpr), FixKind::RemoveUnwrap))
-      return true;
+      return cs.getTypeMatchSuccess();
 
     auto type = cs.getType(subExpr);
     // If the type of sub-expression is optional, type of the
@@ -4635,7 +4635,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // chain which is hard to diagnose.
     if (type->isTypeVariableOrMember() &&
         !isa<UnresolvedMemberChainResultExpr>(subExpr))
-      return false;
+      return cs.getTypeMatchFailure(locator);
 
     // If this is a conversion from optional chain to some
     // other type e.g. contextual type or a parameter type,
@@ -4655,7 +4655,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       // The expression that provides the first type is implicit and never
       // spelled out in source code, e.g. $match in an expression pattern.
       // Thus we cannot force unwrap the first type
-      return false;
+      return cs.getTypeMatchFailure(locator);
     }
   }
 
@@ -4670,7 +4670,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
         // to 'try!'. If the sub-expression is optional, then a force-unwrap
         // won't change anything in Swift 5+ because 'try?' already avoids
         // adding an additional layer of Optional there.
-        return false;
+        return cs.getTypeMatchFailure(locator);
       }
     } else {
       // In cases when sub-expression isn't optional, 'try?'
@@ -4709,14 +4709,14 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (matchKind == ConstraintKind::Equal &&
       (fromObjectType->is<TypeVariableType>() ||
        toObjectType->is<TypeVariableType>())) {
-    return false;
+    return cs.getTypeMatchFailure(locator);
   }
 
   // If `from` is not less optional than `to`, force unwrap is
   // not going to help here. In case of object type of `from`
   // is a type variable, let's assume that it might be optional.
   if (fromUnwraps <= toUnwraps && !fromObjectType->is<TypeVariableType>())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If the result of optional chaining is converted to
   // an optional contextual type represented by a type
@@ -4725,18 +4725,18 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (isa<OptionalEvaluationExpr>(anchor) && toUnwraps > 0) {
     if (locator.endsWith<LocatorPathElt::ContextualType>() &&
         toObjectType->is<TypeVariableType>())
-      return false;
+      return cs.getTypeMatchFailure(locator);
   }
 
   auto result =
       cs.matchTypes(fromObjectType, toObjectType, matchKind,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
   if (!result.isSuccess())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   conversionsOrFixes.push_back(ForceOptional::create(
       cs, fromType, toType, cs.getConstraintLocator(locator)));
-  return true;
+  return cs.getTypeMatchSuccess();
 }
 
 static bool repairArrayLiteralUsedAsDictionary(
@@ -5258,9 +5258,12 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
 
-      if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                  conversionsOrFixes, locator))
-        return true;
+      {
+        auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                              conversionsOrFixes, locator);
+        if (result.isSuccess())
+          return true;
+      }
 
       // `rhs` - is an assignment destination and `lhs` is its source.
       if (repairByConstructingRawRepresentableType(lhs, rhs))
@@ -5582,9 +5585,12 @@ bool ConstraintSystem::repairFailures(
     if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
       break;
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      break;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (result.isSuccess())
+        break;
+    }
 
     {
       auto *calleeLocator = getCalleeLocator(loc);
@@ -5828,9 +5834,12 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (result.isSuccess())
+        return true;
+    }
 
     // If we could record a generic arguments mismatch instead of this fix,
     // don't record a contextual type mismatch here.
@@ -5897,9 +5906,12 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (result.isSuccess())
+        return true;
+    }
 
     // Let's wait until both sides are of the same optionality before
     // attempting `.rawValue` fix.
@@ -5944,9 +5956,12 @@ bool ConstraintSystem::repairFailures(
         auto *locator =
             getConstraintLocator(argument, ConstraintLocator::ClosureResult);
 
-        if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                    conversionsOrFixes, locator))
-          return true;
+        {
+          auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                              conversionsOrFixes, locator);
+          if (result.isSuccess())
+            return true;
+        }
 
         conversionsOrFixes.push_back(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
@@ -6170,8 +6185,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::Condition: {
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
+    auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                          conversionsOrFixes, locator);
+    if (result.isSuccess())
       return true;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
@@ -6195,9 +6211,12 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (result.isSuccess())
+        return true;
+    }
 
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;
@@ -6237,8 +6256,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::OptionalPayload: {
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
+    auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                          conversionsOrFixes, locator);
+    if (result.isSuccess())
       return true;
 
     break;
@@ -6440,10 +6460,13 @@ bool ConstraintSystem::repairFailures(
     // Let's check whether the sub-expression is an optional type which
     // is possible to unwrap (either by force or `??`) to satisfy the cast,
     // otherwise we'd have to fallback to force downcast.
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                conversionsOrFixes,
-                                getConstraintLocator(coercion->getSubExpr())))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(
+          *this, lhs, rhs, matchKind, conversionsOrFixes,
+          getConstraintLocator(coercion->getSubExpr()));
+      if (result.isSuccess())
+        return true;
+    }
 
     // If the result type of the coercion has an value to optional conversion
     // we can instead suggest the conditional downcast as it is safer in
