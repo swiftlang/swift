@@ -674,6 +674,37 @@ GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(), true);
   return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, falseExpr);
 }
+/// Returns a generated guard statement that checks whether the given expr is true.
+/// If it is false, the else block for the guard returns `nil`.
+/// \p C The AST context.
+/// \p testExpr The expression that should be tested.
+/// \p baseType The wrapped type of the to-be-returned Optional<Wrapped>.
+GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
+                                        Expr *testExpr,
+                                        Type optionalWrappedType) {
+  auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(), /*implicit=*/true);
+  auto nilExpr = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
+  nilExpr->setType(optionalWrappedType->wrapInOptionalType());
+
+  SmallVector<StmtConditionElement, 1> conditions;
+  SmallVector<ASTNode, 1> statements;
+
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  statements.push_back(returnStmt);
+
+  // Next, generate the condition being checked.
+//  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
+//      DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
+//      DeclNameLoc());
+//  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
+//      /*implicit*/ true);
+  conditions.emplace_back(testExpr);
+
+  // Build and return the complete guard statement.
+  // guard lhs == rhs else { return lhs < rhs }
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+}
 /// Returns a generated guard statement that checks whether the given lhs and
 /// rhs expressions are equal. If not equal, the else block for the guard
 /// returns lhs < rhs.

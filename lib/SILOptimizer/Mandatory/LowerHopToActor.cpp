@@ -186,7 +186,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     unmarkedExecutor =
       B.createBuiltin(loc, builtinName, resultType, subs, {actor});
 
-  // Otherwise, go through Actor.unownedExecutor.
+  // Otherwise, go through (Distributed)Actor.unownedExecutor.
   } else {
     auto actorKind = actorType->isDistributedActor() ?
                      KnownProtocolKind::DistributedActor :
@@ -214,6 +214,8 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     auto executorDecl = ctx.getUnownedSerialExecutorDecl();
     auto executorProps = executorDecl->getStoredProperties();
     assert(executorProps.size() == 1);
+    fprintf(stderr, "[%s:%d](%s) executorProps = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    executorProps[0]->dump();
     unmarkedExecutor =
       B.createStructExtract(loc, witnessCall, executorProps[0]);
   }

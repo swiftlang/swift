@@ -620,9 +620,79 @@ static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
   return nullptr;
 }
 
+//static Expr *constructOptionalSome(ASTContext &ctx,
+//                                   Expr *arg) {
+//  auto optionalDecl = ctx.getOptionalDecl();
+//  if (!optionalDecl) return nullptr;
+//
+//  for (auto member: optionalDecl->getAllMembers()) {
+//    auto ctor = dyn_cast<ConstructorDecl>(member);
+//    if (!ctor) continue;
+//
+//    // Find the init(_:) which initialized as `some`
+//    auto params = ctor->getParameters();
+//    if (params->size() != 1 ||
+//        params->get(0)->getArgumentName() != Identifier())
+//      continue;
+//
+//    ctor->dump();
+//
+//
+////    Type optionalType = optionalDecl->getDeclaredInterfaceType();
+////    fprintf(stderr, "[%s:%d](%s) optionalDecl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+////    optionalType.dump();
+//
+//    Type optionalType = BoundGenericEnumType::get(optionalDecl, Type(), {arg->getType()});
+//    fprintf(stderr, "[%s:%d](%s) better optionalType\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    optionalType->dump();
+//
+//    Type ctorType = ctor->getInterfaceType();
+//    fprintf(stderr, "[%s:%d](%s) ctor type\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    ctorType->dump();
+//
+//    // We have the right initializer. Build a reference to it of type:
+//    //   (Optional.Type)
+//    //      -> (T) -> T
+//    auto initRef = new (ctx) DeclRefExpr(ctor, DeclNameLoc(), /*implicit*/true,
+//                                         AccessSemantics::Ordinary,
+//                                         ctorType);
+//
+//    // Apply the initializer to the metatype, building an expression of type:
+//    //   (Builtin.Executor) -> Optional<UnownedSerialExecutor>
+//    // auto metatypeRef = TypeExpr::createImplicit(optionalType, ctx);
+//    auto metatypeRef = TypeExpr::createImplicit(optionalType, ctx);
+//    GenericIdentTypeRepr::create(ctx, DeclNameLoc(optionalDecl->getNameLoc()),
+//                                 DeclNameRef(optionalDecl->getBaseName()),
+//                                 {arg->getType()}, SourceRange());
+////
+////    auto ctorAppliedType = new (ctx) TypeRepr(
+////        GenericIdentTypeRepr::create(ctx, DeclNameLoc(), )
+////        );
+//
+////    TypeExpr::createForSpecializedDecl(optionalType.get, {arg->getType()}, SourceRange(), ctx);
+////    Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
+//    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef
+////                                                    ,
+////                                                    ctorAppliedType
+//                                                    );
+//    selfApply->setImplicit(true);
+//    selfApply->setThrows(false);
+//
+//    // Call the constructor, building an expression of type
+//    // Optional<T>.
+//    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+//    auto call = CallExpr::createImplicit(ctx, selfApply, argList);
+//    call->setType(optionalType);
+//    call->setThrows(false);
+//    return call;
+//  }
+//
+//  assert(false);
+//}
+
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
-  // var unownedExecutor: UnownedSerialExecutor {
+  // var unownedExecutor: UnownedSerialExecutor? {
   //   get {
   //     return Builtin.buildDefaultActorExecutorRef(self)
   //   }
@@ -641,32 +711,57 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   Expr *selfArg = DerivedConformance::createSelfDeclRef(getter);
   selfArg->setType(selfType);
 
+  // Prepare the builtin call, we'll use it after the guard, but want to take the type
+  // of its return type earlier, so we prepare it here.
+
   // The builtin call gives us a Builtin.Executor.
   auto builtinCall =
       DerivedConformance::createBuiltinCall(ctx,
                                             BuiltinValueKind::BuildDefaultActorExecutorRef,
                                             {selfType}, {}, {selfArg});
-
   // Turn that into an UnownedSerialExecutor.
   auto initCall = constructDistributedUnownedSerialExecutor(ctx, builtinCall);
   if (!initCall) return failure();
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit*/ true);
+  // guard __isLocalActor(self) else {
+  //   return nil
+  // }
+  auto isLocalActorDecl = ctx.getIsLocalDistributedActor();
+  DeclRefExpr *isLocalActorExpr =
+      new (ctx) DeclRefExpr(ConcreteDeclRef(isLocalActorDecl), DeclNameLoc(), /*implicit=*/true,
+                            AccessSemantics::Ordinary,
+                            FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())},
+                                              ctx.getBoolType()));
+  Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
+  selfForIsLocalArg->setType(selfType);
+  auto *argListForIsLocal =
+      ArgumentList::forImplicitSingle(ctx, Identifier(),
+                                      ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
+  CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
+  isLocalActorCall->setType(ctx.getBoolType());
+  isLocalActorCall->setThrows(false);
+  auto returnNilIfRemoteStmt = DerivedConformance::returnNilIfFalseGuardTypeChecked(
+      ctx, isLocalActorCall, /*optionalWrappedType=*/initCall->getType());
+
+
+  // Finalize preparing the unowned executor for returning.
+  auto wrappedCall = new (ctx) InjectIntoOptionalExpr(initCall, initCall->getType()->wrapInOptionalType());
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), wrappedCall, /*implicit*/ true);
 
   auto body = BraceStmt::create(
-      ctx, SourceLoc(), { ret }, SourceLoc(), /*implicit=*/true);
+      ctx, SourceLoc(), { returnNilIfRemoteStmt, ret }, SourceLoc(), /*implicit=*/true);
+
+  fprintf(stderr, "[%s:%d](%s) ================================================================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  body->dump();
+  fprintf(stderr, "[%s:%d](%s) ================================================================================================\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+
   return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the declaration of DistributedActor's unownedExecutor property.
 static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &derived) {
   ASTContext &ctx = derived.Context;
-
-  if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
-    if (auto existing = classDecl->getUnownedExecutorProperty()) {
-      return const_cast<VarDecl*>(existing);
-    }
-  }
 
   // Retrieve the types and declarations we'll need to form this operation.
   auto executorDecl = ctx.getUnownedSerialExecutorDecl();
@@ -676,16 +771,28 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
     return nullptr;
   }
   Type executorType = executorDecl->getDeclaredInterfaceType();
+  Type optionalExecutorType = executorType->wrapInOptionalType();
+
+  if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
+    if (auto existing = classDecl->getUnownedExecutorProperty()) {
+      if (existing->getInterfaceType()->isEqual(optionalExecutorType)) {
+        return const_cast<VarDecl *>(existing);
+      } else {
+        // bad type, should be diagnosed elsewhere
+        return nullptr;
+      }
+    }
+  }
 
   auto propertyPair = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
-      executorType, executorType,
+      optionalExecutorType, optionalExecutorType,
       /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
-      /*implicit*/ true));
+                                                   /*implicit*/ true));
   property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
 
   // Make the property implicitly final.
@@ -703,7 +810,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
       property, asAvailableAs, ctx);
 
   auto getter =
-      derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+      derived.addGetterToReadOnlyDerivedProperty(property, optionalExecutorType);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
 
   // IMPORTANT: MUST BE AFTER [id, actorSystem].
