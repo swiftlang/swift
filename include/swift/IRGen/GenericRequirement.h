@@ -76,7 +76,6 @@ public:
   }
 
   static GenericRequirement forShape(CanType type) {
-    assert(!isa<PackType>(type));
     assert(type->isParameterPack() || isa<PackArchetypeType>(type));
     return GenericRequirement(Kind::Shape, type, nullptr);
   }
@@ -92,7 +91,6 @@ public:
   }
 
   static GenericRequirement forMetadata(CanType type) {
-    assert(!isa<PackType>(type));
     auto kind = ((type->isParameterPack() ||
                   isa<PackArchetypeType>(type))
                  ? Kind::MetadataPack : Kind::Metadata);
@@ -110,7 +108,6 @@ public:
   }
 
   static GenericRequirement forWitnessTable(CanType type, ProtocolDecl *proto) {
-    assert(!isa<PackType>(type));
     auto kind = ((type->isParameterPack() ||
                   isa<PackArchetypeType>(type))
                  ? Kind::WitnessTablePack

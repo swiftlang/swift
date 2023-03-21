@@ -312,14 +312,14 @@ getTypeRefByFunction(IRGenModule &IGM,
           IGF.Builder.emitBlock(supportedBB);
         }
 
+        SubstitutionMap subs;
+        if (genericEnv)
+          subs = genericEnv->getForwardingSubstitutionMap();
+
         bindFromGenericRequirementsBuffer(
             IGF, requirements,
             Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
-            MetadataState::Complete, [&](CanType t) {
-              return genericEnv
-                ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
-                : t;
-            });
+            MetadataState::Complete, subs);
 
         auto ret = IGF.emitTypeMetadataRef(substT);
         IGF.Builder.CreateRet(ret);
@@ -485,9 +485,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             bindFromGenericRequirementsBuffer(
                 IGF, requirements,
                 Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
-                MetadataState::Complete, [&](CanType t) {
-                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-                });
+                MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
@@ -1256,7 +1254,7 @@ public:
   /// Give up if we captured an opened existential type. Eventually we
   /// should figure out how to represent this.
   static bool hasLocalArchetype(CanSILFunctionType OrigCalleeType,
-                                   const HeapLayout &Layout) {
+                                const HeapLayout &Layout) {
     if (!OrigCalleeType->isPolymorphic() ||
         OrigCalleeType->isPseudogeneric())
       return false;
@@ -1269,7 +1267,8 @@ public:
       if (!Bindings[i].isAnyMetadata())
         continue;
 
-      if (Bindings[i].getTypeParameter()->hasLocalArchetype())
+      if (Bindings[i].getTypeParameter().subst(Bindings.getSubstitutionMap())
+            ->hasLocalArchetype())
         return true;
     }
 
@@ -1317,7 +1316,7 @@ public:
                      ? Entry::Kind::Shape
                      : Entry::Kind::Metadata);
         auto Source = SourceBuilder.createClosureBinding(i);
-        auto BindingType = Bindings[i].getTypeParameter();
+        auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
         auto InterfaceType = BindingType->mapTypeOutOfContext();
         SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Source);
         break;
