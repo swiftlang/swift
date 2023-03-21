@@ -313,6 +313,11 @@ public:
   /// branch, and if so, the kind of branch.
   Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
 
+  /// Returns true if \p locator is ending with either of the following
+  ///  - Member
+  ///  - Member -> KeyPathDynamicMember
+  bool isMemberRef() const;
+
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {
     if (auto *expr = getAnchor().dyn_cast<Expr *>())
