@@ -2479,7 +2479,8 @@ public:
       Modules.insert(M);
     }
     for (auto M : PreferInterfaceForModules) {
-      InitInvoke.getFrontendOptions().PreferInterfaceForModules.push_back(M);
+      InitInvoke.getFrontendOptions().PreferInterfaceForModules
+        .push_back(std::string(M));
     }
     if (Modules.empty()) {
       llvm::errs() << "Need to specify -include-all or -module <name>\n";
