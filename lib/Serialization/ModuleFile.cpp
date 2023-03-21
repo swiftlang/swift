@@ -17,6 +17,7 @@
 #include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignature.h"
@@ -196,6 +197,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
     ModuleLoadingBehavior transitiveBehavior =
       getTransitiveLoadingBehavior(dependency);
+
+    if (ctx.LangOpts.EnableModuleLoadingRemarks) {
+      ctx.Diags.diagnose(diagLoc,
+                         diag::transitive_dependency_behavior,
+                         dependency.Core.getPrettyPrintedPath(),
+                         M->getName(),
+                         unsigned(transitiveBehavior));
+    }
 
     // Skip this dependency?
     if (transitiveBehavior == ModuleLoadingBehavior::Ignored)
