@@ -34,7 +34,7 @@ public func test(x: X) {
   // CHECK: SAFE_TO_IMPORT
   
   // CHECK: note: Mark type 'Ptr' as 'SELF_CONTAINED' in C++ to make methods that use it available in Swift.
-  // CHECK: struct X {
+  // CHECK: struct Ptr {
   // CHECK: ^
   // CHECK: SELF_CONTAINED
   x.other()
