@@ -420,14 +420,18 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     if (dependency.isHeader())
       continue;
 
-    // Transitive @_implementationOnly dependencies of
-    // binary modules are not required to be imported during normal builds
-    // TODO: This is worth revisiting for debugger purposes
-    if (dependency.isImplementationOnly())
-      continue;
-
-    if (dependency.isPackageOnly() &&
-        Ctx.LangOpts.PackageName != loadedModuleFile->getModulePackageName())
+    // Some transitive dependencies of binary modules are not required to be
+    // imported during normal builds.
+    // TODO: This is worth revisiting for debugger purposes where
+    //       loading the module is optional, and implementation-only imports
+    //       from modules with testing enabled where the dependency is
+    //       optional.
+    ModuleLoadingBehavior transitiveBehavior =
+      loadedModuleFile->getTransitiveLoadingBehavior(dependency,
+                                         /*debuggerMode*/false,
+                                         /*isPartialModule*/false,
+                                         /*package*/Ctx.LangOpts.PackageName);
+    if (transitiveBehavior != ModuleLoadingBehavior::Required)
       continue;
 
     // Find the top-level module name.
@@ -940,10 +944,11 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     std::copy_if(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
-        [&duplicates, &Ctx](const ModuleFile::Dependency &dependency) -> bool {
+        [&duplicates, &loadedModuleFile](
+            const ModuleFile::Dependency &dependency) -> bool {
           if (dependency.isLoaded() || dependency.isHeader() ||
-              (dependency.isImplementationOnly() &&
-               Ctx.LangOpts.DebuggerSupport)) {
+              loadedModuleFile->getTransitiveLoadingBehavior(dependency) !=
+                ModuleLoadingBehavior::Required) {
             return false;
           }
           return duplicates.insert(dependency.Core.RawPath).second;
