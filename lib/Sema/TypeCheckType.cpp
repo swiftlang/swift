@@ -4618,7 +4618,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
   if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
     ctx.Diags.diagnose(repr->getLoc(),
                        diag::pack_reference_outside_expansion,
-                       packReference);
+                       packReference, /*inExpression*/false);
     return ErrorType::get(ctx);
   }
 

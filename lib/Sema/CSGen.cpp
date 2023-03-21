@@ -923,9 +923,14 @@ namespace {
             CS.getConstraintLocator(expr, ConstraintLocator::Member),
             TVO_CanBindToHole);
       }
+      unsigned options = (TVO_CanBindToLValue |
+                          TVO_CanBindToNoEscape);
+      if (!PackElementEnvironments.empty())
+        options |= TVO_CanBindToPack;
+
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
-                  TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+                  options);
       SmallVector<OverloadChoice, 4> outerChoices;
       for (auto decl : outerAlternatives) {
         outerChoices.push_back(OverloadChoice(Type(), decl, functionRefKind));
@@ -1419,11 +1424,14 @@ namespace {
         return invalidateReference();
       }
 
+      unsigned options = (TVO_CanBindToLValue |
+                          TVO_CanBindToNoEscape);
+      if (!PackElementEnvironments.empty())
+        options |= TVO_CanBindToPack;
+
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
-      auto tv = CS.createTypeVariable(locator,
-                                      TVO_CanBindToLValue |
-                                      TVO_CanBindToNoEscape);
+      auto tv = CS.createTypeVariable(locator, options);
 
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
@@ -3097,8 +3105,15 @@ namespace {
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
 
-      if (PackElementEnvironments.empty())
-        return Type();
+      // If 'each t' is written outside of a pack expansion expression, allow the
+      // type to bind to a hole. The invalid pack reference will be diagnosed when
+      // attempting to bind the type variable for the underlying pack reference to
+      // a pack type without TVO_CanBindToPack.
+      if (PackElementEnvironments.empty()) {
+        return CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                     TVO_CanBindToHole |
+                                     TVO_CanBindToNoEscape);
+      }
 
       // The type of a PackElementExpr is the opened pack element archetype
       // of the pack reference.

@@ -218,3 +218,25 @@ func takesFunctionPack<each T, R>(functions: repeat ((each T) -> R)) {}
 func forwardFunctionPack<each T>(functions: repeat (each T) -> Bool) {
   takesFunctionPack(functions: repeat each functions)
 }
+
+func packOutsideExpansion<each T>(_ t: repeat each T) {
+  _ = t
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+
+  forward(t)
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+
+  _ = each t
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+
+  forward(each t)
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+
+  let tuple = (repeat each t)
+
+  _ = tuple.element
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+
+  _ = each tuple.element
+  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+}
