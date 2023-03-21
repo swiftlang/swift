@@ -874,6 +874,26 @@ entry:
   return %retval : $()
 }
 
+// Canonicalize the moved-from value when a move_value is deemed redundant and
+// eliminated.
+// CHECK-LABEL: sil [ossa] @canonicalize_source_of_redundant_move_value : {{.*}} {
+// CHECK:         [[GET_OWNED_C:%[^,]+]] = function_ref @getOwnedC
+// CHECK:         [[TAKE_OWNED_C:%[^,]+]] = function_ref @takeOwnedC
+// CHECK:         [[C:%[^,]+]] = apply [[GET_OWNED_C]]() : $@convention(thin) () -> @owned C
+// CHECK:         apply [[TAKE_OWNED_C]]([[C]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-LABEL: } // end sil function 'canonicalize_source_of_redundant_move_value'
+sil [ossa] @canonicalize_source_of_redundant_move_value : $@convention(thin) () -> () {
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %takeOwnedC = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %c = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
+  %c2 = move_value %c : $C
+  %c3 = copy_value %c2 : $C
+  apply %takeOwnedC(%c3) : $@convention(thin) (@owned C) -> ()
+  destroy_value %c2 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // Verify that a dead copy_value is deleted.
 // CHECK-LABEL: sil [ossa] @delete_dead_reborrow_copy : {{.*}} {
 // CHECK-NOT:     copy_value
