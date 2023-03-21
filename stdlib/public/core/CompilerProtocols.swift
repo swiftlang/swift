@@ -972,3 +972,19 @@ public protocol _ExpressibleByFileReferenceLiteral {
 /// then Array would no longer be a _DestructorSafeContainer.
 public protocol _DestructorSafeContainer {
 }
+
+/// This marker protocol describes the category of types that support implicit
+/// copying. By default, all types in Swift implicitly support copying and thus
+/// conformance to `Copyable` is implicitly synthesized. To suppress the
+/// implicit conformance synthesis, write `~Copyable` on the type declaration:
+///
+///     struct FileDescriptor: ~Copyable { /* ... */ }
+///
+/// The reading of this type declaration is "FileDescriptor suppresses implicit
+/// Copyable conformance".
+@_marker public protocol Copyable {}
+
+/// For older compilers interacting with newer stdlibs, define the unavailable
+/// `_Copyable` marker protocol that they expect to find.
+@available(*, unavailable)
+typealias _Copyable = Copyable

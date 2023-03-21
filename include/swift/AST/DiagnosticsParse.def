@@ -1824,6 +1824,8 @@ ERROR(unexpected_class_constraint,none,
        "'class' constraint can only appear on protocol declarations", ())
 NOTE(suggest_anyobject,none,
      "did you mean to write an 'AnyObject' constraint?", ())
+ERROR(suppress_illegal_here,none,
+      "cannot suppress conformances here", ())
 ERROR(expected_generics_type_restriction,none,
       "expected a class type or protocol-constrained type restricting %0",
       (Identifier))

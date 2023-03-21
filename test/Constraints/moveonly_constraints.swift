@@ -88,8 +88,8 @@ func testBasic(_ mo: borrowing MO) {
   genericVarArg(5)
   genericVarArg(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 
-  takeGeneric( (mo, 5) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to '_Copyable'}}
-  takeGenericSendable((mo, mo)) // expected-error 2{{global function 'takeGenericSendable' requires that 'MO' conform to '_Copyable'}}
+  takeGeneric( (mo, 5) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
+  takeGenericSendable((mo, mo)) // expected-error 2{{global function 'takeGenericSendable' requires that 'MO' conform to 'Copyable'}}
 
   let singleton : (MO) = (mo)
   takeGeneric(singleton) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -150,7 +150,7 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
   let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-  let _: _Copyable = mo // expected-error {{'_Copyable' is unavailable}}
+  let _: Copyable = mo // expected-error {{'Copyable' is unavailable}}
                         // expected-error@-1 {{move-only type 'MO' cannot be used with generics yet}}
   let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -251,11 +251,11 @@ protocol HasType<Ty> {
 }
 
 class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}
-  typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
 }
 
 struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
-  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to '_Copyable'}}
+  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
 protocol Gives: HasType {
@@ -263,6 +263,6 @@ protocol Gives: HasType {
 }
 
 struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}}
-  typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
   func give() -> Ty {}
 }

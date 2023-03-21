@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// This test checks that conformances to _Copyable do not appear in swiftinterface files
+// This test checks that conformances to Copyable do not appear in swiftinterface files
 
 // Generate the parseable interface of the current file via the merge-modules step
 // RUN: %target-build-swift -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/TestMerge.swiftinterface -module-name Test %s -enable-library-evolution -swift-version 5
