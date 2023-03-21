@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 class C {}
+sil @getOwned : $@convention(thin) () -> @owned C
 
 // When access scopes are respected, the lifetime which previously extended
 // beyond the access scope still extends beyond it.
@@ -44,4 +45,32 @@ bb0(%addr : $*C):
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
+}
+
+
+// CHECK-LABEL: begin running test 1 of 1 on reuse_destroy_after_barrier_phi: canonicalize-ossa-lifetime with: true, false, true, @trace
+// CHECK-LABEL: sil [ossa] @reuse_destroy_after_barrier_phi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}}
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'reuse_destroy_after_barrier_phi'
+// CHECK-LABEL: end running test 1 of 1 on reuse_destroy_after_barrier_phi: canonicalize-ossa-lifetime with: true, false, true, @trace
+sil [ossa] @reuse_destroy_after_barrier_phi : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
+  debug_value [trace] %instance : $C
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  %get = function_ref @getOwned : $@convention(thin) () -> @owned C
+  cond_br undef, through, loop
+
+through:
+  %4 = copy_value %instance : $C
+  br exit(%4 : $C)
+
+loop:
+  %other = apply %get() : $@convention(thin) () -> @owned C
+  br exit(%other : $C)
+
+exit(%out : @owned $C):
+  destroy_value %instance : $C
+  return %out : $C
 }

@@ -764,6 +764,18 @@ private:
         // before means it has multiple predecessors, so this must be \p block's
         // unique successor.
         assert(block->getSingleSuccessorBlock() == successor);
+        // When this merge point was encountered the first time, a
+        // destroy_value was sought from its top.  If one was found, it was
+        // added to the boundary. If no destroy_value was found, _that_ user
+        // (i.e. the one on behalf of which extendBoundaryFromTerminator was
+        // called which inserted successor into seenMergePoints) was added to
+        // the boundary.
+        //
+        // This time, if a destroy was found, it's already in the boundary.  If
+        // no destroy was found, though, _this_ user must be added to the
+        // boundary.
+        foundDestroy =
+            findDestroyFromBlockBegin(successor, currentDef, isDestroy);
         continue;
       }
       if (auto *dvi =
