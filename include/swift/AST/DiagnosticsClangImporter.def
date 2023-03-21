@@ -169,9 +169,9 @@ NOTE(reference_passed_by_value, none, "function uses foreign reference type "
                                       "C++ Interop User Manual).",
      (StringRef, StringRef))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
-                                                "automatically importable: %1. "
-                                                "Refer to the C++ Interop User "
-                                                "Manual to classify this type.",
+                                                "automatically available: %1. "
+                                                "Does this type have reference "
+                                                "semantics?",
      (StringRef, StringRef))
 
 NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
@@ -186,10 +186,10 @@ NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a re
 NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
                                     "interior pointer. ",
      (StringRef))
-NOTE(mark_self_contained, none, "Mark type '%0' as 'self_contained' in C++ to "
+NOTE(mark_self_contained, none, "Mark type '%0' as 'SELF_CONTAINED' in C++ to "
                                  "make methods that use it available in Swift. ",
      (StringRef))
-NOTE(mark_safe_to_import, none, "Mark method '%0' as 'safe_to_import' in C++ to "
+NOTE(mark_safe_to_import, none, "Mark method '%0' as 'SAFE_TO_IMPORT' in C++ to "
                                 "make it available in Swift. ",
      (StringRef))
 

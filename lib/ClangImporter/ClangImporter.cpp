@@ -4402,12 +4402,24 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
                    "MacroInfo or ModuleMacro pointer");
 }
 
+static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Impl,
+                                              HeaderLoc loc, Diagnostic diag) {
+  auto importedLoc =
+    Impl.SwiftContext.getClangModuleLoader()->importSourceLocation(loc.clangLoc);
+  Impl.diagnose(loc, diag)
+    .fixItInsert(importedLoc, "SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>) ");
+}
+
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     ImportDiagnosticTarget target, clang::SourceLocation fallbackLoc) {
   for (auto it = ImportDiagnostics[target].rbegin();
        it != ImportDiagnostics[target].rend(); ++it) {
     HeaderLoc loc = HeaderLoc(it->loc.isValid() ? it->loc : fallbackLoc);
-    diagnose(loc, it->diag);
+    if (it->diag.getID() == diag::record_not_automatically_importable.ID) {
+      diagnoseForeignReferenceTypeFixit(*this, loc, it->diag);
+    } else {
+      diagnose(loc, it->diag);
+    }
   }
   return ImportDiagnostics[target].size();
 }
@@ -6314,6 +6326,12 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
       }
     }
   }
+}
+
+SourceLoc ClangImporter::importSourceLocation(clang::SourceLocation loc) {
+  auto &bufferImporter = Impl.getBufferImporterForDiagnostics();
+  return bufferImporter.resolveSourceLocation(
+      getClangASTContext().getSourceManager(), loc);
 }
 
 static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {

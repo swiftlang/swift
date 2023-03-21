@@ -3968,6 +3968,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                              ->getName()
                              .str();
 
+    auto methodClangLoc = cxxMethod->getLocation();
+    auto methodSwiftLoc =
+        ctx.getClangModuleLoader()->importSourceLocation(methodClangLoc);
+
     // Rewrite front() and back() as first and last.
     if ((name.getBaseIdentifier().is("front") ||
          name.getBaseIdentifier().is("back")) &&
@@ -4013,7 +4017,9 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
         ctx.Diags.diagnose(loc, diag::replace_with_nil)
-            .fixItReplaceChars(loc, callExpr->getArgs()->getEndLoc(), "nil");
+            .fixItReplaceChars(
+                getAnchor().getStartLoc(),
+                callExpr->getArgs()->getEndLoc().getAdvancedLoc(1), "nil");
       } else {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
@@ -4024,8 +4030,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                          name.getBaseIdentifier().str(), returnTypeStr);
       ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
                          name.getBaseIdentifier().str());
-      ctx.Diags.diagnose(loc, diag::mark_safe_to_import,
-                         name.getBaseIdentifier().str());
+      ctx.Diags
+          .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
+                    name.getBaseIdentifier().str())
+          .fixItInsert(methodSwiftLoc,
+                       " SAFE_TO_IMPORT ");
     } else if (cxxMethod->getReturnType()->isReferenceType()) {
       // Rewrite a call to .at(42) as a subscript.
       if (name.getBaseIdentifier().is("at") &&
@@ -4034,11 +4043,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         auto dotExpr = getAsExpr<UnresolvedDotExpr>(anchor);
         auto callExpr = getAsExpr<CallExpr>(findParentExpr(dotExpr));
 
-        ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
-                           name.getBaseIdentifier().str(), returnTypeStr);
-        ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
-                           name.getBaseIdentifier().str());
-        ctx.Diags.diagnose(loc, diag::at_to_subscript)
+        ctx.Diags.diagnose(dotExpr->getDotLoc(), diag::at_to_subscript)
             .fixItRemove(
                 {dotExpr->getDotLoc(), callExpr->getArgs()->getStartLoc()})
             .fixItReplaceChars(
@@ -4047,13 +4052,20 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
             .fixItReplaceChars(
                 callExpr->getArgs()->getEndLoc(),
                 callExpr->getArgs()->getEndLoc().getAdvancedLoc(1), "]");
+        ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
+                           name.getBaseIdentifier().str(), returnTypeStr);
+        ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
+                           name.getBaseIdentifier().str());
       } else {
         ctx.Diags.diagnose(loc, diag::projection_reference_not_imported,
                            name.getBaseIdentifier().str(), returnTypeStr);
         ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
                            name.getBaseIdentifier().str());
-        ctx.Diags.diagnose(loc, diag::mark_safe_to_import,
-                           name.getBaseIdentifier().str());
+        ctx.Diags
+            .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
+                      name.getBaseIdentifier().str())
+            .fixItInsert(methodSwiftLoc,
+                         " SAFE_TO_IMPORT ");
       }
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
@@ -4067,13 +4079,23 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
         } else {
           assert(methodSemantics ==
                  CxxRecordSemanticsKind::UnsafePointerMember);
+
+          auto baseSwiftLoc = ctx.getClangModuleLoader()->importSourceLocation(
+              cxxRecord->getLocation());
+
           ctx.Diags.diagnose(loc, diag::projection_value_not_imported,
                              name.getBaseIdentifier().str(), returnTypeStr);
           ctx.Diags.diagnose(loc, diag::projection_may_return_interior_ptr,
                              name.getBaseIdentifier().str());
-          ctx.Diags.diagnose(loc, diag::mark_safe_to_import,
-                             name.getBaseIdentifier().str());
-          ctx.Diags.diagnose(loc, diag::mark_self_contained, returnTypeStr);
+          ctx.Diags
+              .diagnose(methodSwiftLoc, diag::mark_safe_to_import,
+                        name.getBaseIdentifier().str())
+              .fixItInsert(methodSwiftLoc,
+                           " SAFE_TO_IMPORT ");
+          ctx.Diags
+              .diagnose(baseSwiftLoc, diag::mark_self_contained, returnTypeStr)
+              .fixItInsert(baseSwiftLoc,
+                           "SELF_CONTAINED ");
         }
       }
     }
