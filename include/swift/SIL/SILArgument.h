@@ -218,10 +218,6 @@ protected:
   }
 };
 
-inline SILArgument *castToArgument(SwiftObject argument) {
-  return static_cast<SILArgument *>(argument);
-}
-
 class SILPhiArgument : public SILArgument {
   friend class SILBasicBlock;
 

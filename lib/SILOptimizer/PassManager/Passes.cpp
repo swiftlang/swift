@@ -27,7 +27,6 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"

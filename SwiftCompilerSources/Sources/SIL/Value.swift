@@ -76,29 +76,27 @@ public enum Ownership {
   /// statically available on some control flow paths.
   case none
   
-  public var _bridged: BridgedOwnership {
+  public var _bridged: BridgedValue.Ownership {
     switch self {
-      case .unowned:    return Ownership_Unowned
-      case .owned:      return Ownership_Owned
-      case .guaranteed: return Ownership_Guaranteed
-      case .none:       return Ownership_None
+      case .unowned:    return BridgedValue.Ownership.Unowned
+      case .owned:      return BridgedValue.Ownership.Owned
+      case .guaranteed: return BridgedValue.Ownership.Guaranteed
+      case .none:       return BridgedValue.Ownership.None
     }
   }
 }
 
 extension Value {
   public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
 
-  public var uses: UseList {
-    UseList(SILValue_firstUse(bridged))
-  }
+  public var uses: UseList { UseList(bridged.getFirstUse()) }
   
   public var parentFunction: Function { parentBlock.parentFunction }
 
-  public var type: Type { SILValue_getType(bridged).type }
+  public var type: Type { bridged.getType().type }
 
   /// True if the value has a trivial type.
   public var hasTrivialType: Bool { type.isTrivial(in: parentFunction) }
@@ -106,15 +104,21 @@ extension Value {
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: parentFunction) }
 
-  public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
+  public var ownership: Ownership {
+    switch bridged.getOwnership() {
+    case .Unowned:    return .unowned
+    case .Owned:      return .owned
+    case .Guaranteed: return .guaranteed
+    case .None:       return .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
   public var bridged: BridgedValue {
     BridgedValue(obj: SwiftObject(self as AnyObject))
-  }
-  var bridgedNode: BridgedNode {
-    BridgedNode(obj: SwiftObject(self as AnyObject))
   }
 }
 
@@ -156,15 +160,10 @@ extension Value {
 
 
 extension BridgedValue {
-  public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
-
-  public var value: Value { getAs(AnyObject.self) as! Value }
-}
-
-extension BridgedClassifiedValue {
   public var value: Value {
     // Doing the type check in C++ is much faster than a conformance lookup with `as! Value`.
-    switch kind {
+    // And it makes a difference because this is a time critical function.
+    switch getKind() {
       case .SingleValueInstruction:
         return obj.getAs(SingleValueInstruction.self)
       case .Argument:
@@ -204,17 +203,4 @@ final class PlaceholderValue : Value {
 
 extension OptionalBridgedValue {
   var value: Value? { obj.getAs(AnyObject.self) as? Value }
-}
-
-extension BridgedOwnership {
-  var ownership: Ownership {
-    switch self {
-      case Ownership_Unowned:    return .unowned
-      case Ownership_Owned:      return .owned
-      case Ownership_Guaranteed: return .guaranteed
-      case Ownership_None:       return .none
-      default:
-        fatalError("unsupported ownership")
-    }
-  }
 }

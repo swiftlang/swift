@@ -28,7 +28,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> Function? {
       if let f = currentFunction {
-        currentFunction = PassContext_nextFunctionInModule(f.bridged).function
+        currentFunction = BridgedPassContext.getNextFunctionInModule(f.bridged).function
         return f
       }
       return nil
@@ -36,14 +36,14 @@ struct ModulePassContext : Context {
   }
 
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedVTableArray
-    
+    fileprivate let bridged: BridgedPassContext.VTableArray
+
     var startIndex: Int { return 0 }
-    var endIndex: Int { return Int(bridged.count) }
-    
+    var endIndex: Int { return bridged.count }
+
     subscript(_ index: Int) -> VTable {
-      assert(index >= 0 && index < bridged.count)
-      return VTable(bridged: bridged.vTables![index])
+      assert(index >= startIndex && index < endIndex)
+      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
     }
   }
 
@@ -54,7 +54,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> WitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextWitnessTableInModule(t.bridged).table
+        currentTable = BridgedPassContext.getNextWitnessTableInModule(t.bridged).witnessTable
         return t
       }
       return nil
@@ -68,7 +68,7 @@ struct ModulePassContext : Context {
 
     mutating func next() -> DefaultWitnessTable? {
       if let t = currentTable {
-        currentTable = PassContext_nextDefaultWitnessTableInModule(t.bridged).table
+        currentTable = BridgedPassContext.getNextDefaultWitnessTableInModule(t.bridged).defaultWitnessTable
         return t
       }
       return nil
@@ -76,19 +76,19 @@ struct ModulePassContext : Context {
   }
 
   var functions: FunctionList {
-    FunctionList(first: PassContext_firstFunctionInModule(_bridged).function)
+    FunctionList(first: _bridged.getFirstFunctionInModule().function)
   }
   
   var vTables: VTableArray {
-    VTableArray(bridged: PassContext_getVTables(_bridged))
+    VTableArray(bridged: _bridged.getVTables())
   }
   
   var witnessTables: WitnessTableList {
-    WitnessTableList(first: PassContext_firstWitnessTableInModule(_bridged).table)
+    WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
   }
 
   var defaultWitnessTables: DefaultWitnessTableList {
-    DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
+    DefaultWitnessTableList(first: _bridged.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
   }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
@@ -96,8 +96,8 @@ struct ModulePassContext : Context {
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
   func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
-    PassContext_beginTransformFunction(function.bridged, _bridged)
+    _bridged.beginTransformFunction(function.bridged)
     runOnFunction(FunctionPassContext(_bridged: _bridged))
-    PassContext_endTransformFunction(_bridged);
+    _bridged.endTransformFunction();
   }
 }

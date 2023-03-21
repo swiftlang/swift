@@ -14,38 +14,40 @@ import Basic
 import SILBridging
 
 public struct Type : CustomStringConvertible, NoReflectionChildren {
-  public let bridged: BridgedType
+  public let bridged: swift.SILType
   
-  public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
+  public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
   public func isTrivial(in function: Function) -> Bool {
-    return SILType_isTrivial(bridged, function.bridged) != 0
+    return bridged.isTrivial(function.bridged.getFunction())
   }
 
   /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
   public func isTrivialNonPointer(in function: Function) -> Bool {
-    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) == 0
+    return !bridged.isNonTrivialOrContainsRawPointer(function.bridged.getFunction())
   }
 
   public func isReferenceCounted(in function: Function) -> Bool {
-    return SILType_isReferenceCounted(bridged, function.bridged) != 0
+    return bridged.isReferenceCounted(function.bridged.getFunction())
   }
 
-  public var hasArchetype: Bool { SILType_hasArchetype(bridged) }
+  public var hasArchetype: Bool { bridged.hasArchetype() }
 
-  public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
-  public var isClass: Bool { SILType_isClass(bridged) != 0 }
-  public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
-  public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
-  public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
-  public var isFunction: Bool { SILType_isFunction(bridged) }
-  public var isMetatype: Bool { SILType_isMetatype(bridged) }
+  public var isNominal: Bool { bridged.getNominalOrBoundGenericNominal() != nil }
+  public var isClass: Bool { bridged.getClassOrBoundGenericClass() != nil }
+  public var isStruct: Bool { bridged.getStructOrBoundGenericStruct() != nil }
+  public var isTuple: Bool { bridged.isTuple() }
+  public var isEnum: Bool { bridged.getEnumOrBoundGenericEnum() != nil }
+  public var isFunction: Bool { bridged.isFunction() }
+  public var isMetatype: Bool { bridged.isMetatype() }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
-  public var nominal: Decl { Decl(bridged: SILType_getNominal(bridged)) }
+  public var nominal: NominalTypeDecl {
+    NominalTypeDecl(bridged: BridgedNominalTypeDecl(decl: bridged.getNominalOrBoundGenericNominal()))
+  }
 
-  public var isOrContainsObjectiveCClass: Bool { SILType_isOrContainsObjectiveCClass(bridged) }
+  public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
@@ -54,28 +56,28 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   public func instanceTypeOfMetatype(in function: Function) -> Type {
-    SILType_instanceTypeOfMetatype(bridged, function.bridged).type
+    bridged.getInstanceTypeOfMetatype(function.bridged.getFunction()).type
   }
 
-  public var isCalleeConsumedFunction: Bool { SILType_isCalleeConsumedFunction(bridged) }
+  public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }
 
-  public var isMarkedAsImmortal: Bool { SILType_isMarkedAsImmortal(bridged) }
+  public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
 
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withStringRef {
-      SILType_getCaseIdxOfEnumType(bridged, $0)
+      bridged.getCaseIdxOfEnumType($0)
     }
     return idx >= 0 ? idx : nil
   }
 
   public var description: String {
-    String(_cxxString: SILType_debugDescription(bridged))
+    String(_cxxString: bridged.getDebugDescription())
   }
 }
 
 extension Type: Equatable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
-    lhs.bridged.typePtr == rhs.bridged.typePtr
+    lhs.bridged == rhs.bridged
   }
 }
 
@@ -84,21 +86,21 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let function: Function
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILType_getNumNominalFields(type.bridged) }
+  public var endIndex: Int { Int(type.bridged.getNumNominalFields()) }
 
   public subscript(_ index: Int) -> Type {
-    SILType_getNominalFieldType(type.bridged, index, function.bridged).type
+    type.bridged.getFieldType(index, function.bridged.getFunction()).type
   }
 
   public func getIndexOfField(withName name: String) -> Int? {
     let idx = name._withStringRef {
-      SILType_getFieldIdxOfNominalType(type.bridged, $0)
+      type.bridged.getFieldIdxOfNominalType($0)
     }
     return idx >= 0 ? idx : nil
   }
 
   public func getNameOfField(withIndex idx: Int) -> StringRef {
-    StringRef(bridged: SILType_getNominalFieldName(type.bridged, idx))
+    StringRef(bridged: type.bridged.getFieldName(idx))
   }
 }
 
@@ -106,22 +108,22 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILType_getNumTupleElements(type.bridged) }
+  public var endIndex: Int { Int(type.bridged.getNumTupleElements()) }
 
   public subscript(_ index: Int) -> Type {
-    SILType_getTupleElementType(type.bridged, index).type
+    type.bridged.getTupleElementType(index).type
   }
 }
 
-extension BridgedType {
+extension swift.SILType {
   var type: Type { Type(bridged: self) }
 }
 
 // TODO: use an AST type for this once we have it
-public struct Decl : Equatable {
-  let bridged: BridgedDecl
+public struct NominalTypeDecl : Equatable {
+  let bridged: BridgedNominalTypeDecl
 
-  public static func ==(lhs: Decl, rhs: Decl) -> Bool {
-    lhs.bridged == rhs.bridged
+  public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
+    lhs.bridged.decl == rhs.bridged.decl
   }
 }

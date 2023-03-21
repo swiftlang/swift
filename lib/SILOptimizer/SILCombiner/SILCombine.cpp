@@ -24,7 +24,6 @@
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"

@@ -17,6 +17,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -118,9 +119,9 @@ bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isOrContainsRawPointer();
 }
 
-bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = F.getTypeLowering(contextType);
+bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
+  auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
+  const TypeLowering &tyLowering = f->getTypeLowering(contextType);
   bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
          "a function type with context must either be non trivial or marked as containing a pointer");
@@ -160,6 +161,10 @@ bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
     .isReferenceCounted();
+}
+
+bool SILType::isReferenceCounted(SILFunction *f) const {
+  return isReferenceCounted(f->getModule());
 }
 
 bool SILType::isNoReturnFunction(SILModule &M,
@@ -331,6 +336,25 @@ SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
 }
 
+SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {
+  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  assert(decl && "expected nominal type");
+  VarDecl *field = getIndexedField(decl, fieldIndex);
+  return getFieldType(field, function->getModule(), function->getTypeExpansionContext());
+}
+
+StringRef SILType::getFieldName(intptr_t fieldIndex) const {
+  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  VarDecl *field = getIndexedField(decl, fieldIndex);
+  return field->getName().str();
+}
+
+unsigned SILType::getNumNominalFields() const {
+  auto *nominal = getNominalOrBoundGenericNominal();
+  assert(nominal && "expected nominal type");
+  return getNumFieldsInNominal(nominal);
+}
+
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
@@ -365,6 +389,15 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
                                     SILFunction *fn) const {
   return getEnumElementType(elt, fn->getModule(),
                             fn->getTypeExpansionContext());
+}
+
+EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
+  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    if ((int)elemWithIndex.index() == caseIndex)
+      return elemWithIndex.value();
+  }
+  llvm_unreachable("invalid enum case index");
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
@@ -987,3 +1020,111 @@ bool SILType::isPureMoveOnly() const {
       return true;
   return false;
 }
+
+SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
+  auto metaType = castTo<MetatypeType>();
+  CanType instanceTy = metaType.getInstanceType();
+  auto &tl = function->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*function));
+  return tl.getLoweredType();
+}
+
+bool SILType::isOrContainsObjectiveCClass() const {
+  return getASTType().findIf([](Type ty) {
+    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
+      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
+        return true;
+    }
+    if (ty->is<ProtocolCompositionType>())
+      return true;
+    return false;
+  });
+}
+
+static bool hasImmortalAttr(NominalTypeDecl *nominal) {
+  if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
+    if (semAttr->Value == semantics::ARC_IMMORTAL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool nominalIsMarkedAsImmortal(NominalTypeDecl *nominal) {
+  if (hasImmortalAttr(nominal))
+    return true;
+
+  if (!isa<ProtocolDecl>(nominal)) {
+    for (ProtocolDecl *p : nominal->getAllProtocols()) {
+      if (hasImmortalAttr(p))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool SILType::isMarkedAsImmortal() const {
+  NominalTypeDecl *nominal = getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return false;
+
+  if (nominalIsMarkedAsImmortal(nominal))
+    return true;
+
+  if (ClassDecl *cl = dyn_cast<ClassDecl>(nominal)) {
+    cl = cl->getSuperclassDecl();
+    while (cl) {
+      if (nominalIsMarkedAsImmortal(cl))
+        return true;
+      cl = cl->getSuperclassDecl();
+    }
+  }
+  return false;
+}
+
+intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
+  auto *nominal = getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return -1;
+
+  SmallVector<NominalTypeDecl *, 5> decls;
+  decls.push_back(nominal);
+  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+    while ((cd = cd->getSuperclassDecl()) != nullptr) {
+      decls.push_back(cd);
+    }
+  }
+  std::reverse(decls.begin(), decls.end());
+
+  intptr_t idx = 0;
+  for (auto *decl : decls) {
+    for (VarDecl *field : decl->getStoredProperties()) {
+      if (field->getName().str() == fieldName)
+        return idx;
+      idx++;
+    }
+  }
+  return -1;
+}
+
+intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
+  auto *enumDecl = getEnumOrBoundGenericEnum();
+  if (!enumDecl)
+    return -1;
+
+  intptr_t idx = 0;
+  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
+    if (elem->getNameStr() == caseName)
+      return idx;
+    idx++;
+  }
+  return -1;
+}
+
+std::string SILType::getDebugDescription() const {
+    std::string str;
+    llvm::raw_string_ostream os(str);
+    print(os);
+    str.pop_back(); // Remove trailing newline.
+    return str;
+  }
+

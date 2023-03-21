@@ -81,6 +81,13 @@
 #define SWIFT_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
+// Needed for C++ bridging functions which return types with pointers.
+#if __has_attribute(swift_attr)
+#define SWIFT_IMPORT_UNSAFE __attribute__((swift_attr("import_unsafe")))
+#else
+#define SWIFT_IMPORT_UNSAFE
+#endif
+
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)

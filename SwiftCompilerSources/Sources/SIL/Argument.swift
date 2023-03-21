@@ -20,7 +20,7 @@ public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {
-    return SILArgument_getParent(bridged).block
+    return bridged.getParent().block
   }
 
   var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
@@ -40,7 +40,7 @@ public class Argument : Value, Hashable {
 
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
-    SILArgument_getConvention(bridged).convention
+    bridged.getConvention().convention
   }
 }
 
@@ -196,14 +196,14 @@ extension BridgedArgument {
 extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
-      case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case ArgumentConvention_Indirect_Inout:          return .indirectInout
-      case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable
-      case ArgumentConvention_Indirect_Out:            return .indirectOut
-      case ArgumentConvention_Direct_Owned:            return .directOwned
-      case ArgumentConvention_Direct_Unowned:          return .directUnowned
-      case ArgumentConvention_Direct_Guaranteed:       return .directGuaranteed
+      case .Indirect_In:             return .indirectIn
+      case .Indirect_In_Guaranteed:  return .indirectInGuaranteed
+      case .Indirect_Inout:          return .indirectInout
+      case .Indirect_InoutAliasable: return .indirectInoutAliasable
+      case .Indirect_Out:            return .indirectOut
+      case .Direct_Owned:            return .directOwned
+      case .Direct_Unowned:          return .directUnowned
+      case .Direct_Guaranteed:       return .directGuaranteed
       default:
         fatalError("unsupported argument convention")
     }

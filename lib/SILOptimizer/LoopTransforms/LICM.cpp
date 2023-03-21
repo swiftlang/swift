@@ -170,7 +170,7 @@ static bool mayWriteTo(AliasAnalysis *AA, BasicCalleeAnalysis *BCA,
                        InstSet &SideEffectInsts, ApplyInst *AI) {
 
   if (BCA->getMemoryBehavior(FullApplySite::isa(AI), /*observeRetains*/true) ==
-      SILInstruction::MemoryBehavior::None) {
+      MemoryBehavior::None) {
     return false;
   }
 
@@ -197,7 +197,7 @@ static bool mayWriteTo(AliasAnalysis *AA, BasicCalleeAnalysis *BCA,
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::TryApplyInst: {
         if (BCA->getMemoryBehavior(FullApplySite::isa(inst), /*observeRetains*/false) >
-            SILInstruction::MemoryBehavior::MayRead)
+            MemoryBehavior::MayRead)
           return true;
         break;
       }
@@ -700,7 +700,7 @@ bool LoopTreeOptimization::isSafeReadOnlyApply(BasicCalleeAnalysis *BCA, ApplyIn
   }
 
   return BCA->getMemoryBehavior(AI, /*observeRetains*/false) <=
-         SILInstruction::MemoryBehavior::MayRead;
+         MemoryBehavior::MayRead;
 }
 
 static void checkSideEffects(swift::SILInstruction &Inst,
@@ -746,7 +746,7 @@ static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
       break;
   }
 
-  if (inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None) {
+  if (inst->getMemoryBehavior() == MemoryBehavior::None) {
     return true;
   }
   return false;

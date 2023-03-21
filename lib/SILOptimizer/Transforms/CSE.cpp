@@ -1154,7 +1154,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
     auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
-    if (MB == SILInstruction::MemoryBehavior::None)
+    if (MB == MemoryBehavior::None)
       return true;
     
     if (isLazyPropertyGetter(AI))

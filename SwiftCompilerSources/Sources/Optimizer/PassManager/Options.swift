@@ -17,14 +17,14 @@ struct Options {
   let _bridged: BridgedPassContext
 
   var enableStackProtection: Bool {
-    SILOptions_enableStackProtection(_bridged) != 0
+    _bridged.enableStackProtection()
   }
 
   var enableMoveInoutStackProtection: Bool {
-    SILOptions_enableMoveInoutStackProtection(_bridged) != 0
+    _bridged.enableMoveInoutStackProtection()
   }
 
   func enableSimplification(for inst: Instruction) -> Bool {
-    SILOptions_enableSimplificationFor(inst.bridged)
+    _bridged.enableSimplificationFor(inst.bridged)
   }
 }
