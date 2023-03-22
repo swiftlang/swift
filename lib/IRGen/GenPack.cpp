@@ -381,6 +381,7 @@ static void emitPackExpansionPack(
   IGF.Builder.CreateCondBr(cond, loop, rest);
 
   IGF.Builder.emitBlock(loop);
+  ConditionalDominanceScope condition(IGF);
 
   auto *element = elementForIndex(phi);
 
@@ -823,6 +824,8 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
 
     // (1) Emit check_i {{
     IGF.Builder.emitBlock(checkBounds);
+
+    ConditionalDominanceScope dominanceScope(IGF);
 
     // The upper bound for the current pack expansion.  Exclusive.
     llvm::Value *upperBound = nullptr;
