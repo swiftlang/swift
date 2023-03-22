@@ -732,9 +732,16 @@ private:
       bool IsRootModule = !Parent;
       if (CreateSkeletonCU && IsRootModule) {
         llvm::DIBuilder DIB(M);
-        DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
-                                              : llvm::dwarf::DW_LANG_C99,
-                              DIB.createFile(Name, RemappedIncludePath),
+        unsigned Lang;
+        if (IGM.Context.LangOpts.EnableCXXInterop && IGM.ObjCInterop)
+          Lang = llvm::dwarf::DW_LANG_ObjC_plus_plus;
+        else if (IGM.Context.LangOpts.EnableCXXInterop)
+          Lang = llvm::dwarf::DW_LANG_C_plus_plus;
+        else if (IGM.ObjCInterop)
+          Lang = llvm::dwarf::DW_LANG_ObjC;
+        else 
+          Lang = llvm::dwarf::DW_LANG_C99;
+        DIB.createCompileUnit(Lang, DIB.createFile(Name, RemappedIncludePath),
                               TheCU->getProducer(), true, StringRef(), 0,
                               RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
