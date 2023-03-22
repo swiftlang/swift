@@ -505,18 +505,43 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   return %7 : $(Builtin.Word, Builtin.RawPointer)
 }
 
-// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer
+// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1
 // CHECK: bb0
 // CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer'
-sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer1'
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
   %4 = load [trivial] %3 : $*Int32
   return %4 : $Int32
+}
+
+sil @useInt : $@convention(thin) (Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer2
+// CHECK: unchecked_addr_cast
+// CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer2'
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer2 : $@convention(thin) (@owned ContiguousArray<UInt16>) -> () {
+bb0(%0 : @owned $ContiguousArray<UInt16>):
+  %1 = begin_borrow %0 : $ContiguousArray<UInt16>
+  %2 = struct_extract %1 : $ContiguousArray<UInt16>, #ContiguousArray._buffer
+  %3 = struct_extract %2 : $_ContiguousArrayBuffer<UInt16>, #_ContiguousArrayBuffer._storage
+  %4 = ref_tail_addr %3 : $__ContiguousArrayStorageBase, $UInt16
+  %5 = address_to_pointer %4 : $*UInt16 to $Builtin.RawPointer
+  br bb1
+
+bb1:
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*Int32
+  %7 = load [trivial] %6 : $*Int32
+  %8 = function_ref @useInt : $@convention(thin) (Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (Int32) -> ()
+  end_borrow %1 : $ContiguousArray<UInt16>
+  destroy_value %0 : $ContiguousArray<UInt16>
+  %12 = tuple ()
+  return %12 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @sil_extract_of_string
