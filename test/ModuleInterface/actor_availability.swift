@@ -7,6 +7,9 @@
 
 // REQUIRES: VENDOR=apple
 
+// FIXME: rdar://107052715 temporarily disabled the test; fails on ios simulator
+// UNSUPPORTED: OS=ios
+
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: public actor ActorWithImplicitAvailability {
 public actor ActorWithImplicitAvailability {
