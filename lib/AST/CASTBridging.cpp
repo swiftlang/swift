@@ -649,6 +649,14 @@ void Plugin_unlock(PluginHandle handle) {
   plugin->unlock();
 }
 
+bool Plugin_spawnIfNeeded(PluginHandle handle) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  auto error = plugin->spawnIfNeeded();
+  bool hadError(error);
+  llvm::consumeError(std::move(error));
+  return hadError;
+}
+
 bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);

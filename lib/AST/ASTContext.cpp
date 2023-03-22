@@ -528,6 +528,9 @@ struct ASTContext::Implementation {
   /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
   PluginRegistry *Plugins = nullptr;
 
+  /// `Plugins` storage if this ASTContext owns it.
+  std::unique_ptr<PluginRegistry> OwnedPluginRegistry = nullptr;
+
   /// Cache of loaded symbols.
   llvm::StringMap<void *> LoadedSymbols;
 
@@ -6272,9 +6275,7 @@ PluginRegistry *ASTContext::getPluginRegistry() const {
   // Create a new one if it hasn't been set.
   if (!registry) {
     registry = new PluginRegistry();
-    const_cast<ASTContext *>(this)->addCleanup([registry]{
-      delete registry;
-    });
+    getImpl().OwnedPluginRegistry.reset(registry);
   }
 
   assert(registry != nullptr);
