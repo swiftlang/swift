@@ -7,7 +7,7 @@
 let i: Int = "Hello"
 #endif
 
-#if arch(arm) && os(Android) && _runtime(_Native) && _endian(little)
+#if arch(arm) && os(Android) && _runtime(_Native) && _endian(little) && _pointerBitWidth(_32)
 class C {}
 var x = C()
 #endif
