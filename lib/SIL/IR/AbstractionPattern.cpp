@@ -2236,7 +2236,7 @@ public:
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
                                  [&](FunctionParamGenerator &param) {
-      if (!param.isPackExpansion()) {
+      if (!param.isOrigPackExpansion()) {
         auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
                                 param.getOrigType());
         addParam(param.getOrigFlags(), newParamTy);

@@ -51,7 +51,7 @@ class FunctionParamGenerator {
   unsigned substParamIndex = 0;
 
   /// The number of subst parameters corresponding to the current
-  /// subst parameter.
+  /// orig parameter.
   unsigned numSubstParamsForOrigParam;
 
   /// Whether the orig function type is opaque, i.e. does not permit us to
@@ -125,7 +125,7 @@ public:
   }
 
   /// Return whether the current orig parameter type is a pack expansion.
-  bool isPackExpansion() const {
+  bool isOrigPackExpansion() const {
     assert(!isFinished());
     return origParamIsExpansion;
   }
