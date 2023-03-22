@@ -1576,7 +1576,7 @@ private:
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
-      if (!param.isPackExpansion()) {
+      if (!param.isOrigPackExpansion()) {
         visit(param.getOrigType(), param.getSubstParams()[0],
               /*forSelf*/false);
         return;
