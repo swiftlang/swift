@@ -4577,6 +4577,11 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
                         ConstraintLocatorBuilder locator) {
   fromType = fromType->getWithoutSpecifierType();
 
+  {
+    fromType = cs.simplifyType(fromType);
+    toType = cs.simplifyType(toType);
+  }
+
   if (!fromType->getOptionalObjectType() || toType->is<TypeVariableType>())
     return cs.getTypeMatchFailure(locator);
 
@@ -4706,10 +4711,10 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // bound to `Int?` and there is no need to unwrap. Solver has to wait
   // until more information becomes available about what `T0` is expected
   // to be before taking action.
-  if (matchKind == ConstraintKind::Equal &&
-      (fromObjectType->is<TypeVariableType>() ||
-       toObjectType->is<TypeVariableType>())) {
-    return cs.getTypeMatchFailure(locator);
+  if (fromObjectType->is<TypeVariableType>() ||
+      toObjectType->is<TypeVariableType>()) {
+    return matchKind == ConstraintKind::Equal ? cs.getTypeMatchFailure(locator)
+                                              : cs.getTypeMatchAmbiguous();
   }
 
   // If `from` is not less optional than `to`, force unwrap is
@@ -5262,8 +5267,8 @@ ConstraintSystem::repairFailures(
       {
         auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                               conversionsOrFixes, locator);
-        if (result.isSuccess())
-          return getTypeMatchSuccess();
+        if (!result.isFailure())
+          return result;
       }
 
       // `rhs` - is an assignment destination and `lhs` is its source.
@@ -5589,8 +5594,8 @@ ConstraintSystem::repairFailures(
     {
       auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                             conversionsOrFixes, locator);
-      if (result.isSuccess())
-        break;
+      if (!result.isFailure())
+        return result;
     }
 
     {
@@ -5838,8 +5843,8 @@ ConstraintSystem::repairFailures(
     {
       auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                             conversionsOrFixes, locator);
-      if (result.isSuccess())
-        return getTypeMatchSuccess();
+      if (!result.isFailure())
+        return result;
     }
 
     // If we could record a generic arguments mismatch instead of this fix,
@@ -5960,8 +5965,8 @@ ConstraintSystem::repairFailures(
         {
           auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                               conversionsOrFixes, locator);
-          if (result.isSuccess())
-            return getTypeMatchSuccess();
+          if (!result.isFailure())
+            return result;
         }
 
         conversionsOrFixes.push_back(
@@ -6188,8 +6193,8 @@ ConstraintSystem::repairFailures(
   case ConstraintLocator::Condition: {
     auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                           conversionsOrFixes, locator);
-    if (result.isSuccess())
-      return getTypeMatchSuccess();
+    if (!result.isFailure())
+      return result;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6215,8 +6220,8 @@ ConstraintSystem::repairFailures(
     {
       auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                             conversionsOrFixes, locator);
-      if (result.isSuccess())
-        return getTypeMatchSuccess();
+      if (!result.isFailure())
+        return result;
     }
 
     if (repairByTreatingRValueAsLValue(lhs, rhs))
@@ -6259,8 +6264,8 @@ ConstraintSystem::repairFailures(
   case ConstraintLocator::OptionalPayload: {
     auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
                                           conversionsOrFixes, locator);
-    if (result.isSuccess())
-      return getTypeMatchSuccess();
+    if (!result.isFailure())
+      return result;
 
     break;
   }
@@ -6465,8 +6470,8 @@ ConstraintSystem::repairFailures(
       auto result = repairViaOptionalUnwrap(
           *this, lhs, rhs, matchKind, conversionsOrFixes,
           getConstraintLocator(coercion->getSubExpr()));
-      if (result.isSuccess())
-        return getTypeMatchSuccess();
+      if (!result.isFailure())
+        return result;
     }
 
     // If the result type of the coercion has an value to optional conversion
