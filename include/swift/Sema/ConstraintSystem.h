@@ -4391,10 +4391,11 @@ public:
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
-  bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
-                      TypeMatchOptions flags,
-                      SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
-                      ConstraintLocatorBuilder locator);
+  TypeMatchResult
+  repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
+                 TypeMatchOptions flags,
+                 SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+                 ConstraintLocatorBuilder locator);
 
   TypeMatchResult
   matchPackTypes(PackType *pack1, PackType *pack2,
