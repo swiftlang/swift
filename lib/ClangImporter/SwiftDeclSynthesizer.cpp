@@ -1214,6 +1214,59 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
   return {getterDecl, setterDecl};
 }
 
+static std::pair<BraceStmt *, bool>
+synthesizeComputedGetterFromField(AbstractFunctionDecl *afd, void *context) {
+  auto accessor = cast<AccessorDecl>(afd);
+  auto method = static_cast<FuncDecl *>(context);
+
+  auto selfArg = createSelfArg(accessor);
+
+  auto *getterImplCallExpr = createAccessorImplCallExpr(method, selfArg);
+  auto returnStmt =
+      new (method->getASTContext()) ReturnStmt(SourceLoc(), getterImplCallExpr);
+  auto body = BraceStmt::create(method->getASTContext(), SourceLoc(),
+                                {returnStmt}, SourceLoc());
+
+  return {body, /*isTypeChecked*/ true};
+}
+
+//VarDecl *
+//SwiftDeclSynthesizer::makeComputedPropertyFromField(
+//    const clang::FieldDecl *field, NominalTypeDecl *typeDecl, VarDecl *importedFieldDecl) {
+//  auto &Context = ImporterImpl.SwiftContext;
+//  const bool isConstQualified = field->getType().isConstQualified();
+//  importedFieldDecl
+//
+//  // if is const qualified, don't synthesize a setter
+//  AccessorDecl *setterDecl = nullptr;
+//
+//  AccessorDecl *getterDecl = AccessorDecl::create(Context, field->getLoc(), field->getLoc(), AccessorKind::Get, importedFieldDecl, SourceLoc(), StaticSpellingKind::None, /* async */ false, SourceLoc(), /* throws */ false, SourceLoc(), ParameterList::createEmpty(Context));
+//
+//  getterDecl->setAccess(AccessLevel::Public);
+//  getterDecl->setImplicit();
+//  getterDecl->setIsDynamic(false);
+//  getterDecl->setIsTransparent(true);
+//  getterDecl->setBodySynthesizer(synthesizeComputedGetterFromField, field);
+//
+//
+////  getterDecl->setBodySynthesizer(synthesizeIndirectFieldGetterBody,
+////                                 anonymousFieldDecl);
+////  setterDecl->setBodySynthesizer(synthesizeIndirectFieldSetterBody,
+////                                 anonymousFieldDecl);
+//
+//  if (isConstQualified) {
+//    VD->setImplInfo(StorageImplInfo::getImmutableComputed());
+//  } else {
+//    VD->setImplInfo(isConstQualified ? StorageImplInfo::getImmutableCompute)
+//  }
+//
+//  Impl.makeComputed(VD, getter, setter);
+//  VD->setIsSetterMutating(!isConstQualified);
+//
+//  // return VD
+//  return VD;
+//}
+
 // MARK: Enum RawValue initializers
 
 /// Synthesize the body of \c init?(rawValue:RawType) for an imported enum.

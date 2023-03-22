@@ -1277,9 +1277,9 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::Enum:
-  case ImportTypeKind::RecordField:
-    return false;
   case ImportTypeKind::RecordFieldWithReferenceSemantics:
+    return false;
+  case ImportTypeKind::RecordField:
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1307,8 +1307,8 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
-  case ImportTypeKind::RecordFieldWithReferenceSemantics:
     return false;
+  case ImportTypeKind::RecordFieldWithReferenceSemantics:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1595,7 +1595,7 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
-  if (importKind == ImportTypeKind::RecordField &&
+  if ((importKind == ImportTypeKind::RecordField || importKind == ImportTypeKind::RecordFieldWithReferenceSemantics) &&
       !importedType->isForeignReferenceType()) {
     switch (objCLifetime) {
       // Wrap retainable struct fields in Unmanaged.
