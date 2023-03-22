@@ -1606,12 +1606,17 @@ getCanonicalParams(AnyFunctionType *funcType,
                    SmallVectorImpl<AnyFunctionType::Param> &canParams) {
   auto origParams = funcType->getParams();
   for (auto param : origParams) {
-    // Canonicalize the type and drop the internal label to canonicalize the
-    // Param.
-    canParams.emplace_back(param.getPlainType()->getReducedType(genericSig),
-                           param.getLabel(), param.getParameterFlags(),
-                           /*InternalLabel=*/Identifier());
+    canParams.emplace_back(param.getCanonical(genericSig));
   }
+}
+
+AnyFunctionType::Param
+AnyFunctionType::Param::getCanonical(CanGenericSignature genericSig) const {
+  // Canonicalize the type and drop the internal label to canonicalize the
+  // Param.
+  return Param(getPlainType()->getReducedType(genericSig),
+               getLabel(), getParameterFlags(),
+               /*InternalLabel=*/Identifier());
 }
 
 CanType TypeBase::computeCanonicalType() {

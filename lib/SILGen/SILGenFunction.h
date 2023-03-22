@@ -1101,6 +1101,7 @@ public:
   uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
                            Type resultType, DeclContext *DC,
                            bool throws, SourceLoc throwsLoc,
+                           unsigned numIgnoredTrailingParameters,
                            Optional<AbstractionPattern> origClosureType = None);
 
   /// Create SILArguments in the entry block that bind a single value

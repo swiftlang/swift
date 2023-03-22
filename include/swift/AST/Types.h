@@ -3103,6 +3103,8 @@ public:
         return true;
       return false;
     }
+
+    Param getCanonical(CanGenericSignature genericSig) const;
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -6864,6 +6866,8 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
   static CanPackType get(const ASTContext &ctx, ArrayRef<CanType> elements);
   static CanPackType get(const ASTContext &ctx, CanTupleEltTypeArrayRef elts);
+  static CanPackType get(const ASTContext &ctx,
+                         AnyFunctionType::CanParamArrayRef params);
 
   static CanTypeWrapper<PackType>
   getSingletonPackExpansion(CanType packParameter);

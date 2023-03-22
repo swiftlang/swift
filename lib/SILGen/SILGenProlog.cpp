@@ -12,6 +12,7 @@
 
 #include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
+#include "FunctionInputGenerator.h"
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
@@ -23,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILInstruction.h"
@@ -66,6 +68,64 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
 }
 
 namespace {
+struct LoweredParamGenerator {
+  SILGenFunction &SGF;
+  CanSILFunctionType fnTy;
+  ArrayRefGenerator<ArrayRef<SILParameterInfo>> parameterTypes;
+
+  LoweredParamGenerator(SILGenFunction &SGF,
+                        unsigned numIgnoredTrailingParameters)
+    : SGF(SGF), fnTy(SGF.F.getLoweredFunctionType()),
+      parameterTypes(
+          SGF.F.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+              ->getParameters().drop_back(numIgnoredTrailingParameters)) {}
+
+  ParamDecl *paramDecl = nullptr;
+  bool isNoImplicitCopy = false;
+  LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+
+  void configureParamData(ParamDecl *paramDecl, bool isNoImplicitCopy,
+                          LifetimeAnnotation lifetimeAnnotation) {
+    this->paramDecl = paramDecl;
+    this->isNoImplicitCopy = isNoImplicitCopy;
+    this->lifetimeAnnotation = lifetimeAnnotation;
+  }
+  void resetParamData() {
+    configureParamData(nullptr, false, LifetimeAnnotation::None);
+  }
+
+  ManagedValue claimNext() {
+    auto parameterInfo = parameterTypes.claimNext();
+
+    // We should only be called without a param decl when pulling
+    // pack parameters out for multiple formal parameters (or a single
+    // formal parameter pack).
+    // TODO: preserve the parameters captured by the pack into the SIL
+    // representation.
+    bool isFormalParameterPack = (paramDecl == nullptr);
+    assert(!isFormalParameterPack || parameterInfo.isPack());
+
+    auto paramType =
+        SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
+    ManagedValue mv = SGF.B.createInputFunctionArgument(
+        paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
+        /*isClosureCapture*/ false, isFormalParameterPack);
+    return mv;
+  }
+
+  bool isFinished() const {
+    return parameterTypes.isFinished();
+  }
+
+  void advance() {
+    (void) claimNext();
+  }
+
+  void finish() {
+    parameterTypes.finish();
+  }
+};
+
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ ManagedValue,
                                               /*ArgTys...*/ AbstractionPattern,
@@ -73,32 +133,86 @@ class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
 {
 public:
   SILGenFunction &SGF;
-  SILBasicBlock *parent;
   SILLocation loc;
-  CanSILFunctionType fnTy;
-  ArrayRef<SILParameterInfo> &parameters;
-  bool isNoImplicitCopy;
-  LifetimeAnnotation lifetimeAnnotation;
+  LoweredParamGenerator &parameters;
 
-  EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
-                  CanSILFunctionType fnTy,
-                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy,
-                  LifetimeAnnotation lifetimeAnnotation)
-      : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters),
-        isNoImplicitCopy(isNoImplicitCopy),
-        lifetimeAnnotation(lifetimeAnnotation) {}
+  EmitBBArguments(SILLocation l, LoweredParamGenerator &parameters)
+      : SGF(parameters.SGF), loc(l), parameters(parameters) {}
 
   ManagedValue claimNextParameter() {
-    // Pop the next parameter info.
-    auto parameterInfo = parameters.front();
-    parameters = parameters.slice(1);
+    return parameters.claimNext();
+  }
 
-    auto paramType =
-        SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
-    ManagedValue mv = SGF.B.createInputFunctionArgument(
-        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy,
-        lifetimeAnnotation);
-    return mv;
+  ManagedValue handleParam(AbstractionPattern origType, CanType substType,
+                           ParamDecl *pd) {
+    // Note: inouts of tuples are not exploded, so we bypass visit().
+    if (pd->isInOut())
+      return handleInOut(origType, substType);
+    return visit(substType, origType, /*emitInto*/ nullptr);
+  }
+
+  ManagedValue handlePackComponent(FunctionInputGenerator &formalParam) {
+    auto origPatternType =
+      formalParam.getOrigType().getPackExpansionPatternType();
+
+    auto substParam = formalParam.getSubstParam();
+    CanType substType = substParam.getParameterType();
+
+    // Forward the pack cleanup and enter a new cleanup for the
+    // remaining components.
+    auto componentValue = formalParam.projectPackComponent(SGF, loc);
+
+    // Handle scalar components.
+    if (!isa<PackExpansionType>(substType)) {
+      return handleScalar(componentValue, origPatternType, substType,
+                          /*emit into*/ nullptr, substParam.isInOut());
+    }
+
+    auto componentPackTy = componentValue.getType().castTo<SILPackType>();
+
+    // Handle pack expansion components.
+    auto formalPackType = formalParam.getFormalPackType();
+    auto componentIndex = formalParam.getPackComponentIndex();
+
+    auto expectedExpansionTy = SGF.getLoweredRValueType(substType);
+    auto expectedPackTy =
+        SILPackType::get(SGF.getASTContext(), componentPackTy->getExtInfo(),
+                         {expectedExpansionTy});
+
+    // If we don't need a pack transformation, this is simple.
+    // This is simultaneously testing that we don't need a transformation
+    // and that we don't have other components in the pack.
+    if (componentPackTy == expectedPackTy) {
+      return componentValue;
+    }
+
+    // FIXME: perform this forwarding by just slicing the original pack.
+    bool canForward =
+      (expectedExpansionTy == componentPackTy->getElementType(componentIndex));
+
+    auto rawOutputPackAddr =
+      SGF.emitTemporaryPackAllocation(loc,
+        SILType::getPrimitiveObjectType(expectedPackTy));
+    auto outputFormalPackType =
+      CanPackType::get(SGF.getASTContext(), {substType});
+    return SGF.emitPackTransform(loc, componentValue,
+                                 formalPackType, componentIndex,
+                                 rawOutputPackAddr, outputFormalPackType, 0,
+                                 canForward, /*plus one*/ !canForward,
+                                 [&](ManagedValue input, SILType outputTy,
+                                     SGFContext context) {
+      if (canForward) return input;
+
+      auto substEltType =
+        cast<PackExpansionType>(substType).getPatternType();
+      if (auto openedEnv = SGF.getInnermostPackExpansion()->OpenedElementEnv) {
+        substEltType =
+          openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
+      }
+
+      return handleScalar(input, origPatternType, substEltType,
+                          context.getEmitInto(), /*inout*/ false);
+    });
   }
 
   ManagedValue visitType(CanType t, AbstractionPattern orig,
@@ -159,7 +273,7 @@ public:
       mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
     }
 
-    if (isNoImplicitCopy && !argIsLoadable) {
+    if (parameters.isNoImplicitCopy && !argIsLoadable) {
       // We do not support no implicit copy address only types. Emit an error.
       auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
@@ -401,53 +515,110 @@ public:
     }
   }
 };
-} // end anonymous namespace
-
-  
-namespace {
 
 /// A helper for creating SILArguments and binding variables to the argument
 /// names.
-struct ArgumentInitHelper {
+class ArgumentInitHelper {
   SILGenFunction &SGF;
-  SILFunction &f;
-  SILGenBuilder &initB;
 
-  /// An ArrayRef that we use in our SILParameterList queue. Parameters are
-  /// sliced off of the front as they're emitted.
-  ArrayRef<SILParameterInfo> parameters;
+  LoweredParamGenerator loweredParams;
   uint16_t ArgNo = 0;
 
-  Optional<AbstractionPattern> OrigFnType;
+  Optional<FunctionInputGenerator> FormalParamTypes;
 
-  ArgumentInitHelper(SILGenFunction &SGF, SILFunction &f,
-                     Optional<AbstractionPattern> origFnType)
-      : SGF(SGF), f(f), initB(SGF.B),
-        parameters(
-            f.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
-                ->getParameters()),
-        OrigFnType(origFnType)
-  {}
+public:
+  ArgumentInitHelper(SILGenFunction &SGF,
+                     unsigned numIgnoredTrailingParameters)
+      : SGF(SGF), loweredParams(SGF, numIgnoredTrailingParameters) {}
 
-  unsigned getNumArgs() const { return ArgNo; }
+  /// Emit the given list of parameters.
+  unsigned emitParams(Optional<AbstractionPattern> origFnType,
+                      ParameterList *paramList, ParamDecl *selfParam) {
+    // If have an orig function type, initialize FormalParamTypes.
+    SmallVector<AnyFunctionType::Param, 8> substFormalParams;
+    if (origFnType) {
+      // Start by constructing an array of subst params that we can use
+      // for the generator.  This array needs to stay in scope across
+      // the loop below, while we're potentially using FormalParamTypes.
 
-  ManagedValue makeArgument(Type ty, bool isInOut, bool isNoImplicitCopy,
-                            LifetimeAnnotation lifetime, SILBasicBlock *parent,
-                            SILLocation l) {
-    assert(ty && "no type?!");
+      auto addParamDecl = [&](ParamDecl *pd) {
+        if (pd->hasExternalPropertyWrapper())
+          pd = cast<ParamDecl>(pd->getPropertyWrapperBackingProperty());
+        substFormalParams.push_back(
+          pd->toFunctionParam(pd->getType()).getCanonical(nullptr));
+      };
+      for (auto paramDecl : *paramList) { addParamDecl(paramDecl); }
+      if (selfParam) { addParamDecl(selfParam); }
 
-    // Create an RValue by emitting destructured arguments into a basic block.
-    CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l, f.getLoweredFunctionType(),
-                               parameters, isNoImplicitCopy, lifetime);
+      // Initialize the formal parameter generator.  Note that this can
+      // immediately claim lowered parameters.
+      // Some of the callers to emitBasicProlog do ask it to ignore the
+      // formal self parameter, but they do not pass an origFnType down,
+      // so we can ignore that possibility.
+      FormalParamTypes.emplace(SGF.getASTContext(), loweredParams, *origFnType,
+                               llvm::makeArrayRef(substFormalParams),
+                               /*ignore final*/ false);
+    }
 
-    // Note: inouts of tuples are not exploded, so we bypass visit().
-    AbstractionPattern origTy = OrigFnType
-      ? OrigFnType->getFunctionParamType(ArgNo - 1)
-      : AbstractionPattern(canTy);
-    if (isInOut)
-      return argEmitter.handleInOut(origTy, canTy);
-    return argEmitter.visit(canTy, origTy, /*emitInto*/ nullptr);
+    // Emit each of the function's explicit parameters in order.
+    if (paramList) {
+      for (auto *param : *paramList)
+        emitParam(param);
+    }
+
+    // The self parameter follows the formal parameters.
+    if (selfParam) {
+      emitParam(selfParam);
+    }
+
+    if (FormalParamTypes) FormalParamTypes->finish();
+    loweredParams.finish();
+
+    return ArgNo;
+  }
+
+private:
+  ManagedValue makeArgument(SILLocation loc, ParamDecl *pd) {
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+    bool isNoImplicitCopy = false;
+    if (pd->isSelfParameter()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
+        lifetimeAnnotation = afd->getLifetimeAnnotation();
+        isNoImplicitCopy = afd->isNoImplicitCopy();
+      }
+    } else {
+      lifetimeAnnotation = pd->getLifetimeAnnotation();
+      isNoImplicitCopy = pd->isNoImplicitCopy();
+    }
+
+    // Configure the lowered parameter generator for this formal parameter.
+    loweredParams.configureParamData(pd, isNoImplicitCopy, lifetimeAnnotation);
+
+    ManagedValue paramValue;
+    EmitBBArguments argEmitter(loc, loweredParams);
+    if (FormalParamTypes && FormalParamTypes->isOrigPackExpansion()) {
+      paramValue = argEmitter.handlePackComponent(*FormalParamTypes);
+    } else {
+      auto substType = pd->getType()->getCanonicalType();
+      assert(!FormalParamTypes ||
+             FormalParamTypes->getSubstParam().getParameterType() == substType);
+      auto origType = (FormalParamTypes ? FormalParamTypes->getOrigType()
+                                        : AbstractionPattern(substType));
+
+      paramValue = argEmitter.handleParam(origType, substType, pd);
+    }
+
+    // Reset the parameter data on the lowered parameter generator.
+    loweredParams.resetParamData();
+
+    // Advance the formal parameter types generator.  This must happen
+    // after resetting parameter data because it can claim lowered
+    // parameters.
+    if (FormalParamTypes) {
+      FormalParamTypes->advance();
+    }
+
+    return paramValue;
   }
 
   void updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
@@ -575,24 +746,8 @@ struct ArgumentInitHelper {
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
-    SILLocation loc(pd);
-    loc.markAsPrologue();
-
-    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
-    bool isNoImplicitCopy = false;
-    if (pd->isSelfParameter()) {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
-        lifetimeAnnotation = afd->getLifetimeAnnotation();
-        isNoImplicitCopy = afd->isNoImplicitCopy();
-      }
-    } else {
-      lifetimeAnnotation = pd->getLifetimeAnnotation();
-      isNoImplicitCopy = pd->isNoImplicitCopy();
-    }
-
-    ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
-                                      lifetimeAnnotation, parent, loc);
+  void makeArgumentIntoBinding(SILLocation loc, ParamDecl *pd) {
+    ManagedValue argrv = makeArgument(loc, pd);
 
     SILValue value = argrv.getValue();
     if (pd->isInOut()) {
@@ -628,39 +783,40 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
+    // Register any auxiliary declarations for the parameter to be
+    // visited later.
     PD->visitAuxiliaryDecls([&](VarDecl *localVar) {
       SGF.LocalAuxiliaryDecls.push_back(localVar);
     });
 
+    // If the parameter has an external property wrapper, then the
+    // wrapper is the actual parameter.  Use that for everything
+    // except the auxiliary decls collection above.
     if (PD->hasExternalPropertyWrapper()) {
       PD = cast<ParamDecl>(PD->getPropertyWrapperBackingProperty());
     }
 
-    auto type = PD->getType();
+    SILLocation loc(PD);
+    loc.markAsPrologue();
 
-    assert(type->isMaterializable());
+    assert(PD->getType()->isMaterializable());
 
     ++ArgNo;
     if (PD->hasName() || PD->isIsolated()) {
-      makeArgumentIntoBinding(type, &*f.begin(), PD);
-      return;
+      makeArgumentIntoBinding(loc, PD);
+    } else {
+      emitAnonymousParam(loc, PD);
     }
-
-    emitAnonymousParam(type, PD, PD);
   }
 
-  void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
+  void emitAnonymousParam(SILLocation loc, ParamDecl *PD) {
     // A value bound to _ is unused and can be immediately released.
     Scope discardScope(SGF.Cleanups, CleanupLocation(PD));
 
     // Manage the parameter.
-    auto argrv =
-        makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
-                     PD->getLifetimeAnnotation(), &*f.begin(), paramLoc);
+    auto argrv = makeArgument(loc, PD);
 
     // Emit debug information for the argument.
-    SILLocation loc(PD);
-    loc.markAsPrologue();
     SILDebugVariable DebugVar(PD->isLet(), ArgNo);
     if (argrv.getType().isAddress())
       SGF.B.createDebugValueAddr(loc, argrv.getValue(), DebugVar);
@@ -845,13 +1001,17 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 bool throws,
                                 SourceLoc throwsLoc,
                                 Optional<AbstractionPattern> origClosureType) {
-  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
-                                   DC, throws, throwsLoc, origClosureType);
-  
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
+
+  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
+                                   DC, throws, throwsLoc,
+                                   /*ignored parameters*/
+                                     captureInfo.getCaptures().size(),
+                                   origClosureType);
+
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
@@ -1335,6 +1495,7 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
                                  DeclContext *DC,
                                  bool throws,
                                  SourceLoc throwsLoc,
+                                 unsigned numIgnoredTrailingParameters,
                                  Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -1348,18 +1509,11 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   // Emit the argument variables in calling convention order.
-  ArgumentInitHelper emitter(*this, F, origClosureType);
-
-  // Add the SILArguments and use them to initialize the local argument
-  // values.
-  if (paramList)
-    for (auto *param : *paramList)
-      emitter.emitParam(param);
-  if (selfParam)
-    emitter.emitParam(selfParam);
+  unsigned ArgNo =
+    ArgumentInitHelper(*this, numIgnoredTrailingParameters)
+      .emitParams(origClosureType, paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
-  unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
      auto NativeErrorTy = SILType::getExceptionType(getASTContext());
     ManagedValue Undef = emitUndef(NativeErrorTy);

@@ -84,6 +84,7 @@
 
 #define DEBUG_TYPE "silgen-poly"
 #include "ExecutorBreadcrumb.h"
+#include "FunctionInputGenerator.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -91,6 +92,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -833,14 +835,6 @@ void SILGenFunction::collectThunkParams(
   }
 }
 
-static CanPackType getInducedPackType(const ASTContext &ctx,
-                                AnyFunctionType::CanParamArrayRef params) {
-  SmallVector<CanType, 8> elts;
-  elts.reserve(params.size());
-  for (auto param : params) elts.push_back(param.getParameterType());
-  return CanPackType::get(ctx, elts);
-}
-
 namespace {
 
 class TranslateIndirect : public Cleanup {
@@ -890,184 +884,6 @@ public:
       << OutputOrigType << ", " << OutputSubstType << ", "
       << Output << ", " << Input << ")\n";
   }
-};
-
-/// A class for generating the elements of a collecttion.
-template <class CollectionType>
-class CollectionGenerator {
-  typename CollectionType::iterator i, e;
-
-  using reference =
-    typename std::iterator_traits<typename CollectionType::iterator>::reference;
-
-public:
-  CollectionGenerator(const CollectionType &collection)
-    : i(collection.begin()), e(collection.end()) {}
-
-  reference getCurrent() const {
-    assert(!isFinished());
-    return *i;
-  }
-
-  reference claimNext() {
-    assert(!isFinished());
-    return *i++;
-  }
-
-  bool isFinished() const {
-    return i == e;
-  }
-
-  void advance() {
-    assert(!isFinished());
-    ++i;
-  }
-
-  void finish() {
-    assert(isFinished() && "didn't finish generating the collection");
-  }
-};
-
-/// A class for destructuring a list of formal input parameters given
-/// an abstraction pattern for it.
-class InputParamGenerator {
-  const ASTContext &ctx;
-  CollectionGenerator<ArrayRef<ManagedValue>> &inputs;
-  FunctionParamGenerator inputParam;
-
-  /// If inputParam.isPackExpansion(), this is the pack currently
-  /// being destructured.  The cleanup on it is only for the components
-  /// starting at inputSubstParamIndex.
-  ManagedValue inputPackValue;
-
-  /// If inputParam.isPackExpansion(), this is the formal type
-  /// of the orig parameter pack.
-  CanPackType inputFormalPackType;
-
-  /// The current index within inputParam.getSubstParams().
-  unsigned inputSubstParamIndex;
-
-  /// Precondition: we aren't finished visiting orig parameters,
-  /// and we've already readied the current orig parameter.
-  ///
-  /// Ready the next subst parameter (the one at inputSubstParamIndex)
-  /// from the current orig parameter.  If we've exhausted the supply
-  /// of subst parameters from this orig parameter, advance to the
-  /// next orig parameter and repeat.
-  ///
-  /// Postcondition: we're either finished or properly configured
-  /// with a subst parameter that hasn't been presented before.
-  void readyNextSubstParameter() {
-    while (true) {
-      assert(!inputParam.isFinished());
-      assert(inputSubstParamIndex <= inputParam.getSubstParams().size());
-
-      // If we haven't reached the limit of the current parameter yet,
-      // continue.
-      if (inputSubstParamIndex != inputParam.getSubstParams().size())
-        return;
-
-      // Otherwise, advance, and ready the next orig parameter if we
-      // didn't finish.
-      inputParam.advance();
-      if (inputParam.isFinished()) return;
-      readyOrigParameter();
-    }
-  }
-
-  /// Ready the current orig parameter.
-  void readyOrigParameter() {
-    inputSubstParamIndex = 0;
-    if (inputParam.isPackExpansion()) {
-      // The pack value exists in the lowered parameters and must be
-      // claimed whether it contains formal parameters or not.
-      inputPackValue = inputs.claimNext();
-
-      // We don't need to do any other set up if we're going to
-      // immediately move past it, though.
-      if (inputParam.getSubstParams().empty())
-        return;
-
-      // Compute a formal pack type for the pack.
-      inputFormalPackType =
-        getInducedPackType(ctx, inputParam.getSubstParams());
-    }
-  }
-
-public:
-  InputParamGenerator(const ASTContext &ctx,
-                      CollectionGenerator<ArrayRef<ManagedValue>> &inputs,
-                      AbstractionPattern inputOrigFunctionType,
-                      AnyFunctionType::CanParamArrayRef inputSubstParams,
-                      bool ignoreFinalParam)
-    : ctx(ctx), inputs(inputs),
-      inputParam(inputOrigFunctionType, inputSubstParams, ignoreFinalParam) {
-
-    if (!inputParam.isFinished()) {
-      readyOrigParameter();
-      readyNextSubstParameter();
-    }
-  }
-
-  /// Is this generator finished?  If so, the getters below may not be used.
-  bool isFinished() const {
-    return inputParam.isFinished();
-  }
-
-  bool isPackExpansion() const {
-    return inputParam.isPackExpansion();
-  }
-
-  AbstractionPattern getOrigType() const {
-    return inputParam.getOrigType();
-  }
-
-  AnyFunctionType::CanParam getSubstParam() const {
-    return inputParam.getSubstParams()[inputSubstParamIndex];
-  }
-
-  ManagedValue getPackValue() const {
-    assert(isPackExpansion());
-    return inputPackValue;
-  }
-
-  void updatePackValue(ManagedValue packValue) {
-    assert(isPackExpansion());
-    inputPackValue = packValue;
-  }
-
-  unsigned getPackComponentIndex() const {
-    assert(isPackExpansion());
-    return inputSubstParamIndex;
-  }
-
-  CanPackType getFormalPackType() const {
-    assert(isPackExpansion());
-    return inputFormalPackType;
-  }
-
-  /// Given that we just processed an input, advance to the next,
-  /// if there is on.
-  ///
-  /// Postcondition: either isFinished() or all of the invariants
-  /// for the mutable state have been established.
-  void advance() {
-    assert(!isFinished());
-    assert(inputSubstParamIndex < inputParam.getSubstParams().size());
-    inputSubstParamIndex++;
-
-    readyNextSubstParameter();
-  }
-
-  void finish() {
-    inputParam.finish();
-  }
-
-  /// Project out the next input scalar pack component.
-  ManagedValue emitInputScalarPackComponent();
-
-  /// "Project" out the next input pack-expansion pack component.
-  ManagedValue emitInputPackPackComponent();
 };
 
 /// Given a list of inputs that are suited to the parameters of one
@@ -1190,7 +1006,7 @@ public:
 class TranslateArguments {
   SILGenFunction &SGF;
   SILLocation Loc;
-  CollectionGenerator<ArrayRef<ManagedValue>> Inputs;
+  ArrayRefGenerator<ArrayRef<ManagedValue>> Inputs;
   SmallVectorImpl<ManagedValue> &Outputs;
   CanSILFunctionType OutputTypesFuncTy;
   ArrayRef<SILParameterInfo> OutputTypes;
@@ -1261,10 +1077,10 @@ public:
     // to invert control for the input sequence, pulling off one
     // component at a time while looping over the output sequence.
 
-    InputParamGenerator inputParams(SGF.getASTContext(), Inputs,
-                                    inputOrigFunctionType,
-                                    inputSubstTypes,
-                                    ignoreFinalInputOrigParam);
+    FunctionInputGenerator inputParams(SGF.getASTContext(), Inputs,
+                                       inputOrigFunctionType,
+                                       inputSubstTypes,
+                                       ignoreFinalInputOrigParam);
 
     FunctionParamGenerator outputParams(outputOrigFunctionType,
                                         outputSubstTypes,
@@ -1404,11 +1220,11 @@ private:
     Outputs.push_back(output);
   }
 
-  void translateToSingleParam(InputParamGenerator &inputParam,
+  void translateToSingleParam(FunctionInputGenerator &inputParam,
                               AbstractionPattern outputOrigType,
                               AnyFunctionType::CanParam outputSubstParam);
 
-  ManagedValue translateToPackParam(InputParamGenerator &inputParams,
+  ManagedValue translateToPackParam(FunctionInputGenerator &inputParams,
                        AbstractionPattern outputOrigExpansionType,
                        AnyFunctionType::CanParamArrayRef outputSubstParams,
                        SILParameterInfo outputParam);
@@ -2047,87 +1863,66 @@ private:
 
 } // end anonymous namespace
 
-static ManagedValue claimScalarPackComponent(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             InputParamGenerator &inputParam) {
-  assert(inputParam.isPackExpansion());
+ManagedValue
+FunctionInputGenerator::projectPackComponent(SILGenFunction &SGF,
+                                             SILLocation loc) {
+  assert(isOrigPackExpansion());
 
-  auto formalPackType = inputParam.getFormalPackType();
-  auto componentIndex = inputParam.getPackComponentIndex();
-  assert(!isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
+  auto formalPackType = getFormalPackType();
+  auto componentIndex = getPackComponentIndex();
 
-  auto packMV = inputParam.getPackValue();
-  auto packTy = packMV.getType().castTo<SILPackType>();
-  auto eltTy = packTy->getSILElementType(componentIndex);
-  assert(!eltTy.is<PackExpansionType>());
+  auto packValue = getPackValue();
+  auto packTy = packValue.getType().castTo<SILPackType>();
+  auto componentTy = packTy->getSILElementType(componentIndex);
+
+  auto isComponentExpansion = componentTy.is<PackExpansionType>();
+  assert(isComponentExpansion == isa<PackExpansionType>(
+            formalPackType.getElementType(componentIndex)));
 
   // Deactivate the cleanup for the input pack value.
-  CleanupCloner cloner(SGF, packMV);
-  auto packAddr = packMV.forward(SGF);
+  CleanupCloner cloner(SGF, packValue);
+  auto packAddr = packValue.forward(SGF);
 
-  // Project the scalar element from the pack.
-  auto packIndex =
-    SGF.B.createScalarPackIndex(loc, componentIndex, formalPackType);
-  auto eltAddr =
-    SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
+  ManagedValue componentValue;
+  if (isComponentExpansion) {
+    // "Project" the expansion component from the pack.
+    // This would be a slice, but we can't currently do pack slices
+    // in SIL, so for now we're just managing cleanups.
+    componentValue =
+      cloner.cloneForPackPackExpansionComponent(packAddr, formalPackType,
+                                                componentIndex);
 
-  // Re-enter cleanups for the element and the remaining pack components.
-  auto elt = cloner.clone(eltAddr);
-  packMV = cloner.cloneForRemainingPackComponents(packAddr,
-                                                  formalPackType,
-                                                  componentIndex + 1);
-  inputParam.updatePackValue(packMV);
+  } else {
+    // Project the scalar element from the pack.
+    auto packIndex =
+      SGF.B.createScalarPackIndex(loc, componentIndex, formalPackType);
+    auto eltAddr =
+      SGF.B.createPackElementGet(loc, packIndex, packAddr, componentTy);
 
-  return elt;
-}
+    componentValue = cloner.clone(eltAddr);
+  }
 
-static ManagedValue claimPackExpansionComponent(SILGenFunction &SGF,
-                                                SILLocation loc,
-                                          InputParamGenerator &inputParam) {
-  assert(inputParam.isPackExpansion());
+  // Re-enter a cleanup for whatever pack components remain.
+  packValue = cloner.cloneForRemainingPackComponents(packAddr,
+                                                     formalPackType,
+                                                     componentIndex + 1);
+  updatePackValue(packValue);
 
-  auto formalPackType = inputParam.getFormalPackType();
-  auto componentIndex = inputParam.getPackComponentIndex();
-  assert(isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
-
-  auto packMV = inputParam.getPackValue();
-  auto packTy = packMV.getType().castTo<SILPackType>();
-  auto expansionTy = packTy->getSILElementType(componentIndex);
-  assert(expansionTy.is<PackExpansionType>());
-
-  // Deactivate the cleanup for the input pack value.  This should be
-  // for the current component and beyond.
-  CleanupCloner cloner(SGF, packMV);
-  auto packAddr = packMV.forward(SGF);
-
-  // We can't project the component pack in SIL currently,
-  // so this is just managing cleanups.
-
-  // Re-enter cleanups for the expansion component and the
-  // remaining pack components.
-  auto component = cloner.cloneForPackPackExpansionComponent(packAddr,
-                                                             formalPackType,
-                                                             componentIndex);
-  packMV = cloner.cloneForRemainingPackComponents(packAddr,
-                                                  formalPackType,
-                                                  componentIndex + 1);
-  inputParam.updatePackValue(packMV);
-
-  return component;
+  return componentValue;
 }
 
 void TranslateArguments::translateToSingleParam(
-                            InputParamGenerator &inputParam,
+                            FunctionInputGenerator &inputParam,
                             AbstractionPattern outputOrigType,
                             AnyFunctionType::CanParam outputSubstParam) {
   // If we're not processing a pack expansion, do a normal translation.
-  if (!inputParam.isPackExpansion()) {
+  if (!inputParam.isOrigPackExpansion()) {
     translate(inputParam.getOrigType(), inputParam.getSubstParam(),
               outputOrigType, outputSubstParam);
 
   // Pull out a scalar component from the pack and translate that.
   } else {
-    auto inputValue = claimScalarPackComponent(SGF, Loc, inputParam);
+    auto inputValue = inputParam.projectPackComponent(SGF, Loc);
     translateFromSingle(inputParam.getOrigType(), inputParam.getSubstParam(),
                         outputOrigType, outputSubstParam,
                         inputValue);
@@ -2152,7 +1947,7 @@ getScalarConventionForPackConvention(ParameterConvention conv) {
 }
 
 ManagedValue TranslateArguments::translateToPackParam(
-                       InputParamGenerator &inputParam,
+                       FunctionInputGenerator &inputParam,
                        AbstractionPattern outputOrigExpansionType,
                        AnyFunctionType::CanParamArrayRef outputSubstParams,
                        SILParameterInfo outputPackParam) {
@@ -2167,7 +1962,7 @@ ManagedValue TranslateArguments::translateToPackParam(
   auto outputPackAddr =
     SGF.emitTemporaryPackAllocation(Loc, outputTy.getObjectType());
   auto outputFormalPackType =
-    getInducedPackType(SGF.getASTContext(), outputSubstParams);
+    CanPackType::get(SGF.getASTContext(), outputSubstParams);
   auto outputOrigPatternType =
     outputOrigExpansionType.getPackExpansionPatternType();
 
@@ -2196,7 +1991,7 @@ ManagedValue TranslateArguments::translateToPackParam(
 
     // If we're not translating from a pack expansion, translate into a
     // single component.  This may claim any number of input values.
-    if (!inputParam.isPackExpansion()) {
+    if (!inputParam.isOrigPackExpansion()) {
       // Fake up a lowered parameter as if we could pass just this
       // component.
       SILParameterInfo outputComponentParam(outputComponentTy.getASTType(),
@@ -2224,8 +2019,7 @@ ManagedValue TranslateArguments::translateToPackParam(
 
         // Claim the pack-expansion component and set up to clone its
         // cleanup onto the elements.
-        auto inputComponent =
-          claimPackExpansionComponent(SGF, Loc, inputParam);
+        auto inputComponent = inputParam.projectPackComponent(SGF, Loc);
 
         // We can only do direct forwarding of of the pack elements in
         // one very specific case right now.  That isn't great, but we
@@ -2281,7 +2075,7 @@ ManagedValue TranslateArguments::translateToPackParam(
         SILParameterInfo outputComponentParam(outputComponentTy.getASTType(),
           getScalarConventionForPackConvention(outputPackParam.getConvention()));
 
-        ManagedValue input = claimScalarPackComponent(SGF, Loc, inputParam);
+        ManagedValue input = inputParam.projectPackComponent(SGF, Loc);
         ManagedValue output =
           translateSingle(inputOrigPatternType, inputSubstType,
                           outputOrigPatternType, outputSubstType,

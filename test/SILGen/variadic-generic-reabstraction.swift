@@ -81,8 +81,31 @@ func passConcreteToOwnedVariadic(fn: (Int, String) -> Int) {
   takesVariadicOwnedFunction(function: fn)
 }
 
-/* FIXME: crashes during substituted function type lowering
-func passConcreteClosureToVariadic(fn: (Int, Float) -> Int) {
+// CHECK-LABEL: sil{{.*}} @$s4main29passConcreteClosureToVariadic2fnyS2i_SStXE_tF :
+// CHECK:       bb0(%0 : @guaranteed $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int)
+// CHECK:         // function_ref
+// CHECK-NEXT:   [[CLOSURE:%.*]] = function_ref @$s4main29passConcreteClosureToVariadic2fnyS2i_SStXE_tFS2i_SStXEfU_ : $@convention(thin) @substituted <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}, @guaranteed @noescape @callee_guaranteed (Int, @guaranteed String) -> Int) -> Int for <Pack{Int, String}>
+// CHECK-NEXT:    [[T0:%.*]] = copy_value %0 :
+// CHECK-NEXT:    partial_apply [callee_guaranteed] [[CLOSURE]]([[T0]])
+func passConcreteClosureToVariadic(fn: (Int, String) -> Int) {
   takesVariadicFunction {x,y in fn(x, y)}
+}
+
+// CHECK-LABEL: sil{{.*}} @$s4main29passConcreteClosureToVariadic2fnyS2i_SStXE_tFS2i_SStXEfU_ : 
+// CHECK:       bb0(%0 : $*Pack{Int, String}, %1 : @closureCapture @guaranteed $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int):
+// CHECK-NEXT:    [[INT_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String}
+// CHECK-NEXT:    [[INT_ADDR:%.*]] = pack_element_get [[INT_INDEX]] of %0 : $*Pack{Int, String} as $*Int
+// CHECK-NEXT:    [[X:%.*]] = load [trivial] [[INT_ADDR]] : $*Int
+// CHECK-NEXT:    debug_value [[X]] : $Int, let, name "x", argno 1
+// CHECK-NEXT:    [[STRING_INDEX:%.*]] = scalar_pack_index 1 of $Pack{Int, String}
+// CHECK-NEXT:    [[STRING_ADDR:%.*]] = pack_element_get [[STRING_INDEX]] of %0 : $*Pack{Int, String} as $*String
+// CHECK-NEXT:    [[Y:%.*]] = load_borrow [[STRING_ADDR]] : $*String
+// CHECK-NEXT:    debug_value [[Y]] : $String, let, name "y", argno 2
+// CHECK:         apply {{.*}}([[X]], [[Y]])
+// CHECK:         end_borrow [[Y]] : $String
+
+/* Doesn't currently type-check
+func passConcreteClosureToVariadic2(fn: (Int, String) -> Int, x: Int) {
+  takesVariadicFunction {y in fn(x, y)}
 }
  */
