@@ -119,7 +119,7 @@ public:
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
-    const unsigned RawImportControl : 2;
+    const unsigned RawImportControl : 3;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
@@ -158,6 +158,9 @@ public:
     }
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+    bool isInternalOrBelow() const {
+      return getImportControl() == ImportFilterKind::InternalOrBelow;
     }
     bool isPackageOnly() const {
       return getImportControl() == ImportFilterKind::PackageOnly;
@@ -571,6 +574,16 @@ public:
 
   StringRef getModulePackageName() const {
     return ModulePackageName;
+  }
+
+  /// Is the module built with testing enabled?
+  bool isTestable() const {
+     return Bits.IsTestable;
+   }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Bits.ResilienceStrategy);
   }
 
   /// Returns the list of modules this module depends on.

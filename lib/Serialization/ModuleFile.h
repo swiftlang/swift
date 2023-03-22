@@ -107,6 +107,9 @@ public:
     bool isImplementationOnly() const {
       return Core.isImplementationOnly();
     }
+    bool isInternalOrBelow() const {
+      return Core.isInternalOrBelow();
+    }
     bool isPackageOnly() const {
       return Core.isPackageOnly();
     }
