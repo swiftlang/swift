@@ -28,7 +28,6 @@
 // CHECK-PCM-NEXT:    },
 // CHECK-PCM-NEXT:    {
 // CHECK-PCM-NEXT:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.pcm",
-// CHECK-PCM: "-I
 
 // CHECK-SWIFT: {
 // CHECK-SWIFT-NEXT:  "mainModuleName": "F",

@@ -178,20 +178,6 @@ void ClangImporter::recordModuleDependencies(
     // Add args reported by the scanner.
     llvm::for_each(clangModuleDep.BuildArguments, addClangArg);
 
-    // Pass down search paths to the -emit-module action.
-    // Unlike building Swift modules, we need to include all search paths to
-    // the clang invocation to build PCMs because transitive headers can only
-    // be found via search paths. Passing these headers as explicit inputs can
-    // be quite challenging.
-    for (const auto &path :
-         Impl.SwiftContext.SearchPathOpts.getImportSearchPaths()) {
-      addClangArg("-I" + path);
-    }
-    for (const auto &path :
-         Impl.SwiftContext.SearchPathOpts.getFrameworkSearchPaths()) {
-      addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
-    }
-
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencyInfo::forClangModule(

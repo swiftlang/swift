@@ -48,4 +48,4 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:          "contextHash": "{{.*}}",
 // CHECK-NEXT:          "commandLine": [
 
-// CHECK:                  "TANGERINE=1",
+// CHECK:                  "TANGERINE=1"
