@@ -1909,7 +1909,6 @@ void SwiftLangSupport::getCursorInfo(
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-
   std::string error;
   auto fileSystem = getFileSystem(vfsOptions, InputFile, error);
   if (!fileSystem)

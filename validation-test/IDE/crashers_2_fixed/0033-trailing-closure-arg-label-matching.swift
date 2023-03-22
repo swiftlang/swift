@@ -8,4 +8,3 @@ func sink(receiveCompletion: (Int) -> Void, receiveValue: (Int) -> Void) { fatal
 
 // CHECK: Begin completions, 1 items
 // CHECK-DAG: Pattern/Local/Flair[ArgLabels]:     {#receiveValue: (Int) -> Void {<#Int#> in|}#}[#(Int) -> Void#];
-// CHECK: End completions

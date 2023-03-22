@@ -71,7 +71,6 @@ struct L<X: G> {
 func testTopLevel() {
   #^TOP_LEVEL_0^#
 }
-// TOP_LEVEL_0: Begin completions
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    A()[#A#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    B({#x: A#}, {#y: A#}, {#z: A#})[#B#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    C()[#C#]{{; name=.+}}
@@ -83,7 +82,6 @@ func testTopLevel() {
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    F()[#F#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    H({#x: A#})[#H#]{{; name=.+}}
 // TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    J()[#A#]{{; name=.+}}
-// TOP_LEVEL_0: End completions
 // NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    E()
 // NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    G(
 // NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    I(
@@ -91,42 +89,34 @@ func testTopLevel() {
 func testQualified0() {
   K.#^K_QUALIFIED_0^#
 }
-// K_QUALIFIED_0: Begin completions
 // K_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    X()[#A#]{{; name=.+}}
 // K_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y()[#K.Y#]{{; name=.+}}
-// K_QUALIFIED_0: End completions
 
 func testQualified1() {
   L.#^L_QUALIFIED_0^#
 }
-// L_QUALIFIED_0: Begin completions
 // L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
-// L_QUALIFIED_0: End completions
 // NEGATIVE_L_QUALIFIED_0-NOT: X({#x: A#})
 
 func testGenericParam<T: I, U: G>() {
   #^TOP_LEVEL_1^#
 }
-// GENERIC_PARAM_0: Begin completions
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    T({#x: A#})[#I#]{{; name=.+}}
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    T({#y: A#})[#I#]{{; name=.+}}
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    U({#x: A#})[#G#]{{; name=.+}}
 // GENERIC_PARAM_0-NOT: Decl[Constructor]/Local:    U({#y
-// GENERIC_PARAM_0: End completions
 
 extension L {
   func test() {
     #^INSIDE_L_0^#
   }
 }
-// INSIDE_L_0: Begin completions
 // INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
 
 // FIXME: <rdar://problem/20530021> Code complete generic parameters in extensions
 // INSIDE_L_0-DAG: Decl[GenericTypeParam]/Local:     X[#X#]; name=X
 // INSIDE_L_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
 
-// INSIDE_L_0: End completions
 
 struct M<X: G> {
   typealias Y = X
@@ -134,10 +124,8 @@ struct M<X: G> {
     #^INSIDE_M_0^#
   }
 }
-// INSIDE_M_0: Begin completions
 // INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
 // INSIDE_M_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
-// INSIDE_M_0: End completions
 
 typealias CAlias = C
 

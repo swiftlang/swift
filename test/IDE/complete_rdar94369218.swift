@@ -15,22 +15,18 @@ struct MyStruct: MyProto {
 
 func test1() {
   #^GLOBALEXPR^#
-// GLOBALEXPR: Begin completions
 // GLOBALEXPR-NOT: name=MyProto(
 // GLOBALEXPR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // GLOBALEXPR-DAG: Decl[Constructor]/CurrModule:       MyStruct({#value: String#})[#MyStruct#]; name=MyStruct(value:)
 // GLOBALEXPR-DAG: Decl[Constructor]/CurrModule:       MyStruct({#arg: String#})[#MyStruct#]; name=MyStruct(arg:)
 // GLOBALEXPR-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProto[#MyProto#]; name=MyProto
 // GLOBALEXPR-NOT: name=MyProto(
-// GLOBALEXPR: End completions
 }
 
 func test2() {
   _ = MyProto(#^PROTOCOL_AFTER_PAREN^#
-// PROTOCOL_AFTER_PAREN: Begin completions
 // PROTOCOL_AFTER_PAREN-NOT: name=arg: 
 // PROTOCOL_AFTER_PAREN-NOT: name=value: 
-// PROTOCOL_AFTER_PAREN: End completions
 }
 
 func test3<MyGeneric: MyProto>() {

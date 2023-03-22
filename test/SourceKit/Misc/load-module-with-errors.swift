@@ -16,7 +16,6 @@ func testInvalidStructCursor() {
 func testInvalidStructMemberCompletion() {
   let foo: InvalidStruct
   foo.#^INVALID-MEMBER^#
-  // INVALID-MEMBER: Begin completions
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberA[#Int#];
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberB[#<<error type>>#];
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberC[#<<error type>>#];
@@ -25,12 +24,10 @@ func testInvalidStructMemberCompletion() {
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         add({#<<error type>>#})[#Void#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         get()[#InvalidStruct.Item#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         set({#item: InvalidStruct.Item#})[#Void#];
-  // INVALID-MEMBER: End completions
 }
 
 func testInvalidTypeCompletion() {
   let foo: #^INVALID-TYPE^#;
-  // INVALID-TYPE: Begin completions
   // INVALID-TYPE-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
   // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct#];
@@ -39,12 +36,10 @@ func testInvalidTypeCompletion() {
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
   // INVALID-TYPE-DAG: Decl[Protocol]/OtherModule[errors]: InvalidProtocol[#InvalidProtocol#];
-  // INVALID-TYPE: End completions
 }
 
 func testInvalidTopLevelCompletion() {
   #^INVALID-TOP^#
-  // INVALID-TOP: Begin completions
   // INVALID-TOP-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncBody({#param: T#})[#T#];
@@ -65,7 +60,6 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
   // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]/Flair[RareType]: InvalidProtocol[#InvalidProtocol#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#<<error type>>#];
-  // INVALID-TOP: End completions
 }
 
 // RUN: %empty-directory(%t)

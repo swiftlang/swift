@@ -14,6 +14,4 @@ struct BorderedBarButtonStyle: ButtonStyle {
   func makeBody(configuration: #^COMPLETE^#) {}
 }
 
-// COMPLETE: Begin completions
 // COMPLETE: Decl[TypeAlias]/Super:              Configuration[#ButtonStyleConfiguration#]; name=Configuration
-// COMPLETE: End completions

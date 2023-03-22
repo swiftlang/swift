@@ -45,9 +45,7 @@ class C4<T, U> {}
 
 _ = C4<#^GENERIC_TYPE_PARAM^# >()
 _ = C4<SomeType, #^SECOND_GENERIC_TYPE_PARAM^# >()
-// GENERIC_TYPE_PARAM: Begin completions
 // GENERIC_TYPE_PARAM-DAG: Decl[Class]/CurrModule:             C1[#C1#];
-// GENERIC_TYPE_PARAM: End completions
 
 // https://github.com/apple/swift/issues/56979
 
@@ -63,6 +61,4 @@ func someFunction() {
   var s2_localVar = S2.Nested< #^GENERIC_PARAM_ON_NESTED_TYPE_LOCAL_VAR^#>()
 }
 
-// GENERIC_PARAM_ON_NESTED_TYPE: Begin completions
 // GENERIC_PARAM_ON_NESTED_TYPE-DAG: Decl[Struct]/CurrModule:            S2[#S2#];
-// GENERIC_PARAM_ON_NESTED_TYPE: End completions

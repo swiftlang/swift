@@ -181,7 +181,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
-// ON_GLOBALVAR: Begin completions
 // ON_GLOBALVAR-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_GLOBALVAR-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_GLOBALVAR-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -206,11 +205,9 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
 // ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
 // ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
-// ON_GLOBALVAR: End completions
 
 struct _S {
   @#^ON_INIT^# init()
-// ON_INIT: Begin completions
 // ON_INIT-DAG: Keyword/None:                       available[#Constructor Attribute#]; name=available
 // ON_INIT-DAG: Keyword/None:                       objc[#Constructor Attribute#]; name=objc
 // ON_INIT-DAG: Keyword/None:                       inline[#Constructor Attribute#]; name=inline
@@ -219,10 +216,8 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       usableFromInline[#Constructor Attribute#]; name=usableFromInline
 // ON_INIT-DAG: Keyword/None:                       discardableResult[#Constructor Attribute#]; name=discardableResult
 // ON_INIT-DAG: Keyword/None:                       preconcurrency[#Constructor Attribute#]; name=preconcurrency
-// ON_INIT: End completions
 
   @#^ON_PROPERTY^# var foo
-// ON_PROPERTY: Begin completions
 // ON_PROPERTY-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_PROPERTY-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_PROPERTY-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -248,11 +243,9 @@ struct _S {
 // ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
 // ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
 // ON_PROPERTY-NOT: Decl[PrecedenceGroup]
-// ON_PROPERTY: End completions
 
   @#^ON_METHOD^# private
   func foo()
-// ON_METHOD: Begin completions
 // ON_METHOD-DAG: Keyword/None:                       available[#Func Attribute#]; name=available
 // ON_METHOD-DAG: Keyword/None:                       objc[#Func Attribute#]; name=objc
 // ON_METHOD-DAG: Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction
@@ -281,17 +274,14 @@ struct _S {
 // ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
 
 
-// ON_METHOD: End completions
 
   func bar(@#^ON_PARAM_1^#)
-// ON_PARAM: Begin completions
 // ON_PARAM-NOT: Keyword
 // ON_PARAM-DAG: Decl[Struct]/CurrModule:             MyStruct[#MyStruct#]; name=MyStruct
 // ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
 // ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
 // ON_PARAM-DAG: Decl[Actor]/CurrModule:              MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
 // ON_PARAM-NOT: Keyword
-// ON_PARAM: End completions
 
   func bar(
     @#^ON_PARAM_2^#
@@ -311,7 +301,6 @@ struct _S {
 
 
   @#^ON_MEMBER_LAST^#
-// ON_MEMBER_LAST: Begin completions
 // ON_MEMBER_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc
 // ON_MEMBER_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -356,7 +345,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
 // ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
-// ON_MEMBER_LAST: End completions
 }
 
 func takeClosure(_: () -> Void) {
@@ -365,12 +353,10 @@ func takeClosure(_: () -> Void) {
   }
 }
 // FIXME: We should mark MyPropertyWrapper and MyResultBuilder as Unrelated
-// IN_CLOSURE: Begin completions
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
 // IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// IN_CLOSURE: End completions
 
 
 @#^KEYWORD_INDEPENDENT_1^#
@@ -384,7 +370,6 @@ func dummy2() {}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST: Begin completions
 // KEYWORD_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -429,4 +414,3 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
 // KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
 // KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// KEYWORD_LAST:                  End completions

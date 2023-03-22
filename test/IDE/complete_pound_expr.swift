@@ -26,7 +26,6 @@ func test1() {
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: line[#ExpressibleByIntegerLiteral#]; name=line
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
 // POUND_EXPR_INTCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: filePath[#ExpressibleByStringLiteral#]; name=filePath
-// POUND_EXPR_INTCONTEXT: End completions
 
 // POUND_EXPR_STRINGCONTEXT: Begin completions, 11 items
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: function[#ExpressibleByStringLiteral#]; name=function
@@ -40,7 +39,6 @@ func test1() {
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: filePath[#ExpressibleByStringLiteral#]; name=filePath
 // POUND_EXPR_STRINGCONTEXT-DAG: Keyword/None/TypeRelation[Convertible]: keyPath({#@objc property sequence#})[#String#];
 // POUND_EXPR_STRINGCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
-// POUND_EXPR_STRINGCONTEXT: End completions
 
 // POUND_EXPR_SELECTORCONTEXT: Begin completions, 11 items
 // POUND_EXPR_SELECTORCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: function[#ExpressibleByStringLiteral#]; name=function
@@ -54,4 +52,3 @@ func test1() {
 // POUND_EXPR_SELECTORCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: filePath[#ExpressibleByStringLiteral#]; name=filePath
 // POUND_EXPR_SELECTORCONTEXT-DAG: Keyword/None/TypeRelation[Convertible]: selector({#@objc method#})[#Selector#];
 // POUND_EXPR_SELECTORCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
-// POUND_EXPR_SELECTORCONTEXT: End completions

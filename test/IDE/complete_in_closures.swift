@@ -12,15 +12,12 @@ struct FooStruct {
   func instanceFunc0() {}
 }
 
-// FOO_OBJECT_DOT: Begin completions
-// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: End completions
+// FOO_OBJECT_DOT: Begin completions, 3 items
+// FOO_OBJECT_DOT-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
+// FOO_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT-DAG: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
 
-// WITH_GLOBAL_DECLS: Begin completions
 // WITH_GLOBAL_DECLS: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_GLOBAL_DECLS: End completions
 
 //===--- Check that we can resolve closure parameters.
 
@@ -96,10 +93,8 @@ struct NestedStructWithClosureMember1 {
   }
 }
 
-// WITH_GLOBAL_DECLS_AND_LOCAL1: Begin completions
 // WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[LocalVar]/Local: x[#Int#]
 // WITH_GLOBAL_DECLS_AND_LOCAL1: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// WITH_GLOBAL_DECLS_AND_LOCAL1: End completions
 
 struct StructWithClosureMemberAndLocal {
   var c = {
@@ -269,14 +264,12 @@ func testClosureParam1() {
     #^CLOSURE_PARAM_1^#
   }
 }
-// CLOSURE_PARAM_1: Begin completions
 // CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#Int#]{{; name=.+$}}
 func testClosureParam2() {
   closureTaker2 { (Value1, Value2) -> () in
     #^CLOSURE_PARAM_2^#
   }
 }
-// CLOSURE_PARAM_2: Begin completions
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value1[#Int#]{{; name=.+$}}
 // CLOSURE_PARAM_2-DAG: Decl[LocalVar]/Local:         Value2[#Int#]{{; name=.+$}}
 
@@ -311,7 +304,6 @@ func testIIFE() {
     return obj
   }()
 }
-// IN_IIFE_1: Begin completions
 // IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: north[#SomeEnum#]
 // IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: south[#SomeEnum#]
 
@@ -324,10 +316,8 @@ class C {
     do {
     } catch {
       error.#^ERROR_IN_CLOSURE_IN_INITIALIZER^#
-// ERROR_IN_CLOSURE_IN_INITIALIZER: Begin completions
 // ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Keyword[self]/CurrNominal:          self[#Error#]; name=self
 // ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Decl[InstanceVar]/CurrNominal:      myErrorNumber[#Int#]; name=myErrorNumber
-// ERROR_IN_CLOSURE_IN_INITIALIZER: End completions
     }
     return ""
   }()
@@ -335,30 +325,25 @@ class C {
 
 var foo = {
   let x = "Siesta:\(3)".#^DECL_IN_CLOSURE_IN_TOPLEVEL_INIT^#
-  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: Begin completions
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Keyword[self]/CurrNominal:          self[#String#]; name=self
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: count[#Int#]; name=count
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]; name=unicodeScalars
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: hasPrefix({#(prefix): String#})[#Bool#]; name=hasPrefix(:)
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]; name=utf16
   // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/Super/IsSystem: dropFirst()[#Substring#]; name=dropFirst()
-  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: End completions
 }
 
 func testWithMemoryRebound(_ bar: UnsafePointer<UInt64>) {
     _ = bar.withMemoryRebound(to: Int64.self, capacity: 3) { ptr in
         return ptr #^SINGLE_EXPR_CLOSURE_CONTEXT^#
-        // SINGLE_EXPR_CLOSURE_CONTEXT: Begin completions
         // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: .deallocate()[#Void#]; name=deallocate()
         // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:    .pointee[#Int64#]; name=pointee
-        // SINGLE_EXPR_CLOSURE_CONTEXT: End completions
     }
 }
 
 func testInsideTernaryClosureReturn(test: Bool) -> [String] {
     return "hello".map { thing in
         test ? String(thing #^SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT^#).uppercased() : String(thing).lowercased()
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT: Begin completions
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .utf8[#Character.UTF8View#]; name=utf8
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .description[#String#]; name=description
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .isWhitespace[#Bool#]; name=isWhitespace
@@ -368,7 +353,6 @@ func testInsideTernaryClosureReturn(test: Bool) -> [String] {
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']>= {#String.Element#}[#Bool#]; name=>=
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']== {#Character#}[#Bool#]; name===
         // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT-DAG: Keyword[self]/CurrNominal:          .self[#String.Element#]; name=self
-        // SINGLE_TERNARY_EXPR_CLOSURE_CONTEXT: End completions
     }
 }
 
@@ -439,10 +423,8 @@ func testSwitchInClosure() {
     }
   })
 
-// SWITCH_IN_CLOSURE: Begin completions
 // SWITCH_IN_CLOSURE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: first[#MyEnum#];
 // SWITCH_IN_CLOSURE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: second[#MyEnum#];
-// SWITCH_IN_CLOSURE: End completions
 }
 
 func testSwitchWithAssociatedValueInClosure() {
@@ -464,9 +446,7 @@ func testSwitchWithAssociatedValueInClosure() {
     }
   })
 
-// SWITCH_WITH_ASSOC_IN_CLOSURE: Begin completions
 // SWITCH_WITH_ASSOC_IN_CLOSURE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: first({#String#})[#MyEnum#];
-// SWITCH_WITH_ASSOC_IN_CLOSURE: End completions
 }
 
 func testCompleteInMatchOfAssociatedValueInSwitchCase() {
@@ -490,9 +470,7 @@ func testCompleteInMatchOfAssociatedValueInSwitchCase() {
     }
   })
 
-// IN_ASSOC_OF_CASE_IN_CLOSURE: Begin completions
 // IN_ASSOC_OF_CASE_IN_CLOSURE-DAG: Decl[LocalVar]/Local:               str[#String#]; name=str
-// IN_ASSOC_OF_CASE_IN_CLOSURE: End completions
 }
 
 }
@@ -504,8 +482,6 @@ func testReferenceToVariableDefinedInClosure() {
     let item = "\(1)"
     #^VARIABLE_DEFINED_IN_CLOSURE^#
   }
-  // VARIABLE_DEFINED_IN_CLOSURE: Begin completions
   // VARIABLE_DEFINED_IN_CLOSURE: Decl[LocalVar]/Local:               item[#String#]; name=item
-  // VARIABLE_DEFINED_IN_CLOSURE: End completions
 }
 

@@ -32,7 +32,6 @@ _Pragma("clang assume_nonnull end")
 
 func test(obj: MyObjCClass) async throws {
     obj.#^COMPLETE^#
-// COMPLETE: Begin completions
 // COMPLETE-NOT: method2(
 // COMPLETE-NOT: method4()
 // COMPLETE-NOT: method5()
@@ -46,5 +45,4 @@ func test(obj: MyObjCClass) async throws {
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal:   method6()[' async'][' throws'][#Void#];
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended:   method7({#completionHandler: (Error?) -> Void##(Error?) -> Void#})[#Void#]; name=method7(completionHandler:); diagnostics=warning:'method7(completionHandler:)' has an async alternative that should be preferred in an async context
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal:   named7()[' async'][' throws'][#Void#];
-// COMPLETE: End completions
 }
