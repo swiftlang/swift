@@ -1128,6 +1128,9 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive
     llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
     collectParsedExportedImports(this, Modules, QualifiedImports);
     for (const auto &QI : QualifiedImports) {
+      auto Module = QI.getFirst();
+      if (Modules.contains(Module)) continue;
+
       auto &Decls = QI.getSecond();
       Results.append(Decls.begin(), Decls.end());
     }
