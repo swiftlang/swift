@@ -1583,13 +1583,14 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
 
 AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
-                                            CanType origMemberInterfaceType)
+                                            CanType origMemberInterfaceType,
+                                            SubstitutionMap subMap)
 const {
   assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    return AbstractionPattern(sig.getCanonicalSignature(),
+    return AbstractionPattern(subMap, sig.getCanonicalSignature(),
                               origMemberInterfaceType);
   }
 
@@ -1626,7 +1627,9 @@ const {
                                       member, origMemberInterfaceType)
                              ->getReducedType(getGenericSignature());
       
-    return AbstractionPattern(getGenericSignature(), memberTy);
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignature(),
+                              memberTy);
   }
   llvm_unreachable("invalid abstraction pattern kind");
 }

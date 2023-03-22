@@ -2343,7 +2343,8 @@ namespace {
         auto sig = field->getDeclContext()->getGenericSignatureOfContext();
         auto interfaceTy = field->getInterfaceType()->getReducedType(sig);
         auto origFieldType = origType.unsafeGetSubstFieldType(field,
-                                                              interfaceTy);
+                                                              interfaceTy,
+                                                              subMap);
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
@@ -2422,7 +2423,8 @@ namespace {
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()
-                                 ->getReducedType(D->getGenericSignature()));
+                                 ->getReducedType(D->getGenericSignature()),
+                              subMap);
         properties.addSubobject(classifyType(origEltType, substEltType,
                                              TC, Expansion));
         properties =
@@ -2765,7 +2767,8 @@ bool TypeConverter::visitAggregateLeaves(
           auto interfaceTy =
               structField->getInterfaceType()->getReducedType(sig);
           auto origFieldType =
-              origTy.unsafeGetSubstFieldType(structField, interfaceTy);
+              origTy.unsafeGetSubstFieldType(structField, interfaceTy,
+                                             subMap);
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              llvm::None);
         }
@@ -2782,7 +2785,7 @@ bool TypeConverter::visitAggregateLeaves(
                                       ->getCanonicalType();
           auto origElementTy = origTy.unsafeGetSubstFieldType(
               element, element->getArgumentInterfaceType()->getReducedType(
-                           decl->getGenericSignature()));
+                           decl->getGenericSignature()), subMap);
 
           insertIntoWorklist(substElementType, origElementTy, element,
                              llvm::None);

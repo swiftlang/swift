@@ -783,7 +783,8 @@ public:
   /// Note that, for most purposes, you should lower a field's type against its
   /// *unsubstituted* interface type.
   AbstractionPattern
-  unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType) const;
+  unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType,
+                          SubstitutionMap subMap) const;
   
 private:
   /// Return an abstraction pattern for the curried type of an
