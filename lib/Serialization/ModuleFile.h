@@ -649,6 +649,19 @@ public:
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool recoverFromIncompatibility);
 
+  /// Load dependencies of this module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  ///
+  /// \returns any error that occurred during loading dependencies.
+  Status
+  loadDependenciesForFileContext(const FileUnit *file, SourceLoc diagLoc,
+                               bool forTestable);
+
   /// How should \p dependency be loaded for a transitive import via \c this?
   ModuleLoadingBehavior
   getTransitiveLoadingBehavior(const Dependency &dependency) const;
