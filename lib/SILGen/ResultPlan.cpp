@@ -18,6 +18,7 @@
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -617,19 +618,20 @@ public:
     eltPlans.reserve(origType.getNumTupleElements());
 
     origType.forEachTupleElement(substType,
-        [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origEltType,
-            CanType substEltType) {
-      Initialization *eltInit = eltInits[substEltIndex].get();
-      eltPlans.push_back(builder.build(eltInit, origEltType, substEltType));
-    },
-        [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origExpansionType,
-            CanTupleEltTypeArrayRef substEltTypes) {
-      auto componentInits = eltInits.slice(substEltIndex, substEltTypes.size());
-      eltPlans.push_back(builder.buildForPackExpansion(componentInits,
-                                                       origExpansionType,
-                                                       substEltTypes));
+                                 [&](TupleElementGenerator &elt) {
+      auto origEltType = elt.getOrigType();
+      auto substEltTypes = elt.getSubstTypes();
+      if (!elt.isOrigPackExpansion()) {
+        Initialization *eltInit = eltInits[elt.getSubstIndex()].get();
+        eltPlans.push_back(builder.build(eltInit, origEltType,
+                                         substEltTypes[0]));
+      } else {
+        auto componentInits =
+          eltInits.slice(elt.getSubstIndex(), substEltTypes.size());
+        eltPlans.push_back(builder.buildForPackExpansion(componentInits,
+                                                         origEltType,
+                                                         substEltTypes));
+      }
     });
   }
 
