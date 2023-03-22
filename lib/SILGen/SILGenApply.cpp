@@ -3389,10 +3389,23 @@ private:
     // If the source expression is a tuple literal, we can break it
     // up directly.
     if (auto tuple = dyn_cast<TupleExpr>(e)) {
-      for (auto i : indices(tuple->getElements())) {
-        emit(tuple->getElement(i),
-             origParamType.getTupleElementType(i));
-      }
+      auto substTupleType =
+        cast<TupleType>(e->getType()->getCanonicalType());
+      origParamType.forEachTupleElement(substTupleType,
+          [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origEltType, CanType substEltType) {
+        emit(tuple->getElement(substEltIndex), origEltType);
+      },
+          [&](unsigned origEltIndex, unsigned substEltIndex,
+              AbstractionPattern origExpansionType,
+              CanTupleEltTypeArrayRef substEltTypes) {
+        SmallVector<ArgumentSource, 4> eltArgs;
+        eltArgs.reserve(substEltTypes.size());
+        for (auto i : range(substEltIndex, substEltTypes.size())) {
+          eltArgs.emplace_back(tuple->getElement(i));
+        }
+        emitPackArg(eltArgs, origExpansionType);
+      });
       return;
     }
 
