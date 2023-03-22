@@ -337,10 +337,10 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       OwnershipRAUWHelper helper(ownershipFixupContext, PTAI,
                                  ATPI->getOperand());
       if (helper) {
+        SILBuilderWithScope localBuilder(std::next(PTAI->getIterator()), Builder);
         auto replacement = helper.prepareReplacement();
-        auto *newInst = Builder.createUncheckedAddrCast(PTAI->getLoc(),
-                                                        replacement,
-                                                        PTAI->getType());
+        auto *newInst = localBuilder.createUncheckedAddrCast(
+            PTAI->getLoc(), replacement, PTAI->getType());
         helper.perform(newInst);
         return nullptr;
       }
