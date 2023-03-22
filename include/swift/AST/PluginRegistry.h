@@ -22,35 +22,78 @@
 
 namespace swift {
 
+/// Represent a "resolved" exectuable plugin.
+///
+/// Plugin clients usually deal with this object to communicate with the actual
+/// plugin implementation.
+/// This object has a file path of the plugin executable, and is responsible to
+/// launch it and manages the process. When the plugin process crashes, this
+/// should automatically relaunch the process so the clients can keep using this
+/// object as the interface.
 class LoadedExecutablePlugin {
-  const llvm::sys::procid_t pid;
+
+  /// Represents the current process of the executable plugin.
+  struct PluginProcess {
+    const llvm::sys::procid_t pid;
+    const int inputFileDescriptor;
+    const int outputFileDescriptor;
+    bool isStale = false;
+
+    PluginProcess(llvm::sys::procid_t pid, int inputFileDescriptor,
+                  int outputFileDescriptor);
+
+    ~PluginProcess();
+
+    ssize_t write(const void *buf, size_t nbyte) const;
+    ssize_t read(void *buf, size_t nbyte) const;
+  };
+
+  /// Launched current process.
+  std::unique_ptr<PluginProcess> Process;
+
+  /// Path to the plugin executable.
+  const std::string ExecutablePath;
+
+  /// Last modification time of the `ExecutablePath` when this is initialized.
   const llvm::sys::TimePoint<> LastModificationTime;
-  const int inputFileDescriptor;
-  const int outputFileDescriptor;
 
   /// Opaque value of the protocol capability of the pluugin. This is a
   /// value from ASTGen.
   const void *capability = nullptr;
+
+  /// Callbacks to be called when the connection is restored.
+  llvm::SmallVector<std::function<void(void)> *, 0> onReconnect;
 
   /// Cleanup function to call ASTGen.
   std::function<void(void)> cleanup;
 
   std::mutex mtx;
 
-  ssize_t write(const void *buf, size_t nbyte) const;
-  ssize_t read(void *buf, size_t nbyte) const;
-
 public:
-  LoadedExecutablePlugin(llvm::sys::procid_t pid,
-                         llvm::sys::TimePoint<> LastModificationTime,
-                         int inputFileDescriptor, int outputFileDescriptor);
+  LoadedExecutablePlugin(llvm::StringRef ExecutablePath,
+                         llvm::sys::TimePoint<> LastModificationTime)
+      : ExecutablePath(ExecutablePath),
+        LastModificationTime(LastModificationTime){};
   ~LoadedExecutablePlugin();
+
+  /// The last modification time of 'ExecutablePath' when this object is
+  /// created.
   llvm::sys::TimePoint<> getLastModificationTime() const {
     return LastModificationTime;
   }
 
+  /// Indicates that the current process is usable.
+  bool isAlive() const { return Process != nullptr && !Process->isStale; }
+
+  /// Mark the current process "stale".
+  void setStale() const { Process->isStale = true; }
+
   void lock() { mtx.lock(); }
   void unlock() { mtx.unlock(); }
+
+  // Launch the plugin if it's not already running, or it's stale. Return an
+  // error if it's fails to execute it.
+  llvm::Error spawnIfNeeded();
 
   /// Send a message to the plugin.
   llvm::Error sendMessage(llvm::StringRef message) const;
@@ -63,7 +106,18 @@ public:
     this->cleanup = cleanup;
   }
 
-  llvm::sys::procid_t getPid() { return pid; }
+  /// Add "on reconnect" callback.
+  /// These callbacks are called when `spawnIfNeeded()` relaunched the plugin.
+  void addOnReconnect(std::function<void(void)> *fn) {
+    onReconnect.push_back(fn);
+  }
+
+  /// Remove "on reconnect" callback.
+  void removeOnReconnect(std::function<void(void)> *fn) {
+    llvm::erase_value(onReconnect, fn);
+  }
+
+  llvm::sys::procid_t getPid() { return Process->pid; }
 
   const void *getCapability() { return capability; };
   void setCapability(const void *newValue) { capability = newValue; };
@@ -78,7 +132,12 @@ class PluginRegistry {
       LoadedPluginExecutables;
 
 public:
+  /// Load a dynamic link library specified by \p path.
+  /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<void *> loadLibraryPlugin(llvm::StringRef path);
+
+  /// Load an executable plugin specified by \p path .
+  /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<LoadedExecutablePlugin *>
   loadExecutablePlugin(llvm::StringRef path);
 

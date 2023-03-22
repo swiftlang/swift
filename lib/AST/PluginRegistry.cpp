@@ -38,9 +38,6 @@
 #include <io.h>
 #endif
 
-extern "C" const void *swift_ASTGen_getCompilerPluginCapability(void *handle);
-extern "C" void swift_ASTGen_destroyCompilerPluginCapability(void *value);
-
 using namespace swift;
 
 llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
@@ -74,14 +71,14 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
   }
 
   // See if the plugin is already loaded.
-  auto &plugin = LoadedPluginExecutables[path];
-  if (plugin) {
+  auto &storage = LoadedPluginExecutables[path];
+  if (storage) {
     // See if the loaded one is still usable.
-    if (plugin->getLastModificationTime() == stat.getLastModificationTime())
-      return plugin.get();
+    if (storage->getLastModificationTime() == stat.getLastModificationTime())
+      return storage.get();
 
     // The plugin is updated. Close the previously opened plugin.
-    plugin = nullptr;
+    storage = nullptr;
   }
 
   if (!llvm::sys::fs::exists(stat)) {
@@ -94,8 +91,35 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
                                    "not executable");
   }
 
+  auto plugin = std::unique_ptr<LoadedExecutablePlugin>(
+      new LoadedExecutablePlugin(path, stat.getLastModificationTime()));
+
+  // Launch here to see if it's actually executable, and diagnose (by returning
+  // an error) if necessary.
+  if (auto error = plugin->spawnIfNeeded()) {
+    return std::move(error);
+  }
+
+  storage = std::move(plugin);
+  return storage.get();
+}
+
+llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
+  if (Process) {
+    // See if the loaded one is still usable.
+    if (!Process->isStale)
+      return llvm::Error::success();
+
+    // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.
+    // PluginRegistry::loadExecutablePlugin() checks it and replace this object
+    // itself if the plugin is updated.
+
+    // The plugin is stale. Discard the previously opened process.
+    Process.reset();
+  }
+
   // Create command line arguments.
-  SmallVector<StringRef, 4> command{path};
+  SmallVector<StringRef, 4> command{ExecutablePath};
 
   // Apply sandboxing.
   llvm::BumpPtrAllocator Allocator;
@@ -107,29 +131,36 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
     return llvm::errorCodeToError(childInfo.getError());
   }
 
-  plugin = std::unique_ptr<LoadedExecutablePlugin>(new LoadedExecutablePlugin(
-      childInfo->Pid, stat.getLastModificationTime(),
-      childInfo->ReadFileDescriptor, childInfo->WriteFileDescriptor));
+  Process = std::unique_ptr<PluginProcess>(
+      new PluginProcess(childInfo->Pid, childInfo->ReadFileDescriptor,
+                        childInfo->WriteFileDescriptor));
 
-  return plugin.get();
+  // Call "on reconnect" callbacks.
+  for (auto *callback : onReconnect) {
+    (*callback)();
+  }
+
+  return llvm::Error::success();
 }
 
-LoadedExecutablePlugin::LoadedExecutablePlugin(
-    llvm::sys::procid_t pid, llvm::sys::TimePoint<> LastModificationTime,
-    int inputFileDescriptor, int outputFileDescriptor)
-    : pid(pid), LastModificationTime(LastModificationTime),
-      inputFileDescriptor(inputFileDescriptor),
+LoadedExecutablePlugin::PluginProcess::PluginProcess(llvm::sys::procid_t pid,
+                                                     int inputFileDescriptor,
+                                                     int outputFileDescriptor)
+    : pid(pid), inputFileDescriptor(inputFileDescriptor),
       outputFileDescriptor(outputFileDescriptor) {}
 
-LoadedExecutablePlugin::~LoadedExecutablePlugin() {
+LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
   close(inputFileDescriptor);
   close(outputFileDescriptor);
+}
 
+LoadedExecutablePlugin::~LoadedExecutablePlugin() {
   // Let ASTGen to cleanup things.
   this->cleanup();
 }
 
-ssize_t LoadedExecutablePlugin::read(void *buf, size_t nbyte) const {
+ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
+                                                    size_t nbyte) const {
   ssize_t bytesToRead = nbyte;
   void *ptr = buf;
 
@@ -154,7 +185,8 @@ ssize_t LoadedExecutablePlugin::read(void *buf, size_t nbyte) const {
   return nbyte - bytesToRead;
 }
 
-ssize_t LoadedExecutablePlugin::write(const void *buf, size_t nbyte) const {
+ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
+                                                     size_t nbyte) const {
   ssize_t bytesToWrite = nbyte;
   const void *ptr = buf;
 
@@ -187,15 +219,17 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   // Write header (message size).
   uint64_t header = llvm::support::endian::byte_swap(
       uint64_t(size), llvm::support::endianness::little);
-  writtenSize = write(&header, sizeof(header));
+  writtenSize = Process->write(&header, sizeof(header));
   if (writtenSize != sizeof(header)) {
+    setStale();
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "failed to write plugin message header");
   }
 
   // Write message.
-  writtenSize = write(data, size);
+  writtenSize = Process->write(data, size);
   if (writtenSize != ssize_t(size)) {
+    setStale();
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "failed to write plugin message data");
   }
@@ -208,9 +242,10 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
 
   // Read header (message size).
   uint64_t header;
-  readSize = read(&header, sizeof(header));
+  readSize = Process->read(&header, sizeof(header));
 
   if (readSize != sizeof(header)) {
+    setStale();
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "failed to read plugin message header");
   }
@@ -224,8 +259,9 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   auto sizeToRead = size;
   while (sizeToRead > 0) {
     char buffer[4096];
-    readSize = read(buffer, std::min(sizeof(buffer), sizeToRead));
+    readSize = Process->read(buffer, std::min(sizeof(buffer), sizeToRead));
     if (readSize == 0) {
+      setStale();
       return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                      "failed to read plugin message data");
     }
