@@ -1875,6 +1875,17 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose pack expansion expressions appearing in contexts that do not
+/// accept a comma-separated list of values.
+class InvalidPackExpansion final : public FailureDiagnostic {
+public:
+  InvalidPackExpansion(const Solution &solution,
+                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:

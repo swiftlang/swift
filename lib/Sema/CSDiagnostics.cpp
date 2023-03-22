@@ -6176,6 +6176,20 @@ bool InvalidPackReference::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPackExpansion::diagnoseAsError() {
+  auto *locator = getLocator();
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    if (auto argInfo = getFunctionArgApplyInfo(locator)) {
+      emitDiagnostic(diag::invalid_expansion_argument,
+                     argInfo->getParamInterfaceType());
+      return true;
+    }
+  }
+
+  emitDiagnostic(diag::expansion_expr_not_allowed);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();

@@ -431,6 +431,9 @@ enum class FixKind : uint8_t {
 
   /// Allow pack references outside of pack expansions.
   AllowInvalidPackReference,
+
+  /// Allow pack expansion expressions in a context that does not support them.
+  AllowInvalidPackExpansion,
 };
 
 class ConstraintFix {
@@ -2125,6 +2128,26 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPackReference;
+  }
+};
+
+class AllowInvalidPackExpansion final : public ConstraintFix {
+  AllowInvalidPackExpansion(ConstraintSystem &cs,
+                            ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPackExpansion, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow invalid pack expansion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidPackExpansion *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidPackExpansion;
   }
 };
 

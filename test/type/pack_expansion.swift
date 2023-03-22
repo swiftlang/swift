@@ -93,5 +93,5 @@ func packRefOutsideExpansion<each T>(_: each T.Type) {}
 // coverage to ensure a 'repeat each' type is considered Copyable
 func golden<Z>(_ z: Z) {}
 func hour<each T>(_ t: repeat each T)  {
-  _ = repeat golden(each t)
+  _ = (repeat golden(each t))
 }
