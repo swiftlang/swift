@@ -4748,7 +4748,17 @@ public:
       return origType;
     }
 
-    AbstractionPattern abstraction(Sig, origType);
+    // We've looked through all the top-level structure in the orig
+    // type that's affected by type lowering.  If substitution has
+    // given us a type with top-level structure that's affected by
+    // type lowering, it must be because the orig type was a type
+    // variable of some sort, and we should lower using an opaque
+    // abstraction pattern.  If substitution hasn't given us such a
+    // type, it doesn't matter what abstraction pattern we use,
+    // lowering will just come back with substType.  So we can just
+    // use an opaque abstraction pattern here and not put any effort
+    // into computing a more "honest" abstraction pattern.
+    AbstractionPattern abstraction = AbstractionPattern::getOpaque();
     return TC.getLoweredRValueType(typeExpansionContext, abstraction,
                                    substType);
   }
