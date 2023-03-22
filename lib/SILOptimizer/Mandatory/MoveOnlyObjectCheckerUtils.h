@@ -44,44 +44,47 @@ struct OSSACanonicalizer {
   /// A list of non-consuming boundary uses.
   SmallVector<SILInstruction *, 32> nonConsumingBoundaryUsers;
 
-  /// The actual canonicalizer that we use.
-  ///
-  /// We mark this Optional to avoid UB behavior caused by us needing to
-  /// initialize CanonicalizeOSSALifetime with parts of OSSACanoncializer
-  /// (specifically with state in our arrays) before the actual constructor has
-  /// run. Specifically this avoids:
-  ///
-  /// 11.9.5p1 class.cdtor: For an object with a non-trivial constructor,
-  /// referring to any non-static member or base class of the object before the
-  /// constructor begins execution results in undefined behavior.
-  Optional<CanonicalizeOSSALifetime> canonicalizer;
+  CanonicalizeOSSALifetime canonicalizer;
 
-  OSSACanonicalizer() {}
-
-  void init(SILFunction *fn, DominanceInfo *domTree,
-            InstructionDeleter &deleter) {
-    canonicalizer.emplace(false /*pruneDebugMode*/,
-                          !fn->shouldOptimize() /*maximizeLifetime*/,
-                          nullptr /*accessBlockAnalysis*/, domTree, deleter);
-  }
+  OSSACanonicalizer(SILFunction *fn, DominanceInfo *domTree,
+                    InstructionDeleter &deleter)
+      : canonicalizer(false /*pruneDebugMode*/,
+                      !fn->shouldOptimize() /*maximizeLifetime*/, fn,
+                      nullptr /*accessBlockAnalysis*/, domTree, deleter) {}
 
   void clear() {
     consumingUsesNeedingCopy.clear();
     consumingBoundaryUsers.clear();
+    nonConsumingBoundaryUsers.clear();
   }
 
-  bool canonicalize(SILValue value);
+  struct LivenessState {
+    OSSACanonicalizer &parent;
+    CanonicalizeOSSALifetime::LivenessState canonicalizerState;
 
-  bool computeLiveness(SILValue value) {
-    return canonicalizer->computeLiveness(value);
-  }
+    LivenessState(OSSACanonicalizer &parent, SILValue def)
+        : parent(parent), canonicalizerState(parent.canonicalizer, def) {}
+
+    ~LivenessState() { parent.clear(); }
+  };
+
+  /// MARK: The following APIs require an active on-stack instance of
+  /// LivenessState:
+  ///
+  ///     OSSACanonicalizer::LivenessState livenessState(canonicalizer, value);
+
+  /// Perform computeLiveness, computeBoundaryData, and rewriteLifetimes in one
+  /// fell swoop.
+  bool canonicalize();
+
+  bool computeLiveness() { return canonicalizer.computeLiveness(); }
 
   void computeBoundaryData(SILValue value);
 
-  void rewriteLifetimes() { canonicalizer->rewriteLifetimes(); }
+  void rewriteLifetimes() { canonicalizer.rewriteLifetimes(); }
 
   void findOriginalBoundary(PrunedLivenessBoundary &resultingFoundBoundary) {
-    canonicalizer->findOriginalBoundary(resultingFoundBoundary);
+    canonicalizer.findOriginalBoundary(resultingFoundBoundary);
   }
 
   bool foundAnyConsumingUses() const {

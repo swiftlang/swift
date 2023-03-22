@@ -149,6 +149,55 @@ public:
   size_t size() const { return numElements; }
 };
 
+/// Embed a reference to a Bitfield container inside a longer-lived object so
+/// the bitfield container can be stack allocated with a properly nested minimal
+/// lifetime. Accessing the container outside the scope of it's stack allocation
+/// results in a nullptr dereference.
+///
+///     struct Parent {
+///       BitfieldRef<Container> container;
+///
+///       void performWithContainer(SILFunction *function) {
+///          BitfieldRef<Container>::StackState state(container, functon);
+///
+///          assert(container->isValid());
+///       }
+///     };
+///
+/// TODO: give this variadic template parameters to support a BitfieldContainer
+/// whose constructor takes more than a single SILFunction argument.
+template <typename BitfieldContainer> struct BitfieldRef {
+  BitfieldContainer *ref = nullptr;
+
+  BitfieldRef() {}
+
+  BitfieldContainer &operator*() const {
+    assert(ref);
+    return *ref;
+  }
+
+  BitfieldContainer *operator->() const {
+    assert(ref);
+    return ref;
+  }
+
+  // Stack-allocated state must be nested relative to other node bitfields.
+  struct StackState {
+    BitfieldRef &ref;
+    BitfieldContainer container;
+
+    StackState(BitfieldRef &ref, SILFunction *function)
+        : ref(ref), container(function) {
+      ref.ref = &container;
+    }
+
+    ~StackState() { ref.ref = nullptr; }
+  };
+
+private:
+  BitfieldRef(const BitfieldRef &) = delete;
+};
+
 } // namespace swift
 
 #endif

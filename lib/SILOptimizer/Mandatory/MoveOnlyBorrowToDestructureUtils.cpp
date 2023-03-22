@@ -1507,7 +1507,6 @@ void Implementation::cleanup() {
   // not actually completely consume.
   auto *fn = getMarkedValue()->getFunction();
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
   PrunedLivenessBoundary boundary;
   while (!interface.createdDestructures.empty()) {
     auto *inst = interface.createdDestructures.pop_back_val();
@@ -1515,8 +1514,8 @@ void Implementation::cleanup() {
     for (auto result : inst->getResults()) {
       if (result->getType().isTrivial(*fn))
         continue;
+      SSAPrunedLiveness liveness(fn, &discoveredBlocks);
       SWIFT_DEFER {
-        liveness.clear();
         discoveredBlocks.clear();
         boundary.clear();
       };
@@ -1533,8 +1532,8 @@ void Implementation::cleanup() {
     if (arg->getType().isTrivial(*fn))
       continue;
 
+    SSAPrunedLiveness liveness(fn, &discoveredBlocks);
     SWIFT_DEFER {
-      liveness.clear();
       discoveredBlocks.clear();
       boundary.clear();
     };
@@ -1542,6 +1541,7 @@ void Implementation::cleanup() {
   }
 
   // And finally do the same thing for our initial copy_value.
+  SSAPrunedLiveness liveness(fn, &discoveredBlocks);
   addCompensatingDestroys(liveness, boundary, initialValue);
 }
 
@@ -1868,7 +1868,6 @@ bool BorrowToDestructureTransform::transform() {
       // copy_value in each destination block that we originally inserted.
       {
         SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-        SSAPrunedLiveness liveness(&discoveredBlocks);
         PrunedLivenessBoundary boundary;
 
         SILBuilderWithScope builder(s);
@@ -1887,8 +1886,8 @@ bool BorrowToDestructureTransform::transform() {
 
             // If we have a copyable type, we need to insert compensating
             // destroys.
+            SSAPrunedLiveness liveness(fn, &discoveredBlocks);
             SWIFT_DEFER {
-              liveness.clear();
               discoveredBlocks.clear();
               boundary.clear();
             };

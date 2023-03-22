@@ -22,11 +22,10 @@
 
 using namespace swift;
 
-void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
-                                                     unsigned bitNo) {
+void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
   // If, we are visiting this block, then it is not already LiveOut. Mark it
   // LiveWithin to indicate a liveness boundary within the block.
-  markBlockLive(userBB, bitNo, LiveWithin);
+  markBlockLive(userBB, LiveWithin);
 
   BasicBlockWorklist worklist(userBB->getFunction());
   worklist.push(userBB);
@@ -37,12 +36,12 @@ void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
     // Traversal terminates at any previously visited block, including the
     // blocks initialized as definition blocks.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      switch (getBlockLiveness(predBlock, bitNo)) {
+      switch (getBlockLiveness(predBlock)) {
       case Dead:
         worklist.pushIfNotVisited(predBlock);
         LLVM_FALLTHROUGH;
       case LiveWithin:
-        markBlockLive(predBlock, bitNo, LiveOut);
+        markBlockLive(predBlock, LiveOut);
         break;
       case LiveOut:
         break;
@@ -51,48 +50,13 @@ void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
   }
 }
 
-/// Update the current def's liveness based on one specific use instruction.
-///
-/// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
-///
-/// Terminators are not live out of the block.
-void PrunedLiveBlocks::updateForUse(
-    SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
-    SmallVectorImpl<IsLive> &resultingLivenessInfo) {
-  resultingLivenessInfo.clear();
-
-  SWIFT_ASSERT_ONLY(seenUse = true);
-
-  auto *bb = user->getParent();
-  getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
-
-  for (auto pair : llvm::enumerate(resultingLivenessInfo)) {
-    unsigned index = pair.index();
-    unsigned specificBitNo = startBitNo + index;
-    switch (pair.value()) {
-    case LiveOut:
-    case LiveWithin:
-      continue;
-    case Dead: {
-      // This use block has not yet been marked live. Mark it and its
-      // predecessor blocks live.
-      computeScalarUseBlockLiveness(bb, specificBitNo);
-      resultingLivenessInfo.push_back(getBlockLiveness(bb, specificBitNo));
-      continue;
-    }
-    }
-    llvm_unreachable("covered switch");
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                            MARK: PrunedLiveness
 //===----------------------------------------------------------------------===//
 
 void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
-  assert(!empty() && "at least one definition must be initialized");
+  liveBlocks.updateForUse(user);
 
-  liveBlocks.updateForUse(user, 0);
   // Note that a user may use the current value from multiple operands. If any
   // of the uses are non-lifetime-ending, then we must consider the user
   // itself non-lifetime-ending; it cannot be a final destroy point because
@@ -179,10 +143,7 @@ void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
     block->printAsOperand(OS);
-    OS << ": ";
-    for (unsigned i : range(getNumBitsToTrack()))
-      OS << getStringRef(this->getBlockLiveness(block, i)) << ", ";
-    OS << "\n";
+    OS << ": " << getStringRef(this->getBlockLiveness(block)) << "\n";
   }
 }
 

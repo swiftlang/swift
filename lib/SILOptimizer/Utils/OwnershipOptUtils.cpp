@@ -141,7 +141,7 @@ bool swift::computeGuaranteedBoundary(SILValue value,
   bool noEscape = findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
   liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
@@ -1857,7 +1857,7 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   ScopedAddressValue scopedAddress(sbi);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+  SSAPrunedLiveness storeBorrowLiveness(sbi->getFunction(), &discoveredBlocks);
 
   // FIXME: if OSSA lifetimes are complete, then we don't need transitive
   // liveness here.

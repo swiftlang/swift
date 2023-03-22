@@ -1213,7 +1213,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   // --- A reference with no borrow scope! Currently happens for project_box.
 
   // Compute the reference value's liveness.
-  SSAPrunedLiveness liveness;
+  SSAPrunedLiveness liveness(root->getFunction());
   liveness.initializeDef(root);
   LiveRangeSummary summary = liveness.computeSimple();
   // Conservatively ignore InnerBorrowKind::Reborrowed and
