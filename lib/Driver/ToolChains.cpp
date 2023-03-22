@@ -376,6 +376,32 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
   }
 
+  // Add plugin path options.
+  inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
+
+  {
+    SmallString<64> pluginPath;
+    auto programPath = getDriver().getSwiftProgramPath();
+    CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+        programPath, /*shared=*/true, pluginPath);
+
+    auto defaultPluginPath = pluginPath;
+    llvm::sys::path::append(defaultPluginPath, "host", "plugins");
+
+    // Default plugin path.
+    arguments.push_back("-plugin-path");
+    arguments.push_back(inputArgs.MakeArgString(defaultPluginPath));
+
+    // Local plugin path.
+    llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
+    llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
+    llvm::sys::path::append(pluginPath, "local", "lib");
+    llvm::sys::path::append(pluginPath, "swift");
+    llvm::sys::path::append(pluginPath, "host", "plugins");
+    arguments.push_back("-plugin-path");
+    arguments.push_back(inputArgs.MakeArgString(pluginPath));
+  }
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
