@@ -401,13 +401,15 @@ public:
     auto *CS = DS->InlinedCallSite;
     if (!CS)
       return nullptr;
-
+ 
     auto CachedInlinedAt = InlinedAtCache.find(CS);
     if (CachedInlinedAt != InlinedAtCache.end())
       return cast<llvm::MDNode>(CachedInlinedAt->second);
 
     auto L = decodeFilenameAndLocation(CS->Loc);
     auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
+    if (auto *Fn = CS->Parent.dyn_cast<SILFunction *>())
+      Scope = getOrCreateScope(Fn->getDebugScope());
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
@@ -416,6 +418,7 @@ public:
     InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
   }
+
 private:
 
 #ifndef NDEBUG
@@ -571,6 +574,12 @@ private:
 
     if (ValueDecl *D = L.getAsASTNode<ValueDecl>())
       return D->getBaseIdentifier().str();
+
+    if (auto *D = L.getAsASTNode<MacroExpansionDecl>())
+      return D->getMacroName().getBaseIdentifier().str();
+
+    if (auto *E = L.getAsASTNode<MacroExpansionExpr>())
+      return E->getMacroName().getBaseIdentifier().str();
 
     return StringRef();
   }

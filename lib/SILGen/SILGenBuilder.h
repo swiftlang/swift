@@ -32,6 +32,10 @@
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
+namespace ast_scope {
+class ASTScopeImpl;
+}
+
 namespace Lowering {
 
 class SILGenFunction;
@@ -50,15 +54,19 @@ public:
   SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
 
-  // Create a new builder, inheriting the given builder's context and debug
-  // scope.
+  /// Create a new builder, inheriting the given builder's context and debug
+  /// scope.
   SILGenBuilder(SILGenBuilder &builder, SILBasicBlock *insertBB)
-      : SILBuilder(insertBB, builder.getCurrentDebugScope(),
-                   builder.getBuilderContext()),
+      : SILBuilder(insertBB, builder.getBuilderContext(),
+                   builder.getCurrentDebugScope()),
         SGF(builder.SGF) {}
 
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }
+
+  SILDebugLocation
+  getSILDebugLocation(SILLocation Loc,
+                      bool ForMetaInstruction = false) override;
 
   using SILBuilder::createInitExistentialValue;
   ManagedValue

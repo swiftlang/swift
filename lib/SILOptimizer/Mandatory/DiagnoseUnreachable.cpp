@@ -910,7 +910,8 @@ static bool diagnoseUnreachableBlock(
       case (UnreachableKind::NoreturnCall): {
         // Specialcase when we are warning about unreachable code after a call
         // to a noreturn function.
-        if (!BrInfo.Loc.isASTNode<ExplicitCastExpr>()) {
+        if (!BrInfo.Loc.isASTNode<ExplicitCastExpr>() &&
+            !BrInfo.Loc.isSILFile()) {
           assert(BrInfo.Loc.isASTNode<ApplyExpr>());
           diagnose(M.getASTContext(), Loc.getSourceLoc(),
                    diag::unreachable_code);

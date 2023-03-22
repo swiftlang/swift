@@ -6235,6 +6235,11 @@ public:
     if (!VerifyDIHoles)
       return;
 
+    // These transforms don't set everything they move to implicit.
+    if (M->getASTContext().LangOpts.Playground ||
+        M->getASTContext().LangOpts.PCMacro)
+      return;
+
     // This check only makes sense at -Onone. Optimizations,
     // e.g. inlining, can move scopes around.
     llvm::DenseSet<const SILDebugScope *> AlreadySeenScopes;
@@ -6252,6 +6257,10 @@ public:
       if (SI.isMetaInstruction())
         continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
+        continue;
+      // FIXME: These still leave holes in the scopes. We should make them
+      // inherit the sourrounding scope in IRGenSIL.
+      if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
 
       // If we haven't seen this debug scope yet, update the

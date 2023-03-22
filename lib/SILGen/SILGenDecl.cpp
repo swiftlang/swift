@@ -497,7 +497,8 @@ public:
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
                               Optional<MarkUninitializedInst::Kind> kind,
-                              uint16_t ArgNo, SILGenFunction &SGF)
+                              uint16_t ArgNo, bool generateDebugInfo,
+                              SILGenFunction &SGF)
       : decl(decl) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
@@ -513,8 +514,16 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILDebugVariable DbgVar(decl->isLet(), ArgNo);
-    Box = SGF.B.createAllocBox(decl, boxType, DbgVar);
+    
+    Optional<SILDebugVariable> DbgVar;
+    if (generateDebugInfo)
+      DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
+    Box = SGF.B.createAllocBox(decl, boxType, DbgVar, false, false, false
+#ifndef NDEBUG
+                               ,
+                               !generateDebugInfo
+#endif
+    );
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
@@ -810,19 +819,17 @@ public:
         MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
   }
 
-  void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne) {
+  void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
+                 SILLocation loc) {
     assert(!SGF.VarLocs.count(vd) && "Already emitted this vardecl?");
     // If we're binding an address to this let value, then we can use it as an
     // address later.  This happens when binding an address only parameter to
     // an argument, for example.
     if (value->getType().isAddress())
       address = value;
-    SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      value = getValueForLexicalLifetimeBinding(SGF, PrologueLoc, value,
-                                                wasPlusOne);
-    }
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
+      value = getValueForLexicalLifetimeBinding(SGF, loc, value, wasPlusOne);
 
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
@@ -830,8 +837,11 @@ public:
     // lifetime, if permitted to do so.
     if (!EmitDebugValueOnInit)
       return;
+
+    // Use the scope from loc and diagnostic location from vd.
+    RegularLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
-    SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
+    SILDebugVariable DbgVar(vd->getName().str(), vd->isLet(), /*ArgNo=*/0);
     SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
   }
 
@@ -850,12 +860,12 @@ public:
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
       bool isPlusOne = value.isPlusOne(SGF);
-      bindValue(value.forward(SGF), SGF, isPlusOne);
+      bindValue(value.forward(SGF), SGF, isPlusOne, loc);
     } else {
       // Disable the expression cleanup of the copy, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF, true);
+      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF, true, loc);
     }
   }
 
@@ -1305,8 +1315,12 @@ struct InitializationForPattern
   /// This is invalid for irrefutable pattern initializations.
   JumpDest patternFailDest;
 
-  InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest)
-    : SGF(SGF), patternFailDest(patternFailDest) {}
+  bool generateDebugInfo = true;
+
+  InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest,
+                           bool generateDebugInfo)
+      : SGF(SGF), patternFailDest(patternFailDest),
+        generateDebugInfo(generateDebugInfo) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
@@ -1334,7 +1348,8 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet());
+    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet(),
+                                            generateDebugInfo);
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -1381,7 +1396,8 @@ struct InitializationForPattern
 } // end anonymous namespace
 
 InitializationPtr
-SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
+                                             bool generateDebugInfo) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
@@ -1418,10 +1434,12 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
-    B.createAllocGlobal(vd, silG);
-    SILValue addr = B.createGlobalAddr(vd, silG);
+    RegularLocation loc(vd);
+    loc.markAutoGenerated();
+    B.createAllocGlobal(loc, silG);
+    SILValue addr = B.createGlobalAddr(loc, silG);
     if (isUninitialized)
-      addr = B.createMarkUninitializedVar(vd, addr);
+      addr = B.createMarkUninitializedVar(loc, addr);
 
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
@@ -1430,7 +1448,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
     if (isUninitialized) {
       uninitKind = MarkUninitializedInst::Kind::Var;
     }
-    Result = emitLocalVariableWithCleanup(vd, uninitKind);
+    Result = emitLocalVariableWithCleanup(vd, uninitKind, /*argno*/ 0,
+                                          generateDebugInfo);
   }
 
   // If we're initializing a weak or unowned variable, this requires a change in
@@ -1441,8 +1460,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   return Result;
 }
 
-void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
-                                        unsigned idx) {
+void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
+                                        bool generateDebugInfo) {
   auto &C = PBD->getASTContext();
 
   // If this is an async let, create a child task to compute the initializer
@@ -1497,8 +1516,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     return;
   }
 
-  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
-                                                         JumpDest::invalid());
+  auto initialization = emitPatternBindingInitialization(
+      PBD->getPattern(idx), JumpDest::invalid(), generateDebugInfo);
 
   auto getWrappedValueExpr = [&](VarDecl *var) -> Expr * {
     if (auto *orig = var->getOriginalWrappedProperty()) {
@@ -1528,7 +1547,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       }
     }
 
-    emitExprInto(initExpr, initialization.get(), SILLocation(PBD));
+    emitExprInto(initExpr, initialization.get());
   };
 
   auto *singleVar = PBD->getSingleVar();
@@ -1544,12 +1563,13 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   }
 }
 
-void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD,
+                                             bool generateDebugInfo) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   for (unsigned i : range(PBD->getNumPatternEntries())) {
-    emitPatternBinding(PBD, i);
+    emitPatternBinding(PBD, i, generateDebugInfo);
   }
 }
 
@@ -1580,9 +1600,6 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
 }
 
 void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
-  MacroScope scope(*this, CleanupLocation(D), D,
-                   D->getMacroName().getBaseIdentifier().str(),
-                   D->getMacroRef().getDecl());
   D->forEachExpandedExprOrStmt([&](ASTNode node) {
     if (auto *expr = node.dyn_cast<Expr *>())
       emitIgnoredExpr(expr);
@@ -1666,7 +1683,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
-      emitExprInto(elt.getInitializer(), initialization.get());
+      emitExprInto(elt.getInitializer(), initialization.get(), loc);
       // Pattern bindings handle their own tests, we don't need a boolean test.
       continue;
     }
@@ -1762,10 +1779,10 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
   }
 }
 
-InitializationPtr
-SILGenFunction::emitPatternBindingInitialization(Pattern *P,
-                                                 JumpDest failureDest) {
-  return InitializationForPattern(*this, failureDest).visit(P);
+InitializationPtr SILGenFunction::emitPatternBindingInitialization(
+    Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
+  return InitializationForPattern(*this, failureDest, generateDebugInfo)
+      .visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.
@@ -1929,9 +1946,10 @@ CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
 
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
-    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo) {
-  return InitializationPtr(
-      new LocalVariableInitialization(vd, kind, ArgNo, *this));
+    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo,
+    bool generateDebugInfo) {
+  return InitializationPtr(new LocalVariableInitialization(
+      vd, kind, ArgNo, generateDebugInfo, *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.
