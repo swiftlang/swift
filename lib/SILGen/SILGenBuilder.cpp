@@ -40,11 +40,24 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
+    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {
+  auto FirstInsn = insertBB->begin();
+  if (FirstInsn != insertBB->end())
+    setCurrentDebugScope(FirstInsn->getDebugScope());
+}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILBuilder(insertBB, insertInst), SGF(SGF) {}
+    : SILBuilder(insertBB, insertInst), SGF(SGF) {
+  if (insertInst != insertBB->end())
+    setCurrentDebugScope(insertInst->getDebugScope());
+}
+
+SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
+                                                    bool ForMetaInstruction) {
+  return SGF.getSILDebugLocation(*this, Loc, getCurrentDebugLocOverride(),
+                                 ForMetaInstruction);
+}
 
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs

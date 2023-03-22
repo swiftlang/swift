@@ -281,6 +281,9 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(SGF, CleanupLocation(S));
+  // This is a workaround until the FIXME in SILGenFunction::getOrCreateScope
+  // has been addressed. Property wrappers create incorrect source locations.
+  DebugScope DbgScope(SGF, S);
   // Keep in sync with DiagnosticsSIL.def.
   const unsigned ReturnStmtType   = 0;
   const unsigned BreakStmtType    = 1;
@@ -728,7 +731,6 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
 }
 
 void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
-  SGF.CurrentSILLoc = S;
   SILLocation Loc = S->isImplicit() ?
                       (SILLocation)ImplicitReturnLocation(S) :
                       (SILLocation)ReturnLocation(S);
@@ -768,8 +770,6 @@ void StmtEmitter::visitForgetStmt(ForgetStmt *S) {
 }
 
 void StmtEmitter::visitYieldStmt(YieldStmt *S) {
-  SGF.CurrentSILLoc = S;
-
   SmallVector<ArgumentSource, 4> sources;
   SmallVector<AbstractionPattern, 4> origTypes;
   for (auto yield : S->getYields()) {
@@ -1167,7 +1167,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
     SGF.emitPatternBinding(S->getIteratorVar(),
-                           /*index=*/0);
+                           /*index=*/0, /*debuginfo*/ true);
   }
 
   // If we ever reach an unreachable point, stop emitting statements.
@@ -1282,7 +1282,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           }
           if (!inputValue.isInContext())
             RValue(SGF, S, optConvertedTy.getOptionalObjectType(), inputValue)
-                .forwardInto(SGF, S, initLoopVars.get());
+                .forwardInto(SGF, S->getBody(), initLoopVars.get());
 
           // Now that the pattern has been initialized, check any where
           // condition.
@@ -1337,8 +1337,6 @@ void StmtEmitter::visitBreakStmt(BreakStmt *S) {
 }
 
 void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
-  CurrentSILLoc = loc;
-  
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
   for (auto &elt : BreakContinueDestStack) {
@@ -1353,8 +1351,6 @@ void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
 void StmtEmitter::visitContinueStmt(ContinueStmt *S) {
   assert(S->getTarget() && "Sema didn't fill in continue target?");
 
-  SGF.CurrentSILLoc = S;
-  
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
   for (auto &elt : SGF.BreakContinueDestStack) {

@@ -882,7 +882,11 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
       Inst->hasDynamicLifetime(), Inst->isLexical(),
-      Inst->getUsesMoveableValueDebugInfo());
+      Inst->getUsesMoveableValueDebugInfo()
+#ifndef NDEBUG
+    , true
+#endif
+  );
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -950,7 +954,12 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
       Inst,
       getBuilder().createAllocBox(
           Loc, this->getOpType(Inst->getType()).template castTo<SILBoxType>(),
-          VarInfo));
+          VarInfo, false, false, false
+#ifndef NDEBUG
+          ,
+          true
+#endif
+          ));
 }
 
 template<typename ImplClass>
