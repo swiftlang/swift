@@ -287,6 +287,13 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     ErrMsg += ModuleName;
     return true;
   }
+  if (Mod->failedToLoad() && ModuleName == "CxxStdlib") {
+    // We might fail to load the underlying Clang module
+    // for a Swift overlay module like 'CxxStdlib'. Make sure an error is reported in this case, so that we can either retry to load with C++ interoperability enabled, and if that fails, we can report this to the user.
+    ErrMsg = "Could not load underlying module for: ";
+    ErrMsg += ModuleName;
+    return true;
+  }
 
   PrintOptions Options = PrintOptions::printModuleInterface(
       Ctx.TypeCheckerOpts.PrintFullConvention);
