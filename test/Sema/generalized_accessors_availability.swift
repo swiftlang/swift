@@ -131,6 +131,20 @@ func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unav
   x.$wrapped_modify_more_available = 0 // expected-error {{is unavailable in macOS}}
 }
 
+@available(iOS, unavailable)
+@_spi_available(macOS, introduced: 10.51)
+extension Butt {
+  struct NestedInSPIAvailableExtension {
+    @available(macOS, unavailable)
+    public var unavailable: Int // expected-note {{'unavailable' has been explicitly marked unavailable here}}
+  }
+}
+
+@available(macOS, introduced: 10.51)
+func testButtNested(x: inout Butt.NestedInSPIAvailableExtension) {
+  x.unavailable = 0 // expected-error {{is unavailable in macOS}}
+}
+
 @available(macOS 11.0, *)
 struct LessAvailable {
   @SetterConditionallyAvailable

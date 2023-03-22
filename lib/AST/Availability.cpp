@@ -109,15 +109,6 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
   llvm::VersionTuple Obsoleted =
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
-  // If a decl is unavailable then it cannot have any introduced, deprecated, or
-  // obsoleted version.
-  if (Inferred.PlatformAgnostic ==
-      PlatformAgnosticAvailabilityKind::Unavailable) {
-    Introduced = llvm::VersionTuple();
-    Deprecated = llvm::VersionTuple();
-    Obsoleted = llvm::VersionTuple();
-  }
-
   return new (Context)
       AvailableAttr(SourceLoc(), SourceRange(), Platform,
                     Message, Rename, RenameDecl,
@@ -167,27 +158,6 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 
   DeclAttributes &Attrs = ToDecl->getAttrs();
-
-  // Some kinds of platform agnostic availability supersede any platform
-  // specific availability.
-  auto InferredAgnostic = Inferred.find(PlatformKind::none);
-  if (InferredAgnostic != Inferred.end()) {
-    switch (InferredAgnostic->second.PlatformAgnostic) {
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-      Attrs.add(createAvailableAttr(PlatformKind::none,
-                                    InferredAgnostic->second, Message, Rename,
-                                    RenameDecl, Context));
-      return;
-
-    case PlatformAgnosticAvailabilityKind::None:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    case PlatformAgnosticAvailabilityKind::NoAsync:
-      break;
-    }
-  }
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
