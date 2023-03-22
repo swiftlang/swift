@@ -5316,6 +5316,12 @@ ERROR(vararg_not_allowed,none,
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument list", (Type))
+ERROR(expansion_expr_not_allowed,none,
+      "value pack expansion can only appear inside a function argument list "
+      "or tuple element", ())
+ERROR(invalid_expansion_argument,none,
+      "cannot pass value pack expansion to non-pack parameter of type %0",
+      (Type))
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
