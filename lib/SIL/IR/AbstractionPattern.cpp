@@ -2310,10 +2310,13 @@ const {
   if (yieldType)
     yieldType = yieldType->getReducedType(substSig);
   
+  // Note that we specifically do not want to put subMap in the
+  // abstraction patterns here, because the types we will be lowering
+  // against them will not be substituted.
   return std::make_tuple(
-          AbstractionPattern(subMap, substSig, substTy->getReducedType(substSig)),
+          AbstractionPattern(substSig, substTy->getReducedType(substSig)),
           subMap,
           yieldType
-            ? AbstractionPattern(subMap, substSig, yieldType)
+            ? AbstractionPattern(substSig, yieldType)
             : AbstractionPattern::getInvalid());
 }

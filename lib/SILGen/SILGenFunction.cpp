@@ -687,7 +687,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     SILDeclRef(ace));
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
-             SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
+             OrigFnType);
   prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
 
   emitProfilerIncrement(ace);
@@ -1231,7 +1231,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   }
 
   emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
-                  interfaceType, dc, /*throws=*/ false,SourceLoc());
+                  interfaceType, dc, /*throws=*/ false,SourceLoc(),
+                  /*ignored parameters*/ 0);
   prepareEpilog(interfaceType, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
