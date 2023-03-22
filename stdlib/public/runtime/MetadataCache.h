@@ -591,7 +591,7 @@ public:
                    const void *const *data, uint32_t hash)
       : Data(data), Layout(layout), Hash(hash) {}
 
-  bool operator==(MetadataCacheKey rhs) const {
+  bool operator==(const MetadataCacheKey &rhs) const {
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
