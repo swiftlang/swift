@@ -184,11 +184,11 @@ bb0(%0 : @guaranteed $D):
 // CHECK:   def: %{{.*}} = copy_value %0 : $C
 // CHECK:   def: %{{.*}} = move_value [[CP0]] : $C
 // CHECK:   def: %{{.*}} = argument of bb4 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveWithin,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb4: LiveWithin,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb2: LiveWithin
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: bb1: LiveWithin
 // CHECK: last user:   br bb4
 // CHECK-NEXT: last user:   br bb4
 // CHECK-NEXT: last user:   %{{.*}} = move_value [[CP0]] : $C
@@ -229,10 +229,10 @@ bb4(%phi : @owned $C):
 // CHECK-LABEL: testSSADeadRefElementAddr: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: Incomplete liveness: Escaping address
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveOut,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb1: LiveOut,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb1: LiveOut
 // CHECK: last user:
 // CHECK-SAME: ref_element_addr %6 : $D, #D.object
 // CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
@@ -260,7 +260,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-LABEL: testSSAInnerReborrowedPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
-// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: bb0: LiveWithin
 // CHECK-NEXT: dead def: %0 = argument of bb0 : $C
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -288,9 +288,9 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 //
 // CHECK-LABEL: testSSADeadGuaranteedPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveWithin,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb2: LiveWithin
+// CHECK-NEXT: bb1: LiveWithin
 // CHECK-NEXT: regular user
 // CHECK: last user:
 // CHECK-SAME: br bb3
@@ -318,10 +318,10 @@ bb3(%deadPhi : @guaranteed $D):
 //
 // CHECK-LABEL: testSSADominatedPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveOut,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb1: LiveOut,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb1: LiveOut
 // CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
 // CHECK-NEXT: regular user:   br bb3
 // CHECK-NEXT: regular user:   %{{.*}} = load
@@ -354,8 +354,8 @@ bb3(%phi : @guaranteed $D):
 //
 // CHECK-LABEL: testSSAPartialDominatedPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
 // CHECK: last user:
 // CHECK-SAME: load
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
@@ -381,7 +381,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 //
 // CHECK-LABEL: testSSAReborrowedPhi: ssa-liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
-// CHECK-NEXT: bb0: LiveWithin,
+// CHECK-NEXT: bb0: LiveWithin
 // CHECK-NEXT: regular user: br bb1
 // CHECK-NEXT: regular user: %{{.*}} = struct
 // CHECK-NEXT: last user: br bb1

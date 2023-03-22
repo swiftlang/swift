@@ -385,8 +385,8 @@ private:
     if (!function->hasOwnership())
       return;
 
-    DiagnoseLifetimeIssues diagnoser;
-    diagnoser.diagnose(function);
+    DiagnoseLifetimeIssues diagnoser(function);
+    diagnoser.diagnose();
   }
 };
 
