@@ -2118,16 +2118,15 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   if (!Imports)
     return;
 
-  bool moduleIsResilient = getParentModule()->getResilienceStrategy() ==
-                             ResilienceStrategy::Resilient;
   for (auto desc : *Imports) {
     ModuleDecl::ImportFilter requiredFilter;
     if (desc.options.contains(ImportFlags::Exported))
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
-    else if (desc.options.contains(ImportFlags::ImplementationOnly) ||
-             (desc.accessLevel <= AccessLevel::Internal && moduleIsResilient))
+    else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    else if (desc.accessLevel <= AccessLevel::Package && moduleIsResilient)
+    else if (desc.accessLevel <= AccessLevel::Internal)
+      requiredFilter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+    else if (desc.accessLevel <= AccessLevel::Package)
       requiredFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
@@ -2483,6 +2482,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
   topLevelFilter |= ModuleDecl::ImportFilterKind::PackageOnly,
   topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   topLevel->getImportedModules(stack, topLevelFilter);

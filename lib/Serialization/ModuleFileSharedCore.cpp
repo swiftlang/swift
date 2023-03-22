@@ -1021,6 +1021,8 @@ getActualImportControl(unsigned rawValue) {
     return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  case static_cast<unsigned>(serialization::ImportControl::InternalOrBelow):
+    return ModuleDecl::ImportFilterKind::InternalOrBelow;
   case static_cast<unsigned>(serialization::ImportControl::PackageOnly):
     return ModuleDecl::ImportFilterKind::PackageOnly;
   default:
@@ -1694,6 +1696,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     return ModuleLoadingBehavior::Required;
   }
 
+  bool moduleIsResilient = getResilienceStrategy() ==
+                             ResilienceStrategy::Resilient;
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
@@ -1709,10 +1713,24 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     }
   }
 
+  if (dependency.isInternalOrBelow()) {
+    // Non-public imports are similar to implementation-only, the module
+    // loading behavior differs on loading those dependencies
+    // on testable imports.
+    if (isTestable() || !moduleIsResilient) {
+      return ModuleLoadingBehavior::Required;
+    } else if (debuggerMode) {
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
   if (dependency.isPackageOnly()) {
     // Package dependencies are usually loaded only for import from the same
     // package.
-    if (!packageName.empty() && packageName == getModulePackageName()) {
+    if ((!packageName.empty() && packageName == getModulePackageName()) ||
+        !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
       return ModuleLoadingBehavior::Optional;

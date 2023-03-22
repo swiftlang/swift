@@ -1218,6 +1218,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
   ImportSet packageOnlyImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::PackageOnly);
+  ImportSet internalOrBelowImportSet =
+      getImportsAsSet(M, ModuleDecl::ImportFilterKind::InternalOrBelow);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1267,6 +1269,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       stableImportControl = ImportControl::Normal;
     else if (packageOnlyImportSet.count(import))
       stableImportControl = ImportControl::PackageOnly;
+    else if (internalOrBelowImportSet.count(import))
+      stableImportControl = ImportControl::InternalOrBelow;
     else
       stableImportControl = ImportControl::ImplementationOnly;
 
