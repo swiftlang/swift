@@ -378,7 +378,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -412,6 +412,8 @@ public:
         DiagName = "architecture"; break;
       case PlatformConditionKind::Endianness:
         DiagName = "endianness"; break;
+      case PlatformConditionKind::PointerBitWidth:
+        DiagName = "pointer bit width"; break;
       case PlatformConditionKind::CanImport:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
