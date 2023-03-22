@@ -3391,8 +3391,6 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   if (Tok.isFollowingLParen()) {
     auto result = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic,
                                 /*allowTrailingClosure*/ true);
-    if (result.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
     argList = result.getPtrOrNull();
     status |= result;
   } else if (Tok.is(tok::l_brace) &&

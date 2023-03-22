@@ -1419,3 +1419,22 @@ func testRdar89773376(arry: [Int]) {
 // RDAR89773376-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#intVal: Int#}[')'][#Rdar89773376#];
 // RDAR89773376: End completions
 }
+
+// This is an incomplete macro definition but it's sufficient to get the signature for code completion purposes
+@freestanding(expression)
+macro MyMacro(myArg: Int)
+
+func testMacroCallPattern() {
+  #MyMacro(#^MACRO_CALL_PATTERN^#
+// MACRO_CALL_PATTERN: Begin completions, 1 items
+// MACRO_CALL_PATTERN: Pattern/CurrModule/Flair[ArgLabels]: ['(']{#myArg: Int#}[')'][#Void#]; name=myArg:
+// MACRO_CALL_PATTERN: End completions
+}
+
+func testMacroArg() {
+  #MyMacro(myArg: #^MACRO_CALL_ARG^#
+// MACRO_CALL_ARG: Begin completions
+// MACRO_CALL_ARG-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#]; name=0
+// MACRO_CALL_ARG-DAG: Literal[Boolean]/None:              true[#Bool#]; name=true
+// MACRO_CALL_ARG: End completions
+}
