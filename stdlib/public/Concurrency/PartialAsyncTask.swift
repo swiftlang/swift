@@ -105,13 +105,13 @@ extension UnownedJob: CustomStringConvertible {
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-//// A unit of scheduleable work.
+/// A unit of scheduleable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.9, *)
 @frozen
-@_moveOnly
+// @_moveOnly // FIXME(moveonly): rdar://107050387 Move-only types fail to be found sometimes, must fix or remove Job before shipping
 public struct Job: Sendable {
   internal var context: Builtin.Job
 
