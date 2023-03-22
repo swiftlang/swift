@@ -4311,6 +4311,23 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
+  // Binding to a pack expansion type is always an error. This indicates
+  // that a pack expansion expression was used in a context that doesn't
+  // support it.
+  if (type->is<PackExpansionType>()) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    auto *fix =
+        AllowInvalidPackExpansion::create(*this, getConstraintLocator(locator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+
+    // Don't allow the pack expansion type to propagate to other
+    // bindings.
+    type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
+  }
+
   // We do not allow keypaths to go through AnyObject. Let's create a fix
   // so this can be diagnosed later.
   if (auto loc = typeVar->getImpl().getLocator()) {
@@ -7152,6 +7169,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                      locator);
     }
     }
+  }
+
+  // Matching types where one side is a pack expansion and the other is not
+  // means a pack expansion was used where it isn't supported.
+  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (type1->isPlaceholder() || type2->isPlaceholder())
+      return getTypeMatchSuccess();
+
+    auto *loc = getConstraintLocator(locator);
+    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
   }
 
   if (kind >= ConstraintKind::Conversion) {
@@ -14171,6 +14204,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::MustBeCopyable:
   case FixKind::AllowInvalidPackElement:
   case FixKind::AllowInvalidPackReference:
+  case FixKind::AllowInvalidPackExpansion:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::GenericArgumentsMismatch: {

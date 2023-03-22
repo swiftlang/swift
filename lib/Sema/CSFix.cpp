@@ -1429,6 +1429,18 @@ AllowInvalidPackReference::create(ConstraintSystem &cs, Type packType,
       AllowInvalidPackReference(cs, packType, locator);
 }
 
+bool AllowInvalidPackExpansion::diagnose(const Solution &solution,
+                                         bool asNote) const {
+  InvalidPackExpansion failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPackExpansion *
+AllowInvalidPackExpansion::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInvalidPackExpansion(cs, locator);
+}
+
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
   CollectionElementContextualFailure failure(

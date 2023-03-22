@@ -39,6 +39,7 @@ func coerceExpansion<each T>(_ value: repeat each T) {
 func localValuePack<each T>(_ t: repeat each T) -> (repeat each T, repeat each T) {
   let local = repeat each t
   let localAnnotated: repeat each T = repeat each t
+  // expected-error@-1{{value pack expansion can only appear inside a function argument list or tuple element}}
 
   return (repeat each local, repeat each localAnnotated)
 }
@@ -52,14 +53,14 @@ protocol P {
 }
 
 func outerArchetype<each T, U>(t: repeat each T, u: U) where each T: P {
-  let _: repeat (each T.A, U) = repeat ((each t).value, u)
+  let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
 }
 
 func sameElement<each T, U>(t: repeat each T, u: U) where each T: P, each T == U {
 // expected-error@-1{{same-element requirements are not yet supported}}
 
   // FIXME: Opened element archetypes in diagnostics
-  let _: repeat each T = repeat (each t).f(u)
+  let _: (repeat each T) = (repeat (each t).f(u))
   // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'τ_1_0'}}
 }
 
@@ -68,13 +69,13 @@ func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     // expected-error@-1{{same-element requirements are not yet supported}}
 
   // FIXME: Opened element archetypes in diagnostics
-  _ = repeat (each c).forEach(function)
+  _ = (repeat (each c).forEach(function))
   // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntegerLiteral {
-  _ = repeat Array<each T>()
-  _ = repeat 1 as each T
+  _ = (repeat Array<each T>())
+  _ = (repeat 1 as each T)
 
   _ = Array<each T>() // expected-error {{pack reference 'T' requires expansion using keyword 'repeat'}}
   _ = 1 as each T // expected-error {{pack reference 'T' requires expansion using keyword 'repeat'}}
@@ -82,9 +83,9 @@ func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntege
 }
 
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
-  _ = repeat (each t, each u) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = repeat Array<(each T, each U)>() // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = repeat (Array<each T>(), each u) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
 }
 
 func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
@@ -239,4 +240,24 @@ func packOutsideExpansion<each T>(_ t: repeat each T) {
 
   _ = each tuple.element
   // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+}
+
+func identity<T>(_ t: T) -> T { t }
+func concrete(_: Int) {}
+
+func invalidRepeat<each T>(t: repeat each T) {
+  _ = repeat each t
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+
+  let _: Int = repeat each t
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+
+  identity(identity(repeat each t))
+  // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'T'}}
+
+  concrete(repeat each t)
+  // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
+
+  _ = [repeat each t]
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
 }
