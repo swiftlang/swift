@@ -301,9 +301,30 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
     && toTy.isHeapObjectReferenceType();
 }
 
+static bool needsFieldSubstitutions(const AbstractionPattern &origType) {
+  if (origType.isTypeParameter()) return false;
+  auto type = origType.getType();
+  if (!type->hasTypeParameter()) return false;
+  return type.findIf([](CanType type) {
+    return isa<PackExpansionType>(type);
+  });
+}
+
+static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
+                                          ValueDecl *field,
+                                          AbstractionPattern &origType) {
+  if (needsFieldSubstitutions(origType)) {
+    auto subMap = ty.getASTType()->getContextSubstitutionMap(
+                    &TC.M, field->getDeclContext());
+    origType = origType.withSubstitutions(subMap);
+  }
+}
+
 SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
                               TypeExpansionContext context) const {
   AbstractionPattern origFieldTy = TC.getAbstractionPattern(field);
+  addFieldSubstitutionsIfNeeded(TC, *this, field, origFieldTy);
+
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
@@ -371,6 +392,9 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
     return SILType(SILType::getPrimitiveObjectType(box).getASTType(),
                    getCategory());
   }
+
+  auto origEltType = TC.getAbstractionPattern(elt);
+  addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
       &TC.M, elt, elt->getArgumentInterfaceType());
