@@ -565,7 +565,10 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
   llvm::Value *offset = loadTupleOffsetFromMetadata(IGF, metadata, index);
   auto *gep =
       IGF.emitByteOffsetGEP(tuple.getAddress(), offset, IGF.IGM.OpaqueTy);
-  return Address(gep, IGF.IGM.OpaqueTy, IGF.IGM.getPointerAlignment());
+  auto elementAddress = Address(gep, IGF.IGM.OpaqueTy,
+                                IGF.IGM.getPointerAlignment());
+  return IGF.Builder.CreateElementBitCast(elementAddress,
+                                          IGF.IGM.getStorageType(elementType));
 }
 
 Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,

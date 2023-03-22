@@ -1966,13 +1966,13 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
-  // Get the primary archetype.
-  auto root = t->getRoot();
-
-  // If there is no primary (IOW, it's an opened archetype), the archetype is
-  // an exemplar.
-  if (!isa<PrimaryArchetypeType>(root) && !isa<VariadicSequenceType>(root))
+  if (isa<LocalArchetypeType>(t) || isa<OpaqueTypeArchetypeType>(t))
     return t;
+
+  assert(isa<PrimaryArchetypeType>(t) || isa<PackArchetypeType>(t));
+
+  // Get the root archetype.
+  auto root = t->getRoot();
 
   // Retrieve the generic environment of the archetype.
   auto genericEnv = root->getGenericEnvironment();
