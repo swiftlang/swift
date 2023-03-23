@@ -485,7 +485,7 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
     // Fast path for concrete case -- we don't need to compute substType
     // at all.
     if (conformance.isConcrete() &&
-        !IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes)) {
+        !IFS.shouldSubstituteOpaqueArchetypes()) {
       newConformances.push_back(
         ProtocolConformanceRef(conformance.getConcrete()->subst(IFS)));
     } else {

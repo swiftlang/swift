@@ -59,6 +59,10 @@ public:
     return Options;
   }
 
+  bool shouldSubstituteOpaqueArchetypes() const {
+    return Options.contains(SubstFlags::SubstituteOpaqueArchetypes);
+  }
+
   /// Is the given type invariant to substitution?
   bool isInvariant(Type type) const;
 };
