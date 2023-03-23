@@ -18,6 +18,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
@@ -162,9 +163,8 @@ PackConformance *PackConformance::getAssociatedConformance(
 
 ProtocolConformanceRef PackConformance::subst(SubstitutionMap subMap,
                                               SubstOptions options) const {
-  return subst(QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
+  InFlightSubstitutionViaSubMap IFS(subMap, options);
+  return subst(IFS);
 }
 
 // TODO: Move this elsewhere since it's generally useful
@@ -206,14 +206,9 @@ namespace {
 template<typename ImplClass>
 class PackExpander {
 protected:
-  TypeSubstitutionFn subs;
-  LookupConformanceFn conformances;
-  SubstOptions options;
+  InFlightSubstitution &IFS;
 
-  PackExpander(TypeSubstitutionFn subs,
-               LookupConformanceFn conformances,
-               SubstOptions options)
-    : subs(subs), conformances(conformances), options(options) {}
+  PackExpander(InFlightSubstitution &IFS) : IFS(IFS) {}
 
   ImplClass *asImpl() {
     return static_cast<ImplClass *>(this);
@@ -233,7 +228,7 @@ protected:
     // the expanded count pack type.
     llvm::SmallDenseMap<Type, PackType *, 2> expandedPacks;
     for (auto origParamType : rootParameterPacks) {
-      auto substParamType = origParamType.subst(subs, conformances, options);
+      auto substParamType = origParamType.subst(IFS);
 
       if (auto expandedParamType = substParamType->template getAs<PackType>()) {
         assert(arePackShapesEqual(expandedParamType, expandedCountType) &&
@@ -262,7 +257,7 @@ protected:
         }
 
         // Compute the substituted type using our parent substitutions.
-        auto substType = Type(type).subst(subs, conformances, options);
+        auto substType = Type(type).subst(IFS);
 
         // If the substituted type is a pack, project the jth element.
         if (isRootParameterPack(type)) {
@@ -277,12 +272,13 @@ protected:
           return packType->getElementType(j);
         }
 
-        return subs(type);
+        return IFS.substType(type);
       };
 
       auto projectedConformances = [&](CanType origType, Type substType,
                                        ProtocolDecl *proto) -> ProtocolConformanceRef {
-        auto substConformance = conformances(origType, substType, proto);
+        auto substConformance =
+          IFS.lookupConformance(origType, substType, proto);
 
         // If the substituted conformance is a pack, project the jth element.
         if (isRootedInParameterPack(origType)) {
@@ -294,7 +290,7 @@ protected:
 
       auto origCountElement = expandedCountType->getElementType(j);
       auto substCountElement = origCountElement.subst(
-          projectedSubs, projectedConformances, options);
+          projectedSubs, projectedConformances, IFS.getOptions());
 
       asImpl()->add(origCountElement, substCountElement, i);
     }
@@ -304,7 +300,7 @@ protected:
   /// form a new pack expansion.
   void addUnexpandedExpansion(Type origPatternType, Type substCountType,
                               unsigned i) {
-    auto substPatternType = origPatternType.subst(subs, conformances, options);
+    auto substPatternType = origPatternType.subst(IFS);
     auto substExpansion = PackExpansionType::get(substPatternType, substCountType);
 
     asImpl()->add(origPatternType, substExpansion, i);
@@ -313,7 +309,7 @@ protected:
   /// Scalar elements of the original pack are substituted and added to the
   /// flattened pack.
   void addScalar(Type origElement, unsigned i) {
-    auto substElement = origElement.subst(subs, conformances, options);
+    auto substElement = origElement.subst(IFS);
 
     asImpl()->add(origElement, substElement, i);
   }
@@ -323,7 +319,7 @@ protected:
     auto origPatternType = origExpansion->getPatternType();
     auto origCountType = origExpansion->getCountType();
 
-    auto substCountType = origCountType.subst(subs, conformances, options);
+    auto substCountType = origCountType.subst(IFS);
 
     // If the substituted count type is a pack, we're expanding the
     // original element.
@@ -358,19 +354,16 @@ public:
 
   ArrayRef<ProtocolConformanceRef> origConformances;
 
-  PackConformanceExpander(TypeSubstitutionFn subs,
-                          LookupConformanceFn conformances,
-                          SubstOptions options,
+  PackConformanceExpander(InFlightSubstitution &IFS,
                           ArrayRef<ProtocolConformanceRef> origConformances)
-    : PackExpander(subs, conformances, options),
-      origConformances(origConformances) {}
+    : PackExpander(IFS), origConformances(origConformances) {}
 
   void add(Type origType, Type substType, unsigned i) {
     substElements.push_back(substType);
 
     // FIXME: Pass down projection callbacks
     substConformances.push_back(origConformances[i].subst(
-        origType, subs, conformances, options));
+        origType, IFS));
   }
 };
 
@@ -379,8 +372,13 @@ public:
 ProtocolConformanceRef PackConformance::subst(TypeSubstitutionFn subs,
                                               LookupConformanceFn conformances,
                                               SubstOptions options) const {
-  PackConformanceExpander expander(subs, conformances, options,
-                                   getPatternConformances());
+  InFlightSubstitution IFS(subs, conformances, options);
+  return subst(IFS);
+}
+
+ProtocolConformanceRef
+PackConformance::subst(InFlightSubstitution &IFS) const {
+  PackConformanceExpander expander(IFS, getPatternConformances());
   expander.expand(ConformingType);
 
   auto &ctx = Protocol->getASTContext();

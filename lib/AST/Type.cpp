@@ -27,6 +27,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -4388,12 +4389,11 @@ CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
            getPointer()->substGenericArgs(subs)->getCanonicalType());
 }
 
-static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
+static Type getMemberForBaseType(InFlightSubstitution &IFS,
                                  Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
-                                 Identifier name,
-                                 SubstOptions options) {
+                                 Identifier name) {
   // Produce a dependent member type for the given base type.
   auto getDependentMemberType = [&](Type baseType) {
     if (assocType)
@@ -4441,7 +4441,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   auto proto = assocType->getProtocol();
   ProtocolConformanceRef conformance =
-      lookupConformances(origBase->getCanonicalType(), substBase, proto);
+    IFS.lookupConformance(origBase->getCanonicalType(), substBase, proto);
 
   if (conformance.isInvalid())
     return failed();
@@ -4456,7 +4456,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
         assocType->getDeclaredInterfaceType());
   } else if (conformance.isConcrete()) {
     auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType,
+                                                         IFS.getOptions());
 
     witnessTy = witness.getWitnessType();
     if (!witnessTy || witnessTy->hasError())
@@ -4464,7 +4465,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes) {
+    if (IFS.getOptions() & SubstFlags::DesugarMemberTypes) {
       if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
         witnessTy = aliasType->getSinglyDesugaredType();
 
@@ -4567,8 +4568,9 @@ Type DependentMemberType::substBaseType(Type substBase,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(lookupConformance, getBase(), substBase,
-                              getAssocType(), getName(), None);
+  InFlightSubstitution IFS(nullptr, lookupConformance, None);
+  return getMemberForBaseType(IFS, getBase(), substBase,
+                              getAssocType(), getName());
 }
 
 Type DependentMemberType::substRootParam(Type newRoot,
@@ -4585,15 +4587,12 @@ Type DependentMemberType::substRootParam(Type newRoot,
 }
 
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
-                                     TypeSubstitutionFn substitutions,
-                                     LookupConformanceFn lookupConformances,
-                                     SubstOptions options) {
+                                     InFlightSubstitution &IFS) {
   // Substitute into the function type (without generic signature).
   auto *bareFnType = FunctionType::get(genericFnType->getParams(),
                                        genericFnType->getResult(),
                                        genericFnType->getExtInfo());
-  Type result =
-    Type(bareFnType).subst(substitutions, lookupConformances, options);
+  Type result = Type(bareFnType).subst(IFS);
   if (!result || result->is<ErrorType>()) return result;
 
   auto *fnType = result->castTo<FunctionType>();
@@ -4601,8 +4600,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   bool anySemanticChanges = false;
   SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto param : genericFnType->getGenericParams()) {
-    Type paramTy =
-      Type(param).subst(substitutions, lookupConformances, options);
+    Type paramTy = Type(param).subst(IFS);
     if (!paramTy)
       return Type();
 
@@ -4624,7 +4622,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   SmallVector<Requirement, 2> requirements;
   for (const auto &req : genericFnType->getRequirements()) {
     // Substitute into the requirement.
-    auto substReqt = req.subst(substitutions, lookupConformances, options);
+    auto substReqt = req.subst(IFS);
 
     // Did anything change?
     if (!anySemanticChanges &&
@@ -4654,27 +4652,27 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                   fnType->getResult(), fnType->getExtInfo());
 }
 
-static Type substType(Type derivedType,
-                      TypeSubstitutionFn substitutions,
-                      LookupConformanceFn lookupConformances,
-                      SubstOptions options) {
+bool InFlightSubstitution::isInvariant(Type derivedType) const {
+  return !derivedType->hasArchetype()
+      && !derivedType->hasTypeParameter()
+      && (!Options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+          || !derivedType->hasOpaqueArchetype());
+}
+
+static Type substType(Type derivedType, InFlightSubstitution &IFS) {
   // Handle substitutions into generic function types.
   if (auto genericFnType = derivedType->getAs<GenericFunctionType>()) {
-    return substGenericFunctionType(genericFnType, substitutions,
-                                    lookupConformances, options);
+    return substGenericFunctionType(genericFnType, IFS);
   }
 
   // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
-  if (!derivedType->hasArchetype()
-      && !derivedType->hasTypeParameter()
-      && (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
-          || !derivedType->hasOpaqueArchetype()))
+  if (IFS.isInvariant(derivedType))
     return derivedType;
 
   return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
     // FIXME: Add SIL versions of mapTypeIntoContext() and
     // mapTypeOutOfContext() and use them appropriately
-    assert((options.contains(SubstFlags::AllowLoweredTypes) ||
+    assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type)) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
@@ -4683,7 +4681,7 @@ static Type substType(Type derivedType,
     // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
-      auto newSubMap = subMap.subst(substitutions, lookupConformances, options);
+      auto newSubMap = subMap.subst(IFS);
 
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
@@ -4691,10 +4689,8 @@ static Type substType(Type derivedType,
     }
 
     if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
-      auto patternTy = substType(packExpansionTy->getPatternType(),
-                                 substitutions, lookupConformances, options);
-      auto countTy = substType(packExpansionTy->getCountType(),
-                               substitutions, lookupConformances, options);
+      auto patternTy = substType(packExpansionTy->getPatternType(), IFS);
+      auto countTy = substType(packExpansionTy->getCountType(), IFS);
       if (auto *archetypeTy = countTy->getAs<PackArchetypeType>())
         countTy = archetypeTy->getReducedShape();
 
@@ -4705,11 +4701,11 @@ static Type substType(Type derivedType,
       if (silFnTy->isPolymorphic())
         return None;
       if (auto subs = silFnTy->getInvocationSubstitutions()) {
-        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        auto newSubs = subs.subst(IFS);
         return silFnTy->withInvocationSubstitutions(newSubs);
       }
       if (auto subs = silFnTy->getPatternSubstitutions()) {
-        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        auto newSubs = subs.subst(IFS);
         return silFnTy->withPatternSubstitutions(newSubs);
       }
       return None;
@@ -4719,14 +4715,11 @@ static Type substType(Type derivedType,
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
       Type parentTy;
       if (auto origParentTy = aliasTy->getParent())
-        parentTy = substType(origParentTy,
-                             substitutions, lookupConformances, options);
-      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
-                                    substitutions, lookupConformances, options);
+        parentTy = substType(origParentTy, IFS);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(), IFS);
       if (parentTy && parentTy->isExistentialType())
         return underlyingTy;
-      auto subMap = aliasTy->getSubstitutionMap()
-          .subst(substitutions, lookupConformances, options);
+      auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
       return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
                                      subMap, underlyingTy));
     }
@@ -4736,12 +4729,11 @@ static Type substType(Type derivedType,
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-      auto newBase = substType(depMemTy->getBase(),
-                               substitutions, lookupConformances, options);
-      return getMemberForBaseType(lookupConformances,
+      auto newBase = substType(depMemTy->getBase(), IFS);
+      return getMemberForBaseType(IFS,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
-                                  depMemTy->getName(), options);
+                                  depMemTy->getName());
     }
     
     auto substOrig = dyn_cast<SubstitutableType>(type);
@@ -4750,13 +4742,13 @@ static Type substType(Type derivedType,
 
     // Opaque types can't normally be directly substituted unless we
     // specifically were asked to substitute them.
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes)
         && isa<OpaqueTypeArchetypeType>(substOrig))
       return None;
 
     // If we have a substitution for this type, use it.
-    if (auto known = substitutions(substOrig)) {
-      if (options.contains(SubstFlags::SubstituteOpaqueArchetypes) &&
+    if (auto known = IFS.substType(substOrig)) {
+      if (IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes) &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
         return None; // Recursively process the substitutions of the opaque type
@@ -4784,8 +4776,7 @@ static Type substType(Type derivedType,
     assert(parent && "Not a nested archetype");
 
     // Substitute into the parent type.
-    Type substParent = substType(parent, substitutions,
-                                 lookupConformances, options);
+    Type substParent = substType(parent, IFS);
 
     // If the parent didn't change, we won't change.
     if (substParent.getPointer() == parent)
@@ -4795,23 +4786,26 @@ static Type substType(Type derivedType,
     AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
         ->castTo<DependentMemberType>()->getAssocType();
 
-    return getMemberForBaseType(lookupConformances, parent, substParent,
-                                assocType, assocType->getName(), options);
+    return getMemberForBaseType(IFS, parent, substParent,
+                                assocType, assocType->getName());
   });
 }
 
 Type Type::subst(SubstitutionMap substitutions,
                  SubstOptions options) const {
-  return substType(*this,
-                   QuerySubstitutionMap{substitutions},
-                   LookUpConformanceInSubstitutionMap(substitutions),
-                   options);
+  InFlightSubstitutionViaSubMap IFS(substitutions, options);
+  return substType(*this, IFS);
 }
 
 Type Type::subst(TypeSubstitutionFn substitutions,
                  LookupConformanceFn conformances,
                  SubstOptions options) const {
-  return substType(*this, substitutions, conformances, options);
+  InFlightSubstitution IFS(substitutions, conformances, options);
+  return substType(*this, IFS);
+}
+
+Type Type::subst(InFlightSubstitution &IFS) const {
+  return substType(*this, IFS);
 }
 
 DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
