@@ -191,10 +191,10 @@ private:
   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr;
 
   /// Only a clean bitfield can be initialized.
-  SWIFT_ASSERT_ONLY_DECL(bool cleanFlag = true);
+  bool cleanFlag = true;
 
   /// Once the first def has been initialized, uses can be added.
-  SWIFT_ASSERT_ONLY_DECL(bool initializedFlag = false);
+  bool initializedFlag = false;
 
 public:
   PrunedLiveBlocks(SILFunction *function,
