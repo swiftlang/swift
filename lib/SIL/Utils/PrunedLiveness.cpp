@@ -542,6 +542,8 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
   }
   // Handle a live-out or live-within block with potentially multiple defs
   unsigned prevCount = boundary.deadDefs.size() + boundary.lastUsers.size();
+  (void)prevCount;
+
   bool isLive = isLiveOut;
   for (auto &inst : llvm::reverse(*block)) {
     // Check if the instruction is a def before checking whether it is a
