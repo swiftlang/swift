@@ -96,6 +96,10 @@ follows:
 |                 |         | only has effect on platforms that have a symbol  |
 |                 |         | cache that can be controlled by the runtime.     |
 +-----------------+---------+--------------------------------------------------+
+| output-to       | stdout  | Set to ``stderr`` to send the backtrace to the   |
+|                 |         | standard error instead of standard output.  This |
+|                 |         | may be useful in some CI systems.                |
++-----------------+---------+--------------------------------------------------+
 | swift-backtrace |         | If specified, gives the full path to the         |
 |                 |         | swift-backtrace binary to use for crashes.       |
 |                 |         | Otherwise, Swift will locate the binary relative |
