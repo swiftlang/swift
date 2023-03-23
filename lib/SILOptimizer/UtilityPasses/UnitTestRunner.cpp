@@ -124,7 +124,11 @@ class UnitTestRunner : public SILFunctionTransform {
                  << name << " with: ";
     for (unsigned long index = 0, size = components.size(); index < size;
          ++index) {
-      llvm::errs() << components[index];
+      auto componentString = components[index].trim();
+      if (componentString.empty())
+        continue;
+
+      llvm::errs() << componentString;
       if (index != size - 1) {
         llvm::errs() << ", ";
       }
