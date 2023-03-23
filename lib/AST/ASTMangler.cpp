@@ -1411,14 +1411,18 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     }
 
     case TypeKind::ProtocolComposition: {
+      auto *PCT = cast<ProtocolCompositionType>(tybase);
+      if (PCT->hasParameterizedExistential())
+        return appendConstrainedExistential(PCT, sig, forDecl);
+
       // We mangle ProtocolType and ProtocolCompositionType using the
       // same production:
-      auto layout = type->getExistentialLayout();
+      auto layout = PCT->getExistentialLayout();
       return appendExistentialLayout(layout, sig, forDecl);
     }
 
     case TypeKind::ParameterizedProtocol:
-      llvm_unreachable("Handled by generalized existential mangling!");
+      return appendConstrainedExistential(tybase, sig, forDecl);
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
