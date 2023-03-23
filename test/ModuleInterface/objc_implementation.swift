@@ -1,7 +1,18 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/objc_implementation -F %clang-importer-sdk-path/frameworks %s -import-underlying-module -swift-version 5 -enable-library-evolution -emit-module-interface-path %t.swiftinterface
-// RUN: %FileCheck --input-file %t.swiftinterface %s
-// RUN: %FileCheck --input-file %t.swiftinterface --check-prefix NEGATIVE %s
+// RUN: %empty-directory(%t)
+
+// FIXME: BEGIN -enable-source-import hackaround
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
+// FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-emit-module-interface(%t/objc_implementation.swiftinterface) %s -import-underlying-module %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation
+// RUN: %FileCheck --input-file %t/objc_implementation.swiftinterface %s
+// RUN: %FileCheck --input-file %t/objc_implementation.swiftinterface --check-prefix NEGATIVE %s
+// RUN: %target-swift-typecheck-module-from-interface(%t/objc_implementation.swiftinterface) %clang-importer-sdk -F %clang-importer-sdk-path/frameworks -I %S/Inputs/objc_implementation
+
 // REQUIRES: objc_interop
+
+import Foundation
 
 // We should never see @_objcImplementation in the header
 // NEGATIVE-NOT: @_objcImplementation
