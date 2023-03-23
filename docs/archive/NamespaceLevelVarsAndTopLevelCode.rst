@@ -10,7 +10,7 @@ A namespace-scope variable (i.e. a variable not inside a function) is allowed to
 have an initializer, and that initializer is allowed to have side effects.
 Thus, we have to decide how and when the initializer runs.
 
-WLOG, lets assume that all namespace-scope variables are mutable (and thus that
+WLOG, let's assume that all namespace-scope variables are mutable (and thus that
 immutable variables are just an optimization of the common case).  Given that
 they can have mutable state, they cannot be "global" (in the C sense) because
 then they would be visible across multiple actors.  Instead, the only logical
@@ -93,7 +93,7 @@ Having header files for public API is nice for a couple of reasons:
 3. Headers are very useful documentation for Objective-C because we ship the
    headers but not the implementation of system classes.  This allows "jump to
    definition" to go to the declaration of an API in the header, which is
-   conveniently co-located with headerdoc.
+   conveniently co-located with HeaderDoc.
 
 On the other hand, headers have a number of disadvantages including:
 
