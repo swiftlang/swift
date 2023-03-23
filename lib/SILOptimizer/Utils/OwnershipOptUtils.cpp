@@ -943,23 +943,9 @@ BeginBorrowInst *OwnershipLifetimeExtender::borrowCopyOverGuaranteedUses(
                                        makeUserRange(guaranteedUsePoints));
 }
 
-// Return the borrow position when replacing guaranteedValue with newValue.
-//
-// Precondition: newValue's block dominates and reaches guaranteedValue's block.
-//
-// Postcondition: The returned instruction's block is guaranteedValue's block.
-//
-// If \p newValue and \p guaranteedValue are in the same block, borrow at the
-// newValue just in case it is defined later in the block (to avoid scanning
-// instructions). Otherwise, borrow in the guaranteedValue's block to avoid
-// introducing the borrow scope too early--not only would this require extra
-// cleanup, but it would hinder optimization.
-static SILBasicBlock::iterator getBorrowPoint(SILValue newValue,
-                                              SILValue guaranteedValue) {
-  if (newValue->getParentBlock() == guaranteedValue->getParentBlock())
-    return newValue->getNextInstruction()->getIterator();
-
-  return guaranteedValue->getNextInstruction()->getIterator();
+// Return the borrow position when replacing oldValue.
+static SILBasicBlock::iterator getBorrowPoint(SILValue oldValue) {
+  return oldValue->getDefiningInsertionPoint()->getIterator();
 }
 
 /// Borrow \p newValue over the lifetime of \p guaranteedValue. Return the
@@ -991,7 +977,7 @@ OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
     return newValue;
 
   // FIXME: use GuaranteedOwnershipExtension
-  auto borrowPt = getBorrowPoint(newValue, guaranteedValue);
+  auto borrowPt = getBorrowPoint(guaranteedValue);
   return borrowCopyOverGuaranteedUses(
       newValue, borrowPt, ArrayRef<Operand *>(ctx.guaranteedUsePoints));
 }
@@ -1151,7 +1137,7 @@ SILValue OwnershipRAUWPrepare::prepareUnowned(SILValue newValue) {
     }
 
     auto extender = getLifetimeExtender();
-    auto borrowPt = getBorrowPoint(newValue, oldValue);
+    auto borrowPt = getBorrowPoint(oldValue);
     SILValue borrow = extender.borrowCopyOverGuaranteedUses(
         newValue, borrowPt, oldValue->getUses());
     return borrow;
@@ -1267,7 +1253,7 @@ OwnershipRAUWHelper::getReplacementAddress() {
   // value. Then we RAUW as appropriate.
   OwnershipLifetimeExtender extender{*ctx};
   auto base = ctx->extraAddressFixupInfo.base;
-  auto borrowPt = getBorrowPoint(newValue, oldValue);
+  auto borrowPt = getBorrowPoint(oldValue);
   // FIXME: why does this use allAddressUsesFromOldValue instead of
   // guaranteedUsePoints?
   BeginBorrowInst *bbi = extender.borrowCopyOverGuaranteedUses(
