@@ -576,18 +576,6 @@ static bool typeSpellingIsAmbiguous(Type type,
   return false;
 }
 
-/// Determine whether this is the main actor type.
-static bool isMainActor(Type type) {
-  if (auto nominal = type->getAnyNominal()) {
-    if (nominal->getName().is("MainActor") &&
-        nominal->getParentModule()->getName() ==
-          nominal->getASTContext().Id_Concurrency)
-      return true;
-  }
-
-  return false;
-}
-
 void swift::printClangDeclName(const clang::NamedDecl *ND,
                                llvm::raw_ostream &os) {
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
@@ -841,10 +829,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe: {
-      Type globalActor = isolation.getGlobalActor();
-      if (isMainActor(globalActor)) {
+      if (isolation.isMainActor()) {
         Out << "main actor-isolated";
       } else {
+        Type globalActor = isolation.getGlobalActor();
         Out << "global actor " << FormatOpts.OpeningQuotationMark
           << globalActor.getString()
           << FormatOpts.ClosingQuotationMark << "-isolated";
