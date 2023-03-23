@@ -7,7 +7,8 @@
 // FIXME(moveonly): rdar://107050387 Move-only types fail to be found sometimes, must fix or remove Job before shipping
 // REQUIRES: radr107050387
 
-// UNSUPPORTED: OS=ios // FIXME: rdar://107112715 test failing on iOS simulator, investigating
+// FIXME: rdar://107112715 test failing on iOS simulator, investigating
+// UNSUPPORTED: OS=ios
 
 // Such type may be encountered since Swift 5.5 (5.1 backdeployed) if someone implemented the
 // not documented, but public Executor types back then already.
