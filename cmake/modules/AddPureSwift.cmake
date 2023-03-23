@@ -62,6 +62,7 @@ function(_add_host_swift_compile_options name)
     DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+  _add_host_variant_swift_sanitizer_flags(${name})
 endfunction()
 
 # Add a new "pure" Swift host library.

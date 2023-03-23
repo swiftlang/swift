@@ -41,7 +41,6 @@ func test() {
 // EXPR-DAG: Decl[FreeFunction]/OtherModule[_Explicit]: hiddenFunc()[#Void#]; name=hiddenFunc()
 // EXPR-DAG: Decl[FreeFunction]/OtherModule[_Helper]: helperFunc()[#Void#]; name=helperFunc()
 
-// EXPR: End completions
 
 // TYPE: Begin completion
 
@@ -58,7 +57,6 @@ func test() {
 // TYPE-DAG: Decl[Struct]/OtherModule[_Explicit]: HiddenTy[#HiddenTy#]; name=HiddenTy
 // TYPE-DAG: Decl[Struct]/OtherModule[_Helper]:  HelperTy[#HelperTy#]; name=HelperTy
 
-// TYPE: End completions
 
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s

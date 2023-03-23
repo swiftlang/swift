@@ -259,13 +259,12 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
   // not be identified as part of the boundary and instead we will identify a
   // boundary edge which does not provide us with something that we want to
   // error upon.
-  for (auto *user :
-       getCanonicalizer().canonicalizer->getLifetimeEndingUsers()) {
+  for (auto *user : getCanonicalizer().canonicalizer.getLifetimeEndingUsers()) {
     consumingUserSet.insert(user);
     consumingBlockToUserMap.try_emplace(user->getParent(), user);
   }
   for (auto *user :
-       getCanonicalizer().canonicalizer->getNonLifetimeEndingUsers()) {
+       getCanonicalizer().canonicalizer.getNonLifetimeEndingUsers()) {
     nonConsumingUserSet.insert(user);
     nonConsumingBlockToUserMap.try_emplace(user->getParent(), user);
   }

@@ -223,9 +223,12 @@ private:
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
-  DominanceInfo *domTree;
+  DominanceInfo *domTree = nullptr;
 
   InstructionDeleter &deleter;
+
+  /// The SILValue to canonicalize.
+  SILValue currentDef;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed. For guaranteed values it remains empty. A backward walk from
@@ -250,7 +253,7 @@ private:
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
-  SSAPrunedLiveness liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   /// The destroys of the value.  These are not uses, but need to be recorded so
   /// that we know when the last use in a consuming block is (without having to
@@ -280,31 +283,46 @@ public:
     }
   }
 
+  /// Stack-allocated liveness for a single SSA def.
+  struct LivenessState {
+    BitfieldRef<SSAPrunedLiveness>::StackState state;
+
+    LivenessState(CanonicalizeOSSALifetime &parent, SILValue def)
+        : state(parent.liveness, def->getFunction()) {
+      parent.initializeLiveness(def);
+    }
+  };
+
   CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
+                           SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceInfo *domTree, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
-        deleter(deleter),
-        liveness(maximizeLifetime ? &discoveredBlocks : nullptr) {}
+        deleter(deleter) {}
 
-  SILValue getCurrentDef() const { return liveness.getDef(); }
+  SILValue getCurrentDef() const { return currentDef; }
 
-  void initDef(SILValue def) {
-    assert(consumingBlocks.empty() && debugValues.empty() && liveness.empty());
+  void initializeLiveness(SILValue def) {
+    assert(consumingBlocks.empty() && debugValues.empty());
     // Clear the cached analysis pointer just in case the client invalidates the
     // analysis, freeing its memory.
     accessBlocks = nullptr;
     consumes.clear();
     destroys.clear();
 
-    liveness.initializeDef(def);
+    currentDef = def;
+
+    if (maximizeLifetime) {
+      liveness->initializeDiscoveredBlocks(&discoveredBlocks);
+    }
+    liveness->initializeDef(getCurrentDef());
   }
 
-  void clearLiveness() {
+  void invalidateLiveness() {
     consumingBlocks.clear();
     debugValues.clear();
-    liveness.clear();
+    liveness->invalidate();
     discoveredBlocks.clear();
   }
 
@@ -327,19 +345,23 @@ public:
   ///
   /// The intention is that this is used if one wants to emit diagnostics using
   /// the liveness information before doing any rewriting.
-  bool computeLiveness(SILValue def);
+  ///
+  /// Requires an active on-stack instance of LivenessState.
+  ///
+  ///     LivenessState livenessState(*this, def);
+  ///
+  bool computeLiveness();
 
   /// Given the already computed liveness boundary for the given def, rewrite
   /// copies of def as appropriate.
   ///
-  /// NOTE: It is assumed that one passes the extended boundary from \see
-  /// computeLiveness.
-  ///
-  /// NOTE: It is assumed that one has emitted any diagnostics.
+  /// Requires an active on-stack instance of LivenessState.
   void rewriteLifetimes();
 
   /// Return the pure original boundary just based off of liveness information
   /// without maximizing or extending liveness.
+  ///
+  /// Requires an active on-stack instance of LivenessState.
   void findOriginalBoundary(PrunedLivenessBoundary &resultingOriginalBoundary);
 
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
@@ -352,21 +374,21 @@ public:
   /// NOTE: Only call this after calling computeLivenessBoundary or the results
   /// will not be initialized.
   IsInterestingUser isInterestingUser(SILInstruction *user) const {
-    return liveness.isInterestingUser(user);
+    return liveness->isInterestingUser(user);
   }
 
   using LifetimeEndingUserRange = PrunedLiveness::LifetimeEndingUserRange;
   LifetimeEndingUserRange getLifetimeEndingUsers() const {
-    return liveness.getLifetimeEndingUsers();
+    return liveness->getLifetimeEndingUsers();
   }
 
   using NonLifetimeEndingUserRange = PrunedLiveness::NonLifetimeEndingUserRange;
   NonLifetimeEndingUserRange getNonLifetimeEndingUsers() const {
-    return liveness.getNonLifetimeEndingUsers();
+    return liveness->getNonLifetimeEndingUsers();
   }
 
   using UserRange = PrunedLiveness::ConstUserRange;
-  UserRange getUsers() const { return liveness.getAllUsers(); }
+  UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }

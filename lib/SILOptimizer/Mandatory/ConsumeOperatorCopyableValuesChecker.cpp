@@ -60,9 +60,9 @@ struct CheckerLivenessInfo {
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
   DiagnosticPrunedLiveness liveness;
 
-  CheckerLivenessInfo()
+  CheckerLivenessInfo(SILFunction *fn)
       : nonLifetimeEndingUsesInLiveOut(),
-        liveness(nullptr, &nonLifetimeEndingUsesInLiveOut) {}
+        liveness(fn, nullptr, &nonLifetimeEndingUsesInLiveOut) {}
 
   void initDef(SILValue def) {
     liveness.initializeDef(def);
@@ -78,7 +78,7 @@ struct CheckerLivenessInfo {
 
   void clear() {
     defUseWorklist.clear();
-    liveness.clear();
+    liveness.invalidate();
     consumingUse.clear();
     interiorPointerTransitiveUses.clear();
     nonLifetimeEndingUsesInLiveOut.clear();
@@ -220,7 +220,7 @@ struct ConsumeOperatorCopyableValuesChecker {
   SILLoopInfo *loopInfoToUpdate;
 
   ConsumeOperatorCopyableValuesChecker(SILFunction *fn)
-      : fn(fn), livenessInfo(), dominanceToUpdate(nullptr),
+      : fn(fn), livenessInfo(fn), dominanceToUpdate(nullptr),
         loopInfoToUpdate(nullptr) {}
 
   void setDominanceToUpdate(DominanceInfo *newDFI) {

@@ -131,9 +131,9 @@ bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
 // CHECK:   def: [[CP3:%.*]] = copy_value %0 : $C
-// CHECK: bb0: LiveOut,
-// CHECK: bb1: LiveWithin,
-// CHECK: bb2: LiveWithin,
+// CHECK: bb0: LiveOut
+// CHECK: bb1: LiveWithin
+// CHECK: bb2: LiveWithin
 // CHECK: last user:   destroy_value [[CP0]] : $C
 // CHECK-NEXT: boundary edge: bb1
 // CHECK-NEXT: dead def: [[CP3]] = copy_value %0 : $C

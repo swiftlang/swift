@@ -178,7 +178,8 @@ protected:
   OSSALiveness &operator=(const OSSALiveness &) = delete;
 
 public:
-  OSSALiveness(SILValue def): ownershipDef(def), liveness(&discoveredBlocks) {}
+  OSSALiveness(SILValue def): ownershipDef(def),
+                              liveness(def->getFunction(), &discoveredBlocks) {}
 
   const SSAPrunedLiveness &getLiveness() const { return liveness; }
 

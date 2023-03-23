@@ -155,28 +155,20 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
   return metadata;
 }
 
-/// Copy the generic arguments into place in a newly-allocated metadata.
-static void installGenericArguments(Metadata *metadata,
-                                    const TypeContextDescriptor *description,
-                                    const void *arguments) {
-  const auto &genericContext = *description->getGenericContext();
-  const auto &header = genericContext.getGenericContextHeader();
-
-  auto dst = (reinterpret_cast<const void **>(metadata) +
-              description->getGenericArgumentOffset());
-  memcpy(dst,
-         reinterpret_cast<const void * const *>(arguments),
-         header.NumKeyArguments * sizeof(void *));
+void MetadataCacheKey::installGenericArguments(
+    uint16_t numKeyArguments,
+    uint16_t numPacks,
+    const GenericPackShapeDescriptor *PackShapeDescriptors,
+    const void **dst, const void * const *src) {
+  memcpy(dst, src, numKeyArguments * sizeof(void *));
 
   // If we don't have any pack arguments, there is nothing more to do.
-  auto packShapeHeader = genericContext.getGenericPackShapeHeader();
-  if (packShapeHeader.NumPacks == 0)
+  if (numPacks == 0)
     return;
 
   // Heap-allocate all installed metadata and witness table packs.
-  for (auto pack : genericContext.getGenericPackShapeDescriptors()) {
-    assert(pack.ShapeClass < packShapeHeader.NumShapeClasses);
-
+  for (unsigned i = 0; i < numPacks; ++i) {
+    auto pack = PackShapeDescriptors[i];
     size_t count = reinterpret_cast<size_t>(dst[pack.ShapeClass]);
 
     switch (pack.Kind) {
@@ -193,6 +185,26 @@ static void installGenericArguments(Metadata *metadata,
       break;
     }
   }
+}
+
+/// Copy the generic arguments into place in a newly-allocated metadata.
+static void installGenericArguments(Metadata *metadata,
+                                    const TypeContextDescriptor *description,
+                                    const void *arguments) {
+  const auto &genericContext = *description->getGenericContext();
+  const auto &header = genericContext.getGenericContextHeader();
+
+  auto dst = (reinterpret_cast<const void **>(metadata) +
+              description->getGenericArgumentOffset());
+  auto src = reinterpret_cast<const void * const *>(arguments);
+
+  auto packShapeHeader = genericContext.getGenericPackShapeHeader();
+
+  MetadataCacheKey::installGenericArguments(
+      header.NumKeyArguments,
+      packShapeHeader.NumPacks,
+      genericContext.getGenericPackShapeDescriptors().data(),
+      dst, src);
 }
 
 #if SWIFT_OBJC_INTEROP

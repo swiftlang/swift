@@ -4,7 +4,6 @@
 {
   1.#^LITERAL1^#
 }
-// LITERAL1:          Begin completions
 // LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       bigEndian[#Int#]; name=bigEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/Super/IsSystem:       littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal/IsSystem: byteSwapped[#Int#]; name=byteSwapped{{$}}
@@ -13,7 +12,6 @@
 {
   1.1.#^LITERAL2^#
 }
-// LITERAL2:         Begin completions
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isNormal[#Bool#]; name=isNormal{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isFinite[#Bool#]; name=isFinite{{$}}
 // LITERAL2-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: isZero[#Bool#]; name=isZero{{$}}
@@ -24,7 +22,6 @@
 {
   true.#^LITERAL3^#
 }
-// LITERAL3:         Begin completions
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: description[#String#]; name=description{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal/IsSystem: hashValue[#Int#]; name=hashValue{{$}}
 
@@ -32,7 +29,6 @@
   "swift".#^LITERAL4^#
 }
 
-// LITERAL4:         Begin completions
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal/IsSystem: withCString({#(body): (UnsafePointer<Int8>) throws -> Result##(UnsafePointer<Int8>) throws -> Result#})[' rethrows'][#Result#]; name=withCString(:){{$}}
 
 // FIXME: we should show the qualified String.Index type.

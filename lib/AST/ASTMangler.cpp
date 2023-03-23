@@ -1812,7 +1812,7 @@ static bool containsRetroactiveConformance(
 
   // If the conformance is conditional and any of the substitutions used to
   // satisfy the conditions are retroactive, it's retroactive.
-  auto subMap = conformance->getSubstitutions(module);
+  auto subMap = conformance->getSubstitutionMap();
   for (auto requirement : rootConformance->getConditionalRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;

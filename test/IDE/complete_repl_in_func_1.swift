@@ -4,9 +4,7 @@
 // missing the right brace.
 // Don't add any tests at the end of the file!
 //
-// CHECK: Begin completions
 // CHECK-DAG: {{^}}a() -> Void{{$}}
-// CHECK: End completions
 struct FooStruct {
   func a() {}
 }

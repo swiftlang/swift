@@ -25,7 +25,6 @@ func foo() {
         foo(kp: \.self#^COMPLETE^#)
 // CHECK:      Begin completions, 1 items
 // CHECK-NEXT: Decl[InstanceVar]/CurrNominal:      .bar[#Int#];
-// CHECK-NEXT: End completions
     }
     .unknownMethod()
 }

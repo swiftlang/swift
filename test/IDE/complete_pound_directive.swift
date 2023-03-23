@@ -45,7 +45,6 @@ class C {
   ##^POUND_GLOBAL_IN_ELSE^#
 #endif
 
-// CONDITION: Begin completions
 // CONDITION-NOT: globalVar
 // CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os(); sourcetext=os(<#T##name#>)
 // CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch(); sourcetext=arch(<#T##name#>)

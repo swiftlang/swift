@@ -1067,8 +1067,7 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
   // in the buffer that gets passed to the witness table accessor.
   llvm::SmallVector<llvm::Value *, 4> tables;
 
-  auto subMap = substConformance->getSubstitutions(IGF.IGM.getSwiftModule());
-
+  auto subMap = substConformance->getSubstitutionMap();
   SILWitnessTable::enumerateWitnessTableConditionalConformances(
       rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
         auto substType = type.subst(subMap)->getCanonicalType();

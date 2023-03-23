@@ -1049,6 +1049,8 @@ struct MoveOnlyAddressCheckerPImpl {
 
   SILFunction *fn;
 
+  DominanceInfo *domTree;
+
   /// A set of mark_must_check that we are actually going to process.
   SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
@@ -1078,7 +1080,8 @@ struct MoveOnlyAddressCheckerPImpl {
       SILFunction *fn, DiagnosticEmitter &diagnosticEmitter,
       DominanceInfo *domTree, PostOrderAnalysis *poa,
       borrowtodestructure::IntervalMapAllocator &allocator)
-      : fn(fn), deleter(), canonicalizer(),
+      : fn(fn), domTree(domTree), deleter(),
+        canonicalizer(fn, domTree, deleter),
         diagnosticEmitter(diagnosticEmitter), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
@@ -1086,7 +1089,6 @@ struct MoveOnlyAddressCheckerPImpl {
             moveIntroducersToProcess.remove(mvi);
           instToDelete->eraseFromParent();
         })));
-    canonicalizer.init(fn, domTree, deleter);
     diagnosticEmitter.initCanonicalizer(&canonicalizer);
   }
 
@@ -1292,7 +1294,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
-    SWIFT_DEFER { liveness.clear(); };
+    SWIFT_DEFER { liveness.invalidate(); };
 
     LLVM_DEBUG(llvm::dbgs() << "Checking for exclusivity hazards for: " << *li);
 
@@ -1466,7 +1468,9 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
     if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy ||
         li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-      SWIFT_DEFER { moveChecker.canonicalizer.clear(); };
+
+      OSSACanonicalizer::LivenessState livenessState(moveChecker.canonicalizer,
+                                                     li);
 
       // Before we do anything, run the borrow to destructure transform in case
       // we have a switch_enum user.
@@ -1495,7 +1499,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
       // Canonicalize the lifetime of the load [take], load [copy].
       LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
-      moveChecker.changed |= moveChecker.canonicalizer.canonicalize(li);
+      moveChecker.changed |= moveChecker.canonicalizer.canonicalize();
 
       // If we are asked to perform no_consume_or_assign checking or
       // assignable_but_not_consumable checking, if we found any consumes of our
@@ -2289,7 +2293,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // to categorize the uses of this address into their ownership behavior (e.x.:
   // init, reinit, take, destroy, etc.).
   SmallVector<SILBasicBlock *, 32> gatherUsesDiscoveredBlocks;
-  SSAPrunedLiveness gatherUsesLiveness(&gatherUsesDiscoveredBlocks);
+  SSAPrunedLiveness gatherUsesLiveness(fn, &gatherUsesDiscoveredBlocks);
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
                             diagnosticEmitter, gatherUsesLiveness);
   SWIFT_DEFER { visitor.clear(); };

@@ -521,6 +521,10 @@ class MetadataCacheKey {
   }
 
 public:
+  static void installGenericArguments(uint16_t numKeyArguments, uint16_t numPacks,
+                                      const GenericPackShapeDescriptor *packShapeDescriptors,
+                                      const void **dst, const void * const *src);
+
   /// Compare two conformance descriptors, checking their contents if necessary.
   static bool areConformanceDescriptorsEqual(
       const ProtocolConformanceDescriptor *aDescription,
@@ -548,7 +552,8 @@ private:
     MetadataPackPointer lhs(lhsPtr);
     MetadataPackPointer rhs(rhsPtr);
 
-    assert(lhs.getLifetime() == PackLifetime::OnHeap);
+    // lhs is the user-supplied key, which might be on the stack.
+    // rhs is the stored key in the cache.
     assert(rhs.getLifetime() == PackLifetime::OnHeap);
 
     auto *lhsElt = lhs.getElements();
@@ -568,7 +573,8 @@ private:
     WitnessTablePackPointer lhs(lhsPtr);
     WitnessTablePackPointer rhs(rhsPtr);
 
-    assert(lhs.getLifetime() == PackLifetime::OnHeap);
+    // lhs is the user-supplied key, which might be on the stack.
+    // rhs is the stored key in the cache.
     assert(rhs.getLifetime() == PackLifetime::OnHeap);
 
     auto *lhsElt = lhs.getElements();
@@ -591,7 +597,7 @@ public:
                    const void *const *data, uint32_t hash)
       : Data(data), Layout(layout), Hash(hash) {}
 
-  bool operator==(MetadataCacheKey rhs) const {
+  bool operator==(const MetadataCacheKey &rhs) const {
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
@@ -682,8 +688,11 @@ public:
   unsigned size() const { return Layout.sizeInWords(); }
 
   void installInto(const void **buffer) const {
-    // FIXME: variadic-parameter-packs
-    memcpy(buffer, Data, size() * sizeof(const void *));
+    MetadataCacheKey::installGenericArguments(
+        Layout.sizeInWords(),
+        Layout.NumPacks,
+        Layout.PackShapeDescriptors,
+        buffer, Data);
   }
 
 private:

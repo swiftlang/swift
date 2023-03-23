@@ -79,7 +79,7 @@ static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
   if (!conformanceRef.isConcrete())
     return false;
   auto conformance = conformanceRef.getConcrete();
-  auto subMap = conformance->getSubstitutions(module);
+  auto subMap = conformance->getSubstitutionMap();
   return llvm::all_of(subMap.getConformances(),
                       [&](ProtocolConformanceRef each) -> bool {
                         return isConcreteAndValid(each, module);

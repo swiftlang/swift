@@ -4,7 +4,7 @@ if (SWIFT_SWIFT_PARSER)
   add_swift_host_library(_swiftCSwiftPluginServer OBJECT
     Sources/CSwiftPluginServer/PluginServer.cpp
   )
-  target_link_libraries(_swiftCSwiftPluginServer
+  target_link_libraries(_swiftCSwiftPluginServer PRIVATE
     swiftDemangling
   )
   target_include_directories(_swiftCSwiftPluginServer PUBLIC

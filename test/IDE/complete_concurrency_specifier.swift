@@ -2,22 +2,16 @@
 
 // REQUIRES: concurrency
 
-// SPECIFIER: Begin completions
 // SPECIFIER-DAG: Keyword/None:                       async; name=async
 // SPECIFIER-DAG: Keyword[throws]/None:               throws; name=throws
-// SPECIFIER: End completions
 
-// SPECIFIER_WITHASYNC: Begin completions
 // SPECIFIER_WITHASYNC-NOT: async
 // SPECIFIER_WITHASYNC-DAG: Keyword[throws]/None:               throws; name=throws
 // SPECIFIER_WITHASYNC-NOT: async
-// SPECIFIER_WITHASYNC: End completions
 
-// SPECIFIER_WITHTHROWS: Begin completions
 // SPECIFIER_WITHTHROWS-NOT: async
 // SPECIFIER_WITHTHROWS-DAG: Keyword/None:               async; name=async
 // SPECIFIER_WITHTHROWS-NOT: async
-// SPECIFIER_WITHTHROWS: End completions
 
 // SPECIFIER_WITHASYNCTHROWS-NOT: Begin completions
 
