@@ -1568,14 +1568,28 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
 
-  std::vector<std::string> CompilerPluginExecutablePaths(
+  std::vector<PluginExecutablePathAndModuleNames> CompilerPluginExecutablePaths(
       Opts.getCompilerPluginExecutablePaths());
   for (const Arg *A : Args.filtered(OPT_load_plugin_executable)) {
-    // NOTE: The value has '#<module names>' after the path.
-    // But resolveSearchPath() works as long as the value starts with a path.
-    CompilerPluginExecutablePaths.push_back(resolveSearchPath(A->getValue()));
+    // 'A' is '<path to executable>#<module names>' where the module names are
+    // comma separated.
+    StringRef path;
+    StringRef modulesStr;
+    std::tie(path, modulesStr) = StringRef(A->getValue()).rsplit('#');
+    std::vector<std::string> moduleNames;
+    for (auto name : llvm::split(modulesStr, ',')) {
+      moduleNames.emplace_back(name);
+    }
+    if (path.empty() || moduleNames.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_load_plugin_executable,
+                     A->getValue());
+    } else {
+      CompilerPluginExecutablePaths.push_back(
+          {resolveSearchPath(path), std::move(moduleNames)});
+    }
   }
-  Opts.setCompilerPluginExecutablePaths(CompilerPluginExecutablePaths);
+  Opts.setCompilerPluginExecutablePaths(
+      std::move(CompilerPluginExecutablePaths));
 
   return false;
 }
