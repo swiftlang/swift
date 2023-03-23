@@ -605,49 +605,19 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
   Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
-  Bits.ModuleDecl.IsNonUserModule = 0;
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
   Bits.ModuleDecl.IsSystemModule = flag;
-  updateNonUserModule(/*newFile=*/nullptr);
 }
 
-static bool prefixMatches(StringRef prefix, StringRef path) {
-  auto i = llvm::sys::path::begin(prefix), e = llvm::sys::path::end(prefix);
-  for (auto pi = llvm::sys::path::begin(path), pe = llvm::sys::path::end(path);
-       i != e && pi != pe; ++i, ++pi) {
-    if (*i != *pi)
-      return false;
-  }
-  return i == e;
-}
+bool ModuleDecl::isNonUserModule() const {
+  // For clang submodules, retrieve their top level module (submodules have no
+  // source path, so we'd always return false for them).
+  ModuleDecl *mod = const_cast<ModuleDecl *>(this)->getTopLevelModule();
 
-void ModuleDecl::updateNonUserModule(FileUnit *newUnit) {
-  if (isNonUserModule())
-    return;
-
-  SearchPathOptions searchPathOpts = getASTContext().SearchPathOpts;
-  StringRef sdkPath = searchPathOpts.getSDKPath();
-
-  if (isStdlibModule() || (sdkPath.empty() && isSystemModule())) {
-    Bits.ModuleDecl.IsNonUserModule = true;
-    return;
-  }
-
-  // If we loaded a serialized module, check if it was compiler adjacent or in
-  // the SDK.
-
-  auto *LF = dyn_cast_or_null<LoadedFile>(newUnit);
-  if (!LF)
-    return;
-
-  StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
-  StringRef modulePath = LF->getSourceFilename();
-  if ((!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) ||
-      (!sdkPath.empty() && prefixMatches(sdkPath, modulePath))) {
-    Bits.ModuleDecl.IsNonUserModule = true;
-  }
+  auto &evaluator = getASTContext().evaluator;
+  return evaluateOrDefault(evaluator, IsNonUserModuleRequest{mod}, false);
 }
 
 ImplicitImportList ModuleDecl::getImplicitImports() const {
@@ -669,8 +639,6 @@ void ModuleDecl::addFile(FileUnit &newFile) {
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
   Files.push_back(&newFile);
   clearLookupCache();
-
-  updateNonUserModule(&newFile);
 }
 
 void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
@@ -4132,4 +4100,46 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
   return &TF;
+}
+
+static bool prefixMatches(StringRef prefix, StringRef path) {
+  auto prefixIt = llvm::sys::path::begin(prefix),
+       prefixEnd = llvm::sys::path::end(prefix);
+  for (auto pathIt = llvm::sys::path::begin(path),
+            pathEnd = llvm::sys::path::end(path);
+       prefixIt != prefixEnd && pathIt != pathEnd; ++prefixIt, ++pathIt) {
+    if (*prefixIt != *pathIt)
+      return false;
+  }
+  return prefixIt == prefixEnd;
+}
+
+bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
+  // stdlib is non-user by definition
+  if (mod->isStdlibModule())
+    return true;
+  
+  // If there's no SDK path, fallback to checking whether the module was
+  // in the system search path or a clang system module
+  SearchPathOptions &searchPathOpts = mod->getASTContext().SearchPathOpts;
+  StringRef sdkPath = searchPathOpts.getSDKPath();
+  if (sdkPath.empty() && mod->isSystemModule())
+    return true;
+
+  // Some temporary module's get created with no module name and they have no
+  // files. Avoid running `getFiles` on them (which will assert if there
+  // aren't any).
+  if (!mod->hasName() || mod->getFiles().empty())
+    return false;
+  
+  auto *LF = dyn_cast_or_null<LoadedFile>(mod->getFiles().front());
+  if (!LF)
+    return false;
+  
+  StringRef modulePath = LF->getSourceFilename();
+  if (modulePath.empty())
+    return false;
+
+  StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
+  return (!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) || (!sdkPath.empty() && prefixMatches(sdkPath, modulePath));
 }

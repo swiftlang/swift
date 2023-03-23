@@ -291,6 +291,7 @@ void CompletionLookup::addSubModuleNames(
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResultKind::Declaration, SemanticContextKind::None);
     auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
+    MD->setFailedToLoad();
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -365,6 +366,8 @@ void CompletionLookup::addImportModuleNames() {
       continue;
 
     auto MD = ModuleDecl::create(ModuleName, Ctx);
+    MD->setFailedToLoad();
+
     Optional<ContextualNotRecommendedReason> Reason = None;
 
     // Imported modules are not recommended.
