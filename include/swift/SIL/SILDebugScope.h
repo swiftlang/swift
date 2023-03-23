@@ -66,9 +66,6 @@ public:
   /// into.
   SILFunction *getParentFunction() const;
 
-  /// Determine whether other is an (indirect) parent of this scope.
-  bool isAncestor(const SILDebugScope *other) const;
-
   /// If this is a debug scope associated with an inlined call site, return the
   /// SILLocation associated with the call site resulting from the final
   /// inlining.
