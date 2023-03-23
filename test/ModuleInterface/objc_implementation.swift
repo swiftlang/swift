@@ -74,7 +74,7 @@ open class SwiftSubclass: ImplClass {
     print("subclass mainMethod")
   }
 
-  // CHECK-DAG: @objc dynamic public init()
+  // CHECK-DAG: @objc override dynamic public init()
   // CHECK-DAG: @objc deinit
 }
 // CHECK: }
