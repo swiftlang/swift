@@ -41,28 +41,6 @@ struct MatchedPair {
     : lhs(lhs), rhs(rhs), lhsIdx(lhsIdx), rhsIdx(rhsIdx) {}
 };
 
-/// Performs a structural match of two lists of tuple elements. The invariant
-/// is that a pack expansion type must not be followed by an unlabeled
-/// element, that is, it is either the last element or the next element has
-/// a label.
-///
-/// In this manner, an element with a pack expansion type "absorbs" all
-/// unlabeled elements up to the next label. An element with any other type
-/// matches exactly one element on the other side.
-class TuplePackMatcher {
-  ArrayRef<TupleTypeElt> lhsElts;
-  ArrayRef<TupleTypeElt> rhsElts;
-
-  ASTContext &ctx;
-
-public:
-  SmallVector<MatchedPair, 4> pairs;
-
-  TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple);
-
-  bool match();
-};
-
 /// Performs a structural match of two lists of types.
 ///
 /// The invariant is that each list must only contain at most one pack
@@ -76,15 +54,17 @@ class TypeListPackMatcher {
     Type type;
     ParameterTypeFlags flags;
 
-  public:
     Element(Identifier label, Type type,
             ParameterTypeFlags flags = ParameterTypeFlags())
         : label(label), type(type), flags(flags) {}
 
+  public:
     bool hasLabel() const { return !label.empty(); }
     Identifier getLabel() const { return label; }
 
     Type getType() const { return type; }
+
+    ParameterTypeFlags getFlags() const { return flags; }
 
     static Element from(const TupleTypeElt &tupleElt);
     static Element from(const AnyFunctionType::Param &funcParam);
@@ -108,7 +88,21 @@ protected:
 public:
   SmallVector<MatchedPair, 4> pairs;
 
-  bool match();
+  [[nodiscard]] bool match();
+};
+
+/// Performs a structural match of two lists of tuple elements.
+///
+/// The invariant is that each list must only contain at most one pack
+/// expansion type. After collecting a common prefix and suffix, the
+/// pack expansion on either side asborbs the remaining elements on the
+/// other side.
+class TuplePackMatcher : public TypeListPackMatcher {
+public:
+  TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
+      : TypeListPackMatcher(lhsTuple->getASTContext(),
+                            lhsTuple->getElements(),
+                            rhsTuple->getElements()) {}
 };
 
 /// Performs a structural match of two lists of (unlabeled) function
