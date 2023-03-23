@@ -34,8 +34,8 @@ namespace {
 class SILTypeSubstituter :
     public CanTypeVisitor<SILTypeSubstituter, CanType> {
   TypeConverter &TC;
-  TypeSubstitutionFn Subst;
-  LookupConformanceFn Conformances;
+  InFlightSubstitution &IFS;
+
   // The signature for the original type.
   //
   // Replacement types are lowered with respect to the current
@@ -65,21 +65,15 @@ class SILTypeSubstituter :
 
   TypeExpansionContext typeExpansionContext;
 
-  bool shouldSubstituteOpaqueArchetypes;
-
 public:
   SILTypeSubstituter(TypeConverter &TC,
                      TypeExpansionContext context,
-                     TypeSubstitutionFn Subst,
-                     LookupConformanceFn Conformances,
-                     CanGenericSignature Sig,
-                     bool shouldSubstituteOpaqueArchetypes)
+                     InFlightSubstitution &IFS,
+                     CanGenericSignature Sig)
     : TC(TC),
-      Subst(Subst),
-      Conformances(Conformances),
+      IFS(IFS),
       Sig(Sig),
-      typeExpansionContext(context),
-      shouldSubstituteOpaqueArchetypes(shouldSubstituteOpaqueArchetypes)
+      typeExpansionContext(context)
   {}
 
   // SIL type lowering only does special things to tuples and functions.
@@ -113,7 +107,7 @@ public:
     assert((!isGenericApplication || origType->isPolymorphic()) &&
            "generic application without invocation signature or with "
            "existing arguments");
-    assert((!isGenericApplication || !shouldSubstituteOpaqueArchetypes) &&
+    assert((!isGenericApplication || !IFS.shouldSubstituteOpaqueArchetypes()) &&
            "generic application while substituting opaque archetypes");
 
     // The general substitution rule is that we should only substitute
@@ -194,7 +188,7 @@ public:
           if (patternSubs) {
             subs = substSubstitutions(patternSubs);
           } else {
-            subs = SubstitutionMap::get(sig, Subst, Conformances);
+            subs = SubstitutionMap::get(sig, IFS);
           }
           auto witnessConformance = substWitnessConformance(origType);
           substType = substType->withPatternSpecialization(nullptr, subs,
@@ -211,7 +205,7 @@ public:
       // substitutions present, just substitute those and preserve the
       // basic structure in the component types.  Otherwise, fall through
       // to substitute the component types.
-      } else if (shouldSubstituteOpaqueArchetypes) {
+      } else if (IFS.shouldSubstituteOpaqueArchetypes()) {
         if (patternSubs) {
           patternSubs = substOpaqueTypes(patternSubs);
           auto witnessConformance = substWitnessConformance(origType);
@@ -271,10 +265,10 @@ public:
     // The substituted type is no longer generic, so it'd never be
     // pseudogeneric.
     auto extInfo = origType->getExtInfo();
-    if (!shouldSubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes())
       extInfo = extInfo.intoBuilder().withIsPseudogeneric(false).build();
 
-    auto genericSig = shouldSubstituteOpaqueArchetypes
+    auto genericSig = IFS.shouldSubstituteOpaqueArchetypes()
                         ? origType->getInvocationGenericSignature()
                         : nullptr;
 
@@ -301,15 +295,14 @@ public:
       selfType = next;
     }
 
-    auto substConformance =
-        conformance.subst(selfType, Subst, Conformances);
+    auto substConformance = conformance.subst(selfType, IFS);
 
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
-      SubstOptions substOptions(None);
-      auto substType = selfType.subst(Subst, Conformances, substOptions)
-                           ->getCanonicalType();
+      auto substType = IFS.withNewOptions(None, [&] {
+        return selfType.subst(IFS)->getCanonicalType();
+      });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
             substConformance, substType, typeExpansionContext);
@@ -523,7 +516,7 @@ public:
     SubstRespectingExpansions(SILTypeSubstituter *_this) : _this(_this) {}
 
     Type operator()(SubstitutableType *origType) const {
-      auto substType = _this->Subst(origType);
+      auto substType = _this->IFS.substType(origType);
       if (!substType) return substType;
       auto substPackType = dyn_cast<PackType>(substType->getCanonicalType());
       if (!substPackType) return substType;
@@ -551,9 +544,10 @@ public:
     ProtocolConformanceRef operator()(CanType dependentType,
                                       Type conformingReplacementType,
                                       ProtocolDecl *conformingProtocol) const {
-      auto conformance = _this->Conformances(dependentType,
-                                             conformingReplacementType,
-                                             conformingProtocol);
+      auto conformance =
+        _this->IFS.lookupConformance(dependentType,
+                                     conformingReplacementType,
+                                     conformingProtocol);
       if (!conformance || !conformance.isPack()) return conformance;
       auto activeExpansion = _this->getActivePackExpansion(dependentType);
       if (!activeExpansion) return conformance;
@@ -567,35 +561,23 @@ public:
   };
 
   CanType substASTType(CanType origType) {
-    SubstOptions substOptions(None);
-    if (shouldSubstituteOpaqueArchetypes)
-      substOptions = SubstFlags::SubstituteOpaqueArchetypes |
-                     SubstFlags::AllowLoweredTypes;
-
     if (ActivePackExpansions.empty())
-      return origType.subst(Subst, Conformances, substOptions)
-        ->getCanonicalType();
+      return origType.subst(IFS)->getCanonicalType();
 
     return origType.subst(SubstRespectingExpansions(this),
                           SubstConformanceRespectingExpansions(this),
-                          substOptions)->getCanonicalType();
+                          IFS.getOptions())->getCanonicalType();
   }
 
   SubstitutionMap substSubstitutions(SubstitutionMap subs) {
-    // Substitute the substitutions.
-    SubstOptions options = None;
-    if (shouldSubstituteOpaqueArchetypes)
-      options |= SubstFlags::SubstituteOpaqueArchetypes;
-
-    // Expand substituted type according to the expansion context.
     SubstitutionMap newSubs;
 
     if (ActivePackExpansions.empty())
-      newSubs = subs.subst(Subst, Conformances, options);
+      newSubs = subs.subst(IFS);
     else
       newSubs = subs.subst(SubstRespectingExpansions(this),
                            SubstConformanceRespectingExpansions(this),
-                           options);
+                           IFS.getOptions());
 
     // If we need to look through opaque types in this context, re-substitute
     // according to the expansion context.
@@ -629,18 +611,39 @@ public:
 
 } // end anonymous namespace
 
+static bool isSubstitutionInvariant(SILType ty,
+                                    bool shouldSubstituteOpaqueArchetypes) {
+  return (!ty.hasArchetype() &&
+          !ty.hasTypeParameter() &&
+          (!shouldSubstituteOpaqueArchetypes ||
+           !ty.getRawASTType()->hasOpaqueArchetype()));
+}
+
 SILType SILType::subst(TypeConverter &tc, TypeSubstitutionFn subs,
                        LookupConformanceFn conformances,
                        CanGenericSignature genericSig,
                        bool shouldSubstituteOpaqueArchetypes) const {
-  if (!hasArchetype() && !hasTypeParameter() &&
-      (!shouldSubstituteOpaqueArchetypes ||
-       !getASTType()->hasOpaqueArchetype()))
+  if (isSubstitutionInvariant(*this, shouldSubstituteOpaqueArchetypes))
     return *this;
 
-  SILTypeSubstituter STST(tc, TypeExpansionContext::minimal(), subs,
-                          conformances, genericSig,
-                          shouldSubstituteOpaqueArchetypes);
+  auto substOptions =
+    (shouldSubstituteOpaqueArchetypes
+       ? SubstOptions(SubstFlags::SubstituteOpaqueArchetypes)
+       : SubstOptions(None));
+  InFlightSubstitution IFS(subs, conformances, substOptions);
+
+  SILTypeSubstituter STST(tc, TypeExpansionContext::minimal(), IFS,
+                          genericSig);
+  return STST.subst(*this);
+}
+
+SILType SILType::subst(TypeConverter &tc, InFlightSubstitution &IFS,
+                       CanGenericSignature genericSig) const {
+  if (isSubstitutionInvariant(*this, IFS.shouldSubstituteOpaqueArchetypes()))
+    return *this;
+
+  SILTypeSubstituter STST(tc, TypeExpansionContext::minimal(), IFS,
+                          genericSig);
   return STST.subst(*this);
 }
 
@@ -654,9 +657,9 @@ SILType SILType::subst(SILModule &M, TypeSubstitutionFn subs,
 
 SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
   auto sig = subs.getGenericSignature();
-  return subst(tc, QuerySubstitutionMap{subs},
-               LookUpConformanceInSubstitutionMap(subs),
-               sig.getCanonicalSignature());
+
+  InFlightSubstitutionViaSubMap IFS(subs, None);
+  return subst(tc, IFS, sig.getCanonicalSignature());
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
   return subst(M.Types, subs);
@@ -664,21 +667,14 @@ SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
 
 SILType SILType::subst(SILModule &M, SubstitutionMap subs,
                        TypeExpansionContext context) const {
-  if (!hasArchetype() && !hasTypeParameter() &&
-      !getASTType()->hasOpaqueArchetype())
+  if (isSubstitutionInvariant(*this, false))
     return *this;
 
-  // Pass the TypeSubstitutionFn and LookupConformanceFn as arguments so that
-  // the llvm::function_ref value's scope spans the STST.subst call since
-  // SILTypeSubstituter captures these functions.
-  auto result = [&](TypeSubstitutionFn subsFn,
-                    LookupConformanceFn conformancesFn) -> SILType {
-    SILTypeSubstituter STST(M.Types, context, subsFn, conformancesFn,
-                            subs.getGenericSignature().getCanonicalSignature(),
-                            false);
-    return STST.subst(*this);
-  }(QuerySubstitutionMap{subs}, LookUpConformanceInSubstitutionMap(subs));
-  return result;
+  InFlightSubstitutionViaSubMap IFS(subs, None);
+
+  SILTypeSubstituter STST(M.Types, context, IFS,
+                          subs.getGenericSignature().getCanonicalSignature());
+  return STST.subst(*this);
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that
@@ -695,10 +691,9 @@ SILFunctionType::substGenericArgs(SILModule &silModule, SubstitutionMap subs,
     return CanSILFunctionType(this);
   }
 
-  return substGenericArgs(silModule,
-                          QuerySubstitutionMap{subs},
-                          LookUpConformanceInSubstitutionMap(subs),
-                          context);
+  InFlightSubstitutionViaSubMap IFS(subs, None);
+
+  return substGenericArgs(silModule, IFS, context);
 }
 
 CanSILFunctionType
@@ -707,9 +702,19 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   LookupConformanceFn conformances,
                                   TypeExpansionContext context) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
-  SILTypeSubstituter substituter(silModule.Types, context, subs, conformances,
-                                 getSubstGenericSignature(),
-                                 /*shouldSubstituteOpaqueTypes*/ false);
+
+  InFlightSubstitution IFS(subs, conformances, None);
+  return substGenericArgs(silModule, IFS, context);
+}
+
+CanSILFunctionType
+SILFunctionType::substGenericArgs(SILModule &silModule,
+                                  InFlightSubstitution &IFS,
+                                  TypeExpansionContext context) {
+  if (!isPolymorphic()) return CanSILFunctionType(this);
+
+  SILTypeSubstituter substituter(silModule.Types, context, IFS,
+                                 getSubstGenericSignature());
   return substituter.substSILFunctionType(CanSILFunctionType(this), true);
 }
 
@@ -724,9 +729,10 @@ SILFunctionType::substituteOpaqueArchetypes(TypeConverter &TC,
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
 
-  SILTypeSubstituter substituter(TC, context, replacer, replacer,
-                                 getSubstGenericSignature(),
-                                 /*shouldSubstituteOpaqueTypes*/ true);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes);
+
+  SILTypeSubstituter substituter(TC, context, IFS, getSubstGenericSignature());
   auto resTy =
     substituter.substSILFunctionType(CanSILFunctionType(this), false);
 

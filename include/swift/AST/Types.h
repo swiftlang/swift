@@ -5168,6 +5168,9 @@ public:
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances,
                                       TypeExpansionContext context);
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
+                                      InFlightSubstitution &IFS,
+                                      TypeExpansionContext context);
   CanSILFunctionType substituteOpaqueArchetypes(Lowering::TypeConverter &TC,
                                                 TypeExpansionContext context);
 
