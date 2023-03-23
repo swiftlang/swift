@@ -640,8 +640,11 @@ function(_compile_swift_files
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
+      set(private_interface_file "${module_base}.private.swiftinterface")
+      set(private_interface_file_static "${module_base_static}.private.swiftinterface")
       list(APPEND swift_module_flags
-           "-emit-module-interface-path" "${interface_file}")
+           "-emit-module-interface-path" "${interface_file}"
+           "-emit-private-module-interface-path" "${private_interface_file}")
     endif()
 
     if (NOT SWIFTFILE_IS_STDLIB_CORE)
@@ -652,7 +655,7 @@ function(_compile_swift_files
     set(module_outputs "${module_file}" "${module_doc_file}")
 
     if(interface_file)
-      list(APPEND module_outputs "${interface_file}")
+      list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
     endif()
 
     set(optional_arg)
@@ -720,8 +723,8 @@ function(_compile_swift_files
   set(module_outputs "${module_file}" "${module_doc_file}")
   set(module_outputs_static "${module_file_static}" "${module_doc_file_static}")
   if(interface_file)
-    list(APPEND module_outputs "${interface_file}")
-    list(APPEND module_outputs_static "${interface_file_static}")
+    list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
+    list(APPEND module_outputs_static "${interface_file_static}" "${private_interface_file_static}")
   endif()
 
   swift_install_in_component(DIRECTORY "${specific_module_dir}"
