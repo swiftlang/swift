@@ -26,6 +26,22 @@ public struct Outer<each U> {
   public struct InnerSameShape<each V> where (repeat (each U, each V)): Any {}
 }
 
+func makeMetatype<each T>(_: repeat (each T).Type) -> Any.Type {
+  return Outer<repeat each T>.self
+}
+
+func blackHole<T>(_: T) {}
+
+types.test("OuterRepeated") {
+  // Instantiate a type containing type parameters to avoid caching
+  blackHole(makeMetatype())
+  blackHole(makeMetatype())
+  blackHole(makeMetatype(Int.self))
+  blackHole(makeMetatype(Int.self))
+  blackHole(makeMetatype(String.self, Substring.self))
+  blackHole(makeMetatype(String.self, Substring.self))
+}
+
 types.test("Outer") {
   expectEqual("main.Outer<Pack{}>", _typeName(Outer< >.self))
   expectEqual("main.Outer<Pack{Swift.Int}>", _typeName(Outer<Int>.self))
