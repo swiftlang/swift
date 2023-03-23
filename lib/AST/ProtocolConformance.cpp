@@ -220,17 +220,12 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
   llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
-SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
-  const ProtocolConformance *conformance = this;
+SubstitutionMap ProtocolConformance::getSubstitutionMap() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getSubstitutionMap, ())
+}
 
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
-    conformance = inheritedC->getInheritedConformance();
-
-  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(conformance))
-    return specializedC->getSubstitutionMap();
-
-  auto *rootC = cast<RootProtocolConformance>(conformance);
-  if (auto genericSig = rootC->getGenericSignature())
+SubstitutionMap RootProtocolConformance::getSubstitutionMap() const {
+  if (auto genericSig = getGenericSignature())
     return genericSig->getIdentitySubstitutionMap();
 
   return SubstitutionMap();
