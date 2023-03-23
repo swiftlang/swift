@@ -1,0 +1,42 @@
+// RUN: %target-sil-opt %s -o - | %FileCheck -check-prefix=SIL %s
+// XUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
+
+sil_stage canonical
+
+class K {}
+
+struct S2 {
+  var k: K
+}
+
+struct S3 {
+  var k: K
+}
+
+struct S {
+  var k : K
+  var s2 : S2
+}
+
+sil_scope 2 { loc "sroa.swift":7:6 parent @test_recursive_dw_fragment : $@convention(thin) (@guaranteed K) -> () }
+
+sil [ossa] @test_recursive_dw_fragment : $@convention(thin) (@guaranteed K) -> () {
+bb0(%0 : @guaranteed $K):
+  // SIL: alloc_stack $K, var (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*K, expr op_fragment: #S.k, loc * "<compiler-generated>":0:0, scope 2
+  %1 = alloc_stack $K, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*K, expr op_fragment: #S.k, loc * "<compiler-generated>":0:0, scope 2
+  // SIL: alloc_stack $K, var (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*K, expr op_fragment:#S.s2 op_fragment:#S2.s2, loc * "<compiler-generated>":0:0, scope 2
+  %2 = alloc_stack $K, var, (name "my_struct", loc "sroa.swift":8:9, scope 2), type $*K, expr op_fragment:#S.s2:op_fragment:#S3.k, loc * "<compiler-generated>":0:0, scope 2
+
+  %0a = copy_value %0 : $K
+  store %0a to [init] %1 : $*K
+  %0b = copy_value %0 : $K
+  store %0b to [init] %2 : $*K
+
+  destroy_addr %2 : $*K
+  dealloc_stack %2 : $*K
+  destroy_addr %1 : $*K
+  dealloc_stack %1 : $*K
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
