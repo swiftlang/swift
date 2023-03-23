@@ -1728,6 +1728,16 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     auto diagLoc = ThePattern.get()->getSemanticsProvidingPattern()->getStartLoc();
     diagnose(diagLoc, diag::conditional_var_valid_identifiers_only)
       .fixItInsert(diagLoc, "<#identifier#> = ");
+
+    // For better recovery, assume the expression pattern as the initializer,
+    // and synthesize an optional AnyPattern.
+    auto *semanticPattern = ThePattern.get()->getSemanticsProvidingPattern();
+    if (auto *EP = dyn_cast<ExprPattern>(semanticPattern)) {
+      Init = makeParserResult(EP->getSubExpr());
+      auto *AP = AnyPattern::createImplicit(Context);
+      ThePattern =
+          makeParserResult(OptionalSomePattern::createImplicit(Context, AP));
+    }
   } else {
     diagnose(Tok, diag::conditional_var_initializer_required);
   }
