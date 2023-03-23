@@ -78,8 +78,8 @@ bb0(%0 : @guaranteed $C):
 //
 // CHECK-LABEL: testDeadSelfKill: multidef-liveness
 // CHECK: MultiDef lifetime analysis:
-// CHECK: def: %1 = argument of bb1 : $C
-// CHECK: def: [[V:%.*]] = move_value %1 : $C
+// CHECK: def value: %1 = argument of bb1 : $C
+// CHECK: def value: [[V:%.*]] = move_value %1 : $C
 // CHECK: bb1: LiveWithin
 // CHECK: lifetime-ending user:   [[V]] = move_value %1 : $C
 // CHECK: last user:   [[V]] = move_value %1 : $C
@@ -129,8 +129,8 @@ bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
 //
 // CHECK-LABEL: testMultiDefDeadDefBoundaryEdge: multidef-liveness
 // CHECK: MultiDef lifetime analysis:
-// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
-// CHECK:   def: [[CP3:%.*]] = copy_value %0 : $C
+// CHECK:   def value: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def value: [[CP3:%.*]] = copy_value %0 : $C
 // CHECK: bb0: LiveOut
 // CHECK: bb1: LiveWithin
 // CHECK: bb2: LiveWithin
