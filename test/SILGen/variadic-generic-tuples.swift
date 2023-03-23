@@ -248,8 +248,38 @@ func takesConcreteTupleHolderFactory(factory: () -> TupleHolder<Int, String>) {
   let holder = factory()
 }
 
-/* We still crash with memberwise initializers
-func generateConcreteMemberTuple() -> TupleHolder<Int, String> {
-  return HasMemberTuple(content: (0, "hello"))
+struct MemberwiseTupleHolder<each T> {
+  var content: (repeat each T)
 }
- */
+
+//   Memberwise initializer.
+//   TODO: initialize directly into the fields
+// CHECK-LABEL: sil{{.*}} @$s4main21MemberwiseTupleHolderV7contentACyxxQp_QPGxxQp_t_tcfC
+// CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat each T}, @thin MemberwiseTupleHolder<repeat each T>.Type) -> @out MemberwiseTupleHolder<repeat each T> {
+// CHECK:         [[TEMP:%.*]] = alloc_stack $(repeat each T)
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[TUPLE_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TEMP]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    [[PACK_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    copy_addr [take] [[PACK_ELT_ADDR]] to [init] [[TUPLE_ELT_ADDR]]
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK-NEXT:    [[CONTENTS_ADDR:%.*]] = struct_element_addr %0 : $*MemberwiseTupleHolder<repeat each T>, #MemberwiseTupleHolder.content
+// CHECK-NEXT:    copy_addr [take] [[TEMP]] to [init] [[CONTENTS_ADDR]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK-NEXT:    return
+
+
+func callVariadicMemberwiseInit() -> MemberwiseTupleHolder<Int, String> {
+  return MemberwiseTupleHolder(content: (0, "hello"))
+}
