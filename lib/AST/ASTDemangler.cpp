@@ -674,8 +674,7 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     case RequirementKind::SameType:
       if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
-        if (baseDecl->getAssociatedType(DMT->getName()))
-          cmap[DMT->getName()] = req.getSecondType();
+        cmap[DMT->getName()] = req.getSecondType();
     }
   }
   llvm::SmallVector<Type, 4> args;
