@@ -203,11 +203,11 @@ public:
     assert(!discoveredBlocks || discoveredBlocks->empty());
   }
 
-  bool isInitialized() const { return initializedFlag; }
+  SWIFT_ASSERT_ONLY_DECL(bool isInitialized() const { return initializedFlag; })
 
   void invalidate() {
-    initializedFlag = false;
-    cleanFlag = false;
+    SWIFT_ASSERT_ONLY(initializedFlag = false);
+    SWIFT_ASSERT_ONLY(cleanFlag = false);
   }
 
   void initializeDiscoveredBlocks(
@@ -224,7 +224,7 @@ public:
   }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
-    initializedFlag = true;
+    SWIFT_ASSERT_ONLY(initializedFlag = true);
     markBlockLive(defBB, LiveWithin);
   }
 
@@ -366,7 +366,8 @@ public:
                  SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : liveBlocks(function, discoveredBlocks) {}
 
-  bool isInitialized() const { return liveBlocks.isInitialized(); }
+  SWIFT_ASSERT_ONLY_DECL(bool isInitialized()
+                             const { return liveBlocks.isInitialized(); })
 
   bool empty() const { return users.empty(); }
 
