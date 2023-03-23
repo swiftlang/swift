@@ -2736,7 +2736,7 @@ bool TypeConverter::visitAggregateLeaves(
     return {ty->getCanonicalType(), origTy, field, index};
   };
   auto isAggregate = [](Type ty) {
-    return ty->is<TupleType>() || ty->getEnumOrBoundGenericEnum() ||
+    return ty->is<SILPackType>() || ty->is<TupleType>() || ty->getEnumOrBoundGenericEnum() ||
            ty->getStructOrBoundGenericStruct();
   };
   insertIntoWorklist(substType, origType, nullptr, llvm::None);
@@ -2747,7 +2747,17 @@ bool TypeConverter::visitAggregateLeaves(
     Optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
-      if (auto tupleTy = ty->getAs<TupleType>()) {
+      if (auto packTy = ty->getAs<SILPackType>()) {
+        for (auto packIndex : indices(packTy->getElementTypes())) {
+          auto origElementTy = origTy.getPackElementType(packIndex);
+          auto substElementTy =
+              packTy->getElementType(packIndex)->getCanonicalType();
+          substElementTy =
+              computeLoweredRValueType(context, origElementTy, substElementTy);
+          insertIntoWorklist(substElementTy, origElementTy, nullptr,
+                             packIndex);
+        }
+      } else if (auto tupleTy = ty->getAs<TupleType>()) {
         for (unsigned tupleIndex = 0, num = tupleTy->getNumElements();
              tupleIndex < num; ++tupleIndex) {
           auto origElementTy = origTy.getTupleElementType(tupleIndex);
@@ -2826,9 +2836,9 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
           // The field's type is an aggregate.  Treat it as a leaf if it
           // has a lifetime annotation.
 
-          // If it's a field of a tuple or the top-level type, there's no value
-          // decl on which to look for an attribute.  It's a leaf iff the type
-          // has a lifetime annotation.
+          // If it's a field of a tuple, pack or the top-level type, there's no
+          // value decl on which to look for an attribute.  It's a leaf iff the
+          // type has a lifetime annotation.
           if (index || !field)
             return getLifetimeAnnotation(ty).isSome();
 
