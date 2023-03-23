@@ -1126,6 +1126,12 @@ bool Decl::isAlwaysWeakImported() const {
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
+  // FIXME: Weak linking on Windows is not yet supported
+  // https://github.com/apple/swift/issues/53303
+  if (getSemanticUnavailableAttr() &&
+      !getASTContext().LangOpts.Target.isOSWindows())
+    return true;
+
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->isAlwaysWeakImported();
 
