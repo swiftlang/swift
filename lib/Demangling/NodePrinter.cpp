@@ -310,7 +310,6 @@ private:
     case Node::Kind::Pack:
     case Node::Kind::SILPackDirect:
     case Node::Kind::SILPackIndirect:
-    case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
     case Node::Kind::Protocol:
@@ -340,6 +339,7 @@ private:
     case Node::Kind::ProtocolListWithAnyObject:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
+    case Node::Kind::ConstrainedExistential:
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorAttachedMacroExpansion:
