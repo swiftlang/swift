@@ -204,5 +204,5 @@ accesses.
 |              | ``sp-128``    |                        |
 +--------------+---------------+------------------------+
 
-.. [1] See Apple documentation, however.  Unlike the official ARM64 ABI, we pack
+.. [1] However, see Apple documentation. Unlike the official ARM64 ABI, we pack
        arguments, so this might also hold argument 1, argument 2 and so on.
