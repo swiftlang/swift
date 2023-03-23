@@ -9,13 +9,11 @@ func testSimpleInTypeCompletion() -> MyProto.#^SIMPLE_IN_TYPE_COMPLETION^# {}
 // SIMPLE_IN_TYPE_COMPLETION-DAG: Decl[TypeAlias]/CurrNominal:        Content[#Int#];
 // SIMPLE_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Protocol[#MyProto.Protocol#];
 // SIMPLE_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Type[#MyProto.Type#];
-// SIMPLE_IN_TYPE_COMPLETION: End completions
 
 func testUnconstrainedUnresolvedMember() {
   let _: MyProto = .#^UNCONSTRAINED_UNRESOLVED_MEMBER^#
 // UNCONSTRAINED_UNRESOLVED_MEMBER: Begin completions, 1 item
 // UNCONSTRAINED_UNRESOLVED_MEMBER-DAG: Decl[TypeAlias]/CurrNominal:        Content[#Int#];
-// UNCONSTRAINED_UNRESOLVED_MEMBER: End completions
 }
 
 protocol MyOtherProto {
@@ -31,13 +29,11 @@ func testConstrainedInTypeCompletion() -> MyOtherProto.#^CONSTRAINED_IN_TYPE_COM
 // CONSTRAINED_IN_TYPE_COMPLETION-DAG: Decl[AssociatedType]/CurrNominal:   MyAssocType;
 // CONSTRAINED_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Protocol[#MyOtherProto.Protocol#];
 // CONSTRAINED_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Type[#MyOtherProto.Type#];
-// CONSTRAINED_IN_TYPE_COMPLETION: End completions
 
 func testConstrainedUnresolvedMember() {
   let _: MyOtherProto = .#^CONSTRAINED_UNRESOLVED_MEMBER^#
 // CONSTRAINED_UNRESOLVED_MEMBER: Begin completions, 1 item
 // CONSTRAINED_UNRESOLVED_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   MyAssocType;
-// CONSTRAINED_UNRESOLVED_MEMBER: End completions
 }
 
 protocol ProtoWithGenericTypealias {
@@ -48,18 +44,14 @@ func testGenericInTypeCompletion() -> ProtoWithGenericTypealias.#^GENERIC_IN_TYP
 // GENERIC_IN_TYPE_COMPLETION-DAG: Decl[TypeAlias]/CurrNominal:        Storage[#Array<T>#];
 // GENERIC_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Protocol[#ProtoWithGenericTypealias.Protocol#];
 // GENERIC_IN_TYPE_COMPLETION-DAG: Keyword/None:                       Type[#ProtoWithGenericTypealias.Type#];
-// GENERIC_IN_TYPE_COMPLETION: End completions
 
 func testGenericUnresolvedMember() {
   let _: ProtoWithGenericTypealias = .#^GENERIC_UNRESOLVED_MEMBER^#
 // GENERIC_UNRESOLVED_MEMBER: Begin completions, 1 item
 // GENERIC_UNRESOLVED_MEMBER-DAG: Decl[TypeAlias]/CurrNominal:   Storage[#Array<T>#];
-// GENERIC_UNRESOLVED_MEMBER: End completions
 }
 
 struct ConformingType: MyProto {
 	func foo(content: #^GLOBAL_COMPLETE_IN_CONFORMING_TYPE^#) {}
-// GLOBAL_COMPLETE_IN_CONFORMING_TYPE: Begin completions
 // GLOBAL_COMPLETE_IN_CONFORMING_TYPE: Decl[TypeAlias]/Super:              Content[#Int#];
-// GLOBAL_COMPLETE_IN_CONFORMING_TYPE: End completions
 }

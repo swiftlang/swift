@@ -23,7 +23,6 @@ func foo() {
 // MEMBER_INHERITED-NEXT: Decl[TypeAlias]/CurrNominal:        T[#String#]; name=T
 // MEMBER_INHERITED-NEXT: Decl[Struct]/CurrNominal:           E[#B.E#]; name=E
 // MEMBER_INHERITED-NEXT: Decl[Constructor]/CurrNominal:      init()[#B#]; name=init()
-// MEMBER_INHERITED-NEXT: End completions
 
 do {
   let _: Any.#^MEMBER_ANY_DOT^#
@@ -31,14 +30,12 @@ do {
   // MEMBER_ANY_DOT-LABEL: Begin completions, 2 items
   // MEMBER_ANY_DOT-NEXT: Keyword/None: Protocol[#Any.Protocol#]; name=Protocol
   // MEMBER_ANY_DOT-NEXT: Keyword/None: Type[#Any.Type#]; name=Type
-  // MEMBER_ANY_DOT-NEXT: End completions
 
   let _: Any#^MEMBER_ANY_NO_DOT^#
 
   // MEMBER_ANY_NO_DOT-LABEL: Begin completions, 2 items
   // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Protocol[#Any.Protocol#]; name=Protocol
   // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Type[#Any.Type#]; name=Type
-  // MEMBER_ANY_NO_DOT-NEXT: End completions
 }
 
 do {
@@ -52,7 +49,6 @@ do {
   // MEMBER_DOT-LABEL: Begin completions, 2 items
   // MEMBER_DOT-NEXT: Decl[Struct]/CurrNominal: Nested[#S.Nested#]; name=Nested
   // MEMBER_DOT-NEXT: Keyword/None: Type[#{{\(?}}S{{\)?}}.Type#]; name=Type
-  // MEMBER_DOT-NEXT: End completions
 
   let _: (S)#^MEMBER_PAREN_NO_DOT^#
 
@@ -61,7 +57,6 @@ do {
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_PAREN_NO_DOT-NEXT: Decl[Struct]/CurrNominal: .Nested[#S.Nested#]; name=Nested
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: .Type[#(S).Type#]; name=Type
-  // MEMBER_PAREN_NO_DOT-NEXT: End completions
 }
 
 do {
@@ -69,25 +64,21 @@ do {
 
   // MEMBER_META_DOT-LABEL: Begin completions, 1 items
   // MEMBER_META_DOT-NEXT: Keyword/None: Type[#Int.Type.Type#]; name=Type
-  // MEMBER_META_DOT-NEXT: End completions
 
   let _: Int.Type#^MEMBER_META_NO_DOT^#
 
   // MEMBER_META_NO_DOT-LABEL: Begin completions, 1 items
   // MEMBER_META_NO_DOT-NEXT: Keyword/None: .Type[#Int.Type.Type#]; name=Type
-  // MEMBER_META_NO_DOT-NEXT: End completions
 
   let _: Sequence.Protocol.#^MEMBER_PROTOCOL_META_DOT^#
 
   // MEMBER_PROTOCOL_META_DOT-LABEL: Begin completions, 1 items
   // MEMBER_PROTOCOL_META_DOT-NEXT: Keyword/None: Type[#Sequence.Protocol.Type#]; name=Type
-  // MEMBER_PROTOCOL_META_DOT-NEXT: End completions
 
   let _: Sequence.Protocol#^MEMBER_PROTOCOL_META_NO_DOT^#
 
   // MEMBER_PROTOCOL_META_NO_DOT-LABEL: Begin completions, 1 items
   // MEMBER_PROTOCOL_META_NO_DOT-NEXT: Keyword/None: .Type[#Sequence.Protocol.Type#]; name=Type
-  // MEMBER_PROTOCOL_META_NO_DOT-NEXT: End completions
 }
 
 extension Optional {
@@ -101,7 +92,6 @@ do {
   // OPTIONAL-LABEL: Begin completions, 2 items
   // OPTIONAL-LABEL: Decl[TypeAlias]/CurrNominal: Wrappt[#Wrapped#]; name=Wrappt
   // OPTIONAL-LABEL: Keyword/None: Type[#{{Optional<Int>|Int\?}}.Type#]; name=Type
-  // OPTIONAL-LABEL: End completions
 
   let _: Array<Int>.#^ARRAY_MEMBER_DOT?check=ARRAY^#
   let _: [Int].#^SUGARED_ARRAY_MEMBER_DOT?check=ARRAY^#
@@ -115,7 +105,6 @@ do {
   // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: ArrayLiteralElement[#Element#]; name=ArrayLiteralElement
   // ARRAY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning:'IndexDistance' is deprecated: all index distances are now of type Int
   // ARRAY-NEXT: Keyword/None: Type[#{{Array<Int>|\[Int\]}}.Type#]; name=Type
-  // ARRAY-NEXT: End completions
 
   let _: Dictionary<Int, Int>.#^DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
   let _: [Int : Int].#^SUGARED_DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
@@ -132,7 +121,6 @@ do {
   // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Iterator[#Dictionary.Iterator#]; name=Iterator
   // DICTIONARY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning
   // DICTIONARY-NEXT: Keyword/None: Type[#{{Dictionary<Int, Int>|\[Int : Int\]}}.Type#]; name=Type
-  // DICTIONARY-NEXT: End completions
 }
 
 do {
@@ -142,7 +130,6 @@ do {
 
   // MEMBER_TUPLE_DOT-LABEL: Begin completions, 1 items
   // MEMBER_TUPLE_DOT-NEXT: Keyword/None: Type[#({{.*}}).Type#]; name=Type
-  // MEMBER_TUPLE_DOT-NEXT: End completions
 
   let _: (Int, Int)#^MEMBER_TUPLE_NO_DOT^#
   let _: ()#^MEMBER_VOID_NO_DOT?check=MEMBER_TUPLE_NO_DOT^#
@@ -152,7 +139,6 @@ do {
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword/None: async; name=async
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword/None: .Type[#({{.*}}).Type#]; name=Type
-  // MEMBER_TUPLE_NO_DOT-NEXT: End completions
 
   let _: (any Sequence).#^MEMBER_EXISTENTIAL_DOT^#
 
@@ -162,7 +148,6 @@ do {
   // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: Iterator; name=Iterator
   // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Protocol[#Sequence.Protocol#]; name=Protocol
   // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Type[#Sequence.Type#]; name=Type
-  // MEMBER_EXISTENTIAL_DOT-NEXT: End completions
 
   let _: (any Sequence)#^MEMBER_EXISTENTIAL_NO_DOT^#
 
@@ -174,5 +159,4 @@ do {
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .Iterator; name=Iterator
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Protocol[#Sequence.Protocol#]; name=Protocol
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Type[#Sequence.Type#]; name=Type
-  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: End completions
 }

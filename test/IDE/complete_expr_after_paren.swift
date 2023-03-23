@@ -42,7 +42,6 @@ func testConstructer() {
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init2: Int#}[')'][#MyClass#];
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init3: Int#}[')'][#MyClass#];
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init4: Int#}[')'][#MyClass#];
-// INITIALIZER: End completions
 }
 
 func testMethod(obj: MyClass) {
@@ -52,7 +51,6 @@ func testMethod(obj: MyClass) {
 // METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method2: Int#}[')'][#Void#];
 // METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method3: Int#}[')'][#Void#];
 // METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method4: Int#}[')'][#Void#];
-// METHOD: End completions
 }
 
 protocol HasUnavailable {}
@@ -73,7 +71,6 @@ func testUnavailable(val: MyStruct) {
 // AVAILABILITY: Begin completions, 2 items
 // AVAILABILITY-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method2: Int#}[')'][#Void#];
 // AVAILABILITY-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]:         ['(']{#method1: Int#}[')'][#Void#];
-// AVAILABILITY: End completions
 }
 
 struct TestStatic {
@@ -82,10 +79,8 @@ struct TestStatic {
 }
 func testStaticFunc() {
   TestStatic.method(#^STATIC^#)
-// STATIC: Begin completions
 // STATIC-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#(self): TestStatic#}[')'][#() -> Void#];
 // STATIC-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(self): TestStatic#}[')'][#() -> Void#];
-// STATIC: End completions
 }
 
 protocol TestShadowedProtocol {}
@@ -108,12 +103,10 @@ struct TestShadowedStruct: TestShadowedProtocol {
     // ARG_OVERLOADED: Begin completions, 2 items
     // ARG_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg: String#}[')'][#Void#]; name=arg:
     // ARG_OVERLOADED-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]: ['(']{#arg: Int#}[')'][#Void#]; name=arg:
-    // ARG_OVERLOADED: End completions
 
     self.returnTypeOverloaded(#^RETURN_OVERLOADED^#)
     // RETURN_OVERLOADED: Begin completions, 2 items
     // RETURN_OVERLOADED-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['('][')'][#String#]; name=
     // RETURN_OVERLOADED-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]: ['('][')'][#Int#]; name=
-    // RETURN_OVERLOADED: End completions
   }
 }

@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
-// TYPEATTR: Begin completions
 // TYPEATTR-NOT: myIntValue
 // TYPEATTR-DAG: Keyword/None:                       autoclosure[#Type Attribute#]; name=autoclosure
 // TYPEATTR-DAG: Keyword/None:                       convention(swift)[#Type Attribute#]; name=convention(swift)
@@ -11,7 +10,6 @@
 // TYPEATTR-DAG: Keyword/None:                       escaping[#Type Attribute#]; name=escaping
 // TYPEATTR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // TYPEATTR-NOT: myIntValue
-// TYPEATTR: End completions
 
 struct MyStruct {}
 

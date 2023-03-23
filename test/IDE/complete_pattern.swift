@@ -35,13 +35,11 @@ protocol BarProtocol {
 
 typealias FooTypealias = Int
 
-// GLOBAL: Begin completions
 // GLOBAL-DAG: fooObject
 // GLOBAL-DAG: fooFunc
 // GLOBAL-DAG: FooTypealias
 // GLOBAL-DAG: FooProtocol
 // GLOBAL-DAG: FooClass
-// GLOBAL: End completions
 
 // GLOBAL_NEGATIVE-NOT: fooObject
 // GLOBAL_NEGATIVE-NOT: fooFunc
@@ -118,12 +116,10 @@ func patternIsGeneric1<
   }
 }
 
-// PATTERN_IS_GENERIC_1: Begin completions
 // Generic parameters of the function.
 // PATTERN_IS_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_1: End completions
 
 struct PatternIsGeneric2<
     StructGenericFoo : FooProtocol,
@@ -139,7 +135,6 @@ struct PatternIsGeneric2<
   }
 }
 
-// PATTERN_IS_GENERIC_2: Begin completions
 // Generic parameters of the struct.
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
@@ -148,7 +143,6 @@ struct PatternIsGeneric2<
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_2: End completions
 
 
 // rdar://21174713
@@ -166,10 +160,8 @@ func test_multiple_patterns1(x: Int) {
     }
 }
 
-// MULTI_PATTERN_1: Begin completions
 // MULTI_PATTERN_1-NOT: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // MULTI_PATTERN_1-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
-// MULTI_PATTERN_1: End completions
 
 func test_multiple_patterns2(x: Int) {
     switch (x, x) {
@@ -178,10 +170,8 @@ func test_multiple_patterns2(x: Int) {
     }
 }
 
-// MULTI_PATTERN_2: Begin completions
 // MULTI_PATTERN_2-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // MULTI_PATTERN_2-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
-// MULTI_PATTERN_2: End completions
 
 func test_multiple_patterns3(x: Int) {
     switch (x, x) {
@@ -190,9 +180,7 @@ func test_multiple_patterns3(x: Int) {
     }
 }
 
-// MULTI_PATTERN_3: Begin completions
 // MULTI_PATTERN_3-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
-// MULTI_PATTERN_3: End completions
 
 func test_multiple_patterns4(x: Int) {
     switch (x, x) {
@@ -201,10 +189,8 @@ func test_multiple_patterns4(x: Int) {
     }
 }
 
-// MULTI_PATTERN_4: Begin completions
 // MULTI_PATTERN_4-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // MULTI_PATTERN_4-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
-// MULTI_PATTERN_4: End completions
 
 enum IntHolder {
   case hold(Int)
@@ -219,6 +205,4 @@ func test_cc_in_pattern(subject: IntHolder, i1: Int) {
   }
 }
 
-// CC_IN_PATTERN_1: Begin completions
 // CC_IN_PATTERN_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i1[#Int#]; name=i1
-// CC_IN_PATTERN_1: End completions

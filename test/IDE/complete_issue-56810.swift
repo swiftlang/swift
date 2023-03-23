@@ -15,6 +15,4 @@ foo { x in
   switch x.#^COMPLETE_WITH_BRACES?check=CHECK^# {}
 }
 
-// CHECK: Begin completions
 // CHECK: Decl[InstanceVar]/CurrNominal:      bar[#Bool#];
-// CHECK: End completions

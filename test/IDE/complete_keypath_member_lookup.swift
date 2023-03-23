@@ -50,29 +50,23 @@ func testMembersPostfix1(r: Lens<Rectangle>) {
   r#^testMembersPostfix1^#
 }
 
-// testMembersPostfix1: Begin completions
 // testMembersPostfix1-DAG: Decl[Subscript]/CurrNominal:        [{#dynamicMember: WritableKeyPath<Rectangle, U>#}][#Lens<U>#];
 
 // testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Lens<Point>#];
 // testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Lens<Point>#];
-// testMembersPostfix1: End completions
 
 func testMembersDot1(r: Lens<Rectangle>) {
   r.#^testMembersDot1^#
 }
-// testMembersDot1: Begin completions
 // testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Lens<Point>#];
 // testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Lens<Point>#];
-// testMembersDot1: End completions
 
 func testMembersDot2(r: Lens<Rectangle>) {
   r.topLeft.#^testMembersDot2^#
 }
 
-// testMembersDot2: Begin completions
 // testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
 // testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
-// testMembersDot2: End completions
 
 @dynamicMemberLookup
 struct MultipleSubscript {
@@ -89,12 +83,10 @@ func testMultipleSubscript1(r: MultipleSubscript) {
   r.#^testMultipleSubscript1^#
 }
 
-// testMultipleSubscript1: Begin completions
 // testMultipleSubscript1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testMultipleSubscript1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
 // testMultipleSubscript1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
 // testMultipleSubscript1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Point#];
-// testMultipleSubscript1: End completions
 
 @dynamicMemberLookup
 class Base<T> {
@@ -110,10 +102,8 @@ class Inherit1<T>: Base<T> {}
 func testInherit1(r: Inherit1<Point>) {
   r.#^testInherit1^#
 }
-// testInherit1: Begin completions
 // testInherit1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testInherit1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// testInherit1: End completions
 
 class Inherit2<T, U>: Base<T> {
   var u: U
@@ -126,12 +116,10 @@ class Inherit2<T, U>: Base<T> {
 func testInherit2(r: Inherit2<Point, Rectangle>) {
   r.#^testInherit2^#
 }
-// testInherit2: Begin completions
 // testInherit2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testInherit2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
 // testInherit2-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
 // testInherit2-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Point#];
-// testInherit2: End completions
 
 class Shadow1<T>: Base<T> {
   var x: String = ""
@@ -154,10 +142,8 @@ protocol P {
 func testGeneric1<G: P>(r: G) where G.T == Point {
   r.#^testGeneric1^#
 }
-// testGeneric1: Begin completions
 // testGeneric1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testGeneric1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// testGeneric1: End completions
 
 
 func testGenericUnderconstrained1<G: P>(r: G) {
@@ -179,10 +165,8 @@ protocol E {
 func testExistential2(r: E) {
   r.#^testExistential2^#
 }
-// testExistential2: Begin completions
 // testExistential2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testExistential2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// testExistential2: End completions
 
 struct WithP<T>: P {
   var t: T
@@ -195,10 +179,8 @@ struct WithP<T>: P {
 func testProtocolConform1(r: WithP<Point>) {
   r.#^testProtocolConform1^#
 }
-// testProtocolConform1: Begin completions
 // testProtocolConform1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testProtocolConform1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// testProtocolConform1: End completions
 
 @dynamicMemberLookup
 struct OnSelf {
@@ -210,11 +192,9 @@ struct OnSelf {
     self.#^OnSelf1^#
   }
 }
-// OnSelf1: Begin completions
 // OnSelf1-DAG: Decl[InstanceMethod]/CurrNominal:   test()[#Void#];
 // OnSelf1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // OnSelf1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// OnSelf1: End completions
 
 protocol HalfRect {
   var topLeft: Point
@@ -303,11 +283,9 @@ struct BoxedCircle {
 func testGenericResult1(r: GenericResult<BoxedCircle>) {
   r.#^testGenericResult1^#
 }
-// testGenericResult1: Begin completions
 // FIXME: the type should be 'GenericResult<Point>'
 // testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      center[#Gen1<Point>#]; name=center
 // testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      radius[#Gen1<Int>#]; name=radius
-// testGenericResult1: End completions
 
 class C {
   var someUniqueName: Int = 0
@@ -328,20 +306,16 @@ func testAnyObjectRoot1(r: AnyObjectRoot) {
 
 func testNested1(r: Lens<Lens<Point>>) {
   r.#^testNested1^#
-// testNested1: Begin completions
 // FIXME: The type should be 'Lens<Lens<Int>>'
 // testNested1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
 // testNested1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
-// testNested1: End completions
 }
 
 func testNested2(r: Lens<Lens<Lens<Point>>>) {
   r.#^testNested2^#
-// testNested2: Begin completions
 // FIXME: The type should be 'Lens<Lens<Lens<Int>>>'
 // testNested2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
 // testNested2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
-// testNested2: End completions
 }
 
 @dynamicMemberLookup
@@ -403,9 +377,7 @@ struct DynamicLookupConcrete : DynamicLookupProto {
 
 func testSubscriptOnProtocolExtension(dyn: DynamicLookupConcrete) {
     dyn.#^testSubscriptOnProtocolExt^#
-// testSubscriptOnProtocolExt: Begin completions
 // testSubscriptOnProtocolExt: Keyword[self]/CurrNominal:          self[#DynamicLookupConcrete#];
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      y[#Int#];
-// testSubscriptOnProtocolExt: End completions
 }

@@ -81,7 +81,6 @@ protocol Bar { func bar() }
 
 // GLOBAL_NEGATIVE-NOT: ERROR
 
-// DL_INSTANCE_NO_DOT: Begin completions
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: .bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[bar_swift_module]:    .bar_ImportedObjcClass_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc1!()[#Void#]{{; name=.+$}}
@@ -123,10 +122,8 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#(i): TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#(idx): Int32#}][#Any??#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#(key): Any!#}][#Any??#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT: End completions
 // GLOBAL_NEGATIVE-NOT:.objectAtIndexedSubscript
 
-// DL_INSTANCE_DOT: Begin completions
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[bar_swift_module]:    bar_ImportedObjcClass_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc1!()[#Void#]{{; name=.+$}}
@@ -160,9 +157,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      topLevelObjcClass_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      topLevelObjcProtocol_Property1[#Int?#]{{; name=.+$}}
-// DL_INSTANCE_DOT: End completions
 
-// DL_CLASS_NO_DOT: Begin completions
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[bar_swift_module]:   .bar_ImportedObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: .bar_ImportedObjcClass_InstanceFunc1({#(self): Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc1({#(self): Base1#})[#() -> Void#]{{; name=.+$}}
@@ -194,9 +189,7 @@ protocol Bar { func bar() }
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcClass_InstanceFunc1({#(self): TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .topLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcProtocol_InstanceFunc1({#(self): TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT: End completions
 
-// DL_CLASS_DOT: Begin completions
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[bar_swift_module]:   bar_ImportedObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1({#(self): Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc1({#(self): Base1#})[#() -> Void#]{{; name=.+$}}
@@ -228,9 +221,7 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcClass_InstanceFunc1({#(self): TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1({#(self): TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT: End completions
 
-// TLOC_MEMBERS_NO_DOT: Begin completions
 // TLOC_MEMBERS_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .topLevelObjcClass_InstanceFunc1()[#Void#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int8#}][#Int#]{{; name=.+$}}
@@ -238,14 +229,11 @@ protocol Bar { func bar() }
 // TLOC_MEMBERS_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: === {#AnyObject?#}[#Bool#];
 // TLOC_MEMBERS_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: !== {#AnyObject?#}[#Bool#];
 // TLOC_MEMBERS_NO_DOT-DAG: Keyword[self]/CurrNominal: .self[#TopLevelObjcClass#]; name=self
-// TLOC_MEMBERS_NO_DOT: End completions
 
-// TLOC_MEMBERS_DOT: Begin completions
 // TLOC_MEMBERS_DOT-DAG: Keyword[self]/CurrNominal: self[#TopLevelObjcClass#]; name=self
 // TLOC_MEMBERS_DOT-DAG: Decl[InstanceMethod]/CurrNominal: returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // TLOC_MEMBERS_DOT-DAG: Decl[InstanceMethod]/CurrNominal: topLevelObjcClass_InstanceFunc1()[#Void#]{{; name=.+$}}
 // TLOC_MEMBERS_DOT-DAG: Decl[InstanceVar]/CurrNominal:    topLevelObjcClass_Property1[#Int#]{{; name=.+$}}
-// TLOC_MEMBERS_DOT: End completions
 
 // FIXME: Properties in Clang modules.
 // There's a test already: baz_Protocol_Property1.
@@ -460,14 +448,11 @@ func testAnyObject11(_ dl: AnyObject) {
 }
 // FIXME: it would be nice if we produced a call pattern here.
 // DL_FUNC_NAME_1:     Begin completions
-// DL_FUNC_NAME_1:     End completions
 
 func testAnyObject11_(_ dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
 }
-// DL_FUNC_NAME_PAREN_1: Begin completions
 // DL_FUNC_NAME_PAREN_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#(i): Int#}[')'][#TopLevelObjcClass#]{{; name=.+$}}
-// DL_FUNC_NAME_PAREN_1: End completions
 
 func testAnyObject12(_ dl: AnyObject) {
   dl.returnsObjcClass.#^DL_FUNC_NAME_DOT_1^#
@@ -477,10 +462,8 @@ func testAnyObject12(_ dl: AnyObject) {
 func testAnyObject13(_ dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#
 }
-// DL_FUNC_NAME_BANG_1: Begin completions
 // DL_FUNC_NAME_BANG_1-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(i): Int#})[#TopLevelObjcClass#]
 // DL_FUNC_NAME_BANG_1-DAG: Keyword[self]/CurrNominal: .self[#(Int) -> TopLevelObjcClass#]; name=self
-// DL_FUNC_NAME_BANG_1: End completions
 
 func testAnyObject14() {
   // FIXME: this syntax is not implemented yet.

@@ -20,7 +20,6 @@ struct MyStruct {
 func testGlobal() {
   #^GLOBAL_EXPR^#
 }
-// GLOBAL_EXPR: Begin completions
 // GLOBAL_EXPR-DAG: Decl[Struct]/CurrModule:            <name>MyStruct</name>; typename=<typeid.user>MyStruct</typeid.user>;
 // GLOBAL_EXPR-DAG: Keyword[class]/None/Flair[RareKeyword]: <keyword>class</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[enum]/None/Flair[RareKeyword]: <keyword>enum</keyword>; typename=;
@@ -42,17 +41,14 @@ func testGlobal() {
 // GLOBAL_EXPR-DAG: Decl[Module]/None/IsSystem:         <name>Swift</name>; typename=Module;
 // GLOBAL_EXPR-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: <name>Int</name>; typename=<typeid.sys>Int</typeid.sys>;
 // GLOBAL_EXPR-DAG: Decl[FreeFunction]/OtherModule[Swift]/IsSystem: <name>print</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>items</callarg.param>: <callarg.type><keyword>Any</keyword></callarg.type>...</callarg>, <callarg><callarg.label>to</callarg.label> <callarg.param>output</callarg.param>: &amp;<callarg.type><typeid.sys>TextOutputStream</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>;
-// GLOBAL_EXPR: End completions
 
 
 func testType(value: #^GLOBAL_TYPE^#) {}
-// GLOBAL_TYPE: Begin completions
 // GLOBAL_TYPE-DAG: Keyword/None:                       <keyword>Any</keyword>; typename=<keyword>Any</keyword>;
 // GLOBAL_TYPE-DAG: Decl[Struct]/CurrModule:            <name>MyStruct</name>; typename=<typeid.user>MyStruct</typeid.user>;
 // GLOBAL_TYPE-DAG: Decl[Module]/None:                  <name>swift_ide_test</name>; typename=Module;
 // GLOBAL_TYPE-DAG: Decl[Module]/None/IsSystem:         <name>Swift</name>; typename=Module;
 // GLOBAL_TYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: <name>Int</name>; typename=<typeid.sys>Int</typeid.sys>;
-// GLOBAL_TYPE: End completions
 
 
 func testMember(value: MyStruct) {
@@ -66,7 +62,6 @@ func testMember(value: MyStruct) {
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal: <name>labelName</name>(<callarg><callarg.label>label</callarg.label>: <callarg.type>(<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>;
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal: <name>sameName</name>(<callarg><callarg.label>label</callarg.label>: &amp;<callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>;
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>;
-// EXPR_MEMBER: End completions
 
 func testPostfix(value: MyStruct) {
   value #^EXPR_POSTFIX^#
@@ -82,7 +77,6 @@ func testPostfix(value: MyStruct) {
 // EXPR_POSTFIX-DAG: Decl[Subscript]/CurrNominal:        [<callarg><callarg.label>label</callarg.label> <callarg.param>param</callarg.param>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>]; typename=<typeid.sys>Int</typeid.sys>;
 // EXPR_POSTFIX-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_POSTFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: <name>+</name>; typename=<typeid.user>MyStruct</typeid.user>;
-// EXPR_POSTFIX: End completions
 
 func testImplicitMember() -> MyStruct {
   return .#^EXPR_IMPLICITMEMBER^#
@@ -95,7 +89,6 @@ func testImplicitMember() -> MyStruct {
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: <keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
-// EXPR_IMPLICITMEMBER: End completions
 
 func testArgument() -> MyStruct {
   func foo(x: Int, y: Int) {}
@@ -103,7 +96,6 @@ func testArgument() -> MyStruct {
 }
 // CALLARG: Begin completions, 1 items
 // CALLARG-DAG: Pattern/Local/Flair[ArgLabels]:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
-// CALLARG: End completions
 
 struct TestArchetypeAnnotations<T> {
   func foo1<U>(u: U, t: T) {}
@@ -117,7 +109,6 @@ func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
 // GENERIC-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>TestArchetypeAnnotations</typeid.user>&lt;<typeid.user>T</typeid.user>&gt;; name=self
 // GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo1</name>(<callarg><callarg.label>u</callarg.label>: <callarg.type><typeid.user>U</typeid.user></callarg.type></callarg>, <callarg><callarg.label>t</callarg.label>: <callarg.type><typeid.user>T</typeid.user></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo1(u:t:)
 // GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   <name>foo2</name>(<callarg><callarg.label>s</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>elt</callarg.label>: <callarg.type><typeid.sys>Sequence</typeid.sys>.<typeid.sys>Element</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=foo2(s:elt:)
-// GENERIC: End completions
 
 struct TestGenericParamAnnotations<T> {
   func foo1<U>(u: U) where #^WHERE^#
@@ -127,7 +118,6 @@ struct TestGenericParamAnnotations<T> {
 // WHERE-DAG: Decl[GenericTypeParam]/Local:       <name>U</name>; typename=<typeid.user>U</typeid.user>; name=U
 // WHERE-DAG: Decl[Struct]/Local:                 <name>TestGenericParamAnnotations</name>;
 // WHERE-DAG: Keyword[Self]/CurrNominal:          <keyword>Self</keyword>;
-// WHERE: End completions
 
 protocol BaseP {
   func protoMethod() -> @convention(c) (UInt8) -> Void
@@ -146,7 +136,6 @@ class BaseC {
 }
 class DerivedC: BaseC, BaseP {
   #^OVERRIDE^#
-// OVERRIDE: Begin completions
 // OVERRIDE-DAG: Keyword[func]/None:                 <keyword>func</keyword>; typename=; name=func; sourcetext=func
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         <name>protoMethod</name>() -&gt; (<typeid.sys>UInt8</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>; typename=; name=protoMethod(); sourcetext=func protoMethod() -> (UInt8) -> Void {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            <name>value</name>: <typeid.user>MyStruct</typeid.user>; typename=; name=value; sourcetext=var value: MyStruct
@@ -159,7 +148,6 @@ class DerivedC: BaseC, BaseP {
 // OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.label>withName</param.label> <param.param>index</param.param>: <param.type><typeid.sys>Int</typeid.sys></param.type></param>) -&gt; <typeid.sys>Float</typeid.sys>; typename=; name=subscript(withName:); sourcetext=override subscript(withName index: Int) -> Float {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[Subscript]/Super:              <name>subscript</name>(<param><param.param>index</param.param>: <param.type><typeid.sys>String</typeid.sys></param.type></param>) -&gt; <typeid.sys>String</typeid.sys>; typename=; name=subscript(:); sourcetext=override subscript(index: String) -> String {\n<#code#>\n}
 // OVERRIDE-DAG: Decl[Constructor]/Super:            <name>init</name>(); typename=; name=init(); sourcetext=override init() {\n<#code#>\n}
-// OVERRIDE: End completions
 }
 
 struct Defaults {
@@ -171,7 +159,6 @@ struct Defaults {
 func defaults(def: Defaults) {
   def.#^DEFAULTS^#
 }
-// DEFAULTS: Begin completions
 // DEFAULTS-DAG: Keyword[self]/CurrNominal:          <keyword>self</keyword>; typename=<typeid.user>Defaults</typeid.user>; name=self; sourcetext=self
 // DEFAULTS-DAG: Decl[InstanceMethod]/CurrNominal:   <name>noDefault</name>(<callarg><callarg.label>a</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=noDefault(a:); sourcetext=noDefault(a: <#T##Int#>)
 // DEFAULTS-DAG: Decl[InstanceMethod]/CurrNominal:   <name>singleDefault</name>(); typename=<typeid.sys>Void</typeid.sys>; name=singleDefault(); sourcetext=singleDefault()
@@ -180,4 +167,3 @@ func defaults(def: Defaults) {
 // DEFAULTS-DAG: Decl[InstanceMethod]/CurrNominal:   <name>mixedDefaults</name>(<callarg><callarg.label>a</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>b</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type><callarg.default/></callarg>, <callarg><callarg.label>c</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=mixedDefaults(a:b:c:); sourcetext=mixedDefaults(a: <#T##Int#>, b: <#T##Int#>, c: <#T##Int#>)
 // DEFAULTS-DAG: Decl[InstanceMethod]/CurrNominal:   <name>closureDefault</name>(); typename=<typeid.sys>Void</typeid.sys>; name=closureDefault(); sourcetext=closureDefault()
 // DEFAULTS-DAG: Decl[InstanceMethod]/CurrNominal:   <name>closureDefault</name>(<callarg><callarg.label>a</callarg.label>: <callarg.type>(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys></callarg.type><callarg.default/></callarg>); typename=<typeid.sys>Void</typeid.sys>; name=closureDefault(a:); sourcetext=closureDefault(a: <#T##(Int) -> Void#>)
-// DEFAULTS: End completions

@@ -3,14 +3,12 @@
 // REQUIRES: concurrency
 
 #^GLOBAL^#
-// GLOBAL: Begin completions
 // GLOBAL-DAG: Keyword/None:                       actor; name=actor
 // GLOBAL-DAG: Keyword/None:                       await; name=await
 // GLOBAL: End completion
 
 enum Namespace {
     #^TYPEMEMBER^#
-// TYPEMEMBER: Begin completions
 // TYPEMEMBER-NOT: Keyword{{.*}}await
 // TYPEMEMBER-DAG: Keyword/None:                       actor; name=actor
 // TYPEMEMBER-NOT: Keyword{{.*}}await
@@ -19,7 +17,6 @@ enum Namespace {
 
 func testFunc() {
   #^STMT^#
-// STMT: Begin completions
 // STMT-DAG: Keyword/None/Flair[RareKeyword]:    actor; name=actor
 // STMT-DAG: Keyword/None:                       await; name=await
 // STMT: End completion
@@ -27,7 +24,6 @@ func testFunc() {
 
 func testExpr() {
   _ = #^EXPR^#
-// EXPR: Begin completions
 // EXPR-NOT: Keyword{{.*}}actor
 // EXPR-DAG: Keyword/None:                       await; name=await
 // EXPR-NOT: Keyword{{.*}}actor

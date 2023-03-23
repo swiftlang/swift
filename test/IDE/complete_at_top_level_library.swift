@@ -11,7 +11,6 @@ protocol MyProtocol {}
 
 #^TOPLEVEL^#
 
-// LIBRARY: Begin completions
 // LIBRARY-DAG: Keyword[associatedtype]/None:       associatedtype; name=associatedtype
 // LIBRARY-DAG: Keyword[class]/None/Flair[CommonKeyword]: class; name=class
 // LIBRARY-DAG: Keyword[deinit]/None:               deinit; name=deinit
@@ -78,9 +77,7 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Decl[Struct]/CurrModule/Flair[ExprAtFileScope]: MyStruct[#MyStruct#]; name=MyStruct
 // LIBRARY-DAG: Decl[Protocol]/CurrModule/Flair[RareType,ExprAtFileScope]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // LIBRARY-DAG: Decl[Struct]/OtherModule[Swift]/Flair[ExprAtFileScope]/IsSystem: Int[#Int#]; name=Int
-// LIBRARY: End completions
 
-// SCRIPT: Begin completions
 // SCRIPT-DAG: Keyword[associatedtype]/None:       associatedtype; name=associatedtype
 // SCRIPT-DAG: Keyword[class]/None:                class; name=class
 // SCRIPT-DAG: Keyword[deinit]/None:               deinit; name=deinit
@@ -147,4 +144,3 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // SCRIPT-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // SCRIPT-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
-// SCRIPT: End completions
