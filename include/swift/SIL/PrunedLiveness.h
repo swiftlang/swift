@@ -190,9 +190,6 @@ private:
   /// Optional vector of live blocks for clients that deterministically iterate.
   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr;
 
-  /// Only a clean bitfield can be initialized.
-  bool cleanFlag = true;
-
   /// Once the first def has been initialized, uses can be added.
   bool initializedFlag = false;
 
@@ -207,7 +204,6 @@ public:
 
   void invalidate() {
     initializedFlag = false;
-    cleanFlag = false;
   }
 
   void initializeDiscoveredBlocks(
