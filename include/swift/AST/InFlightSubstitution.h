@@ -55,6 +55,31 @@ public:
                                      conformedProtocol);
   }
 
+  class OptionsAdjustmentScope {
+    InFlightSubstitution &IFS;
+    SubstOptions SavedOptions;
+
+  public:
+    OptionsAdjustmentScope(InFlightSubstitution &IFS, SubstOptions newOptions)
+      : IFS(IFS), SavedOptions(IFS.Options) {
+      IFS.Options = newOptions;
+    }
+
+    OptionsAdjustmentScope(const OptionsAdjustmentScope &) = delete;
+    OptionsAdjustmentScope &operator=(const OptionsAdjustmentScope &) = delete;
+
+    ~OptionsAdjustmentScope() {
+      IFS.Options = SavedOptions;
+    }
+  };
+
+  template <class Fn>
+  auto withNewOptions(SubstOptions options, Fn &&fn)
+      -> decltype(std::forward<Fn>(fn)()) {
+    OptionsAdjustmentScope scope(*this, options);
+    return std::forward<Fn>(fn)();
+  }
+
   SubstOptions getOptions() const {
     return Options;
   }
