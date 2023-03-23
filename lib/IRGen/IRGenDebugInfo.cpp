@@ -2561,7 +2561,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       Operands.push_back(llvm::dwarf::DW_OP_consts);
       Operands.push_back(*ExprOperand[1].getAsConstInt());
       break;
-    case SILDIExprOperator::INVALID:
+    case SILDIExprOperator::Invalid:
       return false;
     }
   }

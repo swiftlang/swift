@@ -33,25 +33,30 @@ class TailAllocatedDebugVariable;
 
 /// Operator in a debug info expression
 enum class SILDIExprOperator : unsigned {
-  INVALID = 0,
+  Invalid = 0,
+
   /// Dereferences the SSA value
   Dereference,
-  /// Specifies that the SSA value is a fragment (sub-field) of the
-  /// associated source variable. This operator takes a single
-  /// VarDecl operand pointing to the field declaration.
-  /// Note that this directive can only appear at the end of an
-  /// expression.
+
+  /// Specifies that the SSA value is a fragment (sub-field) of the associated
+  /// source variable. This operator takes a list of VarDecl/Tuple element
+  /// operand pointing to a list of field declarations. Note that this directive
+  /// can only appear at the end of an expression.
   Fragment,
+
   /// Perform arithmetic addition on the top two elements of the
   /// expression stack and push the result back to the stack.
   Plus,
+
   /// Subtract the top element in expression stack by the second
   /// element. Then push the result back to the stack.
   Minus,
+
   /// Push an unsigned integer constant onto the stack.
   ConstUInt,
+
   /// Push a signed integer constant onto the stack.
-  ConstSInt
+  ConstSInt,
 };
 
 /// Represents a single component in a debug info expression.
@@ -82,7 +87,7 @@ public:
   Kind getKind() const { return OpKind; }
 
   SILDIExprOperator getAsOperator() const {
-    return OpKind == OperatorKind ? Operator : SILDIExprOperator::INVALID;
+    return OpKind == OperatorKind ? Operator : SILDIExprOperator::Invalid;
   }
 
   Decl *getAsDecl() const { return OpKind == DeclKind ? Declaration : nullptr; }

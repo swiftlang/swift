@@ -1315,7 +1315,7 @@ public:
 
       // Print the operator
       SILDIExprOperator Op = Operand.getOperator();
-      assert(Op != SILDIExprOperator::INVALID &&
+      assert(Op != SILDIExprOperator::Invalid &&
              "Invalid SILDIExprOperator kind");
       *this << SILDIExprInfo::get(Op)->OpText;
 
