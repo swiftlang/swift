@@ -3638,7 +3638,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
     // Drop the double quotes.
-    auto ArgumentsSpecification = P.Tok.getText().drop_front().drop_back();
+    unsigned numQuotes = P.Tok.isMultilineString() ? 4 : 1;
+    auto ArgumentsSpecification =
+      P.Tok.getText().drop_front(numQuotes).drop_back(numQuotes).trim();
     P.consumeToken(tok::string_literal);
     ResultVal = B.createTestSpecificationInst(InstLoc, ArgumentsSpecification);
     break;
