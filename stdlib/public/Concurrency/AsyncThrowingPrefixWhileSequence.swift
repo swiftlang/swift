@@ -14,7 +14,7 @@ import Swift
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
-  @ available(*, deprecated, renamed: "prefix(while:)")
+  @available(*, deprecated, renamed: "prefix(while:)")
   @preconcurrency
   @inlinable
   public __consuming func prefix(
