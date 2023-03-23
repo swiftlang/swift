@@ -112,9 +112,11 @@
 
 # stdlib
 # TODO: /stdlib/
+/stdlib/public/Backtracing/               @al45tair
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Windows/                   @compnerd
+/stdlib/public/libexec/swift-backtrace/   @al45tair
 
 # test
 /test/ASTGen/                                       @zoecarver @CodaFi
