@@ -1683,12 +1683,7 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin,
-                                   /*Size=*/0,
-                                   /*Alignment=*/1,
-                                   /*Stride=*/1,
-                                   /*ExtraInhabitants=*/0,
-                                   /*BitwiseTakable=*/true);
+  EmptyTI = makeTypeInfo<BuiltinTypeInfo>();
   return EmptyTI;
 }
 
