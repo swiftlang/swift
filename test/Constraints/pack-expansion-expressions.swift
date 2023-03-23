@@ -261,3 +261,13 @@ func invalidRepeat<each T>(t: repeat each T) {
   _ = [repeat each t]
   // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
 }
+
+func test_pack_expansions_with_closures() {
+  func takesVariadicFunction<each T>(function: (repeat each T) -> Int) {}
+
+  func test(fn: (Int, String) -> Int, x: Int) {
+    takesVariadicFunction { fn(x, "") } // Ok
+    takesVariadicFunction { y in fn(x, y) } // Ok
+    takesVariadicFunction { y, z in fn(y, z) } // Ok
+  }
+}

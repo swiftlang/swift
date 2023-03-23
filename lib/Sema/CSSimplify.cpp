@@ -11020,6 +11020,11 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (contextualTy->isTypeVariableOrMember())
       return false;
 
+    // Cannot propagate pack expansion type from context,
+    // it has to be handled by type matching logic.
+    if (contextualTy->is<PackExpansionType>())
+      return false;
+
     // If contextual type has an error, let's wait for inference,
     // otherwise contextual would interfere with diagnostics.
     if (contextualTy->hasError())
