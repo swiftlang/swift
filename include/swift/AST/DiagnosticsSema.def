@@ -1007,6 +1007,11 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(in_package_module_not_compiled_from_source,Fatal,
+      "module %0 is in package '%1' but was built from interface '%2'; "
+      "modules of the same package can only be loaded if built from source",
+      (Identifier, StringRef, StringRef))
+
 ERROR(import_restriction_conflict,none,
       "module %0 cannot be both "
       "%select{implementation-only|SPI only|exported}1 and "
