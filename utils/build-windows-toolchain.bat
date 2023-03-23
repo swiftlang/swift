@@ -924,6 +924,7 @@ setlocal enableextensions enabledelayedexpansion
 
 :: Package toolchain.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\toolchain\ ^
   -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
@@ -934,6 +935,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
 
 :: Package sdk.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\sdk\ ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
@@ -944,6 +946,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
 
 :: Package runtime.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\runtime\ ^
   -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
@@ -953,6 +956,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
 
 :: Package devtools.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\devtools\ ^
   -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
@@ -968,6 +972,7 @@ move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
 
 :: Build Installer
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\installer\ ^
   -p:IntermediateOutputPath=%PackageRoot%\installer\ ^
