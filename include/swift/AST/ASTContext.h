@@ -1461,11 +1461,20 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
-  /// search within the library.
-  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
-  
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
+
+  /// Lookup a library plugin that can handle \p moduleName and return the path
+  /// to it.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<std::string> lookupLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Load the specified dylib plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  void *loadLibraryPlugin(StringRef path);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
   /// module by '-load-plugin-executable'.
@@ -1506,7 +1515,7 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  void loadCompilerPlugins();
+  void createModuleToExecutablePluginMap();
 
   friend TypeBase;
   friend ArchetypeType;
