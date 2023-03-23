@@ -749,11 +749,12 @@ namespace {
     RetTy visitTupleType(CanTupleType type, AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties props;
-      for (unsigned i = 0, e = type->getNumElements(); i < e; ++i) {
-        props.addSubobject(classifyType(origType.getTupleElementType(i),
-                                        type.getElementType(i),
-                                        TC, Expansion));
-      }
+      origType.forEachExpandedTupleElement(type,
+          [&](AbstractionPattern origEltType, CanType substEltType,
+              const TupleTypeElt &elt) {
+        props.addSubobject(
+          classifyType(origEltType, substEltType, TC, Expansion));
+      });
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
       return asImpl().handleAggregateByProperties(type, props);
     }
@@ -2250,12 +2251,12 @@ namespace {
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
-      for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
-        auto eltType = tupleType.getElementType(i);
-        auto origEltType = origType.getTupleElementType(i);
-        auto &lowering = TC.getTypeLowering(origEltType, eltType, Expansion);
-        properties.addSubobject(lowering.getRecursiveProperties());
-      }
+      origType.forEachExpandedTupleElement(tupleType,
+          [&](AbstractionPattern origEltType, CanType substEltType,
+              const TupleTypeElt &elt) {
+        properties.addSubobject(
+          classifyType(origEltType, substEltType, TC, Expansion));
+      });
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
@@ -2343,7 +2344,8 @@ namespace {
         auto sig = field->getDeclContext()->getGenericSignatureOfContext();
         auto interfaceTy = field->getInterfaceType()->getReducedType(sig);
         auto origFieldType = origType.unsafeGetSubstFieldType(field,
-                                                              interfaceTy);
+                                                              interfaceTy,
+                                                              subMap);
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
@@ -2422,7 +2424,8 @@ namespace {
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()
-                                 ->getReducedType(D->getGenericSignature()));
+                                 ->getReducedType(D->getGenericSignature()),
+                              subMap);
         properties.addSubobject(classifyType(origEltType, substEltType,
                                              TC, Expansion));
         properties =
@@ -2765,7 +2768,8 @@ bool TypeConverter::visitAggregateLeaves(
           auto interfaceTy =
               structField->getInterfaceType()->getReducedType(sig);
           auto origFieldType =
-              origTy.unsafeGetSubstFieldType(structField, interfaceTy);
+              origTy.unsafeGetSubstFieldType(structField, interfaceTy,
+                                             subMap);
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              llvm::None);
         }
@@ -2782,7 +2786,7 @@ bool TypeConverter::visitAggregateLeaves(
                                       ->getCanonicalType();
           auto origElementTy = origTy.unsafeGetSubstFieldType(
               element, element->getArgumentInterfaceType()->getReducedType(
-                           decl->getGenericSignature()));
+                           decl->getGenericSignature()), subMap);
 
           insertIntoWorklist(substElementType, origElementTy, element,
                              llvm::None);

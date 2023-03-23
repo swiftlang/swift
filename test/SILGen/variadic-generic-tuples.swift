@@ -204,3 +204,52 @@ func projectTupleElements<each T>(_ value: repeat Wrapper<each T>) {
 
   let tuple = (repeat (each value).value)
 }
+
+func takesVariadicTuple<each T>(tuple: (repeat each T)) {}
+
+// CHECK-LABEL: sil{{.*}} @$s4main28testConcreteVariadicTupleArg1i1sySi_SStF :
+// CHECK:       [[PACK:%.*]] = alloc_pack $Pack{Int, String}
+// CHECK-NEXT:  [[I_COPY:%.*]] = alloc_stack $Int
+// CHECK-NEXT:  store %0 to [trivial] [[I_COPY]] : $*Int
+// CHECK-NEXT:  [[I_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String}
+// CHECK-NEXT:  pack_element_set [[I_COPY]] : $*Int into [[I_INDEX]] of [[PACK]] :
+// CHECK-NEXT:  [[S_COPY:%.*]] = alloc_stack $String
+// CHECK-NEXT:  [[T0:%.*]] = copy_value %1 : $String
+// CHECK-NEXT:  store [[T0]] to [init] [[S_COPY]] : $*String
+// CHECK-NEXT:  [[S_INDEX:%.*]] = scalar_pack_index 1 of $Pack{Int, String}
+// CHECK-NEXT:  pack_element_set [[S_COPY]] : $*String into [[S_INDEX]] of [[PACK]] :
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[FN:%.*]] = function_ref @$s4main18takesVariadicTuple5tupleyxxQp_t_tRvzlF : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:  apply [[FN]]<Pack{Int, String}>([[PACK]])
+// CHECK-NEXT:  destroy_addr [[S_COPY]] :
+// CHECK-NEXT:  dealloc_stack [[S_COPY]] :
+// CHECK-NEXT:  dealloc_stack [[I_COPY]] :
+// CHECK-NEXT:  dealloc_pack [[PACK]] :
+func testConcreteVariadicTupleArg(i: Int, s: String) {
+  takesVariadicTuple(tuple: (i, s))
+}
+
+struct TupleHolder<each T> {
+  var content: (repeat each T)
+
+  // Suppress the memberwise initializer
+  init(values: repeat each T) {
+    content = (repeat each values)
+  }
+}
+
+// CHECK-LABEL: sil{{.*}} @$s4main31takesConcreteTupleHolderFactory7factoryyAA0dE0VySi_SSQPGyXE_tF :
+// CHECK-SAME:    $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned TupleHolder<Int, String>) -> ()
+// CHECK:       [[T0:%.*]] = copy_value %0 :
+// CHECK:       [[T1:%.*]] = begin_borrow [[T0]]
+// CHECK:       [[RESULT:%.*]] = apply [[T1]]() :
+// CHECK:       destroy_value [[RESULT]]
+func takesConcreteTupleHolderFactory(factory: () -> TupleHolder<Int, String>) {
+  let holder = factory()
+}
+
+/* We still crash with memberwise initializers
+func generateConcreteMemberTuple() -> TupleHolder<Int, String> {
+  return HasMemberTuple(content: (0, "hello"))
+}
+ */

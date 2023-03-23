@@ -1376,6 +1376,26 @@ void AbstractionPattern::dump() const {
   llvm::errs() << "\n";
 }
 
+static void printGenerics(raw_ostream &out, const AbstractionPattern &pattern) {
+  if (auto sig = pattern.getGenericSignature()) {
+    sig->print(out);
+  }
+  // It'd be really nice if we could get these interleaved with the types.
+  if (auto subs = pattern.getGenericSubstitutions()) {
+    out << "@<";
+    bool first = false;
+    for (auto sub : subs.getReplacementTypes()) {
+      if (!first) {
+        out << ",";
+      } else {
+        first = true;
+      }
+      out << sub;
+    }
+    out << ">";
+  }
+}
+
 void AbstractionPattern::print(raw_ostream &out) const {
   switch (getKind()) {
   case Kind::Invalid:
@@ -1396,9 +1416,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
               ? "AP::Type" :
             getKind() == Kind::Discard
               ? "AP::Discard" : "<<UNHANDLED CASE>>");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     out << '(';
     getType().dump(out);
     out << ')';
@@ -1425,9 +1443,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
             getKind() == Kind::ObjCCompletionHandlerArgumentsType
               ? "AP::ObjCCompletionHandlerArgumentsType("
               : "AP::CFunctionAsMethodType(");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     getType().dump(out);
     out << ", ";
     // [TODO: Improve-Clang-type-printing]
@@ -1459,9 +1475,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
             getKind() == Kind::CurriedCXXMethodType
               ? "AP::CurriedCXXMethodType("
               : "AP::PartialCurriedCXXMethodType");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     getType().dump(out);
     out << ", ";
     getCXXMethod()->dump();
@@ -1569,13 +1583,14 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
 
 AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
-                                            CanType origMemberInterfaceType)
+                                            CanType origMemberInterfaceType,
+                                            SubstitutionMap subMap)
 const {
   assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    return AbstractionPattern(sig.getCanonicalSignature(),
+    return AbstractionPattern(subMap, sig.getCanonicalSignature(),
                               origMemberInterfaceType);
   }
 
@@ -1612,7 +1627,9 @@ const {
                                       member, origMemberInterfaceType)
                              ->getReducedType(getGenericSignature());
       
-    return AbstractionPattern(getGenericSignature(), memberTy);
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignature(),
+                              memberTy);
   }
   llvm_unreachable("invalid abstraction pattern kind");
 }
