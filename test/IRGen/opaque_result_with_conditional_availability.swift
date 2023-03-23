@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/opaque_result_with_conditional_availability_types.swiftmodule %S/Inputs/opaque_result_with_conditional_availability_types.swift
-// RUN: %target-build-swift -c -parse-as-library -o %t/opaque_result_with_conditional_availability_types.o %S/Inputs/opaque_result_with_conditional_availability_types.swift
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -emit-module -emit-module-path=%t/opaque_result_with_conditional_availability_types.swiftmodule %S/Inputs/opaque_result_with_conditional_availability_types.swift
+// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -c -parse-as-library -o %t/opaque_result_with_conditional_availability_types.o %S/Inputs/opaque_result_with_conditional_availability_types.swift
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -I%t -emit-ir %s -swift-version 5 | %IRGenFileCheck %s
 // REQUIRES: OS=macosx
 
