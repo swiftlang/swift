@@ -85,3 +85,21 @@ entry:
   return %retval : $()
 }
 
+actor A {}
+
+sil @getA : $() -> (@owned A)
+sil @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
+
+// CHECK-LABEL: begin running test 1 of 1 on test_hop_to_executor: is-deinit-barrier
+// CHECK:  hop_to_executor
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of 1 on test_hop_to_executor: is-deinit-barrier
+sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
+  %borrowA = function_ref @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
+  (%a, %token) = begin_apply %borrowA() : $@yield_once @convention(thin) () -> @yields @guaranteed A
+  test_specification "is-deinit-barrier @instruction"
+  hop_to_executor %a : $A
+  end_apply %token
+  %retval = tuple ()
+  return %retval : $()
+}

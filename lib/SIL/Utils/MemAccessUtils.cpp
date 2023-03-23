@@ -427,7 +427,8 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
   return FullApplySite::isa(instruction) 
       || isa<EndApplyInst>(instruction)
-      || isa<AbortApplyInst>(instruction);
+      || isa<AbortApplyInst>(instruction)
+      || isa<HopToExecutorInst>(instruction);
 }
 
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
