@@ -1520,21 +1520,17 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   }
 
   llvm::StructType *type;
-  if (T->hasParameterizedExistential()) {
-    type = IGM.createNominalType(T);
-  } else {
-    // Note: Protocol composition types are not nominal, but we name them
-    // anyway.
-    if (auto existential = T->getAs<ExistentialType>()) {
-      T = existential->getConstraintType()->getCanonicalType();
-    }
 
-    if (isa<ProtocolType>(T))
-      type = IGM.createNominalType(T);
-    else
-      type =
-          IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
+  // Note: Protocol composition types are not nominal, but we name them
+  // anyway.
+  if (auto existential = T->getAs<ExistentialType>()) {
+    T = existential->getConstraintType()->getCanonicalType();
   }
+
+  if (isa<ProtocolType>(T) || isa<ParameterizedProtocolType>(T))
+    type = IGM.createNominalType(T);
+  else
+    type = IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
 
   assert(type->isOpaque() && "creating existential type in concrete struct");
 
