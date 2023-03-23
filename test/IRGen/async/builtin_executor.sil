@@ -1,11 +1,8 @@
 // RUN: %target-swift-frontend  -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
 
 // REQUIRES: concurrency
-// FIXME(moveonly): rdar://106849189 move-only types should be supported in freestanding mode
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
-
-// FIXME(moveonly): rdar://107050387 Move-only types fail to be found sometimes, must fix or remove Job before shipping
-// REQUIRES: radr107050387
 
 sil_stage canonical
 
