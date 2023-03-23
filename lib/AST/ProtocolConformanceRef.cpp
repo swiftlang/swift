@@ -86,7 +86,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
   if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(origArchetype)) {
       return *this;
     }

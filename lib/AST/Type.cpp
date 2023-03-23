@@ -4655,7 +4655,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
 bool InFlightSubstitution::isInvariant(Type derivedType) const {
   return !derivedType->hasArchetype()
       && !derivedType->hasTypeParameter()
-      && (!Options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+      && (!shouldSubstituteOpaqueArchetypes()
           || !derivedType->hasOpaqueArchetype());
 }
 
@@ -4742,13 +4742,13 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
 
     // Opaque types can't normally be directly substituted unless we
     // specifically were asked to substitute them.
-    if (!IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(substOrig))
       return None;
 
     // If we have a substitution for this type, use it.
     if (auto known = IFS.substType(substOrig)) {
-      if (IFS.getOptions().contains(SubstFlags::SubstituteOpaqueArchetypes) &&
+      if (IFS.shouldSubstituteOpaqueArchetypes() &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
         return None; // Recursively process the substitutions of the opaque type
