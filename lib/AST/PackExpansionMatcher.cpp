@@ -142,6 +142,9 @@ bool ParamPackMatcher::match() {
     auto lhsParam = lhsParams[lhsIdx];
     auto rhsParam = rhsParams[rhsIdx];
 
+    if (lhsParam.getLabel() != rhsParam.getLabel())
+      break;
+
     // FIXME: Check flags
 
     auto lhsType = lhsParam.getPlainType();
@@ -169,6 +172,9 @@ bool ParamPackMatcher::match() {
     auto rhsParam = rhsParams[rhsIdx];
 
     // FIXME: Check flags
+
+    if (lhsParam.getLabel() != rhsParam.getLabel())
+      break;
 
     auto lhsType = lhsParam.getPlainType();
     auto rhsType = rhsParam.getPlainType();
@@ -203,6 +209,9 @@ bool ParamPackMatcher::match() {
 
       SmallVector<Type, 2> rhsTypes;
       for (auto rhsParam : rhsParams) {
+        if (rhsParam.hasLabel())
+          return true;
+
         // FIXME: Check rhs flags
         rhsTypes.push_back(rhsParam.getPlainType());
       }
@@ -224,6 +233,9 @@ bool ParamPackMatcher::match() {
 
       SmallVector<Type, 2> lhsTypes;
       for (auto lhsParam : lhsParams) {
+        if (lhsParam.hasLabel())
+          return true;
+
         // FIXME: Check lhs flags
         lhsTypes.push_back(lhsParam.getPlainType());
       }
