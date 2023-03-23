@@ -63,6 +63,54 @@ public:
   bool match();
 };
 
+/// Performs a structural match of two lists of types.
+///
+/// The invariant is that each list must only contain at most one pack
+/// expansion type. After collecting a common prefix and suffix, the
+/// pack expansion on either side asborbs the remaining elements on the
+/// other side.
+class TypeListPackMatcher {
+  struct Element {
+  private:
+    Identifier label;
+    Type type;
+    ParameterTypeFlags flags;
+
+  public:
+    Element(Identifier label, Type type,
+            ParameterTypeFlags flags = ParameterTypeFlags())
+        : label(label), type(type), flags(flags) {}
+
+    bool hasLabel() const { return !label.empty(); }
+    Identifier getLabel() const { return label; }
+
+    Type getType() const { return type; }
+
+    static Element from(const TupleTypeElt &tupleElt);
+    static Element from(const AnyFunctionType::Param &funcParam);
+    static Element from(Type type);
+  };
+
+  ASTContext &ctx;
+
+  SmallVector<Element> lhsElements;
+  SmallVector<Element> rhsElements;
+
+protected:
+  TypeListPackMatcher(ASTContext &ctx, ArrayRef<TupleTypeElt> lhs,
+                      ArrayRef<TupleTypeElt> rhs);
+
+  TypeListPackMatcher(ASTContext &ctx, ArrayRef<AnyFunctionType::Param> lhs,
+                      ArrayRef<AnyFunctionType::Param> rhs);
+
+  TypeListPackMatcher(ASTContext &ctx, ArrayRef<Type> lhs, ArrayRef<Type> rhs);
+
+public:
+  SmallVector<MatchedPair, 4> pairs;
+
+  bool match();
+};
+
 /// Performs a structural match of two lists of (unlabeled) function
 /// parameters.
 ///
@@ -70,20 +118,11 @@ public:
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
-class ParamPackMatcher {
-  ArrayRef<AnyFunctionType::Param> lhsParams;
-  ArrayRef<AnyFunctionType::Param> rhsParams;
-
-  ASTContext &ctx;
-
+class ParamPackMatcher : public TypeListPackMatcher {
 public:
-  SmallVector<MatchedPair, 4> pairs;
-
   ParamPackMatcher(ArrayRef<AnyFunctionType::Param> lhsParams,
-                   ArrayRef<AnyFunctionType::Param> rhsParams,
-                   ASTContext &ctx);
-
-  bool match();
+                   ArrayRef<AnyFunctionType::Param> rhsParams, ASTContext &ctx)
+      : TypeListPackMatcher(ctx, lhsParams, rhsParams) {}
 };
 
 /// Performs a structural match of two lists of types.
@@ -92,20 +131,10 @@ public:
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
-class PackMatcher {
-  ArrayRef<Type> lhsTypes;
-  ArrayRef<Type> rhsTypes;
-
-  ASTContext &ctx;
-
+class PackMatcher : public TypeListPackMatcher {
 public:
-  SmallVector<MatchedPair, 4> pairs;
-
-  PackMatcher(ArrayRef<Type> lhsTypes,
-              ArrayRef<Type> rhsTypes,
-              ASTContext &ctx);
-
-  bool match();
+  PackMatcher(ArrayRef<Type> lhsTypes, ArrayRef<Type> rhsTypes, ASTContext &ctx)
+      : TypeListPackMatcher(ctx, lhsTypes, rhsTypes) {}
 };
 
 } // end namespace swift

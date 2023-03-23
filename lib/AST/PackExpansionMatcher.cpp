@@ -123,13 +123,60 @@ bool TuplePackMatcher::match() {
   return false;
 }
 
-ParamPackMatcher::ParamPackMatcher(
-    ArrayRef<AnyFunctionType::Param> lhsParams,
-    ArrayRef<AnyFunctionType::Param> rhsParams,
-    ASTContext &ctx)
-  : lhsParams(lhsParams), rhsParams(rhsParams), ctx(ctx) {}
+TypeListPackMatcher::Element
+TypeListPackMatcher::Element::from(const TupleTypeElt &elt) {
+  return {elt.getName(), elt.getType()};
+}
 
-bool ParamPackMatcher::match() {
+TypeListPackMatcher::Element
+TypeListPackMatcher::Element::from(const AnyFunctionType::Param &param) {
+  return {param.getLabel(), param.getPlainType(), param.getParameterFlags()};
+}
+
+TypeListPackMatcher::Element TypeListPackMatcher::Element::from(Type type) {
+  return {/*label=*/Identifier(), type};
+}
+
+TypeListPackMatcher::TypeListPackMatcher(ASTContext &ctx,
+                                         ArrayRef<TupleTypeElt> lhsParams,
+                                         ArrayRef<TupleTypeElt> rhsParams)
+    : ctx(ctx) {
+  llvm::transform(lhsParams, std::back_inserter(lhsElements),
+                  [&](const auto &elt) { return Element::from(elt); });
+  llvm::transform(rhsParams, std::back_inserter(rhsElements),
+                  [&](const auto &elt) { return Element::from(elt); });
+}
+
+TypeListPackMatcher::TypeListPackMatcher(
+    ASTContext &ctx, ArrayRef<AnyFunctionType::Param> lhsParams,
+    ArrayRef<AnyFunctionType::Param> rhsParams)
+    : ctx(ctx) {
+  llvm::transform(lhsParams, std::back_inserter(lhsElements),
+                  [&](const auto &elt) {
+                    assert(!elt.hasLabel());
+                    return Element::from(elt);
+                  });
+  llvm::transform(rhsParams, std::back_inserter(rhsElements),
+                  [&](const auto &elt) {
+                    assert(!elt.hasLabel());
+                    return Element::from(elt);
+                  });
+}
+
+TypeListPackMatcher::TypeListPackMatcher(ASTContext &ctx,
+                                         ArrayRef<Type> lhsParams,
+                                         ArrayRef<Type> rhsParams)
+    : ctx(ctx) {
+  llvm::transform(lhsParams, std::back_inserter(lhsElements),
+                  [&](const auto &elt) { return Element::from(elt); });
+  llvm::transform(rhsParams, std::back_inserter(rhsElements),
+                  [&](const auto &elt) { return Element::from(elt); });
+}
+
+bool TypeListPackMatcher::match() {
+  ArrayRef<Element> lhsParams(lhsElements);
+  ArrayRef<Element> rhsParams(rhsElements);
+
   unsigned minLength = std::min(lhsParams.size(), rhsParams.size());
 
   // Consume the longest possible prefix where neither type in
@@ -147,8 +194,8 @@ bool ParamPackMatcher::match() {
 
     // FIXME: Check flags
 
-    auto lhsType = lhsParam.getPlainType();
-    auto rhsType = rhsParam.getPlainType();
+    auto lhsType = lhsParam.getType();
+    auto rhsType = rhsParam.getType();
 
     if (lhsType->is<PackExpansionType>() ||
         rhsType->is<PackExpansionType>()) {
@@ -176,8 +223,8 @@ bool ParamPackMatcher::match() {
     if (lhsParam.getLabel() != rhsParam.getLabel())
       break;
 
-    auto lhsType = lhsParam.getPlainType();
-    auto rhsType = rhsParam.getPlainType();
+    auto lhsType = lhsParam.getType();
+    auto rhsType = rhsParam.getType();
 
     if (lhsType->is<PackExpansionType>() ||
         rhsType->is<PackExpansionType>()) {
@@ -202,7 +249,7 @@ bool ParamPackMatcher::match() {
   // If the left hand side is a single pack expansion type, bind it
   // to what remains of the right hand side.
   if (lhsParams.size() == 1) {
-    auto lhsType = lhsParams[0].getPlainType();
+    auto lhsType = lhsParams[0].getType();
     if (auto *lhsExpansion = lhsType->getAs<PackExpansionType>()) {
       unsigned lhsIdx = prefixLength;
       unsigned rhsIdx = prefixLength;
@@ -213,7 +260,7 @@ bool ParamPackMatcher::match() {
           return true;
 
         // FIXME: Check rhs flags
-        rhsTypes.push_back(rhsParam.getPlainType());
+        rhsTypes.push_back(rhsParam.getType());
       }
       auto rhs = createPackBinding(ctx, rhsTypes);
 
@@ -226,7 +273,7 @@ bool ParamPackMatcher::match() {
   // If the right hand side is a single pack expansion type, bind it
   // to what remains of the left hand side.
   if (rhsParams.size() == 1) {
-    auto rhsType = rhsParams[0].getPlainType();
+    auto rhsType = rhsParams[0].getType();
     if (auto *rhsExpansion = rhsType->getAs<PackExpansionType>()) {
       unsigned lhsIdx = prefixLength;
       unsigned rhsIdx = prefixLength;
@@ -237,108 +284,11 @@ bool ParamPackMatcher::match() {
           return true;
 
         // FIXME: Check lhs flags
-        lhsTypes.push_back(lhsParam.getPlainType());
+        lhsTypes.push_back(lhsParam.getType());
       }
       auto lhs = createPackBinding(ctx, lhsTypes);
 
       // FIXME: Check rhs flags
-      pairs.emplace_back(lhs, rhsExpansion, lhsIdx, rhsIdx);
-      return false;
-    }
-  }
-
-  // Otherwise, all remaining possibilities are invalid:
-  // - Neither side has any pack expansions, and they have different lengths.
-  // - One side has a pack expansion but the other side is too short, eg
-  //   {Int, T..., Float} vs {Int}.
-  // - The prefix and suffix are mismatched, so we're left with something
-  //   like {T..., Int} vs {Float, U...}.
-  return true;
-}
-
-PackMatcher::PackMatcher(
-    ArrayRef<Type> lhsTypes,
-    ArrayRef<Type> rhsTypes,
-    ASTContext &ctx)
-  : lhsTypes(lhsTypes), rhsTypes(rhsTypes), ctx(ctx) {}
-
-bool PackMatcher::match() {
-  unsigned minLength = std::min(lhsTypes.size(), rhsTypes.size());
-
-  // Consume the longest possible prefix where neither type in
-  // the pair is a pack expansion type.
-  unsigned prefixLength = 0;
-  for (unsigned i = 0; i < minLength; ++i) {
-    unsigned lhsIdx = i;
-    unsigned rhsIdx = i;
-
-    auto lhsType = lhsTypes[lhsIdx];
-    auto rhsType = rhsTypes[rhsIdx];
-
-    if (lhsType->is<PackExpansionType>() ||
-        rhsType->is<PackExpansionType>()) {
-      break;
-    }
-
-    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
-    ++prefixLength;
-  }
-
-  // Consume the longest possible suffix where neither type in
-  // the pair is a pack expansion type.
-  unsigned suffixLength = 0;
-  for (unsigned i = 0; i < minLength - prefixLength; ++i) {
-    unsigned lhsIdx = lhsTypes.size() - i - 1;
-    unsigned rhsIdx = rhsTypes.size() - i - 1;
-
-    auto lhsType = lhsTypes[lhsIdx];
-    auto rhsType = rhsTypes[rhsIdx];
-
-    if (lhsType->is<PackExpansionType>() ||
-        rhsType->is<PackExpansionType>()) {
-      break;
-    }
-
-    pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
-    ++suffixLength;
-  }
-
-  assert(prefixLength + suffixLength <= lhsTypes.size());
-  assert(prefixLength + suffixLength <= rhsTypes.size());
-
-  // Drop the consumed prefix and suffix from each list of types.
-  lhsTypes = lhsTypes.drop_front(prefixLength).drop_back(suffixLength);
-  rhsTypes = rhsTypes.drop_front(prefixLength).drop_back(suffixLength);
-
-  // If nothing remains, we're done.
-  if (lhsTypes.empty() && rhsTypes.empty())
-    return false;
-
-  // If the left hand side is a single pack expansion type, bind it
-  // to what remains of the right hand side.
-  if (lhsTypes.size() == 1) {
-    auto lhsType = lhsTypes[0];
-    if (auto *lhsExpansion = lhsType->getAs<PackExpansionType>()) {
-      unsigned lhsIdx = prefixLength;
-      unsigned rhsIdx = prefixLength;
-
-      auto rhs = createPackBinding(ctx, rhsTypes);
-
-      pairs.emplace_back(lhsExpansion, rhs, lhsIdx, rhsIdx);
-      return false;
-    }
-  }
-
-  // If the right hand side is a single pack expansion type, bind it
-  // to what remains of the left hand side.
-  if (rhsTypes.size() == 1) {
-    auto rhsType = rhsTypes[0];
-    if (auto *rhsExpansion = rhsType->getAs<PackExpansionType>()) {
-      unsigned lhsIdx = prefixLength;
-      unsigned rhsIdx = prefixLength;
-
-      auto lhs = createPackBinding(ctx, lhsTypes);
-
       pairs.emplace_back(lhs, rhsExpansion, lhsIdx, rhsIdx);
       return false;
     }
