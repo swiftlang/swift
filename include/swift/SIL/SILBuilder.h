@@ -106,16 +106,6 @@ class SILBuilder {
   /// are not auto-inserted.
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
-#ifndef NDEBUG
-  /// Used in the di-hole verifier assertion.
-  /// \{
-protected:
-  bool EnableDIHoleVerification = false;
-
-private:
-  const SILDebugScope *PrevDebugScope = nullptr;
-  /// \}
-#endif
   const SILDebugScope *CurDebugScope = nullptr;
   Optional<SILLocation> CurDebugLocOverride = None;
 
@@ -125,8 +115,7 @@ public:
 
   SILBuilder(SILFunction &F, SmallVectorImpl<SILInstruction *> *InsertedInstrs)
       : TempContext(F.getModule(), InsertedInstrs), C(TempContext), F(&F),
-        BB(nullptr) {
-  }
+        BB(nullptr) {}
 
   explicit SILBuilder(SILInstruction *I,
                       SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)
@@ -233,7 +222,7 @@ public:
     return getModule().Types.getTypeLowering(T, expansion);
   }
 
-  void setCurrentDebugScope(const SILDebugScope *DS);
+  void setCurrentDebugScope(const SILDebugScope *DS) { CurDebugScope = DS; }
   const SILDebugScope *getCurrentDebugScope() const { return CurDebugScope; }
 
   /// Apply a debug location override. If loc is None, the current override is
@@ -290,18 +279,10 @@ public:
 
   /// clearInsertionPoint - Clear the insertion point: created instructions will
   /// not be inserted into a block.
-  void clearInsertionPoint() {
-#ifndef NDEBUG
-    PrevDebugScope = nullptr;
-#endif
-    BB = nullptr;
-  }
+  void clearInsertionPoint() { BB = nullptr; }
 
   /// setInsertionPoint - Set the insertion point.
   void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator insertPt) {
-#ifndef NDEBUG
-    PrevDebugScope = nullptr;
-#endif
     this->BB = BB;
     this->InsertPt = insertPt;
     assert(insertPt == BB->end() || insertPt->getParent() == BB);

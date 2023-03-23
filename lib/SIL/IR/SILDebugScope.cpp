@@ -37,17 +37,6 @@ SILDebugScope::SILDebugScope(SILLocation Loc, SILFunction *SILFn,
 SILDebugScope::SILDebugScope(SILLocation Loc)
     : Loc(Loc), InlinedCallSite(nullptr) {}
 
-bool SILDebugScope::isAncestor(const SILDebugScope *other) const {
-  while (other) {
-    auto Parent = other->Parent;
-    auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
-    if (ParentScope == this)
-      return true;
-    other = ParentScope;
-  }
-  return false;
-}
-
 SILFunction *SILDebugScope::getInlinedFunction() const {
   if (Parent.isNull())
     return nullptr;
