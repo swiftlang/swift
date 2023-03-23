@@ -661,7 +661,7 @@ SILDeclRef SILDeclRef::getAsyncMainDeclEntryPoint(ValueDecl *decl) {
 }
 
 SILDeclRef SILDeclRef::getAsyncMainFileEntryPoint(FileUnit *file) {
-  assert(file->hasEntryPoint() && !file->getMainDecl());
+  assert(file->hasEntryPoint());
   SILDeclRef result;
   result.loc = file;
   result.kind = Kind::AsyncEntryPoint;
@@ -669,7 +669,7 @@ SILDeclRef SILDeclRef::getAsyncMainFileEntryPoint(FileUnit *file) {
 }
 
 SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
-  assert(file->hasEntryPoint() && !file->getMainDecl());
+  assert(file->hasEntryPoint());
   SILDeclRef result;
   result.loc = file;
   result.kind = Kind::EntryPoint;

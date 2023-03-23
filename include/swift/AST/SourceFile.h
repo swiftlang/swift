@@ -126,6 +126,10 @@ private:
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
 
+  /// DeclContext of the `MainDecl` when coming from @main
+  /// This is the type that `@main`
+  DeclContext *MainDeclContext = nullptr;
+
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file.
   ///
@@ -611,11 +615,18 @@ public:
     return getMainDeclDiagLoc();
   }
 
+  /// Get the context with the `@main` attribute.
+  ///
+  /// This is not necessarily the context where the main function decl is
+  /// declared.
+  DeclContext *getMainDeclContext() const { return MainDeclContext; }
+
   /// Register a "main" class for the module, complaining if there is more than
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc);
+  bool registerMainDecl(ValueDecl *mainDecl, DeclContext *mainDeclContext,
+                        SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///

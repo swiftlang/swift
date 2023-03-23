@@ -1108,8 +1108,19 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     // SourceFileScope).
     auto loc = RegularLocation::getModuleLocation();
     preEmitFunction(constant, f, loc);
-    auto *decl = constant.getDecl();
-    auto *dc = decl->getDeclContext();
+
+    ValueDecl *decl = nullptr;
+    DeclContext *dc = nullptr;
+
+    if (constant.hasDecl())
+      decl = constant.getDecl();
+    else if (constant.hasFileUnit())
+      decl = constant.getFileUnit()->getMainDecl();
+    dc = decl->getDeclContext();
+
+    assert(decl && "decl not set");
+    assert(dc && "decl context not set");
+
     PrettyStackTraceSILFunction X("silgen emitArtificialTopLevel", f);
     // In all cases, a constant.kind == EntryPoint indicates the main entrypoint
     // to the program, @main.
@@ -1130,7 +1141,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       SILDeclRef mainEntryPoint = SILDeclRef::getAsyncMainDeclEntryPoint(decl);
       SILGenFunction(*this, *f, dc).emitAsyncMainThreadStart(mainEntryPoint);
     } else {
-      SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
+      SILGenFunction(*this, *f, dc).emitArtificialTopLevel(constant);
     }
     postEmitFunction(constant, f);
     return;
@@ -2225,11 +2236,11 @@ public:
 
     // If the source file contains an artificial main, emit the implicit
     // top-level code.
-    if (auto *mainDecl = sf->getMainDecl()) {
-      if (isa<FuncDecl>(mainDecl) &&
-          static_cast<FuncDecl *>(mainDecl)->hasAsync())
-        emitSILFunctionDefinition(
-            SILDeclRef::getAsyncMainDeclEntryPoint(mainDecl));
+    if (FuncDecl *mainDecl = dyn_cast_or_null<FuncDecl>(sf->getMainDecl())) {
+      if (mainDecl->hasAsync())
+        emitSILFunctionDefinition(SILDeclRef::getAsyncMainFileEntryPoint(sf));
+      emitSILFunctionDefinition(SILDeclRef::getMainFileEntryPoint(sf));
+    } else if (auto *mainDecl = sf->getMainDecl()) {
       emitSILFunctionDefinition(SILDeclRef::getMainDeclEntryPoint(mainDecl));
     }
   }

@@ -710,28 +710,56 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         ArrayRef<ManagedValue> args,
                                         SGFContext C);
 
-void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
+void SILGenFunction::emitArtificialTopLevel(SILDeclRef mainDecl) {
   // Create the argc and argv arguments.
   auto entry = B.getInsertionBB();
   auto paramTypeIter = F.getConventions()
                            .getParameterSILTypes(getTypeExpansionContext())
                            .begin();
 
+  auto getMainDecl = [mainDecl]() -> Decl * {
+    if (mainDecl.hasFileUnit()) {
+      assert(mainDecl.getFileUnit()->hasEntryPoint() &&
+             "File has no entrypoint");
+      SourceFile *file = dyn_cast<SourceFile>(mainDecl.getFileUnit());
+      return file->getMainDecl();
+    } else if (mainDecl.hasDecl()) {
+      return mainDecl.getDecl();
+    }
+    llvm_unreachable("Unimplemented SILDeclRef Entrypoint");
+  };
+
+  auto getMainDeclContext = [mainDecl]() -> DeclContext * {
+    if (mainDecl.hasFileUnit()) {
+      assert(mainDecl.getFileUnit()->hasEntryPoint() &&
+             "File has no entrypoint");
+      SourceFile *file = dyn_cast<SourceFile>(mainDecl.getFileUnit());
+      return file->getMainDeclContext();
+    } else if (mainDecl.hasDecl()) {
+      return mainDecl.getDecl()->getDeclContext();
+    }
+
+    llvm_unreachable("Unimplemented SILDeclRef Entrypoint");
+  };
+
   SILValue argc;
   SILValue argv;
-  const bool isAsyncFunc =
-      isa<FuncDecl>(mainDecl) && static_cast<FuncDecl *>(mainDecl)->hasAsync();
-  if (!isAsyncFunc) {
-    argc = entry->createFunctionArgument(*paramTypeIter);
-    argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+  if (Decl *decl = getMainDecl()) {
+    // If it's not a function, or it's a synchronous function, emit `argc` and
+    // `argv`.
+    FuncDecl *fnDecl = dyn_cast<FuncDecl>(decl);
+    if (!fnDecl || (fnDecl && !fnDecl->hasAsync())) {
+      argc = entry->createFunctionArgument(*paramTypeIter);
+      argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+    }
   }
 
-  switch (mainDecl->getArtificialMainKind()) {
+  switch (getMainDecl()->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
     // Emit a UIKit main.
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
 
-    auto *mainClass = cast<NominalTypeDecl>(mainDecl);
+    auto *mainClass = cast<NominalTypeDecl>(getMainDecl());
 
     CanType NSStringTy = SGM.Types.getNSStringType();
     CanType OptNSStringTy
@@ -871,7 +899,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // Emit an AppKit main.
     // return NSApplicationMain(C_ARGC, C_ARGV);
 
-    auto *mainClass = cast<NominalTypeDecl>(mainDecl);
+    auto *mainClass = cast<NominalTypeDecl>(getMainDecl());
 
     SILParameterInfo argTypes[] = {
       SILParameterInfo(argc->getType().getASTType(),
@@ -913,7 +941,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   case ArtificialMainKind::TypeMain: {
     // Emit a call to the main static function.
     // return Module.$main();
-    auto *mainFunc = cast<FuncDecl>(mainDecl);
+    auto *mainFunc = cast<FuncDecl>(getMainDecl());
     auto moduleLoc = RegularLocation::getModuleLocation();
     auto *entryBlock = B.getInsertionBB();
 
@@ -921,16 +949,22 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SILFunction *mainFunction =
         SGM.getFunction(mainFunctionDeclRef, NotForDefinition);
 
-    ExtensionDecl *mainExtension =
-        dyn_cast<ExtensionDecl>(mainFunc->getDeclContext());
-
-    NominalTypeDecl *mainType;
-    if (mainExtension) {
-      mainType = mainExtension->getExtendedNominal();
+    NominalTypeDecl *mainTypeDecl = nullptr;
+    if (ExtensionDecl *mainExtension =
+            dyn_cast<ExtensionDecl>(getMainDeclContext())) {
+      mainTypeDecl = mainExtension->getExtendedNominal();
+    } else if (NominalTypeDecl *mainNominal =
+                   dyn_cast<NominalTypeDecl>(getMainDeclContext())) {
+      mainTypeDecl = mainNominal;
     } else {
-      mainType = cast<NominalTypeDecl>(mainFunc->getDeclContext());
+      llvm_unreachable("Unknown main decl context");
     }
-    auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
+    assert(!mainTypeDecl->isGeneric() && "main type must not be generic!");
+    SubstitutionMap substitutions =
+        mainTypeDecl->getDeclaredInterfaceType()->getContextSubstitutionMap(
+            mainFunc->getParentModule(), mainFunc->getDeclContext());
+    auto metatype = B.createMetatype(
+        mainTypeDecl, getLoweredType(mainTypeDecl->getInterfaceType()));
 
     auto mainFunctionRef = B.createFunctionRef(moduleLoc, mainFunction);
 
@@ -986,11 +1020,11 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       B.createBranch(moduleLoc, exitBlock, {oneReturnValue});
 
       B.setInsertionPoint(entryBlock);
-      B.createTryApply(moduleLoc, mainFunctionRef, SubstitutionMap(),
-                       {metatype}, successBlock, failureBlock);
+      B.createTryApply(moduleLoc, mainFunctionRef, substitutions, {metatype},
+                       successBlock, failureBlock);
     } else {
       B.setInsertionPoint(entryBlock);
-      B.createApply(moduleLoc, mainFunctionRef, SubstitutionMap(), {metatype});
+      B.createApply(moduleLoc, mainFunctionRef, substitutions, {metatype});
       SILValue returnValue =
           B.createIntegerLiteral(moduleLoc, builtinInt32Type, 0);
       B.createBranch(moduleLoc, exitBlock, {returnValue});

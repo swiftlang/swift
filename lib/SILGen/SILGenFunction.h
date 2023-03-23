@@ -750,7 +750,7 @@ public:
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.
-  void emitArtificialTopLevel(Decl *mainDecl);
+  void emitArtificialTopLevel(SILDeclRef entrypoint);
 
   /// Generate code into @main for starting the async main on the main thread.
   void emitAsyncMainThreadStart(SILDeclRef entryPoint);
