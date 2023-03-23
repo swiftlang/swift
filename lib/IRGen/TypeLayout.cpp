@@ -89,35 +89,7 @@ private:
     RefCountingKind kind;
     union {
       size_t size;
-      uint32_t genericIdx;
       llvm::Function* metaTypeRef;
-      uint64_t alignment;
-    };
-  };
-
-  struct GenericInstOp {
-    enum Type : uint8_t {
-      Copy = 1,
-      Param = 2,
-      Resilient = 3,
-      DynamicAlignment = 4,
-    };
-
-    Type type;
-    union {
-      size_t size;
-      struct {
-        size_t offset;
-        uint32_t idx;
-      } generic;
-      struct {
-        size_t offset;
-        llvm::Function *metaTypeRef;
-      } resilient;
-      struct {
-        size_t offset;
-        llvm::Function *metaTypeRef;
-      } alignment;
     };
   };
 
