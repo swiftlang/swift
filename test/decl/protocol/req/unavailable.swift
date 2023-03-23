@@ -64,6 +64,14 @@ extension ConformsToP5: P {
   func foo(bar: Foo) { }
 }
 
+@available(*, unavailable)
+enum UnavailableEnum {
+  struct ConformsToP6: P {
+    @available(*, unavailable)
+    func foo(bar: Foo) { }
+  }
+}
+
 // Include message string from @available attribute if provided
 protocol Unavail {
   associatedtype T
