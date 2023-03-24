@@ -2401,6 +2401,7 @@ namespace {
 
             {
               IGF.Builder.emitBlock(returnTypeBB);
+              ConditionalDominanceScope domScope(IGF);
               IGF.Builder.CreateRet(getResultValue(
                   IGF, genericEnv, underlyingTy->getSubstitutions()));
             }
