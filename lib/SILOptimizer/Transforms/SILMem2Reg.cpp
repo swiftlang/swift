@@ -526,11 +526,6 @@ static bool isGuaranteedLexicalValue(SILValue src) {
          src->isLexical();
 }
 
-/// Returns true if we have enough information to end the lifetime.
-static bool canEndLexicalLifetime(LiveValues values) {
-  return values.canEndLexicalLifetime();
-}
-
 /// Begin a lexical borrow scope for the value stored into the provided
 /// StoreInst after that instruction.
 ///
@@ -825,7 +820,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
         if (lexicalLifetimeEnsured(asi)) {
           // End the lexical lifetime at a load [take].  The storage is no
           // longer keeping the value alive.
-          if (runningVals && canEndLexicalLifetime(runningVals->value)) {
+          if (runningVals && runningVals->value.canEndLexicalLifetime()) {
             // End it right now if we have enough information.
             endOwnedLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/li,
                                               ctx,
@@ -908,7 +903,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       lastStoreInst = si;
       if (lexicalLifetimeEnsured(asi)) {
         if (oldRunningVals && oldRunningVals->isStorageValid &&
-            canEndLexicalLifetime(oldRunningVals->value)) {
+            oldRunningVals->value.canEndLexicalLifetime()) {
           endOwnedLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/si, ctx,
                                             oldRunningVals->value.getOwned());
         }
@@ -965,7 +960,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       }
       // Mark storage as invalid and mark end_borrow as a deinit point.
       runningVals->isStorageValid = false;
-      if (!canEndLexicalLifetime(runningVals->value)) {
+      if (!runningVals->value.canEndLexicalLifetime()) {
         continue;
       }
       endGuaranteedLexicalLifetimeBeforeInst(
@@ -1422,7 +1417,7 @@ void StackAllocationPromoter::endLexicalLifetime(BlockSetVector &phiBlocks) {
         if (isa<EndBorrowInst>(inst)) {
           // Not all store_borrows will have a begin_borrow [lexical] that needs
           // to be ended. If the source is already lexical, we don't create it.
-          if (!canEndLexicalLifetime(*values)) {
+          if (!values->canEndLexicalLifetime()) {
             continue;
           }
           endGuaranteedLexicalLifetimeBeforeInst(
@@ -1445,7 +1440,7 @@ void StackAllocationPromoter::endLexicalLifetime(BlockSetVector &phiBlocks) {
       if (terminatesInUnreachable || uniqueSuccessorLacksLiveInValues()) {
         auto values = getLiveOutValues(phiBlocks, bb);
         if (values->isGuaranteed()) {
-          if (!canEndLexicalLifetime(*values)) {
+          if (!values->canEndLexicalLifetime()) {
             continue;
           }
           endGuaranteedLexicalLifetimeBeforeInst(
@@ -1965,7 +1960,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         continue;
       }
       runningVals->isStorageValid = false;
-      if (!canEndLexicalLifetime(runningVals->value)) {
+      if (!runningVals->value.canEndLexicalLifetime()) {
         continue;
       }
       endGuaranteedLexicalLifetimeBeforeInst(
