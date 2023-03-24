@@ -55,11 +55,7 @@ public:
   SILGenBuilder(SILGenBuilder &builder, SILBasicBlock *insertBB)
       : SILBuilder(insertBB, builder.getCurrentDebugScope(),
                    builder.getBuilderContext()),
-        SGF(builder.SGF) {
-#ifndef NDEBUG
-    EnableDIHoleVerification = true;
-#endif
-  }
+        SGF(builder.SGF) {}
 
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }

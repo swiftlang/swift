@@ -28,22 +28,6 @@ SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
   setInsertionPoint(&GlobVar->StaticInitializerBlock);
 }
 
-void SILBuilder::setCurrentDebugScope(const SILDebugScope *DS) {
-#ifndef NDEBUG
-  if (EnableDIHoleVerification && DS != CurDebugScope) {
-    // Detect a situation where:
-    // PrevDebugScope = sil_scope(parent: CurDebugScope)
-    // CurDebugScope = sil_scope(parent:)
-    // DS = PrevDebugScope
-    if (DS && DS == PrevDebugScope)
-      assert(!CurDebugScope->isAncestor(PrevDebugScope) &&
-             "attempting to re-enter scope within same basic block");
-    PrevDebugScope = CurDebugScope;
-  }
-#endif
-  CurDebugScope = DS;
-}
-
 IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
   return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E),
                                            getModule()));
@@ -257,9 +241,6 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 /// instruction) then split the block at that instruction and return the
 /// continuation block.
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
-#ifndef NDEBUG
-  PrevDebugScope = nullptr;
-#endif
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock()) {
     return getFunction().createBasicBlockAfter(BB);
