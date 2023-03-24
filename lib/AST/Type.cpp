@@ -1304,7 +1304,6 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
-  variadicGenerics.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1364,10 +1363,6 @@ ParameterListInfo::ParameterListInfo(
     if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
       inheritActorContext.set(i);
     }
-
-    if (param->getInterfaceType()->is<PackExpansionType>()) {
-      variadicGenerics.set(i);
-    }
   }
 }
 
@@ -1401,13 +1396,6 @@ bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
 bool ParameterListInfo::anyContextualInfo() const {
   return implicitSelfCapture.any() || inheritActorContext.any();
 }
-
-bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
-  return paramIdx < variadicGenerics.size()
-      ? variadicGenerics[paramIdx]
-      : false;
-}
-
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (_:, b:, c:)

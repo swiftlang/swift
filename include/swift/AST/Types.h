@@ -3651,7 +3651,6 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
-  SmallBitVector variadicGenerics;
 
 public:
   ParameterListInfo() { }
@@ -3680,8 +3679,6 @@ public:
 
   /// Whether there is any contextual information set on this parameter list.
   bool anyContextualInfo() const;
-
-  bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
