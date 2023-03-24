@@ -1,5 +1,3 @@
-
-
 //===--- SILGenBuilder.cpp ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -38,27 +36,15 @@ SILGenModule &SILGenBuilder::getSILGenModule() const { return SGF.SGM; }
 //===----------------------------------------------------------------------===//
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
-    : SILBuilder(SGF.F), SGF(SGF) {
-#ifndef NDEBUG
-    EnableDIHoleVerification = true;
-#endif
-}
+    : SILBuilder(SGF.F), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {
-#ifndef NDEBUG
-    EnableDIHoleVerification = true;
-#endif
-}
+    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILBuilder(insertBB, insertInst), SGF(SGF) {
-#ifndef NDEBUG
-    EnableDIHoleVerification = true;
-#endif
-}
+    : SILBuilder(insertBB, insertInst), SGF(SGF) {}
 
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs
