@@ -225,6 +225,11 @@ public:
   }
 
   /// Update this liveness result for a single use.
+  ///
+  /// Note: this never propagates liveness upward beyond def blocks.
+  /// PrunedLiveRange knows about defs and whether it is possible for a
+  /// block to contain a use before the first def. It must check that case
+  /// separately and propagate liveness to predecessors.
   IsLive updateForUse(SILInstruction *user) {
     assert(isInitialized() && "at least one definition must be initialized");
 
@@ -344,6 +349,7 @@ struct LiveRangeSummary {
 /// necessarily include liveness up to destroy_value or end_borrow
 /// instructions.
 class PrunedLiveness {
+protected:
   PrunedLiveBlocks liveBlocks;
 
   // Map all "interesting" user instructions in this def's live range to a flag
@@ -385,27 +391,6 @@ public:
   void initializeDefBlock(SILBasicBlock *defBB) {
     liveBlocks.initializeDefBlock(defBB);
   }
-
-  /// For flexibility, \p lifetimeEnding is provided by the
-  /// caller. PrunedLiveness makes no assumptions about the def-use
-  /// relationships that generate liveness. For example, use->isLifetimeEnding()
-  /// cannot distinguish the end of the borrow scope that defines this extended
-  /// live range vs. a nested borrow scope within the extended live range.
-  void updateForUse(SILInstruction *user, bool lifetimeEnding);
-
-  /// Updates the liveness for a whole borrow scope, beginning at \p op.
-  /// Returns false if this cannot be done. This assumes that nested OSSA
-  /// lifetimes are complete.
-  InnerBorrowKind updateForBorrowingOperand(Operand *operand);
-
-  /// Update liveness for an interior pointer use. These are normally handled
-  /// like an instantaneous use. But if \p operand "borrows" a value for the
-  /// duration of a scoped address (store_borrow), then update liveness for the
-  /// entire scope. This assumes that nested OSSA lifetimes are complete.
-  AddressUseKind checkAndUpdateInteriorPointer(Operand *operand);
-
-  /// Update this liveness to extend across the given liveness.
-  void extendAcrossLiveness(PrunedLiveness &otherLiveness);
 
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {
     return liveBlocks.getBlockLiveness(bb);
@@ -561,6 +546,27 @@ protected:
                                            SILValue value);
 
 public:
+  /// For flexibility, \p lifetimeEnding is provided by the
+  /// caller. PrunedLiveness makes no assumptions about the def-use
+  /// relationships that generate liveness. For example, use->isLifetimeEnding()
+  /// cannot distinguish the end of the borrow scope that defines this extended
+  /// live range vs. a nested borrow scope within the extended live range.
+  void updateForUse(SILInstruction *user, bool lifetimeEnding);
+
+  /// Updates the liveness for a whole borrow scope, beginning at \p op.
+  /// Returns false if this cannot be done. This assumes that nested OSSA
+  /// lifetimes are complete.
+  InnerBorrowKind updateForBorrowingOperand(Operand *operand);
+
+  /// Update liveness for an interior pointer use. These are normally handled
+  /// like an instantaneous use. But if \p operand "borrows" a value for the
+  /// duration of a scoped address (store_borrow), then update liveness for the
+  /// entire scope. This assumes that nested OSSA lifetimes are complete.
+  AddressUseKind checkAndUpdateInteriorPointer(Operand *operand);
+
+  /// Update this liveness to extend across the given liveness.
+  void extendAcrossLiveness(PrunedLiveness &otherLiveness);
+
   /// Update liveness for all direct uses of \p def. Transitively follows
   /// guaranteed forwards up to but not including guaranteed phis. If \p def is
   /// used by a guaranteed phi return InnerBorrowKind::Reborrowed.
