@@ -488,7 +488,7 @@ def define_availability : Separate<["-"], "define-availability">,
 
 def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
   Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
-  HelpText<"Only check the availability of the APIs, ignore function bodies">;
+  HelpText<"Deprecated, has no effect">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,

@@ -2051,9 +2051,6 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
-    return;
-  
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
@@ -3020,9 +3017,6 @@ bool swift::diagnoseParameterizedProtocolAvailability(
   // Check the availability of parameterized existential runtime support.
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
-
-  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
     return false;
 
   auto runningOS = TypeChecker::overApproximateAvailabilityAtLocation(
