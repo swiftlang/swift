@@ -101,19 +101,22 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-static DestroyValueInst *dynCastToDestroyOf(SILInstruction *instruction,
-                                            SILValue def) {
+/// Is \p instruction a destroy_value whose operand is \p def, or its
+/// transitive copy.
+static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
   auto *destroy = dyn_cast<DestroyValueInst>(instruction);
   if (!destroy)
-    return nullptr;
-  auto originalDestroyedDef = destroy->getOperand();
-  if (originalDestroyedDef == def)
-    return destroy;
-  auto underlyingDestroyedDef =
-      CanonicalizeOSSALifetime::getCanonicalCopiedDef(originalDestroyedDef);
-  if (underlyingDestroyedDef != def)
-    return nullptr;
-  return destroy;
+    return false;
+  auto destroyed = destroy->getOperand();
+  while (true) {
+    if (destroyed == def)
+      return true;
+    auto *copy = dyn_cast<CopyValueInst>(destroyed);
+    if (!copy)
+      break;
+    destroyed = copy->getOperand();
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -172,11 +175,18 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         liveness->updateForUse(user, /*lifetimeEnding*/ true);
         break;
       case OperandOwnership::DestroyingConsume:
-        if (isa<DestroyValueInst>(user)) {
+        if (isDestroyOfCopyOf(user, getCurrentDef())) {
           destroys.insert(user);
         } else {
-          // destroy_value does not force pruned liveness (but store etc. does).
-          liveness->updateForUse(user, /*lifetimeEnding*/ true);
+          // destroy_value of a transitive copy of the currentDef does not
+          // force pruned liveness (but store etc. does).
+
+          // Even though this instruction is a DestroyingConsume of its operand,
+          // if it's a destroy_value whose operand is not a transitive copy of
+          // currentDef, then it's just ending an implicit borrow of currentDef,
+          // not consuming it.
+          auto lifetimeEnding = !isa<DestroyValueInst>(user);
+          liveness->updateForUse(user, lifetimeEnding);
         }
         recordConsumingUse(use);
         break;
