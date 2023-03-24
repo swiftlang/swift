@@ -427,7 +427,7 @@ namespace swift {
                         StringRef &OpcodeName);
     bool parseSILDebugVar(SILDebugVariable &Var);
 
-    bool parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr);
+    bool parseSILDebugInfoExpression(SILDebugInfoExpression *&DIExpr);
 
     /// Parses the basic block arguments as part of branch instruction.
     bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args, SILBuilder &B);
@@ -1804,7 +1804,7 @@ bool SILParser::parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
   return false;
 }
 
-bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
+bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression *&DIExpr) {
   if (P.Tok.getText() != "expr")
     return true;
 
@@ -1827,8 +1827,8 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
       auto OpText = ExprInfo->OpText;
       if (OpText != P.Tok.getText())
         continue;
-      auto NewOperator = SILDIExprElement::createOperator(Op);
-      DIExpr.push_back(NewOperator);
+      auto NewOperator = SILDIExprElement::createOperator(SILMod, Op);
+      DIExpr = DIExpr->append(SILMod, NewOperator);
       P.consumeToken();
 
       // Ready to parse the operands
@@ -1845,8 +1845,9 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
                        OpText, "declaration");
             return true;
           }
-          auto NewOperand = SILDIExprElement::createDecl(Result.getDecl());
-          DIExpr.push_back(NewOperand);
+          auto NewOperand =
+              SILDIExprElement::createDecl(SILMod, Result.getDecl());
+          DIExpr = DIExpr->append(SILMod, NewOperand);
           break;
         }
         case SILDIExprElement::ConstIntKind: {
@@ -1860,9 +1861,9 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             return true;
           if (IsNegative)
             Val = -Val;
-          auto NewOperand =
-            SILDIExprElement::createConstInt(static_cast<uint64_t>(Val));
-          DIExpr.push_back(NewOperand);
+          auto NewOperand = SILDIExprElement::createConstInt(
+              SILMod, static_cast<uint64_t>(Val));
+          DIExpr = DIExpr->append(SILMod, NewOperand);
           break;
         }
         default:
@@ -1899,7 +1900,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
     }
     // Drop the double quotes.
     StringRef Val = P.Tok.getText().drop_front().drop_back();
-    Var.Name = Val;
+    Var.Name = SILMod.getASTContext().getIdentifier(Val);
     return false;
   };
 
@@ -4728,7 +4729,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       usesMoveableValueDebugInfo = true;
 
     // It doesn't make sense to attach a debug var info if the name is empty
-    if (VarInfo.Name.size())
+    if (VarInfo.getName().size())
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
                                      isLexical, usesMoveableValueDebugInfo);
     else

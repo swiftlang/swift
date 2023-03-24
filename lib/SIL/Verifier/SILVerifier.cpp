@@ -1355,7 +1355,7 @@ public:
         if (DebugVarTy.isAddress()) {
           // FIXME: op_deref could be applied to address types only.
           // FIXME: Add this check
-          if (varInfo->DIExpr.startsWithDeref())
+          if (varInfo->DIExpr->startsWithDeref())
             DebugVarTy = DebugVarTy.getObjectType();
         }
         break;
@@ -1378,7 +1378,7 @@ public:
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
-          require(DebugVars[argNum].first == varInfo->Name,
+          require(DebugVars[argNum].first == varInfo->getName(),
                   "Scope contains conflicting debug variables for one function "
                   "argument");
           // The source variable might change its location (e.g. due to
@@ -1397,7 +1397,7 @@ public:
             DebugVars.push_back({StringRef(), SILType()});
           }
         }
-        DebugVars[argNum] = {varInfo->Name, DebugVarTy};
+        DebugVars[argNum] = {varInfo->getName(), DebugVarTy};
       }
 
     // Check the (auxiliary) debug variable scope
@@ -1407,24 +1407,8 @@ public:
               " as that of instruction.");
 
     // Check debug info expression
-    if (const auto &DIExpr = varInfo->DIExpr) {
-      for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
-           It != ItEnd;) {
-        require(It->getKind() == SILDIExprElement::OperatorKind,
-                "dangling di-expression operand");
-        auto Op = It->getAsOperator();
-        const auto *DIExprInfo = SILDIExprInfo::get(Op);
-        require(DIExprInfo, "unrecognized di-expression operator");
-        ++It;
-        // Check operand kinds
-        for (auto OpK : DIExprInfo->OperandKinds)
-          require(It != ItEnd && (It++)->getKind() == OpK,
-                  "di-expression operand kind mismatch");
-
-        if (Op == SILDIExprOperator::Fragment)
-          require(It == ItEnd, "op_fragment directive needs to be at the end "
-                               "of a di-expression");
-      }
+    if (const auto *diExpr = varInfo->DIExpr) {
+      diExpr->verify();
     }
   }
 
@@ -6867,5 +6851,58 @@ void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
   for (auto &prop : getPropertyList()) {
     prop.verify(*this);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                        MARK: SILDebugInfoExpression
+//===----------------------------------------------------------------------===//
+
+void SILDebugInfoExpression::verify(
+    llvm::function_ref<void(bool, StringRef)> require) const {
+  if (!require) {
+    require = [](bool result, StringRef msg) {
+      if (result)
+        return;
+      llvm::errs() << msg << '\n';
+      llvm::report_fatal_error("verifier error!");
+    };
+  }
+  auto elements = getElements();
+  while (elements.size()) {
+    auto next = elements.front();
+    elements = elements.drop_front();
+
+    require(next->getKind() == SILDIExprElement::OperatorKind,
+            "dangling di-expression operand");
+    auto Op = next->getAsOperator();
+    const auto *DIExprInfo = SILDIExprInfo::get(Op);
+    require(DIExprInfo, "unrecognized di-expression operator");
+
+    // Check operand kinds
+    switch (Op) {
+    case SILDIExprOperator::Invalid:
+    case SILDIExprOperator::Dereference:
+    case SILDIExprOperator::Minus:
+    case SILDIExprOperator::Plus:
+      break;
+    case SILDIExprOperator::ConstSInt:
+    case SILDIExprOperator::ConstUInt: {
+      auto next = elements.front();
+      require(next->getAsConstInt().hasValue(), "Should have a value?!");
+      break;
+    }
+    case SILDIExprOperator::Fragment:
+      // If we have a fragment, we consume the rest of the expression.
+      while (elements.size()) {
+        auto next = elements.front();
+        elements = elements.drop_front();
+        require(next->isFragmentTail(), "Expected fragment tail?!");
+      }
+      break;
+    }
+
+    require(Op != SILDIExprOperator::Fragment || elements.empty(),
+            "op_fragment directive needs to be at the end of a di-expression");
   }
 }

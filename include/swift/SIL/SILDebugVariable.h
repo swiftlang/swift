@@ -35,15 +35,32 @@ inline llvm::hash_code hash_value(const SILDebugVariable &P);
 struct SILDebugVariable {
   friend llvm::hash_code hash_value(const SILDebugVariable &P);
 
-  StringRef Name;
-  unsigned ArgNo : 16;
-  unsigned Constant : 1;
-  unsigned Implicit : 1;
-  unsigned isDenseMapSingleton : 2;
+  enum class Kind : uint8_t {
+    /// A SILDebugVariable that was default initialized and is invalid.
+    Invalid,
+
+    /// Describes a SILArgument via an argument number.
+    Argument,
+
+    /// Describes a SIL instruction created variable with a name.
+    Name,
+
+    /// Is the empty dense map singleton.
+    EmptyDenseMapSingleton,
+
+    /// The dense map tombstone singleton.
+    TombstoneDenseMapSingleton,
+  };
+
+  Identifier Name;
   Optional<SILType> Type;
   Optional<SILLocation> Loc;
   const SILDebugScope *Scope;
-  SILDebugInfoExpression DIExpr;
+  SILDebugInfoExpression *DIExpr;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
+  unsigned Implicit : 1;
+  unsigned kind : 8;
 
   // Use vanilla copy ctor / operator
   SILDebugVariable(const SILDebugVariable &) = default;
@@ -54,23 +71,34 @@ struct SILDebugVariable {
       : SILDebugVariable() {
     assert(inputIsDenseMapSingleton != IsDenseMapSingleton::No &&
            "Should only pass IsEmpty or IsTombstone");
-    isDenseMapSingleton = unsigned(inputIsDenseMapSingleton);
+    switch (inputIsDenseMapSingleton) {
+    case IsDenseMapSingleton::No:
+      llvm_unreachable("Should only pass IsEmpty or IsTombstone");
+      break;
+    case IsDenseMapSingleton::IsEmpty:
+      kind = unsigned(Kind::EmptyDenseMapSingleton);
+      break;
+    case IsDenseMapSingleton::IsTombstone:
+      kind = unsigned(Kind::TombstoneDenseMapSingleton);
+      break;
+    }
   }
 
   SILDebugVariable()
-      : ArgNo(0), Constant(false), Implicit(false), isDenseMapSingleton(0),
-        Scope(nullptr) {}
+      : Scope(nullptr), DIExpr(nullptr), ArgNo(0), Constant(false),
+        Implicit(false), kind(unsigned(Kind::Invalid)) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
-      : ArgNo(ArgNo), Constant(Constant), Implicit(false),
-        isDenseMapSingleton(0), Scope(nullptr) {}
-  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false, Optional<SILType> AuxType = {},
+      : Scope(nullptr), DIExpr(nullptr), ArgNo(ArgNo), Constant(Constant),
+        Implicit(false), kind(unsigned(Kind::Argument)) {}
+  SILDebugVariable(SILModule &mod, Identifier Name, bool Constant,
+                   unsigned ArgNo, bool IsImplicit = false,
+                   Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
-                   llvm::ArrayRef<SILDIExprElement> ExprElements = {})
-      : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
-        isDenseMapSingleton(0), Type(AuxType), Loc(DeclLoc), Scope(DeclScope),
-        DIExpr(ExprElements) {}
+                   llvm::ArrayRef<SILDIExprElement *> ExprElements = {})
+      : Name(Name), Type(AuxType), Loc(DeclLoc), Scope(DeclScope),
+        DIExpr(SILDebugInfoExpression::get(mod, ExprElements)), ArgNo(ArgNo),
+        Constant(Constant), Implicit(IsImplicit), kind(unsigned(Kind::Name)) {}
 
   /// Created from either AllocStack or AllocBox instruction
   static Optional<SILDebugVariable>
@@ -82,9 +110,12 @@ struct SILDebugVariable {
   bool operator==(const SILDebugVariable &V) const {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
-           Scope == V.Scope && isDenseMapSingleton == V.isDenseMapSingleton &&
-           DIExpr == V.DIExpr;
+           Scope == V.Scope && kind == V.kind && DIExpr == V.DIExpr;
   }
+
+  Kind getKind() const { return Kind(kind); }
+
+  operator bool() const { return bool(getKind()); }
 
   SILDebugVariable withoutDIExpr() const {
     auto result = *this;
@@ -92,16 +123,63 @@ struct SILDebugVariable {
     return result;
   }
 
-  bool isLet() const { return Name.size() && Constant; }
+  IsDenseMapSingleton isDenseMapSingleton() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+    case Kind::Argument:
+    case Kind::Name:
+      return IsDenseMapSingleton::No;
+    case Kind::EmptyDenseMapSingleton:
+      return IsDenseMapSingleton::IsEmpty;
+    case Kind::TombstoneDenseMapSingleton:
+      return IsDenseMapSingleton::IsTombstone;
+    }
+  }
 
-  bool isVar() const { return Name.size() && !Constant; }
+  StringRef getName() const { return Name.str(); }
+
+  bool isLet() const { return bool(*this) && getName().size() && Constant; }
+
+  bool isVar() const { return bool(*this) && getName().size() && !Constant; }
+
+  void appendDIExprElements(SILModule &mod, SILDebugInfoExpression *other) {
+    appendDIExprElements(mod, other->getElements());
+  }
+
+  void appendDIExprElements(SILModule &mod,
+                            ArrayRef<SILDIExprElement *> newElements) {
+    if (DIExpr) {
+      DIExpr = DIExpr->append(mod, newElements);
+      return;
+    }
+    DIExpr = SILDebugInfoExpression::get(mod, newElements);
+  }
+
+  void prependDIExprElements(SILModule &mod,
+                             ArrayRef<SILDIExprElement *> newElements) {
+    if (DIExpr) {
+      DIExpr = DIExpr->prepend(mod, newElements);
+      return;
+    }
+    DIExpr = SILDebugInfoExpression::get(mod, newElements);
+  }
+
+  void unconditionallyDropDIExprDeref(SILModule &mod) {
+    if (!DIExpr)
+      return;
+    DIExpr = DIExpr->dropDeref(mod);
+  }
+
+  void verify() const {
+    if (DIExpr)
+      DIExpr->verify();
+  }
 };
 
 /// Returns the hashcode for the new projection path.
 inline llvm::hash_code hash_value(const SILDebugVariable &P) {
-  return llvm::hash_combine(P.ArgNo, P.Constant, P.Name, P.Implicit,
-                            P.isDenseMapSingleton, P.Type, P.Loc, P.Scope,
-                            P.DIExpr);
+  return llvm::hash_combine(P.ArgNo, P.Constant, P.Name, P.Implicit, P.kind,
+                            P.Type, P.Loc, P.Scope, P.DIExpr);
 }
 
 } // namespace swift

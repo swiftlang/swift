@@ -1858,7 +1858,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      if (VarInfo->DIExpr.hasFragment())
+      if (VarInfo->DIExpr->hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
         // existing op_fragment in DIExpression.
@@ -1868,8 +1868,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         SILDebugVariable NewVarInfo = *VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
         // Build the corresponding fragment DIExpression
-        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
-        NewVarInfo.DIExpr.append(FragDIExpr);
+        auto *FragDIExpr =
+            SILDebugInfoExpression::createFragment(STI->getModule(), FD);
+        NewVarInfo.appendDIExprElements(STI->getModule(), FragDIExpr);
 
         if (!NewVarInfo.Type)
           NewVarInfo.Type = STI->getType();
@@ -1889,18 +1890,19 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         SILValue Base = IA->getBase();
         SILValue ResultAddr = IA->getResult(0);
         APInt OffsetVal = LiteralInst->getValue();
-        const SILDIExprElement ExprElements[3] = {
-          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
-            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
-          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
-        };
+        auto &M = IA->getModule();
+        std::array<SILDIExprElement *, 3> ExprElements = {
+            SILDIExprElement::createOperator(
+                M, OffsetVal.isNegative() ? SILDIExprOperator::ConstSInt
+                                          : SILDIExprOperator::ConstUInt),
+            SILDIExprElement::createConstInt(M, OffsetVal.getLimitedValue()),
+            SILDIExprElement::createOperator(M, SILDIExprOperator::Plus)};
         for (Operand *U : getDebugUses(ResultAddr)) {
           auto *DbgInst = cast<DebugValueInst>(U->getUser());
           auto VarInfo = DbgInst->getVarInfo();
           if (!VarInfo)
             continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
+          VarInfo->prependDIExprElements(M, ExprElements);
           // Create a new debug_value
           SILBuilder(IA, DbgInst->getDebugScope())
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
@@ -1922,15 +1924,16 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
 
     // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
+    if (!varInfo || varInfo->DIExpr->hasFragment())
       continue;
 
     SILType baseType = oldValue->getType();
 
     // Copy VarInfo and add the corresponding fragment DIExpression.
     SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
+    auto &mod = debugVal->getModule();
+    newVarInfo.appendDIExprElements(mod, SILDebugInfoExpression::createFragment(
+                                             mod, proj.getVarDecl(baseType)));
 
     if (!newVarInfo.Type)
       newVarInfo.Type = baseType;

@@ -381,16 +381,20 @@ public:
   /// Substitute anonymous function arguments with "_$ArgNo".
   Optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
-                          Optional<SILDebugVariable> Var, SILLocation Loc) {
+                          Optional<SILDebugVariable> Var, SILLocation Loc)
+      __attribute__((optnone)) {
     if (!Var || !Var->ArgNo || !Var->Name.empty())
       return Var;
 
     auto *VD = Loc.getAsASTNode<VarDecl>();
-    if (VD && !VD->getName().empty())
+    if (VD && !VD->getName().empty()) {
+      // If we have an identifier for our decl... use it.
+      Var->Name = VD->getName();
       return Var;
+    }
 
     llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
-    Var->Name = Name;
+    Var->Name = F->getASTContext().getIdentifier(Name);
     return Var;
   }
 
