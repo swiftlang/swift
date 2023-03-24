@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift(-O)
+// RUN: %target-run-stdlib-swift(-O -enable-experimental-feature MoveOnly)
 
 // REQUIRES: executable_test
 
