@@ -511,7 +511,7 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
     // destroys.
     BasicBlockWorklist worklist(currentDef->getFunction());
     for (auto *instruction : boundary.lastUsers) {
-      if (dynCastToDestroyOf(instruction, getCurrentDef()))
+      if (destroys.contains(instruction))
         continue;
       if (liveness->isInterestingUser(instruction)
           != PrunedLiveness::IsInterestingUser::LifetimeEndingUse)
@@ -576,17 +576,20 @@ namespace {
 /// values with overlapping live ranges and failing to find a fixed point
 /// because their destroys are repeatedly hoisted over one another.
 class ExtendBoundaryToDestroys final {
+  using InstructionPredicate = llvm::function_ref<bool(SILInstruction *)>;
   SSAPrunedLiveness &liveness;
   PrunedLivenessBoundary const &originalBoundary;
   SILValue currentDef;
   BasicBlockSet seenMergePoints;
+  InstructionPredicate isDestroy;
 
 public:
   ExtendBoundaryToDestroys(SSAPrunedLiveness &liveness,
                            PrunedLivenessBoundary const &originalBoundary,
-                           SILValue currentDef)
+                           SILValue currentDef, InstructionPredicate isDestroy)
       : liveness(liveness), originalBoundary(originalBoundary),
-        currentDef(currentDef), seenMergePoints(currentDef->getFunction()){};
+        currentDef(currentDef), seenMergePoints(currentDef->getFunction()),
+        isDestroy(isDestroy){};
   ExtendBoundaryToDestroys(ExtendBoundaryToDestroys const &) = delete;
   ExtendBoundaryToDestroys &
   operator=(ExtendBoundaryToDestroys const &) = delete;
@@ -610,34 +613,37 @@ public:
   /// Look past ignoreable instructions to find the _last_ destroy after the
   /// specified instruction that destroys \p def.
   static DestroyValueInst *findDestroyAfter(SILInstruction *previous,
-                                            SILValue def) {
+                                            SILValue def,
+                                            InstructionPredicate isDestroy) {
     DestroyValueInst *retval = nullptr;
     for (auto *instruction = previous->getNextInstruction(); instruction;
          instruction = instruction->getNextInstruction()) {
       if (!CanonicalizeOSSALifetime::ignoredByDestroyHoisting(
               instruction->getKind()))
         break;
-      if (auto destroy = dynCastToDestroyOf(instruction, def))
-        retval = destroy;
+      if (isDestroy(instruction))
+        retval = cast<DestroyValueInst>(instruction);
     }
     return retval;
   }
 
   /// Look past ignoreable instructions to find the _last_ destroy at or after
   /// the specified instruction that destroys \p def.
-  static DestroyValueInst *findDestroyAtOrAfter(SILInstruction *start,
-                                                SILValue def) {
-    if (auto *dvi = dynCastToDestroyOf(start, def))
-      return dvi;
-    return findDestroyAfter(start, def);
+  static DestroyValueInst *
+  findDestroyAtOrAfter(SILInstruction *start, SILValue def,
+                       InstructionPredicate isDestroy) {
+    if (isDestroy(start))
+      return cast<DestroyValueInst>(start);
+    return findDestroyAfter(start, def, isDestroy);
   }
 
   /// Look past ignoreable instructions to find the _first_ destroy in \p
   /// destination that destroys \p def and isn't separated from the beginning
   /// by "interesting" instructions.
-  static DestroyValueInst *findDestroyFromBlockBegin(SILBasicBlock *destination,
-                                                     SILValue def) {
-    return findDestroyAtOrAfter(&*destination->begin(), def);
+  static DestroyValueInst *
+  findDestroyFromBlockBegin(SILBasicBlock *destination, SILValue def,
+                            InstructionPredicate isDestroy) {
+    return findDestroyAtOrAfter(&*destination->begin(), def, isDestroy);
   }
 
 private:
@@ -651,12 +657,14 @@ private:
   /// stays in place and \p def remains a dead def.
   void extendBoundaryFromDef(SILNode *def, PrunedLivenessBoundary &boundary) {
     if (auto *arg = dyn_cast<SILArgument>(def)) {
-      if (auto *dvi = findDestroyFromBlockBegin(arg->getParent(), currentDef)) {
+      if (auto *dvi = findDestroyFromBlockBegin(arg->getParent(), currentDef,
+                                                isDestroy)) {
         boundary.lastUsers.push_back(dvi);
         return;
       }
     } else {
-      if (auto *dvi = findDestroyAfter(cast<SILInstruction>(def), currentDef)) {
+      if (auto *dvi = findDestroyAfter(cast<SILInstruction>(def), currentDef,
+                                       isDestroy)) {
         boundary.lastUsers.push_back(dvi);
         return;
       }
@@ -673,7 +681,8 @@ private:
   /// stays in place and \p destination remains a boundary edge.
   void extendBoundaryFromBoundaryEdge(SILBasicBlock *destination,
                                       PrunedLivenessBoundary &boundary) {
-    if (auto *dvi = findDestroyFromBlockBegin(destination, currentDef)) {
+    if (auto *dvi =
+            findDestroyFromBlockBegin(destination, currentDef, isDestroy)) {
       boundary.lastUsers.push_back(dvi);
     } else {
       boundary.boundaryEdges.push_back(destination);
@@ -694,8 +703,9 @@ private:
   /// user remains a last user.
   void extendBoundaryFromUser(SILInstruction *user,
                               PrunedLivenessBoundary &boundary) {
-    if (auto *dvi = dynCastToDestroyOf(user, currentDef)) {
-      auto *existingDestroy = findDestroyAtOrAfter(dvi, currentDef);
+    if (isDestroy(user)) {
+      auto *dvi = cast<DestroyValueInst>(user);
+      auto *existingDestroy = findDestroyAtOrAfter(dvi, currentDef, isDestroy);
       assert(existingDestroy && "couldn't find a destroy at or after one!?");
       boundary.lastUsers.push_back(existingDestroy);
       return;
@@ -713,7 +723,8 @@ private:
         extendBoundaryFromTerminator(terminator, boundary);
         return;
       }
-      if (auto *existingDestroy = findDestroyAfter(user, currentDef)) {
+      if (auto *existingDestroy =
+              findDestroyAfter(user, currentDef, isDestroy)) {
         boundary.lastUsers.push_back(existingDestroy);
         return;
       }
@@ -745,7 +756,8 @@ private:
         assert(block->getSingleSuccessorBlock() == successor);
         continue;
       }
-      if (auto *dvi = findDestroyFromBlockBegin(successor, currentDef)) {
+      if (auto *dvi =
+              findDestroyFromBlockBegin(successor, currentDef, isDestroy)) {
         boundary.lastUsers.push_back(dvi);
         foundDestroy = true;
       } else {
@@ -770,8 +782,9 @@ void CanonicalizeOSSALifetime::findExtendedBoundary(
     PrunedLivenessBoundary &boundary) {
   assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
          boundary.deadDefs.size() == 0);
+  auto isDestroy = [&](auto *inst) { return destroys.contains(inst); };
   ExtendBoundaryToDestroys extender(*liveness, originalBoundary,
-                                    getCurrentDef());
+                                    getCurrentDef(), isDestroy);
   extender.extend(boundary);
 }
 
@@ -806,8 +819,8 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
     PrunedLivenessBoundary const &boundary) {
   BasicBlockSet seenMergePoints(getCurrentDef()->getFunction());
   for (auto *instruction : boundary.lastUsers) {
-    if (auto *dvi = dynCastToDestroyOf(instruction, getCurrentDef())) {
-      consumes.recordFinalConsume(dvi);
+    if (destroys.contains(instruction)) {
+      consumes.recordFinalConsume(instruction);
       continue;
     }
     switch (liveness->isInterestingUser(instruction)) {
@@ -905,7 +918,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
       defUseWorklist.insert(copy);
       return true;
     }
-    if (auto *destroy = dynCastToDestroyOf(user, getCurrentDef())) {
+    if (destroys.contains(user)) {
+      auto *destroy = cast<DestroyValueInst>(user);
       // If this destroy was marked as a final destroy, ignore it; otherwise,
       // delete it.
       if (!consumes.claimConsume(destroy)) {
