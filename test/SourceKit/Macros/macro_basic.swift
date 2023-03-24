@@ -181,6 +181,25 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // ATTACHED_EXPAND-NEXT: source.edit.kind.active:
 // ATTACHED_EXPAND-NEXT: 21:1-21:15 ""
 
+//##-- Cursor info on the attribute expanded by @myTypeWrapper
+// RUN: %sourcekitd-test -req=cursor -cursor-action -req-opts=retrieve_symbol_graph=1 -offset=2 @__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_CURSOR %s
+// NESTED_ATTACHED_CURSOR: source.lang.swift.ref.macro
+// NESTED_ATTACHED_CURSOR-SAME: macro_basic.swift:10:27-10:43
+// NESTED_ATTACHED_CURSOR-LABEL: SYMBOL GRAPH BEGIN
+// NESTED_ATTACHED_CURSOR: "identifier": {
+// NESTED_ATTACHED_CURSOR-NEXT:   "interfaceLanguage": "swift",
+// NESTED_ATTACHED_CURSOR-NEXT:   "precise": "s:9MacroUser16accessViaStorageyycfm"
+// NESTED_ATTACHED_CURSOR-NEXT: },
+// NESTED_ATTACHED_CURSOR-NEXT: "kind": {
+// NESTED_ATTACHED_CURSOR-NEXT:   "displayName": "Macro",
+// NESTED_ATTACHED_CURSOR-NEXT:   "identifier": "swift.macro"
+// NESTED_ATTACHED_CURSOR-NEXT: },
+// NESTED_ATTACHED_CURSOR: SYMBOL GRAPH END
+// NESTED_ATTACHED_CURSOR-LABEL: ACTIONS BEGIN
+// NESTED_ATTACHED_CURSOR: source.refactoring.kind.expand.macro
+// NESTED_ATTACHED_CURSOR-NEXT: Expand Macro
+// NESTED_ATTACHED_CURSOR:ACTIONS END
+
 //##-- Refactoring on the attribute expanded by @myTypeWrapper
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=1:2 @__swiftmacro_9MacroUser1SV13myTypeWrapperfMA_.swift -primary-file %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=NESTED_ATTACHED_EXPAND %s
 // NESTED_ATTACHED_EXPAND: source.edit.kind.active:

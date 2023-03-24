@@ -632,9 +632,9 @@ public:
   void editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length,
                                EditorConsumer &Consumer) override;
 
-  void getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                     bool Actionables, bool SymbolGraph,
-                     bool CancelOnSubsequentRequest,
+  void getCursorInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
+                     unsigned Offset, unsigned Length, bool Actionables,
+                     bool SymbolGraph, bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
                      Optional<VFSOptions> vfsOptions,
                      SourceKitCancellationToken CancellationToken,
@@ -642,7 +642,7 @@ public:
                          Receiver) override;
 
   void
-  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
+  getDiagnostics(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
                  Optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
@@ -655,27 +655,29 @@ public:
       override;
 
   void getRangeInfo(
-      StringRef Filename, unsigned Offset, unsigned Length,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RangeInfo> &)> Receiver) override;
 
   void getCursorInfoFromUSR(
-      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
       override;
 
   void findRelatedIdentifiersInFile(
-      StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
       override;
 
   void findActiveRegionsInFile(
-      StringRef Filename, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
       override;
 
@@ -695,20 +697,23 @@ public:
                              CategorizedRenameRangesReceiver Receiver) override;
 
   void collectExpressionTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
-      bool CanonicalType, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
+      bool FullyQualified, bool CanonicalType,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
   void collectVariableTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, Optional<unsigned> Offset,
+      Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;
 
-  void semanticRefactoring(StringRef PrimaryFile, SemanticRefactoringInfo Info,
+  void semanticRefactoring(StringRef PrimaryFilePath,
+                           SemanticRefactoringInfo Info,
                            ArrayRef<const char *> Args,
                            SourceKitCancellationToken CancellationToken,
                            CategorizedEditsReceiver Receiver) override;
