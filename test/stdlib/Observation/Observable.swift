@@ -86,9 +86,9 @@ final class TestWithoutMacro: Observable {
 
 @available(SwiftStdlib 5.9, *)
 @Observable final class TestWithMacro {
-  var field1 = "test"
-  var field2 = "test"
-  var field3 = 0
+  var field1: String = "test"
+  var field2: String = "test"
+  var field3: Int = 0
 }
 
 extension AsyncSequence {

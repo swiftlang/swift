@@ -12,7 +12,7 @@
 #if $Macros && hasAttribute(attached)
 
 @available(SwiftStdlib 5.9, *)
-@attached(member, names: named(_registrar), named(changes), named(values), named(_Storage), named(_storage))
+@attached(member, names: named(_$observationRegistrar), named(changes), named(values), named(_$ObservationStorage), named(_$observationStorage), named(`init`))
 @attached(memberAttribute)
 @attached(conformance)
 public macro Observable() = 

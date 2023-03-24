@@ -1,3 +1,14 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+//
+//===----------------------------------------------------------------------===//
+
 import SwiftSyntax
 import SwiftSyntaxMacros
 
@@ -5,33 +16,13 @@ import SwiftSyntaxMacros
 @_implementationOnly import SwiftOperators
 @_implementationOnly import SwiftSyntaxBuilder
 
-private extension DeclSyntaxProtocol {
-  var isObservableStoredProperty: Bool {
-    guard let property = self.as(VariableDeclSyntax.self),
-          let binding = property.bindings.first
-    else {
-      return false
-    }
-
-    return binding.accessor == nil
-  }
+public struct ObservableMacro {
+  static let registarVariableName = "_$observationRegistrar"
+  static let storageVariableName = "_$observationStorage"
+  static let storageTypeName = "_$ObservationStorage"
 }
 
-public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMacro {
-  // MARK: - ConformanceMacro
-  public static func expansion<
-    Declaration: DeclGroupSyntax,
-    Context: MacroExpansionContext
-  >(
-    of node: AttributeSyntax,
-    providingConformancesOf declaration: Declaration,
-    in context: Context
-  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
-    let protocolName: TypeSyntax = "Observable"
-    return [(protocolName, nil)]
-  }
-
-  // MARK: - MemberMacro
+extension ObservableMacro: MemberMacro {
   public static func expansion<
     Declaration: DeclGroupSyntax,
     Context: MacroExpansionContext
@@ -43,12 +34,12 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
     guard let identified = declaration.asProtocol(IdentifiedDeclSyntax.self) else {
       return []
     }
-
+    
     let parentName = identified.identifier
-
-    let registrar: DeclSyntax = 
+    
+    let registrar: DeclSyntax =
       """
-      let _registrar = ObservationRegistrar<\(parentName)>()
+      let \(raw: registarVariableName) = ObservationRegistrar<\(parentName)>()
       """
 
     let changes: DeclSyntax =
@@ -57,7 +48,10 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
         for properties: TrackedProperties<\(parentName)>,
         isolatedTo isolation: Isolation
       ) -> ObservedChanges<\(parentName), Isolation> {
-        _registrar.changes(for: properties, isolatedTo: isolation)
+        \(raw: registarVariableName).changes(
+          for: properties, 
+          isolatedTo: isolation
+        )
       }
       """
 
@@ -66,39 +60,92 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
       public nonisolated func values<Member: Sendable>(
         for keyPath: KeyPath<\(parentName), Member>
       ) -> ObservedValues<\(parentName), Member> {
-        _registrar.values(for: keyPath)
+        \(raw: registarVariableName).values(for: keyPath)
       }
       """
-
-    let memberList = MemberDeclListSyntax(
-      declaration.members.members.filter {
-        $0.decl.isObservableStoredProperty
+    
+    let memberFields: [(IdentifierPatternSyntax, TypeSyntax, InitializerClauseSyntax?)] =
+      try declaration.members.members.compactMap { member in
+        if let variableDecl = member.as(MemberDeclListItemSyntax.self)?.decl.as(VariableDeclSyntax.self) {
+          
+          if let identifierPattern = variableDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self) {
+            if let typeAnnotation = variableDecl.bindings.first?.typeAnnotation {
+              return (identifierPattern, typeAnnotation.type, variableDecl.bindings.first?.initializer)
+            } else {
+              throw DiagnosticsError(
+                diagnostics: [
+                  Diagnostic(node: Syntax(variableDecl), message: MissingTypeAnnotationMessage(identifierPattern))
+                ]
+              )
+            }
+          }
+        }
+        return nil
       }
-    )
-
-    let storageStruct: DeclSyntax =
-      """
-      private struct _Storage {
-      \(memberList)
+    
+    
+    let storageStruct = StructDeclSyntax(
+      identifier: TokenSyntax(
+        .identifier(storageTypeName), 
+        leadingTrivia: .space, 
+        presence: .present
+      )
+    ) {
+      for (identifierPattern, type, _) in memberFields {
+        VariableDeclSyntax(bindingKeyword: .keyword(.var)) {
+          PatternBindingSyntax(
+            leadingTrivia: .space,
+            pattern: identifierPattern,
+            typeAnnotation: TypeAnnotationSyntax(colon: .colonToken(), type: type),
+            trailingTrivia: .newline
+          )
+        }
       }
+    }
+    
+    let parameterInitialization = memberFields.map { (identifierPattern, _, _) in
+      return "\(identifierPattern.identifier.text): \(identifierPattern.identifier.text)"
+    }.joined(separator: ",")
+    
+    let initializer = InitializerDeclSyntax(
+        signature: FunctionSignatureSyntax(
+          input: ParameterClauseSyntax(
+            parameterList: FunctionParameterListSyntax {
+              for (identifierPattern, type, initializer) in memberFields {
+                FunctionParameterSyntax(
+                  firstName: identifierPattern.identifier,
+                  colon: .colonToken(),
+                  type: type,
+                  defaultArgument: initializer
+                )
+              }
+            }
+          )
+        )
+    ) {
+      ExprSyntax(
       """
-
+      \(raw: storageVariableName) = \(raw: storageTypeName)(\(raw: parameterInitialization))
+      """
+      )
+    }
     let storage: DeclSyntax =
       """
-      private var _storage = _Storage()
+      private var \(raw: storageVariableName): \(raw: storageTypeName)
       """
 
     return [
       registrar,
       changes,
       values,
-      storageStruct,
+      DeclSyntax(storageStruct),
       storage,
+      DeclSyntax(initializer)
     ]
   }
+}
 
-  // MARK: - MemberAttributeMacro
-
+extension ObservableMacro: MemberAttributeMacro {
   public static func expansion<
     Declaration: DeclGroupSyntax,
     MemberDeclaration: DeclSyntaxProtocol,
@@ -109,9 +156,17 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
     providingAttributesFor member: MemberDeclaration,
     in context: Context
   ) throws -> [AttributeSyntax] {
-    guard member.isObservableStoredProperty else {
+    guard let property = member.as(VariableDeclSyntax.self) else {
       return []
     }
+    guard let binding = property.bindings.first else {
+      return []
+    }
+    
+    guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier else {
+      return []
+    }
+    if identifier.text == ObservableMacro.registarVariableName || identifier.text == ObservableMacro.storageVariableName { return [] }
 
     return [
       AttributeSyntax(
@@ -120,6 +175,111 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro, ConformanceMac
         )
       )
     ]
+  }
+}
+
+struct InvalidActorApplicationMessage: DiagnosticMessage {
+  let actorDecl: ActorDeclSyntax
+  
+  var message: String {
+    "@Observable applied to actor \(actorDecl.identifier.text) is not supported"
+  }
+  
+  var diagnosticID: SwiftDiagnostics.MessageID { SwiftDiagnostics.MessageID(domain: "Observable", id: "actor conformance")}
+  
+  let severity: SwiftDiagnostics.DiagnosticSeverity = .error
+  
+  init(_ actorDecl: ActorDeclSyntax) {
+    self.actorDecl = actorDecl
+  }
+}
+
+struct MissingTypeAnnotationMessage: DiagnosticMessage {
+  let identifier: IdentifierPatternSyntax
+  
+  var message: String {
+    "@Observable requires properties to have type annotations. \(identifier.identifier.text) is missing a type"
+  }
+  
+  var diagnosticID: SwiftDiagnostics.MessageID { SwiftDiagnostics.MessageID(domain: "Observable", id: "missing type")}
+  
+  let severity: SwiftDiagnostics.DiagnosticSeverity = .error
+  
+  init(_ identifier: IdentifierPatternSyntax) {
+    self.identifier = identifier
+  }
+}
+
+extension ObservableMacro: ConformanceMacro {
+    public static func expansion<
+      Declaration: DeclGroupSyntax,
+      Context: MacroExpansionContext
+    >(
+      of node: AttributeSyntax,
+      providingConformancesOf declaration: Declaration,
+      in context: Context
+    ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+      let identified = declaration.asProtocol(IdentifiedDeclSyntax.self)
+      if let actorDecl = identified as? ActorDeclSyntax {
+        throw DiagnosticsError(
+          diagnostics: [
+            Diagnostic(node: Syntax(actorDecl), message: InvalidActorApplicationMessage(actorDecl))
+          ]
+        )
+      }
+      
+      let protocolName: TypeSyntax = "Observable"
+      return [(protocolName, nil)]
+    }
+}
+
+struct DebugMessage: DiagnosticMessage {
+  var message: String
+  
+  var diagnosticID: SwiftDiagnostics.MessageID { .init(domain: "test", id: "test")}
+  
+  let severity: SwiftDiagnostics.DiagnosticSeverity
+  
+  init(message: String, severity: SwiftDiagnostics.DiagnosticSeverity = .error) {
+    self.message = message
+    self.severity = severity
+  }
+  
+  func emit<S: SyntaxProtocol>(_ node: S) throws {
+    throw DiagnosticsError(diagnostics: [Diagnostic(node: Syntax(node), message: self)])
+  }
+}
+
+extension VariableDeclSyntax {
+  func accessorsMatching(_ predicate: (TokenKind) -> Bool) -> [AccessorDeclSyntax] {
+    let patternBindings = bindings.compactMap { binding in
+      binding.as(PatternBindingSyntax.self)
+    }
+    let accessors = patternBindings.compactMap { patternBinding in
+      switch patternBinding.accessor {
+      case .accessors(let accessors):
+        return accessors
+      default:
+        return nil
+      }
+    }.flatMap { $0.accessors }
+    return accessors.compactMap { accessor in
+      guard let decl = accessor.as(AccessorDeclSyntax.self) else {
+        return nil
+      }
+      if predicate(decl.accessorKind.tokenKind) {
+        return decl
+      } else {
+        return nil
+      }
+    }
+  }
+  
+  var willSetAccessors: [AccessorDeclSyntax] {
+    accessorsMatching { $0 == .keyword(.willSet) }
+  }
+  var didSetAccessors: [AccessorDeclSyntax] {
+    accessorsMatching { $0 == .keyword(.didSet) }
   }
 }
 
@@ -134,28 +294,39 @@ public struct ObservablePropertyMacro: AccessorMacro {
   ) throws -> [AccessorDeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
       let binding = property.bindings.first,
-      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
-      binding.accessor == nil
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier
     else {
       return []
     }
+    
+    if identifier.text == ObservableMacro.registarVariableName || 
+       identifier.text == ObservableMacro.storageVariableName { 
+      return [] 
+    }
 
-    if identifier.text == "_registrar" || identifier.text == "_storage" { return [] }
-
+    let prolog = CodeBlockItemListSyntax(
+      property.willSetAccessors.compactMap { $0.body }.flatMap { $0.statements }
+    )
+    let epilog = CodeBlockItemListSyntax(
+      property.didSetAccessors.compactMap { $0.body }.flatMap { $0.statements }
+    )
+    
     let getAccessor: AccessorDeclSyntax =
       """
       get {
-        _registrar.access(self, keyPath: \\.\(identifier))
-        return _storage.\(identifier)
+        \(raw: ObservableMacro.registarVariableName).access(self, keyPath: \\.\(identifier))
+        return \(raw: ObservableMacro.storageVariableName).\(identifier)
       }
       """
 
     let setAccessor: AccessorDeclSyntax =
       """
       set {
-        _registrar.withMutation(of: self, keyPath: \\.\(identifier)) {
-          _storage.\(identifier) = newValue
+        \(prolog)
+        \(raw: ObservableMacro.registarVariableName).withMutation(of: self, keyPath: \\.\(identifier)) {
+          \(raw: ObservableMacro.storageVariableName).\(identifier) = newValue
         }
+        \(epilog)
       }
       """
 
