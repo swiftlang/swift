@@ -26,9 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
@@ -377,8 +375,9 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
+
     /// The set of features that have been enabled.
-    llvm::SmallSet<Feature, 2> Features;
+    BasicFeatureSet Features;
 
     /// Temporary flag to support LLDB's transition to using \c Features.
     bool EnableBareSlashRegexLiterals = false;
