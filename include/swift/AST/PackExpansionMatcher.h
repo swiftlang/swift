@@ -63,10 +63,10 @@ public:
   SmallVector<MatchedPair, 4> pairs;
 
   [[nodiscard]] bool match() {
-    ArrayRef<Element> lhsParams(lhsElements);
-    ArrayRef<Element> rhsParams(rhsElements);
+    ArrayRef<Element> lhsElts(lhsElements);
+    ArrayRef<Element> rhsElts(rhsElements);
 
-    unsigned minLength = std::min(lhsParams.size(), rhsParams.size());
+    unsigned minLength = std::min(lhsElts.size(), rhsElts.size());
 
     // Consume the longest possible prefix where neither type in
     // the pair is a pack expansion type.
@@ -75,8 +75,8 @@ public:
       unsigned lhsIdx = i;
       unsigned rhsIdx = i;
 
-      auto lhsElt = lhsParams[lhsIdx];
-      auto rhsElt = rhsParams[rhsIdx];
+      auto lhsElt = lhsElts[lhsIdx];
+      auto rhsElt = rhsElts[rhsIdx];
 
       if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
         break;
@@ -101,11 +101,11 @@ public:
     // the pair is a pack expansion type.
     unsigned suffixLength = 0;
     for (unsigned i = 0; i < minLength - prefixLength; ++i) {
-      unsigned lhsIdx = lhsParams.size() - i - 1;
-      unsigned rhsIdx = rhsParams.size() - i - 1;
+      unsigned lhsIdx = lhsElts.size() - i - 1;
+      unsigned rhsIdx = rhsElts.size() - i - 1;
 
-      auto lhsElt = lhsParams[lhsIdx];
-      auto rhsElt = rhsParams[rhsIdx];
+      auto lhsElt = lhsElts[lhsIdx];
+      auto rhsElt = rhsElts[rhsIdx];
 
       // FIXME: Check flags
 
@@ -124,27 +124,27 @@ public:
       ++suffixLength;
     }
 
-    assert(prefixLength + suffixLength <= lhsParams.size());
-    assert(prefixLength + suffixLength <= rhsParams.size());
+    assert(prefixLength + suffixLength <= lhsElts.size());
+    assert(prefixLength + suffixLength <= rhsElts.size());
 
     // Drop the consumed prefix and suffix from each list of types.
-    lhsParams = lhsParams.drop_front(prefixLength).drop_back(suffixLength);
-    rhsParams = rhsParams.drop_front(prefixLength).drop_back(suffixLength);
+    lhsElts = lhsElts.drop_front(prefixLength).drop_back(suffixLength);
+    rhsElts = rhsElts.drop_front(prefixLength).drop_back(suffixLength);
 
     // If nothing remains, we're done.
-    if (lhsParams.empty() && rhsParams.empty())
+    if (lhsElts.empty() && rhsElts.empty())
       return false;
 
     // If the left hand side is a single pack expansion type, bind it
     // to what remains of the right hand side.
-    if (lhsParams.size() == 1) {
-      auto lhsType = getElementType(lhsParams[0]);
+    if (lhsElts.size() == 1) {
+      auto lhsType = getElementType(lhsElts[0]);
       if (auto *lhsExpansion = lhsType->template getAs<PackExpansionType>()) {
         unsigned lhsIdx = prefixLength;
         unsigned rhsIdx = prefixLength;
 
         SmallVector<Type, 2> rhsTypes;
-        for (auto rhsElt : rhsParams) {
+        for (auto rhsElt : rhsElts) {
           if (!getElementLabel(rhsElt).empty())
             return true;
 
@@ -161,14 +161,14 @@ public:
 
     // If the right hand side is a single pack expansion type, bind it
     // to what remains of the left hand side.
-    if (rhsParams.size() == 1) {
-      auto rhsType = getElementType(rhsParams[0]);
+    if (rhsElts.size() == 1) {
+      auto rhsType = getElementType(rhsElts[0]);
       if (auto *rhsExpansion = rhsType->template getAs<PackExpansionType>()) {
         unsigned lhsIdx = prefixLength;
         unsigned rhsIdx = prefixLength;
 
         SmallVector<Type, 2> lhsTypes;
-        for (auto lhsElt : lhsParams) {
+        for (auto lhsElt : lhsElts) {
           if (!getElementLabel(lhsElt).empty())
             return true;
 
