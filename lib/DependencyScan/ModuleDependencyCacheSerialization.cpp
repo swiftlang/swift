@@ -319,7 +319,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &mod : *bridgingModuleDeps)
         moduleDep.addBridgingModuleDependency(mod, alreadyAdded);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -385,7 +386,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &mod : *bridgingModuleDeps)
         moduleDep.addBridgingModuleDependency(mod, alreadyAdded);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordSourceDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
     }
@@ -419,7 +420,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -451,7 +453,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -494,7 +497,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -1018,7 +1022,9 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
   for (auto &contextHash : cache.getAllContextHashes()) {
     addIdentifier(contextHash);
     for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto optionalDependencyInfo = cache.findDependency(moduleID.first, moduleID.second);
+      auto optionalDependencyInfo = cache.findDependency(moduleID.first,
+                                                         moduleID.second,
+                                                         contextHash);
       assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
       auto dependencyInfo = optionalDependencyInfo.value();
       // Add the module's name
@@ -1140,7 +1146,9 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   // has been used with
   for (auto &contextHash : cache.getAllContextHashes()) {
     for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto dependencyInfo = cache.findDependency(moduleID.first, moduleID.second);
+      auto dependencyInfo = cache.findDependency(moduleID.first,
+                                                 moduleID.second,
+                                                 contextHash);
       assert(dependencyInfo.has_value() && "Expected dependency info.");
       writeModuleInfo(moduleID, contextHash, **dependencyInfo);
     }
