@@ -262,6 +262,27 @@ func invalidRepeat<each T>(t: repeat each T) {
   // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
 }
 
+// Make sure that single parameter initializers are handled correctly because
+// the have special type-checking rules in Swift < 6.
+func test_init_refs_with_single_pack_expansion_param() {
+  struct Data<each V> {
+    init(_: repeat each V) {}
+  }
+
+  _ = Data() // Ok
+  _ = Data(42) // Ok
+  _ = Data(42, "") // Ok
+
+  struct EmptyAmbiguous<each V> {
+    init(_: repeat each V) {} // expected-note {{found this candidate}}
+    init(x: repeat each V) {} // expected-note {{found this candidate}}
+  }
+
+  _ = EmptyAmbiguous() // expected-error {{ambiguous use of 'init'}}
+  _ = EmptyAmbiguous(x: 42)
+  _ = EmptyAmbiguous(x: (42, "")) // Ok
+}
+
 func test_pack_expansions_with_closures() {
   func takesVariadicFunction<each T>(function: (repeat each T) -> Int) {}
 
