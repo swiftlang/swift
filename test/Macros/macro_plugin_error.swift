@@ -29,8 +29,7 @@ func test() {
   let _: String = #fooMacro(2)
   // expected-error @-1 {{failedToReceiveMessage}}
   let _: String = #fooMacro(3)
-  // expected-error @-1 {{failedToSendMessage}}
-  //FIXME: ^ This should succeed. Error recovery is not implemented.
+  // ^ This should succeed.
 }
 
 //--- plugin.c
@@ -51,6 +50,6 @@ MOCK_PLUGIN([
     "expect": {"expandFreestandingMacro": {
                 "macro": {"moduleName": "TestPlugin", "typeName": "FooMacro"},
                 "syntax": {"kind": "expression", "source": "#fooMacro(3)"}}},
-    "response": {"expandFreestandingMacroResult": {"expandedSource": "3", "diagnostics": []}}
+    "response": {"expandFreestandingMacroResult": {"expandedSource": "3.description", "diagnostics": []}}
   }
 ])

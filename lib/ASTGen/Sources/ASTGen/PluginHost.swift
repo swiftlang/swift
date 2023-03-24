@@ -16,6 +16,7 @@ import SwiftSyntax
 import swiftLLVMJSON
 
 enum PluginError: Error {
+  case stalePlugin
   case failedToSendMessage
   case failedToReceiveMessage
   case invalidReponseKind
@@ -38,30 +39,37 @@ public func _deinitializePlugin(
 }
 
 /// Load the library plugin in the plugin server.
+/// This should be called inside lock.
 @_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
 func swift_ASTGen_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   libraryPath: UnsafePointer<Int8>,
   moduleName: UnsafePointer<Int8>,
-  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
 ) -> Bool {
   let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
   assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
   let libraryPath = String(cString: libraryPath)
   let moduleName = String(cString: moduleName)
-  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+
+  let diagEngine: PluginDiagnosticsEngine?
+  if let cxxDiagnosticEngine = cxxDiagnosticEngine {
+    diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+  } else {
+    diagEngine = nil
+  }
 
   do {
-    let result = try plugin.sendMessageAndWait(
+    let result = try plugin.sendMessageAndWaitWithoutLock(
       .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
     )
     guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
       throw PluginError.invalidReponseKind
     }
-    diagEngine.emit(diagnostics);
+    diagEngine?.emit(diagnostics);
     return loaded
   } catch {
-    diagEngine.diagnose(error: error)
+    diagEngine?.diagnose(error: error)
     return false
   }
 }
@@ -121,28 +129,31 @@ struct CompilerPlugin {
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
   }
 
+  func sendMessageAndWaitWithoutLock(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
+    try sendMessage(message)
+    return try waitForNextMessage()
+  }
+
   func sendMessageAndWait(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
     try self.withLock {
-      try sendMessage(message)
-      return try waitForNextMessage()
+      guard !Plugin_spawnIfNeeded(opaqueHandle) else {
+        throw PluginError.stalePlugin
+      }
+      return try sendMessageAndWaitWithoutLock(message);
     }
   }
 
+  /// Initialize the plugin. This should be called inside lock.
   func initialize() {
-    // Don't use `sendMessageAndWait` because we want to keep the lock until
-    // setting the returned value.
     do {
-      try self.withLock {
-        // Get capability.
-        try self.sendMessage(.getCapability)
-        let response = try self.waitForNextMessage()
-        guard case .getCapabilityResult(let capability) = response else {
-          throw PluginError.invalidReponseKind
-        }
-        let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
-        ptr.initialize(to: .init(capability))
-        Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
+      // Get capability.
+      let response = try self.sendMessageAndWaitWithoutLock(.getCapability)
+      guard case .getCapabilityResult(let capability) = response else {
+        throw PluginError.invalidReponseKind
       }
+      let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+      ptr.initialize(to: .init(capability))
+      Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
     } catch {
       assertionFailure(String(describing: error))
       return

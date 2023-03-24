@@ -319,6 +319,11 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
   if (!executablePlugin)
     return nullptr;
 
+  // Lock the plugin while initializing.
+  // Note that'executablePlugn' can be shared between multiple ASTContext.
+  executablePlugin->lock();
+  SWIFT_DEFER { executablePlugin->unlock(); };
+
   // FIXME: Ideally this should be done right after invoking the plugin.
   // But plugin loading is in libAST and it can't link ASTGen symbols.
   if (!executablePlugin->isInitialized()) {
@@ -338,11 +343,30 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
     if (fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return nullptr;
     }
+    std::string resolvedLibraryPathStr(resolvedLibraryPath);
+    std::string moduleNameStr(moduleName.str());
+
     bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
-        executablePlugin, resolvedLibraryPath.c_str(), moduleName.str().data(),
+        executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
         &ctx.Diags);
     if (!loaded)
       return nullptr;
+
+    // Set a callback to load the library again on reconnections.
+    auto *callback = new std::function<void(void)>(
+        [executablePlugin, resolvedLibraryPathStr, moduleNameStr]() {
+          (void)swift_ASTGen_pluginServerLoadLibraryPlugin(
+              executablePlugin, resolvedLibraryPathStr.c_str(),
+              moduleNameStr.c_str(),
+              /*diags=*/nullptr);
+        });
+    executablePlugin->addOnReconnect(callback);
+
+    // Remove the callback and deallocate it when this ASTContext is destructed.
+    ctx.addCleanup([executablePlugin, callback]() {
+      executablePlugin->removeOnReconnect(callback);
+      delete callback;
+    });
 #endif
   }
 
