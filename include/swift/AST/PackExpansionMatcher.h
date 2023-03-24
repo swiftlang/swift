@@ -47,48 +47,169 @@ struct MatchedPair {
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
+template <typename Element>
 class TypeListPackMatcher {
-  struct Element {
-  private:
-    Identifier label;
-    Type type;
-    ParameterTypeFlags flags;
-
-    Element(Identifier label, Type type,
-            ParameterTypeFlags flags = ParameterTypeFlags())
-        : label(label), type(type), flags(flags) {}
-
-  public:
-    bool hasLabel() const { return !label.empty(); }
-    Identifier getLabel() const { return label; }
-
-    Type getType() const { return type; }
-
-    ParameterTypeFlags getFlags() const { return flags; }
-
-    static Element from(const TupleTypeElt &tupleElt);
-    static Element from(const AnyFunctionType::Param &funcParam);
-    static Element from(Type type);
-  };
-
   ASTContext &ctx;
 
-  SmallVector<Element> lhsElements;
-  SmallVector<Element> rhsElements;
+  ArrayRef<Element> lhsElements;
+  ArrayRef<Element> rhsElements;
 
 protected:
-  TypeListPackMatcher(ASTContext &ctx, ArrayRef<TupleTypeElt> lhs,
-                      ArrayRef<TupleTypeElt> rhs);
-
-  TypeListPackMatcher(ASTContext &ctx, ArrayRef<AnyFunctionType::Param> lhs,
-                      ArrayRef<AnyFunctionType::Param> rhs);
-
-  TypeListPackMatcher(ASTContext &ctx, ArrayRef<Type> lhs, ArrayRef<Type> rhs);
+  TypeListPackMatcher(ASTContext &ctx, ArrayRef<Element> lhs,
+                      ArrayRef<Element> rhs)
+      : ctx(ctx), lhsElements(lhs), rhsElements(rhs) {}
 
 public:
   SmallVector<MatchedPair, 4> pairs;
 
-  [[nodiscard]] bool match();
+  [[nodiscard]] bool match() {
+    ArrayRef<Element> lhsParams(lhsElements);
+    ArrayRef<Element> rhsParams(rhsElements);
+
+    unsigned minLength = std::min(lhsParams.size(), rhsParams.size());
+
+    // Consume the longest possible prefix where neither type in
+    // the pair is a pack expansion type.
+    unsigned prefixLength = 0;
+    for (unsigned i = 0; i < minLength; ++i) {
+      unsigned lhsIdx = i;
+      unsigned rhsIdx = i;
+
+      auto lhsElt = lhsParams[lhsIdx];
+      auto rhsElt = rhsParams[rhsIdx];
+
+      if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
+        break;
+
+      // FIXME: Check flags
+
+      auto lhsType = getElementType(lhsElt);
+      auto rhsType = getElementType(rhsElt);
+
+      if (lhsType->template is<PackExpansionType>() ||
+          rhsType->template is<PackExpansionType>()) {
+        break;
+      }
+
+      // FIXME: Check flags
+
+      pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
+      ++prefixLength;
+    }
+
+    // Consume the longest possible suffix where neither type in
+    // the pair is a pack expansion type.
+    unsigned suffixLength = 0;
+    for (unsigned i = 0; i < minLength - prefixLength; ++i) {
+      unsigned lhsIdx = lhsParams.size() - i - 1;
+      unsigned rhsIdx = rhsParams.size() - i - 1;
+
+      auto lhsElt = lhsParams[lhsIdx];
+      auto rhsElt = rhsParams[rhsIdx];
+
+      // FIXME: Check flags
+
+      if (getElementLabel(lhsElt) != getElementLabel(rhsElt))
+        break;
+
+      auto lhsType = getElementType(lhsElt);
+      auto rhsType = getElementType(rhsElt);
+
+      if (lhsType->template is<PackExpansionType>() ||
+          rhsType->template is<PackExpansionType>()) {
+        break;
+      }
+
+      pairs.emplace_back(lhsType, rhsType, lhsIdx, rhsIdx);
+      ++suffixLength;
+    }
+
+    assert(prefixLength + suffixLength <= lhsParams.size());
+    assert(prefixLength + suffixLength <= rhsParams.size());
+
+    // Drop the consumed prefix and suffix from each list of types.
+    lhsParams = lhsParams.drop_front(prefixLength).drop_back(suffixLength);
+    rhsParams = rhsParams.drop_front(prefixLength).drop_back(suffixLength);
+
+    // If nothing remains, we're done.
+    if (lhsParams.empty() && rhsParams.empty())
+      return false;
+
+    // If the left hand side is a single pack expansion type, bind it
+    // to what remains of the right hand side.
+    if (lhsParams.size() == 1) {
+      auto lhsType = getElementType(lhsParams[0]);
+      if (auto *lhsExpansion = lhsType->template getAs<PackExpansionType>()) {
+        unsigned lhsIdx = prefixLength;
+        unsigned rhsIdx = prefixLength;
+
+        SmallVector<Type, 2> rhsTypes;
+        for (auto rhsElt : rhsParams) {
+          if (!getElementLabel(rhsElt).empty())
+            return true;
+
+          // FIXME: Check rhs flags
+          rhsTypes.push_back(getElementType(rhsElt));
+        }
+        auto rhs = createPackBinding(rhsTypes);
+
+        // FIXME: Check lhs flags
+        pairs.emplace_back(lhsExpansion, rhs, lhsIdx, rhsIdx);
+        return false;
+      }
+    }
+
+    // If the right hand side is a single pack expansion type, bind it
+    // to what remains of the left hand side.
+    if (rhsParams.size() == 1) {
+      auto rhsType = getElementType(rhsParams[0]);
+      if (auto *rhsExpansion = rhsType->template getAs<PackExpansionType>()) {
+        unsigned lhsIdx = prefixLength;
+        unsigned rhsIdx = prefixLength;
+
+        SmallVector<Type, 2> lhsTypes;
+        for (auto lhsElt : lhsParams) {
+          if (!getElementLabel(lhsElt).empty())
+            return true;
+
+          // FIXME: Check lhs flags
+          lhsTypes.push_back(getElementType(lhsElt));
+        }
+        auto lhs = createPackBinding(lhsTypes);
+
+        // FIXME: Check rhs flags
+        pairs.emplace_back(lhs, rhsExpansion, lhsIdx, rhsIdx);
+        return false;
+      }
+    }
+
+    // Otherwise, all remaining possibilities are invalid:
+    // - Neither side has any pack expansions, and they have different lengths.
+    // - One side has a pack expansion but the other side is too short, eg
+    //   {Int, T..., Float} vs {Int}.
+    // - The prefix and suffix are mismatched, so we're left with something
+    //   like {T..., Int} vs {Float, U...}.
+    return true;
+  }
+
+private:
+  Identifier getElementLabel(const Element &) const;
+  Type getElementType(const Element &) const;
+  ParameterTypeFlags getElementFlags(const Element &) const;
+
+  PackExpansionType *createPackBinding(ArrayRef<Type> types) const {
+    // If there is only one element and it's a PackExpansionType,
+    // return it directly.
+    if (types.size() == 1) {
+      if (auto *expansionType = types.front()->getAs<PackExpansionType>()) {
+        return expansionType;
+      }
+    }
+
+    // Otherwise, wrap the elements in PackExpansionType(PackType(...)).
+    auto *packType = PackType::get(ctx, types);
+    return PackExpansionType::get(packType, packType);
+  }
 };
 
 /// Performs a structural match of two lists of tuple elements.
@@ -97,7 +218,7 @@ public:
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
-class TuplePackMatcher : public TypeListPackMatcher {
+class TuplePackMatcher : public TypeListPackMatcher<TupleTypeElt> {
 public:
   TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
       : TypeListPackMatcher(lhsTuple->getASTContext(),
@@ -112,7 +233,7 @@ public:
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
-class ParamPackMatcher : public TypeListPackMatcher {
+class ParamPackMatcher : public TypeListPackMatcher<AnyFunctionType::Param> {
 public:
   ParamPackMatcher(ArrayRef<AnyFunctionType::Param> lhsParams,
                    ArrayRef<AnyFunctionType::Param> rhsParams, ASTContext &ctx)
@@ -125,7 +246,7 @@ public:
 /// expansion type. After collecting a common prefix and suffix, the
 /// pack expansion on either side asborbs the remaining elements on the
 /// other side.
-class PackMatcher : public TypeListPackMatcher {
+class PackMatcher : public TypeListPackMatcher<Type> {
 public:
   PackMatcher(ArrayRef<Type> lhsTypes, ArrayRef<Type> rhsTypes, ASTContext &ctx)
       : TypeListPackMatcher(ctx, lhsTypes, rhsTypes) {}
