@@ -2977,6 +2977,33 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
+        #if 01
+        if (const char *ep = (const char *)
+            repr->getEndLoc().getOpaquePointerValue()) {
+            while (isalnum(*ep))
+                ep++;
+//            fprintf(stderr, "[[%.100s\n", ep-10);
+            if (*ep == '\n' || *ep == '>' || *ep++ == ' ' &&
+                (*ep++ == '=' && *ep++ == ' ' || *ep--) &&
+                *ep++ == '{')
+                return Action::SkipChildren();
+
+            if (const char *line = strrchr(ep, '\n')) {
+                if (const char *objc = strstr(line, "@objc"))
+                    if (objc-line < 10)
+                        return Action::SkipChildren();
+                if (const char *over = strstr(line, "override"))
+                    if (over-line < 10)
+                        return Action::SkipChildren();
+            }
+        }
+        #endif
+
+        if (isa<DictionaryTypeRepr>(repr) ||
+            isa<ArrayTypeRepr>(repr) ||
+            isa<FunctionTypeRepr>(repr) ||
+            isa<OptionalTypeRepr>(repr))
+          return Action::SkipChildren();
 
       // Don't allow variadic opaque parameter or return types.
       if (isa<PackExpansionTypeRepr>(repr) || isa<VarargTypeRepr>(repr))
