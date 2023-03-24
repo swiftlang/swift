@@ -914,7 +914,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     // Emit a call to the main static function.
     // return Module.$main();
     auto *mainFunc = cast<FuncDecl>(mainDecl);
-    auto moduleLoc = RegularLocation::getModuleLocation();
+    auto moduleLoc = SILLocation(mainDecl);
     auto *entryBlock = B.getInsertionBB();
 
     SILDeclRef mainFunctionDeclRef(mainFunc, SILDeclRef::Kind::Func);
@@ -1001,7 +1001,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 }
 
 void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
-  auto moduleLoc = RegularLocation::getModuleLocation();
+  auto moduleLoc = entryPoint.getAsRegularLocation();
   auto *entryBlock = B.getInsertionBB();
   auto paramTypeIter = F.getConventions()
                            .getParameterSILTypes(getTypeExpansionContext())
