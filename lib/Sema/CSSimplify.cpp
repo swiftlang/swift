@@ -1740,23 +1740,22 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        paramInfo.isVariadicGenericParameter(paramIdx)) {
-      auto *paramPackExpansion = paramTy->castTo<PackExpansionType>();
+    if (auto *paramPackExpansion = paramTy->getAs<PackExpansionType>()) {
+      if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics)) {
+        SmallVector<Type, 2> argTypes;
+        for (auto argIdx : parameterBindings[paramIdx]) {
+          auto argType = argsWithLabels[argIdx].getPlainType();
+          argTypes.push_back(argType);
+        }
 
-      SmallVector<Type, 2> argTypes;
-      for (auto argIdx : parameterBindings[paramIdx]) {
-        auto argType = argsWithLabels[argIdx].getPlainType();
-        argTypes.push_back(argType);
-      }
+        auto *argPack = PackType::get(cs.getASTContext(), argTypes);
+        auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
 
-      auto *argPack = PackType::get(cs.getASTContext(), argTypes);
-      auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
-
-      cs.addConstraint(
+        cs.addConstraint(
           subKind, argPackExpansion, paramPackExpansion,
           loc, /*isFavored=*/false);
-      continue;
+        continue;
+      }
     }
 
     // If type inference from default arguments is enabled, let's
