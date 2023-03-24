@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Generators.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
@@ -32,6 +33,61 @@
 
 using namespace swift;
 using namespace Lowering;
+
+namespace {
+
+class LoweredParamsInContextGenerator {
+  SILGenFunction &SGF;
+  ArrayRefGenerator<ArrayRef<SILParameterInfo>> loweredParams;
+
+public:
+  LoweredParamsInContextGenerator(SILGenFunction &SGF)
+    : SGF(SGF),
+      loweredParams(SGF.F.getLoweredFunctionType()->getParameters()) {
+  }
+
+  using reference = SILType;
+
+  /// Get the original (unsubstituted into context) lowered parameter
+  /// type information.
+  SILParameterInfo getOrigInfo() const {
+    return loweredParams.get();
+  }
+
+  SILType get() const {
+    return SGF.getSILTypeInContext(loweredParams.get(),
+                                   SGF.F.getLoweredFunctionType());
+  }
+
+  SILType claimNext() {
+    auto param = get();
+    advance();
+    return param;
+  }
+
+  bool isFinished() const {
+    return loweredParams.isFinished();
+  }
+
+  void advance() {
+    loweredParams.advance();
+  }
+
+  void finish() {
+    loweredParams.finish();
+  }
+};
+
+} // end anonymous namespace
+
+static ManagedValue emitManagedParameter(SILGenFunction &SGF,
+                                         SILValue value, bool isOwned) {
+  if (isOwned) {
+    return SGF.emitManagedRValueWithCleanup(value);
+  } else {
+    return ManagedValue::forUnmanaged(value);
+  }
+}
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
                                            ValueDecl *ctor) {
@@ -63,14 +119,65 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
 static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
                                               SILLocation loc,
                                               CanType interfaceType,
-                                              DeclContext *DC) {
+                                              DeclContext *DC,
+                      LoweredParamsInContextGenerator &loweredParamTypes,
+                                        Initialization *argInit = nullptr) {
   auto type = DC->mapTypeIntoContext(interfaceType)->getCanonicalType();
 
   // Restructure tuple arguments.
-  if (auto tupleTy = dyn_cast<TupleType>(interfaceType)) {
+  if (auto tupleIfaceTy = dyn_cast<TupleType>(interfaceType)) {
+    // If we don't have a context to emit into, but we have a tuple
+    // that contains pack expansions, create a temporary.
+    TemporaryInitializationPtr tempInit;
+    if (!argInit && tupleIfaceTy.containsPackExpansionType()) {
+      tempInit = SGF.emitTemporary(loc, SGF.getTypeLowering(type));
+      argInit = tempInit.get();
+    }
+
+    // Split the initialization into element initializations if we have
+    // one.  We should never have to deal with an initialization that
+    // can't be split here.
+    assert(!argInit || argInit->canSplitIntoTupleElements());
+    SmallVector<InitializationPtr> initsBuf;
+    MutableArrayRef<InitializationPtr> eltInits;
+    if (argInit) {
+      eltInits = argInit->splitIntoTupleElements(SGF, loc, type, initsBuf);
+      assert(eltInits.size() == tupleIfaceTy->getNumElements());
+    }
+
     RValue tuple(type);
-    for (auto fieldType : tupleTy.getElementTypes())
-      tuple.addElement(emitImplicitValueConstructorArg(SGF, loc, fieldType, DC));
+
+    for (auto eltIndex : range(tupleIfaceTy->getNumElements())) {
+      auto eltIfaceType = tupleIfaceTy.getElementType(eltIndex);
+      auto eltInit = (argInit ? eltInits[eltIndex].get() : nullptr);
+      RValue element = emitImplicitValueConstructorArg(SGF, loc, eltIfaceType,
+                                                       DC, loweredParamTypes,
+                                                       eltInit);
+      if (argInit) {
+        assert(element.isInContext());
+      } else {
+        tuple.addElement(std::move(element));
+      }
+    }
+
+    // If we created a temporary initializer above, finish it and claim
+    // the managed buffer.
+    if (tempInit) {
+      tempInit->finishInitialization(SGF);
+
+      auto tupleValue = tempInit->getManagedAddress();
+      if (tupleValue.getType().isLoadable(SGF.F)) {
+        tupleValue = SGF.B.createLoadTake(loc, tupleValue);
+      }
+
+      return RValue(SGF, loc, type, tupleValue);
+
+    // Otherwise, if we have an emitInto, return forInContext().
+    } else if (argInit) {
+      argInit->finishInitialization(SGF);
+      return RValue::forInContext();
+    }
+
     return tuple;
   }
 
@@ -83,13 +190,51 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(interfaceType);
 
-  auto argType = SGF.getLoweredTypeForFunctionArgument(type);
+  auto origParamInfo = loweredParamTypes.getOrigInfo();
+  auto argType = loweredParamTypes.claimNext();
+
   auto *arg = SGF.F.begin()->createFunctionArgument(argType, VD);
-  ManagedValue mvArg;
-  if (arg->getArgumentConvention().isOwnedConvention()) {
-    mvArg = SGF.emitManagedRValueWithCleanup(arg);
-  } else {
-    mvArg = ManagedValue::forUnmanaged(arg);
+  bool argIsConsumed = origParamInfo.isConsumed();
+
+  // If the lowered parameter is a pack expansion, copy/move the pack
+  // into the initialization, which we assume is there.
+  if (auto packTy = argType.getAs<SILPackType>()) {
+    assert(isa<PackExpansionType>(interfaceType));
+    assert(packTy->getNumElements() == 1);
+    assert(argInit);
+    assert(argInit->canPerformPackExpansionInitialization());
+
+    auto expansionTy = packTy->getSILElementType(0);
+    auto openedEnvAndEltTy =
+      SGF.createOpenedElementValueEnvironment(expansionTy);
+    auto openedEnv = openedEnvAndEltTy.first;
+    auto eltTy = openedEnvAndEltTy.second;
+    auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
+
+    SGF.emitDynamicPackLoop(loc, formalPackType, /*component*/0, openedEnv,
+                            [&](SILValue indexWithinComponent,
+                                SILValue packExpansionIndex,
+                                SILValue packIndex) {
+      argInit->performPackExpansionInitialization(SGF, loc,
+                                                  indexWithinComponent,
+                                              [&](Initialization *eltInit) {
+        auto eltAddr =
+          SGF.B.createPackElementGet(loc, packIndex, arg, eltTy);
+        ManagedValue eltMV = emitManagedParameter(SGF, eltAddr, argIsConsumed);
+        eltInit->copyOrInitValueInto(SGF, loc, eltMV, argIsConsumed);
+        eltInit->finishInitialization(SGF);
+      });
+    });
+    argInit->finishInitialization(SGF);
+    return RValue::forInContext();
+  }
+
+  ManagedValue mvArg = emitManagedParameter(SGF, arg, argIsConsumed);
+
+  if (argInit) {
+    argInit->copyOrInitValueInto(SGF, loc, mvArg, argIsConsumed);
+    argInit->finishInitialization(SGF);
+    return RValue::forInContext();
   }
 
   // This can happen if the value is resilient in the calling convention
@@ -164,15 +309,19 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   AssertingManualScope functionLevelScope(SGF.Cleanups,
                                           CleanupLocation(Loc));
 
+  auto loweredFunctionTy = SGF.F.getLoweredFunctionType();
+
   // FIXME: Handle 'self' along with the other arguments.
+  assert(loweredFunctionTy->getNumResults() == 1);
+  auto selfResultInfo = loweredFunctionTy->getResults()[0];
   auto *paramList = ctor->getParameters();
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto selfIfaceTy = selfDecl->getInterfaceType();
-  SILType selfTy = SGF.getLoweredTypeForFunctionArgument(selfDecl->getType());
+  SILType selfTy = SGF.getSILTypeInContext(selfResultInfo, loweredFunctionTy);
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
+  if (selfTy.isAddress()) {
     auto &AC = SGF.getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -181,9 +330,10 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                  ctor);
     VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(selfIfaceTy);
-    resultSlot =
-        SGF.F.begin()->createFunctionArgument(selfTy.getAddressType(), VD);
+    resultSlot = SGF.F.begin()->createFunctionArgument(selfTy, VD);
   }
+
+  LoweredParamsInContextGenerator loweredParams(SGF);
 
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
@@ -192,10 +342,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
     elements.push_back(
       emitImplicitValueConstructorArg(
-          SGF, Loc, param->getInterfaceType()->getCanonicalType(), ctor));
+          SGF, Loc, param->getInterfaceType()->getCanonicalType(), ctor,
+          loweredParams));
   }
 
   emitConstructorMetatypeArg(SGF, ctor);
+  (void) loweredParams.claimNext();
+  loweredParams.finish();
 
   auto *decl = selfTy.getStructOrBoundGenericStruct();
   assert(decl && "not a struct?!");
@@ -601,16 +754,21 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   Scope scope(Cleanups, CleanupLoc);
 
+  LoweredParamsInContextGenerator loweredParams(*this);
+
   // Emit the exploded constructor argument.
   ArgumentSource payload;
   if (element->hasAssociatedValues()) {
     auto eltArgTy = element->getArgumentInterfaceType()->getCanonicalType();
-    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element);
+    RValue arg = emitImplicitValueConstructorArg(*this, Loc, eltArgTy, element,
+                                                 loweredParams);
     payload = ArgumentSource(Loc, std::move(arg));
   }
 
   // Emit the metatype argument.
   emitConstructorMetatypeArg(*this, element);
+  (void) loweredParams.claimNext();
+  loweredParams.finish();
 
   // If possible, emit the enum directly into the indirect return.
   SGFContext C = (dest ? SGFContext(dest.get()) : SGFContext());

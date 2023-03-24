@@ -470,35 +470,25 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
 }
 
 void AbstractionPattern::forEachTupleElement(CanTupleType substType,
-                      llvm::function_ref<void(unsigned origEltIndex,
-                                              unsigned substEltIndex,
-                                              AbstractionPattern origEltType,
-                                              CanType substEltType)>
-                        handleScalar,
-                      llvm::function_ref<void(unsigned origEltIndex,
-                                              unsigned substEltIndex,
-                                              AbstractionPattern origExpansionType,
-                                              CanTupleEltTypeArrayRef substEltTypes)>
-                        handleExpansion) const {
-  assert(isTuple() && "can only call on a tuple expansion");
-  assert(matchesTuple(substType));
-
-  size_t substEltIndex = 0;
-  auto substEltTypes = substType.getElementTypes();
-  for (size_t origEltIndex : range(getNumTupleElements())) {
-    auto origEltType = getTupleElementType(origEltIndex);
-    if (!origEltType.isPackExpansion()) {
-      handleScalar(origEltIndex, substEltIndex,
-                   origEltType, substEltTypes[substEltIndex]);
-      substEltIndex++;
-    } else {
-      auto numComponents = origEltType.getNumPackExpandedComponents();
-      handleExpansion(origEltIndex, substEltIndex, origEltType,
-                      substEltTypes.slice(substEltIndex, numComponents));
-      substEltIndex += numComponents;
-    }
+      llvm::function_ref<void(TupleElementGenerator &)> handleElement) const {
+  TupleElementGenerator elt(*this, substType);
+  for (; !elt.isFinished(); elt.advance()) {
+    handleElement(elt);
   }
-  assert(substEltIndex == substEltTypes.size());
+  elt.finish();
+}
+
+TupleElementGenerator::TupleElementGenerator(
+                              AbstractionPattern origTupleType,
+                              CanTupleType substTupleType)
+    : origTupleType(origTupleType), substTupleType(substTupleType) {
+  assert(origTupleType.isTuple());
+  assert(origTupleType.matchesTuple(substTupleType));
+
+  origTupleTypeIsOpaque = origTupleType.isOpaqueTuple();
+  numOrigElts = origTupleType.getNumTupleElements();
+
+  if (!isFinished()) loadElement();
 }
 
 void AbstractionPattern::forEachExpandedTupleElement(CanTupleType substType,
@@ -2196,28 +2186,19 @@ public:
   CanType visitTupleType(CanTupleType tuple, AbstractionPattern pattern) {
     assert(pattern.isTuple());
 
-    // It's pretty weird for us to end up in this case with an
-    // open-coded tuple pattern, but it happens with opaque derivative
-    // functions in autodiff.
-    CanTupleType origTupleTypeForLabels = pattern.getAs<TupleType>();
-    if (!origTupleTypeForLabels) origTupleTypeForLabels = tuple;
-
     SmallVector<TupleTypeElt, 4> tupleElts;
-    pattern.forEachTupleElement(tuple,
-        [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origEltType, CanType substEltType) {
-      auto eltTy = visit(substEltType, origEltType);
-      auto &origElt = origTupleTypeForLabels->getElement(origEltIndex);
-      tupleElts.push_back(origElt.getWithType(eltTy));
-    },  [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origExpansionType,
-            CanTupleEltTypeArrayRef substEltTypes) {
-      CanType candidateSubstType;
-      if (!substEltTypes.empty())
-        candidateSubstType = substEltTypes[0];
-      auto eltTy = handlePackExpansion(origExpansionType, candidateSubstType);
-      auto &origElt = origTupleTypeForLabels->getElement(origEltIndex);
-      tupleElts.push_back(origElt.getWithType(eltTy));      
+    pattern.forEachTupleElement(tuple, [&](TupleElementGenerator &elt) {
+      auto substEltTypes = elt.getSubstTypes();
+      CanType eltTy;
+      if (!elt.isOrigPackExpansion()) {
+        eltTy = visit(substEltTypes[0], elt.getOrigType());
+      } else {
+        CanType candidateSubstType;
+        if (!substEltTypes.empty())
+          candidateSubstType = substEltTypes[0];
+        eltTy = handlePackExpansion(elt.getOrigType(), candidateSubstType);
+      }
+      tupleElts.push_back(elt.getOrigElement().getWithType(eltTy));
     });
     
     return CanType(TupleType::get(tupleElts, TC.Context));
@@ -2236,7 +2217,7 @@ public:
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
                                  [&](FunctionParamGenerator &param) {
-      if (!param.isPackExpansion()) {
+      if (!param.isOrigPackExpansion()) {
         auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
                                 param.getOrigType());
         addParam(param.getOrigFlags(), newParamTy);

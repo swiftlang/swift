@@ -42,6 +42,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
@@ -2203,19 +2204,16 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
 
   // Otherwise, add up the elements.
   unsigned count = 0;
-  origType.forEachTupleElement(substTuple,
-                              [&](unsigned origEltIndex,
-                                   unsigned substEltIndex,
-                                   AbstractionPattern origEltType,
-                                   CanType substEltType) {
-    // Recursively expand scalar components.
-    count += getFlattenedValueCount(origEltType, substEltType);
-  },                           [&](unsigned origEltIndex,
-                                   unsigned substEltIndex,
-                                   AbstractionPattern origExpansionType,
-                                   CanTupleEltTypeArrayRef substEltTypes) {
+  origType.forEachTupleElement(substTuple, [&](TupleElementGenerator &elt) {
     // Expansion components turn into a single parameter.
-    count++;
+    if (elt.isOrigPackExpansion()) {
+      count++;
+
+    // Recursively expand scalar components.
+    } else {
+      count += getFlattenedValueCount(elt.getOrigType(),
+                                      elt.getSubstTypes()[0]);
+    }
   });
   return count;
 }
@@ -3392,19 +3390,19 @@ private:
       auto substTupleType =
         cast<TupleType>(e->getType()->getCanonicalType());
       origParamType.forEachTupleElement(substTupleType,
-          [&](unsigned origEltIndex, unsigned substEltIndex,
-              AbstractionPattern origEltType, CanType substEltType) {
-        emit(tuple->getElement(substEltIndex), origEltType);
-      },
-          [&](unsigned origEltIndex, unsigned substEltIndex,
-              AbstractionPattern origExpansionType,
-              CanTupleEltTypeArrayRef substEltTypes) {
+                                        [&](TupleElementGenerator &elt) {
+        if (!elt.isOrigPackExpansion()) {
+          emit(tuple->getElement(elt.getSubstIndex()), elt.getOrigType());
+          return;
+        }
+
+        auto substEltTypes = elt.getSubstTypes();
         SmallVector<ArgumentSource, 4> eltArgs;
         eltArgs.reserve(substEltTypes.size());
-        for (auto i : range(substEltIndex, substEltTypes.size())) {
+        for (auto i : range(elt.getSubstIndex(), substEltTypes.size())) {
           eltArgs.emplace_back(tuple->getElement(i));
         }
-        emitPackArg(eltArgs, origExpansionType);
+        emitPackArg(eltArgs, elt.getOrigType());
       });
       return;
     }

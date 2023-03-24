@@ -36,6 +36,7 @@ namespace clang {
 namespace swift {
 namespace Lowering {
 class FunctionParamGenerator;
+class TupleElementGenerator;
 
 /// A pattern for the abstraction of a value.
 ///
@@ -1174,6 +1175,10 @@ public:
     return CXXMethod;
   }
 
+  bool isOpaqueTuple() const {
+    return getKind() == Kind::Tuple;
+  }
+
   bool isOpaqueFunctionOrOpaqueDerivativeFunction() const {
     return (getKind() == Kind::OpaqueFunction ||
             getKind() == Kind::OpaqueDerivativeFunction);
@@ -1356,20 +1361,8 @@ public:
   /// expand to.
   ///
   /// This pattern must be a tuple pattern.
-  ///
-  /// Calls handleScalar or handleExpansion as appropriate for each
-  /// element of the original tuple, in order.
   void forEachTupleElement(CanTupleType substType,
-           llvm::function_ref<void(unsigned origEltIndex,
-                                   unsigned substEltIndex,
-                                   AbstractionPattern origEltType,
-                                   CanType substEltType)>
-               handleScalar,
-           llvm::function_ref<void(unsigned origEltIndex,
-                                   unsigned substEltIndex,
-                                   AbstractionPattern origExpansionType,
-                                   CanTupleEltTypeArrayRef substEltTypes)>
-               handleExpansion) const;
+         llvm::function_ref<void(TupleElementGenerator &element)> fn) const;
 
   /// Perform a parallel visitation of the elements of a tuple type,
   /// expanding the elements of the type.  This preserves the structure

@@ -31,6 +31,10 @@
 // concept SimpleGenerator : Generator {
 //   type reference;
 //
+//   // Get the current value.
+//   reference get();
+//
+//   // Get the current value and then advance the generator.
 //   reference claimNext();
 // }
 //
@@ -103,7 +107,7 @@ public:
   }
 
   /// Return the current element of the array.
-  reference getCurrent() const {
+  reference get() const {
     assert(!isFinished());
     return values.front();
   }
@@ -111,7 +115,7 @@ public:
   /// Claim the current element of the array and advance past it.
   reference claimNext() {
     assert(!isFinished());
-    reference result = getCurrent();
+    reference result = get();
     advance();
     return result;
   }

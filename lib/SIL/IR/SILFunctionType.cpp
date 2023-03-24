@@ -1274,21 +1274,21 @@ public:
     if (origType.isTuple()) {
       auto substTupleType = cast<TupleType>(substType);
       origType.forEachTupleElement(substTupleType,
-          [&](unsigned origEltIndex, unsigned substEltIndex,
-              AbstractionPattern origEltType, CanType substEltType) {
+                                   [&](TupleElementGenerator &elt) {
         // If the original element type is not a pack expansion, just
         // pull off the next substituted element type.
-        destructure(origEltType, substEltType);
+        if (!elt.isOrigPackExpansion()) {
+          destructure(elt.getOrigType(), elt.getSubstTypes()[0]);
+          return;
+        }
 
-      },  [&](unsigned origEltIndex, unsigned substEltIndex,
-              AbstractionPattern origExpansionType,
-              CanTupleEltTypeArrayRef substEltTypes) {
         // If the original element type is a pack expansion, build a
         // lowered pack type for the substituted components it expands to.
+        auto origExpansionType = elt.getOrigType();
         bool indirect = origExpansionType.arePackElementsPassedIndirectly(TC);
 
         SmallVector<CanType, 4> packElts;
-        for (auto substEltType : substEltTypes) {
+        for (auto substEltType : elt.getSubstTypes()) {
           auto origComponentType
             = origExpansionType.getPackExpansionComponentType(substEltType);
           CanType loweredEltTy =
@@ -1576,7 +1576,7 @@ private:
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
-      if (!param.isPackExpansion()) {
+      if (!param.isOrigPackExpansion()) {
         visit(param.getOrigType(), param.getSubstParams()[0],
               /*forSelf*/false);
         return;
@@ -1690,16 +1690,17 @@ private:
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
 
-    origType.forEachTupleElement(substType,
-        [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origEltType, CanType substEltType) {
-      visit(ownership, forSelf, origEltType, substEltType,
-            isNonDifferentiable);
-    },  [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origExpansionType,
-            CanTupleEltTypeArrayRef substEltTypes) {
+    origType.forEachTupleElement(substType, [&](TupleElementGenerator &elt) {
+      if (!elt.isOrigPackExpansion()) {
+        visit(ownership, forSelf, elt.getOrigType(), elt.getSubstTypes()[0],
+              isNonDifferentiable);
+        return;
+      }
+
+      auto origExpansionType = elt.getOrigType();
+
       SmallVector<CanType, 8> packElts;
-      for (auto substEltType : substEltTypes) {
+      for (auto substEltType : elt.getSubstTypes()) {
         auto origComponentType
           = origExpansionType.getPackExpansionComponentType(substEltType);
         auto loweredEltTy =
