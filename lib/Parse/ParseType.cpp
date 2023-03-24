@@ -812,7 +812,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   // component.
   DeclNameLoc Loc;
   DeclNameRef Name =
-      parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type, {});
+      parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type,
+                       DeclNameFlag::AllowLowercaseAndUppercaseSelf);
   if (!Name)
     return makeParserError();
 
