@@ -31,6 +31,14 @@ func checkNoImplicitCopy2(_ x: SomeValue) {
   checkNoImplicitCopy2(y)
 }
 
+// coverage to ensure the feature flag is working
+#if $MoveOnly
+  func guardedFn() {}
+#endif
+
+func caller() {
+  guardedFn()
+}
 
 
 
