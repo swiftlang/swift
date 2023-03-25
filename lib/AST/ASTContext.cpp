@@ -3272,8 +3272,19 @@ PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
           .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
+  // The canonical pack expansion type uses the canonical shape.
+  // For interface types, we'd need a signature to do this properly,
+  // but for archetypes we can do it directly.
+  bool countIsCanonical = countType->isCanonical();
+  if (countIsCanonical) {
+    if (auto archetype = dyn_cast<PackArchetypeType>(countType.getPointer())) {
+      auto reducedShape = archetype->getReducedShape();
+      countIsCanonical = (reducedShape.getPointer() == archetype);
+    }
+  }
+
   const ASTContext *canCtx =
-      (patternType->isCanonical() && countType->isCanonical())
+      (patternType->isCanonical() && countIsCanonical)
       ? &context : nullptr;
   PackExpansionType *expansionType =
       new (context, arena) PackExpansionType(patternType, countType, properties,

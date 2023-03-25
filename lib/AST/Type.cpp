@@ -1673,6 +1673,8 @@ CanType TypeBase::computeCanonicalType() {
     auto *expansion = cast<PackExpansionType>(this);
     auto patternType = expansion->getPatternType()->getCanonicalType();
     auto countType = expansion->getCountType()->getCanonicalType();
+    if (auto packArchetype = dyn_cast<PackArchetypeType>(countType))
+      countType = packArchetype->getReducedShape();
     Result = PackExpansionType::get(patternType, countType);
     break;
   }
