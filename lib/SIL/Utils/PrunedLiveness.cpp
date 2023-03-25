@@ -168,7 +168,7 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 template <typename LivenessWithDefs>
 void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
                                                      bool lifetimeEnding) {
-  liveBlocks.updateForUse(user);
+  liveBlocks.updateForUse(user, asImpl().isUserBeforeDef(user));
 
   // Note that a user may use the current value from multiple operands. If any
   // of the uses are non-lifetime-ending, then we must consider the user
@@ -526,6 +526,29 @@ void SSAPrunedLiveness::findBoundariesInBlock(
 //===----------------------------------------------------------------------===//
 //                           MultiDefPrunedLiveness
 //===----------------------------------------------------------------------===//
+
+bool MultiDefPrunedLiveness::isUserBeforeDef(SILInstruction *user) const {
+  auto *block = user->getParent();
+  if (!isDefBlock(block))
+    return false;
+
+  if (llvm::any_of(block->getArguments(), [this](SILArgument *arg) {
+    return isDef(arg);
+  })) {
+    return false;
+  }
+
+  auto *current = user;
+  while (true) {
+    // If user is also a def, then the use is considered before the def.
+    current = current->getPreviousInstruction();
+    if (!current)
+      return true;
+
+    if (isDef(current))
+      return false;
+  }
+}
 
 void MultiDefPrunedLiveness::findBoundariesInBlock(
     SILBasicBlock *block, bool isLiveOut,
