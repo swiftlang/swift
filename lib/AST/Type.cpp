@@ -4654,6 +4654,84 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                   fnType->getResult(), fnType->getExtInfo());
 }
 
+void InFlightSubstitution::expandPackExpansionShape(Type origShape,
+    llvm::function_ref<void(Type substComponentShape)> handleComponent) {
+
+  // Substitute the shape using the baseline substitutions, not the
+  // current elementwise projections.
+  auto substShape = origShape.subst(BaselineSubstType,
+                                    BaselineLookupConformance,
+                                    Options);
+
+  auto substPackShape = substShape->getAs<PackType>();
+  if (!substPackShape) {
+    ActivePackExpansions.push_back({/*is subst expansion*/true, 0});
+    handleComponent(substShape);
+    ActivePackExpansions.pop_back();
+    return;
+  }
+
+  ActivePackExpansions.push_back({false, 0});
+  for (auto substElt : substPackShape->getElementTypes()) {
+    auto substExpansion = substElt->getAs<PackExpansionType>();
+    auto substExpansionShape =
+      (substExpansion ? substExpansion->getCountType() : Type());
+
+    ActivePackExpansions.back().isSubstExpansion =
+      (substExpansion != nullptr);
+    handleComponent(substExpansionShape);
+    ActivePackExpansions.back().expansionIndex++;
+  }
+  ActivePackExpansions.pop_back();
+}
+
+Type InFlightSubstitution::substType(SubstitutableType *origType) {
+  auto substType = BaselineSubstType(origType);
+  if (!substType || ActivePackExpansions.empty())
+    return substType;
+
+  auto substPackType = substType->getAs<PackType>();
+  if (!substPackType)
+    return substType;
+
+  auto &activeExpansion = ActivePackExpansions.back();
+  auto index = activeExpansion.expansionIndex;
+  assert(index < substPackType->getNumElements() &&
+         "replacement for pack parameter did not have the right "
+         "size for expansion");
+  auto substEltType = substPackType->getElementType(index);
+  if (activeExpansion.isSubstExpansion) {
+    assert(substEltType->is<PackExpansionType>() &&
+           "substituted shape mismatch: expected an expansion component");
+    substEltType = substEltType->castTo<PackExpansionType>()->getPatternType();
+  } else {
+    assert(!substEltType->is<PackExpansionType>() &&
+           "substituted shape mismatch: expected a scalar component");
+  }
+  return substEltType;
+}
+
+ProtocolConformanceRef
+InFlightSubstitution::lookupConformance(CanType dependentType,
+                                        Type conformingReplacementType,
+                                        ProtocolDecl *conformedProtocol) {
+  auto substConfRef = BaselineLookupConformance(dependentType,
+                                                conformingReplacementType,
+                                                conformedProtocol);
+  if (!substConfRef ||
+      ActivePackExpansions.empty() ||
+      !substConfRef.isPack())
+    return substConfRef;
+
+  auto substPackConf = substConfRef.getPack();
+  auto substPackPatterns = substPackConf->getPatternConformances();
+  auto index = ActivePackExpansions.back().expansionIndex;
+  assert(index < substPackPatterns.size() &&
+         "replacement for pack parameter did not have the right "
+         "size for expansion");
+  return substPackPatterns[index];
+}
+
 bool InFlightSubstitution::isInvariant(Type derivedType) const {
   return !derivedType->hasArchetype()
       && !derivedType->hasTypeParameter()
@@ -4691,12 +4769,9 @@ static Type substType(Type derivedType, InFlightSubstitution &IFS) {
     }
 
     if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
-      auto patternTy = substType(packExpansionTy->getPatternType(), IFS);
-      auto countTy = substType(packExpansionTy->getCountType(), IFS);
-      if (auto *archetypeTy = countTy->getAs<PackArchetypeType>())
-        countTy = archetypeTy->getReducedShape();
-
-      return Type(PackExpansionType::get(patternTy, countTy)->expand());
+      auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
+      if (eltTys.size() == 1) return eltTys[0];
+      return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
     }
 
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
@@ -5194,6 +5269,23 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   });
 }
 
+static PackType *getTransformedPack(Type substType) {
+  if (auto pack = substType->getAs<PackType>()) {
+    return pack;
+  }
+
+  // The pack matchers like to make expansions out of packs, and
+  // these types then propagate out into transforms.  Make sure we
+  // flatten them exactly if they were the underlying pack.
+  // FIXME: stop doing this and make PackExpansionType::get assert
+  // that we never construct these types
+  if (auto expansion = substType->getAs<PackExpansionType>()) {
+    return expansion->getPatternType()->getAs<PackType>();
+  }
+
+  return nullptr;
+}
+
 Type Type::transformRec(
     llvm::function_ref<Optional<Type>(TypeBase *)> fn) const {
   return transformWithPosition(TypePosition::Invariant,
@@ -5631,13 +5723,19 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      elements.push_back(transformedEltTy);
+      // If the transformed type is a pack, immediately expand it.
+      if (auto eltPack = getTransformedPack(transformedEltTy)) {
+        auto eltElements = eltPack->getElementTypes();
+        elements.append(eltElements.begin(), eltElements.end());
+      } else {
+        elements.push_back(transformedEltTy);
+      }
     }
 
     if (!anyChanged)
       return *this;
 
-    return PackType::get(Ptr->getASTContext(), elements)->flattenPackTypes();
+    return PackType::get(Ptr->getASTContext(), elements);
   }
 
   case TypeKind::SILPack: {
@@ -5689,6 +5787,8 @@ case TypeKind::Id:
   case TypeKind::PackExpansion: {
     auto expand = cast<PackExpansionType>(base);
 
+    // Substitution completely replaces this.
+
     Type transformedPat =
         expand->getPatternType().transformWithPosition(pos, fn);
     if (!transformedPat)
@@ -5703,7 +5803,14 @@ case TypeKind::Id:
         transformedCount.getPointer() == expand->getCountType().getPointer())
       return *this;
 
-    return PackExpansionType::get(transformedPat, transformedCount)->expand();
+    // // If we transform the count to a pack type, expand the pattern.
+    // // This is necessary because of how we piece together types in
+    // // the constraint system.
+    // if (auto countPack = transformedCount->getAs<PackType>()) {
+    //   return PackExpansionType::expand(transformedPat, countPack);
+    // }
+
+    return PackExpansionType::get(transformedPat, transformedCount);
   }
 
   case TypeKind::Tuple: {
@@ -5734,13 +5841,35 @@ case TypeKind::Id:
       }
 
       // Add the new tuple element, with the transformed type.
-      elements.push_back(elt.getWithType(transformedEltTy));
+      // Expand packs immediately.
+      if (auto eltPack = getTransformedPack(transformedEltTy)) {
+        bool first = true;
+        for (auto eltElement : eltPack->getElementTypes()) {
+          if (first) {
+            elements.push_back(elt.getWithType(eltElement));
+            first = false;
+          } else {
+            elements.push_back(TupleTypeElt(eltElement));
+          }
+        }
+      } else {
+        elements.push_back(elt.getWithType(transformedEltTy));
+      }
     }
 
     if (!anyChanged)
       return *this;
 
-    return TupleType::get(elements, Ptr->getASTContext())->flattenPackTypes();
+    // If the transform would yield a singleton tuple, and we didn't
+    // start with one, flatten to produce the element type.
+    if (elements.size() == 1 &&
+        !elements[0].getType()->is<PackExpansionType>() &&
+        !(tuple->getNumElements() == 1 &&
+          !tuple->getElementType(0)->is<PackExpansionType>())) {
+      return elements[0].getType();
+    }
+
+    return TupleType::get(elements, Ptr->getASTContext());
   }
 
 
@@ -5794,7 +5923,21 @@ case TypeKind::Id:
         flags = flags.withInOut(true);
       }
 
-      substParams.emplace_back(substType, label, flags, internalLabel);
+      if (auto substPack = getTransformedPack(substType)) {
+        bool first = true;
+        for (auto substEltType : substPack->getElementTypes()) {
+          if (first) {
+            substParams.emplace_back(substEltType, label, flags,
+                                     internalLabel);
+            first = false;
+          } else {
+            substParams.emplace_back(substEltType, Identifier(), flags,
+                                     Identifier());
+          }
+        }
+      } else {
+        substParams.emplace_back(substType, label, flags, internalLabel);
+      }
     }
 
     // Transform result type.
@@ -5836,8 +5979,7 @@ case TypeKind::Id:
         return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
                                       function->getExtInfo()
-                                          .withGlobalActor(globalActorType))
-          ->flattenPackTypes();
+                                          .withGlobalActor(globalActorType));
     }
 
     if (isUnchanged) return *this;
@@ -5846,8 +5988,7 @@ case TypeKind::Id:
       return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
                              function->getExtInfo()
-                                 .withGlobalActor(globalActorType))
-        ->flattenPackTypes();
+                                 .withGlobalActor(globalActorType));
   }
 
   case TypeKind::ArraySlice: {

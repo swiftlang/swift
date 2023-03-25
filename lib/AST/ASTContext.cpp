@@ -3258,6 +3258,12 @@ CanPackExpansionType::get(CanType patternType, CanType countType) {
 }
 
 PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
+  assert(!patternType->is<PackExpansionType>());
+  assert(!countType->is<PackExpansionType>());
+  // FIXME: stop doing this deliberately in PackExpansionMatcher
+  //assert(!patternType->is<PackType>());
+  //assert(!countType->is<PackType>());
+
   auto properties = patternType->getRecursiveProperties();
   properties |= countType->getRecursiveProperties();
 

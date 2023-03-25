@@ -42,27 +42,6 @@ class SILTypeSubstituter :
   // context signature.
   CanGenericSignature Sig;
 
-  struct PackExpansion {
-    /// The shape class of pack parameters that are expanded by this
-    /// expansion.  Set during construction and not changed.
-    CanType OrigShapeClass;
-
-    /// The count type of the pack expansion in the current lane of
-    /// expansion, if any.  Pack elements in this lane should be
-    /// expansions with this shape.
-    CanType SubstPackExpansionCount;
-
-    /// The index of the current lane of expansion.  Basic
-    /// substitution of pack parameters with the same shape as
-    /// OrigShapeClass should yield a pack, and lanewise
-    /// substitution should produce this element of that pack.
-    unsigned Index;
-
-    PackExpansion(CanType origShapeClass)
-      : OrigShapeClass(origShapeClass), Index(0) {}
-  };
-  SmallVector<PackExpansion> ActivePackExpansions;
-
   TypeExpansionContext typeExpansionContext;
 
 public:
@@ -356,63 +335,21 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType origType) {
-    CanType patternType = visit(origType.getPatternType());
-    CanType countType = substASTType(origType.getCountType());
-
-    return CanType(PackExpansionType::get(patternType, countType));
+    llvm_unreachable("shouldn't substitute an independent lowered pack "
+                     "expansion type");
   }
 
   void substPackExpansion(CanPackExpansionType origType,
                           llvm::function_ref<void(CanType)> addExpandedType) {
-    CanType origCountType = origType.getCountType();
-    CanType origPatternType = origType.getPatternType();
-
-    // Substitute the count type (as an AST type).
-    CanType substCountType = substASTType(origCountType);
-
-    // If that produces a pack type, expand the pattern element-wise.
-    if (auto substCountPackType = dyn_cast<PackType>(substCountType)) {
-      // Set up for element-wise expansion.
-      ActivePackExpansions.emplace_back(origCountType);
-
-      for (CanType substCountEltType : substCountPackType.getElementTypes()) {
-        auto expansionType = dyn_cast<PackExpansionType>(substCountEltType);
-        ActivePackExpansions.back().SubstPackExpansionCount =
-          (expansionType ? expansionType.getCountType() : CanType());
-
-        // Expand the pattern type in the element-wise context.
-        CanType expandedType = visit(origPatternType);
-
-        // Turn that into a pack expansion if appropriate for the
-        // count element.
-        if (expansionType) {
-          expandedType =
-            CanPackExpansionType::get(expandedType,
-                                      expansionType.getCountType());
-        }
-
-        addExpandedType(expandedType);
-
-        // Move to the next element.
-        ActivePackExpansions.back().Index++;
+    IFS.expandPackExpansionShape(origType.getCountType(),
+                                [&](Type substExpansionShape) {
+      CanType substComponentType = visit(origType.getPatternType());
+      if (substExpansionShape) {
+        substComponentType = CanPackExpansionType::get(substComponentType,
+                                    substExpansionShape->getCanonicalType());
       }
-
-      // Leave the element-wise context.
-      ActivePackExpansions.pop_back();
-      return;
-    }
-
-    // Otherwise, transform the pattern type abstractly and just add a
-    // type expansion.
-    CanType substPatternType = visit(origPatternType);
-
-    CanType expandedType;
-    if (substCountType == origCountType && substPatternType == origPatternType)
-      expandedType = origType;
-    else
-      expandedType =
-        CanPackExpansionType::get(substPatternType, substCountType);
-    addExpandedType(expandedType);
+      addExpandedType(substComponentType);
+    });
   }
 
   /// Tuples need to have their component types substituted by these
@@ -511,101 +448,18 @@ public:
                                    substType);
   }
 
-  struct SubstRespectingExpansions {
-    SILTypeSubstituter *_this;
-    SubstRespectingExpansions(SILTypeSubstituter *_this) : _this(_this) {}
-
-    Type operator()(SubstitutableType *origType) const {
-      auto substType = _this->IFS.substType(origType);
-      if (!substType) return substType;
-      auto substPackType = dyn_cast<PackType>(substType->getCanonicalType());
-      if (!substPackType) return substType;
-      auto activeExpansion = _this->getActivePackExpansion(CanType(origType));
-      if (!activeExpansion) return substType;
-      auto substEltType =
-        substPackType.getElementType(activeExpansion->Index);
-      auto substExpansion = dyn_cast<PackExpansionType>(substEltType);
-      assert((bool) substExpansion ==
-             (bool) activeExpansion->SubstPackExpansionCount);
-      if (substExpansion) {
-        assert(_this->hasSameShape(substExpansion.getCountType(),
-                            activeExpansion->SubstPackExpansionCount));
-        return substExpansion.getPatternType();
-      }
-      return substEltType;
-    }
-  };
-
-  struct SubstConformanceRespectingExpansions {
-    SILTypeSubstituter *_this;
-    SubstConformanceRespectingExpansions(SILTypeSubstituter *_this)
-      : _this(_this) {}
-
-    ProtocolConformanceRef operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformingProtocol) const {
-      auto conformance =
-        _this->IFS.lookupConformance(dependentType,
-                                     conformingReplacementType,
-                                     conformingProtocol);
-      if (!conformance || !conformance.isPack()) return conformance;
-      auto activeExpansion = _this->getActivePackExpansion(dependentType);
-      if (!activeExpansion) return conformance;
-      auto pack = conformance.getPack();
-      auto substEltConf =
-        pack->getPatternConformances()[activeExpansion->Index];
-      // There isn't currently a ProtocolConformanceExpansion that
-      // we would need to look through here.
-      return substEltConf;
-    };
-  };
-
   CanType substASTType(CanType origType) {
-    if (ActivePackExpansions.empty())
-      return origType.subst(IFS)->getCanonicalType();
-
-    return origType.subst(SubstRespectingExpansions(this),
-                          SubstConformanceRespectingExpansions(this),
-                          IFS.getOptions())->getCanonicalType();
+    return origType.subst(IFS)->getCanonicalType();
   }
 
   SubstitutionMap substSubstitutions(SubstitutionMap subs) {
-    SubstitutionMap newSubs;
-
-    if (ActivePackExpansions.empty())
-      newSubs = subs.subst(IFS);
-    else
-      newSubs = subs.subst(SubstRespectingExpansions(this),
-                           SubstConformanceRespectingExpansions(this),
-                           IFS.getOptions());
+    SubstitutionMap newSubs = subs.subst(IFS);
 
     // If we need to look through opaque types in this context, re-substitute
     // according to the expansion context.
     newSubs = substOpaqueTypes(newSubs);
 
     return newSubs;
-  }
-
-  PackExpansion *getActivePackExpansion(CanType dependentType) {
-    // We push new expansions onto the end of this vector, and we
-    // want to honor the innermost expansion, so we have to traverse
-    // in it reverse.
-    for (auto &entry : reverse(ActivePackExpansions)) {
-      if (hasSameShape(dependentType, entry.OrigShapeClass))
-        return &entry;
-    }
-    return nullptr;
-  }
-
-  bool hasSameShape(CanType lhs, CanType rhs) {
-    if (lhs->isTypeParameter() && rhs->isTypeParameter()) {
-      assert(Sig);
-      return Sig->haveSameShape(lhs, rhs);
-    }
-
-    auto lhsArchetype = cast<PackArchetypeType>(lhs);
-    auto rhsArchetype = cast<PackArchetypeType>(rhs);
-    return lhsArchetype->getReducedShape() == rhsArchetype->getReducedShape();
   }
 };
 
