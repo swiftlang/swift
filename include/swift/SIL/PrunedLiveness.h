@@ -226,21 +226,20 @@ public:
 
   /// Update this liveness result for a single use.
   ///
-  /// Note: this never propagates liveness upward beyond def blocks.
-  /// PrunedLiveRange knows about defs and whether it is possible for a
-  /// block to contain a use before the first def. It must check that case
-  /// separately and propagate liveness to predecessors.
-  IsLive updateForUse(SILInstruction *user) {
+  /// \p isUseBeforeDef is true if \p user occures before the first def in this
+  /// block. This indicates "liveness holes" inside the block, causing liveness
+  /// to propagate to predecessors.
+  IsLive updateForUse(SILInstruction *user, bool isUseBeforeDef) {
     assert(isInitialized() && "at least one definition must be initialized");
 
     auto *block = user->getParent();
-    auto liveness = getBlockLiveness(block);
-    // If a block is already marked live, assume that liveness was propagated to
-    // its predecessors. This assumes that uses will never be added above a def
-    // in the same block.
-    if (liveness != Dead)
-      return liveness;
-
+    if (!isUseBeforeDef) {
+      auto liveness = getBlockLiveness(block);
+      // If a block is already marked live, it must either "kill" liveness, or
+      // liveness was already propagated to its predecessors.
+      if (liveness != Dead)
+        return liveness;
+    }
     computeUseBlockLiveness(block);
     return getBlockLiveness(block);
   }
@@ -662,6 +661,9 @@ public:
     return def->getParentBlock() == block;
   }
 
+  /// In SSA, uses never occur before the single def.
+  bool isUserBeforeDef(SILInstruction *user) const { return false; }
+
   /// SSA implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
                              PrunedLivenessBoundary &boundary) const;
@@ -713,7 +715,7 @@ public:
   }
 
   void initializeDef(SILInstruction *defInst) {
-    initializeDefNode(defInst->asSILNode());
+    initializeDefNode(cast<SILNode>(defInst));
   }
 
   void initializeDef(SILArgument *defArg) { initializeDefNode(defArg); }
@@ -735,9 +737,24 @@ public:
     return defs.contains(cast<SILNode>(inst));
   }
 
+  bool isDef(SILArgument *arg) const {
+    return defs.contains(arg);
+  }
+
   bool isDefBlock(SILBasicBlock *block) const {
     return defBlocks.contains(block);
   }
+
+  /// Return true if \p user occurs before the first def in the same basic
+  /// block. In classical liveness dataflow terms, gen/kill conditions over all
+  /// users in 'bb' are:
+  ///
+  ///   Gen(bb)  |= !isDefBlock(bb) || isUserBeforeDef(bb)
+  ///   Kill(bb) &= isDefBlock(bb) && !isUserBeforeDef(bb)
+  ///
+  /// If 'bb' has no users, it is neither a Gen nor Kill. Otherwise, Gen and
+  /// Kill are complements.
+  bool isUserBeforeDef(SILInstruction *user) const;
 
   /// Multi-Def implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
