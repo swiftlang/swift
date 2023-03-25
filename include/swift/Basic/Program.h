@@ -59,7 +59,8 @@ struct ChildProcessInfo {
 /// \param args An array of strings that are passed to the program. The first
 /// element should be the name of the program.
 /// \param env An optional array of 'key=value 'strings to use for the program's
-/// environment.
+/// environment. If None, all current environment variables are propagated. To
+/// not propagate any, pass an empty array.
 llvm::ErrorOr<swift::ChildProcessInfo> ExecuteWithPipe(
     llvm::StringRef program, llvm::ArrayRef<llvm::StringRef> args,
     llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env = llvm::None);

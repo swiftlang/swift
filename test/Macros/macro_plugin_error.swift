@@ -3,18 +3,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %clang \
-// RUN:  -isysroot %sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/mock-plugin \
-// RUN:  %t/plugin.c
-
+// RUN: env MOCKPLUGIN_TESTSPEC="$(cat %t/spec.json)" \
 // RUN: %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
-// RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
+// RUN:   -load-plugin-executable %swift-mock-plugin#TestPlugin \
 // RUN:   -dump-macro-expansions \
 // RUN:   %t/test.swift
 
@@ -32,10 +25,8 @@ func test() {
   // ^ This should succeed.
 }
 
-//--- plugin.c
-#include "swift-c/MockPlugin/MockPlugin.h"
-
-MOCK_PLUGIN([
+//--- spec.json
+[
   {
     "expect": {"getCapability": {}},
     "response": {"getCapabilityResult": {"capability": {"protocolVersion": 1}}}
@@ -52,4 +43,4 @@ MOCK_PLUGIN([
                 "syntax": {"kind": "expression", "source": "#fooMacro(3)"}}},
     "response": {"expandFreestandingMacroResult": {"expandedSource": "3.description", "diagnostics": []}}
   }
-])
+]
