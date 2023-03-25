@@ -449,15 +449,15 @@ PackType *PackType::get(const ASTContext &C,
     auto arg = args[i];
 
     if (params[i]->isParameterPack()) {
-      wrappedArgs.push_back(PackExpansionType::get(
-          arg, arg->getReducedShape()));
+      auto argPackElements = arg->castTo<PackType>()->getElementTypes();
+      wrappedArgs.append(argPackElements.begin(), argPackElements.end());
       continue;
     }
 
     wrappedArgs.push_back(arg);
   }
 
-  return get(C, wrappedArgs)->flattenPackTypes();
+  return get(C, wrappedArgs);
 }
 
 PackType *PackType::getSingletonPackExpansion(Type param) {

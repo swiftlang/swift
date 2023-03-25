@@ -7125,8 +7125,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto *expansion = dyn_cast<PackExpansionExpr>(expr);
 
     auto *elementEnv = expansion->getGenericEnvironment();
-    auto toElementType = elementEnv->mapPackTypeIntoElementContext(
-        toExpansionType->getPatternType()->mapTypeOutOfContext());
+    auto toElementType = elementEnv->mapContextualPackTypeIntoElementContext(
+        toExpansionType->getPatternType());
 
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
