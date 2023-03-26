@@ -43,6 +43,7 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignatureImpl;
+class InFlightSubstitution;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -342,6 +343,12 @@ public:
   Type subst(TypeSubstitutionFn substitutions,
              LookupConformanceFn conformances,
              SubstOptions options=None) const;
+
+  /// Apply an in-flight substitution to this type.
+  ///
+  /// This should generally not be used outside of the substitution
+  /// subsystem.
+  Type subst(InFlightSubstitution &subs) const;
 
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 

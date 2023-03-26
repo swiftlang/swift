@@ -309,6 +309,13 @@ public:
                              LookupConformanceFn conformances,
                              SubstOptions options=None) const;
 
+  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// applies to the substituted type.
+  ///
+  /// This function should generally not be used outside of the substitution
+  /// subsystem.
+  ProtocolConformance *subst(InFlightSubstitution &IFS) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };

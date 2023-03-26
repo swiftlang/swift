@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -57,10 +58,8 @@ ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               SubstitutionMap subMap,
                               SubstOptions options) const {
-  return subst(origType,
-               QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
+  InFlightSubstitutionViaSubMap IFS(subMap, options);
+  return subst(origType, IFS);
 }
 
 ProtocolConformanceRef
@@ -68,28 +67,33 @@ ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
                               LookupConformanceFn conformances,
                               SubstOptions options) const {
+  InFlightSubstitution IFS(subs, conformances, options);
+  return subst(origType, IFS);
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isInvalid())
     return *this;
 
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
-                                                       options));
+    return ProtocolConformanceRef(getConcrete()->subst(IFS));
   if (isPack())
-    return getPack()->subst(subs, conformances, options);
+    return getPack()->subst(IFS);
 
   // Handle abstract conformances below:
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
   if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(origArchetype)) {
       return *this;
     }
   }
 
   // Otherwise, compute the substituted type.
-  auto substType = origType.subst(subs, conformances, options);
+  auto substType = origType.subst(IFS);
 
   auto *proto = getRequirement();
 
@@ -105,7 +109,7 @@ ProtocolConformanceRef::subst(Type origType,
   }
 
   // Check the conformance map.
-  return conformances(origType->getCanonicalType(), substType, proto);
+  return IFS.lookupConformance(origType->getCanonicalType(), substType, proto);
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
