@@ -35,7 +35,7 @@ inline llvm::hash_code hash_value(const SILDebugVariable &P);
 struct SILDebugVariable {
   friend llvm::hash_code hash_value(const SILDebugVariable &P);
 
-  StringRef Name;
+  Identifier Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
   unsigned Implicit : 1;
@@ -63,8 +63,9 @@ struct SILDebugVariable {
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant), Implicit(false),
         isDenseMapSingleton(0), Scope(nullptr) {}
-  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false, Optional<SILType> AuxType = {},
+  SILDebugVariable(SILModule &mod, Identifier Name, bool Constant,
+                   unsigned ArgNo, bool IsImplicit = false,
+                   Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
@@ -92,9 +93,11 @@ struct SILDebugVariable {
     return result;
   }
 
-  bool isLet() const { return Name.size() && Constant; }
+  bool isLet() const { return Name.str().size() && Constant; }
 
-  bool isVar() const { return Name.size() && !Constant; }
+  bool isVar() const { return Name.str().size() && !Constant; }
+
+  StringRef getName() const { return Name.str(); }
 };
 
 /// Returns the hashcode for the new projection path.

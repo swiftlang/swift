@@ -390,7 +390,7 @@ public:
       return Var;
 
     llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
-    Var->Name = Name;
+    Var->Name = getASTContext().getIdentifier(Name);
     return Var;
   }
 

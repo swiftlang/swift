@@ -1973,7 +1973,7 @@ class TailAllocatedDebugVariable {
     } Data;
   } Bits;
 public:
-  TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf,
+  TailAllocatedDebugVariable(Optional<SILDebugVariable>, Identifier *Name,
                              SILType *AuxVarType = nullptr,
                              SILLocation *DeclLoc = nullptr,
                              const SILDebugScope **DeclScope = nullptr,
@@ -1992,18 +1992,17 @@ public:
   void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
 
   Optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
-      Optional<SILLocation> DeclLoc = {},
+  get(SILModule &mod, VarDecl *VD, Identifier name,
+      Optional<SILType> AuxVarType = {}, Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return None;
 
-    StringRef name = getName(buf);
     if (VD && name.empty())
-      name = VD->getName().str();
-    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
-                            DeclLoc, DeclScope, DIExprElements);
+      name = VD->getName();
+    return SILDebugVariable(mod, name, isLet(), getArgNo(), isImplicit(),
+                            AuxVarType, DeclLoc, DeclScope, DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -2051,6 +2050,10 @@ protected:
                                                                                \
   size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {           \
     return NumDIExprOperands;                                                  \
+  }                                                                            \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {                 \
+    return true;                                                               \
   }
 
 //===----------------------------------------------------------------------===//
@@ -2083,7 +2086,7 @@ class AllocStackInst final
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
                                     const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    Operand, Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2173,7 +2176,8 @@ public:
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
-    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
+    return VarInfo.get(getModule(), getDecl(),
+                       *getTrailingObjects<Identifier>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
   }
 
@@ -2449,9 +2453,8 @@ public:
 /// element is uninitialized.
 class AllocBoxInst final
     : public NullaryInstructionWithTypeDependentOperandsBase<
-                                           SILInstructionKind::AllocBoxInst,
-                                           AllocBoxInst, AllocationInst, char>
-{
+          SILInstructionKind::AllocBoxInst, AllocBoxInst, AllocationInst,
+          Identifier> {
   friend SILBuilder;
 
   TailAllocatedDebugVariable VarInfo;
@@ -2493,7 +2496,8 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+    return VarInfo.get(getModule(), getDecl(),
+                       *getTrailingObjects<Identifier>());
   };
 
   void setUsesMoveableValueDebugInfo() {
@@ -5007,7 +5011,7 @@ class DebugValueInst final
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
                                     const SILDebugScope *, SILDIExprElement,
-                                    char> {
+                                    Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5063,7 +5067,8 @@ public:
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
-    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
+    return VarInfo.get(getModule(), getDecl(),
+                       *getTrailingObjects<Identifier>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
   }
 

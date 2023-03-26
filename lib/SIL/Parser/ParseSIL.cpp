@@ -1899,7 +1899,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
     }
     // Drop the double quotes.
     StringRef Val = P.Tok.getText().drop_front().drop_back();
-    Var.Name = Val;
+    Var.Name = F->getASTContext().getIdentifier(Val);
     return false;
   };
 
@@ -4728,7 +4728,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       usesMoveableValueDebugInfo = true;
 
     // It doesn't make sense to attach a debug var info if the name is empty
-    if (VarInfo.Name.size())
+    if (VarInfo.getName().size())
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
                                      isLexical, usesMoveableValueDebugInfo);
     else

@@ -514,7 +514,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     assert(getKind() != Kind::Invalid);
     StringRef varName = "unknown";
     if (auto varInfo = getVarInfo()) {
-      varName = varInfo->Name;
+      varName = varInfo->Name.str();
     } else if (auto *decl = getDecl()) {
       varName = decl->getBaseName().userFacingName();
     }

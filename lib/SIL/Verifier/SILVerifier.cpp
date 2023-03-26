@@ -1378,7 +1378,7 @@ public:
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
-          require(DebugVars[argNum].first == varInfo->Name,
+          require(DebugVars[argNum].first == varInfo->getName(),
                   "Scope contains conflicting debug variables for one function "
                   "argument");
           // The source variable might change its location (e.g. due to
@@ -1397,7 +1397,7 @@ public:
             DebugVars.push_back({StringRef(), SILType()});
           }
         }
-        DebugVars[argNum] = {varInfo->Name, DebugVarTy};
+        DebugVars[argNum] = {varInfo->getName(), DebugVarTy};
       }
 
     // Check the (auxiliary) debug variable scope

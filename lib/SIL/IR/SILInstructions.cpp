@@ -153,7 +153,7 @@ static void *allocateDebugVarCarryingInst(SILModule &M,
                                           Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
   return M.allocateInst(
-      sizeof(INST) + (Var ? Var->Name.size() : 0) +
+      sizeof(INST) + sizeof(Identifier) +
           (Var && Var->Type ? sizeof(SILType) : 0) +
           (Var && Var->Loc ? sizeof(SILLocation) : 0) +
           (Var && Var->Scope ? sizeof(const SILDebugScope *) : 0) +
@@ -163,7 +163,7 @@ static void *allocateDebugVarCarryingInst(SILModule &M,
 }
 
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(
-    Optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
+    Optional<SILDebugVariable> Var, Identifier *Name, SILType *AuxVarType,
     SILLocation *DeclLoc, const SILDebugScope **DeclScope,
     SILDIExprElement *DIExprOps) {
   if (!Var) {
@@ -175,10 +175,10 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   Bits.Data.Constant = Var->Constant;
   Bits.Data.ArgNo = Var->ArgNo;
   Bits.Data.Implicit = Var->Implicit;
-  Bits.Data.NameLength = Var->Name.size();
+  Bits.Data.NameLength = Var->getName().size();
   assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
-  assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
-  memcpy(buf, Var->Name.data(), Bits.Data.NameLength);
+  assert(Bits.Data.NameLength == Var->getName().size() && "Truncation");
+  *Name = Var->Name;
   if (AuxVarType && Var->Type)
     *AuxVarType = *Var->Type;
   if (DeclLoc && Var->Loc)
@@ -248,7 +248,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
   // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
   // addresses are wrong.
   VarInfo = TailAllocatedDebugVariable(
-      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      Var, getTrailingObjects<Identifier>(), getTrailingObjects<SILType>(),
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
       getTrailingObjects<SILDIExprElement>());
@@ -379,7 +379,7 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            bool usesMoveableValueDebugInfo)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, getTrailingObjects<char>()) {
+      VarInfo(Var, getTrailingObjects<Identifier>()) {
   sharedUInt8().AllocBoxInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocBoxInst.reflection = reflection;
 
@@ -398,8 +398,8 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    bool usesMoveableValueDebugInfo) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
-  auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
-                                                   Var ? Var->Name.size() : 0);
+  auto Sz = totalSizeToAlloc<swift::Operand, Identifier>(
+      TypeDependentOperands.size(), 1);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf)
       AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
@@ -419,8 +419,8 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
-      VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
+      VarInfo(Var, getTrailingObjects<Identifier>(),
+              getTrailingObjects<SILType>(), getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
   if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())

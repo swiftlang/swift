@@ -76,6 +76,8 @@ public:
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
+  ASTContext &getASTContext() const;
+  Identifier getIdentifier(StringRef str) const;
   Lowering::TypeConverter &getSILTypes() const;
   const IRGenOptions &getOptions() const;
 
