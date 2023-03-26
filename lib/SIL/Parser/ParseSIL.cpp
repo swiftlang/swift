@@ -1818,6 +1818,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
     SILDIExprOperator::ConstSInt
   };
 
+  auto &mod = F->getModule();
   do {
     P.consumeToken();
     bool FoundOp = false;
@@ -1827,7 +1828,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
       auto OpText = ExprInfo->OpText;
       if (OpText != P.Tok.getText())
         continue;
-      auto NewOperator = SILDIExprElement::createOperator(Op);
+      auto NewOperator = SILDIExprElement::createOperator(mod, Op);
       DIExpr.push_back(NewOperator);
       P.consumeToken();
 
@@ -1845,7 +1846,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
                        OpText, "declaration");
             return true;
           }
-          auto NewOperand = SILDIExprElement::createDecl(Result.getDecl());
+          auto NewOperand = SILDIExprElement::createDecl(mod, Result.getDecl());
           DIExpr.push_back(NewOperand);
           break;
         }
@@ -1861,7 +1862,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
           if (IsNegative)
             Val = -Val;
           auto NewOperand =
-            SILDIExprElement::createConstInt(static_cast<uint64_t>(Val));
+              SILDIExprElement::createConstInt(mod, static_cast<uint64_t>(Val));
           DIExpr.push_back(NewOperand);
           break;
         }

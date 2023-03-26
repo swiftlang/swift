@@ -1322,12 +1322,12 @@ public:
       // Print arguments
       for (const auto &Arg : Operand.args()) {
         *this << ":";
-        switch (Arg.getKind()) {
+        switch (Arg->getKind()) {
         case SILDIExprElement::OperatorKind:
           llvm_unreachable("Cannot use operator as argument");
           break;
         case SILDIExprElement::DeclKind: {
-          const Decl *D = Arg.getAsDecl();
+          const Decl *D = Arg->getAsDecl();
           // FIXME: Can we generalize this special handling for VarDecl
           // to other kinds of Decl?
           if (const auto *VD = dyn_cast<VarDecl>(D)) {
@@ -1339,7 +1339,7 @@ public:
           break;
         }
         case SILDIExprElement::ConstIntKind: {
-          uint64_t V = *Arg.getAsConstInt();
+          uint64_t V = *Arg->getAsConstInt();
           if (Op == SILDIExprOperator::ConstSInt)
             *this << static_cast<int64_t>(V);
           else

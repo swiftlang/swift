@@ -2497,8 +2497,8 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
   assert(CurDIExprOp.getOperator() == SILDIExprOperator::Fragment);
   // Expecting a VarDecl that points to a field in an struct
   auto DIExprArgs = CurDIExprOp.args();
-  auto *VD = dyn_cast_or_null<VarDecl>(DIExprArgs.size()?
-                                       DIExprArgs[0].getAsDecl() : nullptr);
+  auto *VD = dyn_cast_or_null<VarDecl>(
+      DIExprArgs.size() ? DIExprArgs[0]->getAsDecl() : nullptr);
   assert(VD && "Expecting a VarDecl as the operand for "
                "DIExprOperator::Fragment");
   // Translate the based type
@@ -2555,11 +2555,11 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       break;
     case SILDIExprOperator::ConstUInt:
       Operands.push_back(llvm::dwarf::DW_OP_constu);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      Operands.push_back(*ExprOperand[1]->getAsConstInt());
       break;
     case SILDIExprOperator::ConstSInt:
       Operands.push_back(llvm::dwarf::DW_OP_consts);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      Operands.push_back(*ExprOperand[1]->getAsConstInt());
       break;
     case SILDIExprOperator::Invalid:
       return false;

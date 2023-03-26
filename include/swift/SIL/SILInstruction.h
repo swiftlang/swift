@@ -1977,7 +1977,7 @@ public:
                              SILType *AuxVarType = nullptr,
                              SILLocation *DeclLoc = nullptr,
                              const SILDebugScope **DeclScope = nullptr,
-                             SILDIExprElement *DIExprOps = nullptr);
+                             const SILDIExprElement **DIExprOps = nullptr);
   TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
   int_type getRawValue() const { return Bits.RawValue; }
 
@@ -1995,7 +1995,7 @@ public:
   get(SILModule &mod, VarDecl *VD, Identifier name,
       Optional<SILType> AuxVarType = {}, Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
-      llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
+      llvm::ArrayRef<const SILDIExprElement *> DIExprElements = {}) const {
     if (!Bits.Data.HasValue)
       return None;
 
@@ -2048,13 +2048,11 @@ protected:
     return hasAuxDebugScope() ? 1 : 0;                                         \
   }                                                                            \
                                                                                \
-  size_t numTrailingObjects(OverloadToken<SILDIExprElement>) const {           \
+  size_t numTrailingObjects(OverloadToken<const SILDIExprElement *>) const {   \
     return NumDIExprOperands;                                                  \
   }                                                                            \
                                                                                \
-  size_t numTrailingObjects(OverloadToken<Identifier>) const {                 \
-    return true;                                                               \
-  }
+  size_t numTrailingObjects(OverloadToken<Identifier>) const { return true; }
 
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
@@ -2084,9 +2082,9 @@ class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
       private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, Identifier> {
+      private llvm::TrailingObjects<
+          AllocStackInst, SILType, SILLocation, const SILDebugScope *,
+          const SILDIExprElement *, Operand, Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2173,8 +2171,8 @@ public:
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    llvm::ArrayRef<const SILDIExprElement *> DIExprElements(
+        getTrailingObjects<const SILDIExprElement *>(), NumDIExprOperands);
 
     return VarInfo.get(getModule(), getDecl(),
                        *getTrailingObjects<Identifier>(), AuxVarType,
@@ -5010,8 +5008,8 @@ class DebugValueInst final
                                   NonValueInstruction>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Identifier> {
+                                    const SILDebugScope *,
+                                    const SILDIExprElement *, Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5064,8 +5062,8 @@ public:
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    llvm::ArrayRef<const SILDIExprElement *> DIExprElements(
+        getTrailingObjects<const SILDIExprElement *>(), NumDIExprOperands);
 
     return VarInfo.get(getModule(), getDecl(),
                        *getTrailingObjects<Identifier>(), AuxVarType,

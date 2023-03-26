@@ -1410,15 +1410,15 @@ public:
     if (const auto &DIExpr = varInfo->DIExpr) {
       for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
            It != ItEnd;) {
-        require(It->getKind() == SILDIExprElement::OperatorKind,
+        require((*It)->getKind() == SILDIExprElement::OperatorKind,
                 "dangling di-expression operand");
-        auto Op = It->getAsOperator();
+        auto Op = (*It)->getAsOperator();
         const auto *DIExprInfo = SILDIExprInfo::get(Op);
         require(DIExprInfo, "unrecognized di-expression operator");
         ++It;
         // Check operand kinds
         for (auto OpK : DIExprInfo->OperandKinds)
-          require(It != ItEnd && (It++)->getKind() == OpK,
+          require(It != ItEnd && (*(It++))->getKind() == OpK,
                   "di-expression operand kind mismatch");
 
         if (Op == SILDIExprOperator::Fragment)

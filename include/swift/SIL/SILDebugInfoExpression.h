@@ -61,7 +61,7 @@ enum class SILDIExprOperator : unsigned {
 
 /// Represents a single component in a debug info expression.
 /// Including operator and operand.
-struct SILDIExprElement {
+struct SILDIExprElement : llvm::FoldingSetNode {
   enum Kind {
     /// A di-expression operator.
     OperatorKind,
@@ -99,22 +99,17 @@ public:
       return {};
   }
 
-  static SILDIExprElement createOperator(SILDIExprOperator Op) {
-    SILDIExprElement DIOp(OperatorKind);
-    DIOp.Operator = Op;
-    return DIOp;
-  }
+  static SILDIExprElement *createOperator(SILModule &mod, SILDIExprOperator op);
 
-  static SILDIExprElement createDecl(Decl *D) {
-    SILDIExprElement DIOp(DeclKind);
-    DIOp.Declaration = D;
-    return DIOp;
-  }
+  static SILDIExprElement *createDecl(SILModule &mod, Decl *decl);
 
-  static SILDIExprElement createConstInt(uint64_t V) {
-    SILDIExprElement DIOp(ConstIntKind);
-    DIOp.ConstantInt = V;
-    return DIOp;
+  static SILDIExprElement *createConstInt(SILModule &mod, uint64_t value);
+
+  static void Profile(llvm::FoldingSetNodeID &id, SILDIExprOperator op,
+                      Decl *decl, Optional<uint64_t> intValue);
+
+  void Profile(llvm::FoldingSetNodeID &id) {
+    Profile(id, getAsOperator(), getAsDecl(), getAsConstInt());
   }
 };
 
@@ -135,14 +130,14 @@ struct SILDIExprInfo {
 
 /// A DIExpr operand is consisting of a SILDIExprOperator and
 /// SILDIExprElement arguments following after.
-struct SILDIExprOperand : public llvm::ArrayRef<SILDIExprElement> {
+struct SILDIExprOperand : public llvm::ArrayRef<const SILDIExprElement *> {
   // Reuse all the ctors
-  using llvm::ArrayRef<SILDIExprElement>::ArrayRef;
+  using llvm::ArrayRef<const SILDIExprElement *>::ArrayRef;
 
   SILDIExprOperator getOperator() const {
     assert(size() && "empty DIExpr operand");
-    const SILDIExprElement &First = front();
-    return First.getAsOperator();
+    const SILDIExprElement *const &First = front();
+    return First->getAsOperator();
   }
 
   size_t getNumArg() const {
@@ -150,20 +145,18 @@ struct SILDIExprOperand : public llvm::ArrayRef<SILDIExprElement> {
     return size() - 1;
   }
 
-  llvm::ArrayRef<SILDIExprElement> args() const {
-    return drop_front();
-  }
+  llvm::ArrayRef<const SILDIExprElement *> args() const { return drop_front(); }
 };
 
 /// Represents a debug info expression in SIL
 class SILDebugInfoExpression {
   friend class TailAllocatedDebugVariable;
-  llvm::SmallVector<SILDIExprElement, 2> Elements;
+  llvm::SmallVector<const SILDIExprElement *, 2> Elements;
 
 public:
   SILDebugInfoExpression() = default;
 
-  explicit SILDebugInfoExpression(llvm::ArrayRef<SILDIExprElement> EL)
+  explicit SILDebugInfoExpression(llvm::ArrayRef<const SILDIExprElement *> EL)
       : Elements(EL.begin(), EL.end()) {}
 
   void clear() { Elements.clear(); }
@@ -187,16 +180,16 @@ public:
     return llvm::make_range(element_begin(), element_end());
   }
 
-  const SILDIExprElement &getElement(size_t index) const {
+  const SILDIExprElement *getElement(size_t index) const {
     assert(index < Elements.size());
     return Elements[index];
   }
 
-  void push_back(const SILDIExprElement &Element) {
+  void push_back(const SILDIExprElement *Element) {
     Elements.push_back(Element);
   }
 
-  void appendElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
+  void appendElements(llvm::ArrayRef<const SILDIExprElement *> NewElements) {
     if (NewElements.size())
       Elements.append(NewElements.begin(), NewElements.end());
   }
@@ -205,7 +198,7 @@ public:
     appendElements(Tail.Elements);
   }
 
-  void prependElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
+  void prependElements(llvm::ArrayRef<const SILDIExprElement *> NewElements) {
     Elements.insert(Elements.begin(),
                     NewElements.begin(), NewElements.end());
   }
@@ -219,12 +212,12 @@ public:
     friend class SILDebugInfoExpression;
 
     SILDIExprOperand Current;
-    llvm::ArrayRef<SILDIExprElement> Remain;
+    llvm::ArrayRef<const SILDIExprElement *> Remain;
 
     void increment();
 
-    explicit
-    op_iterator(llvm::ArrayRef<SILDIExprElement> Remain): Remain(Remain) {
+    explicit op_iterator(llvm::ArrayRef<const SILDIExprElement *> Remain)
+        : Remain(Remain) {
       increment();
     }
 
@@ -262,7 +255,7 @@ public:
     return op_iterator(Elements);
   }
   op_iterator operand_end() const {
-    return op_iterator(llvm::ArrayRef<SILDIExprElement>{});
+    return op_iterator(llvm::ArrayRef<SILDIExprElement *>{});
   }
 
   llvm::iterator_range<op_iterator> operands() const {
@@ -273,19 +266,19 @@ public:
   inline operator bool() const { return Elements.size(); }
 
   /// Create a op_fragment expression
-  static SILDebugInfoExpression createFragment(VarDecl *Field);
+  static SILDebugInfoExpression createFragment(SILModule &mod, VarDecl *Field);
 
   /// Return true if this DIExpression starts with op_deref
   bool startsWithDeref() const {
     return Elements.size() &&
-           Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
+           Elements[0]->getAsOperator() == SILDIExprOperator::Dereference;
   }
 
   /// Return true if this DIExpression has op_fragment (at the end)
   bool hasFragment() const {
     return Elements.size() >= 2 &&
-           Elements[Elements.size() - 2].getAsOperator() ==
-            SILDIExprOperator::Fragment;
+           Elements[Elements.size() - 2]->getAsOperator() ==
+               SILDIExprOperator::Fragment;
   }
 };
 

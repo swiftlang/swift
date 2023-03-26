@@ -1868,7 +1868,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         SILDebugVariable NewVarInfo = *VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
         // Build the corresponding fragment DIExpression
-        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
+        auto FragDIExpr =
+            SILDebugInfoExpression::createFragment(STI->getModule(), FD);
         NewVarInfo.DIExpr.append(FragDIExpr);
 
         if (!NewVarInfo.Type)
@@ -1889,12 +1890,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         SILValue Base = IA->getBase();
         SILValue ResultAddr = IA->getResult(0);
         APInt OffsetVal = LiteralInst->getValue();
-        const SILDIExprElement ExprElements[3] = {
-          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
-            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
-          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
-        };
+        auto &mod = IA->getModule();
+        std::array<const SILDIExprElement *, 3> ExprElements = {
+            SILDIExprElement::createOperator(
+                mod, OffsetVal.isNegative() ? SILDIExprOperator::ConstSInt
+                                            : SILDIExprOperator::ConstUInt),
+            SILDIExprElement::createConstInt(mod, OffsetVal.getLimitedValue()),
+            SILDIExprElement::createOperator(mod, SILDIExprOperator::Plus)};
         for (Operand *U : getDebugUses(ResultAddr)) {
           auto *DbgInst = cast<DebugValueInst>(U->getUser());
           auto VarInfo = DbgInst->getVarInfo();
@@ -1929,8 +1931,8 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
 
     // Copy VarInfo and add the corresponding fragment DIExpression.
     SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
+    newVarInfo.DIExpr.append(SILDebugInfoExpression::createFragment(
+        debugVal->getModule(), proj.getVarDecl(baseType)));
 
     if (!newVarInfo.Type)
       newVarInfo.Type = baseType;

@@ -68,7 +68,7 @@ struct SILDebugVariable {
                    Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
-                   llvm::ArrayRef<SILDIExprElement> ExprElements = {})
+                   llvm::ArrayRef<const SILDIExprElement *> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
         isDenseMapSingleton(0), Type(AuxType), Loc(DeclLoc), Scope(DeclScope),
         DIExpr(ExprElements) {}

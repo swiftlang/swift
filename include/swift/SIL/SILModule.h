@@ -182,6 +182,7 @@ public:
 
 private:
   friend KeyPathPattern;
+  friend SILDIExprElement;
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
@@ -398,6 +399,9 @@ private:
 #ifndef NDEBUG
   BasicBlockNameMapType basicBlockNames;
 #endif
+
+  /// Debug info expression element folding set.
+  llvm::FoldingSet<SILDIExprElement> diExprElements;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
