@@ -73,12 +73,12 @@ frames at the bottom of the stack where the actual fault occurred.
     the frames in the backtrace. Note that this \_[includes]() the case
     where there are exactly `limit` frames.
 2.  There are more than `limit` frames.
-    *  `top` is `0`. We will display the first `limit - 1` frames
+    a.  `top` is `0`. We will display the first `limit - 1` frames
         followed by `...` to indicate that more frames exist.
-    *  `top` is less than `limit - 1`. We will display
+    b.  `top` is less than `limit - 1`. We will display
         `limit - 1 - top` frames from the bottom of the stack, then a
         `...`, then `top` frames from the top of the stack.
-    *  `top` is greater or equal to `limit - 1`. We will display `...`,
+    c.  `top` is greater or equal to `limit - 1`. We will display `...`,
         followed by `limit - 1` frames from the top of the stack.
 
 For example, let's say we have a stack containing 10 frames numbered
