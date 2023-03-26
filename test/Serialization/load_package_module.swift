@@ -9,7 +9,7 @@
 
 // RUN: not %target-swift-frontend -module-name ClientInSamePkg %t/ClientLoadInterfaceModule.swift -emit-module -emit-module-path %t/ClientInSamePkg.swiftmodule -package-name mypkg -I %t 2> %t/resultA.output
 // RUN: %FileCheck %s -check-prefix CHECK-A < %t/resultA.output
-// CHECK-A: error: module 'LibFromInterface' is in package 'mypkg' but was built from interface '{{.*}}LibFromInterface.swiftinterface'; modules of the same package can only be loaded if built from source
+// CHECK-A: error: module 'LibFromInterface' is in package 'mypkg' but was built from interface; modules of the same package can only be loaded if built from source: {{.*}}LibFromInterface.swiftinterface
 
 // RUN: not %target-swift-frontend -module-name ClientInDiffPkg %t/ClientLoadInterfaceModule.swift -emit-module -emit-module-path %t/ClientInDiffPkg.swiftmodule -package-name otherPkg -I %t 2> %t/resultB.output
 // RUN: %FileCheck %s -check-prefix CHECK-B < %t/resultB.output
