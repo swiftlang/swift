@@ -152,10 +152,6 @@ public:
   /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<LoadedExecutablePlugin *>
   loadExecutablePlugin(llvm::StringRef path);
-
-  const llvm::StringMap<void *> &getLoadedLibraryPlugins() const {
-    return LoadedPluginLibraries;
-  }
 };
 
 } // namespace swift
