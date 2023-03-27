@@ -126,8 +126,6 @@ public enum AddBlocker: ExpressionMacro {
                       newNode: Syntax(
                         TokenSyntax(
                           .binaryOperator("-"),
-                          leadingTrivia: binOp.operatorToken.leadingTrivia,
-                          trailingTrivia: binOp.operatorToken.trailingTrivia,
                           presence: .present
                         )
                       )
