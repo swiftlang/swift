@@ -125,3 +125,14 @@ enum E {
 protocol Q {
     func f() -> Int
 }
+
+func findBiggerCollection<T : Numeric>( _ first: Collection<T>, _ second: Collection<T>) -> Collection<T> {
+  // expected-error@-1 {{function declares an opaque return type 'Collection<T>', but the return statements in its body do not have matching underlying types}}
+  if (first.count > second.count) { return first } //expected-note {{return statement has underlying type 'Collection<T>'}}
+  return second //expected-note {{return statement has underlying type 'Collection<T>'}}
+}
+
+func createCollection() -> Collection<Int> {
+  let a = [9,2,0]
+  return a
+}

@@ -125,7 +125,7 @@ public:
   }
 
   /// Is this type representation a protocol?
-  bool isProtocol(DeclContext *dc);
+  bool isProtocolOrProtocolComposition(DeclContext *dc);
 
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }

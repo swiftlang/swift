@@ -45,7 +45,8 @@ class ASTScopeImpl;
 /// Walk the type representation recursively, collecting any
 /// \c OpaqueReturnTypeRepr, \c CompositionTypeRepr  or \c DeclRefTypeRepr
 /// nodes.
-CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
+CollectedOpaqueReprs collectOpaqueTypeReprs(TypeRepr *, ASTContext &ctx,
+                                            DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {

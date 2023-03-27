@@ -2924,7 +2924,7 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
 /// Verify there is at least one protocols in the set of declarations.
 static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   if (decls.empty())
-    return false;
+    return false;  // Below, check outer type repr is a protocol, if not bail early
   return llvm::any_of(decls, [&](const TypeDecl *decl) {
     if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto ty = alias->getUnderlyingType();
@@ -2933,14 +2933,12 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
         return false;
     }
     return isa<ProtocolDecl>(decl);
-  });;;
+  });
 }
 
-bool TypeRepr::isProtocol(DeclContext *dc){
+bool TypeRepr::isProtocolOrProtocolComposition(DeclContext *dc){
   auto &ctx = dc->getASTContext();
-  return findIf([&ctx, dc](TypeRepr *ty) {
-    return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc));
-  });
+    return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc));
 }
 
 static GenericParamList *
@@ -2962,7 +2960,8 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext &ctx, DeclContext *d) {
+CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
+                                                   DeclContext *d) {
   class Walker : public ASTWalker {
     CollectedOpaqueReprs &Reprs;
     ASTContext &Ctx;
@@ -2993,15 +2992,19 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
       
       if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
         return Action::SkipChildren();
-      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
-        if (!compositionRepr->isTypeReprAny())
-          Reprs.push_back(compositionRepr);
+      } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
+        if (!composition->isTypeReprAny())
+          Reprs.push_back(composition);
         return Action::SkipChildren();
       } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+        if (generic->isProtocolOrProtocolComposition(dc)){
+          Reprs.push_back(generic);
+          return Action::SkipChildren();
+        }
         return Action::Continue();
-      } else if (auto declRefTR = dyn_cast<DeclRefTypeRepr>(repr)) {
-        if (declRefTR->isProtocol(dc))
-          Reprs.push_back(declRefTR);
+      } else if (auto declRef = dyn_cast<DeclRefTypeRepr>(repr)) {
+        if (declRef->isProtocolOrProtocolComposition(dc))
+          Reprs.push_back(declRef);
       }
       return Action::Continue();
     }
@@ -3043,7 +3046,7 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
 
     // Plain protocols should imply 'some' with experimetal feature
     CollectedOpaqueReprs typeReprs;
-    typeReprs = collectOpaqueReturnTypeReprs(typeRepr, ctx, dc);
+    typeReprs = collectOpaqueTypeReprs(typeRepr, ctx, dc);
 
     for (auto repr : typeReprs) {
    
