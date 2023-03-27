@@ -6403,7 +6403,7 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   return plugin.get();
 }
 
-void *ASTContext::loadLibraryPlugin(StringRef path) {
+LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
   // Remember the path (even if it fails to load.)
   getImpl().LoadedPluginLibraryPaths.insert(path);
 

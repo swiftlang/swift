@@ -38,14 +38,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
 
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
-
 using namespace swift;
 
 extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
@@ -90,10 +82,10 @@ extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
 
 #if SWIFT_SWIFT_PARSER
 /// Look for macro's type metadata given its external module and type name.
-static void const *lookupMacroTypeMetadataByExternalName(
-    ASTContext &ctx, StringRef moduleName, StringRef typeName,
-    void *libraryHint = nullptr
-) {
+static void const *
+lookupMacroTypeMetadataByExternalName(ASTContext &ctx, StringRef moduleName,
+                                      StringRef typeName,
+                                      LoadedLibraryPlugin *plugin) {
   // Look up the type metadata accessor as a struct, enum, or class.
   const Demangle::Node::Kind typeKinds[] = {
     Demangle::Node::Kind::Structure,
@@ -105,11 +97,7 @@ static void const *lookupMacroTypeMetadataByExternalName(
   for (auto typeKind : typeKinds) {
     auto symbolName = Demangle::mangledNameForTypeMetadataAccessor(
         moduleName, typeName, typeKind);
-#if !defined(_WIN32)
-    /// FIXME: 'PluginRegistry' should vend a wrapper object of the library
-    /// handle (like llvm::sys::DynamicLibrary) and dlsym should be abstracted.
-    accessorAddr = dlsym(libraryHint, symbolName.c_str());
-#endif
+    accessorAddr = plugin->getAddressOfSymbol(symbolName.c_str());
     if (accessorAddr)
       break;
   }
@@ -276,7 +264,8 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 }
 
 /// Load a plugin library based on a module name.
-static void *loadLibraryPluginByName(ASTContext &ctx, Identifier moduleName) {
+static LoadedLibraryPlugin *loadLibraryPluginByName(ASTContext &ctx,
+                                                    Identifier moduleName) {
   std::string libraryPath;
   if (auto found = ctx.lookupLibraryPluginByModuleName(moduleName)) {
     libraryPath = *found;
@@ -367,10 +356,6 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
 LoadedCompilerPlugin
 CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
-  auto fs = ctx->SourceMgr.getFileSystem();
-  auto &searchPathOpts = ctx->SearchPathOpts;
-  auto *registry = ctx->getPluginRegistry();
-
   // Check dynamic link library plugins.
   // i.e. '-plugin-path', and '-load-plugin-library'.
   if (auto found = loadLibraryPluginByName(*ctx, moduleName))
@@ -386,14 +371,12 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 }
 
 static Optional<ExternalMacroDefinition>
-resolveInProcessMacro(
-    ASTContext &ctx, Identifier moduleName, Identifier typeName,
-    void *libraryHint = nullptr
-) {
+resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
+                      Identifier typeName, LoadedLibraryPlugin *plugin) {
 #if SWIFT_SWIFT_PARSER
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
-      ctx, moduleName.str(), typeName.str(), libraryHint);
+      ctx, moduleName.str(), typeName.str(), plugin);
   if (macroMetatype) {
     // Check whether the macro metatype is in-process.
     if (auto inProcess = swift_ASTGen_resolveMacroType(macroMetatype)) {
