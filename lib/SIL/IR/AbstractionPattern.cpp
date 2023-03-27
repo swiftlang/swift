@@ -1373,12 +1373,12 @@ static void printGenerics(raw_ostream &out, const AbstractionPattern &pattern) {
   // It'd be really nice if we could get these interleaved with the types.
   if (auto subs = pattern.getGenericSubstitutions()) {
     out << "@<";
-    bool first = false;
+    bool first = true;
     for (auto sub : subs.getReplacementTypes()) {
       if (!first) {
         out << ",";
       } else {
-        first = true;
+        first = false;
       }
       out << sub;
     }
