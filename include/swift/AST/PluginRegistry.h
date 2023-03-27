@@ -22,6 +22,21 @@
 
 namespace swift {
 
+/// Represent a 'dlopen'ed plugin library.
+class LoadedLibraryPlugin {
+  // Opaque handle used to interface with OS-specific dynamic library.
+  void *handle;
+
+  /// Cache of loaded symbols.
+  llvm::StringMap<void *> resolvedSymbols;
+
+public:
+  LoadedLibraryPlugin(void *handle) : handle(handle) {}
+
+  /// Finds the address of the given symbol within the library.
+  void *getAddressOfSymbol(const char *symbolName);
+};
+
 /// Represent a "resolved" exectuable plugin.
 ///
 /// Plugin clients usually deal with this object to communicate with the actual
@@ -130,7 +145,7 @@ public:
 
 class PluginRegistry {
   /// Record of loaded plugin library modules.
-  llvm::StringMap<void *> LoadedPluginLibraries;
+  llvm::StringMap<std::unique_ptr<LoadedLibraryPlugin>> LoadedPluginLibraries;
 
   /// Record of loaded plugin executables.
   llvm::StringMap<std::unique_ptr<LoadedExecutablePlugin>>
@@ -146,7 +161,7 @@ public:
 
   /// Load a dynamic link library specified by \p path.
   /// If \p path plugin is already loaded, this returns the cached object.
-  llvm::Expected<void *> loadLibraryPlugin(llvm::StringRef path);
+  llvm::Expected<LoadedLibraryPlugin *> loadLibraryPlugin(llvm::StringRef path);
 
   /// Load an executable plugin specified by \p path .
   /// If \p path plugin is already loaded, this returns the cached object.

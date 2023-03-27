@@ -44,13 +44,15 @@ PluginRegistry::PluginRegistry() {
   dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
 }
 
-llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
+llvm::Expected<LoadedLibraryPlugin *>
+PluginRegistry::loadLibraryPlugin(StringRef path) {
   std::lock_guard<std::mutex> lock(mtx);
-  auto found = LoadedPluginLibraries.find(path);
-  if (found != LoadedPluginLibraries.end()) {
+  auto &storage = LoadedPluginLibraries[path];
+  if (storage) {
     // Already loaded.
-    return found->second;
+    return storage.get();
   }
+
   void *lib = nullptr;
 #if defined(_WIN32)
   lib = LoadLibraryA(path.str().c_str());
@@ -64,8 +66,19 @@ llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(), dlerror());
   }
 #endif
-  LoadedPluginLibraries.insert({path, lib});
-  return lib;
+
+  storage = std::unique_ptr<LoadedLibraryPlugin>(new LoadedLibraryPlugin(lib));
+  return storage.get();
+}
+
+void *LoadedLibraryPlugin::getAddressOfSymbol(const char *symbolName) {
+  auto &cached = resolvedSymbols[symbolName];
+  if (cached)
+    return cached;
+#if !defined(_WIN32)
+  cached = dlsym(handle, symbolName);
+#endif
+  return cached;
 }
 
 llvm::Expected<LoadedExecutablePlugin *>

@@ -50,6 +50,7 @@ class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
 class LoadedExecutablePlugin;
+class LoadedLibraryPlugin;
 class MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
@@ -4017,15 +4018,17 @@ class LoadedCompilerPlugin {
 public:
   LoadedCompilerPlugin(std::nullptr_t) : kind(PluginKind::None), ptr(nullptr) {}
 
-  static LoadedCompilerPlugin inProcess(void *ptr) {
+  static LoadedCompilerPlugin inProcess(LoadedLibraryPlugin *ptr) {
     return {PluginKind::InProcess, ptr};
   }
   static LoadedCompilerPlugin executable(LoadedExecutablePlugin *ptr) {
     return {PluginKind::Executable, ptr};
   }
 
-  void *getAsInProcessPlugin() const {
-    return kind == PluginKind::InProcess ? ptr : nullptr;
+  LoadedLibraryPlugin *getAsInProcessPlugin() const {
+    return kind == PluginKind::InProcess
+               ? static_cast<LoadedLibraryPlugin *>(ptr)
+               : nullptr;
   }
   LoadedExecutablePlugin *getAsExecutablePlugin() const {
     return kind == PluginKind::Executable
