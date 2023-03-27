@@ -165,6 +165,7 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                          bool removeCondFails, bool enableCopyPropagation) :
   parentTransform(trans),
   AA(trans->getPassManager()->getAnalysis<AliasAnalysis>(trans->getFunction())),
+  CA(trans->getPassManager()->getAnalysis<BasicCalleeAnalysis>()),
   DA(trans->getPassManager()->getAnalysis<DominanceAnalysis>()),
   PCA(trans->getPassManager()->getAnalysis<ProtocolConformanceAnalysis>()),
   CHA(trans->getPassManager()->getAnalysis<ClassHierarchyAnalysis>()),
@@ -352,7 +353,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   CanonicalizeOSSALifetime canonicalizer(
       false /*prune debug*/,
       !parentTransform->getFunction()->shouldOptimize() /*maximize lifetime*/,
-      parentTransform->getFunction(), NLABA, domTree, deleter);
+      parentTransform->getFunction(), NLABA, domTree, CA, deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
                                               deleter);
 

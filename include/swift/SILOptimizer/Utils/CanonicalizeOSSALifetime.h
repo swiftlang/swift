@@ -109,6 +109,8 @@
 
 namespace swift {
 
+class BasicCalleeAnalysis;
+
 extern llvm::Statistic NumCopiesAndMovesEliminated;
 extern llvm::Statistic NumCopiesGenerated;
 
@@ -225,6 +227,8 @@ private:
 
   DominanceInfo *domTree = nullptr;
 
+  BasicCalleeAnalysis *calleeAnalysis;
+
   InstructionDeleter &deleter;
 
   /// The SILValue to canonicalize.
@@ -296,10 +300,12 @@ public:
   CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
                            SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceInfo *domTree, InstructionDeleter &deleter)
+                           DominanceInfo *domTree,
+                           BasicCalleeAnalysis *calleeAnalysis,
+                           InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
-        deleter(deleter) {}
+        calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
@@ -404,6 +410,9 @@ private:
 
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);
+
+  void findDestroysOutsideBoundary(SmallVectorImpl<SILInstruction *> &destroys);
+  void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
 

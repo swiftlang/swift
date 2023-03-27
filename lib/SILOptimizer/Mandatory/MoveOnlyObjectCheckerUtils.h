@@ -50,7 +50,8 @@ struct OSSACanonicalizer {
                     InstructionDeleter &deleter)
       : canonicalizer(false /*pruneDebugMode*/,
                       !fn->shouldOptimize() /*maximizeLifetime*/, fn,
-                      nullptr /*accessBlockAnalysis*/, domTree, deleter) {}
+                      nullptr /*accessBlockAnalysis*/, domTree,
+                      nullptr /*calleeAnalysis*/, deleter) {}
 
   void clear() {
     consumingUsesNeedingCopy.clear();

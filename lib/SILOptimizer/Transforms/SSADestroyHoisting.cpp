@@ -275,10 +275,11 @@ private:
   public:
     DestroyReachability(DeinitBarriers &result)
         : result(result), reachability(result.knownUses.getFunction()),
-          dataflow(result.knownUses.getFunction(),
-                   result.storageDefInst ? result.storageDefInst->getParent()
-                                         : nullptr,
-                   *this, reachability) {}
+          dataflow(Dataflow::untilInitialBlock(
+              result.knownUses.getFunction(),
+              result.storageDefInst ? result.storageDefInst->getParent()
+                                    : nullptr,
+              *this, reachability)) {}
 
     void solve();
 

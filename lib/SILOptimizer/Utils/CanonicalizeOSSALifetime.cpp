@@ -70,6 +70,8 @@
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -230,6 +232,45 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
     }
   }
   return true;
+}
+
+void CanonicalizeOSSALifetime::findDestroysOutsideBoundary(
+    SmallVectorImpl<SILInstruction *> &outsideDestroys) {
+  for (auto destroy : destroys) {
+    if (liveness->isWithinBoundary(destroy))
+      continue;
+    outsideDestroys.push_back(destroy);
+  }
+}
+
+void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
+  SmallVector<SILInstruction *, 4> outsideDestroys;
+  findDestroysOutsideBoundary(outsideDestroys);
+
+  auto *def = getCurrentDef()->getDefiningInstruction();
+  using InitialBlocks = ArrayRef<SILBasicBlock *>;
+  auto *defBlock = getCurrentDef()->getParentBlock();
+  auto initialBlocks = defBlock ? InitialBlocks(defBlock) : InitialBlocks();
+  ReachableBarriers barriers;
+  findBarriersBackward(outsideDestroys, initialBlocks,
+                       *getCurrentDef()->getFunction(), barriers,
+                       [&](auto *inst) {
+                         if (inst == def)
+                           return true;
+                         return isDeinitBarrier(inst, calleeAnalysis);
+                       });
+  for (auto *barrier : barriers.instructions) {
+    liveness->updateForUse(barrier, /*lifetimeEnding*/ false);
+  }
+  for (auto *barrier : barriers.phis) {
+    for (auto *predecessor : barrier->getPredecessorBlocks()) {
+      liveness->updateForUse(predecessor->getTerminator(),
+                             /*lifetimeEnding*/ false);
+    }
+  }
+  // Ignore barriers.edges.  The beginning of the targets of such edges should
+  // not be added to liveness.  These edges will be rediscovered when computing
+  // the liveness boundary.
 }
 
 // Return true if \p inst is an end_access whose access scope overlaps the end
@@ -764,6 +805,18 @@ private:
         // before means it has multiple predecessors, so this must be \p block's
         // unique successor.
         assert(block->getSingleSuccessorBlock() == successor);
+        // When this merge point was encountered the first time, a
+        // destroy_value was sought from its top.  If one was found, it was
+        // added to the boundary. If no destroy_value was found, _that_ user
+        // (i.e. the one on behalf of which extendBoundaryFromTerminator was
+        // called which inserted successor into seenMergePoints) was added to
+        // the boundary.
+        //
+        // This time, if a destroy was found, it's already in the boundary.  If
+        // no destroy was found, though, _this_ user must be added to the
+        // boundary.
+        foundDestroy =
+            findDestroyFromBlockBegin(successor, currentDef, isDestroy);
         continue;
       }
       if (auto *dvi =
@@ -1020,9 +1073,6 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
   if (currentDef->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
-  if (currentDef->isLexical())
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << currentDef);
 
   // Note: There is no need to register callbacks with this utility. 'onDelete'
@@ -1044,6 +1094,9 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     LLVM_DEBUG(llvm::errs() << "Failed to compute canonical liveness?!\n");
     invalidateLiveness();
     return false;
+  }
+  if (currentDef->isLexical()) {
+    extendLivenessToDeinitBarriers();
   }
   if (accessBlockAnalysis) {
     extendLivenessThroughOverlappingAccess();
