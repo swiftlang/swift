@@ -423,6 +423,20 @@ const RelativeWitnessTable *swift_getAssociatedConformanceWitnessRelative(
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+/// Compare two witness tables, which may involving checking the
+/// contents of their conformance descriptors.
+///
+/// Runtime availability: Swift 5.4
+///
+/// \param lhs The first protocol witness table to compare.
+/// \param rhs The second protocol witness table to compare.
+///
+/// \returns true if both witness tables describe the same conformance, false otherwise.
+SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
+bool swift_compareWitnessTables(const WitnessTable *lhs,
+                                const WitnessTable *rhs);
+
 /// Determine whether two protocol conformance descriptors describe the same
 /// conformance of a type to a protocol.
 ///

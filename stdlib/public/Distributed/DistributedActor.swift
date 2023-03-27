@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_spi(ConcurrencyExecutors) import _Concurrency
+import _Concurrency
 
 // ==== Distributed Actor -----------------------------------------------------
 

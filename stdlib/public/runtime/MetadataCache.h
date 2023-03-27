@@ -502,6 +502,7 @@ class MetadataCacheKey {
   GenericSignatureLayout<InProcess> Layout;
   uint32_t Hash;
 
+public:
   /// Compare two witness tables, which may involving checking the
   /// contents of their conformance descriptors.
   static bool areWitnessTablesEqual(const WitnessTable *awt,
@@ -520,7 +521,6 @@ class MetadataCacheKey {
     return areConformanceDescriptorsEqual(aDescription, bDescription);
   }
 
-public:
   static void installGenericArguments(uint16_t numKeyArguments, uint16_t numPacks,
                                       const GenericPackShapeDescriptor *packShapeDescriptors,
                                       const void **dst, const void * const *src);
