@@ -9,3 +9,9 @@ public struct G<T> {}
 public func caller<each T>(fn: (repeat G<each T>) -> ()) {
   fn(repeat G<each T>())
 }
+
+// rdar://107108803
+public struct UsesG<each Input> {
+  public init<E>(builder: (repeat G<each Input>) -> E) {}
+}
+UsesG<Int, String, Bool> { a, b, c in 0 }
