@@ -3119,6 +3119,12 @@ void swift::trySpecializeApplyOfGeneric(
                             << SpecializedF->getLoweredFunctionType() << "\n");
     NewFunctions.push_back(SpecializedF.getFunction());
   }
+  if (replacePartialApplyWithoutReabstraction &&
+      SpecializedF.getFunction()->isExternalDeclaration()) {
+    // Cannot create a tunk without having the body of the function.
+    return;
+  }
+
   if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
     // If the specialized function already exists as a "IsNotSerialized" function,
     // but now it's called from a "IsSerialized" function, we need to mark it as
