@@ -163,16 +163,16 @@ protected:
 
 /// Adds a shared field for instruction class `I`.
 #define SHARED_FIELD(I, ...) \
-  class { friend class I; __VA_ARGS__; } I;
+  class { friend class I; __VA_ARGS__; } I
 
 /// Adds a shared field for a template instruction class `I` which has a single
 /// template argument of type `T`.
 #define SHARED_TEMPLATE_FIELD(T, I, ...) \
-  class { template <T> friend class I; __VA_ARGS__; } I;
-  
+  class { template <T> friend class I; __VA_ARGS__; } I
+
 /// Special case for `InstructionBaseWithTrailingOperands`.
 #define SHARED_TEMPLATE4_FIELD(T1, T2, T3, T4, I, ...) \
-  class { template <T1, T2, T3, T4> friend class I; __VA_ARGS__; } I;
+  class { template <T1, T2, T3, T4> friend class I; __VA_ARGS__; } I
 
   // clang-format off
   union SharedUInt8Fields {
