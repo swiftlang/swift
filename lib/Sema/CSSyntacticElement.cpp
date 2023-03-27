@@ -352,15 +352,6 @@ static void createConjunction(ConstraintSystem &cs,
   }
 
   if (locator->directlyAt<TapExpr>()) {
-    auto *tap = castToExpr<TapExpr>(locator->getAnchor());
-    auto *tapDC = tap->getVar()->getDeclContext();
-
-    referencedVars.push_back(cs.getType(tap)->castTo<TypeVariableType>());
-
-    if (auto *closure = dyn_cast<ClosureExpr>(tapDC)) {
-      referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
-    }
-
     // Body of the interpolation is always isolated from its context, only
     // its individual elements are allowed access to type information
     // from the outside e.g. external declaration references.
