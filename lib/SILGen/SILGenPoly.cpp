@@ -1094,7 +1094,7 @@ public:
       // output type, it corresponds to N formal parameters in the
       // substituted output type.  translateToPackParam will pull off
       // N substituted formal parameters from the input type.
-      if (outputParams.isPackExpansion()) {
+      if (outputParams.isOrigPackExpansion()) {
         auto outputPackParam = claimNextOutputType();
         auto output =
           translateToPackParam(inputParams,

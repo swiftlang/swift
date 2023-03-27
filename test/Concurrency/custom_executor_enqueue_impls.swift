@@ -1,11 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-move-only -disable-availability-checking
 // REQUIRES: concurrency
 
-// FIXME(moveonly): rdar://106849189 move-only types should be supported in freestanding mode
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
-
-// FIXME(moveonly): rdar://107050387 Move-only types fail to be found sometimes, must fix or remove Job before shipping
-// REQUIRES: radr107050387
 
 // FIXME: rdar://107112715 test failing on iOS simulator, investigating
 // UNSUPPORTED: OS=ios

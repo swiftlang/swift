@@ -533,8 +533,6 @@ static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
   sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                         RequestSemanticRefactoring);
   sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, RefactoringKind);
-  sourcekitd_request_dictionary_set_string(Req, KeyPrimaryFile,
-                                           Opts.PrimaryFile.c_str());
   sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());
   sourcekitd_request_dictionary_set_int64(Req, KeyLine, line);
   sourcekitd_request_dictionary_set_int64(Req, KeyColumn, col);
@@ -1119,6 +1117,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     }
     sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
                                              Opts.SourceFile.c_str());
+  }
+
+  if (!Opts.PrimaryFile.empty()) {
+    sourcekitd_request_dictionary_set_string(Req, KeyPrimaryFile,
+                                             Opts.PrimaryFile.c_str());
   }
 
   if (Opts.SourceText) {

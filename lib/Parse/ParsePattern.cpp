@@ -109,15 +109,13 @@ static ParserStatus parseDefaultArgument(
   case Parser::ParameterContextKind::Initializer:
   case Parser::ParameterContextKind::EnumElement:
   case Parser::ParameterContextKind::Subscript:
+  case Parser::ParameterContextKind::Macro:
     break;
   case Parser::ParameterContextKind::Closure:
     diagID = diag::no_default_arg_closure;
     break;
   case Parser::ParameterContextKind::Curried:
     diagID = diag::no_default_arg_curried;
-    break;
-  case Parser::ParameterContextKind::Macro:
-    diagID = diag::no_default_arg_macro;
     break;
   }
   
@@ -704,7 +702,8 @@ mapParsedParameters(Parser &parser,
              paramContext == Parser::ParameterContextKind::Operator ||
              paramContext == Parser::ParameterContextKind::Initializer ||
              paramContext == Parser::ParameterContextKind::EnumElement ||
-             paramContext == Parser::ParameterContextKind::Subscript) &&
+             paramContext == Parser::ParameterContextKind::Subscript ||
+             paramContext == Parser::ParameterContextKind::Macro) &&
             "Default arguments are only permitted on the first param clause");
 
     if (param.DefaultArg) {

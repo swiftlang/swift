@@ -332,10 +332,8 @@ exit:
 //
 // CHECK-LABEL: sil [ossa] @dont_hoist_over_apply_at_copy : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] :
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         apply
 // CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         destroy_value [[COPY]]
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_apply_at_copy'
 sil [ossa] @dont_hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):

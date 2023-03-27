@@ -1007,10 +1007,15 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
-ERROR(in_package_module_not_compiled_from_source,Fatal,
-      "module %0 is in package '%1' but was built from interface '%2'; "
-      "modules of the same package can only be loaded if built from source",
+ERROR(in_package_module_not_compiled_from_source,none,
+      "module %0 is in package '%1' but was built from interface; "
+      "modules of the same package can only be loaded if built from source: %2",
       (Identifier, StringRef, StringRef))
+
+WARNING(in_package_module_not_compiled_locally,none,
+        "module %0 is in package %1 but was loaded from SDK; "
+        "modules of the same package should be built locally from source only: %2",
+        (Identifier, Identifier, StringRef))
 
 ERROR(import_restriction_conflict,none,
       "module %0 cannot be both "
@@ -6965,8 +6970,6 @@ ERROR(macro_definition_unsupported,none,
 ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
       "the external macro's %select{module|type}0", (unsigned))
-ERROR(attached_declaration_macro_not_supported,none,
-      "attached declaration macros are not yet supported", ())
 ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))

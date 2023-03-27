@@ -54,6 +54,8 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
         self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', self.args.install_prefix)
+        self.cmake_options.define('SWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL',
+                                  self.args.assertions)
         self.build_with_cmake(["all"], self.args.swift_build_variant, [])
 
     def should_test(self, host_target):

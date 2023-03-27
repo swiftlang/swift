@@ -128,6 +128,9 @@ ERROR(error_invalid_source_location_str,none,
 ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
+ERROR(error_load_plugin_executable,none,
+      "invalid value '%0' in '-load-plugin-executable'; "
+      "make sure to use format '<plugin path>#<module names>'", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
@@ -160,9 +163,6 @@ ERROR(error_mode_cannot_emit_module_semantic_info,none,
       "this mode does not support emitting module semantic info", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
-      "emitting IR", ())
-ERROR(cannot_emit_ir_checking_api_availability_only,none,
-      "the flag -check-api-availability-only does not support "
       "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,

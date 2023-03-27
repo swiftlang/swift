@@ -651,6 +651,10 @@ public:
                 CanGenericSignature genericSig = CanGenericSignature(),
                 bool shouldSubstituteOpaqueArchetypes = false) const;
 
+  SILType subst(Lowering::TypeConverter &tc,
+                InFlightSubstitution &IFS,
+                CanGenericSignature genericSig) const;
+
   SILType subst(Lowering::TypeConverter &tc, SubstitutionMap subs) const;
 
   SILType subst(SILModule &M, SubstitutionMap subs) const;

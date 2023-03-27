@@ -61,6 +61,9 @@
 /include/swift/DependencyScan                      @artemcm
 /include/swift/Driver                              @artemcm
 # TODO: /include/swift/IRGen/
+/include/swift/IDE/                                @ahoppen @bnbarham @rintaro
+/include/swift/Index/                              @bnbarham
+/include/swift/Refactoring                         @ahoppen @bnbarham
 /include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 /include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan
 # TODO: /include/swift/SIL/
@@ -87,6 +90,10 @@
 /lib/Driver                                         @artemcm
 /lib/Frontend/ModuleInterfaceLoader.cpp             @artemcm
 # TODO: /lib/IRGen/
+/lib/IDE/                                           @ahoppen @bnbarham @rintaro
+/lib/IDETool/                                       @ahoppen @bnbarham @rintaro
+/lib/Index/                                         @bnbarham
+/lib/Refactoring/                                   @ahoppen @bnbarham
 /lib/IRGen/*Distributed*                            @ktoso
 /lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 /lib/PrintAsClang                                   @zoecarver @hyp @egorzhdan
@@ -125,6 +132,10 @@
 /test/Driver/                                       @artemcm
 /test/Generics/                                     @hborla @slavapestov
 # TODO: /test/IRGen/
+/test/IDE/                                          @ahoppen @bnbarham @rintaro
+/test/Index/                                        @bnbarham
+/test/refactoring/                                  @ahoppen @bnbarham
+/test/SourceKit/                                    @ahoppen @bnbarham @rintaro
 /test/Interop/                                      @zoecarver @hyp @egorzhdan
 /test/Parse/                                        @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 # TODO: /test/SIL/
@@ -143,6 +154,9 @@
 
 # tools
 # TODO: /tools
+/tools/SourceKit                                    @ahoppen @bnbarham @rintaro
+/tools/swift-ide-test                               @ahoppen @bnbarham @rintaro
+/tools/swift-refactor                               @ahoppen @bnbarham
 
 # unittests
 /unittests/AST/                           @hborla @slavapestov @xedin
@@ -150,18 +164,28 @@
 /unittests/Parse/                         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 # TODO: /unittests/SIL/
 /unittests/Sema/                          @hborla @xedin
+/unittests/SourceKit/                     @ahoppen @bnbarham @rintaro
 # TODO: /unittests/stdlib/
 
 # userdocs
 # TODO: /userdocs
 
 # utils
-/utils/*windows*                          @compnerd
-/utils/update-checkout*                   @shahmishal
-/utils/update_checkout/                   @shahmishal
+/utils/*windows*                                              @compnerd
+/utils/gyb_sourcekit_support/                                 @ahoppen @bnbarham @rintaro
+/utils/sourcekit_fuzzer/                                      @ahoppen @bnbarham @rintaro
+/utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham
+/utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham
+/utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham
+/utils/swift_build_support/products/swiftevolve.py            @ahoppen @bnbarham
+/utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham
+/utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham
+/utils/update-checkout*                                       @shahmishal
+/utils/update_checkout/                                       @shahmishal
 
 # validation-test
 # TODO: /validation-test/IRGen/
+/validation-test/IDE/                     @ahoppen @bnbarham @rintaro
 /validation-test/Parse/                   @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 # TODO: /validation-test/SIL/
 # TODO: /validation-test/SILGen/

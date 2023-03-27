@@ -282,10 +282,6 @@ bool diagnoseParameterizedProtocolAvailability(SourceRange loc,
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
 
-/// Check if \p D needs to be checked for correct availability depending on the
-/// flag -check-api-availability-only.
-bool shouldCheckAvailability(const Decl *D);
-
 } // namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H

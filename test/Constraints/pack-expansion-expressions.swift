@@ -271,3 +271,15 @@ func test_pack_expansions_with_closures() {
     takesVariadicFunction { y, z in fn(y, z) } // Ok
   }
 }
+
+// rdar://107151854 - crash on invalid due to specialized pack expansion
+func test_pack_expansion_specialization() {
+  struct Data<each T> {
+    init(_: repeat each T) {} // expected-note {{'init(_:)' declared here}}
+  }
+
+  _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
+  _ = Data<Int>(0) // Ok
+  _ = Data<Int, String>(42, "") // Ok
+  _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
+}

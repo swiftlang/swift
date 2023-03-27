@@ -661,15 +661,9 @@ public:
   void setIsSystemModule(bool flag = true);
 
   /// \returns true if this module is part of the stdlib or contained within
-  /// the SDK. If no SDK was specified, also falls back to whether the module
-  /// was specified as a system module (ie. it's on the system search path).
-  bool isNonUserModule() const { return Bits.ModuleDecl.IsNonUserModule; }
-
-private:
-  /// Update whether this module is a non-user module, see \c isNonUserModule.
-  /// \p newUnit is the added unit that caused this update, or \c nullptr if
-  /// the update wasn't caused by adding a new unit.
-  void updateNonUserModule(FileUnit *newUnit);
+  /// the SDK. If no SDK was specified, falls back to whether the module was
+  /// specified as a system module (ie. it's on the system search path).
+  bool isNonUserModule() const;
 
 public:
   /// Returns true if the module was rebuilt from a module interface instead

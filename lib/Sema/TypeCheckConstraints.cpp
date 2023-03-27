@@ -777,16 +777,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
 
-  if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
-      PBD && !DC->getAsDecl()) {
-    // Skip checking the initializer for non-public decls when
-    // checking the API only.
-    auto VD = PBD->getAnchoringVarDecl(0);
-    if (!swift::shouldCheckAvailability(VD)) {
-      options |= TypeCheckExprFlags::DisableExprAvailabilityChecking;
-    }
-  }
-
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
 

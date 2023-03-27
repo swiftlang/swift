@@ -116,6 +116,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // cache
   true,
 
+  // outputTo,
+  OutputTo::Stdout,
+
   // swiftBacktracePath
   NULL,
 };
@@ -619,6 +622,16 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     }
   } else if (key.equals_insensitive("cache")) {
     _swift_backtraceSettings.cache = parseBoolean(value);
+  } else if (key.equals_insensitive("output-to")) {
+    if (value.equals_insensitive("stdout"))
+      _swift_backtraceSettings.outputTo = OutputTo::Stdout;
+    else if (value.equals_insensitive("stderr"))
+      _swift_backtraceSettings.outputTo = OutputTo::Stderr;
+    else {
+      swift::warning(0,
+                     "swift runtime: unknown output-to setting '%.*s'\n",
+                     static_cast<int>(value.size()), value.data());
+    }
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();
     char *path = (char *)std::malloc(len + 1);

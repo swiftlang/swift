@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 class C {}
+sil @getOwned : $@convention(thin) () -> @owned C
+sil @barrier : $@convention(thin) () -> ()
 
 // When access scopes are respected, the lifetime which previously extended
 // beyond the access scope still extends beyond it.
@@ -41,6 +43,74 @@ bb0(%addr : $*C):
   %access = begin_access [modify] [static] %addr : $*C
   store %copy to [init] %access : $*C
   end_access %access : $*C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+
+// CHECK-LABEL: begin running test 1 of 1 on reuse_destroy_after_barrier_phi: canonicalize-ossa-lifetime with: true, false, true, @trace
+// CHECK-LABEL: sil [ossa] @reuse_destroy_after_barrier_phi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}}
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'reuse_destroy_after_barrier_phi'
+// CHECK-LABEL: end running test 1 of 1 on reuse_destroy_after_barrier_phi: canonicalize-ossa-lifetime with: true, false, true, @trace
+sil [ossa] @reuse_destroy_after_barrier_phi : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
+  debug_value [trace] %instance : $C
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  %get = function_ref @getOwned : $@convention(thin) () -> @owned C
+  cond_br undef, through, loop
+
+through:
+  %4 = copy_value %instance : $C
+  br exit(%4 : $C)
+
+loop:
+  %other = apply %get() : $@convention(thin) () -> @owned C
+  br exit(%other : $C)
+
+exit(%out : @owned $C):
+  destroy_value %instance : $C
+  return %out : $C
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on store_arg_to_out_addr: canonicalize-ossa-lifetime with: true, false, true, @trace
+// CHECK-LABEL: sil [ossa] @store_arg_to_out_addr : $@convention(thin) (@owned C) -> @out C {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*C, [[INSTANCE:%[^,]+]] :
+// CHECK:       store [[INSTANCE]] to [init] [[ADDR]]
+// CHECK-LABEL: } // end sil function 'store_arg_to_out_addr'
+// CHECK-LABEL: end running test 1 of 1 on store_arg_to_out_addr: canonicalize-ossa-lifetime with: true, false, true, @trace
+sil [ossa] @store_arg_to_out_addr : $@convention(thin) (@owned C) -> @out C {
+bb0(%0 : $*C, %instance : @owned $C):
+  debug_value [trace] %instance : $C
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  %copy = copy_value %instance : $C
+  store %copy to [init] %0 : $*C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on store_arg_to_out_addr_with_barrier: canonicalize-ossa-lifetime with: true, false, true, @trace
+// CHECK-LABEL: sil [ossa] @store_arg_to_out_addr_with_barrier : $@convention(thin) (@owned C) -> @out C {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*C, [[INSTANCE:%[^,]+]] :
+// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK:         [[REGISTER_3:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         store [[REGISTER_3]] to [init] [[ADDR]]
+// CHECK:         apply [[BARRIER]]()
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'store_arg_to_out_addr_with_barrier'
+// CHECK-LABEL: end running test 1 of 1 on store_arg_to_out_addr_with_barrier: canonicalize-ossa-lifetime with: true, false, true, @trace
+sil [ossa] @store_arg_to_out_addr_with_barrier : $@convention(thin) (@owned C) -> @out C {
+bb0(%0 : $*C, %instance : @owned $C):
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  debug_value [trace] %instance : $C
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  %copy = copy_value %instance : $C
+  store %copy to [init] %0 : $*C
+  apply %barrier() : $@convention(thin) () -> ()
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()

@@ -918,11 +918,22 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       assert(found != matcher.pairs.end());
 
       auto arg = found->rhs;
-      if (auto *expansionType = arg->getAs<PackExpansionType>())
-        arg = expansionType->getPatternType();
 
-      if (arg->isParameterPack())
-        arg = PackType::getSingletonPackExpansion(arg);
+      // PackMatcher will always produce a PackExpansionType as the
+      // arg for a pack parameter, if necessary by wrapping a PackType
+      // in one.  (It's a weird representation.)  Look for that pattern
+      // and unwrap the pack.  Otherwise, we must have matched with a
+      // single component which happened to be an expansion; wrap that
+      // in a PackType.  In either case, we always want arg to end up
+      // a PackType.
+      if (auto *expansionType = arg->getAs<PackExpansionType>()) {
+        auto pattern = expansionType->getPatternType();
+        if (auto pack = pattern->getAs<PackType>()) {
+          arg = pack;
+        } else {
+          arg = PackType::get(ctx, {expansionType});
+        }
+      }
 
       args.push_back(arg);
     }

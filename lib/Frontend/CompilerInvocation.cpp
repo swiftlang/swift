@@ -548,8 +548,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
-  Opts.CheckAPIAvailabilityOnly |=
-      Args.hasArg(OPT_check_api_availability_only);
+  if (Args.hasArg(OPT_check_api_availability_only))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-check-api-availability-only");
+
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
@@ -1195,12 +1197,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
 
-  // Checking availability of the API only relies on skipping non-inlinable
-  // function bodies. Define it first so it can be overridden by the other
-  // flags.
-  if (Args.hasArg(OPT_check_api_availability_only))
-    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
-
   // Check for SkipFunctionBodies arguments in order from skipping less to
   // skipping more.
   if (Args.hasArg(
@@ -1568,14 +1564,28 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
   Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
 
-  std::vector<std::string> CompilerPluginExecutablePaths(
+  std::vector<PluginExecutablePathAndModuleNames> CompilerPluginExecutablePaths(
       Opts.getCompilerPluginExecutablePaths());
   for (const Arg *A : Args.filtered(OPT_load_plugin_executable)) {
-    // NOTE: The value has '#<module names>' after the path.
-    // But resolveSearchPath() works as long as the value starts with a path.
-    CompilerPluginExecutablePaths.push_back(resolveSearchPath(A->getValue()));
+    // 'A' is '<path to executable>#<module names>' where the module names are
+    // comma separated.
+    StringRef path;
+    StringRef modulesStr;
+    std::tie(path, modulesStr) = StringRef(A->getValue()).rsplit('#');
+    std::vector<std::string> moduleNames;
+    for (auto name : llvm::split(modulesStr, ',')) {
+      moduleNames.emplace_back(name);
+    }
+    if (path.empty() || moduleNames.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_load_plugin_executable,
+                     A->getValue());
+    } else {
+      CompilerPluginExecutablePaths.push_back(
+          {resolveSearchPath(path), std::move(moduleNames)});
+    }
   }
-  Opts.setCompilerPluginExecutablePaths(CompilerPluginExecutablePaths);
+  Opts.setCompilerPluginExecutablePaths(
+      std::move(CompilerPluginExecutablePaths));
 
   return false;
 }

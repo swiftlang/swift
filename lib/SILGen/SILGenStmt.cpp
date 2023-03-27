@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -581,31 +582,28 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
     origResultType.forEachTupleElement(resultTupleType,
-        [&](unsigned origEltIndex,
-            unsigned substEltIndex,
-            AbstractionPattern origEltType,
-            CanType substEltType) {
-      auto eltInit = prepareIndirectResultInit(SGF, loc, fnTypeForResults,
-                                       origEltType, substEltType,
-                                       allResults,
-                                       directResults,
-                                       indirectResultAddrs, cleanups);
-      tupleInit->SubInitializations.push_back(std::move(eltInit));
-    },
-        [&](unsigned origEltIndex,
-            unsigned substEltIndex,
-            AbstractionPattern origExpansionType,
-            CanTupleEltTypeArrayRef substEltTypes) {
-      assert(allResults[0].isPack());
-      assert(SGF.silConv.isSILIndirect(allResults[0]));
-      allResults = allResults.slice(1);
+                                       [&](TupleElementGenerator &elt) {
+      if (!elt.isOrigPackExpansion()) {
+        auto eltInit = prepareIndirectResultInit(SGF, loc, fnTypeForResults,
+                                                 elt.getOrigType(),
+                                                 elt.getSubstTypes()[0],
+                                                 allResults,
+                                                 directResults,
+                                                 indirectResultAddrs,
+                                                 cleanups);
+        tupleInit->SubInitializations.push_back(std::move(eltInit));
+      } else {
+        assert(allResults[0].isPack());
+        assert(SGF.silConv.isSILIndirect(allResults[0]));
+        allResults = allResults.slice(1);
 
-      auto packAddr = indirectResultAddrs[0];
-      indirectResultAddrs = indirectResultAddrs.slice(1);
+        auto packAddr = indirectResultAddrs[0];
+        indirectResultAddrs = indirectResultAddrs.slice(1);
 
-      preparePackResultInit(SGF, loc, origExpansionType, substEltTypes,
-                            packAddr,
-                            cleanups, tupleInit->SubInitializations);
+        preparePackResultInit(SGF, loc, elt.getOrigType(), elt.getSubstTypes(),
+                              packAddr,
+                              cleanups, tupleInit->SubInitializations);
+      }
     });
 
     return InitializationPtr(tupleInit);

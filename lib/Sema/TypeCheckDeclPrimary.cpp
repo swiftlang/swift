@@ -1960,9 +1960,25 @@ public:
     // diagnostics.
     (void)ID->getDecls();
 
+    auto target = ID->getModule();
+    if (!getASTContext().LangOpts.PackageName.empty() &&
+        getASTContext().LangOpts.PackageName == target->getPackageName().str() &&
+        !target->isNonSwiftModule() && // target is a Swift module
+        target->isNonUserModule()) { // target module is in distributed SDK
+      // If reached here, a binary module (.swiftmodule) instead of interface of the
+      // target was loaded for the main module, where both belong to the same package;
+      // this is an expected behavior, but it should have been loaded from the local
+      // build directory, not from distributed SDK. In such case, we show a warning.
+      auto &diags = ID->getASTContext().Diags;
+      diags.diagnose(ID,
+                     diag::in_package_module_not_compiled_locally,
+                     target->getBaseIdentifier(),
+                     target->getPackageName(),
+                     target->getModuleFilename());
+    }
+
     // Report the public import of a private module.
     if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
-      auto target = ID->getModule();
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
@@ -2027,6 +2043,7 @@ public:
       MD->diagnose(diag::macro_without_role, MD->getName());
 
     TypeChecker::checkParameterList(MD->getParameterList(), MD);
+    checkDefaultArguments(MD->getParameterList());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {

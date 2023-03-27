@@ -209,14 +209,10 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   return pack;
 }
 
-static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
-                                        CanType elementArchetype,
+/// Use this to index into packs to correctly handle on-heap packs.
+static llvm::Value *loadMetadataAtIndex(IRGenFunction &IGF,
                                         llvm::Value *patternPack,
-                                        llvm::Value *index,
-                                        DynamicMetadataRequest request) {
-  if (auto response = IGF.tryGetLocalTypeMetadata(elementArchetype, request))
-    return response.getMetadata();
-
+                                        llvm::Value *index) {
   // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
       IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
@@ -233,7 +229,18 @@ static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
       IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
                                     patternPackAddress.getAddress(), index),
       patternPackAddress.getElementType(), patternPackAddress.getAlignment());
-  llvm::Value *metadata = IGF.Builder.CreateLoad(fromPtr);
+  return IGF.Builder.CreateLoad(fromPtr);
+}
+
+static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
+                                        CanType elementArchetype,
+                                        llvm::Value *patternPack,
+                                        llvm::Value *index,
+                                        DynamicMetadataRequest request) {
+  if (auto response = IGF.tryGetLocalTypeMetadata(elementArchetype, request))
+    return response.getMetadata();
+
+  llvm::Value *metadata = loadMetadataAtIndex(IGF, patternPack, index);
 
   // Bind the metadata pack element to the element archetype.
   IGF.setScopedLocalTypeMetadata(elementArchetype,
@@ -242,15 +249,10 @@ static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
   return metadata;
 }
 
-static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
-                                            CanType elementArchetype,
-                                            ProtocolConformanceRef conf,
+/// Use this to index into packs to correctly handle on-heap packs.
+static llvm::Value *loadWitnessTableAtIndex(IRGenFunction &IGF,
                                             llvm::Value *wtablePack,
                                             llvm::Value *index) {
-  auto key = LocalTypeDataKind::forProtocolWitnessTable(conf);
-  if (auto *wtable = IGF.tryGetLocalTypeData(elementArchetype, key))
-    return wtable;
-
   // If the pack is on the heap, the LSB is set, so mask it off.
   wtablePack =
       IGF.Builder.CreatePtrToInt(wtablePack, IGF.IGM.SizeTy);
@@ -267,7 +269,19 @@ static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
       IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
                                     patternPackAddress.getAddress(), index),
       patternPackAddress.getElementType(), patternPackAddress.getAlignment());
-  auto *wtable = IGF.Builder.CreateLoad(fromPtr);
+  return IGF.Builder.CreateLoad(fromPtr);
+}
+
+static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
+                                            CanType elementArchetype,
+                                            ProtocolConformanceRef conf,
+                                            llvm::Value *wtablePack,
+                                            llvm::Value *index) {
+  auto key = LocalTypeDataKind::forProtocolWitnessTable(conf);
+  if (auto *wtable = IGF.tryGetLocalTypeData(elementArchetype, key))
+    return wtable;
+
+  auto *wtable = loadWitnessTableAtIndex(IGF, wtablePack, index);
 
   // Bind the witness table pack element to the element archetype.
   IGF.setScopedLocalTypeData(elementArchetype, key, wtable);
@@ -658,18 +672,10 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
   if (materializedMetadataPack &&
       llvm::all_of(materializedWtablePacks,
                    [](auto *wtablePack) { return wtablePack; })) {
-    auto *gep = IGF.Builder.CreateInBoundsGEP(
-        IGF.IGM.TypeMetadataPtrTy, materializedMetadataPack.getMetadata(),
-        index);
-    auto addr =
-        Address(gep, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
-    auto *metadata = IGF.Builder.CreateLoad(addr);
+    auto *metadataPack = materializedMetadataPack.getMetadata();
+    auto *metadata = loadMetadataAtIndex(IGF, metadataPack, index);
     for (auto *wtablePack : materializedWtablePacks) {
-      auto *gep = IGF.Builder.CreateInBoundsGEP(IGF.IGM.WitnessTablePtrTy,
-                                                wtablePack, index);
-      auto addr = Address(gep, IGF.IGM.WitnessTablePtrTy,
-                          IGF.IGM.getPointerAlignment());
-      auto *wtable = IGF.Builder.CreateLoad(addr);
+      auto *wtable = loadWitnessTableAtIndex(IGF, wtablePack, index);
       wtables.push_back(wtable);
     }
     return metadata;

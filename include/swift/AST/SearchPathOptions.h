@@ -174,6 +174,12 @@ public:
                             llvm::vfs::FileSystem *FS, bool IsOSDarwin);
 };
 
+/// Pair of a plugin path and the module name that the plugin provides.
+struct PluginExecutablePathAndModuleNames {
+  std::string ExecutablePath;
+  std::vector<std::string> ModuleNames;
+};
+
 /// Pair of a plugin search path and the corresponding plugin server executable
 /// path.
 struct ExternalPluginSearchPathAndServerPath {
@@ -242,8 +248,7 @@ private:
   std::vector<std::string> CompilerPluginLibraryPaths;
 
   /// Compiler plugin executable paths and providing module names.
-  /// Format: '<path>#<module names>'
-  std::vector<std::string> CompilerPluginExecutablePaths;
+  std::vector<PluginExecutablePathAndModuleNames> CompilerPluginExecutablePaths;
 
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
@@ -361,12 +366,13 @@ public:
   }
 
   void setCompilerPluginExecutablePaths(
-      std::vector<std::string> NewCompilerPluginExecutablePaths) {
-    CompilerPluginExecutablePaths = NewCompilerPluginExecutablePaths;
+      std::vector<PluginExecutablePathAndModuleNames> &&newValue) {
+    CompilerPluginExecutablePaths = std::move(newValue);
     Lookup.searchPathsDidChange();
   }
 
-  ArrayRef<std::string> getCompilerPluginExecutablePaths() const {
+  ArrayRef<PluginExecutablePathAndModuleNames>
+  getCompilerPluginExecutablePaths() const {
     return CompilerPluginExecutablePaths;
   }
 

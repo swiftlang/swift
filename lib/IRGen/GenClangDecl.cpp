@@ -228,18 +228,20 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // Unfortunately, implicitly defined CXXDestructorDecls don't have a real
     // body, so we need to traverse these manually.
     if (auto *dtor = dyn_cast<clang::CXXDestructorDecl>(next)) {
-      auto cxxRecord = dtor->getParent();
+      if (dtor->isImplicit() || dtor->hasBody()) {
+        auto cxxRecord = dtor->getParent();
 
-      for (auto field : cxxRecord->fields()) {
-        if (auto fieldCxxRecord = field->getType()->getAsCXXRecordDecl())
-          if (auto *fieldDtor = fieldCxxRecord->getDestructor())
-            callback(fieldDtor);
-      }
+        for (auto field : cxxRecord->fields()) {
+          if (auto fieldCxxRecord = field->getType()->getAsCXXRecordDecl())
+            if (auto *fieldDtor = fieldCxxRecord->getDestructor())
+              callback(fieldDtor);
+        }
 
-      for (auto base : cxxRecord->bases()) {
-        if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
-          if (auto *baseDtor = baseCxxRecord->getDestructor())
-            callback(baseDtor);
+        for (auto base : cxxRecord->bases()) {
+          if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
+            if (auto *baseDtor = baseCxxRecord->getDestructor())
+              callback(baseDtor);
+        }
       }
     }
 

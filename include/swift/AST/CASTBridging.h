@@ -307,6 +307,9 @@ void Plugin_lock(PluginHandle handle);
 /// Unlock the plugin.
 void Plugin_unlock(PluginHandle handle);
 
+/// Launch the plugin if it's not running.
+_Bool Plugin_spawnIfNeeded(PluginHandle handle);
+
 /// Sends the message to the plugin, returns true if there was an error.
 /// Clients should receive the response  by \c Plugin_waitForNextMessage .
 _Bool Plugin_sendMessage(PluginHandle handle, const BridgedData data);

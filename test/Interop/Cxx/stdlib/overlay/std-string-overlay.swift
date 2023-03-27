@@ -45,6 +45,46 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   expectEqual(swift7, "���")
 }
 
+StdStringOverlayTestSuite.test("std::string operators") {
+  var s1 = std.string("something")
+  let s2 = std.string("123")
+  let sum = s1 + s2
+  expectEqual(sum, std.string("something123"))
+
+  expectFalse(s1 == s2)
+  let s3 = std.string("something123")
+  expectFalse(s1 == s3)
+  expectFalse(s2 == s3)
+
+  s1 += s2
+  expectTrue(s1 == std.string("something123"))
+  expectTrue(s1 == s3)
+
+  // Make sure the operators work together with ExpressibleByStringLiteral conformance.
+  s1 += "literal"
+  expectTrue(s1 == "something123literal")
+}
+
+StdStringOverlayTestSuite.test("std::u16string operators") {
+  var s1 = std.u16string("something")
+  let s2 = std.u16string("123")
+  let sum = s1 + s2
+  expectEqual(sum, std.u16string("something123"))
+
+  expectFalse(s1 == s2)
+  let s3 = std.u16string("something123")
+  expectFalse(s1 == s3)
+  expectFalse(s2 == s3)
+
+  s1 += s2
+  expectTrue(s1 == std.u16string("something123"))
+  expectTrue(s1 == s3)
+
+  // Make sure the operators work together with ExpressibleByStringLiteral conformance.
+  s1 += "literal"
+  expectTrue(s1 == "something123literal")
+}
+
 StdStringOverlayTestSuite.test("std::u16string <=> Swift.String") {
   let cxx1 = std.u16string()
   let swift1 = String(cxx1)

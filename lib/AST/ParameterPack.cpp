@@ -94,60 +94,6 @@ PackType *TypeBase::getPackSubstitutionAsPackType() {
   }
 }
 
-/// G<{X1, ..., Xn}, {Y1, ..., Yn}>... => {G<X1, Y1>, ..., G<Xn, Yn>}...
-PackExpansionType *PackExpansionType::expand() {
-  auto countType = getCountType();
-  auto *countPack = countType->getAs<PackType>();
-  if (countPack == nullptr)
-    return this;
-
-  auto patternType = getPatternType();
-  if (patternType->is<PackType>())
-    return this;
-
-  unsigned j = 0;
-  SmallVector<Type, 4> expandedTypes;
-  for (auto type : countPack->getElementTypes()) {
-    Type expandedCount;
-    if (auto *expansion = type->getAs<PackExpansionType>())
-      expandedCount = expansion->getCountType();
-
-    auto expandedPattern = patternType.transformRec(
-      [&](Type t) -> Optional<Type> {
-        if (t->is<PackExpansionType>())
-          return t;
-
-        if (auto *nestedPack = t->getAs<PackType>()) {
-          auto nestedPackElts = nestedPack->getElementTypes();
-          if (j < nestedPackElts.size()) {
-            if (expandedCount) {
-              if (auto *expansion = nestedPackElts[j]->getAs<PackExpansionType>())
-                return expansion->getPatternType();
-            } else {
-              return nestedPackElts[j];
-            }
-          }
-
-          return ErrorType::get(t->getASTContext());
-        }
-
-        return None;
-      });
-
-    if (expandedCount) {
-      expandedTypes.push_back(PackExpansionType::get(expandedPattern,
-                                                     expandedCount));
-    } else {
-      expandedTypes.push_back(expandedPattern);
-    }
-
-    ++j;
-  }
-
-  auto *packType = PackType::get(getASTContext(), expandedTypes);
-  return PackExpansionType::get(packType, countType);
-}
-
 CanType PackExpansionType::getReducedShape() {
   auto reducedShape = countType->getReducedShape();
   if (reducedShape == getASTContext().TheEmptyTupleType)
@@ -174,54 +120,6 @@ bool CanTupleType::containsPackExpansionTypeImpl(CanTupleType tuple) {
   return false;
 }
 
-/// (W, {X, Y}..., Z) => (W, X, Y, Z)
-Type TupleType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<TupleTypeElt, 4> elts;
-
-  for (unsigned i = 0, e = getNumElements(); i < e; ++i) {
-    auto elt = getElement(i);
-
-    if (auto *expansionType = elt.getType()->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          elts.append(getElements().begin(), getElements().begin() + i);
-          anyChanged = true;
-        }
-
-        bool first = true;
-        for (auto packElt : packType->getElementTypes()) {
-          if (first) {
-            elts.push_back(TupleTypeElt(packElt, elt.getName()));
-            first = false;
-            continue;
-          }
-          elts.push_back(TupleTypeElt(packElt));
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      elts.push_back(elt);
-  }
-
-  if (!anyChanged)
-    return this;
-
-  // If pack substitution yields a single-element tuple, the tuple
-  // structure is flattened to produce the element type.
-  if (elts.size() == 1) {
-    auto type = elts.front().getType();
-    if (!type->is<PackExpansionType>() && !type->is<TypeVariableType>()) {
-      return type;
-    }
-  }
-
-  return TupleType::get(elts, getASTContext());
-}
-
 bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   for (auto param : params) {
     if (param.getPlainType()->is<PackExpansionType>())
@@ -231,50 +129,6 @@ bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   return false;
 }
 
-/// (W, {X, Y}..., Z) -> T => (W, X, Y, Z) -> T
-AnyFunctionType *AnyFunctionType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<AnyFunctionType::Param, 4> params;
-
-  for (unsigned i = 0, e = getParams().size(); i < e; ++i) {
-    auto param = getParams()[i];
-
-    if (auto *expansionType = param.getPlainType()->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          params.append(getParams().begin(), getParams().begin() + i);
-          anyChanged = true;
-        }
-
-        bool first = true;
-        for (auto packElt : packType->getElementTypes()) {
-          if (first) {
-            params.push_back(param.withType(packElt));
-            first = false;
-            continue;
-          }
-          params.push_back(param.withType(packElt).getWithoutLabels());
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      params.push_back(param);
-  }
-
-  if (!anyChanged)
-    return this;
-
-  if (auto *genericFuncType = getAs<GenericFunctionType>()) {
-    return GenericFunctionType::get(genericFuncType->getGenericSignature(),
-                                    params, getResult(), getExtInfo());
-  } else {
-    return FunctionType::get(params, getResult(), getExtInfo());
-  }
-}
-
 bool PackType::containsPackExpansionType() const {
   for (auto type : getElementTypes()) {
     if (type->is<PackExpansionType>())
@@ -282,39 +136,6 @@ bool PackType::containsPackExpansionType() const {
   }
 
   return false;
-}
-
-/// {W, {X, Y}..., Z} => {W, X, Y, Z}
-PackType *PackType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<Type, 4> elts;
-
-  for (unsigned i = 0, e = getNumElements(); i < e; ++i) {
-    auto elt = getElementType(i);
-
-    if (auto *expansionType = elt->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          elts.append(getElementTypes().begin(), getElementTypes().begin() + i);
-          anyChanged = true;
-        }
-
-        for (auto packElt : packType->getElementTypes()) {
-          elts.push_back(packElt);
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      elts.push_back(elt);
-  }
-
-  if (!anyChanged)
-    return this;
-
-  return PackType::get(getASTContext(), elts);
 }
 
 template <class T>
@@ -449,15 +270,15 @@ PackType *PackType::get(const ASTContext &C,
     auto arg = args[i];
 
     if (params[i]->isParameterPack()) {
-      wrappedArgs.push_back(PackExpansionType::get(
-          arg, arg->getReducedShape()));
+      auto argPackElements = arg->castTo<PackType>()->getElementTypes();
+      wrappedArgs.append(argPackElements.begin(), argPackElements.end());
       continue;
     }
 
     wrappedArgs.push_back(arg);
   }
 
-  return get(C, wrappedArgs)->flattenPackTypes();
+  return get(C, wrappedArgs);
 }
 
 PackType *PackType::getSingletonPackExpansion(Type param) {

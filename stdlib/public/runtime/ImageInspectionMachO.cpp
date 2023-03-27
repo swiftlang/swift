@@ -33,6 +33,16 @@
 #if __has_include(<objc/objc-internal.h>) && __has_include(<mach-o/dyld_priv.h>)
 #include <mach-o/dyld_priv.h>
 #include <objc/objc-internal.h>
+
+// Redefine _dyld_lookup_section_info as weak so we can build against it but
+// still run when it's not present at runtime. Note that we don't have to check
+// for its presence at runtime, as it's guaranteed to be available if we get
+// the callbacks from objc_addLoadImageFunc2.
+LLVM_ATTRIBUTE_WEAK
+struct _dyld_section_info_result
+_dyld_lookup_section_info(const struct mach_header *mh,
+                          _dyld_section_location_info_t locationHandle,
+                          enum _dyld_section_location_kind kind);
 #else
 
 // Bring our own definition of enum _dyld_section_location_kind and some of its

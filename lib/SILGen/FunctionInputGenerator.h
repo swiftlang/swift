@@ -89,7 +89,7 @@ class FunctionInputGenerator {
   /// Ready the current orig parameter.
   void readyOrigParameter() {
     substParamIndex = 0;
-    if (origParam.isPackExpansion()) {
+    if (origParam.isOrigPackExpansion()) {
       // The pack value exists in the lowered parameters and must be
       // claimed whether it contains formal parameters or not.
       packValue = inputs.claimNext();
@@ -125,7 +125,7 @@ public:
   }
 
   bool isOrigPackExpansion() const {
-    return origParam.isPackExpansion();
+    return origParam.isOrigPackExpansion();
   }
 
   AbstractionPattern getOrigType() const {
