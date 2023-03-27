@@ -1583,7 +1583,6 @@ class SyntacticElementSolutionApplication
 protected:
   Solution &solution;
   SyntacticElementContext context;
-  Type resultType;
   RewriteTargetFn rewriteTarget;
 
   /// All `func`s declared in the body of the closure.
@@ -1596,24 +1595,39 @@ public:
   SyntacticElementSolutionApplication(Solution &solution,
                                       SyntacticElementContext context,
                                       RewriteTargetFn rewriteTarget)
-      : solution(solution), context(context), rewriteTarget(rewriteTarget) {
-    if (auto fn = AnyFunctionRef::fromDeclContext(context.getAsDeclContext())) {
-      if (auto transform = solution.getAppliedBuilderTransform(*fn)) {
-        resultType = solution.simplifyType(transform->bodyResultType);
-      } else if (auto *closure =
-                     getAsExpr<ClosureExpr>(fn->getAbstractClosureExpr())) {
-        resultType = solution.getResolvedType(closure)
-                         ->castTo<FunctionType>()
-                         ->getResult();
-      } else {
-        resultType = fn->getBodyResultType();
-      }
-    }
-  }
+      : solution(solution), context(context), rewriteTarget(rewriteTarget) {}
 
   virtual ~SyntacticElementSolutionApplication() {}
 
 private:
+  Type getContextualResultType() const {
+    // Taps do not have a contextual result type.
+    if (context.is<TapExpr *>()) {
+      return Type();
+    }
+
+    auto fn = context.getAsAnyFunctionRef();
+
+    if (context.is<SingleValueStmtExpr *>()) {
+      // if/switch expressions can have `return` inside.
+      fn = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
+    }
+
+    if (fn) {
+      if (auto transform = solution.getAppliedBuilderTransform(*fn)) {
+        return solution.simplifyType(transform->bodyResultType);
+      } else if (auto *closure =
+                     getAsExpr<ClosureExpr>(fn->getAbstractClosureExpr())) {
+        return solution.getResolvedType(closure)
+            ->castTo<FunctionType>()
+            ->getResult();
+      } else {
+        return fn->getBodyResultType();
+      }
+    }
+
+    return Type();
+  }
 
   ASTNode visit(Stmt *S, bool performSyntacticDiagnostics = true) {
     auto rewritten = ASTVisitor::visit(S);
@@ -1969,17 +1983,18 @@ private:
     auto closure = context.getAsAbstractClosureExpr();
     if (closure && !closure.get()->hasSingleExpressionBody() &&
         closure.get()->getBody() == braceStmt) {
+      auto resultType = getContextualResultType();
       if (resultType->getOptionalObjectType() &&
           resultType->lookThroughAllOptionalTypes()->isVoid() &&
           !braceStmt->getLastElement().isStmt(StmtKind::Return)) {
-        return addImplicitVoidReturn(braceStmt);
+        return addImplicitVoidReturn(braceStmt, resultType);
       }
     }
 
     return braceStmt;
   }
 
-  ASTNode addImplicitVoidReturn(BraceStmt *braceStmt) {
+  ASTNode addImplicitVoidReturn(BraceStmt *braceStmt, Type contextualResultTy) {
     auto &cs = solution.getConstraintSystem();
     auto &ctx = cs.getASTContext();
 
@@ -1994,7 +2009,7 @@ private:
     // number of times.
     {
       SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                    CTP_ReturnStmt, resultType,
+                                    CTP_ReturnStmt, contextualResultTy,
                                     /*isDiscarded=*/false);
       cs.setTargetFor(returnStmt, target);
 
@@ -2014,6 +2029,8 @@ private:
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
     auto &cs = solution.getConstraintSystem();
+
+    auto resultType = getContextualResultType();
 
     if (!returnStmt->hasResult()) {
       // If contextual is not optional, there is nothing to do here.
