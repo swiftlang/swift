@@ -1,0 +1,4 @@
+module SubE {
+  header "SubE.h"
+  export *
+}
