@@ -110,7 +110,7 @@ class VJPCloner::Implementation final
 
   /// Initializes a context object if needed.
   void emitLinearMapContextInitializationIfNeeded() {
-    if (!pullbackInfo.hasLoops())
+    if (!pullbackInfo.hasHeapAllocatedContext())
       return;
  
     // Get linear map struct size.
@@ -937,7 +937,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     pbParams.push_back(inoutParamTanParam);
   }
 
-  if (pullbackInfo.hasLoops()) {
+  if (pullbackInfo.hasHeapAllocatedContext()) {
     // Accept a `AutoDiffLinarMapContext` heap object if there are loops.
     pbParams.push_back({
       getASTContext().TheNativeObjectType,
