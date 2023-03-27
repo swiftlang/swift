@@ -43,3 +43,16 @@ do {
     }
   }
 }
+
+// This case is (currently) interesting because "\(query)" is type-checked
+// separately as part of ~= operator application.
+func test_interpolation_in_case(query: String) {
+  _ = { (request: String) in
+    switch request {
+    case "\(query)": // Ok
+      break
+    default:
+      break
+    }
+  }
+}
