@@ -555,6 +555,11 @@ public:
 
     // Check whether this is any one of the known compiler features.
     const auto &langOpts = Ctx.LangOpts;
+#if SWIFT_SWIFT_PARSER
+    const bool hasSwiftSwiftParser = true;
+#else
+    const bool hasSwiftSwiftParser = false;
+#endif
     bool isKnownFeature = llvm::StringSwitch<bool>(Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
         .Case("$" #FeatureName, Option)
