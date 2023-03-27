@@ -97,6 +97,11 @@ enum class SanitizePaths {
   On = 1
 };
 
+enum class OutputTo {
+  Stdout = 0,
+  Stderr = 2,
+};
+
 struct BacktraceSettings {
   UnwindAlgorithm  algorithm;
   OnOffTty         enabled;
@@ -112,6 +117,7 @@ struct BacktraceSettings {
   SanitizePaths    sanitize;
   Preset           preset;
   bool             cache;
+  OutputTo         outputTo;
   const char      *swiftBacktracePath;
 };
 

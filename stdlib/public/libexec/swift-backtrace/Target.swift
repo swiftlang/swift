@@ -146,7 +146,7 @@ class Target {
     if let parentTask = Self.getParentTask() {
       task = parentTask
     } else {
-      print("swift-backtrace: couldn't fetch parent task")
+      print("swift-backtrace: couldn't fetch parent task", to: &standardError)
       exit(1)
     }
 
@@ -158,7 +158,7 @@ class Target {
     do {
       crashInfo = try reader.fetch(from: crashInfoAddr, as: CrashInfo.self)
     } catch {
-      print("swift-backtrace: unable to fetch crash info.")
+      print("swift-backtrace: unable to fetch crash info.", to: &standardError)
       exit(1)
     }
 
@@ -168,7 +168,7 @@ class Target {
 
     guard let mctx: MContext = try? reader.fetch(from: crashInfo.mctx,
                                                  as: MContext.self) else {
-      print("swift-backtrace: unable to fetch mcontext.")
+      print("swift-backtrace: unable to fetch mcontext.", to: &standardError)
       exit(1)
     }
 
@@ -188,12 +188,13 @@ class Target {
                           &threadCount)
 
     if kr != KERN_SUCCESS {
-      print("swift-backtrace: failed to enumerate threads - \(kr)")
+      print("swift-backtrace: failed to enumerate threads - \(kr)",
+            to: &standardError)
       exit(1)
     }
 
     guard let ports = threadPorts else {
-      print("swift-backtrace: thread array is nil")
+      print("swift-backtrace: thread array is nil", to: &standardError)
       exit(1)
     }
 
@@ -202,12 +203,13 @@ class Target {
       var kr = mach_thread_info(ports[Int(ndx)], THREAD_IDENTIFIER_INFO,
                                 &threadIdInfo)
       if kr != KERN_SUCCESS {
-        print("swift-backtrace: unable to get thread info for thread \(ndx) - \(kr)")
+        print("swift-backtrace: unable to get thread info for thread \(ndx) - \(kr)",
+              to: &standardError)
         exit(1)
       }
 
       guard let info = threadIdInfo else {
-        print("swift-backtrace: thread info is nil")
+        print("swift-backtrace: thread info is nil", to: &standardError)
         exit(1)
       }
 
@@ -221,7 +223,8 @@ class Target {
       if kr == KERN_SUCCESS {
         threadName = extInfo.pth_swiftName
       } else {
-        print("unable to fetch ext info \(kr)")
+        print("swift-backtrace: unable to fetch ext info \(kr)",
+              to: &standardError)
         threadName = ""
       }
 
@@ -243,14 +246,16 @@ class Target {
                                                    using: reader,
                                                    limit: limit,
                                                    top: top) else {
-        print("unable to capture backtrace from context for thread \(ndx)")
+        print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
+              to: &standardError)
         exit(1)
       }
 
       guard let symbolicated = backtrace.symbolicated(with: images,
                                                       sharedCacheInfo: sharedCacheInfo,
                                                       useSymbolCache: cache) else {
-        print("unable to symbolicate backtrace from context for thread \(ndx)")
+        print("unable to symbolicate backtrace from context for thread \(ndx)",
+              to: &standardError)
         exit(1)
       }
 
@@ -273,14 +278,16 @@ class Target {
                                                    using: reader,
                                                    limit: limit,
                                                    top: top) else {
-        print("unable to capture backtrace from context for thread \(ndx)")
+        print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
+              to: &standardError)
         continue
       }
 
       guard let symbolicated = backtrace.symbolicated(with: images,
                                                       sharedCacheInfo: sharedCacheInfo,
                                                       useSymbolCache: cache) else {
-        print("unable to symbolicate backtrace from context for thread \(ndx)")
+        print("swift-backtrace: unable to symbolicate backtrace from context for thread \(ndx)",
+              to: &standardError)
         continue
       }
 
