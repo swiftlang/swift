@@ -1950,109 +1950,6 @@ public:
   }
 };
 
-/// A DebugVariable where storage for the strings has been
-/// tail-allocated following the parent SILInstruction.
-class TailAllocatedDebugVariable {
-  using int_type = uint32_t;
-  union {
-    int_type RawValue;
-    struct {
-      /// Whether this is a debug variable at all.
-      int_type HasValue : 1;
-      /// True if this is a let-binding.
-      int_type Constant : 1;
-      /// True if this variable is created by compiler
-      int_type Implicit : 1;
-      /// When this is nonzero there is a tail-allocated string storing
-      /// variable name present. This typically only happens for
-      /// instructions that were created from parsing SIL assembler.
-      int_type NameLength : 13;
-      /// The source function argument position from left to right
-      /// starting with 1 or 0 if this is a local variable.
-      int_type ArgNo : 16;
-    } Data;
-  } Bits;
-public:
-  TailAllocatedDebugVariable(
-      Optional<SILDebugVariable>, VarDecl *Decl, Identifier *Name,
-      SILType *AuxVarType = nullptr, SILLocation *DeclLoc = nullptr,
-      const SILDebugScope **DeclScope = nullptr,
-      const SILDebugInfoExpression **DbgInfoExpr = nullptr);
-  TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
-  int_type getRawValue() const { return Bits.RawValue; }
-
-  unsigned getArgNo() const { return Bits.Data.ArgNo; }
-  void setArgNo(unsigned N) { Bits.Data.ArgNo = N; }
-  bool isLet() const { return Bits.Data.Constant; }
-
-  bool isImplicit() const { return Bits.Data.Implicit; }
-  void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
-
-  Optional<SILDebugVariable>
-  get(SILModule &mod, Identifier name, Optional<SILType> AuxVarType = {},
-      Optional<SILLocation> DeclLoc = {},
-      const SILDebugScope *DeclScope = nullptr,
-      const SILDebugInfoExpression *DbgExpr = nullptr) const {
-    if (!Bits.Data.HasValue)
-      return None;
-
-    return SILDebugVariable(mod, name, isLet(), getArgNo(), isImplicit(),
-                            AuxVarType, DeclLoc, DeclScope, DbgExpr);
-  }
-};
-static_assert(sizeof(TailAllocatedDebugVariable) == 4,
-              "SILNode inline bitfield needs updating");
-
-/// Used for keeping track of advanced / supplement debug variable info
-/// stored in trailing objects space inside debug instructions (e.g.
-/// debug_value)
-class SILDebugVariableSupplement {
-protected:
-  enum SourceLocKind : unsigned { SLK_Loc = 0b01, SLK_Scope = 0b10 };
-
-  unsigned HasDebugInfoExpression : 1;
-
-  unsigned HasAuxDebugVariableType : 1;
-
-  unsigned AuxVariableSourceLoc : 2;
-
-  SILDebugVariableSupplement(bool HasDebugInfoExpression, bool AuxType,
-                             bool AuxLoc, bool AuxScope)
-      : HasDebugInfoExpression(HasDebugInfoExpression),
-        HasAuxDebugVariableType(AuxType),
-        AuxVariableSourceLoc((AuxLoc ? SLK_Loc : 0) |
-                             (AuxScope ? SLK_Scope : 0)) {}
-};
-
-#define SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()                          \
-  inline bool hasAuxDebugLocation() const {                                    \
-    return AuxVariableSourceLoc & SLK_Loc;                                     \
-  }                                                                            \
-  inline bool hasAuxDebugScope() const {                                       \
-    return AuxVariableSourceLoc & SLK_Scope;                                   \
-  }                                                                            \
-                                                                               \
-  size_t numTrailingObjects(OverloadToken<SILType>) const {                    \
-    return HasAuxDebugVariableType ? 1 : 0;                                    \
-  }                                                                            \
-                                                                               \
-  size_t numTrailingObjects(OverloadToken<SILLocation>) const {                \
-    return hasAuxDebugLocation() ? 1 : 0;                                      \
-  }                                                                            \
-                                                                               \
-  size_t numTrailingObjects(OverloadToken<const SILDebugScope *>) const {      \
-    return hasAuxDebugScope() ? 1 : 0;                                         \
-  }                                                                            \
-                                                                               \
-  bool hasAuxDebugInfoExpression() const { return HasDebugInfoExpression; }    \
-                                                                               \
-  size_t numTrailingObjects(OverloadToken<const SILDebugInfoExpression *>)     \
-      const {                                                                  \
-    return HasDebugInfoExpression;                                             \
-  }                                                                            \
-                                                                               \
-  size_t numTrailingObjects(OverloadToken<Identifier>) const { return true; }
-
 //===----------------------------------------------------------------------===//
 // Allocation Instructions
 //===----------------------------------------------------------------------===//
@@ -2080,14 +1977,11 @@ class DeallocStackInst;
 class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<
-          AllocStackInst, SILType, SILLocation, const SILDebugScope *,
-          const SILDebugInfoExpression *, Operand, Identifier> {
+      private llvm::TrailingObjects<AllocStackInst, Operand> {
   friend TrailingObjects;
   friend SILBuilder;
 
-  TailAllocatedDebugVariable VarInfo;
+  Optional<SILDebugVariable> VarInfo;
   USE_SHARED_UINT8;
   USE_SHARED_UINT32;
 
@@ -2101,7 +1995,7 @@ class AllocStackInst final
                                 bool hasDynamicLifetime, bool isLexical,
                                 bool usesMoveableValueDebugInfo);
 
-  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
+  // SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return sharedUInt32().AllocStackInst.numOperands;
@@ -2159,22 +2053,7 @@ public:
       return None;
     }
 
-    Optional<SILType> AuxVarType;
-    Optional<SILLocation> VarDeclLoc;
-    const SILDebugScope *VarDeclScope = nullptr;
-    const SILDebugInfoExpression *DbgInfoExpr = nullptr;
-
-    if (HasAuxDebugVariableType)
-      AuxVarType = *getTrailingObjects<SILType>();
-    if (hasAuxDebugLocation())
-      VarDeclLoc = *getTrailingObjects<SILLocation>();
-    if (hasAuxDebugScope())
-      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-    if (hasAuxDebugInfoExpression())
-      DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
-
-    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>(),
-                       AuxVarType, VarDeclLoc, VarDeclScope, DbgInfoExpr);
+    return VarInfo;
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -2214,11 +2093,14 @@ public:
     return false;
   }
 
-  void setArgNo(unsigned N) { VarInfo.setArgNo(N); }
+  void setArgNo(unsigned N) {
+    if (VarInfo)
+      VarInfo->ArgNo = N;
+  }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
-    if (hasAuxDebugScope())
-      *getTrailingObjects<const SILDebugScope *>() = NewDS;
+    if (VarInfo)
+      VarInfo->Scope = NewDS;
   }
 
   /// getElementType - Get the type of the allocated memory (as opposed to the
@@ -2449,11 +2331,10 @@ public:
 /// element is uninitialized.
 class AllocBoxInst final
     : public NullaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::AllocBoxInst, AllocBoxInst, AllocationInst,
-          Identifier> {
+          SILInstructionKind::AllocBoxInst, AllocBoxInst, AllocationInst> {
   friend SILBuilder;
 
-  TailAllocatedDebugVariable VarInfo;
+  Optional<SILDebugVariable> VarInfo;
 
   USE_SHARED_UINT8;
 
@@ -2491,9 +2372,7 @@ public:
   SILType getAddressType() const;
 
   /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>());
-  };
+  Optional<SILDebugVariable> getVarInfo() const { return VarInfo; };
 
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
@@ -5002,15 +4881,10 @@ public:
 /// types).
 class DebugValueInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<
-          DebugValueInst, SILType, SILLocation, const SILDebugScope *,
-          const SILDebugInfoExpression *, Identifier> {
-  friend TrailingObjects;
+                                  NonValueInstruction> {
   friend SILBuilder;
 
-  TailAllocatedDebugVariable VarInfo;
+  SILDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -5023,10 +4897,6 @@ class DebugValueInst final
   static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
                                     SILModule &M, SILDebugVariable Var,
                                     bool operandWasMoved, bool trace);
-
-  SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
-
-  size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
 public:
   /// Sets a bool that states this debug_value is supposed to use the
@@ -5047,29 +4917,9 @@ public:
   VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
-  Optional<SILDebugVariable> getVarInfo() const {
-    Optional<SILType> AuxVarType;
-    Optional<SILLocation> VarDeclLoc;
-    const SILDebugScope *VarDeclScope = nullptr;
-    const SILDebugInfoExpression *DbgInfoExpr = nullptr;
+  Optional<SILDebugVariable> getVarInfo() const { return VarInfo; }
 
-    if (HasAuxDebugVariableType)
-      AuxVarType = *getTrailingObjects<SILType>();
-    if (hasAuxDebugLocation())
-      VarDeclLoc = *getTrailingObjects<SILLocation>();
-    if (hasAuxDebugScope())
-      VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-    if (hasAuxDebugInfoExpression())
-      DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
-
-    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>(),
-                       AuxVarType, VarDeclLoc, VarDeclScope, DbgInfoExpr);
-  }
-
-  void setDebugVarScope(const SILDebugScope *NewDS) {
-    if (hasAuxDebugScope())
-      *getTrailingObjects<const SILDebugScope *>() = NewDS;
-  }
+  void setDebugVarScope(const SILDebugScope *NewDS) { VarInfo.Scope = NewDS; }
 
   /// Whether the SSA value associated with the current debug_value
   /// instruction has an address type.

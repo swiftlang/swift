@@ -148,52 +148,6 @@ static void collectTypeDependentOperands(
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-template <typename INST>
-static void *allocateDebugVarCarryingInst(SILModule &M,
-                                          Optional<SILDebugVariable> Var,
-                                          ArrayRef<SILValue> Operands = {}) {
-  return M.allocateInst(
-      sizeof(INST) + sizeof(Identifier) +
-          (Var && Var->Type ? sizeof(SILType) : 0) +
-          (Var && Var->Loc ? sizeof(SILLocation) : 0) +
-          (Var && Var->Scope ? sizeof(const SILDebugScope *) : 0) +
-          sizeof(uintptr_t) * (Var ? unsigned(bool(Var->DIExpr)) : 0) +
-          sizeof(Operand) * Operands.size(),
-      alignof(INST));
-}
-
-TailAllocatedDebugVariable::TailAllocatedDebugVariable(
-    Optional<SILDebugVariable> Var, VarDecl *VD, Identifier *Name,
-    SILType *AuxVarType, SILLocation *DeclLoc, const SILDebugScope **DeclScope,
-    const SILDebugInfoExpression **DbgInfoExpr) {
-  if (!Var) {
-    Bits.RawValue = 0;
-    return;
-  }
-
-  Bits.Data.HasValue = true;
-  Bits.Data.Constant = Var->Constant;
-  Bits.Data.ArgNo = Var->ArgNo;
-  Bits.Data.Implicit = Var->Implicit;
-  Bits.Data.NameLength = Var->getName().size();
-  assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
-  assert(Bits.Data.NameLength == Var->getName().size() && "Truncation");
-
-  if (!Var->Name.empty())
-    *Name = Var->Name;
-  else if (VD)
-    *Name = VD->getName();
-
-  if (AuxVarType && Var->Type)
-    *AuxVarType = *Var->Type;
-  if (DeclLoc && Var->Loc)
-    *DeclLoc = *Var->Loc;
-  if (DeclScope && Var->Scope)
-    *DeclScope = Var->Scope;
-  if (DbgInfoExpr && Var->DIExpr)
-    *DbgInfoExpr = Var->DIExpr;
-}
-
 Optional<SILDebugVariable>
 SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   Optional<SILDebugVariable> VarInfo;
@@ -227,14 +181,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                SILFunction &F, Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical,
                                bool usesMoveableValueDebugInfo)
-    : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? bool(Var->DIExpr) : false,
-                                 Var ? Var->Type.has_value() : false,
-                                 Var ? Var->Loc.has_value() : false,
-                                 Var ? Var->Scope != nullptr : false),
-      // Initialize VarInfo with a temporary raw value of 0. The real
-      // initialization can only be done after `numOperands` is set (see below).
-      VarInfo(0) {
+    : InstructionBase(Loc, elementType.getAddressType()) {
   sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocStackInst.lexical = isLexical;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
@@ -246,18 +193,31 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
   // VarInfo must be initialized after
   // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
   // addresses are wrong.
-  VarInfo = TailAllocatedDebugVariable(
-      Var, VD, getTrailingObjects<Identifier>(), getTrailingObjects<SILType>(),
-      getTrailingObjects<SILLocation>(),
-      getTrailingObjects<const SILDebugScope *>(),
-      getTrailingObjects<const SILDebugInfoExpression *>());
+  if (Var) {
+    VarInfo = SILDebugVariable();
+    VarInfo->Constant = Var->Constant;
+    VarInfo->ArgNo = Var->ArgNo;
+    VarInfo->Implicit = Var->Implicit;
+    if (!Var->Name.empty()) {
+      VarInfo->Name = Var->Name;
+    } else if (VD)
+      VarInfo->Name = VD->getName();
+    if (Var->Type)
+      VarInfo->Type = Var->Type;
+    if (Var->Loc)
+      VarInfo->Loc = Var->Loc;
+    if (Var->Scope)
+      VarInfo->Scope = Var->Scope;
+    if (Var->DIExpr)
+      VarInfo->DIExpr = Var->DIExpr;
+  }
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
              TypeDependentOperands.size() &&
          "Truncation");
 
   if (Var && VD) {
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
+    VarInfo->Implicit |= VD->isImplicit();
   }
   TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                          TypeDependentOperands);
@@ -271,8 +231,8 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
-  void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
-      F.getModule(), Var, TypeDependentOperands);
+  size_t numBytes = totalSizeToAlloc<Operand>(TypeDependentOperands.size());
+  void *Buffer = F.getModule().allocateInst(numBytes, alignof(AllocStackInst));
   return ::new (Buffer)
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
                      hasDynamicLifetime, isLexical, wasMoved);
@@ -378,8 +338,7 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            bool usesMoveableValueDebugInfo)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, Loc.getLocation().getAsASTNode<VarDecl>(),
-              getTrailingObjects<Identifier>()) {
+      VarInfo() {
   sharedUInt8().AllocBoxInst.dynamicLifetime = hasDynamicLifetime;
   sharedUInt8().AllocBoxInst.reflection = reflection;
 
@@ -389,6 +348,30 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
 
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
       usesMoveableValueDebugInfo;
+
+  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
+
+  // VarInfo must be initialized after
+  // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
+  // addresses are wrong.
+  if (Var) {
+    VarInfo = SILDebugVariable();
+    VarInfo->Constant = Var->Constant;
+    VarInfo->ArgNo = Var->ArgNo;
+    VarInfo->Implicit = Var->Implicit;
+    if (!Var->Name.empty()) {
+      VarInfo->Name = Var->Name;
+    } else if (VD)
+      VarInfo->Name = VD->getName();
+    if (Var->Type)
+      VarInfo->Type = Var->Type;
+    if (Var->Loc)
+      VarInfo->Loc = Var->Loc;
+    if (Var->Scope)
+      VarInfo->Scope = Var->Scope;
+    if (Var->DIExpr)
+      VarInfo->DIExpr = Var->DIExpr;
+  }
 }
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
@@ -398,8 +381,7 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                                    bool usesMoveableValueDebugInfo) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
-  auto Sz = totalSizeToAlloc<swift::Operand, Identifier>(
-      TypeDependentOperands.size(), 1);
+  auto Sz = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf)
       AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
@@ -415,16 +397,27 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs,
                                bool usesMoveableValueDebugInfo, bool trace)
-    : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(bool(Var.DIExpr), Var.Type.has_value(),
-                                 Var.Loc.has_value(), Var.Scope),
-      VarInfo(Var, DebugLoc.getLocation().getAsASTNode<VarDecl>(),
-              getTrailingObjects<Identifier>(), getTrailingObjects<SILType>(),
-              getTrailingObjects<SILLocation>(),
-              getTrailingObjects<const SILDebugScope *>(),
-              getTrailingObjects<const SILDebugInfoExpression *>()) {
-  if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
-    VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
+    : UnaryInstructionBase(DebugLoc, Operand), VarInfo() {
+
+  auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>();
+  VarInfo.Constant = Var.Constant;
+  VarInfo.ArgNo = Var.ArgNo;
+  VarInfo.Implicit = Var.Implicit;
+  if (!Var.Name.empty()) {
+    VarInfo.Name = Var.Name;
+  } else if (VD)
+    VarInfo.Name = VD->getName();
+  if (Var.Type)
+    VarInfo.Type = Var.Type;
+  if (Var.Loc)
+    VarInfo.Loc = Var.Loc;
+  if (Var.Scope)
+    VarInfo.Scope = Var.Scope;
+  if (Var.DIExpr)
+    VarInfo.DIExpr = Var.DIExpr;
+
+  if (VD)
+    VarInfo.Implicit |= VD->isImplicit();
   setPoisonRefs(poisonRefs);
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
@@ -435,7 +428,7 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
                                        SILDebugVariable Var, bool poisonRefs,
                                        bool wasMoved, bool trace) {
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  void *buf = M.allocateInst(sizeof(DebugValueInst), alignof(DebugValueInst));
   return ::new (buf)
     DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
 }
@@ -449,17 +442,15 @@ DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
   if (!isa<AllocStackInst>(Operand))
     Var.prependingElements(M, {SILDIExprElement::createOperator(
                                   M, SILDIExprOperator::Dereference)});
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  void *buf = M.allocateInst(sizeof(DebugValueInst), alignof(DebugValueInst));
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
                                     /*poisonRefs=*/false, wasMoved, trace);
 }
 
 bool DebugValueInst::exprStartsWithDeref() const {
-  if (!hasAuxDebugInfoExpression())
-    return false;
-
-  auto *expr = *getTrailingObjects<const SILDebugInfoExpression *>();
-  return expr->startsWithDeref();
+  if (auto *diExpr = VarInfo.DIExpr)
+    return diExpr->startsWithDeref();
+  return false;
 }
 
 VarDecl *DebugValueInst::getDecl() const {
