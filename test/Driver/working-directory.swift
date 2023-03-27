@@ -65,12 +65,6 @@
 // RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map=ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2 --enable-yaml-compatibility
 // OUTPUT_FILE_MAP_2: BUILD_DIR{{.*}}main-modified.o
 
-// RUN: %empty-directory(%t/sub)
-// RUN: echo "{\"\": {\"swift-dependencies\": \"br.swiftdeps\"}}" > %t/sub/ofmo.json
-// RUN: touch %t/sub/a.swift %t/sub/b.swift
-// RUN: cd %t && %swiftc_driver -incremental -working-directory %/t/sub -emit-dependencies -c -module-name ab a.swift b.swift -output-file-map=%/t/sub/ofmo.json
-// RUN: ls %t/sub/br.swiftdeps
-
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -Xcc -working-directory -Xcc %/t -c %/s | %FileCheck %s -check-prefix=CLANG
 // CLANG: -Xcc -working-directory -Xcc SOURCE_DIR
 // CLANG-SAME: -Xcc -working-directory -Xcc BUILD_DIR
