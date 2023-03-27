@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Mutex.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -580,18 +581,20 @@ class SwiftDependencyScanningService {
   llvm::StringMap<std::unique_ptr<ContextSpecificGlobalCacheState>>
       ContextSpecificCacheMap;
 
-  /// The current context hash configuration
-  Optional<std::string> CurrentContextHash;
-
   /// The context hashes used by scanners using this cache, in the order in
   /// which they were used
   std::vector<std::string> AllContextHashes;
 
+  /// Shared state mutual-exclusivity lock
+  llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
+
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
-  ModuleNameToDependencyMap &getDependenciesMap(ModuleDependencyKind kind);
+  ModuleNameToDependencyMap &getDependenciesMap(ModuleDependencyKind kind,
+                                                StringRef scanContextHash);
   const ModuleNameToDependencyMap &
-  getDependenciesMap(ModuleDependencyKind kind) const;
+  getDependenciesMap(ModuleDependencyKind kind,
+                     StringRef scanContextHash) const;
 
 public:
   SwiftDependencyScanningService();
@@ -613,8 +616,8 @@ public:
     return *SharedFilesystemCache;
   }
 
-  llvm::StringSet<>& getAlreadySeenClangModules() {
-    return getCurrentCache()->alreadySeenClangModules;
+  llvm::StringSet<>& getAlreadySeenClangModules(StringRef scanningContextHash) {
+    return getCacheForScanningContextHash(scanningContextHash)->alreadySeenClangModules;
   }
 
   /// Wrap the filesystem on the specified `CompilerInstance` with a
@@ -630,7 +633,7 @@ private:
 
   /// Configure the current state of the cache to respond to queries
   /// for the specified scanning context hash.
-  void configureForContextHash(std::string scanningContextHash);
+  void configureForContextHash(StringRef scanningContextHash);
 
   /// Return context hashes of all scanner invocations that have used
   /// this cache instance.
@@ -640,15 +643,12 @@ private:
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
-                     Optional<ModuleDependencyKind> kind) const;
-
-  /// Return a pointer to the context-specific cache state of the current
-  /// scanning action.
-  ContextSpecificGlobalCacheState *getCurrentCache() const;
+                     Optional<ModuleDependencyKind> kind,
+                     StringRef scanContextHash) const;
 
   /// Return a pointer to the cache state of the specified context hash.
   ContextSpecificGlobalCacheState *
-  getCacheForScanningContextHash(StringRef scanningContextHash) const;
+  getCacheForScanningContextHash(StringRef scanContextHash) const;
 
   /// Look for source-based module dependency details
   Optional<const ModuleDependencyInfo*>
@@ -659,15 +659,22 @@ private:
   /// \returns the cached result, or \c None if there is no cached entry.
   Optional<const ModuleDependencyInfo*>
   findDependency(StringRef moduleName,
-                 Optional<ModuleDependencyKind> kind) const;
+                 Optional<ModuleDependencyKind> kind,
+                 StringRef scanContextHash) const;
 
   /// Record dependencies for the given module.
   const ModuleDependencyInfo *recordDependency(StringRef moduleName,
-                                               ModuleDependencyInfo dependencies);
+                                               ModuleDependencyInfo dependencies,
+                                               StringRef scanContextHash);
+
+  /// Record source-module dependencies for the given module.
+  const ModuleDependencyInfo *recordSourceDependency(StringRef moduleName,
+                                                     ModuleDependencyInfo dependencies);
 
   /// Update stored dependencies for the given module.
   const ModuleDependencyInfo *updateDependency(ModuleDependencyID moduleID,
-                                               ModuleDependencyInfo dependencies);
+                                               ModuleDependencyInfo dependencies,
+                                               StringRef scanContextHash);
 
   /// Reference the list of all module dependencies that are not source-based
   /// modules (i.e. interface dependencies, binary dependencies, clang
@@ -727,7 +734,7 @@ public:
     return clangScanningTool;
   }
   llvm::StringSet<>& getAlreadySeenClangModules() {
-    return globalScanningService.getAlreadySeenClangModules();
+    return globalScanningService.getAlreadySeenClangModules(scannerContextHash);
   }
   
   /// Look for module dependencies for a module with the given name

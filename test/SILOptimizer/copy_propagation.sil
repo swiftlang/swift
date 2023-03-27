@@ -305,13 +305,15 @@ bb0(%0 : @owned $B):
 
 // FIXME: mark_dependence is currently a PointerEscape, so dependent live ranges are not canonicalized.
 //
-// CHECK-LABEL: sil [ossa] @testMarkDependence : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+// CHECK-LABEL: sil [ossa] @testMarkDependence : {{.*}} {
 // CHECK: copy_value
 // CHECK: destroy_value
 // CHECK: destroy_value
 // CHECK-LABEL: } // end sil function 'testMarkDependence'
-sil [ossa] @testMarkDependence : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
-bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
+sil [ossa] @testMarkDependence : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %getOwnedB = function_ref @getOwnedB : $@convention(thin) () -> (@owned B)
+  %1 = apply %getOwnedB() : $@convention(thin) () -> (@owned B)
   %ptr = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
   %val = load [trivial] %ptr : $*Builtin.Int64
   %copy = copy_value %1 : $B
@@ -831,16 +833,18 @@ bb4:
 // Test a dead begin_borrow (with no scope ending uses). Make sure
 // copy-propagation doesn't end the lifetime before the dead borrow.
 //
-// CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : $@convention(thin) (@owned C) -> () {
-// CHECK: bb0(%0 : @owned $C):
-// CHECK:   copy_value %0 : $C
+// CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
+// CHECK: bb0:
+// CHECK:   copy_value %1 : $C
 // CHECK:   destroy_value
-// CHECK:   copy_value %0 : $C
+// CHECK:   copy_value %1 : $C
 // CHECK:   begin_borrow
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
-sil hidden [ossa] @testDeadBorrow : $@convention(thin) (@owned C) -> () {
-bb0(%0 : @owned $C):
+sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {
+bb0:
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %0 = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
   %1 = copy_value %0 : $C
   destroy_value %1 : $C
   %6 = copy_value %0 : $C
@@ -988,4 +992,27 @@ bb0:
   dealloc_stack %14 : $*Optional<@callee_guaranteed () -> ()>
   %99 = tuple ()
   return %99 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_destroy_of_copy_of_lexical_over_deinit_barrier : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned
+// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK:         [[BORROW:%[^,]+]] = function_ref @takeGuaranteedC
+// CHECK:         apply [[BORROW]]([[INSTANCE]])
+// The destroy of the copy should be hoisted over the deinit barrier, and then
+// canonicalization of the lexical value should remove the copy.
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         apply [[BARRIER]]()
+// CHECK-LABEL: } // end sil function 'hoist_destroy_of_copy_of_lexical_over_deinit_barrier'
+sil [ossa] @hoist_destroy_of_copy_of_lexical_over_deinit_barrier : $(@owned C) -> () {
+entry(%instance : @owned $C):
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  %borrow = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %copy = copy_value %instance : $C
+  apply %borrow(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  apply %barrier() : $@convention(thin) () -> ()
+  destroy_value %copy : $C
+  %retval = tuple ()
+  return %retval : $()
 }
