@@ -139,6 +139,8 @@ class PluginRegistry {
   /// Flag to dump plugin messagings.
   bool dumpMessaging = false;
 
+  std::mutex mtx;
+
 public:
   PluginRegistry();
 

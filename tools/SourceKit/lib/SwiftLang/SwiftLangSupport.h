@@ -293,8 +293,9 @@ class Session {
 
 public:
   Session(const std::string &RuntimeResourcePath,
-          const std::string &DiagnosticDocumentationPath)
-  : Compiler(RuntimeResourcePath, DiagnosticDocumentationPath) {}
+          const std::string &DiagnosticDocumentationPath,
+          std::shared_ptr<swift::PluginRegistry> Plugins)
+      : Compiler(RuntimeResourcePath, DiagnosticDocumentationPath, Plugins) {}
 
   bool
   performCompile(llvm::ArrayRef<const char *> Args,
@@ -308,6 +309,7 @@ public:
 class SessionManager {
   const std::string &RuntimeResourcePath;
   const std::string &DiagnosticDocumentationPath;
+  const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   llvm::StringMap<std::shared_ptr<Session>> sessions;
   WorkQueue compileQueue{WorkQueue::Dequeuing::Concurrent,
@@ -316,9 +318,11 @@ class SessionManager {
 
 public:
   SessionManager(std::string &RuntimeResourcePath,
-                 std::string &DiagnosticDocumentationPath)
+                 std::string &DiagnosticDocumentationPath,
+                 std::shared_ptr<swift::PluginRegistry> Plugins)
       : RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath) {}
+        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
+        Plugins(Plugins) {}
 
   std::shared_ptr<Session> getSession(StringRef name);
 
@@ -356,7 +360,7 @@ class SwiftLangSupport : public LangSupport {
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
   std::shared_ptr<swift::ide::IDEInspectionInstance> IDEInspectionInst;
-  compile::SessionManager CompileManager;
+  std::shared_ptr<compile::SessionManager> CompileManager;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);

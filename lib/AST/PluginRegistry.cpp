@@ -45,6 +45,7 @@ PluginRegistry::PluginRegistry() {
 }
 
 llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
+  std::lock_guard<std::mutex> lock(mtx);
   auto found = LoadedPluginLibraries.find(path);
   if (found != LoadedPluginLibraries.end()) {
     // Already loaded.
@@ -73,6 +74,8 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
   if (auto err = llvm::sys::fs::status(path, stat)) {
     return llvm::errorCodeToError(err);
   }
+
+  std::lock_guard<std::mutex> lock(mtx);
 
   // See if the plugin is already loaded.
   auto &storage = LoadedPluginExecutables[path];
