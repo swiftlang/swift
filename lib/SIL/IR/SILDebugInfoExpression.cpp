@@ -66,12 +66,53 @@ void SILDebugInfoExpression::op_iterator::increment() {
   }
 }
 
-SILDebugInfoExpression SILDebugInfoExpression::createFragment(SILModule &mod,
-                                                              VarDecl *Field) {
-  assert(Field);
-  return SILDebugInfoExpression(
-      {SILDIExprElement::createOperator(mod, SILDIExprOperator::Fragment),
-       SILDIExprElement::createDecl(mod, Field)});
+SILDebugInfoExpression *
+SILDebugInfoExpression::get(SILModule &mod,
+                            ArrayRef<const SILDIExprElement *> start,
+                            ArrayRef<const SILDIExprElement *> end) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, start);
+  Profile(id, end);
+
+  void *insertPos;
+  auto existing = mod.diExprs.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  unsigned numTrailingElts = start.size() + end.size();
+  unsigned numBytes =
+      totalSizeToAlloc<const SILDIExprElement *>(numTrailingElts);
+  void *mem = mod.allocate(numBytes, alignof(SILDebugInfoExpression));
+  auto *diExpr = new (mem) SILDebugInfoExpression();
+  diExpr->numElts = numTrailingElts;
+  auto elements = llvm::makeMutableArrayRef(
+      diExpr->getTrailingObjects<const SILDIExprElement *>(), numTrailingElts);
+  unsigned index = 0;
+  for (auto &elt : start)
+    elements[index++] = elt;
+  for (auto &elt : end)
+    elements[index++] = elt;
+  assert(diExpr->getElements().size() == numTrailingElts);
+  for (auto &elt : diExpr->getElements())
+    assert(elt);
+  mod.diExprs.InsertNode(diExpr, insertPos);
+  return diExpr;
+}
+
+SILDebugInfoExpression *SILDebugInfoExpression::createFragment(SILModule &mod,
+                                                               VarDecl *field) {
+  assert(field);
+  std::array<const SILDIExprElement *, 2> inputs = {
+      SILDIExprElement::createOperator(mod, SILDIExprOperator::Fragment),
+      SILDIExprElement::createDecl(mod, field)};
+  return SILDebugInfoExpression::get(mod, inputs);
+}
+
+void SILDebugInfoExpression::Profile(
+    llvm::FoldingSetNodeID &id, ArrayRef<const SILDIExprElement *> elements) {
+  for (auto &e : elements) {
+    e->Profile(id);
+  }
 }
 
 SILDIExprElement *SILDIExprElement::createOperator(SILModule &mod,

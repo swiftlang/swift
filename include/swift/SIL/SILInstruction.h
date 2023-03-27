@@ -1973,11 +1973,11 @@ class TailAllocatedDebugVariable {
     } Data;
   } Bits;
 public:
-  TailAllocatedDebugVariable(Optional<SILDebugVariable>, Identifier *Name,
-                             SILType *AuxVarType = nullptr,
-                             SILLocation *DeclLoc = nullptr,
-                             const SILDebugScope **DeclScope = nullptr,
-                             const SILDIExprElement **DIExprOps = nullptr);
+  TailAllocatedDebugVariable(
+      Optional<SILDebugVariable>, Identifier *Name,
+      SILType *AuxVarType = nullptr, SILLocation *DeclLoc = nullptr,
+      const SILDebugScope **DeclScope = nullptr,
+      const SILDebugInfoExpression **DbgInfoExpr = nullptr);
   TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
   int_type getRawValue() const { return Bits.RawValue; }
 
@@ -1995,14 +1995,14 @@ public:
   get(SILModule &mod, VarDecl *VD, Identifier name,
       Optional<SILType> AuxVarType = {}, Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
-      llvm::ArrayRef<const SILDIExprElement *> DIExprElements = {}) const {
+      const SILDebugInfoExpression *DbgExpr = nullptr) const {
     if (!Bits.Data.HasValue)
       return None;
 
     if (VD && name.empty())
       name = VD->getName();
     return SILDebugVariable(mod, name, isLet(), getArgNo(), isImplicit(),
-                            AuxVarType, DeclLoc, DeclScope, DIExprElements);
+                            AuxVarType, DeclLoc, DeclScope, DbgExpr);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -2015,15 +2015,16 @@ class SILDebugVariableSupplement {
 protected:
   enum SourceLocKind : unsigned { SLK_Loc = 0b01, SLK_Scope = 0b10 };
 
-  unsigned NumDIExprOperands : 8;
+  unsigned HasDebugInfoExpression : 1;
 
   unsigned HasAuxDebugVariableType : 1;
 
   unsigned AuxVariableSourceLoc : 2;
 
-  SILDebugVariableSupplement(unsigned NumDIExprOps, bool AuxType, bool AuxLoc,
-                             bool AuxScope)
-      : NumDIExprOperands(NumDIExprOps), HasAuxDebugVariableType(AuxType),
+  SILDebugVariableSupplement(bool HasDebugInfoExpression, bool AuxType,
+                             bool AuxLoc, bool AuxScope)
+      : HasDebugInfoExpression(HasDebugInfoExpression),
+        HasAuxDebugVariableType(AuxType),
         AuxVariableSourceLoc((AuxLoc ? SLK_Loc : 0) |
                              (AuxScope ? SLK_Scope : 0)) {}
 };
@@ -2048,8 +2049,11 @@ protected:
     return hasAuxDebugScope() ? 1 : 0;                                         \
   }                                                                            \
                                                                                \
-  size_t numTrailingObjects(OverloadToken<const SILDIExprElement *>) const {   \
-    return NumDIExprOperands;                                                  \
+  bool hasAuxDebugInfoExpression() const { return HasDebugInfoExpression; }    \
+                                                                               \
+  size_t numTrailingObjects(OverloadToken<const SILDebugInfoExpression *>)     \
+      const {                                                                  \
+    return HasDebugInfoExpression;                                             \
   }                                                                            \
                                                                                \
   size_t numTrailingObjects(OverloadToken<Identifier>) const { return true; }
@@ -2084,7 +2088,7 @@ class AllocStackInst final
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<
           AllocStackInst, SILType, SILLocation, const SILDebugScope *,
-          const SILDIExprElement *, Operand, Identifier> {
+          const SILDebugInfoExpression *, Operand, Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2163,20 +2167,20 @@ public:
     Optional<SILType> AuxVarType;
     Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+    const SILDebugInfoExpression *DbgInfoExpr = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
-
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-
-    llvm::ArrayRef<const SILDIExprElement *> DIExprElements(
-        getTrailingObjects<const SILDIExprElement *>(), NumDIExprOperands);
+    if (hasAuxDebugInfoExpression())
+      DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
 
     return VarInfo.get(getModule(), getDecl(),
                        *getTrailingObjects<Identifier>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, DbgInfoExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -5007,9 +5011,9 @@ class DebugValueInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
                                   NonValueInstruction>,
       private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *,
-                                    const SILDIExprElement *, Identifier> {
+      private llvm::TrailingObjects<
+          DebugValueInst, SILType, SILLocation, const SILDebugScope *,
+          const SILDebugInfoExpression *, Identifier> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5054,20 +5058,20 @@ public:
     Optional<SILType> AuxVarType;
     Optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
+    const SILDebugInfoExpression *DbgInfoExpr = nullptr;
+
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
-
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-
-    llvm::ArrayRef<const SILDIExprElement *> DIExprElements(
-        getTrailingObjects<const SILDIExprElement *>(), NumDIExprOperands);
+    if (hasAuxDebugInfoExpression())
+      DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
 
     return VarInfo.get(getModule(), getDecl(),
                        *getTrailingObjects<Identifier>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, DbgInfoExpr);
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {

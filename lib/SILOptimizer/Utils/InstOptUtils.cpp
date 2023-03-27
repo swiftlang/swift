@@ -1858,7 +1858,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      if (VarInfo->DIExpr.hasFragment())
+      if (VarInfo->hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
         // existing op_fragment in DIExpression.
@@ -1870,7 +1870,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         // Build the corresponding fragment DIExpression
         auto FragDIExpr =
             SILDebugInfoExpression::createFragment(STI->getModule(), FD);
-        NewVarInfo.DIExpr.append(FragDIExpr);
+        NewVarInfo.appendingElements(STI->getModule(), FragDIExpr);
 
         if (!NewVarInfo.Type)
           NewVarInfo.Type = STI->getType();
@@ -1902,7 +1902,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           auto VarInfo = DbgInst->getVarInfo();
           if (!VarInfo)
             continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
+          VarInfo->prependingElements(DbgInst->getModule(), ExprElements);
           // Create a new debug_value
           SILBuilder(IA, DbgInst->getDebugScope())
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
@@ -1924,15 +1924,17 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
 
     // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
+    if (!varInfo || varInfo->hasFragment())
       continue;
 
     SILType baseType = oldValue->getType();
 
     // Copy VarInfo and add the corresponding fragment DIExpression.
     SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(SILDebugInfoExpression::createFragment(
-        debugVal->getModule(), proj.getVarDecl(baseType)));
+    newVarInfo.appendingElements(
+        debugVal->getModule(),
+        SILDebugInfoExpression::createFragment(debugVal->getModule(),
+                                               proj.getVarDecl(baseType)));
 
     if (!newVarInfo.Type)
       newVarInfo.Type = baseType;

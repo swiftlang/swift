@@ -1303,11 +1303,11 @@ public:
     }
   }
 
-  void printDebugInfoExpression(const SILDebugInfoExpression &DIExpr) {
+  void printDebugInfoExpression(const SILDebugInfoExpression *DIExpr) {
     assert(DIExpr && "DIExpression empty?");
     *this << ", expr ";
     bool IsFirst = true;
-    for (const auto &Operand : DIExpr.operands()) {
+    for (const auto &Operand : DIExpr->operands()) {
       if (IsFirst)
         IsFirst = false;
       else

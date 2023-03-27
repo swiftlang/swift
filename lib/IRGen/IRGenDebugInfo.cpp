@@ -2538,7 +2538,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
   assert(VarInfo.DIExpr && "SIL debug info expression not found");
 
   const auto &DIExpr = VarInfo.DIExpr;
-  for (const SILDIExprOperand &ExprOperand : DIExpr.operands()) {
+  for (const SILDIExprOperand &ExprOperand : DIExpr->operands()) {
     switch (ExprOperand.getOperator()) {
     case SILDIExprOperator::Fragment:
       if (!handleFragmentDIExpr(ExprOperand, Operands))

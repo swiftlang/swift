@@ -427,7 +427,7 @@ namespace swift {
                         StringRef &OpcodeName);
     bool parseSILDebugVar(SILDebugVariable &Var);
 
-    bool parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr);
+    bool parseSILDebugInfoExpression(const SILDebugInfoExpression *&DIExpr);
 
     /// Parses the basic block arguments as part of branch instruction.
     bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args, SILBuilder &B);
@@ -1804,7 +1804,8 @@ bool SILParser::parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
   return false;
 }
 
-bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
+bool SILParser::parseSILDebugInfoExpression(
+    const SILDebugInfoExpression *&DIExpr) {
   if (P.Tok.getText() != "expr")
     return true;
 
@@ -1819,6 +1820,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
   };
 
   auto &mod = F->getModule();
+  SmallVector<const SILDIExprElement *, 16> parsedElts;
   do {
     P.consumeToken();
     bool FoundOp = false;
@@ -1829,7 +1831,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
       if (OpText != P.Tok.getText())
         continue;
       auto NewOperator = SILDIExprElement::createOperator(mod, Op);
-      DIExpr.push_back(NewOperator);
+      parsedElts.push_back(NewOperator);
       P.consumeToken();
 
       // Ready to parse the operands
@@ -1847,7 +1849,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             return true;
           }
           auto NewOperand = SILDIExprElement::createDecl(mod, Result.getDecl());
-          DIExpr.push_back(NewOperand);
+          parsedElts.push_back(NewOperand);
           break;
         }
         case SILDIExprElement::ConstIntKind: {
@@ -1863,7 +1865,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             Val = -Val;
           auto NewOperand =
               SILDIExprElement::createConstInt(mod, static_cast<uint64_t>(Val));
-          DIExpr.push_back(NewOperand);
+          parsedElts.push_back(NewOperand);
           break;
         }
         default:
@@ -1881,6 +1883,8 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
       return true;
     }
   } while (P.Tok.is(tok::colon));
+
+  DIExpr = SILDebugInfoExpression::get(SILMod, parsedElts);
 
   return false;
 }

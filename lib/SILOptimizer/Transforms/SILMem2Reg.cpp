@@ -322,9 +322,7 @@ static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
   // Drop op_deref if dvai is actually a debug_value instruction
   auto varInfo = *dvai->getVarInfo();
   if (isa<DebugValueInst>(dvai)) {
-    auto &diExpr = varInfo.DIExpr;
-    if (diExpr)
-      diExpr.eraseElement(diExpr.element_begin());
+    varInfo.eraseDeref(dvai->getModule());
   }
 
   SILBuilderWithScope b(dvai, ctx);

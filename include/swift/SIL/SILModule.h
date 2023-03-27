@@ -183,6 +183,7 @@ public:
 private:
   friend KeyPathPattern;
   friend SILDIExprElement;
+  friend SILDebugInfoExpression;
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
@@ -399,6 +400,9 @@ private:
 #ifndef NDEBUG
   BasicBlockNameMapType basicBlockNames;
 #endif
+
+  /// Debug info expression folding set.
+  llvm::FoldingSet<SILDebugInfoExpression> diExprs;
 
   /// Debug info expression element folding set.
   llvm::FoldingSet<SILDIExprElement> diExprElements;

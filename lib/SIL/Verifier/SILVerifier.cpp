@@ -1355,7 +1355,7 @@ public:
         if (DebugVarTy.isAddress()) {
           // FIXME: op_deref could be applied to address types only.
           // FIXME: Add this check
-          if (varInfo->DIExpr.startsWithDeref())
+          if (varInfo->exprStartsWithDeref())
             DebugVarTy = DebugVarTy.getObjectType();
         }
         break;
@@ -1408,8 +1408,7 @@ public:
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
-      for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
-           It != ItEnd;) {
+      for (auto It = DIExpr->begin(), ItEnd = DIExpr->end(); It != ItEnd;) {
         require((*It)->getKind() == SILDIExprElement::OperatorKind,
                 "dangling di-expression operand");
         auto Op = (*It)->getAsOperator();

@@ -5103,8 +5103,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     SILTy = *MaybeSILTy;
   } else {
     SILTy = SILVal->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
+    IsFragmentType = VarInfo->hasFragment();
   }
 
   auto RealTy = SILTy.getASTType();
@@ -5502,8 +5501,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     SILTy = *MaybeSILTy;
   } else {
     SILTy = i->getType();
-    if (VarInfo->DIExpr)
-      IsFragmentType = VarInfo->DIExpr.hasFragment();
+    IsFragmentType = VarInfo->hasFragment();
   }
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
