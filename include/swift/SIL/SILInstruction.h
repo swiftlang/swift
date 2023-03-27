@@ -1974,7 +1974,7 @@ class TailAllocatedDebugVariable {
   } Bits;
 public:
   TailAllocatedDebugVariable(
-      Optional<SILDebugVariable>, Identifier *Name,
+      Optional<SILDebugVariable>, VarDecl *Decl, Identifier *Name,
       SILType *AuxVarType = nullptr, SILLocation *DeclLoc = nullptr,
       const SILDebugScope **DeclScope = nullptr,
       const SILDebugInfoExpression **DbgInfoExpr = nullptr);
@@ -1983,24 +1983,19 @@ public:
 
   unsigned getArgNo() const { return Bits.Data.ArgNo; }
   void setArgNo(unsigned N) { Bits.Data.ArgNo = N; }
-  /// Returns the name of the source variable, if it is stored in the
-  /// instruction.
-  StringRef getName(const char *buf) const;
   bool isLet() const { return Bits.Data.Constant; }
 
   bool isImplicit() const { return Bits.Data.Implicit; }
   void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
 
   Optional<SILDebugVariable>
-  get(SILModule &mod, VarDecl *VD, Identifier name,
-      Optional<SILType> AuxVarType = {}, Optional<SILLocation> DeclLoc = {},
+  get(SILModule &mod, Identifier name, Optional<SILType> AuxVarType = {},
+      Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       const SILDebugInfoExpression *DbgExpr = nullptr) const {
     if (!Bits.Data.HasValue)
       return None;
 
-    if (VD && name.empty())
-      name = VD->getName();
     return SILDebugVariable(mod, name, isLet(), getArgNo(), isImplicit(),
                             AuxVarType, DeclLoc, DeclScope, DbgExpr);
   }
@@ -2178,9 +2173,8 @@ public:
     if (hasAuxDebugInfoExpression())
       DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
 
-    return VarInfo.get(getModule(), getDecl(),
-                       *getTrailingObjects<Identifier>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DbgInfoExpr);
+    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>(),
+                       AuxVarType, VarDeclLoc, VarDeclScope, DbgInfoExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -2498,8 +2492,7 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getModule(), getDecl(),
-                       *getTrailingObjects<Identifier>());
+    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>());
   };
 
   void setUsesMoveableValueDebugInfo() {
@@ -5069,9 +5062,8 @@ public:
     if (hasAuxDebugInfoExpression())
       DbgInfoExpr = *getTrailingObjects<const SILDebugInfoExpression *>();
 
-    return VarInfo.get(getModule(), getDecl(),
-                       *getTrailingObjects<Identifier>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DbgInfoExpr);
+    return VarInfo.get(getModule(), *getTrailingObjects<Identifier>(),
+                       AuxVarType, VarDeclLoc, VarDeclScope, DbgInfoExpr);
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
