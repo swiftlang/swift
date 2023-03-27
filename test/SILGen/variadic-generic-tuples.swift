@@ -283,3 +283,11 @@ struct MemberwiseTupleHolder<each T> {
 func callVariadicMemberwiseInit() -> MemberwiseTupleHolder<Int, String> {
   return MemberwiseTupleHolder(content: (0, "hello"))
 }
+
+// rdar://107151145: when we tuple-destructure a black hole
+// initialization, the resulting element initializations need to
+// handle pack expansion initialization
+struct EmptyContainer<each T> {}
+func f<each T>(_: repeat each T) {
+  let _ = (repeat EmptyContainer<each T>())
+}
