@@ -1,4 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros
+// REQUIRES: OS=macosx
+
 protocol P { }
 protocol Q { associatedtype Assoc }
 
@@ -15,7 +17,7 @@ protocol Q { associatedtype Assoc }
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm5'; the type must be public and provided via '-load-plugin-library'}}
 
 @freestanding(expression) macro m6 = A // expected-error{{expected '(' for macro parameters or ':' for a value-like macro}}
-// expected-error@-1{{macro must itself be defined by a macro expansion such as '#externalMacro(...)'}}
+// expected-error@-1{{by a macro expansion}}
 
 // expected-error @+2 {{expected '('}}
 // expected-error @+1 {{macro 'm7' must declare its applicable roles}}

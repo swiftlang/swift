@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/CASTBridging.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -54,6 +55,16 @@ extern "C" void *swift_ASTGen_resolveExecutableMacro(
     const char *typeName, ptrdiff_t typeNameLength,
     void * opaquePluginHandle);
 extern "C" void swift_ASTGen_destroyExecutableMacro(void *macro);
+
+extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
+    void *diagEngine,
+    void *sourceFile,
+    const void *macroSourceLocation,
+    char **expansionSourcePtr,
+    ptrdiff_t *expansionSourceLength,
+    ptrdiff_t **replacementsPtr,
+    ptrdiff_t *numReplacements
+);
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
@@ -108,60 +119,6 @@ static void const *lookupMacroTypeMetadataByExternalName(
 }
 #endif
 
-/// Handle the "A.B" spelling of an external macro definition, from early
-/// pitches of the expression-macros proposal, which is also used as the syntax
-/// for builtin macro definitions.
-///
-/// \returns The macro definition if the pattern is recognized, or \c None
-/// otherwise.
-static Optional<MacroDefinition> handleOldStyleOrBuiltinMacroDefinition(
-    ASTContext &ctx, Expr *expr
-) {
-  auto memberExpr = dyn_cast<UnresolvedDotExpr>(expr);
-  if (!memberExpr)
-    return None;
-
-  Expr *base = memberExpr->getBase();
-  auto baseDeclRef = dyn_cast<UnresolvedDeclRefExpr>(base);
-  if (!baseDeclRef)
-    return None;
-
-  if (memberExpr->getName().isSpecial() ||
-      baseDeclRef->getName().isSpecial())
-    return None;
-
-  Identifier moduleName = baseDeclRef->getName().getBaseIdentifier();
-  Identifier typeName = memberExpr->getName().getBaseIdentifier();
-
-  // If this is a reference to the builtin module, check if it's a known
-  // builtin macro.
-  if (moduleName.str().equals("Builtin") && ctx.SILOpts.ParseStdlib) {
-    if (typeName.str() == "ExternalMacro") {
-      return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
-    }
-
-    ctx.Diags.diagnose(
-        memberExpr->getLoc(), diag::macro_definition_unknown_builtin,
-        typeName
-    );
-
-    return MacroDefinition::forInvalid();
-  }
-
-  std::string newCode;
-  {
-    llvm::raw_string_ostream out(newCode);
-    out << "#externalMacro(module: \"" << moduleName << "\", type: \""
-        << typeName << "\")";
-  }
-
-  ctx.Diags.diagnose(
-      memberExpr->getLoc(), diag::macro_definition_old_style
-  ).fixItReplace(memberExpr->getSourceRange(), newCode);
-
-  return MacroDefinition::forExternal(moduleName, typeName);
-}
-
 /// Translate an argument provided as a string literal into an identifier,
 /// or return \c None and emit an error if it cannot be done.
 Optional<Identifier> getIdentifierFromStringLiteralArgument(
@@ -198,7 +155,7 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
 
 /// For a macro expansion expression that is known to be #externalMacro,
 /// handle the definition.
-static MacroDefinition handleExternalMacroDefinition(
+static MacroDefinition  handleExternalMacroDefinition(
     ASTContext &ctx, MacroExpansionExpr *expansion) {
   // Dig out the module and type name.
   auto moduleName = getIdentifierFromStringLiteralArgument(ctx, expansion, 0);
@@ -224,31 +181,44 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   if (!definition)
     return MacroDefinition::forUndefined();
 
-  // Recognize the "A.B" spelling of external macro definitions from early
-  // pitches of the feature. This spelling is also used for builtin macro
-  // definitions.
-  if (auto oldStyleOrBuiltinResult =
-          handleOldStyleOrBuiltinMacroDefinition(ctx, definition)) {
-    return *oldStyleOrBuiltinResult;
-  }
+  auto sourceFile = macro->getParentSourceFile();
 
-  // At this point, we must have a macro expansion expression.
-  auto expansion = dyn_cast<MacroExpansionExpr>(definition);
-  if (!expansion) {
-    ctx.Diags.diagnose(
-        definition->getLoc(), diag::macro_definition_not_expansion
-    );
-
+#if SWIFT_SWIFT_PARSER
+  char *externalMacroNamePtr;
+  ptrdiff_t externalMacroNameLength;
+  ptrdiff_t *replacements;
+  ptrdiff_t numReplacements;
+  auto checkResult = swift_ASTGen_checkMacroDefinition(
+      &ctx.Diags, sourceFile->exportedSourceFile, macro->getLoc().getOpaquePointerValue(),
+      &externalMacroNamePtr, &externalMacroNameLength,
+      &replacements, &numReplacements);
+  if (checkResult < 0)
     return MacroDefinition::forInvalid();
+
+  switch (static_cast<BridgedMacroDefinitionKind>(checkResult)) {
+  case BridgedExpandedMacro:
+    // Handle expanded macros below.
+    break;
+
+  case BridgedExternalMacro: {
+    // An external macro described as ModuleName.TypeName. Get both identifiers.
+    assert(!replacements && "External macro doesn't have replacements");
+    StringRef externalMacroStr(externalMacroNamePtr, externalMacroNameLength);
+    StringRef externalModuleName, externalTypeName;
+    std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
+
+    Identifier moduleName = ctx.getIdentifier(externalModuleName);
+    Identifier typeName = ctx.getIdentifier(externalTypeName);
+    free(externalMacroNamePtr);
+    return MacroDefinition::forExternal(moduleName, typeName);
   }
 
-  // Handle #externalMacro without requiring a declaration at all.
-  // Note: this is a workaround to allow newer compilers to work with
-  // older standard libraries.
-  if (expansion->getMacroName().getBaseName().userFacingName() ==
-          "externalMacro") {
-    return handleExternalMacroDefinition(ctx, expansion);
+  case BridgedBuiltinExternalMacro:
+    return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
   }
+
+  // Free the set of replacements; we aren't using them just yet.
+  free(replacements);
 
   // Type-check the macro expansion.
   Type resultType = macro->mapTypeIntoContext(macro->getResultInterfaceType());
@@ -267,6 +237,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     return MacroDefinition::forInvalid();
 
   // Dig out the macro that was expanded.
+  auto expansion = cast<MacroExpansionExpr>(definition);
   auto expandedMacro =
       dyn_cast_or_null<MacroDecl>(expansion->getMacroRef().getDecl());
   if (!expandedMacro)
@@ -283,6 +254,10 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   }
 
   return handleExternalMacroDefinition(ctx, expansion);
+#else
+  macro->diagnose(diag::macro_unsupported);
+  return MacroDefinition::forInvalid();
+#endif
 }
 
 /// Load a plugin library based on a module name.
