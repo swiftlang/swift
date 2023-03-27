@@ -2715,6 +2715,18 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
 
   return fn->getLoweredFunctionType();
 }
+// Async functions that end up with weak_odr or linkonce_odr linkage may not be
+// directly called because we need to preserve the connection between the
+// function's implementation and the function's context size in the async
+// function pointer data structure.
+static bool mayDirectlyCallAsync(SILFunction *fn) {
+  if (fn->getLinkage() == SILLinkage::Shared ||
+      fn->getLinkage() == SILLinkage::PublicNonABI) {
+    return false;
+  }
+
+  return true;
+}
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
@@ -2741,7 +2753,8 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
-    secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+    secondaryValue = mayDirectlyCallAsync(fn) ?
+      IGM.getAddrOfSILFunction(fn, NotForDefinition) : nullptr;
 
   // For ordinary sync functions and special async functions, produce
   // only the direct address of the function.  The runtime does not
