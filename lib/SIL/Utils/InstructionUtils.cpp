@@ -904,6 +904,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:
     case BuiltinValueKind::StartAsyncLet:

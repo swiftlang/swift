@@ -59,9 +59,25 @@ class ExecutorRef {
 
   // We future-proof the ABI here by masking the low bits off the
   // implementation pointer before using it as a witness table.
+  //
+  // We have 3 bits for future use remaining here.
   enum: uintptr_t {
     WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
   };
+
+  /// The kind is stored in the free bits in the `Implementation` witness table reference.
+  enum class ExecutorKind : uintptr_t {
+    /// Ordinary executor.
+    ///
+    /// Note that the "Generic" executor is also implicitly "Ordinary".
+    /// To check if an executor is Generic, explicitly check this by calling `isGeneric`.
+    Ordinary = 0b00,
+    /// Executor that may need to participate in complex "same context" checks,
+    /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
+    ComplexEquality = 0b01,
+  };
+
+  static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
 
   constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
@@ -89,7 +105,18 @@ public:
                            const SerialExecutorWitnessTable *witnessTable) {
     assert(identity);
     assert(witnessTable);
-    return ExecutorRef(identity, reinterpret_cast<uintptr_t>(witnessTable));
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+        static_cast<uintptr_t>(ExecutorKind::Ordinary);
+    return ExecutorRef(identity, wtable);
+  }
+
+  static ExecutorRef forComplexEquality(HeapObject *identity,
+                                        const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+                  static_cast<uintptr_t>(ExecutorKind::ComplexEquality);
+    return ExecutorRef(identity, wtable);
   }
 
   HeapObject *getIdentity() const {
@@ -99,6 +126,23 @@ public:
   /// Is this the generic executor reference?
   bool isGeneric() const {
     return Identity == 0;
+  }
+
+  ExecutorKind getExecutorKind() const {
+    return static_cast<ExecutorKind>(Implementation & ~WitnessTableMask);
+  }
+
+  /// Is this an ordinary executor reference?
+  /// These executor references are the default kind, and have no special treatment elsewhere in the system.
+  bool isOrdinary() const {
+    return getExecutorKind() == ExecutorKind::Ordinary;
+  }
+
+  /// Is this an `complex-equality` executor reference?
+  /// These executor references should implement `isSameExclusiveExecutionContext` which will be invoked
+  /// when two executors are compared for being the same exclusive execution context.
+  bool isComplexEquality() const {
+    return getExecutorKind() == ExecutorKind::ComplexEquality;
   }
 
   /// Is this a default-actor executor reference?
@@ -126,7 +170,9 @@ public:
   bool isMainExecutor() const;
 
   /// Get the raw value of the Implementation field, for tracing.
-  uintptr_t getRawImplementation() { return Implementation; }
+  uintptr_t getRawImplementation() const {
+    return Implementation & WitnessTableMask;
+  }
 
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;

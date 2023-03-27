@@ -123,7 +123,7 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
 #endif
 
 // The task listed as argument is escalated to a new priority. Pass that
-// inforamtion along to the executor that it is enqueued into.
+// information along to the executor that it is enqueued into.
 SWIFT_CC(swift)
 void
 swift_executor_escalate(ExecutorRef executor, AsyncTask *task, JobPriority newPriority);

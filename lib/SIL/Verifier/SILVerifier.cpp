@@ -2052,6 +2052,7 @@ public:
     }
 
     if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
+        builtinKind == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
       require(arguments.size() == 1,
               "builtin expects one argument");
