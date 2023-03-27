@@ -1716,6 +1716,11 @@ public:
 
     /// If passed, compound names with empty argument lists are allowed.
     AllowZeroArgCompoundNames = AllowCompoundNames | 1 << 5,
+
+    /// If passed, \c self and \c Self are allowed as basenames. In a lot of
+    /// cases this doesn't actually make sense but we need to accept them for
+    /// backwards compatibility.
+    AllowLowercaseAndUppercaseSelf = 1 << 6,
   };
   using DeclNameOptions = OptionSet<DeclNameFlag>;
 

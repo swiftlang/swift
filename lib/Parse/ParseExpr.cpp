@@ -745,7 +745,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   // Parse the sequence of unqualified-names.
   ParserStatus status;
   SourceLoc LastDotLoc;
-  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames;
+  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames |
+                          DeclNameFlag::AllowLowercaseAndUppercaseSelf;
   while (true) {
     // Handle code completion.
     if (Tok.is(tok::code_complete))
@@ -1272,8 +1273,10 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Diag<> D = isa<SuperRefExpr>(Result.get())
                      ? diag::expected_identifier_after_super_dot_expr
                      : diag::expected_member_name;
-      auto Name = parseDeclNameRef(NameLoc, D,
-          DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
+      auto Name = parseDeclNameRef(
+          NameLoc, D,
+          DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames |
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
       if (!Name) {
         SourceRange ErrorRange = Result.get()->getSourceRange();
         ErrorRange.widen(TokLoc);
@@ -1756,7 +1759,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     }
 
     Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
-        DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
+                            DeclNameFlag::AllowKeywords |
+                                DeclNameFlag::AllowCompoundNames |
+                                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     if (!Name)
       return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
 
@@ -2205,7 +2210,9 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
-  if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
+  if (Tok.is(tok::identifier) ||
+      (flags.contains(DeclNameFlag::AllowLowercaseAndUppercaseSelf) &&
+       Tok.isAny(tok::kw_Self, tok::kw_self))) {
     Identifier baseNameId;
     baseNameLoc = consumeIdentifier(baseNameId, /*diagnoseDollarPrefix=*/false);
     baseName = baseNameId;
@@ -2266,8 +2273,10 @@ ParserResult<Expr> Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr,
-                                      DeclNameFlag::AllowCompoundNames);
+  DeclNameRef name =
+      parseDeclNameRef(loc, diag::expected_expr,
+                       DeclNameFlag::AllowCompoundNames |
+                           DeclNameFlag::AllowLowercaseAndUppercaseSelf);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -3123,8 +3132,10 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     Expr *SubExpr = nullptr;
     if (isUnappliedOperator()) {
       DeclNameLoc Loc;
-      auto OperName = parseDeclNameRef(Loc, diag::expected_operator_ref,
-                                       DeclNameFlag::AllowOperators);
+      auto OperName =
+          parseDeclNameRef(Loc, diag::expected_operator_ref,
+                           DeclNameFlag::AllowOperators |
+                               DeclNameFlag::AllowLowercaseAndUppercaseSelf);
       if (!OperName) {
         return makeParserError();
       }

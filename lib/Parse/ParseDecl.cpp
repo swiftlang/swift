@@ -857,7 +857,8 @@ bool Parser::parseSpecializeAttributeArguments(
               loc, diag::attr_specialize_expected_function,
               DeclNameFlag::AllowZeroArgCompoundNames |
                   DeclNameFlag::AllowKeywordsUsingSpecialNames |
-                  DeclNameFlag::AllowOperators);
+                  DeclNameFlag::AllowOperators |
+                  DeclNameFlag::AllowLowercaseAndUppercaseSelf);
         }
       }
       if (ParamLabel == "spiModule") {
@@ -1144,10 +1145,11 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     }
 
     if (!Status.isErrorOrHasCompletion()) {
-      MemberName = parseDeclNameRef(MemberNameLoc,
-          diag::attr_implements_expected_member_name,
+      MemberName = parseDeclNameRef(
+          MemberNameLoc, diag::attr_implements_expected_member_name,
           DeclNameFlag::AllowZeroArgCompoundNames |
-          DeclNameFlag::AllowOperators);
+              DeclNameFlag::AllowOperators |
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -1512,7 +1514,8 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
         original.Loc, nameParseError,
         Parser::DeclNameFlag::AllowZeroArgCompoundNames |
             Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
-            Parser::DeclNameFlag::AllowOperators);
+            Parser::DeclNameFlag::AllowOperators |
+            Parser::DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     // The base type is optional, but the final unqualified declaration name is
     // not. If name could not be parsed, return true for error.
     if (!original.Name)
@@ -3214,11 +3217,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       consumeToken(tok::colon);
       {
         DeclNameLoc loc;
-        replacedFunction = parseDeclNameRef(loc,
-            diag::attr_dynamic_replacement_expected_function,
+        replacedFunction = parseDeclNameRef(
+            loc, diag::attr_dynamic_replacement_expected_function,
             DeclNameFlag::AllowZeroArgCompoundNames |
-            DeclNameFlag::AllowKeywordsUsingSpecialNames |
-            DeclNameFlag::AllowOperators);
+                DeclNameFlag::AllowKeywordsUsingSpecialNames |
+                DeclNameFlag::AllowOperators |
+                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
       }
     }
 
@@ -3927,8 +3931,9 @@ bool Parser::parseConventionAttributeInternal(
     }
 
     DeclNameLoc unusedLoc;
-    convention.WitnessMethodProtocol = parseDeclNameRef(unusedLoc,
-        diag::convention_attribute_witness_method_expected_protocol, {});
+    convention.WitnessMethodProtocol = parseDeclNameRef(
+        unusedLoc, diag::convention_attribute_witness_method_expected_protocol,
+        DeclNameFlag::AllowLowercaseAndUppercaseSelf);
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
