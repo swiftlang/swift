@@ -186,6 +186,10 @@ void SILFunction::init(
     IsExactSelfClass_t isExactSelfClass, IsDistributed_t isDistributed,
     IsRuntimeAccessible_t isRuntimeAccessible) {
   setName(Name);
+
+  assert(!LoweredType->hasTypeParameter() &&
+         "function type has open type parameters");
+
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
   this->SpecializationInfo = nullptr;
