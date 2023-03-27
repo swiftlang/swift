@@ -255,7 +255,8 @@ extension VariableDeclSyntax {
     let patternBindings = bindings.compactMap { binding in
       binding.as(PatternBindingSyntax.self)
     }
-    let accessors = patternBindings.compactMap { patternBinding in
+    let accessors: [AccessorListSyntax.Element] 
+      = patternBindings.compactMap { patternBinding in
       switch patternBinding.accessor {
       case .accessors(let accessors):
         return accessors
