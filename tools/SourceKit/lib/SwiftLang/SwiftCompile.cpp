@@ -31,7 +31,9 @@ compile::SessionManager::getSession(StringRef name) {
   }
 
   bool inserted = false;
-  std::tie(i, inserted) = sessions.try_emplace(name, std::make_shared<compile::Session>(RuntimeResourcePath, DiagnosticDocumentationPath));
+  std::tie(i, inserted) = sessions.try_emplace(
+      name, std::make_shared<compile::Session>(
+                RuntimeResourcePath, DiagnosticDocumentationPath, Plugins));
   assert(inserted);
   return i->second;
 }
@@ -141,10 +143,10 @@ void SwiftLangSupport::performCompile(
     CancellationFlag->store(true, std::memory_order_relaxed);
   });
 
-  CompileManager.performCompileAsync(Name, Args, std::move(fileSystem),
-                                     CancellationFlag, Receiver);
+  CompileManager->performCompileAsync(Name, Args, std::move(fileSystem),
+                                      CancellationFlag, Receiver);
 }
 
 void SwiftLangSupport::closeCompile(StringRef Name) {
-  CompileManager.clearSession(Name);
+  CompileManager->clearSession(Name);
 }
