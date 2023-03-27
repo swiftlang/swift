@@ -146,8 +146,13 @@ func testExternalMacroOutOfPlace() {
 
 @freestanding(expression)
 public macro macroWithDefaults(_: Int = 17) = #externalMacro(module: "A", type: "B")
-// expected-error@-1{{default arguments are not allowed in macros}}
-// expected-warning@-2{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+// expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+// expected-note@-2{{'macroWithDefaults' declared here}}
+
+func callMacroWithDefaults() {
+  _ = #macroWithDefaults()
+  // expected-error@-1 {{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+}
 
 // Make sure we don't allow macros to prevent type folding.
 @attached(member)

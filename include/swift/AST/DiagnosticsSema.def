@@ -6965,8 +6965,6 @@ ERROR(macro_definition_unsupported,none,
 ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
       "the external macro's %select{module|type}0", (unsigned))
-ERROR(attached_declaration_macro_not_supported,none,
-      "attached declaration macros are not yet supported", ())
 ERROR(invalid_decl_in_macro_expansion,none,
       "macro expansion cannot introduce %0",
       (DescriptiveDeclKind))
