@@ -217,10 +217,10 @@ class SILPerformanceInliner {
       int &NumCallerBlocks,
       const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap);
 
-  bool decideInColdBlock(FullApplySite AI, SILFunction *Callee);
+  bool decideInColdBlock(FullApplySite AI, SILFunction *Callee, int numCallerBlocks);
 
   void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
-                       SILBasicBlock *root, DominanceInfo *DT);
+                       SILBasicBlock *root, DominanceInfo *DT, int numCallerBlocks);
 
   void collectAppliesToInline(SILFunction *Caller,
                               SmallVectorImpl<FullApplySite> &Applies);
@@ -619,12 +619,29 @@ static bool returnsClosure(SILFunction *F) {
   return false;
 }
 
-static bool isInlineAlwaysCallSite(SILFunction *Callee) {
+static bool hasMaxNumberOfBasicBlocks(SILFunction *f, int limit) {
+  for (SILBasicBlock &block : *f) {
+    (void)block;
+    if (limit == 0)
+      return false;
+    limit--;
+  }
+  return true;
+}
+
+static bool isInlineAlwaysCallSite(SILFunction *Callee, int numCallerBlocks) {
   if (Callee->isTransparent())
     return true;
-  if (Callee->getInlineStrategy() == AlwaysInline)
-    if (!Callee->getModule().getOptions().IgnoreAlwaysInline)
-      return true;
+  if (Callee->getInlineStrategy() == AlwaysInline &&
+      !Callee->getModule().getOptions().IgnoreAlwaysInline &&
+
+      // Protect against misuse of @inline(__always).
+      // Inline-always should only be used on relatively small functions.
+      // It must not be used on recursive functions. This check prevents that
+      // the compiler blows up if @inline(__always) is put on a recursive function.
+      (numCallerBlocks < 64 || hasMaxNumberOfBasicBlocks(Callee, 64))) {
+    return true;
+  }
   return false;
 }
 
@@ -634,7 +651,7 @@ static bool isInlineAlwaysCallSite(SILFunction *Callee) {
 /// It returns false if a function should not be inlined.
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
-static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
+static Optional<bool> shouldInlineGeneric(FullApplySite AI, int numCallerBlocks) {
   assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 
@@ -654,7 +671,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
 
   // Always inline generic functions which are marked as
   // AlwaysInline or transparent.
-  if (isInlineAlwaysCallSite(Callee))
+  if (isInlineAlwaysCallSite(Callee, numCallerBlocks))
     return true;
 
   // If all substitutions are concrete, then there is no need to perform the
@@ -694,14 +711,14 @@ bool SILPerformanceInliner::decideInWarmBlock(
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
-    auto ShouldInlineGeneric = shouldInlineGeneric(AI);
+    auto ShouldInlineGeneric = shouldInlineGeneric(AI, NumCallerBlocks);
     if (ShouldInlineGeneric.has_value())
       return ShouldInlineGeneric.value();
   }
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
-  if (isInlineAlwaysCallSite(Callee)) {
+  if (isInlineAlwaysCallSite(Callee, NumCallerBlocks)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -714,17 +731,17 @@ bool SILPerformanceInliner::decideInWarmBlock(
 
 /// Return true if inlining this call site into a cold block is profitable.
 bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
-                                              SILFunction *Callee) {
+                                              SILFunction *Callee, int numCallerBlocks) {
   if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
-    auto ShouldInlineGeneric = shouldInlineGeneric(AI);
+    auto ShouldInlineGeneric = shouldInlineGeneric(AI, numCallerBlocks);
     if (ShouldInlineGeneric.has_value())
       return ShouldInlineGeneric.value();
 
     return false;
   }
 
-  if (isInlineAlwaysCallSite(Callee)) {
+  if (isInlineAlwaysCallSite(Callee, numCallerBlocks)) {
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    always-inline decision "
                             << Callee->getName() << '\n');
@@ -923,7 +940,7 @@ void SILPerformanceInliner::collectAppliesToInline(
       if (Callee) {
         // Check if we have an always_inline or transparent function. If we do,
         // just add it to our final Applies list and continue.
-        if (isInlineAlwaysCallSite(Callee)) {
+        if (isInlineAlwaysCallSite(Callee, NumCallerBlocks)) {
           NumCallerBlocks += Callee->size();
           Applies.push_back(AI);
           continue;
@@ -953,7 +970,7 @@ void SILPerformanceInliner::collectAppliesToInline(
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {
         // Handle cold blocks separately.
-        visitColdBlocks(InitialCandidates, child, DT);
+        visitColdBlocks(InitialCandidates, child, DT, NumCallerBlocks);
         return false;
       }
       return true;
@@ -1089,7 +1106,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 // All other functions are not inlined in cold blocks.
 void SILPerformanceInliner::visitColdBlocks(
     SmallVectorImpl<FullApplySite> &AppliesToInline, SILBasicBlock *Root,
-    DominanceInfo *DT) {
+    DominanceInfo *DT, int numCallerBlocks) {
   DominanceOrder domOrder(Root, DT);
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
@@ -1098,7 +1115,7 @@ void SILPerformanceInliner::visitColdBlocks(
         continue;
 
       auto *Callee = getEligibleFunction(AI, WhatToInline);
-      if (Callee && decideInColdBlock(AI, Callee)) {
+      if (Callee && decideInColdBlock(AI, Callee, numCallerBlocks)) {
         AppliesToInline.push_back(AI);
       }
     }
