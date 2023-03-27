@@ -9602,9 +9602,10 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   DeclName macroFullName;
 
   // Parameter list.
+  DefaultArgumentInfo defaultArgs;
   SmallVector<Identifier, 2> namePieces;
   auto parameterResult = parseSingleParameterClause(
-      ParameterContextKind::Macro, &namePieces, nullptr);
+      ParameterContextKind::Macro, &namePieces, &defaultArgs);
   status |= parameterResult;
   parameterList = parameterResult.getPtrOrNull();
 
@@ -9646,6 +9647,8 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
     }
     status |= whereStatus;
   }
+
+  defaultArgs.setFunctionContext(macro, macro->getParameterList());
 
   return dcc.fixupParserResult(status, macro);
 }

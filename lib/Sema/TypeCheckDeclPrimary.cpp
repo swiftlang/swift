@@ -2043,6 +2043,7 @@ public:
       MD->diagnose(diag::macro_without_role, MD->getName());
 
     TypeChecker::checkParameterList(MD->getParameterList(), MD);
+    checkDefaultArguments(MD->getParameterList());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
