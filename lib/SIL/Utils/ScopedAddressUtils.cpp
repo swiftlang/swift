@@ -105,8 +105,8 @@ AddressUseKind ScopedAddressValue::computeTransitiveLiveness(
   return updateTransitiveLiveness(liveness);
 }
 
-AddressUseKind
-ScopedAddressValue::updateTransitiveLiveness(PrunedLiveness &liveness) const {
+AddressUseKind ScopedAddressValue::updateTransitiveLiveness(
+    SSAPrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
