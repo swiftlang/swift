@@ -53,6 +53,10 @@ llvm::cl::opt<bool> SILPrintPassTime(
     "sil-print-pass-time", llvm::cl::init(false),
     llvm::cl::desc("Print the execution time of each SIL pass"));
 
+llvm::cl::opt<unsigned> SILMinPassTime(
+    "sil-min-pass-time", llvm::cl::init(0),
+    llvm::cl::desc("The minimum number of milliseconds for which a pass is printed with -sil-print-pass-time"));
+
 llvm::cl::opt<bool> SILPrintLast(
     "sil-print-last", llvm::cl::init(false),
     llvm::cl::desc("Print the last optimized function before and after the last pass"));
@@ -619,8 +623,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   totalPassRuntime += duration;
   if (SILPrintPassTime) {
     double milliSecs = (double)duration.count() / 1000000.;
-    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
-                 << " @" << F->getName() << "\n";
+    if (milliSecs > (double)SILMinPassTime) {
+      llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
+                   << " #" << NumPassesRun << " @" << F->getName() << "\n";
+    }
   }
 
   if (numRepeats > 1)
@@ -783,7 +789,10 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   if (SILPrintPassTime) {
     double milliSecs = (double)duration.count() / 1000000.;
-    llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag() << "\n";
+    if (milliSecs > (double)SILMinPassTime) {
+      llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SMT->getTag()
+                   << " #" << NumPassesRun << "\n";
+    }
   }
 
   // If this pass invalidated anything, print and verify.
