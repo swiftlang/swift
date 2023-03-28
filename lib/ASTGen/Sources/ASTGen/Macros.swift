@@ -314,7 +314,7 @@ func checkMacroDefinition(
       )
       return BridgedMacroDefinitionKind.externalMacro.rawValue
 
-    case let .expansion(expansionSyntax, replacements: replacements)
+    case let .expansion(expansionSyntax, replacements: _)
         where expansionSyntax.macro.text == "externalMacro":
       // Extract the identifier from the "module" argument.
       guard let firstArg = expansionSyntax.argumentList.first,
@@ -354,6 +354,12 @@ func checkMacroDefinition(
       return BridgedMacroDefinitionKind.externalMacro.rawValue
 
     case let .expansion(expansionSyntax, replacements: replacements):
+      // Provide the expansion syntax.
+      (externalMacroPointer.pointee, externalMacroLength.pointee) =
+        allocateUTF8String(expansionSyntax.trimmedDescription,
+                           nullTerminated: true)
+
+
       // If there are no replacements, we're done.
       if replacements.isEmpty {
         return BridgedMacroDefinitionKind.expandedMacro.rawValue
