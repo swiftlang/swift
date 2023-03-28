@@ -118,6 +118,7 @@ EXPERIMENTAL_FEATURE(FreestandingMacros, true)
 EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
 EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
 EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
+EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)

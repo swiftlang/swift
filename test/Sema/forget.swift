@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature MoveOnlyEnumDeinits
 
 // Typechecking for the forget statement.
 
