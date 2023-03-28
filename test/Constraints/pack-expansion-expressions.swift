@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature VariadicGenerics
 
 // REQUIRES: asserts
 
@@ -380,4 +380,19 @@ do {
   _ = Defaulted(t: "a", 0, 1.0) // Ok
   _ = Defaulted(t: "b", 0) // Ok
   _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
+}
+
+// rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
+protocol Q {
+  associatedtype B
+}
+
+do {
+  struct G<each T>: Q {
+    typealias B = (repeat each T)
+  }
+
+  func f<each T>(_: repeat each T) -> some Q {
+    return G<repeat each T>() // Ok
+  }
 }
