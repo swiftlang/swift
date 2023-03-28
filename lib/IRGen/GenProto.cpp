@@ -130,6 +130,10 @@ public:
   /// nullptr if it's unfulfilled.
   const Fulfillment *getFulfillmentForTypeMetadata(CanType type) const;
 
+  /// Returns a Fulfillment for a pack shape, or nullptr if it's
+  /// unfulfilled.
+  const Fulfillment *getFulfillmentForShape(CanType type) const;
+
   /// Return the source of type metadata at a particular source index.
   const MetadataSource &getSource(size_t SourceIndex) const {
     return Sources[SourceIndex];
@@ -471,6 +475,11 @@ PolymorphicConvention::getFulfillmentForTypeMetadata(CanType type) const {
   return Fulfillments.getTypeMetadata(type);
 }
 
+const Fulfillment *
+PolymorphicConvention::getFulfillmentForShape(CanType type) const {
+  return Fulfillments.getShape(type);
+}
+
 void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
                                   CanSILFunctionType fnType,
                                   GenericParamFulfillmentCallback callback) {
@@ -479,6 +488,17 @@ void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
   // Check if any requirements were fulfilled by metadata stored inside a
   // captured value.
   auto generics = fnType->getInvocationGenericSignature();
+
+  for (auto shapeClass : generics->getShapeClasses()) {
+    auto fulfillment
+      = convention.getFulfillmentForShape(shapeClass);
+    if (fulfillment == nullptr)
+      continue;
+
+    auto &source = convention.getSource(fulfillment->SourceIndex);
+    callback(GenericRequirement::forShape(shapeClass),
+             source, fulfillment->Path);
+  }
 
   for (auto genericParam : generics.getGenericParams()) {
     auto genericParamType = genericParam->getCanonicalType();
@@ -489,7 +509,8 @@ void irgen::enumerateGenericParamFulfillments(IRGenModule &IGM,
       continue;
 
     auto &source = convention.getSource(fulfillment->SourceIndex);
-    callback(genericParamType, source, fulfillment->Path);
+    callback(GenericRequirement::forMetadata(genericParamType),
+             source, fulfillment->Path);
   }
 }
 
