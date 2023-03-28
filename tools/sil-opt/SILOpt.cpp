@@ -581,8 +581,13 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
-  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
+  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
+    // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
     Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
+    Invocation.getLangOptions().Features.insert(Feature::NoImplicitCopy);
+    Invocation.getLangOptions().Features.insert(
+        Feature::OldOwnershipOperatorSpellings);
+  }
   for (auto &featureName : ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().Features.insert(*feature);
