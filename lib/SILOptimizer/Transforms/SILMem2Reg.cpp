@@ -309,10 +309,14 @@ static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
   // 2. We are only trying to delete debug_var that are on values... values will
   //    never have an op_deref meaning that the comparison will always fail and
   //    not serve out purpose here.
-  auto dvaiWithoutDIExpr = dvai->getVarInfo()->withoutDIExpr();
+  const SILDebugInfoExpression *dvaiExprWithoutDeref =
+      dvai->getVarInfo()->DIExpr;
+  if (dvaiExprWithoutDeref)
+    dvaiExprWithoutDeref = dvaiExprWithoutDeref->dropDeref(dvai->getModule());
   for (auto *use : value->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-      if (!dvi->hasAddrVal() && *dvi->getVarInfo() == dvaiWithoutDIExpr) {
+      if (!dvi->hasAddrVal() &&
+          dvi->getVarInfo()->DIExpr == dvaiExprWithoutDeref) {
         deleter.forceDelete(dvai);
         return;
       }
