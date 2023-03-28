@@ -414,6 +414,9 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
 }
 
 bool TBDGenVisitor::willVisitDecl(Decl *D) {
+  if (Lowering::shouldSkipLowering(D))
+    return false;
+
   // A @_silgen_name("...") function without a body only exists to
   // forward-declare a symbol from another library.
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
