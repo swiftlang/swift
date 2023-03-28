@@ -205,6 +205,9 @@ public func assumeOnMainActorExecutor<T>(
 
 /// A safe way to synchronously assume that the current execution context belongs to the passed in actor.
 ///
+/// This method cannot be used in an asynchronous context. Instead, prefer implementing
+/// a method on the distributed actor and calling it from your asynchronous context.
+///
 /// This API should only be used as last resort, when it is not possible to express the current
 /// execution context definitely belongs to the specified actor in other ways. E.g. one may need to use
 /// this in a delegate style API, where a synchronous method is guaranteed to be called by the

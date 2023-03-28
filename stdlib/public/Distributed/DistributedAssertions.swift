@@ -115,9 +115,32 @@ public func assertOnExecutor(
 // ==== -----------------------------------------------------------------------
 // MARK: Assume APIs
 
+/// A safe way to synchronously assume that the current execution context belongs to the passed in `distributed actor`.
+///
+/// This method requires that the passed in `actor` is a local distributed actor reference.
+/// If the passed in reference is *remote*, this function will crash because it is not possible
+/// to obtain an `isolated DistributedActor` reference for a remote object as the memory used for
+/// a "complete" distributed actor object may not even have been allocated or initialized.
+///
+/// This method cannot be used in an asynchronous context. Instead, prefer implementing
+/// a method on the distributed actor and calling it from your asynchronous context.
+///
+/// This API should only be used as last resort, when it is not possible to express the current
+/// execution context definitely belongs to the main actor in other ways. E.g. one may need to use
+/// this in a delegate style API, where a synchronous method is guaranteed to be called by the
+/// main actor, however it is not possible to move some function implementation onto the target
+/// `distributed actor` for some reason.
+///
+/// - Warning: If the current executor is *not* the actor's serial executor, and the actor is local, this function will crash.
+///
+/// - Parameters:
+///   - actor: the actor whose executor is to be compared
+///   - operation: the operation that will run if the actor was local, and the current executor is the same as of the passed in actors
+/// - Returns: the result of the operation
+/// - Throws: the error the operation has thrown
 @available(SwiftStdlib 5.9, *)
 @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
-public func assumeOnLocalDistributedActorExecutor<Act: DistributedActor, T>(
+public func assumeOnExecutor<Act: DistributedActor, T>(
     of actor: Act,
     _ operation: (isolated Act) throws -> T,
     file: StaticString = #fileID, line: UInt = #line
