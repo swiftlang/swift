@@ -243,3 +243,29 @@ package protocol PkgEmptyInit {
 public struct PkgBuggy: PkgEmptyInit {
   // expected-error@-1 {{initializer 'init()' must be declared package because it matches a requirement in package protocol 'PkgEmptyInit'}}
 }
+
+package protocol PkgReqProvider {}
+extension PkgReqProvider {
+  fileprivate func foo() {}
+  // expected-note@-1 {{mark the instance method as 'package' to satisfy the requirement}} {{3-14=package}}
+  typealias AssocB = String
+  // expected-note@-1 {{mark the type alias as 'package' to satisfy the requirement}} {{3-3=package }}
+}
+package struct PkgAdoptViaProtocol : PkgProtoWithReqs, PkgReqProvider {
+  // expected-error@-1 {{method 'foo()' must be declared package because it matches a requirement in package protocol 'PkgProtoWithReqs'}} {{none}}
+  // expected-error@-2 {{type alias 'AssocB' must be declared package because it matches a requirement in package protocol 'PkgProtoWithReqs'}} {{none}}
+  package typealias AssocA = Int
+}
+
+package protocol PkgReqProvider2 {}
+extension PkgProtoWithReqs where Self : PkgReqProvider2 {
+  func foo() {}
+  // expected-note@-1 {{mark the instance method as 'package' to satisfy the requirement}} {{3-3=package }}
+  typealias AssocB = String
+  // expected-note@-1 {{mark the type alias as 'package' to satisfy the requirement}} {{3-3=package }}
+}
+package struct PkgAdoptViaCombinedProtocol : PkgProtoWithReqs, PkgReqProvider2 {
+  // expected-error@-1 {{method 'foo()' must be declared package because it matches a requirement in package protocol 'PkgProtoWithReqs'}} {{none}}
+  // expected-error@-2 {{type alias 'AssocB' must be declared package because it matches a requirement in package protocol 'PkgProtoWithReqs'}} {{none}}
+  public typealias AssocA = Int
+}
