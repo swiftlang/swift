@@ -86,14 +86,15 @@ private:
   llvm::DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
 
-  /// Blocks in a loop.
-  llvm::SmallSetVector<SILBasicBlock *, 4> blocksInLoop;
-
   /// A synthesized file unit.
   SynthesizedFileUnit &synthesizedFile;
 
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
+
+  /// True, if a heap-allocated context is required. For example, when there are
+  /// any loops
+  bool heapAllocatedContext = false;
 
 private:
   /// Remaps the given type into the derivative function's context.
@@ -193,12 +194,8 @@ public:
     return getLinearMapTupleType(ai->getParentBlock())->getElement(idx).getType();
   }
 
-  bool hasLoops() const {
-    return !blocksInLoop.empty();
-  }
-
-  ArrayRef<SILBasicBlock *> getBlocksInLoop() const {
-    return blocksInLoop.getArrayRef();
+  bool hasHeapAllocatedContext() const {
+    return heapAllocatedContext;
   }
 };
 
