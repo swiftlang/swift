@@ -63,8 +63,8 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   Opts.PrintUserInaccessibleAttrs = false;
-  Opts.SkipPrivateStdlibDecls = true;
-  Opts.SkipUnderscoredStdlibProtocols = true;
+  Opts.SkipPrivateStdlibDecls = !Walker.Options.PrintPrivateStdlibSymbols;
+  Opts.SkipUnderscoredStdlibProtocols = !Walker.Options.PrintPrivateStdlibSymbols;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
