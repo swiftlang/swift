@@ -1085,8 +1085,9 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
-    for (Decl *member : theType->getABIMembers())
+    forEachMemberToLower(theType, [&](Decl *member) {
       visit(member);
+    });
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
@@ -1252,9 +1253,10 @@ public:
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
 
-    for (Decl *member : e->getABIMembers())
+    forEachMemberToLower(e, [&](Decl *member) {
       visit(member);
-    
+    });
+
     // If this is a main-interface @_objcImplementation extension and the class
     // has a synthesized destructor, emit it now.
     if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {

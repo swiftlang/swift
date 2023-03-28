@@ -181,6 +181,9 @@ AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
       return NTD;
   }
 
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
+    return PBD->getAnchoringVarDecl(0);
+
   // Clang decls may be inaccurately parented rdar://53956555
   if (D->hasClangNode())
     return nullptr;

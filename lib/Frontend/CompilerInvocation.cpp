@@ -552,6 +552,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-check-api-availability-only");
 
+  if (const Arg *A = Args.getLastArg(OPT_unavailable_decl_optimization_EQ)) {
+    auto value =
+        llvm::StringSwitch<Optional<UnavailableDeclOptimization>>(A->getValue())
+            .Case("none", UnavailableDeclOptimization::None)
+            .Case("complete", UnavailableDeclOptimization::Complete)
+            .Default(None);
+
+    if (value)
+      Opts.UnavailableDeclOptimizationMode = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
