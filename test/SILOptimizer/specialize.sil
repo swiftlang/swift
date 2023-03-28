@@ -757,3 +757,5 @@ bb0:
   return %r : $()
 }
 
+sil @$s7closures5UInt8V_Tg5 : $@convention(thin) (UInt8) -> ()
+
