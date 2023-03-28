@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 sil_stage canonical
 

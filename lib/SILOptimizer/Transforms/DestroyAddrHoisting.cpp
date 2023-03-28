@@ -1,8 +1,8 @@
-//===--- SSADestroyHoisting.cpp - SSA-based destroy hoisting --------------===//
+//===--- DestroyAddrHoisting.cpp - SSA-based destroy_addr hoisting --------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -87,7 +87,7 @@
 ///
 /// ===--------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "ssa-destroy-hoisting"
+#define DEBUG_TYPE "destroy-addr-hoisting"
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/GraphNodeWorklist.h"
@@ -121,8 +121,8 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
         preserveDebugInfo(function->preserveDebugInfo()) {}
 
   bool empty() const {
-    return storageUsers.empty() && originalDestroys.empty()
-           && debugInsts.empty();
+    return storageUsers.empty() && originalDestroys.empty() &&
+           debugInsts.empty();
   }
 
   SILFunction *getFunction() const { return function; }
@@ -449,8 +449,7 @@ protected:
   void insertDestroy(SILInstruction *barrier, SILInstruction *insertBefore,
                      const KnownStorageUses &knownUses);
 
-  void createDestroy(SILInstruction *insertBefore,
-                     const SILDebugScope *scope);
+  void createDestroy(SILInstruction *insertBefore, const SILDebugScope *scope);
 
   void createSuccessorDestroys(SILBasicBlock *barrierBlock);
 
@@ -810,16 +809,16 @@ void HoistDestroys::insertDestroy(SILInstruction *barrier,
     destroyMergeBlocks.insert(branch->getDestBB());
   }
   // Avoid mutating SIL for no reason. This could lead to infinite loops.
-  if (isa<DestroyAddrInst>(insertBefore)
-      || isa<DestroyValueInst>(insertBefore)) {
-    if (llvm::find(knownUses.originalDestroys, insertBefore)
-        != knownUses.originalDestroys.end()) {
+  if (isa<DestroyAddrInst>(insertBefore) ||
+      isa<DestroyValueInst>(insertBefore)) {
+    if (llvm::find(knownUses.originalDestroys, insertBefore) !=
+        knownUses.originalDestroys.end()) {
       reusedDestroys.insert(insertBefore);
       return;
     }
   }
-  const SILDebugScope *scope = barrier
-    ? barrier->getDebugScope() : getFunction()->getDebugScope();
+  const SILDebugScope *scope =
+      barrier ? barrier->getDebugScope() : getFunction()->getDebugScope();
   createDestroy(insertBefore, scope);
 }
 
@@ -829,10 +828,10 @@ void HoistDestroys::createDestroy(SILInstruction *insertBefore,
   SILInstruction *newDestroy;
   if (storageRoot->getType().isAddress()) {
     newDestroy =
-      SILBuilder(insertBefore, scope).createDestroyAddr(loc, storageRoot);
+        SILBuilder(insertBefore, scope).createDestroyAddr(loc, storageRoot);
   } else {
     newDestroy =
-      SILBuilder(insertBefore, scope).createDestroyValue(loc, storageRoot);
+        SILBuilder(insertBefore, scope).createDestroyValue(loc, storageRoot);
   }
   deleter.getCallbacks().createdNewInst(newDestroy);
 }
@@ -841,8 +840,8 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
   SmallVector<SILInstruction *, 4> deadDestroys;
   for (auto *predecessors : mergeBlock->getPredecessorBlocks()) {
     auto *tailDestroy = predecessors->getTerminator()->getPreviousInstruction();
-    if (!tailDestroy || (!isa<DestroyAddrInst>(tailDestroy)
-                         && !isa<DestroyValueInst>(tailDestroy))) {
+    if (!tailDestroy || (!isa<DestroyAddrInst>(tailDestroy) &&
+                         !isa<DestroyValueInst>(tailDestroy))) {
       return;
     }
     if (tailDestroy->getOperand(0) != storageRoot)
@@ -894,7 +893,7 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
 // =============================================================================
 
 namespace {
-class SSADestroyHoisting : public swift::SILFunctionTransform {
+class DestroyAddrHoisting : public swift::SILFunctionTransform {
   void run() override;
 };
 } // end anonymous namespace
@@ -902,7 +901,7 @@ class SSADestroyHoisting : public swift::SILFunctionTransform {
 // TODO: Handle alloc_box the same way, as long as the box doesn't escape.
 //
 // TODO: Handle address and boxes that are captured in no-escape closures.
-void SSADestroyHoisting::run() {
+void DestroyAddrHoisting::run() {
   if (!getFunction()->hasOwnership())
     return;
 
@@ -1067,6 +1066,6 @@ void SSADestroyHoisting::run() {
   }
 }
 
-SILTransform *swift::createSSADestroyHoisting() {
-  return new SSADestroyHoisting();
+SILTransform *swift::createDestroyAddrHoisting() {
+  return new DestroyAddrHoisting();
 }
