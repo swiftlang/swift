@@ -324,6 +324,12 @@ void ImportResolver::bindImport(UnboundImport &&I) {
     return;
   }
 
+  // Load more dependencies for testable imports.
+  if (I.import.options.contains(ImportFlags::Testable)) {
+    for (auto file: M->getFiles())
+      file->loadDependenciesForTestable(ID.get()->getStartLoc());
+  }
+
   auto topLevelModule = I.getTopLevelModule(M, SF);
 
   I.validateOptions(topLevelModule, SF);

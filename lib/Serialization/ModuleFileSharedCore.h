@@ -614,11 +614,17 @@ public:
   ///
   /// If \p packageName is set, transitive package dependencies are loaded if
   /// loaded from the same package.
+  ///
+  /// If \p forTestable, get the desired loading behavior for a @testable
+  /// import. Reports non-public dependencies as required for a testable
+  /// client so it can access internal details, which in turn can reference
+  /// those non-public dependencies.
   ModuleLoadingBehavior
   getTransitiveLoadingBehavior(const Dependency &dependency,
                                bool debuggerMode,
                                bool isPartialModule,
-                               StringRef packageName) const;
+                               StringRef packageName,
+                               bool forTestable) const;
 };
 
 template <typename T, typename RawData>

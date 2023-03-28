@@ -133,6 +133,9 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
 
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
+    if (forTestable && dependency.isLoaded())
+      continue;
+
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
@@ -156,7 +159,7 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     }
 
     ModuleLoadingBehavior transitiveBehavior =
-      getTransitiveLoadingBehavior(dependency);
+      getTransitiveLoadingBehavior(dependency, forTestable);
 
     if (ctx.LangOpts.EnableModuleLoadingRemarks) {
       ctx.Diags.diagnose(diagLoc,
@@ -282,7 +285,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 }
 
 ModuleLoadingBehavior
-ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency) const {
+ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
+    bool forTestable) const {
   ASTContext &ctx = getContext();
   ModuleDecl *mod = FileContext->getParentModule();
 
@@ -293,7 +297,8 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency) const {
   return Core->getTransitiveLoadingBehavior(dependency.Core,
                                             ctx.LangOpts.DebuggerSupport,
                                             isPartialModule,
-                                            ctx.LangOpts.PackageName);
+                                            ctx.LangOpts.PackageName,
+                                            forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {

@@ -430,7 +430,8 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
       loadedModuleFile->getTransitiveLoadingBehavior(dependency,
                                          /*debuggerMode*/false,
                                          /*isPartialModule*/false,
-                                         /*package*/Ctx.LangOpts.PackageName);
+                                         /*package*/Ctx.LangOpts.PackageName,
+                                         loadedModuleFile->isTestable());
     if (transitiveBehavior != ModuleLoadingBehavior::Required)
       continue;
 
@@ -1039,11 +1040,12 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
     std::copy_if(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
-        [&duplicates, &loadedModuleFile](
+        [&duplicates, &loadedModuleFile, forTestable](
             const ModuleFile::Dependency &dependency) -> bool {
           if (dependency.isLoaded() || dependency.isHeader() ||
-              loadedModuleFile->getTransitiveLoadingBehavior(dependency) !=
-                ModuleLoadingBehavior::Required) {
+              loadedModuleFile->getTransitiveLoadingBehavior(dependency,
+                                                             forTestable)
+                != ModuleLoadingBehavior::Required) {
             return false;
           }
           return duplicates.insert(dependency.Core.RawPath).second;
@@ -1469,6 +1471,18 @@ void SerializedASTFile::collectLinkLibraries(
     collectLinkLibrariesFromImports(callback);
   } else {
     File.collectLinkLibraries(callback);
+  }
+}
+
+void SerializedASTFile::loadDependenciesForTestable(SourceLoc diagLoc) const {
+  serialization::Status status =
+    File.loadDependenciesForFileContext(this, diagLoc, /*forTestable=*/true);
+
+  if (status != serialization::Status::Valid) {
+    if (diagLoc)
+      serialization::diagnoseSerializedASTLoadFailureTransitive(
+          getASTContext(), diagLoc, status, &File,
+          getParentModule()->getName(), /*forTestable*/true);
   }
 }
 
