@@ -44,10 +44,12 @@ namespace swift {
 class NecessaryBindings {
   llvm::SetVector<GenericRequirement> RequirementsSet;
   SubstitutionMap SubMap;
+  bool NoEscape;
 
 public:
   NecessaryBindings() {}
-  NecessaryBindings(SubstitutionMap subs) : SubMap(subs) {}
+  NecessaryBindings(SubstitutionMap subs, bool noEscape)
+    : SubMap(subs), NoEscape(noEscape) {}
   
   SubstitutionMap getSubstitutionMap() const {
     return SubMap;
@@ -58,7 +60,8 @@ public:
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,
-                                                    bool considerParameterSources = true);
+                                                    bool noEscape,
+                                                    bool considerParameterSources);
 
   void addRequirement(GenericRequirement requirement) {
     auto type = requirement.getTypeParameter().subst(SubMap);
@@ -93,10 +96,9 @@ public:
   }
 
 private:
-  static NecessaryBindings computeBindings(IRGenModule &IGM,
-                                           CanSILFunctionType origType,
-                                           SubstitutionMap subs,
-                                           bool considerParameterSources);
+  void computeBindings(IRGenModule &IGM,
+                       CanSILFunctionType origType,
+                       bool considerParameterSources);
 };
 
 } // end namespace irgen

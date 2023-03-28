@@ -56,13 +56,15 @@ llvm::Value *
 emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                         GenericRequirement requirement,
                                         MetadataState metadataState,
-                                        SubstitutionMap subs);
+                                        SubstitutionMap subs,
+                                        bool onHeapPacks=false);
 
 void emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
                                          ArrayRef<GenericRequirement> reqts,
                                          Address buffer,
                                          MetadataState metadataState,
-                                         SubstitutionMap subs);
+                                         SubstitutionMap subs,
+                                         bool onHeapPacks=false);
 
 /// Given a required value, map the requirement into the given
 /// context and bind the value.
