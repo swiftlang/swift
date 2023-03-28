@@ -89,11 +89,10 @@ extension ASTGenVisitor {
 
     let firstName: UnsafeMutableRawPointer?
     let secondName: UnsafeMutableRawPointer?
-    let type: UnsafeMutableRawPointer?
-
-    if let nodeFirstName = node.firstName,
-       // Swift AST represnts "_" as nil.
-       nodeFirstName.text != "_" {
+    
+    let nodeFirstName = node.firstName
+    if nodeFirstName.text != "_" {
+      // Swift AST represents "_" as nil.
       var text = nodeFirstName.text
       firstName = text.withUTF8 { buf in
         SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
@@ -111,11 +110,7 @@ extension ASTGenVisitor {
       secondName = nil
     }
 
-    if let typeSyntax = node.type {
-      type = visit(typeSyntax).rawValue
-    } else {
-      type = nil
-    }
+    let type = visit(node.type).rawValue
 
     return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, type, declContext))
   }
