@@ -1183,6 +1183,14 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
               continue;
+            } else {
+              // Otherwise, put the end_borrow.
+              for (auto *succBlock : ti->getSuccessorBlocks()) {
+                auto *nextInst = &succBlock->front();
+                SILBuilderWithScope endBuilder(nextInst);
+                endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
+              }
+              continue;
             }
           }
 
