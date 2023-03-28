@@ -1762,6 +1762,8 @@ static void bindArchetypesFromContext(
     auto genericSig = parentDC->getGenericSignatureOfContext();
     for (auto *paramTy : genericSig.getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
+      if (paramTy->isParameterPack())
+        contextTy = PackType::getSingletonPackExpansion(contextTy);
       bindPrimaryArchetype(paramTy, contextTy);
     }
 
