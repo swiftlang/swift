@@ -53,7 +53,8 @@ class NodeFactory {
   /// The head of the single-linked slab list.
   Slab *CurrentSlab = nullptr;
 
-  /// The size of the previously allocated slab.
+  /// The size of the previously allocated slab. This may NOT be the size of
+  /// CurrentSlab, in the case where a checkpoint has been popped.
   ///
   /// The slab size can only grow, even clear() does not reset the slab size.
   /// This initial size is good enough to fit most de-manglings.
@@ -219,6 +220,26 @@ public:
     memcpy(copiedString, str.data(), stringSize);
     return {copiedString, str.size()};
   }
+
+  /// A checkpoint which captures the allocator's state at any given time. A
+  /// checkpoint can be popped to free all allocations made since it was made.
+  struct Checkpoint {
+    Slab *Slab;
+    char *CurPtr;
+    char *End;
+  };
+
+  /// Create a new checkpoint with the current state of the allocator.
+  Checkpoint pushCheckpoint() const;
+
+  /// Clear all allocations made since the given checkpoint. It is
+  /// undefined behavior to pop checkpoints in an order other than the
+  /// order in which they were pushed, or to pop a checkpoint when
+  /// clear() was called after creating it. The implementation attempts
+  /// to raise a fatal error in that case, but does not guarantee it. It
+  /// is allowed to pop outer checkpoints without popping inner ones, or
+  /// to call clear() without popping existing checkpoints.
+  void popCheckpoint(Checkpoint checkpoint);
 
   /// Creates a node of kind \p K.
   NodePointer createNode(Node::Kind K);
