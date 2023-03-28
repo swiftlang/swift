@@ -72,7 +72,7 @@ struct RenameRangeDetail {
   Optional<unsigned> Index;
 };
 
-enum class RenameAvailableKind {
+enum class RefactorAvailableKind {
   Available,
   Unavailable_system_symbol,
   Unavailable_has_no_location,
@@ -81,14 +81,14 @@ enum class RenameAvailableKind {
   Unavailable_decl_from_clang,
 };
 
-struct RenameAvailabilityInfo {
+struct RefactorAvailabilityInfo {
   RefactoringKind Kind;
-  RenameAvailableKind AvailableKind;
-  RenameAvailabilityInfo(RefactoringKind Kind,
-                         RenameAvailableKind AvailableKind)
+  RefactorAvailableKind AvailableKind;
+  RefactorAvailabilityInfo(RefactoringKind Kind,
+                           RefactorAvailableKind AvailableKind)
       : Kind(Kind), AvailableKind(AvailableKind) {}
-  RenameAvailabilityInfo(RefactoringKind Kind)
-      : RenameAvailabilityInfo(Kind, RenameAvailableKind::Available) {}
+  RefactorAvailabilityInfo(RefactoringKind Kind)
+      : RefactorAvailabilityInfo(Kind, RefactorAvailableKind::Available) {}
 };
 
 class FindRenameRangesConsumer {
@@ -112,7 +112,7 @@ public:
 
 StringRef getDescriptiveRefactoringKindName(RefactoringKind Kind);
 
-StringRef getDescriptiveRenameUnavailableReason(RenameAvailableKind Kind);
+StringRef getDescriptiveRenameUnavailableReason(RefactorAvailableKind Kind);
 
 bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          SourceEditConsumer &EditConsumer,
@@ -131,25 +131,13 @@ int findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
                           FindRenameRangesConsumer &RenameConsumer,
                           DiagnosticConsumer &DiagConsumer);
 
-void collectAvailableRefactorings(
-    SourceFile *SF, RangeConfig Range, bool &RangeStartMayNeedRename,
-    llvm::SmallVectorImpl<RefactoringKind> &Kinds,
-    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers);
+SmallVector<RefactorAvailabilityInfo, 0>
+collectRefactorings(SourceFile *SF, RangeConfig Range,
+                    bool &RangeStartMayNeedRename,
+                    llvm::ArrayRef<DiagnosticConsumer *> DiagConsumers);
 
-void collectAvailableRefactorings(ResolvedCursorInfoPtr CursorInfo,
-                                  llvm::SmallVectorImpl<RefactoringKind> &Kinds,
-                                  bool ExcludeRename);
-
-/// Stores information about the reference that rename availability is being
-/// queried on.
-struct RenameRefInfo {
-  SourceFile *SF; ///< The source file containing the reference.
-  SourceLoc Loc; ///< The reference's source location.
-  bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
-};
-
-Optional<RenameAvailabilityInfo>
-renameAvailabilityInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo);
+SmallVector<RefactorAvailabilityInfo, 0>
+collectRefactorings(ResolvedCursorInfoPtr CursorInfo, bool ExcludeRename);
 
 } // namespace ide
 } // namespace swift
