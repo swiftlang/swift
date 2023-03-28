@@ -491,6 +491,15 @@ public:
     return buf;
   }
 
+  bool canPerformPackExpansionInitialization() const override {
+    return true;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                llvm::function_ref<void(Initialization *into)> fn) override;
+
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;
 
