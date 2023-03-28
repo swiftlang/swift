@@ -260,6 +260,17 @@ NullablePtr<const GenericParamList> MacroDeclScope::genericParams() const {
   return decl->getParsedGenericParams();
 }
 
+bool MacroDeclScope::lookupLocalsOrMembers(
+    DeclConsumer consumer) const {
+  if (auto *paramList = decl->parameterList) {
+    for (auto *paramDecl : *paramList)
+      if (consumer.consume({paramDecl}))
+        return true;
+  }
+
+  return false;
+}
+
 #pragma mark lookInMyGenericParameters
 
 std::pair<bool, NullablePtr<const GenericParamList>>

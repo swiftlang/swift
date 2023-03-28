@@ -1215,6 +1215,26 @@ public:
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
+};
+
+/// The scope introduced for the definition of a macro, which follows the `=`.
+class MacroDefinitionScope final : public ASTScopeImpl {
+public:
+  Expr *const definition;
+
+  MacroDefinitionScope(Expr *definition) : definition(definition) {}
+
+  virtual ~MacroDefinitionScope() {}
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  std::string getClassName() const override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 };
 
 class AbstractStmtScope : public ASTScopeImpl {
