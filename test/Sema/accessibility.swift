@@ -1471,7 +1471,11 @@ public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGen
   public func publicReq() {}
 }
 
-// FIXME: rdar://104987455 should have expected note and error 'class cannot be declared public because its superclass is internal'
+fileprivate typealias FilePrivateConcreteGenericCompositionPkg = InternalGenericClass<Int> & InternalProto
+public class DerivedFromFilePrivateConcreteGenericCompositionPkg : FilePrivateConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses an internal type as a generic parameter}}
+  public func internalReq() {}
+}
+
 internal typealias InternalConcreteGenericCompositionPkg = PackageGenericClass<Int> & PackageProto
 public class DerivedFromInternalConcreteGenericCompositionPkg : InternalConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses a package type as a generic parameter}}
   public func packageReq() {}
