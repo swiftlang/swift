@@ -664,7 +664,8 @@ public:
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ModuleLoadingBehavior
-  getTransitiveLoadingBehavior(const Dependency &dependency) const;
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool forTestable) const;
 
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate

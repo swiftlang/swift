@@ -74,8 +74,8 @@ import PrivateDep
 // RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
 
-/// Even with resilience, all access-level dependencies are visible to clients
-/// for modules with testing enabled.
+/// Even with resilience and testing enabled, all non-public dependencies are
+/// hidden if there are no testable imports.
 // RUN: %target-swift-frontend -emit-module %t/PublicDep.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -enable-testing \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
@@ -95,4 +95,24 @@ import PrivateDep
 // RUN: %target-swift-frontend -typecheck %t/ClientOfPublic.swift -I %t \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
 // RUN: %target-swift-frontend -typecheck %t/ClientOfNonPublic.swift -I %t \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=HIDDEN-DEP %s
+
+/// With testable imports, transitive dependencies are required.
+//--- TestableClientOfPublic.swift
+@testable import PublicDep
+
+//--- TestableClientOfNonPublic.swift
+@testable import PackageDep // expected-error {{missing required module 'HiddenDep'}}
+@testable import InternalDep // expected-error {{missing required module 'HiddenDep'}}
+@testable import FileprivateDep // expected-error {{missing required module 'HiddenDep'}}
+@testable import PrivateDep // expected-error {{missing required module 'HiddenDep'}}
+
+// RUN: %target-swift-frontend -typecheck %t/TestableClientOfPublic.swift -I %t \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
+// RUN: %target-swift-frontend -typecheck %t/TestableClientOfNonPublic.swift -I %t \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
+
+/// Fail if the transitive dependency is missing.
+// RUN: rm %t/HiddenDep.swiftmodule
+// RUN: %target-swift-frontend -typecheck %t/TestableClientOfNonPublic.swift -I %t \
+// RUN:   -verify -show-diagnostics-after-fatal
