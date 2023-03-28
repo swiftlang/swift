@@ -999,6 +999,11 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocate
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
                                    "buildOrdinarySerialExecutorRef", "n", Special)
 
+/// Build a Builtin.Executor value from an "complex equality" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildComplexEqualitySerialExecutorRef,
+                                   "buildComplexEqualitySerialExecutorRef", "n", Special)
+
 /// Build a Builtin.Executor value from a default actor reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
                                    "buildDefaultActorExecutorRef", "n", Special)

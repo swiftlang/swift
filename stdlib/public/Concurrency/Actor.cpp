@@ -295,14 +295,49 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
+// Implemented in Swift to avoid some annoying hard-coding about
+// SerialExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift)
+bool _task_serialExecutor_isSameExclusiveExecutionContext(
+    HeapObject *currentExecutor, HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
-  if (auto currentTracking = ExecutorTrackingInfo::current()) {
-    return currentTracking->getActiveExecutor() == executor;
+  auto current = ExecutorTrackingInfo::current();
+
+  if (!current) {
+    // TODO(ktoso): checking the "is main thread" is not correct, main executor can be not main thread, relates to rdar://106188692
+    return executor.isMainExecutor() && isExecutingOnMainThread();
   }
 
-  // TODO(ktoso): checking the "is main thread" is not correct, main executor can be not main thread, relates to rdar://106188692
-  return executor.isMainExecutor() && isExecutingOnMainThread();
+  auto currentExecutor = current->getActiveExecutor();
+  if (currentExecutor == executor) {
+    return true;
+  }
+
+  if (executor.isComplexEquality()) {
+    if (!swift_compareWitnessTables(
+        reinterpret_cast<const WitnessTable*>(currentExecutor.getSerialExecutorWitnessTable()),
+        reinterpret_cast<const  WitnessTable*>(executor.getSerialExecutorWitnessTable()))) {
+      // different witness table, we cannot invoke complex equality call
+      return false;
+    }
+    // Avoid passing nulls to Swift for the isSame check:
+    if (!currentExecutor.getIdentity() || !executor.getIdentity()) {
+      return false;
+    }
+
+    return _task_serialExecutor_isSameExclusiveExecutionContext(
+        currentExecutor.getIdentity(),
+        executor.getIdentity(),
+        swift_getObjectType(currentExecutor.getIdentity()),
+        executor.getSerialExecutorWitnessTable());
+  }
+
+  return false;
 }
 
 /// Logging level for unexpected executors:

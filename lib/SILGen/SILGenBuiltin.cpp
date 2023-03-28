@@ -1770,6 +1770,12 @@ static ManagedValue emitBuiltinBuildOrdinarySerialExecutorRef(
   return emitBuildExecutorRef(SGF, loc, subs, args,
                             BuiltinValueKind::BuildOrdinarySerialExecutorRef);
 }
+static ManagedValue emitBuiltinBuildComplexEqualitySerialExecutorRef(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuildExecutorRef(SGF, loc, subs, args,
+                            BuiltinValueKind::BuildComplexEqualitySerialExecutorRef);
+}
 static ManagedValue emitBuiltinBuildDefaultActorExecutorRef(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {

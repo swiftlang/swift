@@ -6659,6 +6659,11 @@ const RelativeWitnessTable *swift::swift_getAssociatedConformanceWitnessRelative
                                                    assocConformance);
 }
 
+bool swift::swift_compareWitnessTables(const WitnessTable *lhs,
+                                       const WitnessTable *rhs) {
+  return MetadataCacheKey::areWitnessTablesEqual(lhs, rhs);
+}
+
 bool swift::swift_compareProtocolConformanceDescriptors(
     const ProtocolConformanceDescriptor *lhs,
     const ProtocolConformanceDescriptor *rhs) {
