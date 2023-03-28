@@ -3869,12 +3869,14 @@ void ASTMangler::appendMacroExpansionContext(
       baseName = expr->getMacroName().getBaseName();
       discriminator = expr->getDiscriminator();
       role = MacroRole::Expression;
+      outerExpansionDC = expr->getDeclContext();
     } else {
       auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
       outerExpansionLoc = decl->getLoc();
       baseName = decl->getMacroName().getBaseName();
       discriminator = decl->getDiscriminator();
       role = MacroRole::Declaration;
+      outerExpansionDC = decl->getDeclContext();
     }
     break;
   }

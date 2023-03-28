@@ -4613,6 +4613,10 @@ public:
         }
         break;
       }
+
+      case MacroDefinition::Kind::Expanded: {
+        llvm_unreachable("No serialization support yet");
+      }
     }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[MacroLayout::Code];

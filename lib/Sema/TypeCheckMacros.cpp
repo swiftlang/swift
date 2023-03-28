@@ -22,6 +22,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/CASTBridging.h"
 #include "swift/AST/Expr.h"
+#include "../AST/InlinableText.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PluginRegistry.h"
@@ -196,6 +197,13 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       &ctx.Diags, sourceFile->exportedSourceFile, macro->getLoc().getOpaquePointerValue(),
       &externalMacroNamePtr, &externalMacroNameLength,
       &replacements, &numReplacements);
+
+  // Clean up after the call.
+  SWIFT_DEFER {
+    free(externalMacroNamePtr);
+    free(replacements);
+  };
+
   if (checkResult < 0)
     return MacroDefinition::forInvalid();
 
@@ -213,16 +221,12 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
     Identifier moduleName = ctx.getIdentifier(externalModuleName);
     Identifier typeName = ctx.getIdentifier(externalTypeName);
-    free(externalMacroNamePtr);
     return MacroDefinition::forExternal(moduleName, typeName);
   }
 
   case BridgedBuiltinExternalMacro:
     return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
   }
-
-  // Free the set of replacements; we aren't using them just yet.
-  free(replacements);
 
   // Type-check the macro expansion.
   Type resultType = macro->mapTypeIntoContext(macro->getResultInterfaceType());
@@ -247,17 +251,24 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   if (!expandedMacro)
     return MacroDefinition::forInvalid();
 
-  // FIXME: Only external macros are supported at this point.
+  // Handle external macros after type-checking.
   auto builtinKind = expandedMacro->getBuiltinKind();
-  if (builtinKind != BuiltinMacroKind::ExternalMacro) {
-    ctx.Diags.diagnose(
-        definition->getLoc(), diag::macro_definition_unsupported
-    );
+  if (builtinKind == BuiltinMacroKind::ExternalMacro)
+    return handleExternalMacroDefinition(ctx, expansion);
 
-    return MacroDefinition::forInvalid();
+  // Expansion string text.
+  StringRef expansionText(externalMacroNamePtr, externalMacroNameLength);
+
+  // Copy over the replacements.
+  SmallVector<ExpandedMacroReplacement, 2> replacementsVec;
+  for (unsigned i: range(0, numReplacements)) {
+    replacementsVec.push_back(
+        { static_cast<unsigned>(replacements[3*i]),
+          static_cast<unsigned>(replacements[3*i+1]),
+          static_cast<unsigned>(replacements[3*i+2])});
   }
 
-  return handleExternalMacroDefinition(ctx, expansion);
+  return MacroDefinition::forExpanded(ctx, expansionText, replacementsVec);
 #else
   macro->diagnose(diag::macro_unsupported);
   return MacroDefinition::forInvalid();
@@ -637,6 +648,39 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
   return false;
 }
 
+/// Expand a macro definition.
+static std::string expandMacroDefinition(
+    ExpandedMacroDefinition def, MacroDecl *macro, ArgumentList *args) {
+  ASTContext &ctx = macro->getASTContext();
+
+  std::string expandedResult;
+
+  StringRef originalText = def.getExpansionText();
+  unsigned startIdx = 0;
+  for (const auto replacement: def.getReplacements()) {
+    // Add the original text up to the first replacement.
+    expandedResult.append(
+        originalText.begin() + startIdx,
+        originalText.begin() + replacement.startOffset);
+
+    // Add the replacement text.
+    auto argExpr = args->getArgExprs()[replacement.parameterIndex];
+    SmallString<32> argTextBuffer;
+    auto argText = extractInlinableText(ctx.SourceMgr, argExpr, argTextBuffer);
+    expandedResult.append(argText);
+
+    // Update the starting position.
+    startIdx = replacement.endOffset;
+  }
+
+  // Add the remaining text.
+  expandedResult.append(
+      originalText.begin() + startIdx,
+      originalText.end());
+
+  return expandedResult;
+}
+
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
 ) {
@@ -658,7 +702,22 @@ Expr *swift::expandMacroExpr(
     return nullptr;
   }
 
-  std::string discriminator;
+  /// The discriminator used for the macro.
+  std::string cachedDiscriminator;
+  auto getDiscriminator = [&]() -> StringRef {
+    if (!cachedDiscriminator.empty())
+      return cachedDiscriminator;
+
+#if SWIFT_SWIFT_PARSER
+    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
+      Mangle::ASTMangler mangler;
+      cachedDiscriminator = mangler.mangleMacroExpansion(expansionExpr);
+    }
+#endif
+
+    return cachedDiscriminator;
+  };
+
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -673,6 +732,15 @@ Expr *swift::expandMacroExpr(
           expr->getLoc(), diag::external_macro_outside_macro_definition);
       return nullptr;
     }
+  }
+
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(
+        macroDef.getExpanded(), macro, expr->getArgs());
+    llvm::MallocAllocator allocator;
+    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    break;
   }
 
   case MacroDefinition::Kind::External: {
@@ -701,17 +769,12 @@ Expr *swift::expandMacroExpr(
     if (!astGenSourceFile)
       return nullptr;
 
-    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
-      Mangle::ASTMangler mangler;
-      discriminator = mangler.mangleMacroExpansion(expansionExpr);
-    }
-
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
-        discriminator.size(), astGenSourceFile,
+        static_cast<uint32_t>(externalDef->kind), getDiscriminator().data(),
+        getDiscriminator().size(), astGenSourceFile,
         expr->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
@@ -728,10 +791,10 @@ Expr *swift::expandMacroExpr(
 
   // Figure out a reasonable name for the macro expansion buffer.
   std::string bufferName;
-  if (discriminator.empty())
+  if (getDiscriminator().empty())
     bufferName = "macro-expansion";
   else {
-    bufferName = adjustMacroExpansionBufferName(discriminator);
+    bufferName = adjustMacroExpansionBufferName(getDiscriminator());
   }
 
   // Dump macro expansions to standard output, if requested.
@@ -843,6 +906,15 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
       // FIXME: Error here.
       return None;
     }
+  }
+
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(
+        macroDef.getExpanded(), macro, med->getArgs());
+    llvm::MallocAllocator allocator;
+    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    break;
   }
 
   case MacroDefinition::Kind::External: {
@@ -1041,6 +1113,15 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
       // FIXME: Error here.
       return nullptr;
     }
+  }
+
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(
+        macroDef.getExpanded(), macro, attr->getArgs());
+    llvm::MallocAllocator allocator;
+    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    break;
   }
 
   case MacroDefinition::Kind::External: {

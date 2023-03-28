@@ -4758,8 +4758,8 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
 
       case MacroDefinition::Kind::External: {
         auto external = def.getExternalMacro();
-        Printer << " = #externalMacro(module: \"" << external.moduleName << "\", "
-                << "type: \"" << external.macroTypeName << "\")";
+        Printer << " = #externalMacro(module: \"" << external.moduleName
+                << "\", " << "type: \"" << external.macroTypeName << "\")";
         break;
       }
 
@@ -4770,6 +4770,10 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
           Printer << "ExternalMacro";
           break;
         }
+        break;
+
+      case MacroDefinition::Kind::Expanded:
+        Printer << " = " << def.getExpanded().getExpansionText();
         break;
       }
     }
