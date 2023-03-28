@@ -456,7 +456,26 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Dem; }
 
-  void clearNodeFactory() { Dem.clear(); }
+  NodeFactory::Checkpoint pushNodeFactoryCheckpoint() const {
+    return Dem.pushCheckpoint();
+  }
+
+  void popNodeFactoryCheckpoint(NodeFactory::Checkpoint checkpoint) {
+    Dem.popCheckpoint(checkpoint);
+  }
+
+  class ScopedNodeFactoryCheckpoint {
+    TypeRefBuilder *Builder;
+    NodeFactory::Checkpoint Checkpoint;
+
+  public:
+    ScopedNodeFactoryCheckpoint(TypeRefBuilder *Builder)
+        : Builder(Builder), Checkpoint(Builder->pushNodeFactoryCheckpoint()) {}
+
+    ~ScopedNodeFactoryCheckpoint() {
+      Builder->popNodeFactoryCheckpoint(Checkpoint);
+    }
+  };
 
   BuiltType decodeMangledType(Node *node, bool forRequirement = true);
 
@@ -1190,13 +1209,19 @@ public:
       for (auto descriptor : sections.AssociatedType) {
         // Read out the relevant info from the associated type descriptor:
         // The type's name and which protocol conformance it corresponds to
-        auto typeRef = readTypeRef(descriptor, descriptor->ConformingTypeName);
-        auto typeName = nodeToString(demangleTypeRef(typeRef));
-        auto optionalMangledTypeName = normalizeReflectionName(typeRef);
-        auto protocolNode = demangleTypeRef(
-            readTypeRef(descriptor, descriptor->ProtocolTypeName));
-        auto protocolName = nodeToString(protocolNode);
-        clearNodeFactory();
+        llvm::Optional<std::string> optionalMangledTypeName;
+        std::string typeName;
+        std::string protocolName;
+        {
+          ScopedNodeFactoryCheckpoint checkpoint(this);
+          auto typeRef =
+              readTypeRef(descriptor, descriptor->ConformingTypeName);
+          typeName = nodeToString(demangleTypeRef(typeRef));
+          optionalMangledTypeName = normalizeReflectionName(typeRef);
+          auto protocolNode = demangleTypeRef(
+              readTypeRef(descriptor, descriptor->ProtocolTypeName));
+          protocolName = nodeToString(protocolNode);
+        }
         if (optionalMangledTypeName.has_value()) {
           auto mangledTypeName = optionalMangledTypeName.value();
           if (forMangledTypeName.has_value()) {
@@ -2011,10 +2036,10 @@ public:
     std::unordered_map<std::string, std::string> typeNameToManglingMap;
     for (const auto &section : ReflectionInfos) {
       for (auto descriptor : section.Field) {
+        ScopedNodeFactoryCheckpoint checkpoint(this);
         auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
         auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
         auto TypeName = nodeToString(demangleTypeRef(TypeRef));
-        clearNodeFactory();
         if (OptionalMangledTypeName.has_value()) {
           typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
         }
