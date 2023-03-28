@@ -945,6 +945,91 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleDocBufferID);
     break;
 
+  case serialization::Status::MissingDependency:
+  case serialization::Status::CircularDependency:
+  case serialization::Status::MissingUnderlyingModule:
+    serialization::diagnoseSerializedASTLoadFailureTransitive(
+      Ctx, diagLoc, loadInfo.status,
+      loadedModuleFile, ModuleName, /*forTestable*/false);
+    break;
+
+  case serialization::Status::FailedToLoadBridgingHeader:
+    // We already emitted a diagnostic about the bridging header. Just emit
+    // a generic message here.
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
+                       ModuleName.str());
+    break;
+
+  case serialization::Status::NameMismatch: {
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_name_mismatch;
+    if (Ctx.LangOpts.DebuggerSupport)
+      diagKind = diag::serialization_name_mismatch_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName.str());
+    break;
+  }
+
+  case serialization::Status::TargetIncompatible: {
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_incompatible;
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
+      diagKind = diag::serialization_target_incompatible_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
+                       moduleBufferID);
+    break;
+  }
+
+  case serialization::Status::TargetTooNew: {
+    llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
+
+    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
+        getOSAndVersionForDiagnostics(moduleTarget);
+    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
+        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
+
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_too_new;
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
+      diagKind = diag::serialization_target_too_new_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
+                       compilationOSInfo.second, ModuleName,
+                       moduleOSInfo.second, moduleBufferID);
+    break;
+  }
+
+  case serialization::Status::SDKMismatch:
+    auto currentSDK = Ctx.LangOpts.SDKName;
+    auto moduleSDK = loadInfo.sdkName;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
+                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
+  }
+}
+
+void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
+    ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
+    ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable) {
+  switch (status) {
+  case serialization::Status::Valid:
+  case serialization::Status::FormatTooNew:
+  case serialization::Status::FormatTooOld:
+  case serialization::Status::NotInOSSA:
+  case serialization::Status::RevisionIncompatible:
+  case serialization::Status::Malformed:
+  case serialization::Status::MalformedDocumentation:
+  case serialization::Status::FailedToLoadBridgingHeader:
+  case serialization::Status::NameMismatch:
+  case serialization::Status::TargetIncompatible:
+  case serialization::Status::TargetTooNew:
+  case serialization::Status::SDKMismatch:
+    llvm_unreachable("status not handled by "
+        "diagnoseSerializedASTLoadFailureTransitive");
+
   case serialization::Status::MissingDependency: {
     // Figure out /which/ dependencies are missing.
     // FIXME: Dependencies should be de-duplicated at serialization time,
@@ -1023,62 +1108,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     }
     break;
   }
-
-  case serialization::Status::FailedToLoadBridgingHeader:
-    // We already emitted a diagnostic about the bridging header. Just emit
-    // a generic message here.
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
-                       ModuleName.str());
-    break;
-
-  case serialization::Status::NameMismatch: {
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_name_mismatch;
-    if (Ctx.LangOpts.DebuggerSupport)
-      diagKind = diag::serialization_name_mismatch_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName.str());
-    break;
-  }
-
-  case serialization::Status::TargetIncompatible: {
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_target_incompatible;
-    if (Ctx.LangOpts.DebuggerSupport ||
-        Ctx.LangOpts.AllowModuleWithCompilerErrors)
-      diagKind = diag::serialization_target_incompatible_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
-                       moduleBufferID);
-    break;
-  }
-
-  case serialization::Status::TargetTooNew: {
-    llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
-
-    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
-        getOSAndVersionForDiagnostics(moduleTarget);
-    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
-        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
-
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_target_too_new;
-    if (Ctx.LangOpts.DebuggerSupport ||
-        Ctx.LangOpts.AllowModuleWithCompilerErrors)
-      diagKind = diag::serialization_target_too_new_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
-                       compilationOSInfo.second, ModuleName,
-                       moduleOSInfo.second, moduleBufferID);
-    break;
-  }
-
-  case serialization::Status::SDKMismatch:
-    auto currentSDK = Ctx.LangOpts.SDKName;
-    auto moduleSDK = loadInfo.sdkName;
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
-                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
-    break;
   }
 }
 
