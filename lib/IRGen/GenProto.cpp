@@ -1113,7 +1113,9 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
   for (auto idx : indices(tables)) {
     auto slot =
         IGF.Builder.CreateConstArrayGEP(buffer, idx, IGF.IGM.getPointerSize());
-    IGF.Builder.CreateStore(tables[idx], slot);
+    auto wtable =
+        IGF.Builder.CreateBitCast(tables[idx], IGF.IGM.WitnessTablePtrTy);
+    IGF.Builder.CreateStore(wtable, slot);
   }
 
   return buffer.getAddress();
@@ -1184,15 +1186,11 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   return accessor;
 }
 
-static const ProtocolConformance &
-mapConformanceIntoContext(IRGenModule &IGM, const RootProtocolConformance &conf,
-                          DeclContext *dc) {
-  auto normal = dyn_cast<NormalProtocolConformance>(&conf);
-  if (!normal) return conf;
-  return *conf.subst([&](SubstitutableType *t) -> Type {
-                       return dc->mapTypeIntoContext(t);
-                     },
-                     LookUpConformanceInModule(IGM.getSwiftModule()));
+static const ProtocolConformance *
+mapConformanceIntoContext(const RootProtocolConformance *conf) {
+  if (auto *genericEnv = conf->getDeclContext()->getGenericEnvironmentOfContext())
+    return conf->subst(genericEnv->getForwardingSubstitutionMap());
+  return conf;
 }
 
 WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
@@ -1292,22 +1290,19 @@ public:
   protected:
     IRGenModule &IGM;
     SILWitnessTable *SILWT;
-    CanType ConcreteType;
     const RootProtocolConformance &Conformance;
     const ProtocolConformance &ConformanceInContext;
+    CanType ConcreteType;
 
     Optional<FulfillmentMap> Fulfillments;
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
-          ConcreteType(SILWT->getConformance()->getDeclContext()
-                          ->mapTypeIntoContext(
-                            SILWT->getConformance()->getType())
-                         ->getCanonicalType()),
           Conformance(*SILWT->getConformance()),
-          ConformanceInContext(
-            mapConformanceIntoContext(IGM, Conformance,
-                                      Conformance.getDeclContext())) {}
+          ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance())),
+          ConcreteType(Conformance.getDeclContext()
+                         ->mapTypeIntoContext(Conformance.getType())
+                         ->getCanonicalType()) {}
 
     void defineAssociatedTypeWitnessTableAccessFunction(
                                         AssociatedConformance requirement,
