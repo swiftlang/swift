@@ -111,7 +111,7 @@ extension UnownedJob: CustomStringConvertible {
 /// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.9, *)
 @frozen
-// @_moveOnly // FIXME(moveonly): rdar://107050387 Move-only types fail to be found sometimes, must fix or remove Job before shipping
+@_moveOnly
 public struct Job: Sendable {
   internal var context: Builtin.Job
 

@@ -98,6 +98,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(
     FreestandingExpressionMacros, 382, "Expression macros",
     true)
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", true)
+LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -108,7 +109,6 @@ EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(VariadicGenerics, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
-EXPERIMENTAL_FEATURE(MoveOnly, true)
 EXPERIMENTAL_FEATURE(FreestandingMacros, true)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
