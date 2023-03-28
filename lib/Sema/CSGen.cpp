@@ -1699,7 +1699,8 @@ namespace {
         if (!CS.getASTContext().isSwiftVersionAtLeast(6)) {
           auto paramTypeVar = CS.createTypeVariable(
               CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
-              TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+              TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
+                  TVO_CanBindToPack);
           CS.addConstraint(ConstraintKind::BindTupleOfFunctionParams, methodTy,
                            paramTypeVar, CS.getConstraintLocator(expr));
         }

@@ -4318,21 +4318,37 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
-  // Binding to a pack expansion type is always an error. This indicates
-  // that a pack expansion expression was used in a context that doesn't
-  // support it.
+  // Binding to a pack expansion type is always an error in Swift 6 mode.
+  // This indicates that a pack expansion expression was used in a context
+  // that doesn't support it.
+  //
+  // In Swift 5 and earlier initializer references are handled in a special
+  // way that uses a type variable to represent a type of the parameter
+  // list. Such type variables should be allowed to bind to a pack expansion
+  // type to support cases where initializer has a single unlabeled variadic
+  // generic parameter - `init(_ data: repeat each T)`.
+  //
+  // See BindTupleOfFunctionParams constraint for more details.
   if (type->is<PackExpansionType>()) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
+    bool representsParameterList =
+        typeVar->getImpl()
+            .getLocator()
+            ->isLastElement<LocatorPathElt::ApplyArgument>();
 
-    auto *fix =
-        AllowInvalidPackExpansion::create(*this, getConstraintLocator(locator));
-    if (recordFix(fix))
-      return getTypeMatchFailure(locator);
+    if (!(typeVar->getImpl().canBindToPack() && representsParameterList) ||
+        getASTContext().isSwiftVersionAtLeast(6)) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
 
-    // Don't allow the pack expansion type to propagate to other
-    // bindings.
-    type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
+      auto *fix = AllowInvalidPackExpansion::create(
+          *this, getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+
+      // Don't allow the pack expansion type to propagate to other
+      // bindings.
+      type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
+    }
   }
 
   // We do not allow keypaths to go through AnyObject. Let's create a fix
@@ -7867,7 +7883,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   if (!getASTContext().isSwiftVersionAtLeast(6)) {
     auto paramTypeVar = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
-        TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+        TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
+            TVO_CanBindToPack);
     addConstraint(ConstraintKind::BindTupleOfFunctionParams, memberType,
                   paramTypeVar, locator);
   }
