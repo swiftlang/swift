@@ -57,6 +57,12 @@ struct SymbolGraphOptions {
   /// along with "extensionTo" relationships instead of directly associating
   /// members and conformances with the extended nominal.
   bool EmitExtensionBlockSymbols = false;
+
+  /// Whether to print information for private symbols in the standard library.
+  /// This should be left as `false` when printing a full-module symbol graph,
+  /// but SourceKit should be able to load the information when pulling symbol
+  /// information for individual queries.
+  bool PrintPrivateStdlibSymbols = false;
 };
 
 } // end namespace symbolgraphgen
