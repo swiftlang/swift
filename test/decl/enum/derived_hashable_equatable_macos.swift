@@ -25,7 +25,7 @@ enum HasElementsWithAvailability: Hashable {
   case introduced10_50
 
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasElementsWithAvailability, _ b: HasElementsWithAvailability) -> Bool {
-  // CHECK-NEXT:    private var index_a: Int
+  // CHECK-NEXT:    var index_a: Int
   // CHECK-NEXT:    switch a {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_a = 0
@@ -40,7 +40,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    case .introduced10_50:
   // CHECK-NEXT:      index_a = 2
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    private var index_b: Int
+  // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      index_b = 0
@@ -59,7 +59,7 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:  }
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    private var discriminator: Int
+  // CHECK-NEXT:    var discriminator: Int
   // CHECK-NEXT:    switch self {
   // CHECK-NEXT:    case .alwaysAvailable:
   // CHECK-NEXT:      discriminator = 0
