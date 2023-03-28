@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -Rmodule-interface-rebuild -Xfrontend -disable-availability-checking %s -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -Rmodule-interface-rebuild -Xfrontend -disable-availability-checking %s -o %t/a.out 1>&2
 // RUN: %target-codesign %t/a.out
 // RUN:  %target-run %t/a.out
 
