@@ -169,7 +169,7 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
-    #if compiler(>=5.9) && $BuiltinBuildExecutor
+    #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
     self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
