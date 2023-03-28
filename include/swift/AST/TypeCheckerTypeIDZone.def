@@ -469,3 +469,6 @@ SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
 SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
               bool(ModuleDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
+              unsigned(ExtensionDecl *),
+              Cached, NoLocationInfo)
