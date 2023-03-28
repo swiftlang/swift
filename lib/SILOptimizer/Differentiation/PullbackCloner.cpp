@@ -1928,7 +1928,7 @@ bool PullbackCloner::Implementation::run() {
       builder.setInsertionPoint(pullbackBB);
       // Obtain the context object, if any, and the top-level subcontext, i.e.
       // the main pullback struct.
-      if (getPullbackInfo().hasLoops()) {
+      if (getPullbackInfo().hasHeapAllocatedContext()) {
         // The last argument is the context object (`Builtin.NativeObject`).
         contextValue = pullbackBB->getArguments().back();
         assert(contextValue->getType() ==
@@ -1939,7 +1939,7 @@ bool PullbackCloner::Implementation::run() {
         SILValue mainPullbackTuple = builder.createLoad(
             pbLoc, subcontextAddr,
             pbTupleLoweredType.isTrivial(getPullback()) ?
-                LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
+                LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Copy);
         auto *dsi = builder.createDestructureTuple(pbLoc, mainPullbackTuple);
         initializePullbackTupleElements(origBB, dsi->getAllResults());
       } else {
@@ -2023,7 +2023,7 @@ bool PullbackCloner::Implementation::run() {
   auto *pullbackEntry = pullback.getEntryBlock();
   auto pbTupleLoweredType =
     remapType(getPullbackInfo().getLinearMapTupleLoweredType(originalExitBlock));
-  unsigned numVals = (getPullbackInfo().hasLoops() ?
+  unsigned numVals = (getPullbackInfo().hasHeapAllocatedContext() ?
                       1 : pbTupleLoweredType.getAs<TupleType>()->getNumElements());
   (void)numVals;
 
@@ -2449,7 +2449,7 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
     auto predPbStructVal = pullbackTrampolineBBBuilder.createLoad(
         loc, predPbTupleAddr,
         pbTupleType.isTrivial(getPullback()) ?
-            LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take);
+            LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Copy);
     trampolineArguments.push_back(predPbStructVal);
   } else {
     trampolineArguments.push_back(pullbackTrampolineBBArg);
