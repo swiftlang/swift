@@ -132,11 +132,20 @@ void swift::swift_task_enqueueGlobalWithDeadline(
     swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock, job);
 }
 
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+extern "C" SWIFT_CC(swift)
+ExecutorRef _task_serialExecutor_getExecutorRef(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static bool swift_task_isOnExecutorImpl(HeapObject *executor,
                                         const Metadata *selfType,
                                         const SerialExecutorWitnessTable *wtable) {
-  auto executorRef = ExecutorRef::forOrdinary(executor, wtable);
+  auto executorRef = _task_serialExecutor_getExecutorRef(executor, selfType, wtable);
   return swift_task_isCurrentExecutor(executorRef);
 }
 
@@ -148,6 +157,10 @@ bool swift::swift_task_isOnExecutor(HeapObject *executor,
         executor, selfType, wtable, swift_task_isOnExecutorImpl);
   else
     return swift_task_isOnExecutorImpl(executor, selfType, wtable);
+}
+
+bool swift::swift_executor_isComplexEquality(ExecutorRef ref) {
+  return ref.isComplexEquality();
 }
 
 uint64_t swift::swift_task_getJobTaskId(Job *job) {

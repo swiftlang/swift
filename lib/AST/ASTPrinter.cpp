@@ -2979,6 +2979,10 @@ static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinBuildComplexEqualityExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinBuildMainExecutor(Decl *decl) {
   return false;
 }
