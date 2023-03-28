@@ -25,13 +25,13 @@ package import PackageDep
 // RUN:   -package-name MyPackage -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-PACKAGE-DEP %s
-// VISIBLE-PACKAGE-DEP: source: '{{.*}}PackageDep.swiftmodule'
+// VISIBLE-PACKAGE-DEP: loaded module 'PackageDep'
 
 // RUN: %target-swift-frontend -typecheck %t/ResilientClient.swift \
 // RUN:   -package-name NotMyPackage -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=HIDDEN-PACKAGE-DEP %s
-// HIDDEN-PACKAGE-DEP-NOT: PackageDep
+// HIDDEN-PACKAGE-DEP-NOT: loaded module 'PackageDep'
 
 //--- ResilientClient.swift
 import ResilientDep
