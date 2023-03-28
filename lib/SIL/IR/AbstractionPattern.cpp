@@ -554,6 +554,17 @@ static CanType getCanPackElementType(CanType type, unsigned index) {
   return cast<PackType>(type).getElementType(index);
 }
 
+static CanType getCanSILPackElementType(CanType type, unsigned index) {
+  return cast<SILPackType>(type).getElementType(index);
+}
+
+static CanType getAnyCanPackElementType(CanType type, unsigned index) {
+  if (isa<PackType>(type)) {
+    return getCanPackElementType(type, index);
+  }
+  return getCanSILPackElementType(type, index);
+}
+
 AbstractionPattern
 AbstractionPattern::getPackElementType(unsigned index) const {
   switch (getKind()) {
@@ -583,7 +594,7 @@ AbstractionPattern::getPackElementType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignature(),
-                              getCanPackElementType(getType(), index)); 
+                              getAnyCanPackElementType(getType(), index)); 
   }
   llvm_unreachable("bad kind");
 }
