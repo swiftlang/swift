@@ -1742,21 +1742,28 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // inout and @autoclosure.
     if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
-      auto *paramPackExpansion = paramTy->castTo<PackExpansionType>();
+      // If generic parameter comes from a variadic type declaration it's
+      // possible that it got specialized early and is no longer represented
+      // by a pack expansion type. For example, consider expression -
+      // `Test<Int>(42)` where `Test<each T>` and the initializer
+      // is declared as `init(_: repeat each T)`. Although declaration
+      // based information reports parameter at index 0 as variadic generic
+      // the call site specializes it to `Int`.
+      if (auto *paramPackExpansion = paramTy->getAs<PackExpansionType>()) {
+        SmallVector<Type, 2> argTypes;
+        for (auto argIdx : parameterBindings[paramIdx]) {
+          auto argType = argsWithLabels[argIdx].getPlainType();
+          argTypes.push_back(argType);
+        }
 
-      SmallVector<Type, 2> argTypes;
-      for (auto argIdx : parameterBindings[paramIdx]) {
-        auto argType = argsWithLabels[argIdx].getPlainType();
-        argTypes.push_back(argType);
-      }
+        auto *argPack = PackType::get(cs.getASTContext(), argTypes);
+        auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
 
-      auto *argPack = PackType::get(cs.getASTContext(), argTypes);
-      auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
-
-      cs.addConstraint(
+        cs.addConstraint(
           subKind, argPackExpansion, paramPackExpansion,
           loc, /*isFavored=*/false);
-      continue;
+        continue;
+      }
     }
 
     // If type inference from default arguments is enabled, let's
