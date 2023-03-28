@@ -735,6 +735,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
 
+  if (Args.hasArg(OPT_enable_builtin_module))
+    Opts.Features.insert(Feature::BuiltinModule);
+
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
   Opts.EnableSwift3ObjCInference =
@@ -1152,8 +1155,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Case("task-to-thread", ConcurrencyModel::TaskToThread)
             .Default(ConcurrencyModel::Standard);
   }
-
-  Opts.EnableBuiltinModule = Args.hasArg(OPT_enable_builtin_module);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }

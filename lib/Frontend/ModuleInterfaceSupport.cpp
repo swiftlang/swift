@@ -295,10 +295,12 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
-    // Unless '-enable-builtin-module' was passed, do not print 'import Builtin'
-    // in the interface. '-parse-stdlib' still implicitly imports it however...
+    // Unless '-enable-builtin-module' /
+    // '-enable-experimental-feature BuiltinModule' was passed, do not print
+    // 'import Builtin' in the interface. '-parse-stdlib' still implicitly
+    // imports it however...
     if (importedModule->isBuiltinModule() &&
-        !M->getASTContext().LangOpts.EnableBuiltinModule) {
+        !M->getASTContext().LangOpts.hasFeature(Feature::BuiltinModule)) {
       continue;
     }
 

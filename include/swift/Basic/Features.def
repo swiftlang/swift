@@ -183,6 +183,9 @@ EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 /// Enable reference bindings.
 EXPERIMENTAL_FEATURE(ReferenceBindings, false)
 
+/// Enable the explicit 'import Builtin' and allow Builtin usage.
+EXPERIMENTAL_FEATURE(BuiltinModule, true)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
