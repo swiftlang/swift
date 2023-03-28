@@ -1213,15 +1213,37 @@ public:
       Subs(Subs),
       Layout(Layout) {}
 
-  using MetadataSourceMap
-    = std::vector<std::pair<CanType, const reflection::MetadataSource*>>;
+  struct Entry {
+    enum Kind {
+      Metadata,
+      Shape
+    };
 
-  void addMetadataSource(const reflection::MetadataSource *Source) {
+    Kind kind;
+
+    CanType type;
+    const reflection::MetadataSource *source;
+
+    Entry(Kind kind, CanType type, const reflection::MetadataSource *source)
+      : kind(kind), type(type), source(source) {}
+  };
+
+  using MetadataSourceMap = std::vector<Entry>;
+
+  void addMetadataSource(Entry::Kind Kind, const reflection::MetadataSource *Source) {
     if (Source == nullptr) {
       B.addInt32(0);
     } else {
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
+      switch (Kind) {
+      case Entry::Kind::Shape:
+        OS << "s";
+        break;
+      case Entry::Kind::Metadata:
+        break;
+      }
+
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
@@ -1287,24 +1309,31 @@ public:
     // the bindings structure directly.
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
-      // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].isAnyWitnessTable())
-        continue;
-
-      // FIXME: bind pack counts in the source map
-      assert(Bindings[i].isAnyMetadata());
-
-      auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Bindings[i].getTypeParameter();
-      auto InterfaceType = BindingType->mapTypeOutOfContext();
-      SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
+      switch (Bindings[i].getKind()) {
+      case GenericRequirement::Kind::Shape:
+      case GenericRequirement::Kind::Metadata:
+      case GenericRequirement::Kind::MetadataPack: {
+        auto Kind = (Bindings[i].getKind() == GenericRequirement::Kind::Shape
+                     ? Entry::Kind::Shape
+                     : Entry::Kind::Metadata);
+        auto Source = SourceBuilder.createClosureBinding(i);
+        auto BindingType = Bindings[i].getTypeParameter();
+        auto InterfaceType = BindingType->mapTypeOutOfContext();
+        SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Source);
+        break;
+      }
+      case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::WitnessTablePack:
+        // Skip protocol requirements (FIXME: for now?)
+        break;
+      }
     }
 
     // Check if any requirements were fulfilled by metadata stored inside a
     // captured value.
 
     enumerateGenericParamFulfillments(IGM, OrigCalleeType,
-        [&](CanType GenericParam,
+        [&](GenericRequirement Req,
             const irgen::MetadataSource &Source,
             const MetadataPath &Path) {
 
@@ -1332,15 +1361,31 @@ public:
         break;
       }
 
+      Entry::Kind Kind;
+      switch (Req.getKind()) {
+      case GenericRequirement::Kind::Shape:
+        Kind = Entry::Kind::Shape;
+        break;
+
+      case GenericRequirement::Kind::Metadata:
+      case GenericRequirement::Kind::MetadataPack:
+        Kind = Entry::Kind::Metadata;
+        break;
+
+      case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::WitnessTablePack:
+        llvm_unreachable("Bad kind");
+      }
+
       // The metadata might be reached via a non-trivial path (eg,
       // dereferencing an isa pointer or a generic argument). Record
       // the path. We assume captured values map 1-1 with function
       // parameters.
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
-      auto SubstType = GenericParam.subst(Subs);
+      auto SubstType = Req.getTypeParameter().subst(Subs);
       auto InterfaceType = SubstType->mapTypeOutOfContext();
-      SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
+      SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Src);
     });
 
     return SourceMap;
@@ -1398,12 +1443,9 @@ public:
 
     // Add the pairs that make up the generic param -> metadata source map
     // to the struct.
-    for (auto GenericAndSource : MetadataSources) {
-      auto GenericParam = GenericAndSource.first->getCanonicalType();
-      auto Source = GenericAndSource.second;
-
-      addTypeRef(GenericParam, sig);
-      addMetadataSource(Source);
+    for (auto entry : MetadataSources) {
+      addTypeRef(entry.type, sig);
+      addMetadataSource(entry.kind, entry.source);
     }
   }
 
