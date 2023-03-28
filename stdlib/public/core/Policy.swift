@@ -42,6 +42,23 @@ extension Never: Identifiable {
   }
 }
 
+@available(SwiftStdlib 5.9, *)
+extension Never: Encodable {
+  @available(SwiftStdlib 5.9, *)
+  public func encode(to: Encoder) throws {}
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Never: Decodable {
+  @available(SwiftStdlib 5.9, *)
+  public init(from decoder: Decoder) throws {
+    let context = DecodingError.Context(
+      codingPath: decoder.codingPath,
+      debugDescription: "Unable to decode an instance of Never.")
+    throw DecodingError.dataCorrupted(context)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
