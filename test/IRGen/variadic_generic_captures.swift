@@ -3,6 +3,8 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
+public func takesNoEscape(_: () -> ()) {}
+
 public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
   return { _ = (repeat each T).self }
 }
@@ -17,8 +19,9 @@ public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
 // CHECK: store [[INT]] %1, [[INT]]* [[SHAPE_PTR]]
 
 // CHECK: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_ARGS]], i32 1
+// CHECK: [[T_HEAP:%.*]] = call swiftcc %swift.type** @swift_allocateMetadataPack(%swift.type** %T, [[INT]] %1)
 // CHECK: [[T_ADDR2:%.*]] = bitcast %swift.type** [[T_ADDR]] to %swift.type***
-// CHECK: store %swift.type** %T, %swift.type*** [[T_ADDR2]]
+// CHECK: store %swift.type** [[T_HEAP]], %swift.type*** [[T_ADDR2]]
 
 // CHECK: [[CONTEXT1:%.*]] = insertvalue {{.*}} @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlFyycfU_TA"
 // CHECK: ret { i8*, %swift.refcounted* } [[CONTEXT1]]
@@ -36,6 +39,42 @@ public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
 // CHECK: [[T:%.*]] = load %swift.type**, %swift.type*** [[T_PTR]]
 
 // CHECK: tail call swiftcc void @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlFyycfU_"([[INT]] [[SHAPE]], %swift.type** [[T]])
+// CHECK: ret void
+
+public func has_metadata_pack_noescape<each T>(t: repeat each T) {
+  takesNoEscape { _ = (repeat each T).self }
+}
+
+// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlF"(%swift.opaque** noalias nocapture %0, i64 %1, %swift.type** %T) #0 {
+// CHECK: [[CONTEXT0:%.*]] = alloca i8, [[INT]]
+// CHECK: [[CONTEXT1:%.*]] = bitcast i8* [[CONTEXT0]] to %swift.opaque*
+// CHECK: [[CONTEXT:%.*]] = bitcast %swift.opaque* [[CONTEXT1]] to <{{.*}}>*
+
+// CHECK: [[GENERIC_ARGS_ADDR:%.*]] = getelementptr inbounds {{.*}}* [[CONTEXT]], i32 0, i32 {{(1|2)}}
+// CHECK: [[GENERIC_ARGS:%.*]] = bitcast {{.*}} [[GENERIC_ARGS_ADDR]] to %swift.type**
+// CHECK: [[SHAPE_PTR:%.*]] = bitcast %swift.type** [[GENERIC_ARGS]] to [[INT]]*
+// CHECK: store [[INT]] %1, [[INT]]* [[SHAPE_PTR]]
+
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_ARGS]], i32 1
+// CHECK: [[T_ADDR2:%.*]] = bitcast %swift.type** [[T_ADDR]] to %swift.type***
+// CHECK: store %swift.type** %T, %swift.type*** [[T_ADDR2]]
+
+// CHECK:  call swiftcc void @"$s25variadic_generic_captures13takesNoEscapeyyyyXEF"(
+// CHECK: ret void
+
+// CHECK-LABEL: define internal swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlFyyXEfU_TA"(%swift.refcounted* swiftself %0)
+// CHECK: [[CONTEXT:%.*]] = bitcast %swift.refcounted* %0 to {{.*}}*
+// CHECK: [[GENERIC_ARGS_ADDR:%.*]] = getelementptr inbounds {{.*}}* [[CONTEXT]], i32 0, i32 {{(1|2)}}
+// CHECK: [[GENERIC_ARGS:%.*]] = bitcast {{.*}} to %swift.type**
+
+// CHECK: [[SHAPE_PTR:%.*]] = bitcast %swift.type** [[GENERIC_ARGS]] to [[INT]]*
+// CHECK: [[SHAPE:%.*]] = load [[INT]], [[INT]]* [[SHAPE_PTR]]
+
+// CHECK: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_ARGS]], i32 1
+// CHECK: [[T_PTR:%.*]] = bitcast %swift.type** [[T_ADDR]] to %swift.type***
+// CHECK: [[T:%.*]] = load %swift.type**, %swift.type*** [[T_PTR]]
+
+// CHECK: tail call swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlFyyXEfU_"([[INT]] [[SHAPE]], %swift.type** [[T]])
 // CHECK: ret void
 
 public func has_witness_table_pack<each T: Sequence>(t: repeat each T) -> () -> () {

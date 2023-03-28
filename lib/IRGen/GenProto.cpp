@@ -3279,7 +3279,8 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
 
 void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
   emitInitOfGenericRequirementsBuffer(IGF, getRequirements(), buffer,
-                                      MetadataState::Complete, SubMap);
+                                      MetadataState::Complete, SubMap,
+                                      /*onHeapPacks=*/!NoEscape);
 }
 
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
@@ -3485,22 +3486,22 @@ void EmitPolymorphicArguments::emit(SubstitutionMap subs,
 
 NecessaryBindings
 NecessaryBindings::forPartialApplyForwarder(IRGenModule &IGM,
-                                          CanSILFunctionType origType,
-                                          SubstitutionMap subs,
-                                          bool considerParameterSources) {
-  return computeBindings(IGM, origType, subs,
-                         considerParameterSources);
+                                            CanSILFunctionType origType,
+                                            SubstitutionMap subs,
+                                            bool noEscape,
+                                            bool considerParameterSources) {
+  NecessaryBindings bindings(subs, noEscape);
+  bindings.computeBindings(IGM, origType, considerParameterSources);
+  return bindings;
 }
 
-NecessaryBindings NecessaryBindings::computeBindings(
-    IRGenModule &IGM, CanSILFunctionType origType, SubstitutionMap subs,
+void NecessaryBindings::computeBindings(
+    IRGenModule &IGM, CanSILFunctionType origType,
     bool considerParameterSources) {
-
-  NecessaryBindings bindings(subs);
 
   // Bail out early if we don't have polymorphic parameters.
   if (!hasPolymorphicParameters(origType))
-    return bindings;
+    return;
 
   // Figure out what we're actually required to pass:
   PolymorphicConvention convention(IGM, origType, considerParameterSources);
@@ -3513,14 +3514,14 @@ NecessaryBindings NecessaryBindings::computeBindings(
       continue;
 
     case MetadataSource::Kind::GenericLValueMetadata:
-      bindings.addRequirement(GenericRequirement::forMetadata(
+      addRequirement(GenericRequirement::forMetadata(
           getOrigSelfType(IGM, origType)));
       continue;
 
     case MetadataSource::Kind::SelfMetadata:
       // Async functions pass the SelfMetadata and SelfWitnessTable parameters
       // along explicitly.
-      bindings.addRequirement(GenericRequirement::forMetadata(
+      addRequirement(GenericRequirement::forMetadata(
           getOrigSelfType(IGM, origType)));
       continue;
 
@@ -3538,10 +3539,8 @@ NecessaryBindings NecessaryBindings::computeBindings(
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
                                         [&](GenericRequirement requirement) {
-    bindings.addRequirement(requirement);
+    addRequirement(requirement);
   });
-
-  return bindings;
 }
 
 /// The information we need to record in generic type metadata
@@ -3592,7 +3591,8 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
                                ArrayRef<GenericRequirement> requirements,
                                Address buffer,
                                MetadataState metadataState,
-                               SubstitutionMap subs) {
+                               SubstitutionMap subs,
+                               bool onHeapPacks) {
   if (requirements.empty()) return;
 
   // Cast the buffer to %type**.
@@ -3607,7 +3607,7 @@ void irgen::emitInitOfGenericRequirementsBuffer(IRGenFunction &IGF,
     }
 
     llvm::Value *value = emitGenericRequirementFromSubstitutions(
-        IGF, requirements[index], metadataState, subs);
+        IGF, requirements[index], metadataState, subs, onHeapPacks);
     slot = IGF.Builder.CreateElementBitCast(slot,
                                        requirements[index].getType(IGF.IGM));
     IGF.Builder.CreateStore(value, slot);
@@ -3618,7 +3618,8 @@ llvm::Value *
 irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                GenericRequirement requirement,
                                                MetadataState metadataState,
-                                               SubstitutionMap subs) {
+                                               SubstitutionMap subs,
+                                               bool onHeapPacks) {
   CanType depTy = requirement.getTypeParameter();
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
@@ -3627,16 +3628,39 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
     return IGF.emitPackShapeExpression(argType);
 
   case GenericRequirement::Kind::Metadata:
-  case GenericRequirement::Kind::MetadataPack:
     return IGF.emitTypeMetadataRef(argType, metadataState).getMetadata();
 
-  case GenericRequirement::Kind::WitnessTable:
+  case GenericRequirement::Kind::MetadataPack: {
+    auto metadata = IGF.emitTypeMetadataRef(argType, metadataState).getMetadata();
+    metadata = IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrPtrTy);
+
+    // FIXME: We should track if this pack is already known to be on the heap
+    if (onHeapPacks) {
+      auto shape = IGF.emitPackShapeExpression(argType);
+      metadata = IGF.Builder.CreateCall(IGF.IGM.getAllocateMetadataPackFunctionPointer(),
+                                        {metadata, shape});
+    }
+
+    return metadata;
+  }
+
+  case GenericRequirement::Kind::WitnessTable: {
+    auto conformance = subs.lookupConformance(depTy, requirement.getProtocol());
+    return emitWitnessTableRef(IGF, argType, conformance);
+  }
+
   case GenericRequirement::Kind::WitnessTablePack: {
-    auto proto = requirement.getProtocol();
-    auto conformance = subs.lookupConformance(depTy, proto);
-    assert(conformance.getRequirement() == proto);
-    llvm::Value *metadata = nullptr;
-    auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);
+    auto conformance = subs.lookupConformance(depTy, requirement.getProtocol());
+    auto wtable = emitWitnessTableRef(IGF, argType, conformance);
+    wtable = IGF.Builder.CreateBitCast(wtable, IGF.IGM.WitnessTablePtrPtrTy);
+
+    // FIXME: We should track if this pack is already known to be on the heap
+    if (onHeapPacks) {
+      auto shape = IGF.emitPackShapeExpression(argType);
+      wtable = IGF.Builder.CreateCall(IGF.IGM.getAllocateWitnessTablePackFunctionPointer(),
+                                      {wtable, shape});
+    }
+
     return wtable;
   }
   }
@@ -3651,10 +3675,10 @@ void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
 }
 
 void irgen::bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
-                                    ArrayRef<GenericRequirement> requirements,
-                                    Address buffer,
-                                    MetadataState metadataState,
-                                    SubstitutionMap subs) {
+                                              ArrayRef<GenericRequirement> requirements,
+                                              Address buffer,
+                                              MetadataState metadataState,
+                                              SubstitutionMap subs) {
   if (requirements.empty()) return;
 
   // Cast the buffer to %type**.

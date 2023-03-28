@@ -1949,7 +1949,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // Reserve space for polymorphic bindings.
   auto bindings = NecessaryBindings::forPartialApplyForwarder(
-      IGF.IGM, origType, subs, considerParameterSources);
+      IGF.IGM, origType, subs, outType->isNoEscape(),
+      considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;

@@ -43,4 +43,20 @@ types.test("WitnessTable2") {
   expectEqual((Int, String, Bool).self, hasWitnessTablePack2([[1]], [["hi"]], [[false]])())
 }
 
+// Test lifetimes of captured packs
+func lifetimeTest1() -> () -> Any.Type {
+  return hasMetadataPack("hello", Set<Int>())
+}
+
+func lifetimeTest2() -> () -> Any.Type {
+  return hasMetadataPack(3, 1.0)
+}
+
+types.test("Lifetime") {
+  let fn1 = lifetimeTest1()
+  let fn2 = lifetimeTest2()
+  expectEqual((String, Set<Int>).self, fn1())
+  expectEqual((Int, Double).self, fn2())
+}
+
 runAllTests()
