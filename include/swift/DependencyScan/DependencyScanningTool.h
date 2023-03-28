@@ -115,6 +115,9 @@ private:
   /// command-line options specified in the batch scan input entry.
   std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
 
+  /// Shared state mutual-exclusivity lock
+  llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
+
   /// A shared consumer that accumulates encountered diagnostics.
   DependencyScannerDiagnosticCollectingConsumer CDC;
   llvm::BumpPtrAllocator Alloc;
