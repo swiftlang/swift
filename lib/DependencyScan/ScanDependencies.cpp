@@ -405,6 +405,10 @@ static void discoverCrossImportOverlayDependencies(
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
   for (auto dep : allDependencies) {
+    // Do not look for overlays of main module under scan
+    if (dep.first == mainModuleName)
+      continue;
+
     auto moduleName = dep.first;
     auto dependencies = cache.findDependency(moduleName, dep.second).value();
 
@@ -413,8 +417,12 @@ static void discoverCrossImportOverlayDependencies(
         instance.getASTContext(), moduleName);
     if (overlayMap.empty())
       continue;
+
     std::for_each(allDependencies.begin(), allDependencies.end(),
                   [&](ModuleDependencyID Id) {
+                    // Do not look for overlays of main module under scan
+                    if (Id.first == mainModuleName)
+                      return;
                     // check if any explicitly imported modules can serve as a
                     // secondary module, and add the overlay names to the
                     // dependencies list.
