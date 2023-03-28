@@ -311,11 +311,7 @@ public:
 
     // If we had a fragment tail and do not have a fragment operator afterwards,
     // then we are done. Return false.
-    if (ii == ie)
-      return false;
-
-    // Otherwised, we search for fragment fragment_tail*
-    do {
+    while (ii != ie) {
       auto *val = *ii;
       ++ii;
 
@@ -323,7 +319,7 @@ public:
         return true;
       if (!val->isFragmentTail())
         return false;
-    } while (ii != ie);
+    }
 
     // If we did not find either pattern (for instance, if we saw a tail and no
     // fragment), return false.

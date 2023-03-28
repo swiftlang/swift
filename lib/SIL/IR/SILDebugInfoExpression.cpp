@@ -93,8 +93,10 @@ SILDebugInfoExpression::get(SILModule &mod,
   for (auto &elt : end)
     elements[index++] = elt;
   assert(diExpr->getElements().size() == numTrailingElts);
-  for (auto &elt : diExpr->getElements())
-    assert(elt);
+  assert(llvm::all_of(diExpr->getElements(),
+                      [](const SILDIExprElement *elt) -> bool {
+                        return bool(elt);
+                      }));
   mod.diExprs.InsertNode(diExpr, insertPos);
   return diExpr;
 }
