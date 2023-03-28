@@ -382,7 +382,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addAllocBoxToStack();
 
   if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
-    P.addSSADestroyHoisting();
+    P.addDestroyAddrHoisting();
   }
 
   // Propagate copies through stack locations.  Should run after

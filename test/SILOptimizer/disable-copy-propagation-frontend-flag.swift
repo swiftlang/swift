@@ -74,30 +74,30 @@
 // RUN: 2>&1 | %FileCheck -check-prefix CHECK-CPON-DHON %s
 
 // CHECK-CPUNSPEC-DHUNSPEC: copy-propagation
-// CHECK-CPUNSPEC-DHUNSPEC: ssa-destroy-hoisting
+// CHECK-CPUNSPEC-DHUNSPEC: destroy-addr-hoisting
 
 // CHECK-CPUNSPEC-DHOFF: copy-propagation
-// CHECK-CPUNSPEC-DHOFF-NOT: ssa-destroy-hoisting
+// CHECK-CPUNSPEC-DHOFF-NOT: destroy-addr-hoisting
 
 // CHECK-CPUNSPEC-DHON: copy-propagation
-// CHECK-CPUNSPEC-DHON: ssa-destroy-hoisting
+// CHECK-CPUNSPEC-DHON: destroy-addr-hoisting
 
 // CHECK-CPOFF-DHUNSPEC-NOT: copy-propagation
-// CHECK-CPOFF-DHUNSPEC-NOT: ssa-destroy-hoisting
+// CHECK-CPOFF-DHUNSPEC-NOT: destroy-addr-hoisting
 
 // CHECK-CPOFF-DHOFF-NOT: copy-propagation
-// CHECK-CPOFF-DHOFF-NOT: ssa-destroy-hoisting
+// CHECK-CPOFF-DHOFF-NOT: destroy-addr-hoisting
 
 // CHECK-CPOFF-DHON-NOT: copy-propagation
-// CHECK-CPOFF-DHON: ssa-destroy-hoisting
+// CHECK-CPOFF-DHON: destroy-addr-hoisting
 
 // CHECK-CPON-DHUNSPEC: copy-propagation
-// CHECK-CPON-DHUNSPEC: ssa-destroy-hoisting
+// CHECK-CPON-DHUNSPEC: destroy-addr-hoisting
 
 // CHECK-CPON-DHOFF: copy-propagation
-// CHECK-CPON-DHOFF-NOT: ssa-destroy-hoisting
+// CHECK-CPON-DHOFF-NOT: destroy-addr-hoisting
 
 // CHECK-CPON-DHON: copy-propagation
-// CHECK-CPON-DHON: ssa-destroy-hoisting
+// CHECK-CPON-DHON: destroy-addr-hoisting
 
 func foo() {}

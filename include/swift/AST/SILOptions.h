@@ -59,10 +59,10 @@ enum class CopyPropagationOption : uint8_t {
 };
 
 enum class DestroyHoistingOption : uint8_t {
-  // Do not run SSADestroyHoisting.
+  // Do not run DestroyAddrHoisting.
   Off = 0,
 
-  // Run SSADestroyHoisting pass after AllocBoxToStack in the function passes.
+  // Run DestroyAddrHoisting pass after AllocBoxToStack in the function passes.
   On = 1
 };
 
@@ -98,7 +98,7 @@ public:
   /// When this is 'On' the pipeline has default behavior.
   CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
 
-  /// Whether to run the SSADestroyHoisting pass.
+  /// Whether to run the DestroyAddrHoisting pass.
   ///
   /// When this 'On' the pipeline has the default behavior.
   DestroyHoistingOption DestroyHoisting = DestroyHoistingOption::On;
