@@ -35,3 +35,5 @@ func renameBuiltinMacroWithoutHash() {
   // BUILTIN: error: cannot rename system symbol 'file'
 }
 
+
+// REQUIRES: swift_swift_parser

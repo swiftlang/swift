@@ -242,3 +242,5 @@ func test8() {
 // CALLARG: String
 // CALLARG: intVal
 }
+
+// REQUIRES: swift_swift_parser
