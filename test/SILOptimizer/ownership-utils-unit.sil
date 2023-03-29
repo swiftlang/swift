@@ -6,6 +6,11 @@ import Builtin
 
 class C {}
 
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
 sil @getOwned : $@convention(thin) () -> (@owned C)
 
 sil @borrow : $@convention(thin) (@guaranteed C) -> ()
@@ -39,6 +44,30 @@ exit(%instance : @owned $C):
 // CHECK-LABEL: end running test {{[0-9]+}} of {{[0-9]+}} on test_escape_of_phi_transitive_incoming_value: has-pointer-escape with
   test_specification "has-pointer-escape @block.argument"
   destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @test_loop_phi : $@convention(thin) () -> () {
+entry:
+  %instance_1 = enum $FakeOptional<C>, #FakeOptional.none!enumelt
+  br loop_entry(%instance_1 : $FakeOptional<C>)
+
+loop_entry(%18 : @owned $FakeOptional<C>):
+  test_specification "has-pointer-escape @block.argument"
+  br loop_body
+
+loop_body:
+  cond_br undef, loop_back, loop_exit
+
+loop_back:
+  br loop_entry(%18 : $FakeOptional<C>)
+
+loop_exit:
+  destroy_value %18 : $FakeOptional<C>
+  br exit
+
+exit:
   %retval = tuple ()
   return %retval : $()
 }
