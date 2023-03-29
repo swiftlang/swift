@@ -421,13 +421,14 @@ int main(int argc, char *argv[]) {
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
 
   if (options::Action == RefactoringKind::None) {
-    llvm::SmallVector<RefactoringKind, 32> Kinds;
     bool CollectRangeStartRefactorings = false;
-    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
-                                 Kinds, {&PrintDiags});
+    auto Refactorings = collectRefactorings(
+        SF, Range, CollectRangeStartRefactorings, {&PrintDiags});
     llvm::outs() << "Action begins\n";
-    for (auto Kind : Kinds) {
-      llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
+    for (auto Info : Refactorings) {
+      if (Info.AvailableKind == RefactorAvailableKind::Available) {
+        llvm::outs() << getDescriptiveRefactoringKindName(Info.Kind) << "\n";
+      }
     }
     llvm::outs() << "Action ends\n";
     return 0;

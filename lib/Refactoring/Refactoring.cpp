@@ -625,10 +625,82 @@ static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
   return nullptr;
 }
 
+/// Stores information about the reference that rename availability is being
+/// queried on.
+struct RenameRefInfo {
+  SourceFile *SF;  ///< The source file containing the reference.
+  SourceLoc Loc;   ///< The reference's source location.
+  bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
+};
+
 struct RenameInfo {
   ValueDecl *VD;
-  RenameAvailabilityInfo Availability;
+  RefactorAvailabilityInfo Availability;
 };
+
+static Optional<RefactorAvailabilityInfo>
+renameAvailabilityInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo) {
+  RefactorAvailableKind AvailKind = RefactorAvailableKind::Available;
+  if (getRelatedSystemDecl(VD)) {
+    AvailKind = RefactorAvailableKind::Unavailable_system_symbol;
+  } else if (VD->getClangDecl()) {
+    AvailKind = RefactorAvailableKind::Unavailable_decl_from_clang;
+  } else if (VD->getLoc().isInvalid()) {
+    AvailKind = RefactorAvailableKind::Unavailable_has_no_location;
+  } else if (!VD->hasName()) {
+    AvailKind = RefactorAvailableKind::Unavailable_has_no_name;
+  }
+
+  if (isa<AbstractFunctionDecl>(VD)) {
+    // Disallow renaming accessors.
+    if (isa<AccessorDecl>(VD))
+      return None;
+
+    // Disallow renaming deinit.
+    if (isa<DestructorDecl>(VD))
+      return None;
+
+    // Disallow renaming init with no arguments.
+    if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+      if (!CD->getParameters()->size())
+        return None;
+
+      if (RefInfo && !RefInfo->IsArgLabel) {
+        NameMatcher Matcher(*(RefInfo->SF));
+        auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/ true});
+        if (Resolved.LabelRanges.empty())
+          return None;
+      }
+    }
+
+    // Disallow renaming 'callAsFunction' method with no arguments.
+    if (auto FD = dyn_cast<FuncDecl>(VD)) {
+      // FIXME: syntactic rename can only decide by checking the spelling, not
+      // whether it's an instance method, so we do the same here for now.
+      if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
+        if (!FD->getParameters()->size())
+          return None;
+
+        if (RefInfo && !RefInfo->IsArgLabel) {
+          NameMatcher Matcher(*(RefInfo->SF));
+          auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/ true});
+          if (Resolved.LabelRanges.empty())
+            return None;
+        }
+      }
+    }
+  }
+
+  // Always return local rename for parameters.
+  // FIXME: if the cursor is on the argument, we should return global rename.
+  if (isa<ParamDecl>(VD))
+    return RefactorAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
+
+  // If the indexer considers VD a global symbol, then we apply global rename.
+  if (index::isLocalSymbol(VD))
+    return RefactorAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
+  return RefactorAvailabilityInfo{RefactoringKind::GlobalRename, AvailKind};
+}
 
 /// Given a cursor, return the decl and its rename availability. \c None if
 /// the cursor did not resolve to a decl or it resolved to a decl that we do
@@ -651,7 +723,7 @@ static Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
                valueCursor->isKeywordArgument()};
   }
 
-  Optional<RenameAvailabilityInfo> info = renameAvailabilityInfo(VD, refInfo);
+  Optional<RefactorAvailabilityInfo> info = renameAvailabilityInfo(VD, refInfo);
   if (!info)
     return None;
 
@@ -872,7 +944,7 @@ bool RefactoringActionLocalRename::isApplicable(
     ResolvedCursorInfoPtr CursorInfo, DiagnosticEngine &Diag) {
   Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
   return Info &&
-         Info->Availability.AvailableKind == RenameAvailableKind::Available &&
+         Info->Availability.AvailableKind == RefactorAvailableKind::Available &&
          Info->Availability.Kind == RefactoringKind::LocalRename;
 }
 
@@ -918,21 +990,21 @@ static Optional<RenameRangeCollector> localRenames(SourceFile *SF,
   }
 
   switch (info->Availability.AvailableKind) {
-  case RenameAvailableKind::Available:
+  case RefactorAvailableKind::Available:
     break;
-  case RenameAvailableKind::Unavailable_system_symbol:
+  case RefactorAvailableKind::Unavailable_system_symbol:
     diags.diagnose(startLoc, diag::decl_is_system_symbol, info->VD->getName());
     return None;
-  case RenameAvailableKind::Unavailable_has_no_location:
+  case RefactorAvailableKind::Unavailable_has_no_location:
     diags.diagnose(startLoc, diag::value_decl_no_loc, info->VD->getName());
     return None;
-  case RenameAvailableKind::Unavailable_has_no_name:
+  case RefactorAvailableKind::Unavailable_has_no_name:
     diags.diagnose(startLoc, diag::decl_has_no_name);
     return None;
-  case RenameAvailableKind::Unavailable_has_no_accessibility:
+  case RefactorAvailableKind::Unavailable_has_no_accessibility:
     diags.diagnose(startLoc, diag::decl_no_accessibility);
     return None;
-  case RenameAvailableKind::Unavailable_decl_from_clang:
+  case RefactorAvailableKind::Unavailable_decl_from_clang:
     diags.diagnose(startLoc, diag::decl_from_clang);
     return None;
   }
@@ -3028,10 +3100,9 @@ bool RefactoringActionFillProtocolStub::performChange() {
   return false;
 }
 
-static void collectAvailableRefactoringsAtCursor(
-    SourceFile *SF, unsigned Line, unsigned Column,
-    SmallVectorImpl<RefactoringKind> &Kinds,
-    ArrayRef<DiagnosticConsumer *> DiagConsumers) {
+static SmallVector<RefactorAvailabilityInfo, 0>
+collectRefactoringsAtCursor(SourceFile *SF, unsigned Line, unsigned Column,
+                            ArrayRef<DiagnosticConsumer *> DiagConsumers) {
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
@@ -3040,14 +3111,14 @@ static void collectAvailableRefactoringsAtCursor(
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().value(), Line, Column);
   if (Loc.isInvalid())
-    return;
+    return {};
 
   ResolvedCursorInfoPtr Tok =
       evaluateOrDefault(SF->getASTContext().evaluator,
                         CursorInfoRequest{CursorInfoOwner(
                             SF, Lexer::getLocForStartOfToken(SM, Loc))},
                         new ResolvedCursorInfo());
-  collectAvailableRefactorings(Tok, Kinds, /*Exclude rename*/ false);
+  return collectRefactorings(Tok, /*ExcludeRename=*/false);
 }
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
@@ -8752,21 +8823,21 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
     llvm_unreachable("unhandled kind");
   }
 
-  StringRef swift::ide::
-  getDescriptiveRenameUnavailableReason(RenameAvailableKind Kind) {
+  StringRef swift::ide::getDescriptiveRenameUnavailableReason(
+      RefactorAvailableKind Kind) {
     switch(Kind) {
-      case RenameAvailableKind::Available:
-        return "";
-      case RenameAvailableKind::Unavailable_system_symbol:
-        return "symbol from system module cannot be renamed";
-      case RenameAvailableKind::Unavailable_has_no_location:
-        return "symbol without a declaration location cannot be renamed";
-      case RenameAvailableKind::Unavailable_has_no_name:
-        return "cannot find the name of the symbol";
-      case RenameAvailableKind::Unavailable_has_no_accessibility:
-        return "cannot decide the accessibility of the symbol";
-      case RenameAvailableKind::Unavailable_decl_from_clang:
-        return "cannot rename a Clang symbol from its Swift reference";
+    case RefactorAvailableKind::Available:
+      return "";
+    case RefactorAvailableKind::Unavailable_system_symbol:
+      return "symbol from system module cannot be renamed";
+    case RefactorAvailableKind::Unavailable_has_no_location:
+      return "symbol without a declaration location cannot be renamed";
+    case RefactorAvailableKind::Unavailable_has_no_name:
+      return "cannot find the name of the symbol";
+    case RefactorAvailableKind::Unavailable_has_no_accessibility:
+      return "cannot decide the accessibility of the symbol";
+    case RefactorAvailableKind::Unavailable_decl_from_clang:
+      return "cannot rename a Clang symbol from its Swift reference";
     }
     llvm_unreachable("unhandled kind");
   }
@@ -8838,100 +8909,37 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
-Optional<RenameAvailabilityInfo>
-swift::ide::renameAvailabilityInfo(const ValueDecl *VD,
-                                   Optional<RenameRefInfo> RefInfo) {
-  RenameAvailableKind AvailKind = RenameAvailableKind::Available;
-  if (getRelatedSystemDecl(VD)){
-    AvailKind = RenameAvailableKind::Unavailable_system_symbol;
-  } else if (VD->getClangDecl()) {
-    AvailKind = RenameAvailableKind::Unavailable_decl_from_clang;
-  } else if (VD->getLoc().isInvalid()) {
-    AvailKind = RenameAvailableKind::Unavailable_has_no_location;
-  } else if (!VD->hasName()) {
-    AvailKind = RenameAvailableKind::Unavailable_has_no_name;
-  }
+SmallVector<RefactorAvailabilityInfo, 0>
+swift::ide::collectRefactorings(ResolvedCursorInfoPtr CursorInfo,
+                                bool ExcludeRename) {
+  SmallVector<RefactorAvailabilityInfo, 0> Infos;
 
-  if (isa<AbstractFunctionDecl>(VD)) {
-    // Disallow renaming accessors.
-    if (isa<AccessorDecl>(VD))
-      return None;
-
-    // Disallow renaming deinit.
-    if (isa<DestructorDecl>(VD))
-      return None;
-
-    // Disallow renaming init with no arguments.
-    if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-      if (!CD->getParameters()->size())
-        return None;
-
-      if (RefInfo && !RefInfo->IsArgLabel) {
-        NameMatcher Matcher(*(RefInfo->SF));
-        auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
-        if (Resolved.LabelRanges.empty())
-          return None;
-      }
-    }
-
-    // Disallow renaming 'callAsFunction' method with no arguments.
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      // FIXME: syntactic rename can only decide by checking the spelling, not
-      // whether it's an instance method, so we do the same here for now.
-      if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
-        if (!FD->getParameters()->size())
-          return None;
-
-        if (RefInfo && !RefInfo->IsArgLabel) {
-          NameMatcher Matcher(*(RefInfo->SF));
-          auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
-          if (Resolved.LabelRanges.empty())
-            return None;
-        }
-      }
-    }
-  }
-
-  // Always return local rename for parameters.
-  // FIXME: if the cursor is on the argument, we should return global rename.
-  if (isa<ParamDecl>(VD))
-    return RenameAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
-
-  // If the indexer considers VD a global symbol, then we apply global rename.
-  if (index::isLocalSymbol(VD))
-    return RenameAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
-  return RenameAvailabilityInfo{RefactoringKind::GlobalRename, AvailKind};
-}
-
-void swift::ide::collectAvailableRefactorings(
-    ResolvedCursorInfoPtr CursorInfo, SmallVectorImpl<RefactoringKind> &Kinds,
-    bool ExcludeRename) {
   DiagnosticEngine DiagEngine(
       CursorInfo->getSourceFile()->getASTContext().SourceMgr);
 
   if (!ExcludeRename) {
     if (auto Info = getRenameInfo(CursorInfo)) {
-      if (Info->Availability.AvailableKind == RenameAvailableKind::Available) {
-        Kinds.push_back(Info->Availability.Kind);
-      }
+      Infos.push_back(std::move(Info->Availability));
     }
   }
 
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringKind::KIND != RefactoringKind::LocalRename &&                 \
       RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
-    Kinds.push_back(RefactoringKind::KIND);
+    Infos.emplace_back(RefactoringKind::KIND, RefactorAvailableKind::Available);
 #include "swift/Refactoring/RefactoringKinds.def"
+
+  return Infos;
 }
 
-void swift::ide::collectAvailableRefactorings(
-    SourceFile *SF, RangeConfig Range, bool &CollectRangeStartRefactorings,
-    SmallVectorImpl<RefactoringKind> &Kinds,
-    ArrayRef<DiagnosticConsumer *> DiagConsumers) {
-  if (Range.Length == 0) {
-    return collectAvailableRefactoringsAtCursor(SF, Range.Line, Range.Column,
-                                                Kinds, DiagConsumers);
-  }
+SmallVector<RefactorAvailabilityInfo, 0>
+swift::ide::collectRefactorings(SourceFile *SF, RangeConfig Range,
+                                bool &CollectRangeStartRefactorings,
+                                ArrayRef<DiagnosticConsumer *> DiagConsumers) {
+  if (Range.Length == 0)
+    return collectRefactoringsAtCursor(SF, Range.Line, Range.Column,
+                                       DiagConsumers);
+
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
@@ -8946,15 +8954,19 @@ void swift::ide::collectAvailableRefactorings(
 
   bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
 
+  SmallVector<RefactorAvailabilityInfo, 0> Infos;
+
 #define RANGE_REFACTORING(KIND, NAME, ID)                                      \
   if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))               \
-    Kinds.push_back(RefactoringKind::KIND);
+    Infos.emplace_back(RefactoringKind::KIND, RefactorAvailableKind::Available);
 #define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
   if (enableInternalRefactoring)                                              \
     RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/Refactoring/RefactoringKinds.def"
 
   CollectRangeStartRefactorings = collectRangeStartRefactorings(Result);
+
+  return Infos;
 }
 
 bool swift::ide::
