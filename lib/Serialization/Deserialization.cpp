@@ -6323,9 +6323,12 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
       scratch, parameterPack, declIDOrDepth, indexPlusOne);
 
   if (indexPlusOne == 0) {
-    auto genericParam =
-        dyn_cast_or_null<GenericTypeParamDecl>(MF.getDecl(declIDOrDepth));
+    auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
+    if (!genericParamOrError)
+      return genericParamOrError.takeError();
 
+    auto genericParam =
+        dyn_cast_or_null<GenericTypeParamDecl>(genericParamOrError.get());
     if (!genericParam)
       return MF.diagnoseFatal();
 
