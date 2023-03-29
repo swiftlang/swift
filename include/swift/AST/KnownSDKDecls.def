@@ -21,6 +21,7 @@
 
 KNOWN_SDK_FUNC_DECL(Distributed, IsRemoteDistributedActor, "__isRemoteActor")
 KNOWN_SDK_FUNC_DECL(Distributed, IsLocalDistributedActor, "__isLocalActor")
+KNOWN_SDK_FUNC_DECL(Distributed, GetUnwrapLocalDistributedActorUnownedExecutor, "_getUnwrapLocalDistributedActorUnownedExecutor")
 
 #undef KNOWN_SDK_FUNC_DECL
 
