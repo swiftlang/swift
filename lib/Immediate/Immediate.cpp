@@ -326,6 +326,7 @@ int swift::RunImmediately(CompilerInstance &CI,
         .setJITTargetMachineBuilder(
             llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
               .setRelocationModel(llvm::Reloc::PIC_)
+              .setCodeModel(llvm::CodeModel::Large)
               .setOptions(std::move(TargetOpt))
               .setCPU(std::move(CPU))
               .addFeatures(Features)
