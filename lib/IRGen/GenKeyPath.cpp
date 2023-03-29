@@ -89,12 +89,11 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
     args =
         IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
   }
+
   bindFromGenericRequirementsBuffer(
       IGF, requirements,
       Address(args, IGF.IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-      MetadataState::Complete, [&](CanType t) {
-        return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-      });
+      MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 }
 
 static llvm::Function *
@@ -295,9 +294,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
       bindFromGenericRequirementsBuffer(
           IGF, requirements,
           Address(args, IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-          MetadataState::Complete, [&](CanType t) {
-            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-          });
+          MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
     }
     
     // Run through the captured index types to determine the size and alignment
@@ -583,9 +580,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       bindFromGenericRequirementsBuffer(
           IGF, requirements,
           Address(src, IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-          MetadataState::Complete, [&](CanType t) {
-            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-          });
+          MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
     } else {
       offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
