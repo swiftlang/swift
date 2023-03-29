@@ -25,6 +25,7 @@ namespace swift {
 
 class CompilerInstance;
 class DiagnosticConsumer;
+class PluginRegistry;
 
 namespace ide {
 
@@ -32,6 +33,7 @@ namespace ide {
 class CompileInstance {
   const std::string &RuntimeResourcePath;
   const std::string &DiagnosticDocumentationPath;
+  const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   struct Options {
     unsigned MaxASTReuseCount = 100;
@@ -66,10 +68,11 @@ class CompileInstance {
 
 public:
   CompileInstance(const std::string &RuntimeResourcePath,
-                  const std::string &DiagnosticDocumentationPath)
+                  const std::string &DiagnosticDocumentationPath,
+                  std::shared_ptr<swift::PluginRegistry> Plugins = nullptr)
       : RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
-        CachedCIInvalidated(false), CachedReuseCount(0) {}
+        Plugins(Plugins), CachedCIInvalidated(false), CachedReuseCount(0) {}
 
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same

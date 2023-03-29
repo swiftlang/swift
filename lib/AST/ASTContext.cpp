@@ -534,6 +534,8 @@ struct ASTContext::Implementation {
   /// Map a module name to an executable plugin path that provides the module.
   llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
 
+  llvm::StringSet<> LoadedPluginLibraryPaths;
+
   /// The permanent arena.
   Arena Permanent;
 
@@ -6395,6 +6397,9 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
 }
 
 void *ASTContext::loadLibraryPlugin(StringRef path) {
+  // Remember the path (even if it fails to load.)
+  getImpl().LoadedPluginLibraryPaths.insert(path);
+
   SmallString<128> resolvedPath;
   auto fs = this->SourceMgr.getFileSystem();
   if (auto err = fs->getRealPath(path, resolvedPath)) {
@@ -6411,6 +6416,10 @@ void *ASTContext::loadLibraryPlugin(StringRef path) {
   }
 
   return plugin.get();
+}
+
+const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
+  return getImpl().LoadedPluginLibraryPaths;
 }
 
 bool ASTContext::supportsMoveOnlyTypes() const {

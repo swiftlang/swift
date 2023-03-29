@@ -276,8 +276,7 @@ static void configureIDEInspectionInstance(
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       SwiftExecutablePath(SKCtx.getSwiftExecutablePath()),
-      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
-      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -285,14 +284,20 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
+
+  std::shared_ptr<PluginRegistry> Plugins = std::make_shared<PluginRegistry>();
+
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
+      Plugins, SwiftExecutablePath, RuntimeResourcePath,
+      DiagnosticDocumentationPath);
 
-  IDEInspectionInst = std::make_shared<IDEInspectionInstance>();
-
+  IDEInspectionInst = std::make_shared<IDEInspectionInstance>(Plugins);
   configureIDEInspectionInstance(IDEInspectionInst,
                                  SKCtx.getGlobalConfiguration());
+
+  CompileManager = std::make_shared<compile::SessionManager>(
+      RuntimeResourcePath, DiagnosticDocumentationPath, Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();

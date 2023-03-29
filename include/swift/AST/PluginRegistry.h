@@ -139,6 +139,8 @@ class PluginRegistry {
   /// Flag to dump plugin messagings.
   bool dumpMessaging = false;
 
+  std::mutex mtx;
+
 public:
   PluginRegistry();
 
@@ -150,10 +152,6 @@ public:
   /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<LoadedExecutablePlugin *>
   loadExecutablePlugin(llvm::StringRef path);
-
-  const llvm::StringMap<void *> &getLoadedLibraryPlugins() const {
-    return LoadedPluginLibraries;
-  }
 };
 
 } // namespace swift
