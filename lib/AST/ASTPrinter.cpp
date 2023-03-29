@@ -3246,6 +3246,13 @@ static bool usesFeatureOldOwnershipOperatorSpellings(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
+  if (auto *ei = dyn_cast<EnumDecl>(decl)) {
+    return usesFeatureMoveOnly(ei) && ei->getValueTypeDestructor();
+  }
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
