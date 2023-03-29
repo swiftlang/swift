@@ -110,7 +110,7 @@ func emitDiagnostic(
         message: fixIt.message.message,
         severity: .note,
         position: diagnostic.position,
-        fixItChanges: fixIt.changes.changes
+        fixItChanges: fixIt.changes
     )
   }
 
@@ -228,7 +228,7 @@ extension SourceManager {
           severity: .note,
           node: diagnostic.node,
           position: diagnostic.position,
-          fixItChanges: fixIt.changes.changes
+          fixItChanges: fixIt.changes
       )
     }
 
