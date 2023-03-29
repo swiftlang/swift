@@ -5490,7 +5490,7 @@ Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
 /// index. This looks through inheritance for inherited default args.
 static ConcreteDeclRef getDefaultArgOwner(ConcreteDeclRef owner,
                                           unsigned index) {
-  auto *param = getParameterAt(owner.getDecl(), index);
+  auto *param = getParameterAt(owner, index);
   assert(param);
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
     return getDefaultArgOwner(owner.getOverriddenDecl(), index);
@@ -6027,7 +6027,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     };
 
     if (paramInfo.hasExternalPropertyWrapper(paramIdx)) {
-      auto *paramDecl = getParameterAt(callee.getDecl(), paramIdx);
+      auto *paramDecl = getParameterAt(callee, paramIdx);
       assert(paramDecl);
 
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
