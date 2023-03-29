@@ -484,6 +484,9 @@ struct PrintOptions {
   /// of the alias.
   bool PrintTypeAliasUnderlyingType = false;
 
+  /// Print the definition of a macro, e.g. `= #externalMacro(...)`.
+  bool PrintMacroDefinitions = true;
+
   /// Use aliases when printing references to modules to avoid ambiguities
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
