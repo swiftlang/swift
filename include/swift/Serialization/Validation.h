@@ -251,6 +251,23 @@ void diagnoseSerializedASTLoadFailure(
     StringRef moduleBufferID, StringRef moduleDocBufferID,
     ModuleFile *loadedModuleFile, Identifier ModuleName);
 
+/// Emit diagnostics explaining a failure to load a serialized AST,
+/// this version only supports diagnostics relevant to transitive dependencies:
+/// missing dependency, missing underlying module, or circular dependency.
+///
+/// \see diagnoseSerializedASTLoadFailure that supports all diagnostics.
+///
+/// - \p Ctx is an AST context through which any diagnostics are surfaced.
+/// - \p diagLoc is the (possibly invalid) location used in the diagnostics.
+/// - \p status describes the issue with loading the AST. It must not be
+///   Status::Valid.
+/// - \p loadedModuleFile is an invalid loaded module.
+/// - \p ModuleName is the name used to refer to the module in diagnostics.
+/// - \p forTestable indicates if we loaded the AST for a @testable import.
+void diagnoseSerializedASTLoadFailureTransitive(
+    ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
+    ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable);
+
 } // end namespace serialization
 } // end namespace swift
 

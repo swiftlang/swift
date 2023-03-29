@@ -294,6 +294,9 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
 
+  /// Load extra dependencies of this module to satisfy a testable import.
+  virtual void loadDependenciesForTestable(SourceLoc diagLoc) const {}
+
   /// Returns the path of the file or directory that defines the module
   /// represented by this \c FileUnit, or empty string if there is none.
   /// Cross-import overlay specifiers are found relative to this path.
