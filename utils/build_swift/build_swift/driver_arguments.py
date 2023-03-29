@@ -716,8 +716,13 @@ def create_argument_parser():
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
            toggle_true('swiftsyntax_verify_generated_files'),
-           help='set to verify that the generated files in the source tree '
+           help='set to verify that the generated files in the source tree ' +
                 'match the ones that would be generated from current main')
+    option('--swiftsyntax-enable-rawsyntax-validation',
+           toggle_true('swiftsyntax_enable_rawsyntax_validation'),
+           help='set to validate that RawSyntax layout nodes contain children of ' +
+                'the expected types and that RawSyntax tokens have the expected ' +
+                'token kinds')
     option('--swiftsyntax-lint',
            toggle_true('swiftsyntax_lint'),
            help='verify that swift-syntax Source code is formatted correctly')
