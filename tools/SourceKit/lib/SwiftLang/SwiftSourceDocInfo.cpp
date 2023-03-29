@@ -702,30 +702,22 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
-static Optional<RefactoringInfo>
-collectAvailableRenameInfo(const ValueDecl *VD,
-                           Optional<RenameRefInfo> RefInfo) {
-  Optional<RenameAvailabilityInfo> Info = renameAvailabilityInfo(VD, RefInfo);
-  if (!Info)
-    return None;
+static void addRefactorings(
+    SmallVectorImpl<RefactoringInfo> &intoLangInfos,
+    const SmallVectorImpl<RefactorAvailabilityInfo> &availableInfos) {
+  for (auto info : availableInfos) {
+    auto uid = SwiftLangSupport::getUIDForRefactoringKind(info.Kind);
+    bool hasRefactoringWithSameUID =
+        llvm::any_of(intoLangInfos, [&](RefactoringInfo &existing) {
+          return uid == existing.Kind;
+        });
+    if (hasRefactoringWithSameUID)
+      continue;
 
-  return RefactoringInfo(
-      SwiftLangSupport::getUIDForRefactoringKind(Info->Kind),
-      ide::getDescriptiveRefactoringKindName(Info->Kind),
-      ide::getDescriptiveRenameUnavailableReason(Info->AvailableKind));
-}
-
-static SmallVector<RefactoringInfo>
-collectAvailableRefactoringsOtherThanRename(ResolvedCursorInfoPtr CursorInfo) {
-  SmallVector<RefactoringKind, 8> Kinds;
-  collectAvailableRefactorings(CursorInfo, Kinds, /*ExcludeRename*/ true);
-  SmallVector<RefactoringInfo> Refactorings;
-  for (auto Kind : Kinds) {
-    Refactorings.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
-                              ide::getDescriptiveRefactoringKindName(Kind),
-                              StringRef());
+    intoLangInfos.emplace_back(
+        uid, ide::getDescriptiveRefactoringKindName(info.Kind),
+        ide::getDescriptiveRenameUnavailableReason(info.AvailableKind));
   }
-  return Refactorings;
 }
 
 static Optional<unsigned>
@@ -1212,27 +1204,8 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   }
 
   if (AddRefactorings) {
-    Optional<RenameRefInfo> RefInfo;
-    if (Info->isRef())
-      RefInfo = {Info->getSourceFile(), Info->getLoc(),
-                 Info->isKeywordArgument()};
-
-    /// Adds an action to \c Data if no action with the same UID exists.
-    auto AddAction = [&Data](const RefactoringInfo &NewRefactoring) {
-      bool HasRefactoringWithSameUID = llvm::any_of(
-          Data.AvailableActions, [&](RefactoringInfo &ExistingRefactoring) {
-            return ExistingRefactoring.Kind == NewRefactoring.Kind;
-          });
-      if (HasRefactoringWithSameUID) {
-        return;
-      }
-      Data.AvailableActions.push_back(NewRefactoring);
-    };
-    if (auto Rename = collectAvailableRenameInfo(MainInfo.VD, RefInfo)) {
-      AddAction(*Rename);
-    }
-    llvm::for_each(collectAvailableRefactoringsOtherThanRename(Info),
-                   AddAction);
+    addRefactorings(Data.AvailableActions,
+                    collectRefactorings(Info, /*ExcludeRename=*/false));
   }
 
   return true;
@@ -1585,7 +1558,6 @@ static void resolveCursor(
       // Retrieve relevant actions on the code under selection.
       llvm::SmallVector<RefactoringInfo, 8> Actions;
       if (Actionables && Length) {
-        SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
         Range.BufferID = BufferID;
         auto Pair = SM.getLineAndColumnInBuffer(Loc);
@@ -1593,13 +1565,9 @@ static void resolveCursor(
         Range.Column = Pair.second;
         Range.Length = Length;
         bool CollectRangeStartRefactorings = false;
-        collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
-                                     Kinds, {});
-        for (RefactoringKind Kind : Kinds) {
-          Actions.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
-                               getDescriptiveRefactoringKindName(Kind),
-                               /*UnavailableReason*/ StringRef());
-        }
+        addRefactorings(
+            Actions,
+            collectRefactorings(SF, Range, CollectRangeStartRefactorings, {}));
         if (!CollectRangeStartRefactorings) {
           // If Length is given then this request is only for refactorings,
           // return straight away unless we need cursor based refactorings as
@@ -1653,8 +1621,8 @@ static void resolveCursor(
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
         if (Actionables) {
-          Actions.append(
-              collectAvailableRefactoringsOtherThanRename(CursorInfo));
+          addRefactorings(
+              Actions, collectRefactorings(CursorInfo, /*ExcludeRename=*/true));
           if (!Actions.empty()) {
             CursorInfoData Data;
             Data.AvailableActions = Actions;

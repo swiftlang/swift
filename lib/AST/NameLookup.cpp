@@ -3053,7 +3053,8 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
       // Allocate a new generic parameter to represent this opaque type.
       auto *gp = GenericTypeParamDecl::createImplicit(
           dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
-          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr);
+          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr,
+          /*nameLoc*/ repr->getStartLoc());
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
