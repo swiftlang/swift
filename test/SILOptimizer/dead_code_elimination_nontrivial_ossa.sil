@@ -1022,11 +1022,11 @@ bb0(%0 : $@sil_unmanaged AnyObject):
 
 sil @foo : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [ossa] @test_escape : {{.*}} {
+// CHECK-LABEL: sil [ossa] @test_escape1 : {{.*}} {
 // CHECK: br bb1
 // CHECK: end_borrow
-// CHECK-LABEL: } // end sil function 'test_escape'
-sil [ossa] @test_escape : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function 'test_escape1'
+sil [ossa] @test_escape1 : $@convention(thin) () -> () {
 bb0:
   %13 = function_ref @foo : $@convention(thin) () -> ()
   %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
@@ -1039,6 +1039,27 @@ bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@cal
   %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
   destroy_value %21 : $@noescape @callee_guaranteed () -> ()
   end_borrow %22 : $@callee_guaranteed () -> ()
+  destroy_value %23 : $@callee_guaranteed () -> ()
+  %28 = tuple ()
+  return %28: $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_escape2 : {{.*}} {
+// CHECK: br bb1
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'test_escape2'
+sil [ossa] @test_escape2 : $@convention(thin) () -> () {
+bb0:
+  %13 = function_ref @foo : $@convention(thin) () -> ()
+  %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
+  %15 = convert_escape_to_noescape %14 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %18 = mark_dependence %15 : $@noescape @callee_guaranteed () -> () on %14 : $@callee_guaranteed () -> ()
+  br bb1(%18 : $@noescape @callee_guaranteed () -> (), %14 : $@callee_guaranteed () -> ())
+
+bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
+  %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %21 : $@noescape @callee_guaranteed () -> ()
   destroy_value %23 : $@callee_guaranteed () -> ()
   %28 = tuple ()
   return %28: $()
