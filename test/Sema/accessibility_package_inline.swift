@@ -1,53 +1,22 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -module-name UtilsGood %t/UtilsGood.swift -emit-module -emit-module-path %t/UtilsGood.swiftmodule -package-name myLib
+// RUN: %target-swift-frontend -verify -module-name UtilsGood %t/UtilsGood.swift -emit-module -emit-module-path %t/UtilsGood.swiftmodule -package-name myLib
 // RUN: test -f %t/UtilsGood.swiftmodule
 
-// RUN: not %target-swift-frontend -typecheck %t/Utils.swift -package-name myLib -I %t 2> %t/resultUtils.output
-// RUN: %FileCheck %s -input-file %t/resultUtils.output -check-prefix CHECK-UTILS
-// CHECK-UTILS: error: class 'PackageKlass' is package and cannot be referenced from an '@inlinable' function
-// CHECK-UTILS:   let a = PackageKlass()
-// CHECK-UTILS:           ^
-// CHECK-UTILS: note: class 'PackageKlass' is not '@usableFromInline' or public
-// CHECK-UTILS: package class PackageKlass {
-// CHECK-UTILS:               ^
-// CHECK-UTILS: error: initializer 'init()' is package and cannot be referenced from an '@inlinable' function
-// CHECK-UTILS:  let a = PackageKlass() // should error
-// CHECK-UTILS:          ^
-// CHECK-UTILS: note: initializer 'init()' is not '@usableFromInline' or public
-// CHECK-UTILS:  package init() {}
-// CHECK-UTILS:          ^
-// CHECK-UTILS: error: class 'InternalKlass' is internal and cannot be referenced from an '@inlinable' function
-// CHECK-UTILS:  let b = InternalKlass() // should error
-// CHECK-UTILS:          ^
-// CHECK-UTILS: note: class 'InternalKlass' is not '@usableFromInline' or public
-// CHECK-UTILS: class InternalKlass {
-// CHECK-UTILS:       ^
-// CHECK-UTILS: error: initializer 'init()' is internal and cannot be referenced from an '@inlinable' function
-// CHECK-UTILS:  let b = InternalKlass() // should error
-// CHECK-UTILS:          ^
-// CHECK-UTILS: note: initializer 'init()' is not '@usableFromInline' or public
-// CHECK-UTILS:  init() {}
-// CHECK-UTILS:  ^
+// RUN: %target-swift-frontend -typecheck -verify %t/Utils.swift -package-name myLib -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/LibOtherPackage.swift -package-name otherLib -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/LibSamePackage.swift -package-name myLib -I %t
 
-// RUN: not %target-swift-frontend -typecheck %t/Lib.swift -package-name "otherLib" -I %t 2> %t/resultLib.output
-// %FileCheck %s -input-file %t/resultLib.output -check-prefix CHECK-LIB
-// CHECK-LIB: error: cannot find 'packageFunc' in scope
-// CHECK-LIB: packageFunc()
-// CHECK-LIB: ^~~~~~~~~~~
-
-// RUN: %target-swift-frontend -module-name Lib %t/Lib.swift -emit-module -emit-module-path %t/Lib.swiftmodule -package-name myLib -I %t
-// RUN: test -f %t/Lib.swiftmodule
-
-// BEGIN Utils.swift
+//--- Utils.swift
 package protocol PackageProto {
   var pkgVar: Double { get set }
   func pkgFunc()
 }
 
+// expected-note@+1 *{{class 'PackageKlass' is not '@usableFromInline' or public}}
 package class PackageKlass {
-  package init() {}
+  package init() {} // expected-note *{{initializer 'init()' is not '@usableFromInline' or public}}
   package private(set) var pkgVar: Double = 1.0
   package func pkgFunc() {}
 }
@@ -71,8 +40,10 @@ protocol InternalProto {
   var internalVar: Double { get set }
   func internalFunc()
 }
+
+// expected-note@+1 *{{class 'InternalKlass' is not '@usableFromInline' or public}}
 class InternalKlass {
-  init() {}
+  init() {} // expected-note *{{initializer 'init()' is not '@usableFromInline' or public}}
 }
 @usableFromInline
 class InternalKlassProto: InternalProto {
@@ -90,8 +61,12 @@ class InternalKlassForInline {
 
 @inlinable
 public func publicFunc() {
-  let a = PackageKlass() // should error
+  let a = PackageKlass()
+  // expected-error@-1 {{class 'PackageKlass' is package and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is package and cannot be referenced from an '@inlinable' function}}
   let b = InternalKlass() // should error
+  // expected-error@-1 {{class 'InternalKlass' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
   let c = PackageKlassProto()
   let d = InternalKlassProto()
   let e = PackageKlassForInline()
@@ -101,8 +76,12 @@ public func publicFunc() {
 
 @inlinable
 func internalFunc() {
-  let a = PackageKlass() // should error
-  let b = InternalKlass() // should error
+  let a = PackageKlass()
+  // expected-error@-1 {{class 'PackageKlass' is package and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is package and cannot be referenced from an '@inlinable' function}}
+  let b = InternalKlass()
+  // expected-error@-1 {{class 'InternalKlass' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
   let c = PackageKlassProto()
   let d = InternalKlassProto()
   let e = PackageKlassForInline()
@@ -112,8 +91,12 @@ func internalFunc() {
 
 @inlinable
 package func packageFunc() {
-  let a = PackageKlass() // should error
-  let b = InternalKlass() // should error
+  let a = PackageKlass()
+  // expected-error@-1 {{class 'PackageKlass' is package and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is package and cannot be referenced from an '@inlinable' function}}
+  let b = InternalKlass()
+  // expected-error@-1 {{class 'InternalKlass' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-error@-2 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
   let c = PackageKlassProto()
   let d = InternalKlassProto()
   let e = PackageKlassForInline()
@@ -121,7 +104,7 @@ package func packageFunc() {
   print(a, b, c, d, e, f)
 }
 
-// BEGIN UtilsGood.swift
+//--- UtilsGood.swift
 package protocol PackageProto {
   var pkgVar: Double { get set }
   func pkgFunc()
@@ -170,11 +153,20 @@ package func packageFunc() {
   print(x, y)
 }
 
-// BEGIN Lib.swift
+//--- LibOtherPackage.swift
 import UtilsGood
 
 @inlinable
 public func libFunc() {
   publicFunc()
-  packageFunc() // Allowed if in same package
+  packageFunc() // expected-error {{cannot find 'packageFunc' in scope}}
+}
+
+//--- LibSamePackage.swift
+import UtilsGood
+
+@inlinable
+public func libFunc() {
+  publicFunc()
+  packageFunc() // OK
 }
