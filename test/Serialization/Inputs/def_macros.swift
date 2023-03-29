@@ -1,5 +1,8 @@
 @freestanding(expression) public macro publicStringify<T>(_ value: T, label: String? = nil) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
+@freestanding(expression) public macro unlabeledStringify<T>(_ value: T) -> (T, String) = #publicStringify(value, label: "default label")
+
+
 @freestanding(expression) macro internalStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
 @attached(accessor) public macro myWrapper() = #externalMacro(module: "MacroDefinition", type: "MyWrapperMacro")

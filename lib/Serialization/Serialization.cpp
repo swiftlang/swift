@@ -4590,8 +4590,10 @@ public:
     Type resultType = macro->getResultInterfaceType();
 
     uint8_t builtinID = 0;
+    uint8_t hasExpandedDefinition = 0;
     IdentifierID externalModuleNameID = 0;
     IdentifierID externalMacroTypeNameID = 0;
+    Optional<ExpandedMacroDefinition> expandedDef;
     auto def = macro->getDefinition();
     switch (def.kind) {
       case MacroDefinition::Kind::Invalid:
@@ -4615,7 +4617,9 @@ public:
       }
 
       case MacroDefinition::Kind::Expanded: {
-        llvm_unreachable("No serialization support yet");
+        expandedDef = def.getExpanded();
+        hasExpandedDefinition = 1;
+        break;
       }
     }
 
@@ -4630,6 +4634,7 @@ public:
                             rawAccessLevel,
                             macro->getName().getArgumentNames().size(),
                             builtinID,
+                            hasExpandedDefinition,
                             externalModuleNameID,
                             externalMacroTypeNameID,
                             nameComponentsAndDependencies);
@@ -4637,6 +4642,32 @@ public:
     writeGenericParams(macro->getGenericParams());
     if (macro->parameterList)
       writeParameterList(macro->parameterList);
+
+    if (expandedDef) {
+      // Source text for the expanded macro definition layout.
+      uint8_t hasReplacements = !expandedDef->getReplacements().empty();
+      unsigned abbrCode =
+          S.DeclTypeAbbrCodes[ExpandedMacroDefinitionLayout::Code];
+      ExpandedMacroDefinitionLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          hasReplacements,
+          expandedDef->getExpansionText());
+
+      // If there are any replacements, emit a replacements record.
+      if (!hasReplacements) {
+        SmallVector<uint64_t, 3> replacements;
+        for (const auto &replacement : expandedDef->getReplacements()) {
+          replacements.push_back(replacement.startOffset);
+          replacements.push_back(replacement.endOffset);
+          replacements.push_back(replacement.parameterIndex);
+        }
+
+        unsigned abbrCode =
+            S.DeclTypeAbbrCodes[ExpandedMacroReplacementsLayout::Code];
+        ExpandedMacroReplacementsLayout::emitRecord(
+            S.Out, S.ScratchRecord, abbrCode, replacements);
+      }
+    }
   }
 
   void visitTopLevelCodeDecl(const TopLevelCodeDecl *) {
@@ -5615,6 +5646,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
   registerDeclTypeAbbr<FilenameForPrivateLayout>();
   registerDeclTypeAbbr<DeserializationSafetyLayout>();
+  registerDeclTypeAbbr<ExpandedMacroDefinitionLayout>();
+  registerDeclTypeAbbr<ExpandedMacroReplacementsLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 
