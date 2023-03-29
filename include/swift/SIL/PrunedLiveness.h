@@ -190,6 +190,9 @@ private:
   /// Optional vector of live blocks for clients that deterministically iterate.
   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr;
 
+  /// Only a clean bitfield can be initialized.
+  bool cleanFlag = true;
+
   /// Once the first def has been initialized, uses can be added.
   bool initializedFlag = false;
 
@@ -204,6 +207,7 @@ public:
 
   void invalidate() {
     initializedFlag = false;
+    cleanFlag = false;
   }
 
   void initializeDiscoveredBlocks(
@@ -225,21 +229,17 @@ public:
   }
 
   /// Update this liveness result for a single use.
-  ///
-  /// \p isUseBeforeDef is true if \p user occures before the first def in this
-  /// block. This indicates "liveness holes" inside the block, causing liveness
-  /// to propagate to predecessors.
-  IsLive updateForUse(SILInstruction *user, bool isUseBeforeDef) {
+  IsLive updateForUse(SILInstruction *user) {
     assert(isInitialized() && "at least one definition must be initialized");
 
     auto *block = user->getParent();
-    if (!isUseBeforeDef) {
-      auto liveness = getBlockLiveness(block);
-      // If a block is already marked live, it must either "kill" liveness, or
-      // liveness was already propagated to its predecessors.
-      if (liveness != Dead)
-        return liveness;
-    }
+    auto liveness = getBlockLiveness(block);
+    // If a block is already marked live, assume that liveness was propagated to
+    // its predecessors. This assumes that uses will never be added above a def
+    // in the same block.
+    if (liveness != Dead)
+      return liveness;
+
     computeUseBlockLiveness(block);
     return getBlockLiveness(block);
   }
@@ -348,7 +348,6 @@ struct LiveRangeSummary {
 /// necessarily include liveness up to destroy_value or end_borrow
 /// instructions.
 class PrunedLiveness {
-protected:
   PrunedLiveBlocks liveBlocks;
 
   // Map all "interesting" user instructions in this def's live range to a flag
@@ -390,6 +389,27 @@ public:
   void initializeDefBlock(SILBasicBlock *defBB) {
     liveBlocks.initializeDefBlock(defBB);
   }
+
+  /// For flexibility, \p lifetimeEnding is provided by the
+  /// caller. PrunedLiveness makes no assumptions about the def-use
+  /// relationships that generate liveness. For example, use->isLifetimeEnding()
+  /// cannot distinguish the end of the borrow scope that defines this extended
+  /// live range vs. a nested borrow scope within the extended live range.
+  void updateForUse(SILInstruction *user, bool lifetimeEnding);
+
+  /// Updates the liveness for a whole borrow scope, beginning at \p op.
+  /// Returns false if this cannot be done. This assumes that nested OSSA
+  /// lifetimes are complete.
+  InnerBorrowKind updateForBorrowingOperand(Operand *operand);
+
+  /// Update liveness for an interior pointer use. These are normally handled
+  /// like an instantaneous use. But if \p operand "borrows" a value for the
+  /// duration of a scoped address (store_borrow), then update liveness for the
+  /// entire scope. This assumes that nested OSSA lifetimes are complete.
+  AddressUseKind checkAndUpdateInteriorPointer(Operand *operand);
+
+  /// Update this liveness to extend across the given liveness.
+  void extendAcrossLiveness(PrunedLiveness &otherLiveness);
 
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {
     return liveBlocks.getBlockLiveness(bb);
@@ -545,27 +565,6 @@ protected:
                                            SILValue value);
 
 public:
-  /// For flexibility, \p lifetimeEnding is provided by the
-  /// caller. PrunedLiveness makes no assumptions about the def-use
-  /// relationships that generate liveness. For example, use->isLifetimeEnding()
-  /// cannot distinguish the end of the borrow scope that defines this extended
-  /// live range vs. a nested borrow scope within the extended live range.
-  void updateForUse(SILInstruction *user, bool lifetimeEnding);
-
-  /// Updates the liveness for a whole borrow scope, beginning at \p op.
-  /// Returns false if this cannot be done. This assumes that nested OSSA
-  /// lifetimes are complete.
-  InnerBorrowKind updateForBorrowingOperand(Operand *operand);
-
-  /// Update liveness for an interior pointer use. These are normally handled
-  /// like an instantaneous use. But if \p operand "borrows" a value for the
-  /// duration of a scoped address (store_borrow), then update liveness for the
-  /// entire scope. This assumes that nested OSSA lifetimes are complete.
-  AddressUseKind checkAndUpdateInteriorPointer(Operand *operand);
-
-  /// Update this liveness to extend across the given liveness.
-  void extendAcrossLiveness(PrunedLiveness &otherLiveness);
-
   /// Update liveness for all direct uses of \p def. Transitively follows
   /// guaranteed forwards up to but not including guaranteed phis. If \p def is
   /// used by a guaranteed phi return InnerBorrowKind::Reborrowed.
@@ -661,9 +660,6 @@ public:
     return def->getParentBlock() == block;
   }
 
-  /// In SSA, uses never occur before the single def.
-  bool isUserBeforeDef(SILInstruction *user) const { return false; }
-
   /// SSA implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
                              PrunedLivenessBoundary &boundary) const;
@@ -715,7 +711,7 @@ public:
   }
 
   void initializeDef(SILInstruction *defInst) {
-    initializeDefNode(cast<SILNode>(defInst));
+    initializeDefNode(defInst->asSILNode());
   }
 
   void initializeDef(SILArgument *defArg) { initializeDefNode(defArg); }
@@ -737,24 +733,9 @@ public:
     return defs.contains(cast<SILNode>(inst));
   }
 
-  bool isDef(SILArgument *arg) const {
-    return defs.contains(arg);
-  }
-
   bool isDefBlock(SILBasicBlock *block) const {
     return defBlocks.contains(block);
   }
-
-  /// Return true if \p user occurs before the first def in the same basic
-  /// block. In classical liveness dataflow terms, gen/kill conditions over all
-  /// users in 'bb' are:
-  ///
-  ///   Gen(bb)  |= !isDefBlock(bb) || isUserBeforeDef(bb)
-  ///   Kill(bb) &= isDefBlock(bb) && !isUserBeforeDef(bb)
-  ///
-  /// If 'bb' has no users, it is neither a Gen nor Kill. Otherwise, Gen and
-  /// Kill are complements.
-  bool isUserBeforeDef(SILInstruction *user) const;
 
   /// Multi-Def implementation of computeBoundary.
   void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
