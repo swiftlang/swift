@@ -2449,8 +2449,6 @@ public:
   
   bool containsPackExpansionType() const;
 
-  Type flattenPackTypes();
-
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)
@@ -3519,8 +3517,6 @@ public:
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
   static bool containsPackExpansionType(ArrayRef<Param> params);
-
-  AnyFunctionType *flattenPackTypes();
 
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
                           const PrintOptions &PO = PrintOptions());
@@ -5167,6 +5163,9 @@ public:
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances,
+                                      TypeExpansionContext context);
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
+                                      InFlightSubstitution &IFS,
                                       TypeExpansionContext context);
   CanSILFunctionType substituteOpaqueArchetypes(Lowering::TypeConverter &TC,
                                                 TypeExpansionContext context);
@@ -6839,8 +6838,6 @@ public:
 
   bool containsPackExpansionType() const;
 
-  PackType *flattenPackTypes();
-
   CanTypeWrapper<PackType> getReducedShape();
 
 public:
@@ -6934,8 +6931,6 @@ public:
 
   /// Retrieves the count type of this pack expansion.
   Type getCountType() const { return countType; }
-
-  PackExpansionType *expand();
 
   CanType getReducedShape();
 

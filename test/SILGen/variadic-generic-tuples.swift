@@ -204,3 +204,122 @@ func projectTupleElements<each T>(_ value: repeat Wrapper<each T>) {
 
   let tuple = (repeat (each value).value)
 }
+
+func takesVariadicTuple<each T>(tuple: (repeat each T)) {}
+
+// CHECK-LABEL: sil{{.*}} @$s4main28testConcreteVariadicTupleArg1i1sySi_SStF :
+// CHECK:       [[PACK:%.*]] = alloc_pack $Pack{Int, String}
+// CHECK-NEXT:  [[I_COPY:%.*]] = alloc_stack $Int
+// CHECK-NEXT:  store %0 to [trivial] [[I_COPY]] : $*Int
+// CHECK-NEXT:  [[I_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String}
+// CHECK-NEXT:  pack_element_set [[I_COPY]] : $*Int into [[I_INDEX]] of [[PACK]] :
+// CHECK-NEXT:  [[S_COPY:%.*]] = alloc_stack $String
+// CHECK-NEXT:  [[T0:%.*]] = copy_value %1 : $String
+// CHECK-NEXT:  store [[T0]] to [init] [[S_COPY]] : $*String
+// CHECK-NEXT:  [[S_INDEX:%.*]] = scalar_pack_index 1 of $Pack{Int, String}
+// CHECK-NEXT:  pack_element_set [[S_COPY]] : $*String into [[S_INDEX]] of [[PACK]] :
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[FN:%.*]] = function_ref @$s4main18takesVariadicTuple5tupleyxxQp_t_tRvzlF : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+// CHECK-NEXT:  apply [[FN]]<Pack{Int, String}>([[PACK]])
+// CHECK-NEXT:  destroy_addr [[S_COPY]] :
+// CHECK-NEXT:  dealloc_stack [[S_COPY]] :
+// CHECK-NEXT:  dealloc_stack [[I_COPY]] :
+// CHECK-NEXT:  dealloc_pack [[PACK]] :
+func testConcreteVariadicTupleArg(i: Int, s: String) {
+  takesVariadicTuple(tuple: (i, s))
+}
+
+struct TupleHolder<each T> {
+  var content: (repeat each T)
+
+  // Suppress the memberwise initializer
+  init(values: repeat each T) {
+    content = (repeat each values)
+  }
+}
+
+// CHECK-LABEL: sil{{.*}} @$s4main31takesConcreteTupleHolderFactory7factoryyAA0dE0VySi_SSQPGyXE_tF :
+// CHECK-SAME:    $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned TupleHolder<Int, String>) -> ()
+// CHECK:       [[T0:%.*]] = copy_value %0 :
+// CHECK:       [[T1:%.*]] = begin_borrow [[T0]]
+// CHECK:       [[RESULT:%.*]] = apply [[T1]]() :
+// CHECK:       destroy_value [[RESULT]]
+func takesConcreteTupleHolderFactory(factory: () -> TupleHolder<Int, String>) {
+  let holder = factory()
+}
+
+struct MemberwiseTupleHolder<each T> {
+  var content: (repeat each T)
+}
+
+//   Memberwise initializer.
+//   TODO: initialize directly into the fields
+// CHECK-LABEL: sil{{.*}} @$s4main21MemberwiseTupleHolderV7contentACyxxQp_QPGxxQp_t_tcfC
+// CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat each T}, @thin MemberwiseTupleHolder<repeat each T>.Type) -> @out MemberwiseTupleHolder<repeat each T> {
+// CHECK:         [[TEMP:%.*]] = alloc_stack $(repeat each T)
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT:    br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IDX:%.*]] : $Builtin.Word)
+// CHECK-NEXT:    [[IDX_EQ_LEN:%.*]] = builtin "cmp_eq_Word"([[IDX]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[TUPLE_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TEMP]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    [[PACK_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %1 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    copy_addr [take] [[PACK_ELT_ADDR]] to [init] [[TUPLE_ELT_ADDR]]
+// CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK-NEXT:    [[CONTENTS_ADDR:%.*]] = struct_element_addr %0 : $*MemberwiseTupleHolder<repeat each T>, #MemberwiseTupleHolder.content
+// CHECK-NEXT:    copy_addr [take] [[TEMP]] to [init] [[CONTENTS_ADDR]]
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK-NEXT:    return
+
+
+func callVariadicMemberwiseInit() -> MemberwiseTupleHolder<Int, String> {
+  return MemberwiseTupleHolder(content: (0, "hello"))
+}
+
+// rdar://107151145: when we tuple-destructure a black hole
+// initialization, the resulting element initializations need to
+// handle pack expansion initialization
+struct EmptyContainer<each T> {}
+func f<each T>(_: repeat each T) {
+  let _ = (repeat EmptyContainer<each T>())
+}
+
+// rdar://107161241: handle receiving tuples that originally contained
+// packs that are not emitted into an initialization
+struct FancyTuple<each T> {
+  var x: (repeat each T)
+
+  func makeTuple() -> (repeat each T) {
+    return (repeat each x.element)
+  }
+}
+
+// CHECK: sil{{.*}} @$s4main23testFancyTuple_concreteyyF :
+//   Create a pack to receive the results from makeTuple.
+// CHECK:      [[PACK:%.*]] = alloc_pack $Pack{Int, String, Bool}
+// CHECK-NEXT: [[INT_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT: [[INT_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[INT_ADDR]] : $*Int into [[INT_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK-NEXT: [[STRING_ADDR:%.*]] = alloc_stack $String
+// CHECK-NEXT: [[STRING_INDEX:%.*]] = scalar_pack_index 1 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[STRING_ADDR]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK-NEXT: [[BOOL_ADDR:%.*]] = alloc_stack $Bool
+// CHECK-NEXT: [[BOOL_INDEX:%.*]] = scalar_pack_index 2 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[BOOL_ADDR]] : $*Bool into [[BOOL_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK:      [[FN:%.*]] = function_ref @$s4main10FancyTupleV04makeC0xxQp_tyF
+// CHECK-NEXT: apply [[FN]]<Pack{Int, String, Bool}>([[PACK]], {{.*}})
+func testFancyTuple_concrete() {
+  FancyTuple<Int, String, Bool>(x: (1, "hi", false)).makeTuple()
+}
+
+func testFancyTuple_pack<each T>(values: repeat each T) {
+  FancyTuple<Int, String, repeat each T, Bool>(x: (1, "hi", repeat each values, false)).makeTuple()
+}

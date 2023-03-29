@@ -361,24 +361,24 @@ public:
     // In this case, we do not need to force emission into a pack
     // expansion.
     SmallVector<ManagedValue, 4> elements;
-    orig.forEachTupleElement(t,
-       [&](unsigned origEltIndex, unsigned substEltIndex,
-           AbstractionPattern origEltType,
-           CanType substEltType) {
-      auto elt = visit(substEltType, origEltType,
-                       init ? eltInits[substEltIndex].get() : nullptr);
-      assert((init != nullptr) == (elt.isInContext()));
-      if (!elt.isInContext())
-        elements.push_back(elt);
+    orig.forEachTupleElement(t, [&](TupleElementGenerator &elt) {
+      auto origEltType = elt.getOrigType();
+      auto substEltTypes = elt.getSubstTypes();
+      if (!elt.isOrigPackExpansion()) {
+        auto eltValue =
+          visit(substEltTypes[0], origEltType,
+                init ? eltInits[elt.getSubstIndex()].get() : nullptr);
+        assert((init != nullptr) == (eltValue.isInContext()));
+        if (!eltValue.isInContext())
+          elements.push_back(eltValue);
 
-      if (elt.hasCleanup())
-        canBeGuaranteed = false;
-    }, [&](unsigned origEltIndex, unsigned substEltIndex,
-           AbstractionPattern origExpansionType,
-           CanTupleEltTypeArrayRef substEltTypes) {
-      assert(init);
-      expandPack(origExpansionType, substEltTypes, substEltIndex,
-                 eltInits, elements);
+        if (eltValue.hasCleanup())
+          canBeGuaranteed = false;
+      } else {
+        assert(init);
+        expandPack(origEltType, substEltTypes, elt.getSubstIndex(),
+                   eltInits, elements);
+      }
     });
 
     // If we emitted into a context, we're done.

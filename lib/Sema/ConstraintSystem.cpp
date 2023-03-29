@@ -3713,16 +3713,56 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-Type ConstraintSystem::simplifyTypeImpl(Type type,
-    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const {
-  return type.transform([&](Type type) -> Type {
-    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer()))
-      return getFixedTypeFn(tvt);
+namespace {
+
+struct TypeSimplifier {
+  const ConstraintSystem &CS;
+  llvm::function_ref<Type(TypeVariableType *)> GetFixedTypeFn;
+
+  struct ActivePackExpansion {
+    bool isPackExpansion = false;
+    unsigned index = 0;
+  };
+  SmallVector<ActivePackExpansion, 4> ActivePackExpansions;
+
+  TypeSimplifier(const ConstraintSystem &CS,
+                 llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn)
+    : CS(CS), GetFixedTypeFn(getFixedTypeFn) {}
+
+  Type operator()(Type type) {
+    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
+      auto fixedTy = GetFixedTypeFn(tvt);
+
+      // TODO: the following logic should be applied when rewriting
+      // PackElementType.
+      if (ActivePackExpansions.empty()) {
+        return fixedTy;
+      }
+
+      if (auto fixedPack = fixedTy->getAs<PackType>()) {
+        auto &activeExpansion = ActivePackExpansions.back();
+        if (activeExpansion.index >= fixedPack->getNumElements()) {
+          return tvt;
+        }
+
+        auto fixedElt = fixedPack->getElementType(activeExpansion.index);
+        auto fixedExpansion = fixedElt->getAs<PackExpansionType>();
+        if (activeExpansion.isPackExpansion && fixedExpansion) {
+          return fixedExpansion->getPatternType();
+        } else if (!activeExpansion.isPackExpansion && !fixedExpansion) {
+          return fixedElt;
+        } else {
+          return tvt;
+        }
+      }
+
+      return fixedTy;
+    }
 
     if (auto tuple = dyn_cast<TupleType>(type.getPointer())) {
       if (tuple->getNumElements() == 1) {
         auto element = tuple->getElement(0);
-        auto elementType = simplifyTypeImpl(element.getType(), getFixedTypeFn);
+        auto elementType = element.getType().transform(*this);
 
         // Flatten single-element tuples containing type variables that cannot
         // bind to packs.
@@ -3733,14 +3773,47 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       }
     }
 
+    if (auto expansion = dyn_cast<PackExpansionType>(type.getPointer())) {
+      // Transform the count type, ignoring any active pack expansions.
+      auto countType = expansion->getCountType().transform(
+                                        TypeSimplifier(CS, GetFixedTypeFn));
+
+      if (auto countPack = countType->getAs<PackType>()) {
+        SmallVector<Type, 4> elts;
+        ActivePackExpansions.push_back({false, 0});
+        for (auto countElt : countPack->getElementTypes()) {
+          auto countExpansion = countElt->getAs<PackExpansionType>();
+          ActivePackExpansions.back().isPackExpansion =
+            (countExpansion != nullptr);
+
+          auto elt = expansion->getPatternType().transform(*this);
+          if (countExpansion)
+            elt = PackExpansionType::get(elt, countExpansion->getCountType());
+          elts.push_back(elt);
+
+          ActivePackExpansions.back().index++;
+        }
+        ActivePackExpansions.pop_back();
+
+        if (elts.size() == 1)
+          return elts[0];
+        return PackType::get(CS.getASTContext(), elts);
+      } else {
+        ActivePackExpansions.push_back({true, 0});
+        auto patternType = expansion->getPatternType().transform(*this);
+        ActivePackExpansions.pop_back();
+        return PackExpansionType::get(patternType, countType);
+      }
+    }
+
     // If this is a dependent member type for which we end up simplifying
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type.getPointer())) {
       // Simplify the base.
-      Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
+      Type newBase = depMemTy->getBase().transform(*this);
 
       if (newBase->isPlaceholder()) {
-        return PlaceholderType::get(getASTContext(), depMemTy);
+        return PlaceholderType::get(CS.getASTContext(), depMemTy);
       }
 
       // If nothing changed, we're done.
@@ -3760,7 +3833,7 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       if (lookupBaseType->mayHaveMembers() ||
           lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
-        auto conformance = DC->getParentModule()->lookupConformance(
+        auto conformance = CS.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance) {
           // FIXME: This regresses diagnostics if removed, but really the
@@ -3774,9 +3847,9 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (shouldAttemptFixes() &&
-              getPhase() == ConstraintSystemPhase::Solving) {
-            return PlaceholderType::get(getASTContext(), memberTy);
+          if (CS.shouldAttemptFixes() &&
+              CS.getPhase() == ConstraintSystemPhase::Solving) {
+            return PlaceholderType::get(CS.getASTContext(), memberTy);
           }
 
           return memberTy;
@@ -3792,7 +3865,14 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
     }
 
     return type;
-  });
+  }
+};
+
+} // end anonymous namespace
+
+Type ConstraintSystem::simplifyTypeImpl(Type type,
+    llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) const {
+  return type.transform(TypeSimplifier(*this, getFixedTypeFn));
 }
 
 Type ConstraintSystem::simplifyType(Type type) const {

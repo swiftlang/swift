@@ -470,35 +470,25 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
 }
 
 void AbstractionPattern::forEachTupleElement(CanTupleType substType,
-                      llvm::function_ref<void(unsigned origEltIndex,
-                                              unsigned substEltIndex,
-                                              AbstractionPattern origEltType,
-                                              CanType substEltType)>
-                        handleScalar,
-                      llvm::function_ref<void(unsigned origEltIndex,
-                                              unsigned substEltIndex,
-                                              AbstractionPattern origExpansionType,
-                                              CanTupleEltTypeArrayRef substEltTypes)>
-                        handleExpansion) const {
-  assert(isTuple() && "can only call on a tuple expansion");
-  assert(matchesTuple(substType));
-
-  size_t substEltIndex = 0;
-  auto substEltTypes = substType.getElementTypes();
-  for (size_t origEltIndex : range(getNumTupleElements())) {
-    auto origEltType = getTupleElementType(origEltIndex);
-    if (!origEltType.isPackExpansion()) {
-      handleScalar(origEltIndex, substEltIndex,
-                   origEltType, substEltTypes[substEltIndex]);
-      substEltIndex++;
-    } else {
-      auto numComponents = origEltType.getNumPackExpandedComponents();
-      handleExpansion(origEltIndex, substEltIndex, origEltType,
-                      substEltTypes.slice(substEltIndex, numComponents));
-      substEltIndex += numComponents;
-    }
+      llvm::function_ref<void(TupleElementGenerator &)> handleElement) const {
+  TupleElementGenerator elt(*this, substType);
+  for (; !elt.isFinished(); elt.advance()) {
+    handleElement(elt);
   }
-  assert(substEltIndex == substEltTypes.size());
+  elt.finish();
+}
+
+TupleElementGenerator::TupleElementGenerator(
+                              AbstractionPattern origTupleType,
+                              CanTupleType substTupleType)
+    : origTupleType(origTupleType), substTupleType(substTupleType) {
+  assert(origTupleType.isTuple());
+  assert(origTupleType.matchesTuple(substTupleType));
+
+  origTupleTypeIsOpaque = origTupleType.isOpaqueTuple();
+  numOrigElts = origTupleType.getNumTupleElements();
+
+  if (!isFinished()) loadElement();
 }
 
 void AbstractionPattern::forEachExpandedTupleElement(CanTupleType substType,
@@ -1387,6 +1377,26 @@ void AbstractionPattern::dump() const {
   llvm::errs() << "\n";
 }
 
+static void printGenerics(raw_ostream &out, const AbstractionPattern &pattern) {
+  if (auto sig = pattern.getGenericSignature()) {
+    sig->print(out);
+  }
+  // It'd be really nice if we could get these interleaved with the types.
+  if (auto subs = pattern.getGenericSubstitutions()) {
+    out << "@<";
+    bool first = true;
+    for (auto sub : subs.getReplacementTypes()) {
+      if (!first) {
+        out << ",";
+      } else {
+        first = false;
+      }
+      out << sub;
+    }
+    out << ">";
+  }
+}
+
 void AbstractionPattern::print(raw_ostream &out) const {
   switch (getKind()) {
   case Kind::Invalid:
@@ -1407,9 +1417,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
               ? "AP::Type" :
             getKind() == Kind::Discard
               ? "AP::Discard" : "<<UNHANDLED CASE>>");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     out << '(';
     getType().dump(out);
     out << ')';
@@ -1436,9 +1444,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
             getKind() == Kind::ObjCCompletionHandlerArgumentsType
               ? "AP::ObjCCompletionHandlerArgumentsType("
               : "AP::CFunctionAsMethodType(");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     getType().dump(out);
     out << ", ";
     // [TODO: Improve-Clang-type-printing]
@@ -1470,9 +1476,7 @@ void AbstractionPattern::print(raw_ostream &out) const {
             getKind() == Kind::CurriedCXXMethodType
               ? "AP::CurriedCXXMethodType("
               : "AP::PartialCurriedCXXMethodType");
-    if (auto sig = getGenericSignature()) {
-      sig->print(out);
-    }
+    printGenerics(out, *this);
     getType().dump(out);
     out << ", ";
     getCXXMethod()->dump();
@@ -1580,13 +1584,14 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
 
 AbstractionPattern
 AbstractionPattern::unsafeGetSubstFieldType(ValueDecl *member,
-                                            CanType origMemberInterfaceType)
+                                            CanType origMemberInterfaceType,
+                                            SubstitutionMap subMap)
 const {
   assert(origMemberInterfaceType);
   if (isTypeParameterOrOpaqueArchetype()) {
     // Fall back to the generic abstraction pattern for the member.
     auto sig = member->getDeclContext()->getGenericSignatureOfContext();
-    return AbstractionPattern(sig.getCanonicalSignature(),
+    return AbstractionPattern(subMap, sig.getCanonicalSignature(),
                               origMemberInterfaceType);
   }
 
@@ -1623,7 +1628,9 @@ const {
                                       member, origMemberInterfaceType)
                              ->getReducedType(getGenericSignature());
       
-    return AbstractionPattern(getGenericSignature(), memberTy);
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignature(),
+                              memberTy);
   }
   llvm_unreachable("invalid abstraction pattern kind");
 }
@@ -1965,8 +1972,11 @@ public:
       : CanType(CanMetatypeType::get(substInstance));
   }
   
-  CanType handleGenericNominalType(CanType orig, CanType subst,
-                                   CanGenericSignature origSig) {
+  CanType handleGenericNominalType(AbstractionPattern origPattern, CanType subst) {
+    CanType orig = origPattern.getType();
+    CanGenericSignature origSig = origPattern.getGenericSignatureOrNull();
+    auto origPatternSubs = origPattern.getGenericSubstitutions();
+
     // If there are no loose type parameters in the pattern here, we don't need
     // to do a recursive visit at all.
     if (!orig->hasTypeParameter()
@@ -2011,6 +2021,7 @@ public:
     if (differentOrigClass) {
       orig = subst;
       origSig = TC.getCurGenericSignature();
+      origPatternSubs = SubstitutionMap();
       assert((!subst->hasTypeParameter() || origSig) &&
              "lowering mismatched interface types in a context without "
              "a generic signature");
@@ -2032,7 +2043,8 @@ public:
         ->getCanonicalType();
 
       replacementTypes[gp->getCanonicalType()->castTo<SubstitutableType>()]
-          = visit(substParamTy, AbstractionPattern(origSig, origParamTy));
+          = visit(substParamTy,
+                  AbstractionPattern(origPatternSubs, origSig, origParamTy));
     }
 
     auto newSubMap = SubstitutionMap::get(nomGenericSig,
@@ -2052,8 +2064,7 @@ public:
     // If the type is generic (because it's a nested type in a generic context),
     // process the generic type bindings.
     if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
-      return handleGenericNominalType(pattern.getType(), nom,
-                                      pattern.getGenericSignatureOrNull());
+      return handleGenericNominalType(pattern, nom);
     }
     
     // Otherwise, there are no structural type parameters to visit.
@@ -2062,8 +2073,7 @@ public:
   
   CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
-    return handleGenericNominalType(pattern.getType(), bgt,
-                                    pattern.getGenericSignatureOrNull());
+    return handleGenericNominalType(pattern, bgt);
   }
 
   CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
@@ -2089,7 +2099,7 @@ public:
     // the pack substitution for that parameter recorded in the pattern.
 
     // Remember that we're within an expansion.
-    // FIXME: when we introduce PackReferenceType we'll need to be clear
+    // FIXME: when we introduce PackElementType we'll need to be clear
     // about which pack expansions to treat this way.
     llvm::SaveAndRestore<bool> scope(WithinExpansion, true);
 
@@ -2190,28 +2200,19 @@ public:
   CanType visitTupleType(CanTupleType tuple, AbstractionPattern pattern) {
     assert(pattern.isTuple());
 
-    // It's pretty weird for us to end up in this case with an
-    // open-coded tuple pattern, but it happens with opaque derivative
-    // functions in autodiff.
-    CanTupleType origTupleTypeForLabels = pattern.getAs<TupleType>();
-    if (!origTupleTypeForLabels) origTupleTypeForLabels = tuple;
-
     SmallVector<TupleTypeElt, 4> tupleElts;
-    pattern.forEachTupleElement(tuple,
-        [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origEltType, CanType substEltType) {
-      auto eltTy = visit(substEltType, origEltType);
-      auto &origElt = origTupleTypeForLabels->getElement(origEltIndex);
-      tupleElts.push_back(origElt.getWithType(eltTy));
-    },  [&](unsigned origEltIndex, unsigned substEltIndex,
-            AbstractionPattern origExpansionType,
-            CanTupleEltTypeArrayRef substEltTypes) {
-      CanType candidateSubstType;
-      if (!substEltTypes.empty())
-        candidateSubstType = substEltTypes[0];
-      auto eltTy = handlePackExpansion(origExpansionType, candidateSubstType);
-      auto &origElt = origTupleTypeForLabels->getElement(origEltIndex);
-      tupleElts.push_back(origElt.getWithType(eltTy));      
+    pattern.forEachTupleElement(tuple, [&](TupleElementGenerator &elt) {
+      auto substEltTypes = elt.getSubstTypes();
+      CanType eltTy;
+      if (!elt.isOrigPackExpansion()) {
+        eltTy = visit(substEltTypes[0], elt.getOrigType());
+      } else {
+        CanType candidateSubstType;
+        if (!substEltTypes.empty())
+          candidateSubstType = substEltTypes[0];
+        eltTy = handlePackExpansion(elt.getOrigType(), candidateSubstType);
+      }
+      tupleElts.push_back(elt.getOrigElement().getWithType(eltTy));
     });
     
     return CanType(TupleType::get(tupleElts, TC.Context));
@@ -2230,7 +2231,7 @@ public:
 
     pattern.forEachFunctionParam(func.getParams(), /*ignore self*/ false,
                                  [&](FunctionParamGenerator &param) {
-      if (!param.isPackExpansion()) {
+      if (!param.isOrigPackExpansion()) {
         auto newParamTy = visit(param.getSubstParams()[0].getParameterType(),
                                 param.getOrigType());
         addParam(param.getOrigFlags(), newParamTy);

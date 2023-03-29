@@ -2069,13 +2069,19 @@ class TupleMatcher {
   TupleType *tuple2;
 
 public:
+  enum class MatchKind : uint8_t {
+    Equality,
+    Subtype,
+    Conversion,
+  };
+
   SmallVector<MatchedPair, 4> pairs;
   bool hasLabelMismatch = false;
 
   TupleMatcher(TupleType *tuple1, TupleType *tuple2)
-    : tuple1(tuple1), tuple2(tuple2) {}
+      : tuple1(tuple1), tuple2(tuple2) {}
 
-  bool matchBind() {
+  bool match(MatchKind kind, ConstraintLocatorBuilder locator) {
     // FIXME: TuplePackMatcher should completely replace the non-variadic
     // case too eventually.
     if (tuple1->containsPackExpansionType() ||
@@ -2091,42 +2097,32 @@ public:
     if (tuple1->getNumElements() != tuple2->getNumElements())
       return true;
 
-    for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
-      const auto &elt1 = tuple1->getElement(i);
-      const auto &elt2 = tuple2->getElement(i);
+    switch (kind) {
+    case MatchKind::Equality:
+      return matchEquality(isInPatternMatchingContext(locator));
 
-      // If the names don't match, we have a conflict.
-      if (elt1.getName() != elt2.getName())
-        return true;
+    case MatchKind::Subtype:
+      return matchSubtype();
 
-      pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
+    case MatchKind::Conversion:
+      return matchConversion();
     }
-
-    return false;
   }
 
-  bool matchInPatternMatchingContext() {
-    // FIXME: TuplePackMatcher should completely replace the non-variadic
-    // case too eventually.
-    if (tuple1->containsPackExpansionType() ||
-        tuple2->containsPackExpansionType()) {
-      TuplePackMatcher matcher(tuple1, tuple2);
-      if (matcher.match())
-        return true;
-
-      pairs = matcher.pairs;
-      return false;
-    }
-
-    if (tuple1->getNumElements() != tuple2->getNumElements())
-      return true;
-
+private:
+  bool matchEquality(bool inPatternMatchingContext) {
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
       const auto &elt2 = tuple2->getElement(i);
 
-      if (elt1.hasName() && elt1.getName() != elt2.getName())
-        return true;
+      if (inPatternMatchingContext) {
+        if (elt1.hasName() && elt1.getName() != elt2.getName())
+          return true;
+      } else {
+        // If the names don't match, we have a conflict.
+        if (elt1.getName() != elt2.getName())
+          return true;
+      }
 
       pairs.emplace_back(elt1.getType(), elt2.getType(), i, i);
     }
@@ -2135,21 +2131,6 @@ public:
   }
 
   bool matchSubtype() {
-    // FIXME: TuplePackMatcher should completely replace the non-variadic
-    // case too eventually.
-    if (tuple1->containsPackExpansionType() ||
-        tuple2->containsPackExpansionType()) {
-      TuplePackMatcher matcher(tuple1, tuple2);
-      if (matcher.match())
-        return true;
-
-      pairs = matcher.pairs;
-      return false;
-    }
-
-    if (tuple1->getNumElements() != tuple2->getNumElements())
-      return true;
-
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
       const auto &elt2 = tuple2->getElement(i);
@@ -2173,18 +2154,6 @@ public:
   }
 
   bool matchConversion() {
-    // FIXME: TuplePackMatcher should completely replace the non-variadic
-    // case too eventually.
-    if (tuple1->containsPackExpansionType() ||
-        tuple2->containsPackExpansionType()) {
-      TuplePackMatcher matcher(tuple1, tuple2);
-      if (matcher.match())
-        return true;
-
-      pairs = matcher.pairs;
-      return false;
-    }
-
     SmallVector<unsigned, 4> sources;
     if (computeTupleShuffle(tuple1, tuple2, sources))
       return true;
@@ -2208,23 +2177,16 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator) {
-  TupleMatcher matcher(tuple1, tuple2);
+  using TupleMatchKind = TupleMatcher::MatchKind;
 
   ConstraintKind subkind;
+  TupleMatchKind matchKind;
 
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal: {
     subkind = kind;
-
-    if (isInPatternMatchingContext(locator)) {
-      if (matcher.matchInPatternMatchingContext())
-        return getTypeMatchFailure(locator);
-    } else {
-      if (matcher.matchBind())
-        return getTypeMatchFailure(locator);
-    }
-
+    matchKind = TupleMatchKind::Equality;
     break;
   }
 
@@ -2234,17 +2196,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Subtype:
   case ConstraintKind::BindToPointerType: {
     subkind = kind;
-
-    if (matcher.matchSubtype())
-      return getTypeMatchFailure(locator);
-
-    if (matcher.hasLabelMismatch) {
-      // If we had a label mismatch, emit a warning. This is something we
-      // shouldn't permit, as it's more permissive than what a conversion would
-      // allow. Ideally we'd turn this into an error in Swift 6 mode.
-      recordFix(AllowTupleLabelMismatch::create(
-          *this, tuple1, tuple2, getConstraintLocator(locator)));
-    }
+    matchKind = TupleMatchKind::Subtype;
     break;
   }
 
@@ -2252,11 +2204,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion: {
     subkind = ConstraintKind::Conversion;
-
-    // Compute the element shuffles for conversions.
-    if (matcher.matchConversion())
-      return getTypeMatchFailure(locator);
-
+    matchKind = TupleMatchKind::Conversion;
     break;
   }
 
@@ -2294,6 +2242,19 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
+  }
+
+  TupleMatcher matcher(tuple1, tuple2);
+
+  if (matcher.match(matchKind, locator))
+    return getTypeMatchFailure(locator);
+
+  if (matcher.hasLabelMismatch) {
+    // If we had a label mismatch, emit a warning. This is something we
+    // shouldn't permit, as it's more permissive than what a conversion would
+    // allow. Ideally we'd turn this into an error in Swift 6 mode.
+    recordFix(AllowTupleLabelMismatch::create(*this, tuple1, tuple2,
+                                              getConstraintLocator(locator)));
   }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);

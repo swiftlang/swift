@@ -2172,6 +2172,15 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   llvm_unreachable("unhandled case");
 }
 
+void BlackHoleInitialization::performPackExpansionInitialization(
+                                        SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SILValue indexWithinComponent,
+                          llvm::function_ref<void(Initialization *into)> fn) {
+  BlackHoleInitialization subInit;
+  fn(&subInit);
+}
+
 void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                                                   ManagedValue value, bool isInit) {
   // Normally we do not do anything if we have a black hole

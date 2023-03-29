@@ -42,6 +42,12 @@ public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc,
                         ArrayRef<ManagedValue> &directResults,
                         SILValue bridgedForeignError) = 0;
+
+  virtual void finishAndAddTo(SILGenFunction &SGF, SILLocation loc,
+                              ArrayRef<ManagedValue> &directResults,
+                              SILValue bridgedForeignError,
+                              RValue &result);
+
   virtual ~ResultPlan() = default;
 
   /// Defers the emission of the given breadcrumb until \p finish is invoked.
@@ -92,8 +98,8 @@ struct ResultPlanBuilder {
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanTupleType substType);
-  ResultPlanPtr buildForPackExpansion(MutableArrayRef<InitializationPtr> inits,
-                                      AbstractionPattern origPatternType,
+  ResultPlanPtr buildForPackExpansion(Optional<MutableArrayRef<InitializationPtr>> inits,
+                                      AbstractionPattern origExpansionType,
                                       CanTupleEltTypeArrayRef substTypes);
   ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,
                                            CanPackType formalPackType,
