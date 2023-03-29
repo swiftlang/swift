@@ -58,7 +58,17 @@ enum _dyld_section_location_kind {
 #define _dyld_section_location_text_swift5_replace2 4
 #define _dyld_section_location_text_swift5_ac_funcs 5
 
-#if !OBJC_ADDLOADIMAGEFUNC2_DEFINED
+#if OBJC_ADDLOADIMAGEFUNC2_DEFINED
+// Redefine _dyld_lookup_section_info as weak so we can build against it but
+// still run when it's not present at runtime. Note that we don't have to check
+// for its presence at runtime, as it's guaranteed to be available if we get
+// the callbacks from objc_addLoadImageFunc2.
+LLVM_ATTRIBUTE_WEAK
+struct _dyld_section_info_result
+_dyld_lookup_section_info(const struct mach_header *mh,
+                          _dyld_section_location_info_t locationHandle,
+                          enum _dyld_section_location_kind kind);
+#else
 // If we don't have objc_addLoadImageFunc2, fall back to objc_addLoadImageFunc.
 // Use a #define so we don't have to conditionalize the calling code below.
 #define objc_addLoadImageFunc2 objc_addLoadImageFunc
