@@ -3933,10 +3933,15 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
+      // No package context was found; show diagnostics
       auto &d = VD->getASTContext().Diags;
       d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
+      // Instead of reporting and failing early, return the scope of
+      // resultDC to allow continuation (should still non-zero exit later)
+      return AccessScope(resultDC);
+    } else {
+      return AccessScope(pkg);
     }
-    return AccessScope(pkg);
   }
   case AccessLevel::Public:
   case AccessLevel::Open:
