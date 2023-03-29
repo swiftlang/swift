@@ -60,6 +60,27 @@ public protocol SerialExecutor: Executor {
   /// executor references.
   @available(SwiftStdlib 5.9, *)
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
+
+  /// If this executor has complex equality semantics, and the runtime needs to compare
+  /// two executors, it will first attempt the usual pointer-based equality check,
+  /// and if it fails it will compare the types of both executors, if they are the same,
+  /// it will finally invoke this method, in an attempt to let the executor itself decide
+  /// if this and the `other` executor represent the same serial, exclusive, isolation context.
+  ///
+  /// This method must be implemented with great care, as wrongly returning `true` would allow
+  /// code from a different execution context (e.g. thread) to execute code which was intended
+  /// to be isolated by another actor.
+  ///
+  /// This check is not used when performing executor switching.
+  ///
+  /// This check is used when performing `preconditionTaskOnActorExecutor`, `preconditionTaskOnActorExecutor`,
+  /// `assumeOnActorExecutor` and similar APIs which assert about the same "exclusive serial execution context".
+  ///
+  /// - Parameter other: the executor to compare with.
+  /// - Returns: true, if `self` and the `other` executor actually are mutually exclusive
+  ///            and it is safe–from a concurrency perspective–to execute code assuming one on the other.
+  @available(SwiftStdlib 5.9, *)
+  func isSameExclusiveExecutionContext(other: Self) -> Bool
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -81,6 +102,16 @@ extension SerialExecutor {
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
   }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension SerialExecutor {
+
+  @available(SwiftStdlib 5.9, *)
+  public func isSameExclusiveExecutionContext(other: Self) -> Bool {
+    return self === other
+  }
+
 }
 
 /// An unowned reference to a serial executor (a `SerialExecutor`
@@ -125,6 +156,32 @@ public struct UnownedSerialExecutor: Sendable {
     #endif
   }
 
+  /// Opts the executor into complex "same exclusive execution context" equality checks.
+  ///
+  /// This means what when asserting or assuming executors, and the current and expected
+  /// executor are not the same instance (by object equality), the runtime may invoke
+  /// `isSameExclusiveExecutionContext` in order to compare the executors for equality.
+  ///
+  /// Implementing such complex equality can be useful if multiple executor instances
+  /// actually use the same underlying serialization context and can be therefore
+  /// safely treated as the same serial exclusive execution context (e.g. multiple
+  /// dispatch queues targeting the same serial queue).
+  @available(SwiftStdlib 5.9, *)
+  @inlinable
+  public init<E: SerialExecutor>(complexEquality executor: __shared E) {
+    #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
+    self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
+  }
+
+  @_spi(ConcurrencyExecutors)
+  @available(SwiftStdlib 5.9, *)
+  public var _isComplexEquality: Bool {
+    _executor_isComplexEquality(self)
+  }
+
 }
 
 /// Checks if the current task is running on the expected executor.
@@ -138,6 +195,11 @@ public struct UnownedSerialExecutor: Sendable {
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("swift_task_isOnExecutor")
 public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
+
+@_spi(ConcurrencyExecutors)
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_executor_isComplexEquality")
+public func _executor_isComplexEquality(_ executor: UnownedSerialExecutor) -> Bool
 
 @available(SwiftStdlib 5.1, *)
 @_transparent
@@ -164,6 +226,22 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
+
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")
+internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current currentExecutor: E, executor: E) -> Bool
+    where E: SerialExecutor {
+  currentExecutor.isSameExclusiveExecutionContext(other: executor)
+}
+
+/// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
+/// The obtained executor ref will have all the user-defined flags set on the executor.
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("_task_serialExecutor_getExecutorRef")
+internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
+    where E: SerialExecutor {
+  return executor.asUnownedSerialExecutor().executor
+}
 
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)

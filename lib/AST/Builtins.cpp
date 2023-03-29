@@ -1596,6 +1596,15 @@ static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                             _executor);
 }
 
+static ValueDecl *getBuildComplexEqualitySerialExecutorRef(ASTContext &ctx,
+                                                           Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                              _conformsTo(_typeparam(0), _serialExecutor)),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -2887,6 +2896,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     return getBuildOrdinarySerialExecutorRef(Context, Id);
+  case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
+    return getBuildComplexEqualitySerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

@@ -715,6 +715,9 @@ bool swift_task_isOnExecutor(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_executor_isComplexEquality(ExecutorRef ref);
+
 /// Return the 64bit TaskID (if the job is an AsyncTask),
 /// or the 32bits of the job Id otherwise.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

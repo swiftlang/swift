@@ -16,7 +16,7 @@
 @preconcurrency import Dispatch
 
 protocol WithSpecifiedExecutor: Actor {
-  nonisolated var executor: SpecifiedExecutor { get }
+  nonisolated var executor: any SpecifiedExecutor { get }
 }
 
 protocol SpecifiedExecutor: SerialExecutor {}
@@ -54,12 +54,12 @@ final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
 
 actor MyActor: WithSpecifiedExecutor {
 
-  nonisolated let executor: SpecifiedExecutor
+  nonisolated let executor: any SpecifiedExecutor
 
   // Note that we don't have to provide the unownedExecutor in the actor itself.
   // We obtain it from the extension on `WithSpecifiedExecutor`.
 
-  init(executor: SpecifiedExecutor) {
+  init(executor: any SpecifiedExecutor) {
     self.executor = executor
   }
 
