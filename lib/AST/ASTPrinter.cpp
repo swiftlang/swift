@@ -3232,6 +3232,14 @@ static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
 
+static bool usesFeatureNoImplicitCopy(Decl *decl) {
+  return decl->isNoImplicitCopy();
+}
+
+static bool usesFeatureOldOwnershipOperatorSpellings(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }

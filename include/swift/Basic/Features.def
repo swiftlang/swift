@@ -116,6 +116,8 @@ EXPERIMENTAL_FEATURE(FreestandingMacros, true)
 // but our tests currently rely on it, and we want to run those
 // tests in non-asserts builds too.
 EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
+EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
+EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)

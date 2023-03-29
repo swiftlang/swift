@@ -283,3 +283,43 @@ struct MemberwiseTupleHolder<each T> {
 func callVariadicMemberwiseInit() -> MemberwiseTupleHolder<Int, String> {
   return MemberwiseTupleHolder(content: (0, "hello"))
 }
+
+// rdar://107151145: when we tuple-destructure a black hole
+// initialization, the resulting element initializations need to
+// handle pack expansion initialization
+struct EmptyContainer<each T> {}
+func f<each T>(_: repeat each T) {
+  let _ = (repeat EmptyContainer<each T>())
+}
+
+// rdar://107161241: handle receiving tuples that originally contained
+// packs that are not emitted into an initialization
+struct FancyTuple<each T> {
+  var x: (repeat each T)
+
+  func makeTuple() -> (repeat each T) {
+    return (repeat each x.element)
+  }
+}
+
+// CHECK: sil{{.*}} @$s4main23testFancyTuple_concreteyyF :
+//   Create a pack to receive the results from makeTuple.
+// CHECK:      [[PACK:%.*]] = alloc_pack $Pack{Int, String, Bool}
+// CHECK-NEXT: [[INT_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT: [[INT_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[INT_ADDR]] : $*Int into [[INT_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK-NEXT: [[STRING_ADDR:%.*]] = alloc_stack $String
+// CHECK-NEXT: [[STRING_INDEX:%.*]] = scalar_pack_index 1 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[STRING_ADDR]] : $*String into [[STRING_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK-NEXT: [[BOOL_ADDR:%.*]] = alloc_stack $Bool
+// CHECK-NEXT: [[BOOL_INDEX:%.*]] = scalar_pack_index 2 of $Pack{Int, String, Bool}
+// CHECK-NEXT: pack_element_set [[BOOL_ADDR]] : $*Bool into [[BOOL_INDEX]] of [[PACK]] : $*Pack{Int, String, Bool}
+// CHECK:      [[FN:%.*]] = function_ref @$s4main10FancyTupleV04makeC0xxQp_tyF
+// CHECK-NEXT: apply [[FN]]<Pack{Int, String, Bool}>([[PACK]], {{.*}})
+func testFancyTuple_concrete() {
+  FancyTuple<Int, String, Bool>(x: (1, "hi", false)).makeTuple()
+}
+
+func testFancyTuple_pack<each T>(values: repeat each T) {
+  FancyTuple<Int, String, repeat each T, Bool>(x: (1, "hi", repeat each values, false)).makeTuple()
+}
