@@ -3176,7 +3176,13 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
 }
 
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
-  return false;
+  auto &attrs = decl->getAttrs();
+  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
+    if (auto *specialize = dyn_cast<SpecializeAttr>(attr)) {
+      return !specialize->getTypeErasedParams().empty();
+    }
+    return false;
+  });
 }
 
 static bool usesFeatureLayoutStringValueWitnesses(Decl *decl) {
