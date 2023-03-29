@@ -440,17 +440,10 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
-          auto ty = reqt.getTypeParameter().subst(archetype->getSubstitutions())
-                        ->getReducedType(opaqueDecl->getGenericSignature());
-          if (reqt.isAnyWitnessTable()) {
-            auto ref =
-                ProtocolConformanceRef(reqt.getProtocol())
-                    .subst(reqt.getTypeParameter(), archetype->getSubstitutions());
-            args.push_back(emitWitnessTableRef(IGF, ty, ref));
-          } else {
-            assert(reqt.isAnyMetadata());
-            args.push_back(IGF.emitAbstractTypeMetadataRef(ty));
-          }
+          auto arg = emitGenericRequirementFromSubstitutions(
+              IGF, reqt, MetadataState::Abstract,
+              archetype->getSubstitutions());
+          args.push_back(arg);
           types.push_back(args.back()->getType());
         });
     auto bufTy = llvm::StructType::get(IGF.IGM.getLLVMContext(), types);

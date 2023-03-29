@@ -74,7 +74,7 @@ struct GenericArguments {
 
     for (auto requirement : requirements.getRequirements()) {
       Values.push_back(emitGenericRequirementFromSubstitutions(
-          IGF, requirement, subs, MetadataState::Abstract));
+          IGF, requirement, MetadataState::Abstract, subs));
     }
 
     collectTypes(IGF.IGM, requirements);

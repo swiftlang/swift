@@ -2318,11 +2318,10 @@ namespace {
             bindFromGenericRequirementsBuffer(
                 IGF, requirements,
                 Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
-                MetadataState::Complete, [&](CanType t) {
-                  return genericEnv ? genericEnv->mapTypeIntoContext(t)
-                                          ->getCanonicalType()
-                                    : t;
-                });
+                MetadataState::Complete,
+                (genericEnv
+                 ? genericEnv->getForwardingSubstitutionMap()
+                 : SubstitutionMap()));
           }
 
           SmallVector<llvm::BasicBlock *, 4> conditionalTypes;
