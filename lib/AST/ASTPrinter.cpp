@@ -3143,6 +3143,24 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
+  ClangNode clangNode = decl->getClangNode();
+  if (!clangNode)
+    return false;
+
+  const clang::Decl *clangDecl = clangNode.getAsDecl();
+  if (!clangDecl)
+    return false;
+
+  if (auto objCInterfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+    return !objCInterfaceDecl->hasDefinition();
+
+  if (auto objCProtocolDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl))
+    return !objCProtocolDecl->hasDefinition();
+
+  return false;
+}
+
 static bool usesFeatureImplicitSome(Decl *decl) {
   return false;
 }
