@@ -112,7 +112,43 @@ import PrivateDep
 // RUN: %target-swift-frontend -typecheck %t/TestableClientOfNonPublic.swift -I %t \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP %s
 
+/// In the case of a testable of a module reexporting another Swift module,
+/// only non-public transitive dependencies from the first module are required.
+/// Non-public imports from the reexported modules are not loaded, we could
+/// revisit this if desired.
+// RUN: %target-swift-frontend -emit-module %t/Exporter.swift -o %t -I %t \
+// RUN:   -enable-library-evolution -enable-testing \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -typecheck %t/ExporterClient.swift -I %t \
+// RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefixes=CHECK-EXPORTER,HIDDEN-DEP %s
+// CHECK-EXPORTER: 'InternalDep' has an ignored transitive dependency on 'HiddenDep'
+
+//--- Exporter.swift
+@_exported import InternalDep
+
+//--- ExporterClient.swift
+@testable import Exporter
+
 /// Fail if the transitive dependency is missing.
 // RUN: rm %t/HiddenDep.swiftmodule
 // RUN: %target-swift-frontend -typecheck %t/TestableClientOfNonPublic.swift -I %t \
 // RUN:   -verify -show-diagnostics-after-fatal
+
+/// In a multi-file scenario, we try and fail to load the transitive dependency
+/// only for @testable imports, not regular imports.
+// RUN: %target-swift-frontend -typecheck -I %t \
+// RUN:   %t/TestableClientOfNonPublic_FileA.swift \
+// RUN:   %t/TestableClientOfNonPublic_FileB.swift \
+// RUN:   -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -typecheck -wmo -I %t \
+// RUN:   %t/TestableClientOfNonPublic_FileA.swift \
+// RUN:   %t/TestableClientOfNonPublic_FileB.swift \
+// RUN:   -verify -show-diagnostics-after-fatal
+
+//--- TestableClientOfNonPublic_FileA.swift
+import InternalDep
+@testable import FileprivateDep // expected-error {{missing required module 'HiddenDep'}}
+
+//--- TestableClientOfNonPublic_FileB.swift
+@testable import InternalDep // expected-error {{missing required module 'HiddenDep'}}
+import FileprivateDep
