@@ -4320,15 +4320,19 @@ void AttributeChecker::checkBackDeployedAttrs(
     // Unavailable decls cannot be back deployed.
     if (auto unavailableAttrPair = VD->getSemanticUnavailableAttr()) {
       auto unavailableAttr = unavailableAttrPair.value().first;
-      DeclName name;
-      unsigned accessorKind;
-      std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
-      diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
-               accessorKind, name, prettyPlatformString(Platform));
-      diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
-               accessorKind, name)
-          .highlight(unavailableAttr->getRange());
-      continue;
+
+      if (unavailableAttr->Platform == PlatformKind::none ||
+          unavailableAttr->Platform == Attr->Platform) {
+        DeclName name;
+        unsigned accessorKind;
+        std::tie(accessorKind, name) = getAccessorKindAndNameForDiagnostics(VD);
+        diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
+                 accessorKind, name, prettyPlatformString(Platform));
+        diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
+                 accessorKind, name)
+            .highlight(unavailableAttr->getRange());
+        continue;
+      }
     }
 
     // Verify that the decl is available before the back deployment boundary.
