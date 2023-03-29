@@ -1479,10 +1479,9 @@ void SerializedASTFile::loadDependenciesForTestable(SourceLoc diagLoc) const {
     File.loadDependenciesForFileContext(this, diagLoc, /*forTestable=*/true);
 
   if (status != serialization::Status::Valid) {
-    if (diagLoc)
-      serialization::diagnoseSerializedASTLoadFailureTransitive(
-          getASTContext(), diagLoc, status, &File,
-          getParentModule()->getName(), /*forTestable*/true);
+    serialization::diagnoseSerializedASTLoadFailureTransitive(
+        getASTContext(), diagLoc, status, &File,
+        getParentModule()->getName(), /*forTestable*/true);
   }
 }
 
