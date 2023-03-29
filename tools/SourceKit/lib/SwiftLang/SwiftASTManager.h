@@ -95,6 +95,7 @@ namespace swift {
   class CompilerInstance;
   class CompilerInvocation;
   class DiagnosticEngine;
+  class PluginRegistry;
   class SourceFile;
   class SourceManager;
 }
@@ -235,6 +236,7 @@ public:
                            std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
                            std::shared_ptr<RequestTracker> ReqTracker,
+                           std::shared_ptr<swift::PluginRegistry> Plugins,
                            StringRef SwiftExecutablePath,
                            StringRef RuntimeResourcePath,
                            StringRef DiagnosticDocumentationPath);

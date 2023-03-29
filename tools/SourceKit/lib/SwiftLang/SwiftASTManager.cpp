@@ -553,10 +553,12 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
       std::shared_ptr<SwiftStatistics> Stats,
-      std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+      std::shared_ptr<RequestTracker> ReqTracker,
+      std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
       StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        ReqTracker(ReqTracker), SwiftExecutablePath(SwiftExecutablePath),
+        ReqTracker(ReqTracker), Plugins(Plugins),
+        SwiftExecutablePath(SwiftExecutablePath),
         RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
@@ -566,6 +568,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
   std::shared_ptr<RequestTracker> ReqTracker;
+  std::shared_ptr<PluginRegistry> Plugins;
   /// The path of the swift-frontend executable.
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
@@ -638,9 +641,10 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
     std::shared_ptr<SwiftStatistics> Stats,
-    std::shared_ptr<RequestTracker> ReqTracker, StringRef SwiftExecutablePath,
+    std::shared_ptr<RequestTracker> ReqTracker,
+    std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
     StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
-    : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker,
+    : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker, Plugins,
                                SwiftExecutablePath, RuntimeResourcePath,
                                DiagnosticDocumentationPath)) {}
 
@@ -1073,6 +1077,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     }
     return nullptr;
   }
+  CompIns.getASTContext().setPluginRegistry(ASTManager->Impl.Plugins.get());
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {

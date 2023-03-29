@@ -1503,6 +1503,8 @@ public:
   /// This should be called before any plugin is loaded.
   void setPluginRegistry(PluginRegistry *newValue);
 
+  const llvm::StringSet<> &getLoadedPluginLibraryPaths() const;
+
 private:
   friend Decl;
 

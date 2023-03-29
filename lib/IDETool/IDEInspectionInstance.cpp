@@ -482,6 +482,7 @@ void IDEInspectionInstance::performNewOperation(
           InstanceSetupError));
       return;
     }
+    CI->getASTContext().setPluginRegistry(Plugins.get());
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 

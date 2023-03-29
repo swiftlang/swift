@@ -35,6 +35,7 @@ namespace swift {
 class CompilerInstance;
 class CompilerInvocation;
 class DiagnosticConsumer;
+class PluginRegistry;
 
 namespace ide {
 
@@ -95,6 +96,8 @@ class IDEInspectionInstance {
   } Opts;
 
   std::mutex mtx;
+
+  std::shared_ptr<PluginRegistry> Plugins;
 
   std::shared_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
@@ -167,7 +170,8 @@ class IDEInspectionInstance {
           Callback);
 
 public:
-  IDEInspectionInstance() : CachedCIShouldBeInvalidated(false) {}
+  IDEInspectionInstance(std::shared_ptr<PluginRegistry> Plugins = nullptr)
+      : Plugins(Plugins), CachedCIShouldBeInvalidated(false) {}
 
   // Mark the cached compiler instance "should be invalidated". In the next
   // completion, new compiler instance will be used. (Thread safe.)

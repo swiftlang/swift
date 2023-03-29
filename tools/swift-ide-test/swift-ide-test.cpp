@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -1188,7 +1189,8 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance IDEInspectionInst;
+        IDEInspectionInstance IDEInspectionInst(
+            std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         IDEInspectionInst.typeContextInfo(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1260,7 +1262,8 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance IDEInspectionInst;
+        IDEInspectionInstance IDEInspectionInst(
+            std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         IDEInspectionInst.conformingMethodList(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1410,7 +1413,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance Inst;
+        IDEInspectionInstance Inst(std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1504,7 +1507,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   auto FileSystem = llvm::vfs::getRealFileSystem();
 
-  IDEInspectionInstance IDEInspectionInst;
+  IDEInspectionInstance IDEInspectionInst(std::make_shared<PluginRegistry>());
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty())
