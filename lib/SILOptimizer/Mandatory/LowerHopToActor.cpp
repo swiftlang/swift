@@ -15,6 +15,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/ScopedHashTable.h"
 
@@ -49,6 +50,7 @@ namespace {
 class LowerHopToActor {
   SILFunction *F;
   DominanceInfo *Dominance;
+  SILOptFunctionBuilder &functionBuilder;
 
   /// A map from an actor value to the executor we've derived for it.
   llvm::ScopedHashTable<SILValue, SILValue> ExecutorForActor;
@@ -56,12 +58,18 @@ class LowerHopToActor {
   bool processHop(HopToExecutorInst *hop);
   bool processExtract(ExtractExecutorInst *extract);
 
-  SILValue emitGetExecutor(SILBuilderWithScope &B, SILLocation loc,
+  SILValue emitGetExecutor(SILBuilderWithScope &B,
+                           SILLocation loc,
                            SILValue actor, bool makeOptional);
 
 public:
-  LowerHopToActor(SILFunction *f, DominanceInfo *dominance)
-    : F(f), Dominance(dominance) { }
+  LowerHopToActor(SILFunction *f,
+                  SILOptFunctionBuilder &FunctionBuilder,
+                  DominanceInfo *dominance)
+    : F(f),
+      Dominance(dominance),
+      functionBuilder(FunctionBuilder)
+      { }
 
   /// The entry point to the transformation.
   bool run();
@@ -154,28 +162,6 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
   return nullptr;
 }
 
-static AccessorDecl *getUnwrapLocalUnownedExecutorGetter(ASTContext &ctx,
-                                              ProtocolDecl *actorProtocol) {
-  for (auto member: actorProtocol->getAllMembers()) { // FIXME: remove this, just go to the extension
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor)
-        return var->getAccessor(AccessorKind::Get);
-    }
-  }
-
-  for (auto extension: actorProtocol->getExtensions()) {
-    for (auto member: extension->getAllMembers()) {
-      if (auto var = dyn_cast<VarDecl>(member)) {
-        if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor) {
-          return var->getAccessor(AccessorKind::Get);
-        }
-      }
-    }
-  }
-
-  return nullptr;
-}
-
 SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
                                           SILLocation loc, SILValue actor,
                                           bool makeOptional) {
@@ -212,7 +198,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
   } else if (actorType->isDistributedActor()) {
     auto actorKind = KnownProtocolKind::DistributedActor;
     auto actorProtocol = ctx.getProtocol(actorKind);
-    auto req = getUnwrapLocalUnownedExecutorGetter(ctx, actorProtocol);
+    auto req = ctx.getGetUnwrapLocalDistributedActorUnownedExecutor();
     assert(req && "Distributed library broken");
     SILDeclRef fn(req, SILDeclRef::Kind::Func);
 
@@ -222,12 +208,19 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
 
     auto subs = SubstitutionMap::get(req->getGenericSignature(),
                                      {actorType}, {actorConf});
-    auto fnType = F->getModule().Types.getConstantFunctionType(*F, fn);
 
-    auto witness =
-      B.createWitnessMethod(loc, actorType, actorConf, fn,
-                            SILType::getPrimitiveObjectType(fnType));
-    auto witnessCall = B.createApply(loc, witness, subs, {actor});
+    // Find the unwrap function
+    FuncDecl *funcDecl = ctx.getGetUnwrapLocalDistributedActorUnownedExecutor();
+    assert(funcDecl);
+    auto funcDeclRef = SILDeclRef(funcDecl, SILDeclRef::Kind::Func);
+
+    SILFunction *unwrapExecutorFun =
+        functionBuilder.getOrCreateFunction(
+            loc, funcDeclRef, ForDefinition_t::NotForDefinition);
+    assert(unwrapExecutorFun && "no sil function!");
+    auto funcRef =
+        B.createFunctionRef(loc, unwrapExecutorFun);
+    auto witnessCall = B.createApply(loc, funcRef, subs, {actor});
 
     // The protocol requirement returns an Optional<UnownedSerialExecutor>;
     // extract the Builtin.Executor from it.
@@ -286,7 +279,8 @@ class LowerHopToActorPass : public SILFunctionTransform {
   void run() override {
     auto fn = getFunction();
     auto domTree = getAnalysis<DominanceAnalysis>()->get(fn);
-    LowerHopToActor pass(getFunction(), domTree);
+    auto functionBuilder = SILOptFunctionBuilder(*this);
+    LowerHopToActor pass(getFunction(), functionBuilder, domTree);
     if (pass.run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
