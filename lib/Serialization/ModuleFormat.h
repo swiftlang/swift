@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 756; // build complexEquality executor builtin
+const uint16_t SWIFTMODULE_VERSION_MINOR = 757; // expanded macro definitions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1726,6 +1726,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCVBR<5>,    // number of parameter name components
     BCVBR<3>,    // builtin macro definition ID
+    BCFixed<1>,  // whether it has an expanded macro definition
     IdentifierIDField, // external module name, for external macros
     IdentifierIDField,  // external type name, for external macros
     BCArray<IdentifierIDField> // name components,
@@ -1733,6 +1734,22 @@ namespace decls_block {
     // The record is trailed by:
     // - its generic parameters, if any
     // - parameter list, if present
+    // - expanded macro definition, if needed.
+  >;
+
+  /// The expanded macro definition text.
+  using ExpandedMacroDefinitionLayout = BCRecordLayout<
+    EXPANDED_MACRO_DEFINITION,
+    BCFixed<1>, // whether it has replacements
+    BCBlob // expansion text
+    // potentially trailed by the expanded macro replacements
+  >;
+
+  /// The replacements to be performed for an expanded macro definition.
+  using ExpandedMacroReplacementsLayout = BCRecordLayout<
+    EXPANDED_MACRO_REPLACEMENTS,
+    BCArray<BCVBR<6>> // a set of replacement triples (start offset,
+                      // end offset, parameter index)
   >;
 
   using InlinableBodyTextLayout = BCRecordLayout<

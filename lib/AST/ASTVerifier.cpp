@@ -769,6 +769,7 @@ public:
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
     FUNCTION_LIKE(SubscriptDecl)
+    FUNCTION_LIKE(MacroDecl)
     TYPE_LIKE(NominalTypeDecl)
     TYPE_LIKE(ExtensionDecl)
 
