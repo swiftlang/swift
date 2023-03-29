@@ -423,10 +423,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto def = MD->definition) {
-      if (auto newDef = doIt(def))
-        MD->definition = newDef;
-      else
-        return true;
+      // Don't walk into unchecked definitions.
+      if (auto expansion = dyn_cast<MacroExpansionExpr>(def)) {
+        if (!expansion->getType().isNull()) {
+          if (auto newDef = doIt(def))
+            MD->definition = newDef;
+          else
+            return true;
+        }
+      }
     }
 
     // Visit trailing requirements
