@@ -9,8 +9,8 @@
 #
 # For documentation and usage, see http://www.unicode.org/reports/tr51
 #
-# Format: 
-# <codepoint(s)> ; <property> # <comments> 
+# Format:
+# <codepoint(s)> ; <property> # <comments>
 # Note: there is no guarantee as to the structure of whitespace or comments
 #
 # Characters and sequences are listed in code point order. Users should be shown a more natural order.
@@ -19,7 +19,7 @@
 
 # ================================================
 
-# All omitted code points have Emoji=No 
+# All omitted code points have Emoji=No
 # @missing: 0000..10FFFF  ; Emoji ; No
 
 0023          ; Emoji                # E0.0   [1] (#️)       hash sign
@@ -421,7 +421,7 @@
 
 # ================================================
 
-# All omitted code points have Emoji_Presentation=No 
+# All omitted code points have Emoji_Presentation=No
 # @missing: 0000..10FFFF  ; Emoji_Presentation ; No
 
 231A..231B    ; Emoji_Presentation   # E0.6   [2] (⌚..⌛)    watch..hourglass done
@@ -701,7 +701,7 @@
 
 # ================================================
 
-# All omitted code points have Emoji_Modifier=No 
+# All omitted code points have Emoji_Modifier=No
 # @missing: 0000..10FFFF  ; Emoji_Modifier ; No
 
 1F3FB..1F3FF  ; Emoji_Modifier       # E1.0   [5] (🏻..🏿)    light skin tone..dark skin tone
@@ -710,7 +710,7 @@
 
 # ================================================
 
-# All omitted code points have Emoji_Modifier_Base=No 
+# All omitted code points have Emoji_Modifier_Base=No
 # @missing: 0000..10FFFF  ; Emoji_Modifier_Base ; No
 
 261D          ; Emoji_Modifier_Base  # E0.6   [1] (☝️)       index pointing up
@@ -767,7 +767,7 @@
 
 # ================================================
 
-# All omitted code points have Emoji_Component=No 
+# All omitted code points have Emoji_Component=No
 # @missing: 0000..10FFFF  ; Emoji_Component ; No
 
 0023          ; Emoji_Component      # E0.0   [1] (#️)       hash sign
@@ -785,7 +785,7 @@ E0020..E007F  ; Emoji_Component      # E0.0  [96] (󠀠..󠁿)      tag space..c
 
 # ================================================
 
-# All omitted code points have Extended_Pictographic=No 
+# All omitted code points have Extended_Pictographic=No
 # @missing: 0000..10FFFF  ; Extended_Pictographic ; No
 
 00A9          ; Extended_Pictographic# E0.6   [1] (©️)       copyright
