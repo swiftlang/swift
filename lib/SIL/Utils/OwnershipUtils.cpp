@@ -97,7 +97,7 @@ bool swift::hasPointerEscape(SILValue original) {
       return true;
     });
   }
-  while (auto value = worklist.popAndForget()) {
+  while (auto value = worklist.pop()) {
     for (auto use : value->getUses()) {
       switch (use->getOperandOwnership()) {
       case OperandOwnership::PointerEscape:
