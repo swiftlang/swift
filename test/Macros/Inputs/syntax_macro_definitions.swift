@@ -316,6 +316,51 @@ public struct WarningMacro: ExpressionMacro {
   }
 }
 
+public struct ErrorMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = macro.argumentList.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(messageString)? = stringLiteral.segments.first
+      else {
+        let errorNode: Syntax
+          if let firstElement = macro.argumentList.first {
+          errorNode = Syntax(firstElement)
+        } else {
+          errorNode = Syntax(macro)
+        }
+
+        let messageID = MessageID(domain: "silly", id: "error")
+        let diag = Diagnostic(
+          node: errorNode,
+          message: SimpleDiagnosticMessage(
+            message: "#myError macro requires a string literal",
+            diagnosticID: messageID,
+            severity: .error
+          )
+        )
+
+       throw DiagnosticsError(diagnostics: [diag])
+     }
+
+     context.diagnose(
+       Diagnostic(
+         node: Syntax(macro),
+         message: SimpleDiagnosticMessage(
+           message: messageString.content.description,
+           diagnosticID: MessageID(domain: "test", id: "error"),
+           severity: .error
+         )
+       )
+     )
+
+     return "()"
+  }
+}
+
 public struct PropertyWrapperMacro {}
 
 extension PropertyWrapperMacro: AccessorMacro, Macro {
