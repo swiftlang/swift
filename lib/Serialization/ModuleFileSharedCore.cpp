@@ -1688,7 +1688,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           const Dependency &dependency,
                                           bool debuggerMode,
                                           bool isPartialModule,
-                                          StringRef packageName) const {
+                                          StringRef packageName,
+                                          bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
     // we load all transitive dependencies from partial modules and
@@ -1717,7 +1718,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Non-public imports are similar to implementation-only, the module
     // loading behavior differs on loading those dependencies
     // on testable imports.
-    if (isTestable() || !moduleIsResilient) {
+    if (forTestable || !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
       return ModuleLoadingBehavior::Optional;
@@ -1730,6 +1731,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||
+        forTestable ||
         !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
