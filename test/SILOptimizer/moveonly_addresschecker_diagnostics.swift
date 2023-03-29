@@ -2467,3 +2467,18 @@ func borrowAndConsumeAtSameTimeTest(x: __owned NonTrivialStruct) { // expected-e
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
 }
+
+////////////////
+// Yield Test //
+////////////////
+
+func yieldTest() {  
+  // Make sure we do not crash on this.
+  @_moveOnly
+  struct S {
+    var c = CopyableKlass()
+    var c2: CopyableKlass {
+      _read { yield c }
+    }
+  }
+}

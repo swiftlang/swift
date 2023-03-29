@@ -1650,6 +1650,17 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     }
   }
 
+  if (auto *yi = dyn_cast<YieldInst>(user)) {
+    if (yi->getYieldInfoForOperand(*op).isGuaranteed()) {
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+  }
+
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
     if (pas->isOnStack()) {
       LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply!\n");
