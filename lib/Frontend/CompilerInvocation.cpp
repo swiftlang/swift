@@ -1366,8 +1366,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   // type seems to be NoneAction.
   if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::REPL &&
       FrontendOpts.RequestedAction != FrontendOptions::ActionType::NoneAction &&
-      (Args.hasArg(OPT_enable_import_objc_forward_declarations) ||
-       LangOpts.isSwiftVersionAtLeast(6))) {
+      LangOpts.hasFeature(Feature::ImportObjcForwardDeclarations)) {
     Opts.ImportForwardDeclarations = true;
   }
 

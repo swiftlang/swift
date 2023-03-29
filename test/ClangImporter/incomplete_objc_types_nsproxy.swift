@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %S/Inputs/custom-modules/IncompleteTypes/incomplete-nsproxy-library.m -c -o %t/incomplete-nsproxy-library.o
 
-// RUN: %target-build-swift -Xfrontend -enable-import-objc-forward-declarations -Xfrontend -enable-objc-interop -I %S/Inputs/custom-modules/IncompleteTypes %s %t/incomplete-nsproxy-library.o -Xlinker -framework -Xlinker Foundation -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend ImportObjcForwardDeclarations -Xfrontend -enable-objc-interop -I %S/Inputs/custom-modules/IncompleteTypes %s %t/incomplete-nsproxy-library.o -Xlinker -framework -Xlinker Foundation -o %t/a.out
 // RUN: %target-run %t/a.out
 
 // RUN: %target-build-swift -swift-version 6 -Xfrontend -enable-objc-interop -I %S/Inputs/custom-modules/IncompleteTypes %s %t/incomplete-nsproxy-library.o -Xlinker -framework -Xlinker Foundation -o %t/a.out
