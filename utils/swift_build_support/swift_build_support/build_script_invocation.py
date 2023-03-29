@@ -386,6 +386,13 @@ class BuildScriptInvocation(object):
         if args.maccatalyst_ios_tests:
             impl_args += ["--darwin-test-maccatalyst-ios-like=1"]
 
+        # Provide a fixed backtracer path, if required
+        if args.swift_runtime_fixed_backtracer_path is not None:
+            impl_args += [
+                '--swift-runtime-fixed-backtracer-path=%s' %
+                args.swift_runtime_fixed_backtracer_path
+            ]
+
         # If we have extra_cmake_options, combine all of them together and then
         # add them as one command.
         if args.extra_cmake_options:

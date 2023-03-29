@@ -166,12 +166,25 @@ static_assert((SWIFT_BACKTRACE_ENVIRONMENT_SIZE % SWIFT_PAGE_SIZE) == 0,
 
 #if _WIN32
 #pragma section(SWIFT_BACKTRACE_SECTION, read, write)
+
+#if defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+const WCHAR swiftBacktracePath[] = L"" SWIFT_RUNTIME_FIXED_BACKTRACER_PATH;
+#else
 __declspec(allocate(SWIFT_BACKTRACE_SECTION)) WCHAR swiftBacktracePath[SWIFT_BACKTRACE_BUFFER_SIZE];
+#endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+
 __declspec(allocate(SWIFT_BACKTRACE_SECTION)) CHAR swiftBacktraceEnv[SWIFT_BACKTRACE_ENVIRONMENT_SIZE];
+
 #elif defined(__linux__) || TARGET_OS_OSX
+
+#if defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+const char swiftBacktracePath[] = SWIFT_RUNTIME_FIXED_BACKTRACER_PATH;
+#else
 char swiftBacktracePath[SWIFT_BACKTRACE_BUFFER_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_PAGE_SIZE)));
+#endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH
+
 char swiftBacktraceEnv[SWIFT_BACKTRACE_ENVIRONMENT_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_PAGE_SIZE)));
-#endif
+#endif // defined(__linux__) || TARGET_OS_OSX
 
 void _swift_backtraceSetupEnvironment();
 
@@ -314,6 +327,7 @@ BacktraceInitializer::BacktraceInitializer() {
       _swift_backtraceSettings.preset = Preset::Full;
   }
 
+#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   if (_swift_backtraceSettings.enabled == OnOffTty::On
       && !_swift_backtraceSettings.swiftBacktracePath) {
     _swift_backtraceSettings.swiftBacktracePath
@@ -327,6 +341,7 @@ BacktraceInitializer::BacktraceInitializer() {
       _swift_backtraceSettings.enabled = OnOffTty::Off;
     }
   }
+#endif
 
   if (_swift_backtraceSettings.enabled == OnOffTty::On) {
     // Copy the path to swift-backtrace into swiftBacktracePath, then write
@@ -339,6 +354,7 @@ BacktraceInitializer::BacktraceInitializer() {
     if (_swift_backtraceSettings.algorithm == UnwindAlgorithm::Auto)
       _swift_backtraceSettings.algorithm = UnwindAlgorithm::Precise;
 
+#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
     int len = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                                     _swift_backtraceSettings.swiftBacktracePath, -1,
                                     swiftBacktracePath,
@@ -359,6 +375,7 @@ BacktraceInitializer::BacktraceInitializer() {
                      ::GetLastError());
       _swift_backtraceSettings.enabled = OnOffTty::Off;
     }
+#endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
 
     _swift_backtraceSetupEnvironment();
 
@@ -376,6 +393,7 @@ BacktraceInitializer::BacktraceInitializer() {
     if (_swift_backtraceSettings.algorithm == UnwindAlgorithm::Auto)
       _swift_backtraceSettings.algorithm = UnwindAlgorithm::Precise;
 
+#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
     size_t len = strlen(_swift_backtraceSettings.swiftBacktracePath);
     if (len > SWIFT_BACKTRACE_BUFFER_SIZE - 1) {
       swift::warning(0,
@@ -400,6 +418,7 @@ BacktraceInitializer::BacktraceInitializer() {
       }
 #endif // PROTECT_BACKTRACE_SETTINGS
     }
+#endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
 
     _swift_backtraceSetupEnvironment();
 
@@ -632,6 +651,7 @@ _swift_processBacktracingSetting(llvm::StringRef key,
                      "swift runtime: unknown output-to setting '%.*s'\n",
                      static_cast<int>(value.size()), value.data());
     }
+#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();
     char *path = (char *)std::malloc(len + 1);
@@ -640,6 +660,7 @@ _swift_processBacktracingSetting(llvm::StringRef key,
 
     std::free(const_cast<char *>(_swift_backtraceSettings.swiftBacktracePath));
     _swift_backtraceSettings.swiftBacktracePath = path;
+#endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else {
     swift::warning(0,
                    "swift runtime: unknown backtracing setting '%.*s'\n",
