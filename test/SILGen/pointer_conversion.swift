@@ -286,8 +286,7 @@ func functionInoutToPointer() {
 // CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion20inoutPointerOrderingyyF
 func inoutPointerOrdering() {
   // CHECK: [[ARRAY_BOX:%.*]] = alloc_box ${ var Array<Int> }
-  // CHECK: [[ARRAY_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ARRAY_BOX]]
-  // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_LIFETIME]] :
+  // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_BOX]] :
   // CHECK: store {{.*}} to [init] [[ARRAY]]
   var array = [Int]()
 

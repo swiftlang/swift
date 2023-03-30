@@ -386,6 +386,7 @@
 /// optimization that is used when two instances of `Dictionary` share
 /// buffer.
 @frozen
+@_eagerMove
 public struct Dictionary<Key: Hashable, Value> {
   /// The element type of a dictionary: a tuple containing an individual
   /// key-value pair.
