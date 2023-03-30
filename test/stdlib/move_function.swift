@@ -72,7 +72,7 @@ extension Class {
         do {
             x = self.array
         }
-        switch (consume x)[userHandle] {
+        switch (x)[userHandle] {
         case .foo:
             expectTrue(self.array._buffer.isUniquelyReferenced())
         }
@@ -91,8 +91,8 @@ tests.test("simpleArrayVarTest") {
     expectTrue(x._buffer.isUniquelyReferenced())
 
     var y = x
-    expectFalse(x._buffer.isUniquelyReferenced())
-    let _ = consume y
+    expectTrue(x._buffer.isUniquelyReferenced())
+    let _ = y
     expectTrue(x._buffer.isUniquelyReferenced())
     y = []
     expectTrue(x._buffer.isUniquelyReferenced())
@@ -101,8 +101,8 @@ tests.test("simpleArrayVarTest") {
 tests.test("simpleArrayInoutVarTest") {
     func inOutTest(_ x: inout [Enum]) {
         var y = x
-        expectFalse(x._buffer.isUniquelyReferenced())
-        let _ = consume y
+        expectTrue(x._buffer.isUniquelyReferenced())
+        let _ = y
         expectTrue(x._buffer.isUniquelyReferenced())
         y = []
         expectTrue(x._buffer.isUniquelyReferenced())

@@ -68,10 +68,10 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [lexical] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
+  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [[STR]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
@@ -509,7 +509,7 @@ struct LetDeclInStruct {
 func test_unassigned_let_constant() {
   let string : String
 }
-// CHECK: [[S:%[0-9]+]] = alloc_stack [lexical] $String, let, name "string"
+// CHECK: [[S:%[0-9]+]] = alloc_stack $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String

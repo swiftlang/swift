@@ -2758,16 +2758,16 @@ bool TypeConverter::visitAggregateLeaves(
                              packIndex);
         }
       } else if (auto tupleTy = ty->getAs<TupleType>()) {
-        for (unsigned tupleIndex = 0, num = tupleTy->getNumElements();
-             tupleIndex < num; ++tupleIndex) {
-          auto origElementTy = origTy.getTupleElementType(tupleIndex);
-          auto substElementTy =
-              tupleTy->getElementType(tupleIndex)->getCanonicalType();
-          substElementTy =
-              computeLoweredRValueType(context, origElementTy, substElementTy);
-          insertIntoWorklist(substElementTy, origElementTy, nullptr,
-                             tupleIndex);
-        }
+        unsigned tupleIndex = 0;
+        origTy.forEachExpandedTupleElement(
+            CanTupleType(tupleTy),
+            [&](auto origElementTy, auto substElementTy, auto element) {
+              substElementTy =
+                  substOpaqueTypesWithUnderlyingTypes(substElementTy, context);
+              insertIntoWorklist(substElementTy, origElementTy, nullptr,
+                                 tupleIndex);
+              ++tupleIndex;
+            });
       } else if (auto *decl = ty->getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap(&M, decl);
