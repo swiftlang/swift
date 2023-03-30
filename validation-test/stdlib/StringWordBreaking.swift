@@ -29,7 +29,7 @@ let StringWordBreaking = TestSuite("StringWordBreaking")
 // }
 
 extension String {
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlib 5.9, *)
   var _words: [String] {
     var result: [String] = []
 
@@ -48,7 +48,7 @@ extension String {
     return result
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlib 5.9, *)
   var _wordsBackwards: [String] {
     var result: [String] = []
 
@@ -68,7 +68,7 @@ extension String {
   }
 }
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 5.9, *) {
   StringWordBreaking.test("word breaking") {
     for wordBreakTest in wordBreakTests {
       expectEqual(
@@ -135,7 +135,7 @@ func getUTF16Array(from string: String) -> [UInt16] {
   return result
 }
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 5.9, *) {
   StringWordBreaking.test("word breaking foreign") {
     for wordBreakTest in wordBreakTests {
       let foreignTest = NonContiguousNSString(
