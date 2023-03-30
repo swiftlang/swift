@@ -10326,6 +10326,15 @@ Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   return def.getBuiltinKind();
 }
 
+MacroDefinition MacroDefinition::forExpanded(
+    ASTContext &ctx,
+    StringRef expansionText,
+    ArrayRef<ExpandedMacroReplacement> replacements
+) {
+  return ExpandedMacroDefinition{ctx.AllocateCopy(expansionText),
+                                 ctx.AllocateCopy(replacements)};
+}
+
 MacroExpansionDecl::MacroExpansionDecl(
     DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
     DeclNameLoc macroLoc, SourceLoc leftAngleLoc,

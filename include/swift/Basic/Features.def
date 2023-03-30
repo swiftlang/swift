@@ -94,11 +94,11 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors", true)
-LANGUAGE_FEATURE(Macros, 0, "Macros", true)
+LANGUAGE_FEATURE(Macros, 0, "Macros", hasSwiftSwiftParser)
 SUPPRESSIBLE_LANGUAGE_FEATURE(
     FreestandingExpressionMacros, 382, "Expression macros",
-    true)
-LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", true)
+        hasSwiftSwiftParser)
+LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
