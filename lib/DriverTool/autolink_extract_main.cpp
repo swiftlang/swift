@@ -243,16 +243,50 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   std::vector<std::string> LinkerFlags;
 
   // Keep track of whether we've already added the common
-  // Swift libraries that ususally have autolink directives
-  // in most object fiels
-  std::unordered_map<std::string, bool> SwiftRuntimeLibraries = {
-      {"-lswiftSwiftOnoneSupport", false},
-      {"-lswiftCore", false},
-      {"-lswift_Concurrency", false},
-      {"-lswift_StringProcessing", false},
-      {"-lswift_RegexParser", false},
-      {"-lswift_Backtracing", false},
+  // Swift libraries that usually have autolink directives
+  // in most object files
+
+  std::vector<std::string> SwiftRuntimeLibsOrdered = {
+      // Common Swift runtime libs
+      "-lswiftSwiftOnoneSupport",
+      "-lswiftCore",
+      "-lswift_Concurrency",
+      "-lswift_StringProcessing",
+      "-lswift_RegexBuilder",
+      "-lswift_RegexParser",
+      "-lswift_Backtracing",
+      "-lswiftGlibc",
+      "-lBlocksRuntime",
+      // Dispatch-specific Swift runtime libs
+      "-ldispatch",
+      "-lDispatchStubs",
+      "-lswiftDispatch",
+      // CoreFoundation and Foundation Swift runtime libs
+      "-lCoreFoundation",
+      "-lFoundation",
+      "-lFoundationNetworking",
+      "-lFoundationXML",
+      // Foundation support libs
+      "-lcurl",
+      "-lxml2",
+      "-luuid",
+      // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
+      "-lXCTest",
+      // ICU Swift runtime libs
+      "-licui18nswift",
+      "-licuucswift",
+      "-licudataswift",
+      // Common-use ordering-agnostic Linux system libs
+      "-lm",
+      "-lpthread",
+      "-lutil",
+      "-ldl",
+      "-lz",
   };
+  std::unordered_map<std::string, bool> SwiftRuntimeLibraries;
+  for (const auto &RuntimeLib : SwiftRuntimeLibsOrdered) {
+    SwiftRuntimeLibraries[RuntimeLib] = false;
+  }
 
   // Extract the linker flags from the objects.
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
@@ -289,9 +323,11 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
     OutOS << Flag << '\n';
   }
 
-  for (const auto &RuntimeLib : SwiftRuntimeLibraries) {
-    if (RuntimeLib.second)
-      OutOS << RuntimeLib.first << '\n';
+  for (const auto &RuntimeLib : SwiftRuntimeLibsOrdered) {
+    auto entry = SwiftRuntimeLibraries.find(RuntimeLib);
+    if (entry != SwiftRuntimeLibraries.end() && entry->second) {
+      OutOS << entry->first << '\n';
+    }
   }
 
 
