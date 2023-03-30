@@ -374,11 +374,13 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
 
   // The Builtin module cannot be explicitly imported unless:
   // 1. We're in a .sil file
-  // 2. '-enable-builtin-module' was passed.
+  // 2. '-enable-builtin-module'/'-enable-experimental-feature BuiltinModule'
+  //    was passed.
   //
   // FIXME: Eventually, it would be nice to separate '-parse-stdlib' from
   // implicitly importing Builtin, but we're not there yet.
-  if (SF.Kind == SourceFileKind::SIL || ctx.LangOpts.EnableBuiltinModule) {
+  if (SF.Kind == SourceFileKind::SIL ||
+      ctx.LangOpts.hasFeature(Feature::BuiltinModule)) {
     if (moduleID.Item == ctx.TheBuiltinModule->getName()) {
       return ctx.TheBuiltinModule;
     }
