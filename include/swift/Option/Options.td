@@ -501,6 +501,10 @@ def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
+def library_level_EQ : Joined<["-"], "library-level=">,
+  MetaVarName<"<level>">,
+  Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
+  Alias<library_level>;
 
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
