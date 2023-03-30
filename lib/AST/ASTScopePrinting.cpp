@@ -182,6 +182,10 @@ void MacroDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
+void MacroExpansionDeclScope::printSpecifics(llvm::raw_ostream &out) const {
+  out << decl->getMacroName();
+}
+
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
   sec.getPattern()->print(out);
