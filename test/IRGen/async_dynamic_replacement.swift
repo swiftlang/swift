@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
 
-// Windows does not do swiftailcc
-// XFAIL: OS=windows-msvc
-
 // REQUIRES: concurrency
 
 public dynamic func number() async -> Int {
