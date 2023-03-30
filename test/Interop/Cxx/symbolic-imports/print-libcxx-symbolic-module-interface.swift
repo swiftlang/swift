@@ -15,7 +15,7 @@
 // STRING: typealias string = std.__1.basic_string
 
 // VECTOR: struct vector {
-// VECTOR: mutating func push_back()
+// VECTOR: mutating func push_back(_ __x: Any)
 // VECTOR: }
 
 // MAP: struct map {
