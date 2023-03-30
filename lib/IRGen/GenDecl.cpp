@@ -490,15 +490,13 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     if (!getSwiftModule()->getName().is("Cxx"))
       this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
 
-    // Only link with std on platforms where the overlay is available.
-    // Do not try to link std with itself.
+    // Only link with CxxStdlib on platforms where the overlay is available.
+    // Do not try to link CxxStdlib with itself.
     if ((target.isOSDarwin() || (target.isOSLinux() && !target.isAndroid())) &&
         !getSwiftModule()->getName().is("Cxx") &&
         !getSwiftModule()->getName().is("CxxStdlib") &&
         !getSwiftModule()->getName().is("std")) {
       this->addLinkLibrary(LinkLibrary("swiftCxxStdlib", LibraryKind::Library));
-      if (target.isOSDarwin())
-        this->addLinkLibrary(LinkLibrary("swiftstd", LibraryKind::Library));
     }
   }
 
