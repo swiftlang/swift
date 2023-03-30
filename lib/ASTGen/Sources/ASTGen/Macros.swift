@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CASTBridging
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftParser
@@ -155,14 +156,246 @@ func allocateUTF8String(
   }
 }
 
-/// Diagnostic message used for thrown errors.
-fileprivate struct ThrownErrorDiagnostic: DiagnosticMessage {
-  let message: String
+/// Diagnostics produced here.
+enum ASTGenMacroDiagnostic: DiagnosticMessage, FixItMessage {
+  case thrownError(Error)
+  case oldStyleExternalMacro
+  case useExternalMacro
+  case unknownBuiltin(String)
+  case notStringLiteralArgument(String)
 
-  var severity: DiagnosticSeverity { .error }
+  var message: String {
+    switch self {
+    case .thrownError(let error):
+      return String(describing: error)
+
+    case .oldStyleExternalMacro:
+      return "external macro definitions are now written using #externalMacro"
+
+    case .useExternalMacro:
+      return "use '#externalMacro'"
+
+    case .unknownBuiltin(let type):
+      return "ignoring definition of unknown builtin macro \(type)"
+
+    case .notStringLiteralArgument(let kind):
+      return "argument to `#externalMacro` must be a string literal naming the external macro's \(kind)"
+    }
+  }
+
+  var severity: DiagnosticSeverity {
+    switch self {
+    case .thrownError, .notStringLiteralArgument:
+      return .error
+
+    case .oldStyleExternalMacro, .unknownBuiltin:
+      return .warning
+
+    case .useExternalMacro:
+      return .note
+    }
+  }
 
   var diagnosticID: MessageID {
-    .init(domain: "SwiftSyntaxMacros", id: "ThrownErrorDiagnostic")
+    .init(domain: "Swift", id: "\(self)")
+  }
+
+  var fixItID: MessageID { diagnosticID }
+}
+
+/// Treat the given expression as a string literal, which should contain a
+/// single identifier.
+fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
+  guard let stringLiteral = node.as(StringLiteralExprSyntax.self),
+        stringLiteral.segments.count == 1,
+        let segment = stringLiteral.segments.first,
+        case .stringSegment(let stringSegment) = segment else {
+    return nil
+  }
+
+  return stringSegment.content.text
+}
+
+/// Check a macro definition, producing a description of that macro definition
+/// for use in macro expansion.
+///
+/// When the resulting macro requires expansion, the result will come in
+/// two parts: 
+///
+/// - Returns: -1 on failure, BridgedMacroDefinitionKind on success. When the
+/// successful result is "expanded macro", `replacementsPtr` will point to a
+/// number of "replacements" to perform when expanding that macro. Each
+/// replacement is a textual replacement of use of a macro parameter with the
+/// source text of the corresponding argument, and is represented as a triple
+/// (start offset, end offset, parameter index): the [start offset, end offset)
+/// range in the macro expansion expression should be replaced with the
+/// argument matching the corresponding parameter.
+@_cdecl("swift_ASTGen_checkMacroDefinition")
+func checkMacroDefinition(
+    diagEnginePtr: UnsafeMutablePointer<UInt8>,
+    sourceFilePtr: UnsafeRawPointer,
+    macroLocationPtr: UnsafePointer<UInt8>,
+    externalMacroPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+    externalMacroLength: UnsafeMutablePointer<Int>,
+    replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
+    numReplacementsPtr: UnsafeMutablePointer<Int>
+) -> Int {
+  // Clear out the "out" parameters.
+  externalMacroPointer.pointee = nil
+  externalMacroLength.pointee = 0
+  replacementsPtr.pointee = nil
+  numReplacementsPtr.pointee = 0
+
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+
+  // Find the macro declaration.
+  guard let macroDecl = findSyntaxNodeInSourceFile(
+    sourceFilePtr: sourceFilePtr,
+    sourceLocationPtr: macroLocationPtr,
+    type: MacroDeclSyntax.self
+  ) else {
+    // FIXME: Produce an error
+    return -1
+  }
+
+  // Check the definition
+  do {
+    let definition = try macroDecl.checkDefinition()
+    switch definition {
+    case let .deprecatedExternal(node: node, module: module, type: type):
+      // Check for known builtins.
+      if module == "Builtin" {
+        switch type {
+        case "ExternalMacro":
+          return BridgedMacroDefinitionKind.builtinExternalMacro.rawValue
+
+        default:
+          // Warn about the unknown builtin.
+          let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+          srcMgr.insert(sourceFilePtr)
+          srcMgr.diagnose(
+            diagnostic: .init(
+              node: node,
+              message: ASTGenMacroDiagnostic.unknownBuiltin(type)
+            )
+          )
+
+          return -1
+        }
+      }
+
+      // Form the "ModuleName.TypeName" result string.
+      (externalMacroPointer.pointee, externalMacroLength.pointee) =
+        allocateUTF8String("\(module).\(type)", nullTerminated: true)
+
+      // Translate this into a use of #externalMacro.
+      let expansionSourceSyntax: ExprSyntax =
+        "#externalMacro(module: \(literal: module), type: \(literal: type))"
+
+      // Warn about the use of old-style external macro syntax here.
+      let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+      srcMgr.insert(sourceFilePtr)
+      srcMgr.diagnose(
+        diagnostic: .init(
+          node: node,
+          message: ASTGenMacroDiagnostic.oldStyleExternalMacro,
+          fixIts: [
+            FixIt(
+              message: ASTGenMacroDiagnostic.useExternalMacro,
+              changes: [
+                FixIt.Change.replace(
+                  oldNode: node,
+                  newNode: Syntax(expansionSourceSyntax)
+                )
+              ]
+            )
+          ]
+        )
+      )
+      return BridgedMacroDefinitionKind.externalMacro.rawValue
+
+    case let .expansion(expansionSyntax, replacements: _)
+        where expansionSyntax.macro.text == "externalMacro":
+      // Extract the identifier from the "module" argument.
+      guard let firstArg = expansionSyntax.argumentList.first,
+            let firstArgLabel = firstArg.label?.text,
+            firstArgLabel == "module",
+            let module = identifierFromStringLiteral(firstArg.expression) else {
+        let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+        srcMgr.insert(sourceFilePtr)
+        srcMgr.diagnose(
+          diagnostic: .init(
+            node: Syntax(expansionSyntax),
+            message: ASTGenMacroDiagnostic.notStringLiteralArgument("module")
+          )
+        )
+        return -1
+      }
+
+      // Extract the identifier from the "type" argument.
+      guard let secondArg = expansionSyntax.argumentList.dropFirst().first,
+            let secondArgLabel = secondArg.label?.text,
+            secondArgLabel == "type",
+            let type = identifierFromStringLiteral(secondArg.expression) else {
+        let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+        srcMgr.insert(sourceFilePtr)
+        srcMgr.diagnose(
+          diagnostic: .init(
+            node: Syntax(expansionSyntax),
+            message: ASTGenMacroDiagnostic.notStringLiteralArgument("type")
+          )
+        )
+        return -1
+      }
+
+      // Form the "ModuleName.TypeName" result string.
+      (externalMacroPointer.pointee, externalMacroLength.pointee) =
+        allocateUTF8String("\(module).\(type)", nullTerminated: true)
+      return BridgedMacroDefinitionKind.externalMacro.rawValue
+
+    case let .expansion(expansionSyntax, replacements: replacements):
+      // Provide the expansion syntax.
+      (externalMacroPointer.pointee, externalMacroLength.pointee) =
+        allocateUTF8String(expansionSyntax.trimmedDescription,
+                           nullTerminated: true)
+
+
+      // If there are no replacements, we're done.
+      if replacements.isEmpty {
+        return BridgedMacroDefinitionKind.expandedMacro.rawValue
+      }
+
+      // The replacements are triples: (startOffset, endOffset, parameter index).
+      let replacementBuffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3 * replacements.count)
+      for (index, replacement) in replacements.enumerated() {
+        let expansionStart = expansionSyntax.positionAfterSkippingLeadingTrivia.utf8Offset
+
+        replacementBuffer[index * 3] = replacement.reference.positionAfterSkippingLeadingTrivia.utf8Offset - expansionStart
+        replacementBuffer[index * 3 + 1] = replacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
+        replacementBuffer[index * 3 + 2] = replacement.parameterIndex
+      }
+
+      replacementsPtr.pointee = replacementBuffer.baseAddress
+      numReplacementsPtr.pointee = replacements.count
+      return BridgedMacroDefinitionKind.expandedMacro.rawValue
+    }
+  } catch let errDiags as DiagnosticsError {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    for diag in errDiags.diagnostics {
+      srcMgr.diagnose(diagnostic: diag)
+    }
+    return -1
+  } catch let error {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    srcMgr.diagnose(
+      diagnostic: .init(
+        node: Syntax(macroDecl),
+        message: ASTGenMacroDiagnostic.thrownError(error)
+      )
+    )
+    return -1
   }
 }
 
@@ -286,7 +519,7 @@ func expandFreestandingMacroIPC(
         node: macroSyntax,
         // FIXME: This is probably a plugin communication error.
         // The error might not be relevant as the diagnostic message.
-        message: ThrownErrorDiagnostic(message: String(describing: error))
+        message: ASTGenMacroDiagnostic.thrownError(error)
       ),
       messageSuffix: " (from macro '\(macroName)')"
     )
@@ -386,7 +619,7 @@ func expandFreestandingMacroInProcess(
     sourceManager.diagnose(
       diagnostic: Diagnostic(
         node: macroSyntax,
-        message: ThrownErrorDiagnostic(message: String(describing: error))
+        message: ASTGenMacroDiagnostic.thrownError(error)
       ),
       messageSuffix: " (from macro '\(macroName)')"
     )
@@ -639,7 +872,7 @@ func expandAttachedMacroIPC(
         node: Syntax(declarationNode),
         // FIXME: This is probably a plugin communication error.
         // The error might not be relevant as the diagnostic message.
-        message: ThrownErrorDiagnostic(message: String(describing: error))
+        message: ASTGenMacroDiagnostic.thrownError(error)
       ),
       messageSuffix: " (from macro '\(macroName)')"
     )
@@ -828,7 +1061,7 @@ func expandAttachedMacroInProcess(
     sourceManager.diagnose(
       diagnostic: Diagnostic(
         node: Syntax(declarationNode),
-        message: ThrownErrorDiagnostic(message: String(describing: error))
+        message: ASTGenMacroDiagnostic.thrownError(error)
       ),
       messageSuffix: " (from macro '\(macroName)')"
     )

@@ -14,6 +14,7 @@ import def_macros
 func test(a: Int, b: Int) {
   _ = #publicStringify(a + b)
   _ = #publicStringify(a + b, label: "hello")
+  _ = #unlabeledStringify(a + b)
 
   _ = #internalStringify(a + b)
   // expected-error@-1{{no macro named 'internalStringify'}}

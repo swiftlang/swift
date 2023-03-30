@@ -35,3 +35,7 @@ func renameBuiltinMacroWithoutHash() {
   // BUILTIN: error: cannot rename system symbol 'file'
 }
 
+
+// REQUIRES: swift_swift_parser
+// FIXME: Swift parser is not enabled on Linux CI yet.
+// REQUIRES: OS=macosx

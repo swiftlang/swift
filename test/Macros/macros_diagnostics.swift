@@ -1,12 +1,14 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -module-name MacrosTest
+// REQUIRES: OS=macosx
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 // expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
-// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
+// expected-warning@-1{{external macro definitions are now written using #externalMacro}}
 // expected-warning@-2{{external macro implementation type}}
+// expected-note@-3{{use '#externalMacro'}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
 @freestanding(expression) macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-warning@-1{{external macro implementation type}}
 
