@@ -255,8 +255,8 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
 
   _ = getTuple(v) // expected-error {{inferred result type '(any B, any P)' requires explicit coercion due to loss of generic requirements}} {{18-18=as (any B, any P)}}
   _ = getTuple(v) as (any B, any P) // Ok
-
-  _ = getNoError(v) // Ok because T.C.A == Double
+  // Ok because T.C.A == Double
+  _ = getNoError(v) // expected-error {{inferred result type '(any B).C.A' requires explicit coercion due to loss of generic requirements}}
 
   _ = getComplex(v) // expected-error {{inferred result type '([(x: (a: any P, b: Int), y: Int)], [Int : any P])' requires explicit coercion due to loss of generic requirements}} {{20-20=as ([(x: (a: any P, b: Int), y: Int)], [Int : any P])}}
   _ = getComplex(v) as ([(x: (a: any P, b: Int), y: Int)], [Int : any P]) // Ok
@@ -304,4 +304,53 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
 
   getP((getC(v) as any P))   // Ok - parens avoid opening suppression
   getP((v.getC() as any P))  // Ok - parens avoid opening suppression
+}
+
+// Generic Class Types
+class C1 {}
+class C2<T>: C1 {}
+
+// Test Associated Types
+protocol P1 {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P1) { // should return C1
+  let _ = p.returnAssocTypeB() // expected-error {{inferred result type 'C1' requires explicit coercion due to loss of generic requirements}} {{29-29=as C1}}
+}
+
+// Test Primary Associated Types
+protocol P2<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P2<Int>) { // should return C2<A>
+  let _ = p.returnAssocTypeB()
+}
+
+func testAssocReturn(p: any P2<any P2<String>>) {
+  let _ = p.returnAssocTypeB()
+}
+
+protocol P3<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnPrimaryAssocTypeA() -> A
+  func returnAssocTypeCollection() -> any Collection<A>
+}
+
+// Confirm there is no way to access Primary Associated Type
+func testPrimaryAssocReturn(p: any P3<Int>) {
+  let _ = p.returnPrimaryAssocTypeA() //expected-error {{inferred result type '(any P3<Int>).A' requires explicit coercion due to loss of generic requirements}}
+}
+
+func testPrimaryAssocCollection(p: any P3<Float>) {
+  let _: any Collection<Float> = p.returnAssocTypeCollection()
 }
