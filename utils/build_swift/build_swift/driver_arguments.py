@@ -739,6 +739,9 @@ def create_argument_parser():
            toggle_true('build_swift_inspect'),
            help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
+    option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
+           help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
