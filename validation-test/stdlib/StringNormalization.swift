@@ -18,7 +18,7 @@
 // RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest14.txt
+// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest15.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
@@ -97,11 +97,11 @@ tests.test("StringNormalization/ConvertNFK*ToNFKC")
 }
 
 //==------------------------------------------------------------------------==//
-// Newer stdlib with native normalization and supporting Unicode 14
+// Newer stdlib with native normalization and supporting Unicode 15
 //==------------------------------------------------------------------------==//
 
-if #available(SwiftStdlib 5.6, *) {
-  tests.test("StringNormalization14/ConvertToNFC")
+if #available(SwiftStdlib 5.9, *) {
+  tests.test("StringNormalization15/ConvertToNFC")
   .code {
     for test in normalizationTests14 {
       expectEqualIterators(
@@ -117,7 +117,7 @@ if #available(SwiftStdlib 5.6, *) {
     }
   }
 
-  tests.test("StringNormalization14/ConvertNFK*ToNFKC")
+  tests.test("StringNormalization15/ConvertNFK*ToNFKC")
   .code {
     for test in normalizationTests14 {
       expectEqualIterators(
