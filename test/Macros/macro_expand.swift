@@ -334,3 +334,16 @@ func testFreestandingMacroExpansion() {
   #anonymousTypes { "hello" }
 }
 testFreestandingMacroExpansion()
+
+// Avoid re-type-checking declaration macro arguments.
+@freestanding(declaration)
+macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+func testFreestandingWithClosure(i: Int) {
+  #freestandingWithClosure(i) { x in x }
+
+  #freestandingWithClosure(i) {
+    let x = $0
+    return x
+  }
+}

@@ -2716,16 +2716,34 @@ TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
   return createImpl(ctx, joinType.getPointer(), /*elements*/ {}, arena, SVE);
 }
 
+MacroExpansionExpr::MacroExpansionExpr(
+    DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
+    DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+    ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
+    ArgumentList *argList, MacroRoles roles, bool isImplicit,
+    Type ty
+) : Expr(ExprKind::MacroExpansion, isImplicit, ty), DC(dc),
+    Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
+  ASTContext &ctx = dc->getASTContext();
+  info = new (ctx) MacroExpansionInfo{
+      sigilLoc, macroName, macroNameLoc,
+      leftAngleLoc, rightAngleLoc, genericArgs,
+      argList ? argList : ArgumentList::createImplicit(ctx, {})
+  };
+
+  Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+}
+
 SourceRange MacroExpansionExpr::getSourceRange() const {
   SourceLoc endLoc;
-  if (ArgList && !ArgList->isImplicit())
-    endLoc = ArgList->getEndLoc();
-  else if (RightAngleLoc.isValid())
-    endLoc = RightAngleLoc;
+  if (info->ArgList && !info->ArgList->isImplicit())
+    endLoc = info->ArgList->getEndLoc();
+  else if (info->RightAngleLoc.isValid())
+    endLoc = info->RightAngleLoc;
   else
-    endLoc = MacroNameLoc.getEndLoc();
+    endLoc = info->MacroNameLoc.getEndLoc();
 
-  return SourceRange(SigilLoc, endLoc);
+  return SourceRange(info->SigilLoc, endLoc);
 }
 
 unsigned MacroExpansionExpr::getDiscriminator() const {
@@ -2745,21 +2763,16 @@ unsigned MacroExpansionExpr::getDiscriminator() const {
   return getRawDiscriminator();
 }
 
-MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() const {
+MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() {
   auto dc = DC;
   if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
     dc = tlcd->getDeclContext();
-  return new (DC->getASTContext()) MacroExpansionDecl(
-      dc, SigilLoc, MacroName, MacroNameLoc, LeftAngleLoc,
-      GenericArgs, RightAngleLoc, ArgList);
+  SubstituteDecl = new (DC->getASTContext()) MacroExpansionDecl(dc, info);
+  return SubstituteDecl;
 }
 
 MacroExpansionDecl *MacroExpansionExpr::getSubstituteDecl() const {
   return SubstituteDecl;
-}
-
-void MacroExpansionExpr::setSubstituteDecl(MacroExpansionDecl *decl) {
-  SubstituteDecl = decl;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
