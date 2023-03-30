@@ -567,14 +567,6 @@ class SwiftDependencyScanningService {
       clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
       SharedFilesystemCache;
 
-  /// All cached Swift source module dependencies, in the order in which they
-  /// were encountered
-  std::vector<ModuleDependencyID> AllSourceModules;
-
-  /// Dependencies for all Swift source-based modules discovered. Each one is
-  /// the main module of a prior invocation of the scanner.
-  ModuleNameToDependencyMap SwiftSourceModuleDependenciesMap;
-
   /// A map from a String representing the target triple of a scanner invocation
   /// to the corresponding cached dependencies discovered so far when using this
   /// triple.
@@ -650,10 +642,6 @@ private:
   ContextSpecificGlobalCacheState *
   getCacheForScanningContextHash(StringRef scanContextHash) const;
 
-  /// Look for source-based module dependency details
-  Optional<const ModuleDependencyInfo*>
-  findSourceModuleDependency(StringRef moduleName) const;
-
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
@@ -667,28 +655,17 @@ private:
                                                ModuleDependencyInfo dependencies,
                                                StringRef scanContextHash);
 
-  /// Record source-module dependencies for the given module.
-  const ModuleDependencyInfo *recordSourceDependency(StringRef moduleName,
-                                                     ModuleDependencyInfo dependencies);
-
   /// Update stored dependencies for the given module.
   const ModuleDependencyInfo *updateDependency(ModuleDependencyID moduleID,
                                                ModuleDependencyInfo dependencies,
                                                StringRef scanContextHash);
 
-  /// Reference the list of all module dependencies that are not source-based
-  /// modules (i.e. interface dependencies, binary dependencies, clang
-  /// dependencies).
+  /// Reference the list of all module dependency infos for a given scanning context
   const std::vector<ModuleDependencyID> &
-  getAllNonSourceModules(StringRef scanningContextHash) const {
+  getAllModules(StringRef scanningContextHash) const {
     auto contextSpecificCache =
         getCacheForScanningContextHash(scanningContextHash);
     return contextSpecificCache->AllModules;
-  }
-
-  /// Return the list of all source-based modules discovered by this cache
-  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
-    return AllSourceModules;
   }
 };
 
@@ -756,10 +733,6 @@ public:
   /// to a kind-qualified set of module IDs.
   void resolveDependencyImports(ModuleDependencyID moduleID,
                                 const std::vector<ModuleDependencyID> &dependencyIDs);
-
-  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
-    return globalScanningService.getAllSourceModules();
-  }
   
   StringRef getMainModuleName() const {
     return mainScanModuleName;
