@@ -1098,6 +1098,8 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
     return *containingContext;
   }
 
+  // FIXME: Adopt AvailabilityInference::parentDeclForInferredAvailability()
+  // here instead of duplicating the logic.
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
