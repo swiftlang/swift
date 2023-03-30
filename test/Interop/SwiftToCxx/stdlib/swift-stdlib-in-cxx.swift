@@ -90,6 +90,8 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
 // CHECK-NEXT: #define SWIFT_CXX_INTEROP_STRING_MIXIN
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 // CHECK-NEXT: // Look for the C++ interop support header relative to clang's resource dir:
 // CHECK-NEXT: //  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT: #if __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
@@ -101,6 +103,7 @@
 // CHECK-NEXT: #elif __has_include(<swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #endif
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: private:
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
@@ -114,6 +117,8 @@
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
+// CHECK: #pragma clang diagnostic push
+// CHECK: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 // CHECK: #if __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
@@ -123,5 +128,6 @@
 // CHECK-NEXT: #elif __has_include(<swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #endif
+// CHECK-NEXTZ: #pragma clang diagnostic pop
 
 // CHECK: } // namespace swift
