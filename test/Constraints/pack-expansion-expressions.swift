@@ -346,3 +346,29 @@ func test_pack_expansion_specialization() {
   _ = Data<Int, String, Float>((vals: 42, "", 0))
   // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
 }
+
+// Make sure that in-exact matches (that require any sort of conversion or load) on arguments are handled correctly.
+do {
+  var v: Float = 42 // expected-warning {{variable 'v' was never mutated; consider changing to 'let' constant}}
+
+  func testOpt<each T>(x: Int?, _: repeat each T) {}
+  testOpt(x: 42, "", v) // Load + Optional promotion
+
+  func testLoad<each T, each U>(t: repeat each T, u: repeat each U) {}
+  testLoad(t: "", v) // Load + default
+  testLoad(t: "", v, u: v, 0.0) // Two loads
+
+  func testDefaultWithExtra<each T, each U>(t: repeat each T, u: repeat each U, extra: Int?) {}
+  testDefaultWithExtra(t: "", v, extra: 42)
+
+  func defaults1<each T>(x: Int? = nil, _: repeat each T) {}
+  defaults1("", 3.14) // Ok
+
+  func defaults2<each T>(_: repeat each T, x: Int? = nil) {}
+  defaults2("", 3.14) // Ok
+
+  func defaults3<each T, each U>(t: repeat each T, u: repeat each U, extra: Int? = nil) {}
+  defaults3(t: "", 3.14) // Ok
+  defaults3(t: "", 3.14, u: 0, v) // Ok
+  defaults3(t: "", 3.14, u: 0, v, extra: 42) // Ok
+}
