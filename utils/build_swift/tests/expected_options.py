@@ -240,6 +240,7 @@ EXPECTED_DEFAULTS = {
     'swift_darwin_supported_archs': None,
     'swift_freestanding_is_darwin': False,
     'swift_profile_instr_use': None,
+    'swift_runtime_fixed_backtracer_path': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
@@ -754,6 +755,7 @@ EXPECTED_OPTIONS = [
     PathOption('--cmake-c-launcher'),
     PathOption('--cmake-cxx-launcher'),
     PathOption('--swift-profile-instr-use'),
+    PathOption('--swift-runtime-fixed-backtracer-path'),
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),

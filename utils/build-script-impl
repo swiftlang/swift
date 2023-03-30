@@ -236,6 +236,7 @@ KNOWN_SETTINGS=(
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
     swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
     swift-enable-backtracing                      "1"               "whether to build the backtracing support"
+    swift-runtime-fixed-backtracer-path           ""                "if set, use a fixed path for the backtracer"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -1622,6 +1623,13 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH:STRING="${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}"
+        )
+    fi
+
     if [[ "${EXTRA_SWIFT_ARGS}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
@@ -2047,6 +2055,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES:BOOL=$(true_false "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}")
+                    )
+                fi
+
+                if [[ "${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH:STRING="${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}"
                     )
                 fi
 
