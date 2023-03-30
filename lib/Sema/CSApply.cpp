@@ -5963,9 +5963,10 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   assert(solution.argumentMatchingChoices.count(locatorPtr) == 1);
   auto parameterBindings = solution.argumentMatchingChoices.find(locatorPtr)
                                ->second.parameterBindings;
+  bool shouldSubstituteBindings = shouldSubstituteParameterBindings(callee);
 
   SmallVector<ParamBinding, 4> substitutedBindings;
-  if (shouldSubstituteParameterBindings(callee)) {
+  if (shouldSubstituteBindings) {
     computeParameterBindingsSubstitutions(callee, params, parameterBindings,
                                           substitutedBindings);
   } else {
@@ -6037,10 +6038,21 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // Handle default arguments.
     if (substitutedBindings[paramIdx].empty()) {
+      auto paramIdxForDefault = paramIdx;
+      // If bindings were substituted we need to find "original"
+      // (or contextless) parameter index for the default argument.
+      if (shouldSubstituteBindings) {
+        auto *paramList = getParameterList(callee.getDecl());
+        assert(paramList);
+        paramIdxForDefault =
+            paramList->getOrigParamIndex(callee.getSubstitutions(), paramIdx);
+      }
+
       auto owner = getDefaultArgOwner(callee, paramIdx);
       auto paramTy = param.getParameterType();
       auto *defArg = new (ctx) DefaultArgumentExpr(
-          owner, paramIdx, args->getStartLoc(), paramTy, dc);
+          owner, paramIdxForDefault, args->getStartLoc(), paramTy, dc);
+
       cs.cacheType(defArg);
       newArgs.emplace_back(SourceLoc(), param.getLabel(), defArg);
       continue;
