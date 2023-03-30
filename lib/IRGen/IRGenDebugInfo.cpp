@@ -921,6 +921,9 @@ private:
         Ty->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
@@ -935,6 +938,9 @@ private:
         Reconstructed->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       }
     }
