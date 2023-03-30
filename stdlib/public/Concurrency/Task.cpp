@@ -47,6 +47,13 @@
 #include <dlfcn.h>
 #endif
 
+// Check for valid Swift-async calling convention support here to ensure that
+// the concurrency runtime is being built correctly.
+#if !__has_feature(swiftasynccc) || !__has_attribute(swiftasynccall) ||        \
+    !__has_attribute(swift_async_context)
+#error "The Swift concurrency runtime must be built with a C++ compiler that supports swiftasynccall calling conventions."
+#endif
+
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 #include <Availability.h>
 #include <TargetConditionals.h>

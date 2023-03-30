@@ -198,20 +198,24 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_CC_c
 
 // SWIFT_CC(swift) is the Swift calling convention.
-// FIXME: the next comment is false.
-// Functions outside the stdlib or runtime that include this file may be built 
-// with a compiler that doesn't support swiftcall; don't define these macros
-// in that case so any incorrect usage is caught.
-#if __has_attribute(swiftcall)
+
+#if __has_attribute(swiftcall) && __has_attribute(swift_context) &&            \
+    __has_attribute(swift_error_result) &&                                     \
+    __has_attribute(swift_indirect_result)
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 #define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
 #else
-#define SWIFT_CC_swift
-#define SWIFT_CONTEXT
-#define SWIFT_ERROR_RESULT
-#define SWIFT_INDIRECT_RESULT
+
+#if _MSC_VER && !__INTEL_COMPILER
+#pragma message(                                                               \
+    "Warning: C++ Compiler does not support swiftcall calling conventions. SWIFT_CC_swift macros not defined!")
+#else
+#warning                                                                       \
+    "C++ Compiler does not support swiftcall calling conventions. SWIFT_CC_swift macros not defined!"
+#endif
+
 #endif
 
 #if __has_attribute(swift_async_context)
@@ -231,7 +235,15 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #if __has_feature(swiftasynccc) && __has_attribute(swiftasynccall)
 #define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
 #else
-#define SWIFT_CC_swiftasync SWIFT_CC_swift
+
+#if _MSC_VER && !__INTEL_COMPILER
+#pragma message(                                                               \
+    "Warning: C++ Compiler does not support swiftcall calling conventions. SWIFT_CC_swiftasync macros not defined!")
+#else
+#warning                                                                       \
+    "C++ Compiler does not support async-swift calling conventions. SWIFT_CC_swiftasync macros not defined!"
+#endif
+
 #endif
 
 // SWIFT_CC(PreserveMost) is used in the runtime implementation to prevent
