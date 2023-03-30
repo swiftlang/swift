@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
 
-// FIXME: Fix the optimizer
-// REQUIRES: swift_test_mode_optimize_none
-
 // REQUIRES: executable_test
 
 // Because of -enable-experimental-feature VariadicGenerics
