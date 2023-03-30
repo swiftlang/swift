@@ -5398,15 +5398,6 @@ namespace {
           auto &ctx = cs.getASTContext();
           if (!E->getSubstituteDecl()) {
             auto *med = E->createSubstituteDecl();
-
-            // Cache the result of ResolveMacroRequest for this new declaration;
-            // we don't want to compute it again.
-            ctx.evaluator.cacheOutput(
-                ResolveMacroRequest{UnresolvedMacroReference{med},
-                                    med->getDeclContext()},
-                ConcreteDeclRef(macroRef));
-
-            E->setSubstituteDecl(med);
             TypeChecker::typeCheckDecl(med);
           }
         }

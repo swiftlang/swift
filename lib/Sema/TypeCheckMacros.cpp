@@ -1481,6 +1481,9 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   MacroExpansionExpr *macroExpansion;
   if (auto *expr = macroRef.getExpr()) {
     macroExpansion = expr;
+  } else if (auto *decl = macroRef.getDecl()) {
+    macroExpansion = new (ctx) MacroExpansionExpr(
+        dc, decl->getExpansionInfo(), roles);
   } else {
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = new (ctx) MacroExpansionExpr(
