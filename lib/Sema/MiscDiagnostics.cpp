@@ -2027,6 +2027,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       return Action::Continue(E);
     }
+    
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      // We need to look at all AST nodes, so make sure to check the children of statements
+      return Action::Continue(S);
+    }
+    
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // We need to look at all AST nodes, so make sure to check the children of decls
+      return Action::Continue();
+    }
   };
 
   auto &ctx = DC->getASTContext();
