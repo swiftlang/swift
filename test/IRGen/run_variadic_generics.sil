@@ -10,8 +10,6 @@
 
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
-// Because generic specialization does not work yet.
-// REQUIRES: swift_test_mode_optimize_none
 
 import Builtin
 import Swift
