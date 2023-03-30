@@ -862,6 +862,7 @@ static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
     return RequirementKind::KIND;
 
   switch (rawKind) {
+  CASE(SameShape)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
