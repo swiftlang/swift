@@ -208,6 +208,15 @@ enum CustomError: Error, CustomStringConvertible {
   }
 }
 
+public struct EmptyDeclarationMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return []
+  }
+}
+
 public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
