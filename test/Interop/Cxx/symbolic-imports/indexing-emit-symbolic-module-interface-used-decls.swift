@@ -35,7 +35,7 @@ public func useConcreteTemplate() {
 // CHECK-EMPTY:
 // CHECK-NEXT: public struct TemplateRecord {
 // CHECK-EMPTY:
-// CHECK-NEXT:    public func methodFunc()
+// CHECK-NEXT:    public func methodFunc(_ x: Any)
 // CHECK-NEXT:}
 // CHECK-NEXT:}
 // CHECK-NEXT: public typealias TemplateRecordInt = ns.TemplateRecord

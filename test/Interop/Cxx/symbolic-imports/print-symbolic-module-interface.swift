@@ -52,9 +52,9 @@ using MyType = ns::TemplateRecord<int>;
 // CHECK-NEXT:    var y: Int32
 // CHECK-NEXT:  }
 // CHECK-NEXT:  struct TemplateRecord {
-// CHECK-NEXT:    mutating func methodFunc()
+// CHECK-NEXT:    mutating func methodFunc(_ x: Any)
 // CHECK-NEXT:    struct InnerRecord {
-// CHECK-NEXT:      mutating func innerMethod()
+// CHECK-NEXT:      mutating func innerMethod(_ y: Any)
 // CHECK-NEXT:    }
 // CHECK-NEXT:    struct InnerTemplate {
 // CHECK-NEXT:      mutating func innerTemplateMethod()
