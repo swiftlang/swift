@@ -234,3 +234,8 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
 option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
        "Use relative protocol witness tables"
        FALSE)
+
+set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
+  "If set, provides a fixed path to the swift-backtrace binary.  This
+   will disable dynamic determination of the path and will also disable
+   the setting in SWIFT_BACKTRACE.")

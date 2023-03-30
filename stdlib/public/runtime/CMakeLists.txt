@@ -18,6 +18,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH=\"${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}\"")
+endif()
+
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
