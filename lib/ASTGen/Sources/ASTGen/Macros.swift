@@ -373,6 +373,14 @@ func expandFreestandingMacroInProcess(
       print("not an expression macro or a declaration macro")
       return nil
     }
+  } catch let diagsError as DiagnosticsError {
+    for diag in diagsError.diagnostics {
+      sourceManager.diagnose(
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
+      )
+    }
+    return nil
   } catch {
     // Record the error
     sourceManager.diagnose(
@@ -805,6 +813,15 @@ func expandAttachedMacroInProcess(
       print("\(macroPtr) does not conform to any known attached macro protocol")
       return nil
     }
+  } catch let diagsError as DiagnosticsError {
+    for diag in diagsError.diagnostics {
+      sourceManager.diagnose(
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
+      )
+    }
+
+    return nil
   } catch {
     // Record the error
     // FIXME: Need to decide where to diagnose the error:
