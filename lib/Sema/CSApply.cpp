@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -5394,27 +5395,20 @@ namespace {
         }
         // For a non-expression macro, expand it as a declaration.
         else if (macro->getMacroRoles().contains(MacroRole::Declaration)) {
+          auto &ctx = cs.getASTContext();
           if (!E->getSubstituteDecl()) {
             auto *med = E->createSubstituteDecl();
+
+            // Cache the result of ResolveMacroRequest for this new declaration;
+            // we don't want to compute it again.
+            ctx.evaluator.cacheOutput(
+                ResolveMacroRequest{UnresolvedMacroReference{med},
+                                    med->getDeclContext()},
+                ConcreteDeclRef(macroRef));
+
             E->setSubstituteDecl(med);
             TypeChecker::typeCheckDecl(med);
           }
-          // To prevent AST nodes from being visited twice, we've sunk the
-          // original argument list down to the substitute macro expansion decl,
-          // and we'll replace the expr's arguments with opaque values.
-          SmallVector<Argument, 4> newArguments;
-          for (auto arg : *E->getArgs()) {
-            arg.setExpr(new (cs.getASTContext()) OpaqueValueExpr(
-                arg.getSourceRange(), cs.getType(arg.getExpr())));
-            newArguments.push_back(arg);
-          }
-          auto newArgList = ArgumentList::create(
-              cs.getASTContext(), E->getArgs()->getLParenLoc(), newArguments,
-              E->getArgs()->getRParenLoc(),
-              E->getArgs()->getFirstTrailingClosureIndex(),
-              E->getArgs()->isImplicit());
-          E->setArgs(newArgList);
-          cs.setType(E, cs.getASTContext().getVoidType());
         }
         // Other macro roles may also be encountered here, as they use
         // `MacroExpansionExpr` for resolution. In those cases, do not expand.
