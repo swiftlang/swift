@@ -66,7 +66,7 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // RUN: %empty-directory(%t)
 
 //##-- Prepare the macro plugin.
-// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: COMPILER_ARGS_WITHOUT_SOURCE=( \
 // RUN:   -swift-version 5 \
