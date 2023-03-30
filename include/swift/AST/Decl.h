@@ -8538,8 +8538,13 @@ public:
   using Decl::getASTContext;
 };
 
-class MacroExpansionDecl : public Decl {
-  SourceLoc PoundLoc;
+/// Information about a macro expansion that is common between macro
+/// expansion declarations and expressions.
+///
+/// Instances of these types will be shared among paired macro expansion
+/// declaration/expression nodes.
+struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
+  SourceLoc SigilLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
@@ -8549,8 +8554,24 @@ class MacroExpansionDecl : public Decl {
   /// The referenced macro.
   ConcreteDeclRef macroRef;
 
+  MacroExpansionInfo(SourceLoc sigilLoc,
+                     DeclNameRef macroName,
+                     DeclNameLoc macroNameLoc,
+                     SourceLoc leftAngleLoc, SourceLoc rightAngleLoc,
+                     ArrayRef<TypeRepr *> genericArgs,
+                     ArgumentList *argList)
+    : SigilLoc(sigilLoc), MacroName(macroName), MacroNameLoc(macroNameLoc),
+      LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
+      GenericArgs(genericArgs), ArgList(argList) { }
+};
+
+class MacroExpansionDecl : public Decl {
+  MacroExpansionInfo *info;
+
 public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  MacroExpansionDecl(DeclContext *dc, MacroExpansionInfo *info);
 
   MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
                      DeclNameLoc macroLoc,
@@ -8559,23 +8580,27 @@ public:
                      SourceLoc rightAngleLoc,
                      ArgumentList *args);
 
-  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+  ArrayRef<TypeRepr *> getGenericArgs() const {
+    return info->GenericArgs;
+  }
 
   SourceRange getGenericArgsRange() const {
-    return SourceRange(LeftAngleLoc, RightAngleLoc);
+    return SourceRange(info->LeftAngleLoc, info->RightAngleLoc);
   }
 
   SourceRange getSourceRange() const;
-  SourceLoc getLocFromSource() const { return PoundLoc; }
-  SourceLoc getPoundLoc() const { return PoundLoc; }
-  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
-  DeclNameRef getMacroName() const { return MacroName; }
-  ArgumentList *getArgs() const { return ArgList; }
-  void setArgs(ArgumentList *args) { ArgList = args; }
+  SourceLoc getLocFromSource() const { return info->SigilLoc; }
+  SourceLoc getPoundLoc() const { return info->SigilLoc; }
+  DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
+  DeclNameRef getMacroName() const { return info->MacroName; }
+  ArgumentList *getArgs() const { return info->ArgList; }
+  void setArgs(ArgumentList *args) { info->ArgList = args; }
   using ExprOrStmtExpansionCallback = llvm::function_ref<void(ASTNode)>;
   void forEachExpandedExprOrStmt(ExprOrStmtExpansionCallback) const;
-  ConcreteDeclRef getMacroRef() const { return macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+  ConcreteDeclRef getMacroRef() const { return info->macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
+
+  MacroExpansionInfo *getExpansionInfo() const { return info; }
 
   /// Returns a discriminator which determines this macro expansion's index
   /// in the sequence of macro expansions within the current function.

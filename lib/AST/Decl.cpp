@@ -10336,29 +10336,36 @@ MacroDefinition MacroDefinition::forExpanded(
 }
 
 MacroExpansionDecl::MacroExpansionDecl(
+    DeclContext *dc, MacroExpansionInfo *info
+) : Decl(DeclKind::MacroExpansion, dc), info(info) {
+  Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
+}
+
+MacroExpansionDecl::MacroExpansionDecl(
     DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
     DeclNameLoc macroLoc, SourceLoc leftAngleLoc,
     ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
-    ArgumentList *args)
-    : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
-      MacroName(macro), MacroNameLoc(macroLoc),
-      LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-      GenericArgs(genericArgs),
-      ArgList(args ? args
-                   : ArgumentList::createImplicit(dc->getASTContext(), {})) {
+    ArgumentList *args
+) : Decl(DeclKind::MacroExpansion, dc) {
+  ASTContext &ctx = dc->getASTContext();
+  info = new (ctx) MacroExpansionInfo{
+      poundLoc, macro, macroLoc,
+      leftAngleLoc, rightAngleLoc, genericArgs,
+      args ? args : ArgumentList::createImplicit(ctx, {})
+  };
   Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;
 }
 
 SourceRange MacroExpansionDecl::getSourceRange() const {
   SourceLoc endLoc;
-  if (auto argsEndList = ArgList->getEndLoc())
+  if (auto argsEndList = info->ArgList->getEndLoc())
     endLoc = argsEndList;
-  else if (RightAngleLoc.isValid())
-    endLoc = RightAngleLoc;
+  else if (info->RightAngleLoc.isValid())
+    endLoc = info->RightAngleLoc;
   else
-    endLoc = MacroNameLoc.getEndLoc();
+    endLoc = info->MacroNameLoc.getEndLoc();
 
-  return SourceRange(PoundLoc, endLoc);
+  return SourceRange(info->SigilLoc, endLoc);
 }
 
 unsigned MacroExpansionDecl::getDiscriminator() const {
