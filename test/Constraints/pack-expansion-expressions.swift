@@ -379,4 +379,13 @@ do {
   defaults3(t: "", 3.14) // Ok
   defaults3(t: "", 3.14, u: 0, v) // Ok
   defaults3(t: "", 3.14, u: 0, v, extra: 42) // Ok
+
+  struct Defaulted<each T> {
+    init(t: repeat each T, extra: Int? = nil) {}
+    init<each U>(t: repeat each T, u: repeat each U, other: Int? = nil) {}
+  }
+
+  _ = Defaulted(t: "a", 0, 1.0) // Ok
+  _ = Defaulted(t: "b", 0) // Ok
+  _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
 }
