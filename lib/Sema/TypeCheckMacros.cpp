@@ -1482,6 +1482,16 @@ ConcreteDeclRef
 ResolveMacroRequest::evaluate(Evaluator &evaluator,
                               UnresolvedMacroReference macroRef,
                               DeclContext *dc) const {
+  // Macro expressions and declarations have their own stored macro
+  // reference. Use it if it's there.
+  if (auto *expr = macroRef.getExpr()) {
+    if (auto ref = expr->getMacroRef())
+      return ref;
+  } else if (auto decl = macroRef.getDecl()) {
+    if (auto ref = decl->getMacroRef())
+      return ref;
+  }
+
   auto &ctx = dc->getASTContext();
   auto roles = macroRef.getMacroRoles();
   auto foundMacros = TypeChecker::lookupMacros(
@@ -1494,6 +1504,9 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   MacroExpansionExpr *macroExpansion;
   if (auto *expr = macroRef.getExpr()) {
     macroExpansion = expr;
+  } else if (auto *decl = macroRef.getDecl()) {
+    macroExpansion = new (ctx) MacroExpansionExpr(
+        dc, decl->getExpansionInfo(), roles);
   } else {
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = new (ctx) MacroExpansionExpr(
@@ -1510,6 +1523,17 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // If we couldn't resolve a macro decl, the attribute is invalid.
   if (!macroExpansion->getMacroRef() && macroRef.getAttr())
     macroRef.getAttr()->setInvalid();
+
+  // Macro expressions and declarations have their own stored macro
+  // reference. If we got a reference, store it there, too.
+  // FIXME: This duplication of state is really unfortunate.
+  if (auto ref = macroExpansion->getMacroRef()) {
+    if (auto *expr = macroRef.getExpr()) {
+      expr->setMacroRef(ref);
+    } else if (auto decl = macroRef.getDecl()) {
+      decl->setMacroRef(ref);
+    }
+  }
 
   return macroExpansion->getMacroRef();
 }

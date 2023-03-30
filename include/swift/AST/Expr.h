@@ -6189,21 +6189,23 @@ public:
 class MacroExpansionExpr final : public Expr {
 private:
   DeclContext *DC;
-  SourceLoc SigilLoc;
-  DeclNameRef MacroName;
-  DeclNameLoc MacroNameLoc;
-  SourceLoc LeftAngleLoc, RightAngleLoc;
-  ArrayRef<TypeRepr *> GenericArgs;
-  ArgumentList *ArgList;
+  MacroExpansionInfo *info;
   Expr *Rewritten;
   MacroRoles Roles;
   MacroExpansionDecl *SubstituteDecl;
 
-  /// The referenced macro.
-  ConcreteDeclRef macroRef;
-
 public:
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  explicit MacroExpansionExpr(DeclContext *dc, MacroExpansionInfo *info,
+                              MacroRoles roles,
+                              bool isImplicit = false,
+                              Type ty = Type())
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty),
+        DC(dc), info(info), Rewritten(nullptr), Roles(roles),
+        SubstituteDecl(nullptr) {
+    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+  }
 
   explicit MacroExpansionExpr(DeclContext *dc,
                               SourceLoc sigilLoc, DeclNameRef macroName,
@@ -6214,45 +6216,29 @@ public:
                               ArgumentList *argList,
                               MacroRoles roles,
                               bool isImplicit = false,
-                              Type ty = Type())
-      : Expr(ExprKind::MacroExpansion, isImplicit, ty),
-        DC(dc), SigilLoc(sigilLoc),
-        MacroName(macroName), MacroNameLoc(macroNameLoc),
-        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs),
-        Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
-    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+                              Type ty = Type());
 
-    // Macro expansions always have an argument list. If one is not provided, create
-    // an implicit one.
-    if (argList) {
-      ArgList = argList;
-    } else {
-      ArgList = ArgumentList::createImplicit(dc->getASTContext(), {});
-    }
-  }
-
-  DeclNameRef getMacroName() const { return MacroName; }
-  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+  DeclNameRef getMacroName() const { return info->MacroName; }
+  DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
 
   Expr *getRewritten() const { return Rewritten; }
   void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
 
-  ArrayRef<TypeRepr *> getGenericArgs() const { return GenericArgs; }
+  ArrayRef<TypeRepr *> getGenericArgs() const { return info->GenericArgs; }
 
   SourceRange getGenericArgsRange() const {
-    return SourceRange(LeftAngleLoc, RightAngleLoc);
+    return SourceRange(info->LeftAngleLoc, info->RightAngleLoc);
   }
 
-  ArgumentList *getArgs() const { return ArgList; }
-  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+  ArgumentList *getArgs() const { return info->ArgList; }
+  void setArgs(ArgumentList *newArgs) { info->ArgList = newArgs; }
 
   MacroRoles getMacroRoles() const { return Roles; }
 
-  SourceLoc getLoc() const { return SigilLoc; }
+  SourceLoc getLoc() const { return info->SigilLoc; }
 
-  ConcreteDeclRef getMacroRef() const { return macroRef; }
-  void setMacroRef(ConcreteDeclRef ref) { macroRef = ref; }
+  ConcreteDeclRef getMacroRef() const { return info->macroRef; }
+  void setMacroRef(ConcreteDeclRef ref) { info->macroRef = ref; }
 
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *dc) { DC = dc; }
@@ -6275,11 +6261,12 @@ public:
     Bits.MacroExpansionExpr.Discriminator = discriminator;
   }
 
+  MacroExpansionInfo *getExpansionInfo() const { return info; }
+
   SourceRange getSourceRange() const;
 
-  MacroExpansionDecl *createSubstituteDecl() const;
+  MacroExpansionDecl *createSubstituteDecl();
   MacroExpansionDecl *getSubstituteDecl() const;
-  void setSubstituteDecl(MacroExpansionDecl *decl);
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MacroExpansion;
