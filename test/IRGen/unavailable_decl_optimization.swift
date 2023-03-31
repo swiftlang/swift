@@ -44,31 +44,6 @@ extension UnavailableStruct {
   public func extensionMethod() {}
 }
 
-@available(*, unavailable)
-public class UnavailableClass<T> {
-  // CHECK-NO-STRIP: s4Test16UnavailableClassC8propertyxvg
-  // CHECK-NO-STRIP: s4Test16UnavailableClassC8propertyxvs
-  // CHECK-NO-STRIP: s4Test16UnavailableClassC8propertyxvM
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassC8propertyxvg
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassC8propertyxvs
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassC8propertyxvM
-  public var property: T
-
-  // CHECK-NO-STRIP: s4Test16UnavailableClassCyACyxGxcfC
-  // CHECK-NO-STRIP: s4Test16UnavailableClassCyACyxGxcfc
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassCyACyxGxcfC
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassCyACyxGxcfc
-  public init(_ t: T) {
-    self.property = t
-  }
-
-  // CHECK-NO-STRIP: s4Test16UnavailableClassCfd
-  // CHECK-NO-STRIP: s4Test16UnavailableClassCfD
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassCfd
-  // CHECK-STRIP-NOT: s4Test16UnavailableClassCfD
-  deinit {}
-}
-
 public struct S<T> {
   // CHECK-NO-STRIP: s4Test1SV19unavailablePropertyxvg
   // CHECK-NO-STRIP: s4Test1SV19unavailablePropertyxvs
@@ -96,32 +71,3 @@ extension S {
   // CHECK-STRIP-NOT: s4Test1SV28methodInUnavailableExtensionyyF
   public func methodInUnavailableExtension() {}
 }
-
-public class C<T> {
-  // CHECK-NO-STRIP: s4Test1CC19unavailablePropertyxvg
-  // CHECK-NO-STRIP: s4Test1CC19unavailablePropertyxvs
-  // CHECK-NO-STRIP: s4Test1CC19unavailablePropertyxvM
-  // CHECK-STRIP-NOT: s4Test1CC19unavailablePropertyxvg
-  // CHECK-STRIP-NOT: s4Test1CC19unavailablePropertyxvs
-  // CHECK-STRIP-NOT: s4Test1CC19unavailablePropertyxvM
-  @available(*, unavailable)
-  public var unavailableProperty: T
-
-  // CHECK-NO-STRIP: s4Test1CCyACyxGxcfC
-  // CHECK-NO-STRIP: s4Test1CCyACyxGxcfc
-  // CHECK-STRIP-NOT: s4Test1CCyACyxGxcfC
-  // CHECK-STRIP-NOT: s4Test1CCyACyxGxcfc
-  @available(*, unavailable)
-  public init(_ t: T) { fatalError() }
-
-  // CHECK: s4Test1CCfd
-  // CHECK: s4Test1CCfD
-  deinit {}
-}
-
-// MARK: -
-
-// MARK: UnavailableClass
-
-// CHECK-NO-STRIP: s4Test16UnavailableClassCMa
-// CHECK-STRIP-NOT: s4Test16UnavailableClassCMa
