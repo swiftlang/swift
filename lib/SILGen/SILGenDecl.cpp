@@ -539,8 +539,7 @@ public:
       }
     }
 
-    if (!Box->getType().isBoxedNonCopyableType(Box->getFunction()))
-      Addr = SGF.B.createProjectBox(decl, Box, 0);
+    Addr = SGF.B.createProjectBox(decl, Box, 0);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -589,10 +588,7 @@ public:
     /// decl to.
     assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
 
-    if (Addr)
-      SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
-    else
-      SGF.VarLocs[decl] = SILGenFunction::VarLoc::getForBox(Box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
 
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
@@ -657,8 +653,7 @@ public:
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only or is noncopyable.
       //
-      // For noncopyable types, we always need to box them and eagerly
-      // reproject.
+      // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
         lowering->getLoweredType().isPureMoveOnly();

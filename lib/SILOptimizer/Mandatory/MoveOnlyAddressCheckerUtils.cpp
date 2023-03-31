@@ -477,32 +477,14 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
     }
   }
 
-  // See if we have an assignable_but_not_consumable from a project_box +
-  // function_argument. In this case, the value must be live at the end of the
-  // use, similar to an inout parameter.
-  //
-  // TODO: Rather than using a terminator, we might be able to use the
-  // end_access of the access marker instead. That would slightly change the
-  // model and this is semantically ok today.
+  // See if we have an assignable_but_not_consumable from a formal access.
+  // In this case, the value must be live at the end of the
+  // access, similar to an inout parameter.
   if (markedAddr->getCheckKind() ==
       MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
-    if (auto *pbi = dyn_cast<ProjectBoxInst>(stripAccessMarkers(operand))) {
-      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
-        if (!fArg->isClosureCapture())
-          return false;
-        LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
-        return true;
-      }
+    if (isa<BeginAccessInst>(operand)) {
+      return true;
     }
-
-    if (isa<RefElementAddrInst>(stripAccessMarkers(operand)))
-      return true;
-
-    if (isa<GlobalAddrInst>(stripAccessMarkers(operand)))
-      return true;
-
-  if (auto *rei = dyn_cast<RefElementAddrInst>(stripAccessMarkers(operand)))
-    return true;
   }
 
 
@@ -1135,12 +1117,25 @@ struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
   StackList<LoadBorrowInst *> targets;
 
   CopiedLoadBorrowEliminationVisitor(SILFunction *fn)
-      : AccessUseVisitor(AccessUseType::Overlapping,
+      : AccessUseVisitor(AccessUseType::Inner,
                          NestedAccessType::IgnoreAccessBegin),
         fn(fn), targets(fn) {}
 
   bool visitUse(Operand *op, AccessUseType useTy) override {
-    LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim. Visiting: " << *op->getUser());
+    LLVM_DEBUG(
+      llvm::dbgs() << "CopiedLBElim visiting ";
+      switch (useTy) {
+      case AccessUseType::Exact:
+        llvm::dbgs() << "exact      ";
+        break;
+      case AccessUseType::Inner:
+        llvm::dbgs() << "inner      ";
+        break;
+      case AccessUseType::Overlapping:
+        llvm::dbgs() << "overlapping";
+        break;
+      }
+      llvm::dbgs() << " use: " << *op->getUser());
     auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
     if (!lbi)
       return true;
@@ -1278,7 +1273,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
                     UseState &useState, MarkMustCheckInst *markedValue,
                     DiagnosticEmitter &diagnosticEmitter,
                     SSAPrunedLiveness &gatherUsesLiveness)
-      : AccessUseVisitor(AccessUseType::Overlapping,
+      : AccessUseVisitor(AccessUseType::Inner,
                          NestedAccessType::IgnoreAccessBegin),
         moveChecker(moveChecker), useState(useState), markedValue(markedValue),
         diagnosticEmitter(diagnosticEmitter), liveness(gatherUsesLiveness) {}
@@ -1351,7 +1346,19 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
-  LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *user);
+  LLVM_DEBUG(
+    switch (useTy) {
+    case AccessUseType::Exact:
+      llvm::dbgs() << "Visiting exact       user: ";
+      break;
+    case AccessUseType::Inner:
+      llvm::dbgs() << "Visiting inner       user: ";
+      break;
+    case AccessUseType::Overlapping:
+      llvm::dbgs() << "Visiting overlapping user: ";
+      break;
+    }
+    llvm::dbgs() << *user);
 
   // First check if we have init/reinit. These are quick/simple.
   if (::memInstMustInitialize(op)) {
@@ -1408,15 +1415,15 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
 
   if (auto *di = dyn_cast<DebugValueInst>(user)) {
-    // Make sure that our debug_value is always on our root value. If not, we
-    // have something we don't understand and should bail. This ensures we can
-    // always hoist the debug_value to our mark_must_check. This ensures that by
-    // marking debug_value later as requiring liveness, we do not change our
-    // liveness calculation since values are always live at the mark_must_check.
-    if (di->getOperand() != getRootAddress())
-      return false;
-
-    useState.debugValue = di;
+    // Save the debug_value if it is attached directly to this mark_must_check.
+    // If the underlying storage we're checking is immutable, then the access
+    // being checked is not confined to an explicit access, but every other
+    // use of the storage must also be immutable, so it is fine if we see
+    // debug_values or other uses that aren't directly related to the current
+    // marked use; they will have to behave compatibly anyway.
+    if (di->getOperand() == getRootAddress()) {
+      useState.debugValue = di;
+    }
     return true;
   }
 
@@ -2297,7 +2304,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
 
-  auto accessPathWithBase = AccessPathWithBase::compute(markedAddress);
+  auto accessPathWithBase = AccessPathWithBase::computeInScope(markedAddress);
   auto accessPath = accessPathWithBase.accessPath;
   if (!accessPath.isValid()) {
     LLVM_DEBUG(llvm::dbgs() << "Invalid access path: " << *markedAddress);

@@ -558,8 +558,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   ManagedValue selfLV =
       maybeEmitValueOfLocalVarDecl(selfDecl, AccessKind::ReadWrite);
-  if (!selfLV)
-    selfLV = maybeEmitAddressForBoxOfLocalVarDecl(selfDecl, selfDecl);
   assert(selfLV);
 
   // Emit the prolog.
@@ -1223,10 +1221,6 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                  SGFContext::AllowImmediatePlusZero)
       .getAsSingleValue(SGF, loc);
   } else {
-    // First see if we have a variable that is boxed without a value.
-    if (auto value = SGF.maybeEmitAddressForBoxOfLocalVarDecl(loc, selfDecl))
-      return value;
-    // Otherwise, emit the address directly.
     return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
                                          SGFAccessKind::Write);
   }
