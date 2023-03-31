@@ -1237,6 +1237,32 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 };
 
+class MacroExpansionDeclScope final : public ASTScopeImpl {
+public:
+  MacroExpansionDecl *const decl;
+
+  MacroExpansionDeclScope(MacroExpansionDecl *e) : decl(e) {}
+  virtual ~MacroExpansionDeclScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+
+protected:
+  void printSpecifics(llvm::raw_ostream &out) const override;
+
+public:
+  virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
+  Decl *getDecl() const { return decl; }
+};
+
 class AbstractStmtScope : public ASTScopeImpl {
 public:
   SourceRange

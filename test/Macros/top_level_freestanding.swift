@@ -35,3 +35,14 @@ struct Main {
     lookupGlobalFreestandingExpansion()
   }
 }
+
+@freestanding(declaration)
+macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+// Unqualified lookup for names defined within macro arguments.
+#freestandingWithClosure(0) { x in x }
+
+#freestandingWithClosure(1) {
+  let x = $0
+  return x
+}

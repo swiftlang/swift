@@ -317,7 +317,6 @@ public:
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
   // are visited separately.
@@ -353,6 +352,7 @@ public:
   VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
   VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
   VISIT_AND_CREATE(MacroDecl, MacroDeclScope)
+  VISIT_AND_CREATE(MacroExpansionDecl, MacroExpansionDeclScope)
 
 #undef VISIT_AND_CREATE
 
@@ -724,6 +724,7 @@ NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(MacroDeclScope)
 NO_NEW_INSERTION_POINT(MacroDefinitionScope)
+NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
@@ -1129,6 +1130,16 @@ void
 MacroDefinitionScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(ASTNode(definition), this);
+}
+
+void MacroExpansionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  // FIXME: If we get attributes on macro expansions, visit them here.
+  if (auto argList = decl->getArgs()) {
+    for (const auto &arg : *argList) {
+      scopeCreator.addExprToScopeTree(arg.getExpr(), this);
+    }
+  }
 }
 
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
