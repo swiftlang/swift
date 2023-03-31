@@ -1,3 +1,4 @@
+// REQUIRES: rdar107424494
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature VariadicGenerics | %FileCheck %s -DINT=i%target-ptrsize
 
 // Because of -enable-experimental-feature VariadicGenerics
