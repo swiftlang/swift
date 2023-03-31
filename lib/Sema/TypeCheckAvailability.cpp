@@ -2508,11 +2508,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   auto I = argumentLabelIDs.begin();
 
   auto updateLabelsForArg = [&](Expr *expr) -> bool {
+    if (I == argumentLabelIDs.end())
+      return true;
+
     if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
-      if (I == argumentLabelIDs.end())
-        return true;
-
       I = argumentLabelIDs.erase(I);
       return false;
     }
@@ -2539,9 +2539,6 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     }
 
     // Normal: Just advance.
-    if (I == argumentLabelIDs.end())
-      return true;
-
     ++I;
     return false;
   };
