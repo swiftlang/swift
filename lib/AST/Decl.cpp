@@ -2695,13 +2695,15 @@ void AbstractStorageDecl::visitOpaqueAccessors(
   });
 }
 
-static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
-  return D->getFormalAccess() <= AccessLevel::FilePrivate;
+static bool hasPrivateOrFilePrivateFormalAccess(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+  return isa<MacroExpansionDecl>(D);
 }
 
 /// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
 /// marked private or fileprivate or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
+static bool isInPrivateOrLocalContext(const Decl *D) {
   const DeclContext *DC = D->getDeclContext();
   if (!DC->isTypeContext()) {
     assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
@@ -2718,7 +2720,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
-bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
+bool Decl::isOutermostPrivateOrFilePrivateScope() const {
   return hasPrivateOrFilePrivateFormalAccess(this) &&
          !isInPrivateOrLocalContext(this);
 }

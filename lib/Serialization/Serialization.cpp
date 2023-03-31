@@ -1968,7 +1968,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     Identifier discriminator;
     if (generic->isOutermostPrivateOrFilePrivateScope()) {
       auto *containingFile = cast<FileUnit>(generic->getModuleScopeContext());
-      discriminator = containingFile->getDiscriminatorForPrivateValue(generic);
+      discriminator = containingFile->getDiscriminatorForPrivateDecl(generic);
     }
 
     bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
@@ -2144,7 +2144,7 @@ void Serializer::writeCrossReference(const Decl *D) {
     if (type->isOutermostPrivateOrFilePrivateScope()) {
       auto *containingFile =
          cast<FileUnit>(type->getDeclContext()->getModuleScopeContext());
-      discriminator = containingFile->getDiscriminatorForPrivateValue(type);
+      discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
     }
 
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3057,7 +3057,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelSubcontext)) {
         if (shouldEmitPrivateDiscriminator) {
           Identifier discriminator =
-              enclosingFile->getDiscriminatorForPrivateValue(value);
+              enclosingFile->getDiscriminatorForPrivateDecl(value);
           unsigned abbrCode =
               S.DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
           PrivateDiscriminatorLayout::emitRecord(

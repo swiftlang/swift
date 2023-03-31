@@ -104,7 +104,7 @@ public:
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
+  getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private decls in Clang modules");
   }
 

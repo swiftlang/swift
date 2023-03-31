@@ -990,7 +990,7 @@ static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
   if (!containingFile)
     return DiscriminatorMatch::Different;
 
-  if (discriminator == containingFile->getDiscriminatorForPrivateValue(value))
+  if (discriminator == containingFile->getDiscriminatorForPrivateDecl(value))
     return DiscriminatorMatch::Matches;
 
   return DiscriminatorMatch::Different;

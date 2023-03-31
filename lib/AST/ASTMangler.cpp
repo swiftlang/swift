@@ -959,7 +959,7 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
   llvm_unreachable("param not found");
 }
 
-static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
+static StringRef getPrivateDiscriminatorIfNecessary(const Decl *decl) {
   if (!decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
 
@@ -969,7 +969,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
   auto fileUnit = cast<FileUnit>(topLevelSubcontext);
 
   Identifier discriminator =
-      fileUnit->getDiscriminatorForPrivateValue(decl);
+      fileUnit->getDiscriminatorForPrivateDecl(decl);
   assert(!discriminator.empty());
   assert(!isNonAscii(discriminator.str()) &&
          "discriminator contains non-ASCII characters");
@@ -4005,6 +4005,11 @@ std::string ASTMangler::mangleMacroExpansion(
     const MacroExpansionDecl *expansion) {
   beginMangling();
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
   appendMacroExpansionOperator(
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Declaration,
