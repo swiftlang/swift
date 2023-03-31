@@ -1,4 +1,4 @@
-//===--- swift-interop-support.h - C++ and Swift Interop --------*- C++ -*-===//
+//===------------------ bridging - C++ and Swift Interop --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

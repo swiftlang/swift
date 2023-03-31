@@ -5,7 +5,7 @@
 // RUN: %empty-directory(%t/plugins)
 //
 //== Build the plugin library
-// RUN: %target-build-swift \
+// RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
 // RUN:   -I %swift-host-lib-dir \
 // RUN:   -L %swift-host-lib-dir \
@@ -15,7 +15,7 @@
 // RUN:   %S/Inputs/syntax_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift \
+// RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
 // RUN:   -I %swift-host-lib-dir \
 // RUN:   -L %swift-host-lib-dir \
