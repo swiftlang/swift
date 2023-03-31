@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: swift_swift_parser
+// FIXME: Swift parser is not enabled on Linux CI yet.
+// REQUIRES: OS=macosx
 
 // rdar://15946844
 func test1(inout var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{18-21=`var`}}

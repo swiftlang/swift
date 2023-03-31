@@ -2009,6 +2009,7 @@ public:
 
     case MacroDefinition::Kind::Invalid:
     case MacroDefinition::Kind::Builtin:
+    case MacroDefinition::Kind::Expanded:
       // Nothing else to check here.
       break;
 

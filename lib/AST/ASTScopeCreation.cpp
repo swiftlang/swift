@@ -723,6 +723,7 @@ NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(MacroDeclScope)
+NO_NEW_INSERTION_POINT(MacroDefinitionScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
@@ -1115,9 +1116,19 @@ void MacroDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
       decl, getPotentiallyOpaqueGenericParams(decl), this);
   if (decl->parameterList) {
-    scopeCreator.constructExpandAndInsert<ParameterListScope>(
+    leaf = scopeCreator.constructExpandAndInsert<ParameterListScope>(
         leaf, decl->parameterList, nullptr);
   }
+  if (auto def = decl->definition) {
+    scopeCreator
+      .constructExpandAndInsert<MacroDefinitionScope>(leaf, def);
+  }
+}
+
+void
+MacroDefinitionScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(ASTNode(definition), this);
 }
 
 void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(

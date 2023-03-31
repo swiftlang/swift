@@ -4676,6 +4676,7 @@ public:
     uint8_t rawAccessLevel;
     unsigned numArgNames;
     unsigned builtinID;
+    uint8_t hasExpandedMacroDefinition;
     IdentifierID externalModuleNameID;
     IdentifierID externalMacroTypeNameID;
 
@@ -4689,6 +4690,7 @@ public:
                                          rawAccessLevel,
                                          numArgNames,
                                          builtinID,
+                                         hasExpandedMacroDefinition,
                                          externalModuleNameID,
                                          externalMacroTypeNameID,
                                          argNameAndDependencyIDs);
@@ -4781,6 +4783,58 @@ public:
             MF.getIdentifier(externalModuleNameID),
             MF.getIdentifier(externalMacroTypeNameID)
          )
+      );
+    } else if (hasExpandedMacroDefinition) {
+      // Macro expansion definition block.
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        return macro;
+
+      SmallVector<uint64_t, 16> scratch;
+      scratch.clear();
+      StringRef expansionText;
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &expansionText));
+      if (recordID != decls_block::EXPANDED_MACRO_DEFINITION)
+        return macro;
+
+      uint8_t hasReplacements;
+      decls_block::ExpandedMacroDefinitionLayout::readRecord(
+          scratch, hasReplacements);
+
+      // Macro replacements block.
+      SmallVector<ExpandedMacroReplacement, 2> replacements;
+      if (hasReplacements) {
+        llvm::BitstreamEntry entry =
+            MF.fatalIfUnexpected(
+              MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+        if (entry.Kind == llvm::BitstreamEntry::Record) {
+          scratch.clear();
+          unsigned recordID = MF.fatalIfUnexpected(
+              MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+          if (recordID != decls_block::EXPANDED_MACRO_REPLACEMENTS)
+            return macro;
+
+          ArrayRef<uint64_t> serializedReplacements;
+          decls_block::ExpandedMacroReplacementsLayout::readRecord(
+              scratch, serializedReplacements);
+          if (serializedReplacements.size() % 3 == 0) {
+            for (unsigned i : range(0, serializedReplacements.size() / 3)) {
+              ExpandedMacroReplacement replacement{
+                static_cast<unsigned>(serializedReplacements[3*i]),
+                static_cast<unsigned>(serializedReplacements[3*i + 1]),
+                static_cast<unsigned>(serializedReplacements[3*i + 2])
+              };
+              replacements.push_back(replacement);
+            }
+          }
+        }
+      }
+
+      ctx.evaluator.cacheOutput(
+          MacroDefinitionRequest{macro},
+          MacroDefinition::forExpanded(ctx, expansionText, replacements)
       );
     }
 
