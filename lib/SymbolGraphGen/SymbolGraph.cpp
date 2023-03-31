@@ -69,6 +69,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
   Opts.PrintFactoryInitializerComment = false;
+  Opts.PrintMacroDefinitions = false;
 
   Opts.ExclusiveAttrList.clear();
 
