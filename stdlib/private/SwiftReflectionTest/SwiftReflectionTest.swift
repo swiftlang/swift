@@ -508,6 +508,7 @@ public func reflect<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+  withExtendedLifetime(error) {}
 }
 
 // Like reflect<T: Error>(error: T), but calls projectExistentialAndUnwrapClass 
@@ -523,6 +524,7 @@ public func reflectUnwrappingClassExistential<T: Error>(error: T) {
           kind: .ErrorExistential, 
           shouldUnwrapClassExistential: true)
   anyPointer.deallocate()
+  withExtendedLifetime(error) {}
 }
 
 // Reflect an `Enum`

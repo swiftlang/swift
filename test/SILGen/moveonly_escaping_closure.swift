@@ -90,7 +90,8 @@ func testGlobalClosureCaptureVar() {
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [var_decl] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -400,7 +401,8 @@ func testGlobalClosureCaptureLet() {
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [var_decl] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -922,7 +924,8 @@ func testGlobalClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX_LIFETIME]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [var_decl] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
@@ -1175,7 +1178,8 @@ func testGlobalClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX]]
 // CHECK: mark_function_escape [[PROJECT]]
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
-// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [lexical] [var_decl] [[PAI]]
+// CHECK: [[MOVE_PAI:%.*]] = move_value [lexical] [var_decl] [[PAI]]
+// CHECK: [[BORROW_PAI:%.*]] = begin_borrow [[MOVE_PAI]]
 // CHECK: [[COPY_BORROW_PAI:%.*]] = copy_value [[BORROW_PAI]]
 // CHECK: [[BORROW_COPY_BORROW_PAI:%.*]] = begin_borrow [[COPY_BORROW_PAI]]
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()

@@ -8,7 +8,8 @@ protocol P {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7consume15testLoadableLetyyF : $@convention(thin) () -> () {
 // CHECK: [[ORIG_VALUE:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick Klass.Type) -> @owned Klass
-// CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [lexical] [var_decl] [[ORIG_VALUE]]
+// CHECK: [[MOVED_VALUE:%.*]] = move_value [lexical] [var_decl] [[ORIG_VALUE]]
+// CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[MOVED_VALUE]]
 // CHECK: [[COPY:%.*]] = copy_value [[BORROWED_VALUE:%.*]]
 // CHECK: move_value [allows_diagnostics] [[COPY]]
 // CHECK: } // end sil function '$s7consume15testLoadableLetyyF'

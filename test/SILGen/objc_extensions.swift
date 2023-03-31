@@ -81,7 +81,7 @@ extension Sub {
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[BORROWED_UPCAST_SELF_COPY]])
 
     // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : @owned $Optional<String>):
-    // CHECK:   [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [var_decl] [[OLD_NSSTRING_BRIDGED]]
+    // CHECK:   [[MOVED_OLD_NSSTRING_BRIDGED:%.*]] = move_value [var_decl] [[OLD_NSSTRING_BRIDGED]]
     // This next line is completely not needed. But we are emitting it now.
     // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -99,10 +99,11 @@ extension Sub {
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
+    // CHECK:   [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[MOVED_OLD_NSSTRING_BRIDGED]]
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$s15objc_extensions3SubC4propSSSgvW : $@convention(method) (@guaranteed Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    apply [[DIDSET_NOTIFIER]]([[BORROWED_OLD_NSSTRING_BRIDGED]], [[SELF]])
     // CHECK:    end_borrow [[BORROWED_OLD_NSSTRING_BRIDGED]]
-    // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
+    // CHECK:    destroy_value [[MOVED_OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[NEW_VALUE]]
     // CHECK: } // end sil function '$s15objc_extensions3SubC4propSSSgvs'
 

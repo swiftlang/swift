@@ -847,11 +847,18 @@ public:
     }
 
     // Otherwise, if we do not have a no implicit copy variable, just follow
-    // the "normal path": perform a lexical borrow if the lifetime is lexical.
-    return SGF.B.createBeginBorrow(
-        PrologueLoc, value,
-        /*isLexical=*/SGF.F.getLifetime(vd, value->getType()).isLexical(),
-        /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+    // the "normal path".
+
+    auto isLexical = SGF.F.getLifetime(vd, value->getType()).isLexical();
+
+    if (value->getOwnershipKind() == OwnershipKind::Owned)
+      return SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ isLexical,
+                                   /*hasPointerEscape=*/false,
+                                   /*fromVarDecl=*/true);
+
+    return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ isLexical,
+                                   /*hasPointerEscape=*/false,
+                                   /*fromVarDecl=*/true);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
@@ -2174,6 +2181,11 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   if (auto *bbi = dyn_cast<BeginBorrowInst>(Val.getDefiningInstruction())) {
     B.createEndBorrow(silLoc, bbi);
     B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+    return;
+  }
+
+  if (auto *mvi = dyn_cast<MoveValueInst>(Val.getDefiningInstruction())) {
+    B.emitDestroyValueOperation(silLoc, mvi);
     return;
   }
 
