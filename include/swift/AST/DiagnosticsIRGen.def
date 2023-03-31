@@ -59,5 +59,8 @@ ERROR(temporary_allocation_alignment_not_positive,none,
 ERROR(temporary_allocation_alignment_not_power_of_2,none,
       "alignment value must be a power of two", ())
 
+ERROR(explosion_size_oveflow,none,
+      "explosion size too large", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

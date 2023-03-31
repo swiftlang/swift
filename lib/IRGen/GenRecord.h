@@ -28,7 +28,9 @@
 #include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 
 namespace swift {
 namespace irgen {
@@ -42,8 +44,8 @@ template <class FieldImpl> class RecordField {
   template <class, class, class> friend class RecordTypeBuilder;
 
   /// Begin/End - the range of explosion indexes for this element
-  unsigned Begin : 16;
-  unsigned End : 16;
+  unsigned Begin;
+  unsigned End;
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
@@ -883,7 +885,12 @@ public:
 
       auto &fieldInfo = fields.back();
       fieldInfo.Begin = explosionSize;
-      explosionSize += loadableFieldTI->getExplosionSize();
+      bool overflow = false;
+      explosionSize = llvm::SaturatingAdd(explosionSize, loadableFieldTI->getExplosionSize(), &overflow);
+      if (overflow) {
+        IGM.Context.Diags.diagnose(SourceLoc(), diag::explosion_size_oveflow);
+      }
+
       fieldInfo.End = explosionSize;
     }
 
