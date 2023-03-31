@@ -58,4 +58,14 @@ func testUnavailableExpandAllElsePaths() {
   } else {
     foo()
   }
-} 
+}
+
+func log(message: String) {}
+
+@available(*, unavailable, renamed: "log(message:)")
+func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+
+// Regression test for https://github.com/apple/swift/issues/64694
+func testUnavailableRenamedFromVariadicDoesntAssert() {
+  log(format: "") // expected-error{{'log(format:_:)' has been renamed to 'log(message:)'}}
+}
