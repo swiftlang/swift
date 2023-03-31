@@ -454,6 +454,8 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
+  virtual void loadDependenciesForTestable(SourceLoc diagLoc) const override;
+
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
 
   virtual StringRef getFilename() const override;
