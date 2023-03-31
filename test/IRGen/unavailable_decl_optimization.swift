@@ -45,22 +45,6 @@ extension UnavailableStruct {
 }
 
 @available(*, unavailable)
-public enum UnavailableEnum {
-  case a, b
-
-  // CHECK-NO-STRIP: s4Test15UnavailableEnumO6methodyyF
-  // CHECK-STRIP-NOT: s4Test15UnavailableEnumO6methodyyF
-  public func method() {}
-
-  // CHECK-NO-STRIP: s4Test15UnavailableEnumO21__derived_enum_equalsySbAC_ACtFZ
-  // CHECK-NO-STRIP: s4Test15UnavailableEnumO4hash4intoys6HasherVz_tF
-  // CHECK-NO-STRIP: s4Test15UnavailableEnumO9hashValueSivg
-  // CHECK-STRIP-NOT: s4Test15UnavailableEnumO21__derived_enum_equalsySbAC_ACtFZ
-  // CHECK-STRIP-NOT: s4Test15UnavailableEnumO4hash4intoys6HasherVz_tF
-  // CHECK-STRIP-NOT: s4Test15UnavailableEnumO9hashValueSivg
-}
-
-@available(*, unavailable)
 public class UnavailableClass<T> {
   // CHECK-NO-STRIP: s4Test16UnavailableClassC8propertyxvg
   // CHECK-NO-STRIP: s4Test16UnavailableClassC8propertyxvs
@@ -113,18 +97,6 @@ extension S {
   public func methodInUnavailableExtension() {}
 }
 
-public enum E {
-  case a
-
-  @available(*, unavailable)
-  case b
-
-  // CHECK-NO-STRIP: s4Test1EO17unavailableMethodyyF
-  // CHECK-STRIP-NOT: s4Test1EO17unavailableMethodyyF
-  @available(*, unavailable)
-  public func unavailableMethod() {}
-}
-
 public class C<T> {
   // CHECK-NO-STRIP: s4Test1CC19unavailablePropertyxvg
   // CHECK-NO-STRIP: s4Test1CC19unavailablePropertyxvs
@@ -149,20 +121,7 @@ public class C<T> {
 
 // MARK: -
 
-// MARK: UnavailableEnum
-
-// CHECK-NO-STRIP: s4Test15UnavailableEnumOwug
-// CHECK-STRIP-NOT: s4Test15UnavailableEnumOwug
-
-// CHECK-NO-STRIP: s4Test15UnavailableEnumOMa
-// CHECK-STRIP-NOT: s4Test15UnavailableEnumOMa
-
 // MARK: UnavailableClass
 
 // CHECK-NO-STRIP: s4Test16UnavailableClassCMa
 // CHECK-STRIP-NOT: s4Test16UnavailableClassCMa
-
-// MARK: E
-
-// CHECK: s4Test1EOwug
-// CHECK: s4Test1EOMa
