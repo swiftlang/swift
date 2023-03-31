@@ -1635,7 +1635,22 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       SmallVector<SynthesizedArg, 4> synthesizedArgs;
       for (unsigned i = 0, n = argTuple->getNumElements(); i != n; ++i) {
         const auto &elt = argTuple->getElement(i);
-        AnyFunctionType::Param argument(elt.getType(), elt.getName());
+
+        // If tuple doesn't have a label for its first element
+        // and parameter does, let's assume parameter's label
+        // to aid argument matching. For example:
+        //
+        // \code
+        // func test(val: Int, _: String) {}
+        //
+        // test(val: (42, "")) // expands into `(val: 42, "")`
+        // \endcode
+        Identifier label = elt.getName();
+        if (i == 0 && !elt.hasName() && params[0].hasLabel()) {
+          label = params[0].getLabel();
+        }
+
+        AnyFunctionType::Param argument(elt.getType(), label);
         synthesizedArgs.push_back(SynthesizedArg{i, argument});
         argsWithLabels.push_back(argument);
       }
