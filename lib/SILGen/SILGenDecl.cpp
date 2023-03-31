@@ -835,7 +835,7 @@ public:
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
     if (vd->isNoImplicitCopy()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*IisLexical*/ true,
+      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true,
                                     /*hasPointerEscape=*/false,
                                     /*fromVarDecl=*/true);
       value =
