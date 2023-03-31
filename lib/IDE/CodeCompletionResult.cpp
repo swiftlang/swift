@@ -20,6 +20,100 @@
 using namespace swift;
 using namespace swift::ide;
 
+CodeCompletionMacroRoles swift::ide::getCompletionMacroRoles(const Decl *D) {
+  CodeCompletionMacroRoles roles;
+
+  auto *MD = dyn_cast<MacroDecl>(D);
+  if (!MD)
+    return roles;
+
+  MacroRoles macroRoles = MD->getMacroRoles();
+  if (macroRoles.contains(MacroRole::Expression)) {
+    roles |= CodeCompletionMacroRole::Expression;
+  }
+  if (macroRoles.contains(MacroRole::Declaration)) {
+    roles |= CodeCompletionMacroRole::Declaration;
+  }
+  if (macroRoles.contains(MacroRole::CodeItem)) {
+    roles |= CodeCompletionMacroRole::CodeItem;
+  }
+  if (macroRoles.contains(MacroRole::Accessor)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (macroRoles & MacroRoles({MacroRole::MemberAttribute, MacroRole::Member,
+                               MacroRole::Conformance})) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (macroRoles.contains(MacroRole::Peer)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+
+  return roles;
+}
+
+CodeCompletionMacroRoles
+swift::ide::getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds) {
+  CodeCompletionMacroRoles roles;
+  if (kinds.contains(CustomAttributeKind::VarMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (kinds.contains(CustomAttributeKind::ContextMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (kinds.contains(CustomAttributeKind::DeclMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  return roles;
+}
+
+CodeCompletionMacroRoles
+swift::ide::getCompletionMacroRoles(CodeCompletionFilter filter) {
+  CodeCompletionMacroRoles roles;
+  if (filter.contains(CodeCompletionFilterFlag::ExpressionMacro)) {
+    roles |= CodeCompletionMacroRole::Expression;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::DeclarationMacro)) {
+    roles |= CodeCompletionMacroRole::Declaration;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::CodeItemMacro)) {
+    roles |= CodeCompletionMacroRole::CodeItem;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedVarMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedContextMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedDeclMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  return roles;
+}
+
+CodeCompletionFilter
+swift::ide::getCompletionFilter(CodeCompletionMacroRoles roles) {
+  CodeCompletionFilter filter;
+  if (roles.contains(CodeCompletionMacroRole::Expression)) {
+    filter |= CodeCompletionFilterFlag::ExpressionMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::Declaration)) {
+    filter |= CodeCompletionFilterFlag::DeclarationMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::CodeItem)) {
+    filter |= CodeCompletionFilterFlag::CodeItemMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedVar)) {
+    filter |= CodeCompletionFilterFlag::AttachedVarMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedContext)) {
+    filter |= CodeCompletionFilterFlag::AttachedContextMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedDecl)) {
+    filter |= CodeCompletionFilterFlag::AttachedDeclMacro;
+  }
+  return filter;
+}
+
 // MARK: - ContextFreeCodeCompletionResult
 
 ContextFreeCodeCompletionResult *
@@ -42,8 +136,9 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     NameForDiagnostics = "operator";
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
-      Kind, /*AssociatedKind=*/0, KnownOperatorKind,
-      /*IsSystem=*/false, IsAsync, /*HasAsyncAlternative=*/false, CompletionString,
+      Kind, /*AssociatedKind=*/0, KnownOperatorKind, /*MacroRoles=*/{},
+      /*IsSystem=*/false, IsAsync, /*HasAsyncAlternative=*/false,
+      CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
       DiagnosticMessage,
@@ -62,7 +157,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
-      CodeCompletionOperatorKind::None, /*IsSystem=*/false, /*IsAsync=*/false,
+      CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
+      /*IsSystem=*/false, /*IsAsync=*/false,
       /*HasAsyncAlternative=*/false, CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
@@ -81,7 +177,7 @@ ContextFreeCodeCompletionResult::createLiteralResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
-      CodeCompletionOperatorKind::None,
+      CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
       /*IsSystem=*/false, /*IsAsync=*/false, /*HasAsyncAlternative=*/false,
       CompletionString,
       /*ModuleName=*/"",
@@ -124,10 +220,10 @@ ContextFreeCodeCompletionResult::createDeclResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
-      CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
-      IsAsync, HasAsyncAlternative, CompletionString, ModuleName,
-      BriefDocComment, AssociatedUSRs, ResultType, NotRecommended,
-      DiagnosticSeverity, DiagnosticMessage,
+      CodeCompletionOperatorKind::None, getCompletionMacroRoles(AssociatedDecl),
+      getDeclIsSystem(AssociatedDecl), IsAsync, HasAsyncAlternative,
+      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }

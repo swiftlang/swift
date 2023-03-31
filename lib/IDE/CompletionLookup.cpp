@@ -1791,22 +1791,20 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
       MD->shouldHideFromEditor())
     return;
 
-  // If this is the wrong kind of macro, we don't need it.
-  bool wantAttachedMacro =
-      expectedTypeContext.getExpectedCustomAttributeKinds()
-        .contains(CustomAttributeKind::Macro);
-  if ((wantAttachedMacro && !isAttachedMacro(MD->getMacroRoles())) ||
-      (!wantAttachedMacro && !isFreestandingMacro(MD->getMacroRoles())))
-    return;
+  OptionSet<CustomAttributeKind> expectedKinds =
+      expectedTypeContext.getExpectedCustomAttributeKinds();
+  if (expectedKinds) {
+    CodeCompletionMacroRoles expectedRoles =
+        getCompletionMacroRoles(expectedKinds);
+    CodeCompletionMacroRoles roles = getCompletionMacroRoles(MD);
+    if (!(roles & expectedRoles))
+      return;
+  }
 
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(MD, Reason, DynamicLookupInfo()));
   Builder.setAssociatedDecl(MD);
-
-  if (NeedLeadingMacroPound && !wantAttachedMacro) {
-    Builder.addTextChunk("#");
-  }
 
   addValueBaseName(Builder, MD->getBaseIdentifier());
 
@@ -2207,7 +2205,8 @@ bool CompletionLookup::tryFunctionCallCompletions(
   return false;
 }
 
-bool CompletionLookup::tryModuleCompletions(Type ExprType, bool TypesOnly) {
+bool CompletionLookup::tryModuleCompletions(Type ExprType,
+                                            CodeCompletionFilter Filter) {
   if (auto MT = ExprType->getAs<ModuleType>()) {
     ModuleDecl *M = MT->getModule();
 
@@ -2225,11 +2224,8 @@ bool CompletionLookup::tryModuleCompletions(Type ExprType, bool TypesOnly) {
         ShadowingOrOriginal.push_back(M);
     }
     for (ModuleDecl *M : ShadowingOrOriginal) {
-      RequestedResultsTy Request = RequestedResultsTy::fromModule(M)
-                                       .needLeadingDot(needDot())
-                                       .withModuleQualifier(false);
-      if (TypesOnly)
-        Request = Request.onlyTypes();
+      RequestedResultsTy Request =
+          RequestedResultsTy::fromModule(M, Filter).needLeadingDot(needDot());
       RequestedCachedResults.insert(Request);
     }
     return true;
@@ -2345,7 +2341,8 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD) {
   bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
   if (tryFunctionCallCompletions(ExprType, VD))
     return;
-  if (tryModuleCompletions(ExprType))
+  if (tryModuleCompletions(ExprType, {CodeCompletionFilterFlag::Expr,
+                                      CodeCompletionFilterFlag::Type}))
     return;
   if (tryTupleExprCompletions(ExprType))
     return;
@@ -2726,9 +2723,9 @@ void CompletionLookup::addObjCPoundKeywordCompletions(bool needPound) {
   }
 }
 
-void CompletionLookup::getMacroCompletions(bool needPound) {
+void CompletionLookup::getMacroCompletions(CodeCompletionMacroRoles roles) {
   RequestedCachedResults.insert(
-      RequestedResultsTy::toplevelResults().onlyMacros(needPound));
+      RequestedResultsTy::topLevelResults(getCompletionFilter(roles)));
 }
 
 void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
@@ -2744,9 +2741,13 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
 
   lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
                      /*IncludeTopLevel=*/false, Loc);
-  RequestedCachedResults.insert(
-      RequestedResultsTy::toplevelResults().withModuleQualifier(
-          ModuleQualifier));
+
+  CodeCompletionFilter filter{CodeCompletionFilterFlag::Expr,
+                              CodeCompletionFilterFlag::Type};
+  if (ModuleQualifier) {
+    filter |= CodeCompletionFilterFlag::Module;
+  }
+  RequestedCachedResults.insert(RequestedResultsTy::topLevelResults(filter));
 
   if (CompletionContext) {
     // FIXME: this is an awful simplification that says all and only enums can
@@ -2891,7 +2892,7 @@ void CompletionLookup::addCallArgumentCompletionResults(
 }
 
 void CompletionLookup::getTypeCompletions(Type BaseType) {
-  if (tryModuleCompletions(BaseType, /*OnlyTypes=*/true))
+  if (tryModuleCompletions(BaseType, CodeCompletionFilterFlag::Type))
     return;
   Kind = LookupKind::Type;
   this->BaseType = BaseType;
@@ -3047,9 +3048,8 @@ void CompletionLookup::collectPrecedenceGroups() {
     if (Module == CurrModule)
       continue;
 
-    RequestedCachedResults.insert(RequestedResultsTy::fromModule(Module)
-                                      .onlyPrecedenceGroups()
-                                      .withModuleQualifier(false));
+    RequestedCachedResults.insert(RequestedResultsTy::fromModule(
+        Module, CodeCompletionFilterFlag::PrecedenceGroup));
   }
 }
 
@@ -3139,24 +3139,38 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
                      /*IncludeTopLevel=*/false, Loc);
 
-  RequestedCachedResults.insert(
-      RequestedResultsTy::toplevelResults().onlyTypes().withModuleQualifier(
-          ModuleQualifier));
+  CodeCompletionFilter filter{CodeCompletionFilterFlag::Type};
+  if (ModuleQualifier) {
+    filter |= CodeCompletionFilterFlag::Module;
+  }
+  RequestedCachedResults.insert(RequestedResultsTy::topLevelResults(filter));
 }
 
-void CompletionLookup::getToplevelCompletions(bool OnlyTypes, bool OnlyMacros) {
-  Kind = OnlyTypes ? LookupKind::TypeInDeclContext
-                   : LookupKind::ValueInDeclContext;
+void CompletionLookup::getToplevelCompletions(CodeCompletionFilter Filter) {
+  Kind = (Filter - CodeCompletionFilterFlag::Module)
+                 .containsOnly(CodeCompletionFilterFlag::Type)
+             ? LookupKind::TypeInDeclContext
+             : LookupKind::ValueInDeclContext;
   NeedLeadingDot = false;
-  NeedLeadingMacroPound = !OnlyMacros;
 
   UsableFilteringDeclConsumer UsableFilteringConsumer(
       Ctx.SourceMgr, CurrDeclContext, Ctx.SourceMgr.getIDEInspectionTargetLoc(),
       *this);
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext,
                                                       UsableFilteringConsumer);
-  DeclFilter Filter = OnlyMacros ? MacroFilter : DefaultFilter;
-  FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
+
+  CodeCompletionMacroRoles ExpectedRoles = getCompletionMacroRoles(Filter);
+  DeclFilter VisibleFilter =
+      [ExpectedRoles](ValueDecl *VD, DeclVisibilityKind Kind,
+                      DynamicLookupInfo DynamicLookupInfo) {
+        CodeCompletionMacroRoles Roles = getCompletionMacroRoles(VD);
+        if (!ExpectedRoles)
+          return !Roles;
+        return (bool)(Roles & ExpectedRoles);
+      };
+
+  FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer,
+                                         VisibleFilter);
 
   CurrModule->lookupVisibleDecls({}, FilteringConsumer,
                                  NLKind::UnqualifiedLookup);

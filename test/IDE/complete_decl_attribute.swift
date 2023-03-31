@@ -57,9 +57,6 @@ actor MyGenericGlobalActor<T> {
   static let shared = MyGenricGlobalActor<T>()
 }
 
-@attached(member)
-macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
-
 @available(#^AVAILABILITY1^#)
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
@@ -81,7 +78,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
-// AVAILABILITY1-NEXT: End completions
 
 @available(*, #^AVAILABILITY2^#)
 
@@ -91,7 +87,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // AVAILABILITY2-NEXT:        Keyword/None:                       renamed: [#Specify replacing name#]; name=renamed{{$}}
 // AVAILABILITY2-NEXT:        Keyword/None:                       introduced: [#Specify version number#]; name=introduced{{$}}
 // AVAILABILITY2-NEXT:        Keyword/None:                       deprecated: [#Specify version number#]; name=deprecated{{$}}
-// AVAILABILITY2-NEXT:        End completions
 
 @#^KEYWORD2^# func method(){}
 
@@ -119,8 +114,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
 // KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// KEYWORD2-DAG:              Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
-// KEYWORD2:                  End completions
 
 @#^KEYWORD3^# class C {}
 
@@ -141,8 +134,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 // KEYWORD3-NEXT:             Keyword/None:                       runtimeMetadata[#Class Attribute#]; name=runtimeMetadata
-// KEYWORD3-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
-// KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
 // Same as KEYWORD3.
@@ -161,8 +152,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 // KEYWORD4-NEXT:             Keyword/None:                       runtimeMetadata[#Enum Attribute#]; name=runtimeMetadata
-// KEYWORD4-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
-// KEYWORD4-NEXT:             End completions
 
 @#^KEYWORD5^# struct S{}
 // KEYWORD5:                  Begin completions
@@ -177,8 +166,6 @@ macro MyMacro() = #externalMacro(module: "Macros", type: "MyMacro")
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 // KEYWORD5-NEXT:             Keyword/None:                       runtimeMetadata[#Struct Attribute#]; name=runtimeMetadata
-// KEYWORD5-NEXT:             Decl[Macro]/CurrModule: MyMacro[#Void#]; name=MyMacro
-// KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
 // ON_GLOBALVAR-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
