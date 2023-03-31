@@ -636,7 +636,8 @@ mapOffsetToNewerSnapshot(unsigned Offset,
 static void mapLocToLatestSnapshot(
     SwiftLangSupport &Lang, LocationInfo &Location,
     ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
-  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename);
+  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename,
+                                                         /*IsRealpath=*/true);
   if (!EditorDoc)
     return;
 
@@ -701,30 +702,22 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
-static Optional<RefactoringInfo>
-collectAvailableRenameInfo(const ValueDecl *VD,
-                           Optional<RenameRefInfo> RefInfo) {
-  Optional<RenameAvailabilityInfo> Info = renameAvailabilityInfo(VD, RefInfo);
-  if (!Info)
-    return None;
+static void addRefactorings(
+    SmallVectorImpl<RefactoringInfo> &intoLangInfos,
+    const SmallVectorImpl<RefactorAvailabilityInfo> &availableInfos) {
+  for (auto info : availableInfos) {
+    auto uid = SwiftLangSupport::getUIDForRefactoringKind(info.Kind);
+    bool hasRefactoringWithSameUID =
+        llvm::any_of(intoLangInfos, [&](RefactoringInfo &existing) {
+          return uid == existing.Kind;
+        });
+    if (hasRefactoringWithSameUID)
+      continue;
 
-  return RefactoringInfo(
-      SwiftLangSupport::getUIDForRefactoringKind(Info->Kind),
-      ide::getDescriptiveRefactoringKindName(Info->Kind),
-      ide::getDescriptiveRenameUnavailableReason(Info->AvailableKind));
-}
-
-static SmallVector<RefactoringInfo>
-collectAvailableRefactoringsOtherThanRename(ResolvedCursorInfoPtr CursorInfo) {
-  SmallVector<RefactoringKind, 8> Kinds;
-  collectAvailableRefactorings(CursorInfo, Kinds, /*ExcludeRename*/ true);
-  SmallVector<RefactoringInfo> Refactorings;
-  for (auto Kind : Kinds) {
-    Refactorings.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
-                              ide::getDescriptiveRefactoringKindName(Kind),
-                              StringRef());
+    intoLangInfos.emplace_back(
+        uid, ide::getDescriptiveRefactoringKindName(info.Kind),
+        ide::getDescriptiveRenameUnavailableReason(info.AvailableKind));
   }
-  return Refactorings;
 }
 
 static Optional<unsigned>
@@ -906,12 +899,13 @@ static void setLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, Loc);
     }
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+    auto [DeclBufID, DeclLoc] =
+        VD->getModuleContext()->getOriginalLocation(Loc);
     Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
-    Location.Offset = SM.getLocOffsetInBuffer(Loc, DeclBufID);
+    Location.Offset = SM.getLocOffsetInBuffer(DeclLoc, DeclBufID);
     Location.Length = NameLen;
-    std::tie(Location.Line, Location.Column) = SM.getLineAndColumnInBuffer(
-        Loc, DeclBufID);
+    std::tie(Location.Line, Location.Column) =
+        SM.getLineAndColumnInBuffer(DeclLoc, DeclBufID);
     if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(DeclBufID)) {
       if (GeneratedSourceInfo->kind ==
           GeneratedSourceInfo::ReplacedFunctionBody) {
@@ -925,9 +919,8 @@ static void setLocationInfo(const ValueDecl *VD,
         auto GeneratedStartOffset = SM.getLocOffsetInBuffer(
             GeneratedSourceInfo->generatedSourceRange.getStart(), DeclBufID);
         Location.Offset += OriginalStartOffset - GeneratedStartOffset;
-        assert(SM.findBufferContainingLoc(Loc) == DeclBufID);
         std::tie(Location.Line, Location.Column) =
-            SM.getPresumedLineAndColumnForLoc(Loc, DeclBufID);
+            SM.getPresumedLineAndColumnForLoc(DeclLoc, DeclBufID);
       }
     }
   } else if (ClangNode) {
@@ -1211,27 +1204,8 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   }
 
   if (AddRefactorings) {
-    Optional<RenameRefInfo> RefInfo;
-    if (Info->isRef())
-      RefInfo = {Info->getSourceFile(), Info->getLoc(),
-                 Info->isKeywordArgument()};
-
-    /// Adds an action to \c Data if no action with the same UID exists.
-    auto AddAction = [&Data](const RefactoringInfo &NewRefactoring) {
-      bool HasRefactoringWithSameUID = llvm::any_of(
-          Data.AvailableActions, [&](RefactoringInfo &ExistingRefactoring) {
-            return ExistingRefactoring.Kind == NewRefactoring.Kind;
-          });
-      if (HasRefactoringWithSameUID) {
-        return;
-      }
-      Data.AvailableActions.push_back(NewRefactoring);
-    };
-    if (auto Rename = collectAvailableRenameInfo(MainInfo.VD, RefInfo)) {
-      AddAction(*Rename);
-    }
-    llvm::for_each(collectAvailableRefactoringsOtherThanRename(Info),
-                   AddAction);
+    addRefactorings(Data.AvailableActions,
+                    collectRefactorings(Info, /*ExcludeRename=*/false));
   }
 
   return true;
@@ -1435,9 +1409,9 @@ public:
   CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                           bool TryExistingAST, bool CancelOnSubsequentRequest)
-    : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile.str()), Offset(Offset),
-      Length(Length), TryExistingAST(TryExistingAST),
-      CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
+      : Lang(Lang), ASTInvok(ASTInvok), InputFile(InputFile.str()),
+        Offset(Offset), Length(Length), TryExistingAST(TryExistingAST),
+        CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
   bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
     if (!TryExistingAST) {
@@ -1452,7 +1426,8 @@ public:
     // blocked waiting on the AST to be fully typechecked.
 
     ImmutableTextSnapshotRef InputSnap;
-    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(InputFile))
+    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(
+            InputFile, /*IsRealpath=*/true))
       InputSnap = EditorDoc->getLatestSnapshot();
     if (!InputSnap)
       return false;
@@ -1493,6 +1468,33 @@ public:
   }
 };
 
+static SourceFile *retrieveInputFile(StringRef inputBufferName,
+                                     const CompilerInstance &CI,
+                                     bool haveRealPath = false) {
+  // Don't bother looking up if we have the same file as the primary file or
+  // we weren't given a separate input file
+  if (inputBufferName.empty() ||
+      CI.getPrimarySourceFile()->getFilename() == inputBufferName)
+    return CI.getPrimarySourceFile();
+
+  // Otherwise, try to find the given buffer identifier
+  const SourceManager &SM = CI.getSourceMgr();
+  Optional<unsigned> inputBufferID =
+      SM.getIDForBufferIdentifier(inputBufferName);
+  if (!inputBufferID) {
+    // If that failed, try again with symlinks resolved (unless we've already
+    // done that)
+    if (haveRealPath)
+      return nullptr;
+    std::string realPath =
+        SwiftLangSupport::resolvePathSymlinks(inputBufferName);
+    return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
+  }
+
+  return CI.getMainModule()->getSourceFileContainingLocation(
+      SM.getRangeForBuffer(*inputBufferID).getStart());
+}
+
 static void resolveCursor(
     SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
     unsigned Length, bool Actionables, bool SymbolGraph,
@@ -1524,13 +1526,21 @@ static void resolveCursor(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
+
+      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<CursorInfoData>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+
       SourceManager &SM = CompIns.getSourceMgr();
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
+      unsigned BufferID = SF->getBufferID().value();
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
         Receiver(RequestResult<CursorInfoData>::fromError(
-          "Unable to resolve the start of the token."));
+            "Unable to find initial lookup location"));
         return;
       }
 
@@ -1548,7 +1558,6 @@ static void resolveCursor(
       // Retrieve relevant actions on the code under selection.
       llvm::SmallVector<RefactoringInfo, 8> Actions;
       if (Actionables && Length) {
-        SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
         Range.BufferID = BufferID;
         auto Pair = SM.getLineAndColumnInBuffer(Loc);
@@ -1556,13 +1565,9 @@ static void resolveCursor(
         Range.Column = Pair.second;
         Range.Length = Length;
         bool CollectRangeStartRefactorings = false;
-        collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(), Range,
-                                     CollectRangeStartRefactorings, Kinds, {});
-        for (RefactoringKind Kind : Kinds) {
-          Actions.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
-                               getDescriptiveRefactoringKindName(Kind),
-                               /*UnavailableReason*/ StringRef());
-        }
+        addRefactorings(
+            Actions,
+            collectRefactorings(SF, Range, CollectRangeStartRefactorings, {}));
         if (!CollectRangeStartRefactorings) {
           // If Length is given then this request is only for refactorings,
           // return straight away unless we need cursor based refactorings as
@@ -1575,10 +1580,9 @@ static void resolveCursor(
         // Fall through to collect cursor based refactorings
       }
 
-      auto *File = &AstUnit->getPrimarySourceFile();
       ResolvedCursorInfoPtr CursorInfo =
-          evaluateOrDefault(File->getASTContext().evaluator,
-                            CursorInfoRequest{CursorInfoOwner(File, Loc)},
+          evaluateOrDefault(CompIns.getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(SF, Loc)},
                             new ResolvedCursorInfo());
 
       CompilerInvocation CompInvok;
@@ -1617,8 +1621,8 @@ static void resolveCursor(
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
         if (Actionables) {
-          Actions.append(
-              collectAvailableRefactoringsOtherThanRename(CursorInfo));
+          addRefactorings(
+              Actions, collectRefactorings(CursorInfo, /*ExcludeRename=*/true));
           if (!Actions.empty()) {
             CursorInfoData Data;
             Data.AvailableActions = Actions;
@@ -1671,7 +1675,7 @@ static void resolveCursor(
 }
 
 static void computeDiagnostics(
-    SwiftLangSupport &Lang, StringRef InputFile, SwiftInvocationRef Invok,
+    SwiftLangSupport &Lang, SwiftInvocationRef Invok,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver) {
@@ -1685,8 +1689,7 @@ static void computeDiagnostics(
         : Receiver(Receiver) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      unsigned BufferID =
-          AstUnit->getPrimarySourceFile().getBufferID().value();
+      unsigned BufferID = *AstUnit->getPrimarySourceFile().getBufferID();
       auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
@@ -1732,19 +1735,24 @@ static void resolveName(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
-      SourceLoc Loc =
-        Lexer::getLocForStartOfToken(CompIns.getSourceMgr(), BufferID, Offset);
+      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<NameTranslatingInfo>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+
+      SourceLoc Loc = Lexer::getLocForStartOfToken(CompIns.getSourceMgr(),
+                                                   *SF->getBufferID(), Offset);
       if (Loc.isInvalid()) {
         Receiver(RequestResult<NameTranslatingInfo>::fromError(
           "Unable to resolve the start of the token."));
         return;
       }
 
-      auto *File = &AstUnit->getPrimarySourceFile();
       ResolvedCursorInfoPtr CursorInfo =
-          evaluateOrDefault(File->getASTContext().evaluator,
-                            CursorInfoRequest{CursorInfoOwner(File, Loc)},
+          evaluateOrDefault(CompIns.getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(SF, Loc)},
                             new ResolvedCursorInfo());
       if (CursorInfo->isInvalid()) {
         NameTranslatingInfo Info;
@@ -1836,10 +1844,19 @@ resolveRange(SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       // FIXME: Implement tracing
-      auto *File = &AstUnit->getPrimarySourceFile();
-      ResolvedRangeInfo Info = evaluateOrDefault(File->getASTContext().evaluator,
-        RangeInfoRequest(RangeInfoOwner({File, Offset, Length})),
-                                                 ResolvedRangeInfo());
+      auto &CompIns = AstUnit->getCompilerInstance();
+
+      SourceFile *SF = retrieveInputFile(InputFile, CompIns);
+      if (!SF) {
+        Receiver(
+            RequestResult<RangeInfo>::fromError("Unable to find input file"));
+        return;
+      }
+
+      ResolvedRangeInfo Info = evaluateOrDefault(
+          CompIns.getASTContext().evaluator,
+          RangeInfoRequest(RangeInfoOwner({SF, Offset, Length})),
+          ResolvedRangeInfo());
 
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
@@ -1939,17 +1956,18 @@ static void deliverCursorInfoResults(
 }
 
 void SwiftLangSupport::getCursorInfo(
-    StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
-    bool SymbolGraph, bool CancelOnSubsequentRequest,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+    unsigned Length, bool Actionables, bool SymbolGraph,
+    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+    Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string error;
-  auto fileSystem = getFileSystem(vfsOptions, InputFile, error);
+  auto fileSystem = getFileSystem(vfsOptions, PrimaryFilePath, error);
   if (!fileSystem)
     return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
-  if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
+  if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables,
                                  SymbolGraph, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
@@ -1991,7 +2009,7 @@ void SwiftLangSupport::getCursorInfo(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, fileSystem, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, fileSystem, Error);
   if (!Error.empty()) {
     LOG_WARN_FUNC("error creating ASTInvocation: " << Error);
   }
@@ -2001,14 +2019,18 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   bool SolverBasedProducedResult = false;
-  std::string InputFileError;
-  llvm::SmallString<64> RealInputFilePath;
-  fileSystem->getRealPath(InputFile, RealInputFilePath);
-  std::unique_ptr<llvm::MemoryBuffer> UnresolvedInputFile =
-      getASTManager()->getMemoryBuffer(RealInputFilePath, fileSystem,
-                                       InputFileError);
-  // The solver-based implementation doesn't support range based cursor info.
-  if (UnresolvedInputFile && Length == 0) {
+  // Solver based cursor info cannot handle generated buffers or range based
+  // cursor info.
+  std::unique_ptr<llvm::MemoryBuffer> InputBuffer;
+  if (InputBufferName.empty() && Length == 0) {
+    std::string InputFileError;
+    llvm::SmallString<128> RealInputFilePath;
+    fileSystem->getRealPath(PrimaryFilePath, RealInputFilePath);
+    InputBuffer = getASTManager()->getMemoryBuffer(RealInputFilePath,
+                                                   fileSystem, InputFileError);
+  }
+
+  if (InputBuffer) {
     auto SolverBasedReceiver = [&](const RequestResult<CursorInfoData> &Res) {
       SolverBasedProducedResult = true;
       Receiver(Res);
@@ -2018,7 +2040,7 @@ void SwiftLangSupport::getCursorInfo(
     Invok->applyTo(CompInvok);
 
     performWithParamsToCompletionLikeOperation(
-        UnresolvedInputFile.get(), Offset,
+        InputBuffer.get(), Offset,
         /*InsertCodeCompletionToken=*/false, Args, fileSystem,
         CancellationToken,
         [&](CancellableResult<CompletionLikeOperationParams> ParmsResult) {
@@ -2037,19 +2059,20 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   if (!SolverBasedProducedResult) {
-    resolveCursor(*this, InputFile, Offset, Length, Actionables, SymbolGraph,
-                  Invok, /*TryExistingAST=*/true, CancelOnSubsequentRequest,
-                  fileSystem, CancellationToken, Receiver);
+    resolveCursor(*this, InputBufferName, Offset, Length, Actionables,
+                  SymbolGraph, Invok, /*TryExistingAST=*/true,
+                  CancelOnSubsequentRequest, fileSystem, CancellationToken,
+                  Receiver);
   }
 }
 
 void SwiftLangSupport::getDiagnostics(
-    StringRef InputFile, ArrayRef<const char *> Args,
+    StringRef PrimaryFilePath, ArrayRef<const char *> Args,
     Optional<VFSOptions> VfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver) {
   std::string FileSystemError;
-  auto FileSystem = getFileSystem(VfsOptions, InputFile, FileSystemError);
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
   if (!FileSystem) {
     Receiver(RequestResult<DiagnosticsResult>::fromError(FileSystemError));
     return;
@@ -2057,7 +2080,7 @@ void SwiftLangSupport::getDiagnostics(
 
   std::string InvocationError;
   SwiftInvocationRef Invok = ASTMgr->getTypecheckInvocation(
-      Args, InputFile, FileSystem, InvocationError);
+      Args, PrimaryFilePath, FileSystem, InvocationError);
   if (!InvocationError.empty()) {
     LOG_WARN_FUNC("error creating ASTInvocation: " << InvocationError);
   }
@@ -2066,16 +2089,15 @@ void SwiftLangSupport::getDiagnostics(
     return;
   }
 
-  computeDiagnostics(*this, InputFile, Invok, FileSystem, CancellationToken,
-                     Receiver);
+  computeDiagnostics(*this, Invok, FileSystem, CancellationToken, Receiver);
 }
 
 void SwiftLangSupport::getRangeInfo(
-    StringRef InputFile, unsigned Offset, unsigned Length,
-    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+    unsigned Length, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<RangeInfo> &)> Receiver) {
-  if (IFaceGenContexts.get(InputFile)) {
+  if (IFaceGenContexts.get(InputBufferName)) {
     // FIXME: return range info for generated interfaces.
     Receiver(RequestResult<RangeInfo>::fromError(
         "Range info for generated interfaces is not implemented."));
@@ -2083,7 +2105,7 @@ void SwiftLangSupport::getRangeInfo(
   }
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<RangeInfo>::fromError(Error));
@@ -2093,8 +2115,9 @@ void SwiftLangSupport::getRangeInfo(
     Receiver(RequestResult<RangeInfo>::fromError("Invalid range length."));
     return;
   }
-  resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
-               CancelOnSubsequentRequest, CancellationToken, Receiver);
+  resolveRange(*this, InputBufferName, Offset, Length, Invok,
+               /*TryExistingAST=*/true, CancelOnSubsequentRequest,
+               CancellationToken, Receiver);
 }
 
 void SwiftLangSupport::getNameInfo(
@@ -2283,17 +2306,18 @@ static void resolveCursorFromUSR(
 }
 
 void SwiftLangSupport::getCursorInfoFromUSR(
-    StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
+    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+    Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string error;
 
-  auto fileSystem = getFileSystem(vfsOptions, filename, error);
+  auto fileSystem = getFileSystem(vfsOptions, PrimaryFilePath, error);
   if (!fileSystem)
     return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
-  if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
+  if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");
     CursorInfoData Info;
     Info.InternalDiagnostic = "Info for generated interfaces not implemented.";
@@ -2303,16 +2327,16 @@ void SwiftLangSupport::getCursorInfoFromUSR(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, filename, fileSystem, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, fileSystem, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));
     return;
   }
 
-  resolveCursorFromUSR(*this, filename, USR, Invok, /*TryExistingAST=*/true,
-                       CancelOnSubsequentRequest, fileSystem, CancellationToken,
-                       Receiver);
+  resolveCursorFromUSR(*this, InputBufferName, USR, Invok,
+                       /*TryExistingAST=*/true, CancelOnSubsequentRequest,
+                       fileSystem, CancellationToken, Receiver);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2457,13 +2481,14 @@ private:
 } // end anonymous namespace
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
-    StringRef InputFile, unsigned Offset, bool CancelOnSubsequentRequest,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) {
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
@@ -2471,34 +2496,42 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   }
 
   class RelatedIdConsumer : public SwiftASTConsumer {
+    std::string InputFile;
     unsigned Offset;
     std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver;
     SwiftInvocationRef Invok;
 
   public:
-    RelatedIdConsumer(unsigned Offset,
-                      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver,
-                      SwiftInvocationRef Invok)
-      : Offset(Offset), Receiver(std::move(Receiver)), Invok(Invok) { }
+    RelatedIdConsumer(
+        StringRef InputFile, unsigned Offset,
+        std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver,
+        SwiftInvocationRef Invok)
+        : InputFile(InputFile.str()), Offset(Offset),
+          Receiver(std::move(Receiver)), Invok(Invok) {}
 
     // FIXME: Don't silently eat errors here.
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompInst = AstUnit->getCompilerInstance();
-      auto &SrcFile = AstUnit->getPrimarySourceFile();
 
+      auto *SrcFile = retrieveInputFile(InputFile, CompInst);
+      if (!SrcFile) {
+        Receiver(RequestResult<RelatedIdentsInfo>::fromError(
+            "Unable to find input file"));
+        return;
+      }
 
       SmallVector<std::pair<unsigned, unsigned>, 8> Ranges;
 
       auto Action = [&]() {
-        unsigned BufferID = SrcFile.getBufferID().value();
+        unsigned BufferID = SrcFile->getBufferID().value();
         SourceLoc Loc =
           Lexer::getLocForStartOfToken(CompInst.getSourceMgr(), BufferID, Offset);
         if (Loc.isInvalid())
           return;
 
         ResolvedCursorInfoPtr CursorInfo =
-            evaluateOrDefault(SrcFile.getASTContext().evaluator,
-                              CursorInfoRequest{CursorInfoOwner(&SrcFile, Loc)},
+            evaluateOrDefault(CompInst.getASTContext().evaluator,
+                              CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
                               new ResolvedCursorInfo());
         auto ValueRefCursorInfo =
             dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
@@ -2539,7 +2572,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
             continue;
           }
 
-          RelatedIdScanner Scanner(SrcFile, BufferID, Dcl, RangesSet, Worklist);
+          RelatedIdScanner Scanner(*SrcFile, BufferID, Dcl, RangesSet,
+                                   Worklist);
 
           if (auto *Case = getCaseStmtOfCanonicalVar(Dcl)) {
             Scanner.walk(Case);
@@ -2550,7 +2584,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
                          Dcl->getDeclContext()->getLocalContext()) {
             Scanner.walk(LocalDC);
           } else {
-            Scanner.walk(SrcFile);
+            Scanner.walk(*SrcFile);
           }
         }
 
@@ -2592,7 +2626,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     }
   };
 
-  auto Consumer = std::make_shared<RelatedIdConsumer>(Offset, Receiver, Invok);
+  auto Consumer = std::make_shared<RelatedIdConsumer>(InputBufferName, Offset,
+                                                      Receiver, Invok);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -2607,16 +2642,14 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
 namespace {
 class IfConfigScanner : public SourceEntityWalker {
-  SmallVectorImpl<IfConfigInfo> &Infos;
-  SourceManager &SourceMgr;
   unsigned BufferID = -1;
+  SmallVectorImpl<IfConfigInfo> &Infos;
   bool Cancelled = false;
 
 public:
-  explicit IfConfigScanner(SourceFile &SrcFile, unsigned BufferID,
+  explicit IfConfigScanner(unsigned BufferID,
                            SmallVectorImpl<IfConfigInfo> &Infos)
-      : Infos(Infos), SourceMgr(SrcFile.getASTContext().SourceMgr),
-        BufferID(BufferID) {}
+      : BufferID(BufferID), Infos(Infos) {}
 
 private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
@@ -2625,7 +2658,8 @@ private:
 
     if (auto *IfDecl = dyn_cast<IfConfigDecl>(D)) {
       for (auto &Clause : IfDecl->getClauses()) {
-        unsigned Offset = SourceMgr.getLocOffsetInBuffer(Clause.Loc, BufferID);
+        unsigned Offset = D->getASTContext().SourceMgr.getLocOffsetInBuffer(
+            Clause.Loc, BufferID);
         Infos.emplace_back(Offset, Clause.isActive);
       }
     }
@@ -2637,13 +2671,13 @@ private:
 } // end anonymous namespace
 
 void SwiftLangSupport::findActiveRegionsInFile(
-    StringRef InputFile, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver) {
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ActiveRegionsInfo>::fromError(Error));
@@ -2651,23 +2685,29 @@ void SwiftLangSupport::findActiveRegionsInFile(
   }
 
   class IfConfigConsumer : public SwiftASTConsumer {
+    std::string InputFile;
     std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver;
     SwiftInvocationRef Invok;
 
   public:
     IfConfigConsumer(
+        StringRef InputFile,
         std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver,
         SwiftInvocationRef Invok)
-        : Receiver(std::move(Receiver)), Invok(Invok) {}
+        : InputFile(InputFile.str()), Receiver(std::move(Receiver)),
+          Invok(Invok) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto &SrcFile = AstUnit->getPrimarySourceFile();
-      SmallVector<IfConfigInfo> Configs;
-      auto BufferID = SrcFile.getBufferID();
-      if (!BufferID)
+      auto *SF = retrieveInputFile(InputFile, AstUnit->getCompilerInstance());
+      if (!SF) {
+        Receiver(RequestResult<ActiveRegionsInfo>::fromError(
+            "Unable to find input file"));
         return;
-      IfConfigScanner Scanner(SrcFile, *BufferID, Configs);
-      Scanner.walk(SrcFile);
+      }
+
+      SmallVector<IfConfigInfo> Configs;
+      IfConfigScanner Scanner(*SF->getBufferID(), Configs);
+      Scanner.walk(SF);
 
       // Sort by offset so nested decls are reported
       // in source order (not tree order).
@@ -2690,7 +2730,8 @@ void SwiftLangSupport::findActiveRegionsInFile(
     }
   };
 
-  auto Consumer = std::make_shared<IfConfigConsumer>(Receiver, Invok);
+  auto Consumer =
+      std::make_shared<IfConfigConsumer>(InputBufferName, Receiver, Invok);
   ASTMgr->processASTAsync(Invok, std::move(Consumer),
                           /*OncePerASTToken=*/nullptr, CancellationToken,
                           llvm::vfs::getRealFileSystem());
@@ -2710,12 +2751,12 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
 }
 
 void SwiftLangSupport::semanticRefactoring(
-    StringRef PrimaryFile, SemanticRefactoringInfo Info,
+    StringRef PrimaryFilePath, SemanticRefactoringInfo Info,
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     CategorizedEditsReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, PrimaryFile, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
@@ -2736,20 +2777,17 @@ void SwiftLangSupport::semanticRefactoring(
       RequestRefactoringEditConsumer EditConsumer(Receiver);
 
       auto &CompIns = AstUnit->getCompilerInstance();
-      auto &SM = CompIns.getSourceMgr();
 
       RefactoringOptions Opts(getIDERefactoringKind(Info));
 
-      Optional<unsigned> BufferID;
-      if (Info.SourceFile.empty()) {
-        BufferID = AstUnit->getPrimarySourceFile().getBufferID();
-      } else {
-        BufferID = SM.getIDForBufferIdentifier(Info.SourceFile);
-      }
-      if (!BufferID)
+      SourceFile *SF = retrieveInputFile(Info.InputBufferName, CompIns);
+      if (!SF) {
+        Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(
+            "Unable to find input file"));
         return;
+      }
 
-      Opts.Range.BufferID = *BufferID;
+      Opts.Range.BufferID = *SF->getBufferID();
       Opts.Range.Line = Info.Line;
       Opts.Range.Column = Info.Column;
       Opts.Range.Length = Info.Length;
@@ -2778,14 +2816,15 @@ void SwiftLangSupport::semanticRefactoring(
 }
 
 void SwiftLangSupport::collectExpressionTypes(
-    StringRef FileName, ArrayRef<const char *> Args,
-    ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
-    bool CanonicalType, SourceKitCancellationToken CancellationToken,
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
+    bool FullyQualified, bool CanonicalType,
+    SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<ExpressionTypesInFile> &)>
         Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, FileName, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ExpressionTypesInFile>::fromError(Error));
@@ -2794,6 +2833,7 @@ void SwiftLangSupport::collectExpressionTypes(
   assert(Invok);
   class ExpressionTypeCollector: public SwiftASTConsumer {
     std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver;
+    std::string InputFile;
     std::vector<const char *> ExpectedProtocols;
     bool FullyQualified;
     bool CanonicalType;
@@ -2801,13 +2841,20 @@ void SwiftLangSupport::collectExpressionTypes(
     ExpressionTypeCollector(
         std::function<void(const RequestResult<ExpressionTypesInFile> &)>
             Receiver,
-        ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
-        bool CanonicalType)
-        : Receiver(std::move(Receiver)),
+        StringRef InputFile, ArrayRef<const char *> ExpectedProtocols,
+        bool FullyQualified, bool CanonicalType)
+        : Receiver(std::move(Receiver)), InputFile(InputFile.str()),
           ExpectedProtocols(ExpectedProtocols.vec()),
           FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      SourceFile *SF =
+          retrieveInputFile(InputFile, AstUnit->getCompilerInstance());
+      if (!SF) {
+        Receiver(RequestResult<ExpressionTypesInFile>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+
       std::vector<ExpressionTypeInfo> Scratch;
       llvm::SmallString<256> TypeBuffer;
       llvm::raw_svector_ostream OS(TypeBuffer);
@@ -2833,7 +2880,8 @@ void SwiftLangSupport::collectExpressionTypes(
     }
   };
   auto Collector = std::make_shared<ExpressionTypeCollector>(
-      Receiver, ExpectedProtocols, FullyQualified, CanonicalType);
+      Receiver, InputBufferName, ExpectedProtocols, FullyQualified,
+      CanonicalType);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -2843,13 +2891,14 @@ void SwiftLangSupport::collectExpressionTypes(
 }
 
 void SwiftLangSupport::collectVariableTypes(
-    StringRef FileName, ArrayRef<const char *> Args, Optional<unsigned> Offset,
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, Optional<unsigned> Offset,
     Optional<unsigned> Length, bool FullyQualified,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getTypecheckInvocation(Args, FileName, Error);
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<VariableTypesInFile>::fromError(Error));
@@ -2860,6 +2909,7 @@ void SwiftLangSupport::collectVariableTypes(
   class VariableTypeCollectorASTConsumer : public SwiftASTConsumer {
   private:
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver;
+    std::string InputFile;
     Optional<unsigned> Offset;
     Optional<unsigned> Length;
     bool FullyQualified;
@@ -2868,14 +2918,19 @@ void SwiftLangSupport::collectVariableTypes(
     VariableTypeCollectorASTConsumer(
         std::function<void(const RequestResult<VariableTypesInFile> &)>
             Receiver,
-        Optional<unsigned> Offset, Optional<unsigned> Length,
-        bool FullyQualified)
-        : Receiver(std::move(Receiver)), Offset(Offset), Length(Length),
-          FullyQualified(FullyQualified) {}
+        StringRef InputFile, Optional<unsigned> Offset,
+        Optional<unsigned> Length, bool FullyQualified)
+        : Receiver(std::move(Receiver)), InputFile(InputFile), Offset(Offset),
+          Length(Length), FullyQualified(FullyQualified) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompInst = AstUnit->getCompilerInstance();
-      auto *SF = CompInst.getPrimarySourceFile();
+      SourceFile *SF = retrieveInputFile(InputFile, CompInst);
+      if (!SF) {
+        Receiver(RequestResult<VariableTypesInFile>::fromError(
+            "Unable to find input file"));
+        return;
+      }
 
       // Construct the range for which variable types are to be queried. If
       // offset/length are unset, the (default) range will be used, which
@@ -2914,7 +2969,7 @@ void SwiftLangSupport::collectVariableTypes(
   };
 
   auto Collector = std::make_shared<VariableTypeCollectorASTConsumer>(
-      Receiver, Offset, Length, FullyQualified);
+      Receiver, InputBufferName, Offset, Length, FullyQualified);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

@@ -204,13 +204,16 @@ static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseRece
 
 static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result, ResponseReceiver Rec);
 
-static void findRelatedIdents(StringRef Filename, int64_t Offset,
+static void findRelatedIdents(StringRef PrimaryFilePath,
+                              StringRef InputBufferName, int64_t Offset,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec);
 
-static void findActiveRegions(StringRef Filename, ArrayRef<const char *> Args,
+static void findActiveRegions(StringRef PrimaryFilePath,
+                              StringRef InputBufferName,
+                              ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec);
 
@@ -454,34 +457,44 @@ getInputBufForRequestOrEmitError(const RequestDict &Req,
   return buf;
 }
 
-/// Get 'key.primary_file' value as a string. If it's missing, reply with an
-/// error and return \c None.
+/// Retrieves `key.primary_file` value as a string, or `key.sourcefile` if
+/// missing. If both are missing, reply with an error and return \c None.
 ///
-/// Fallsback to 'key.sourcefile' for compatibility.
+/// The "primary file" is the file to mark as `-primary-file` when building
+/// the corresponding AST for this request. The "input file" is the file to
+/// resolve any offset or line/column in. These were (prior to
+/// \c GeneratedSourceInfo) always the same, but the input file is now able to
+/// be a generated buffer name (where that buffer is created during the AST
+/// build).
 static Optional<StringRef>
-getPrimaryFileForRequestOrEmitError(const RequestDict &Req,
-                                    ResponseReceiver Rec) {
-  Optional<StringRef> PrimaryFile = Req.getString(KeyPrimaryFile);
-  if (!PrimaryFile) {
+getPrimaryFilePathForRequestOrEmitError(const RequestDict &Req,
+                                        ResponseReceiver Rec) {
+  Optional<StringRef> PrimaryFilePath = Req.getString(KeyPrimaryFile);
+  if (!PrimaryFilePath) {
     // Fallback to the old key.sourcefile
-    PrimaryFile = Req.getString(KeySourceFile);
-    if (!PrimaryFile) {
-      Rec(createErrorRequestInvalid("missing 'key.primary_file'"));
+    PrimaryFilePath = Req.getString(KeySourceFile);
+    if (!PrimaryFilePath) {
+      Rec(createErrorRequestInvalid(
+          "missing 'key.primary_file' and 'key.sourcefile'"));
     }
   }
-  return PrimaryFile;
+  return PrimaryFilePath;
 }
 
-/// Get 'key.source_file' value as a string. If it's missing, reply with an
-/// error and return \c None.
-static Optional<StringRef>
-getSourceFileForRequestOrEmitError(const RequestDict &Req,
-                                   ResponseReceiver Rec) {
-  Optional<StringRef> SourceFile = Req.getString(KeySourceFile);
-  if (!SourceFile) {
-    Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
-  }
-  return SourceFile;
+/// Retrieves `key.sourcefile` only if it is different to `key.primary_file`.
+/// Returns an empty string if it's the same or if it was missing. Callers are
+/// expected to pull the primary file from the AST if the input file is
+/// empty.
+///
+/// See \c getPrimaryFilePathForRequestOrEmitError for an explanation of primary
+/// vs input file.
+static StringRef getInputBufferNameForRequest(const RequestDict &Req,
+                                              ResponseReceiver Rec) {
+  Optional<StringRef> PrimaryFilePath = Req.getString(KeyPrimaryFile);
+  Optional<StringRef> InputBufferName = Req.getString(KeySourceFile);
+  if (!PrimaryFilePath || PrimaryFilePath == InputBufferName)
+    return "";
+  return InputBufferName.value_or("");
 }
 
 /// Get compiler arguments from 'key.compilerargs' in \p Req . If the key is
@@ -1378,13 +1391,15 @@ static void handleRequestIndex(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, Rec]() {
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
-    return Rec(indexSource(*SourceFile, Args));
+    return Rec(indexSource(*PrimaryFilePath, Args));
   });
 }
 
@@ -1396,9 +1411,13 @@ handleRequestCursorInfo(const RequestDict &Req,
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
 
     Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
@@ -1417,8 +1436,8 @@ handleRequestCursorInfo(const RequestDict &Req,
       int64_t SymbolGraph = false;
       Req.getInt64(KeyRetrieveSymbolGraph, SymbolGraph, /*isOptional=*/true);
       return Lang.getCursorInfo(
-          *SourceFile, Offset, Length, Actionables, SymbolGraph,
-          CancelOnSubsequentRequest, Args, std::move(vfsOptions),
+          *PrimaryFilePath, InputBufferName, Offset, Length, Actionables,
+          SymbolGraph, CancelOnSubsequentRequest, Args, std::move(vfsOptions),
           CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
@@ -1426,8 +1445,8 @@ handleRequestCursorInfo(const RequestDict &Req,
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
-          *SourceFile, *USR, CancelOnSubsequentRequest, Args,
-          std::move(vfsOptions), CancellationToken,
+          *PrimaryFilePath, InputBufferName, *USR, CancelOnSubsequentRequest,
+          Args, std::move(vfsOptions), CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
@@ -1446,12 +1465,18 @@ static void handleRequestRangeInfo(const RequestDict &Req,
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     int64_t Offset;
     int64_t Length;
     // For backwards compatibility, the default is 1.
@@ -1460,11 +1485,12 @@ static void handleRequestRangeInfo(const RequestDict &Req,
                  /*isOptional=*/true);
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
       if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
-        return Lang.getRangeInfo(
-            *SourceFile, Offset, Length, CancelOnSubsequentRequest, Args,
-            CancellationToken, [Rec](const RequestResult<RangeInfo> &Result) {
-              reportRangeInfo(Result, Rec);
-            });
+        return Lang.getRangeInfo(*PrimaryFilePath, InputBufferName, Offset,
+                                 Length, CancelOnSubsequentRequest, Args,
+                                 CancellationToken,
+                                 [Rec](const RequestResult<RangeInfo> &Result) {
+                                   reportRangeInfo(Result, Rec);
+                                 });
       }
     }
 
@@ -1481,9 +1507,13 @@ handleRequestSemanticRefactoring(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
-    auto PrimaryFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!PrimaryFile)
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
@@ -1505,24 +1535,18 @@ handleRequestSemanticRefactoring(const RequestDict &Req,
     if (Info.Kind == SemanticRefactoringKind::None)
       return Rec(createErrorRequestInvalid("'key.actionuid' isn't recognized"));
 
-    auto SourceFile = getSourceFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
-      return;
-
     if (!Req.getInt64(KeyLine, Line, /*isOptional=*/false)) {
       if (!Req.getInt64(KeyColumn, Column, /*isOptional=*/false)) {
         Req.getInt64(KeyLength, Length, /*isOptional=*/true);
         if (auto N = Req.getString(KeyName))
           Info.PreferredName = *N;
         LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-        if (*PrimaryFile != *SourceFile) {
-          Info.SourceFile = *SourceFile;
-        }
+        Info.InputBufferName = InputBufferName;
         Info.Line = Line;
         Info.Column = Column;
         Info.Length = Length;
         return Lang.semanticRefactoring(
-            *PrimaryFile, Info, Args, CancellationToken,
+            *PrimaryFilePath, Info, Args, CancellationToken,
             [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
               Rec(createCategorizedEditsResponse(Result));
             });
@@ -1541,9 +1565,14 @@ handleRequestCollectExpressionType(const RequestDict &Req,
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
@@ -1556,8 +1585,8 @@ handleRequestCollectExpressionType(const RequestDict &Req,
     int64_t CanonicalTy = false;
     Req.getInt64(KeyCanonicalizeType, CanonicalTy, /*isOptional=*/true);
     return Lang.collectExpressionTypes(
-        *SourceFile, Args, ExpectedProtocols, FullyQualified, CanonicalTy,
-        CancellationToken,
+        *PrimaryFilePath, InputBufferName, Args, ExpectedProtocols,
+        FullyQualified, CanonicalTy, CancellationToken,
         [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
           reportExpressionTypeInfo(Result, Rec);
         });
@@ -1573,12 +1602,18 @@ handleRequestCollectVariableType(const RequestDict &Req,
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).transform(
         [](int64_t v) -> unsigned { return v; });
     Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).transform(
@@ -1586,7 +1621,8 @@ handleRequestCollectVariableType(const RequestDict &Req,
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     return Lang.collectVariableTypes(
-        *SourceFile, Args, Offset, Length, FullyQualified, CancellationToken,
+        *PrimaryFilePath, InputBufferName, Args, Offset, Length, FullyQualified,
+        CancellationToken,
         [Rec](const RequestResult<VariableTypesInFile> &Result) {
           reportVariableTypeInfo(Result, Rec);
         });
@@ -1601,12 +1637,14 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     int64_t Line = 0, Column = 0, Length = 0;
     if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("'key.line' is required"));
@@ -1616,7 +1654,7 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
 
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
-        *SourceFile, Line, Column, Length, Args, CancellationToken,
+        *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
         [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
         });
@@ -1631,12 +1669,14 @@ handleRequestNameTranslation(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
@@ -1677,7 +1717,7 @@ handleRequestNameTranslation(const RequestDict &Req,
     llvm::transform(Selectors, std::back_inserter(Input.ArgNames),
                     [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(
-        *SourceFile, Offset, Input, Args, CancellationToken,
+        *PrimaryFilePath, Offset, Input, Args, CancellationToken,
         [Rec](const RequestResult<NameTranslatingInfo> &Result) {
           reportNameInfo(Result, Rec);
         });
@@ -1692,12 +1732,17 @@ handleRequestRelatedIdents(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
@@ -1707,8 +1752,9 @@ handleRequestRelatedIdents(const RequestDict &Req,
     Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
                  /*isOptional=*/true);
 
-    return findRelatedIdents(*SourceFile, Offset, CancelOnSubsequentRequest,
-                             Args, CancellationToken, Rec);
+    return findRelatedIdents(*PrimaryFilePath, InputBufferName, Offset,
+                             CancelOnSubsequentRequest, Args, CancellationToken,
+                             Rec);
   });
 }
 
@@ -1720,14 +1766,19 @@ handleRequestActiveRegions(const RequestDict &Req,
     return;
 
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
-    auto SourceFile = getSourceFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    Optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
     SmallVector<const char *> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
 
-    return findActiveRegions(*SourceFile, Args, CancellationToken, Rec);
+    return findActiveRegions(*PrimaryFilePath, InputBufferName, Args,
+                             CancellationToken, Rec);
   });
 }
 
@@ -1737,14 +1788,16 @@ handleRequestDiagnostics(const RequestDict &Req,
                          ResponseReceiver Rec) {
   handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
     Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
-    auto SourceFile = getPrimaryFileForRequestOrEmitError(Req, Rec);
-    if (!SourceFile)
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
       return;
+
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
+
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    Lang.getDiagnostics(*SourceFile, Args, std::move(vfsOptions),
+    Lang.getDiagnostics(*PrimaryFilePath, Args, std::move(vfsOptions),
                         CancellationToken,
                         [Rec](const RequestResult<DiagnosticsResult> &Result) {
                           reportDiagnostics(Result, Rec);
@@ -2598,15 +2651,16 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
 
-static void findRelatedIdents(StringRef Filename, int64_t Offset,
+static void findRelatedIdents(StringRef PrimaryFilePath,
+                              StringRef InputBufferName, int64_t Offset,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(
-      Filename, Offset, CancelOnSubsequentRequest, Args, CancellationToken,
-      [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
+      PrimaryFilePath, InputBufferName, Offset, CancelOnSubsequentRequest, Args,
+      CancellationToken, [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());
         if (Result.isError())
@@ -2630,13 +2684,15 @@ static void findRelatedIdents(StringRef Filename, int64_t Offset,
 // FindActiveRegions
 //===----------------------------------------------------------------------===//
 
-static void findActiveRegions(StringRef Filename, ArrayRef<const char *> Args,
+static void findActiveRegions(StringRef PrimaryFilePath,
+                              StringRef InputBufferName,
+                              ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
 
   Lang.findActiveRegionsInFile(
-      Filename, Args, CancellationToken,
+      PrimaryFilePath, InputBufferName, Args, CancellationToken,
       [Rec](const RequestResult<ActiveRegionsInfo> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());
