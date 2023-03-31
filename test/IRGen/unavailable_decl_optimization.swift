@@ -147,17 +147,6 @@ public class C<T> {
   deinit {}
 }
 
-public protocol P {
-  func requirement()
-}
-
-@available(*, unavailable)
-extension S: P {
-  // CHECK-NO-STRIP: s4Test1SV11requirementyyF
-  // CHECK-STRIP-NOT: s4Test1SV11requirementyyF
-  public func requirement() {}
-}
-
 // MARK: -
 
 // MARK: UnavailableEnum
