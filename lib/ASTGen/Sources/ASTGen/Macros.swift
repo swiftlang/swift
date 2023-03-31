@@ -310,23 +310,35 @@ func expandFreestandingMacroInProcess(
     discriminator: discriminator
   )
 
+  guard let parentExpansion = macroSyntax.asProtocol(
+    FreestandingMacroExpansionSyntax.self
+  ) else {
+    print("not on a macro expansion node: \(macroSyntax.recursiveDescription)")
+    return nil
+  }
+
+  let macroName = parentExpansion.macro.text
+
+  // Make sure we emit all of the diagnostics from the context.
+  defer {
+    // Emit diagnostics accumulated in the context.
+    for diag in context.diagnostics {
+      sourceManager.diagnose(
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
+      )
+    }
+
+    context.diagnostics = []
+  }
+
   let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
 
-  let macroName: String
   let evaluatedSyntax: Syntax
   do {
     switch macroPtr.pointee.macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
-      guard let parentExpansion = macroSyntax.asProtocol(
-        FreestandingMacroExpansionSyntax.self
-      ) else {
-        print("not on a macro expansion node: \(macroSyntax.recursiveDescription)")
-        return nil
-      }
-
-      macroName = parentExpansion.macro.text
-
       func expandExpressionMacro<Node: FreestandingMacroExpansionSyntax>(
         _ node: Node
       ) throws -> ExprSyntax {
@@ -346,14 +358,6 @@ func expandFreestandingMacroInProcess(
     // Handle declaration macro. The resulting decls are wrapped in a
     // `CodeBlockItemListSyntax`.
     case let declMacro as DeclarationMacro.Type:
-      guard let parentExpansion = macroSyntax.asProtocol(
-        FreestandingMacroExpansionSyntax.self
-      ) else {
-        print("not on a macro expansion decl: \(macroSyntax.recursiveDescription)")
-        return nil
-      }
-      macroName = parentExpansion.macro.text
-
       func expandDeclarationMacro<Node: FreestandingMacroExpansionSyntax>(
         _ node: Node
       ) throws -> [DeclSyntax] {
@@ -374,23 +378,8 @@ func expandFreestandingMacroInProcess(
       return nil
     }
   } catch {
-    // Record the error
-    sourceManager.diagnose(
-      diagnostic: Diagnostic(
-        node: macroSyntax,
-        message: ThrownErrorDiagnostic(message: String(describing: error))
-      ),
-      messageSuffix: " (from macro '\(macroName)')"
-    )
+    context.addDiagnostics(from: error, node: macroSyntax)
     return nil
-  }
-
-  // Emit diagnostics accumulated in the context.
-  for diag in context.diagnostics {
-    sourceManager.diagnose(
-      diagnostic: diag,
-      messageSuffix: " (from macro '\(macroName)')"
-    )
   }
 
   return evaluatedSyntax.trimmedDescription
@@ -670,6 +659,20 @@ func expandAttachedMacroInProcess(
   )
 
   let macroName = customAttrNode.attributeName.trimmedDescription
+
+  // Emit all of the accumulated diagnostics before we exit.
+  defer {
+    // Emit diagnostics accumulated in the context.
+    for diag in context.diagnostics {
+      sourceManager.diagnose(
+        diagnostic: diag,
+        messageSuffix: " (from macro '\(macroName)')"
+      )
+    }
+
+    context.diagnostics = []
+  }
+
   var expandedSources: [String]
   do {
     switch (macro, macroRole) {
@@ -806,25 +809,8 @@ func expandAttachedMacroInProcess(
       return nil
     }
   } catch {
-    // Record the error
-    // FIXME: Need to decide where to diagnose the error:
-    sourceManager.diagnose(
-      diagnostic: Diagnostic(
-        node: Syntax(declarationNode),
-        message: ThrownErrorDiagnostic(message: String(describing: error))
-      ),
-      messageSuffix: " (from macro '\(macroName)')"
-    )
-
+    context.addDiagnostics(from: error, node: declarationNode)
     return nil
-  }
-
-  // Emit diagnostics accumulated in the context.
-  for diag in context.diagnostics {
-    sourceManager.diagnose(
-      diagnostic: diag,
-      messageSuffix: " (from macro '\(macroName)')"
-    )
   }
 
   return expandedSources
