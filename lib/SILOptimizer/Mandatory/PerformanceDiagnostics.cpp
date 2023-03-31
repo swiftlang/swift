@@ -335,7 +335,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
     case SILInstructionKind::MetatypeInst:
       if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
-        break;
+        return false;
       LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
