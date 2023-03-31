@@ -158,16 +158,6 @@ extension S: P {
   public func requirement() {}
 }
 
-// CHECK-NO-STRIP: s4Test29unavailableFuncWithNestedTypeyyF
-// CHECK-STRIP-NOT: s4Test29unavailableFuncWithNestedTypeyyF
-@available(*, unavailable)
-public func unavailableFuncWithNestedType() {
-  struct Nested {
-    // s4Test29unavailableFuncWithNestedTypeyyF0E0L_V6methodyyF
-    public func method() {}
-  }
-}
-
 // MARK: -
 
 // MARK: UnavailableEnum
@@ -187,8 +177,3 @@ public func unavailableFuncWithNestedType() {
 
 // CHECK: s4Test1EOwug
 // CHECK: s4Test1EOMa
-
-// MARK: unavailableFuncWithNestedType().Nested
-
-// CHECK-NO-STRIP: s4Test29unavailableFuncWithNestedTypeyyF0E0L_VMa
-// CHECK-STRIP-NOT: s4Test29unavailableFuncWithNestedTypeyyF0E0L_VMa
