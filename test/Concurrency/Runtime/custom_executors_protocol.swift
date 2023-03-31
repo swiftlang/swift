@@ -64,7 +64,7 @@ actor MyActor: WithSpecifiedExecutor {
   }
 
   func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
-    // FIXME(waiting on preconditions to merge): preconditionTaskOnExecutor(expectedExecutor, "Expected to be on: \(expectedExecutor)")
+    // FIXME(waiting on preconditions to merge): expectedExecutor.preconditionIsolated("Expected to be on: \(expectedExecutor)")
     dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }
