@@ -2,14 +2,25 @@
 
 // RUN: %target-swift-frontend -parse-as-library -module-name Test -validate-tbd-against-ir=missing -unavailable-decl-optimization=complete %s -emit-ir | %FileCheck %s --check-prefixes=CHECK,CHECK-STRIP
 
-// CHECK-NO-STRIP: s4Test14globalConstantSbvp
-// CHECK-NO-STRIP: s4Test14globalConstantSbvau
-// CHECK-STRIP-NOT: s4Test14globalConstantSbvp
-// CHECK-STRIP-NOT: s4Test14globalConstantSbvau
-@available(*, unavailable)
-public let globalConstant = true
+// CHECK-NO-STRIP: s4Test1SVAA1PAAMc
+// CHECK-STRIP-NOT: s4Test1SVAA1PAAMc
 
-// CHECK-NO-STRIP: s4Test15unavailableFuncyyF
-// CHECK-STRIP-NOT: s4Test15unavailableFuncyyF
+// CHECK-NO-STRIP: s4Test1SVAA1PAAWP
+// CHECK-STRIP-NOT: s4Test1SVAA1PAAWP
+
+// CHECK-NO-STRIP: s4Test1PMp
+// CHECK-STRIP-NOT: s4Test1PMp
+
 @available(*, unavailable)
-public func unavailableFunc() {}
+public protocol P {
+  func requirement()
+}
+
+public struct S {}
+
+@available(*, unavailable)
+extension S: P {
+  // CHECK-NO-STRIP: s4Test1SV11requirementyyF
+  // CHECK-STRIP-NOT: s4Test1SV11requirementyyF
+  public func requirement() {}
+}

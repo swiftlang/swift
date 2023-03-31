@@ -5489,6 +5489,9 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
+    if (Lowering::shouldSkipLowering(member))
+      continue;
+
     member->visitAuxiliaryDecls([&](Decl *decl) {
       emitNestedTypeDecls({decl, nullptr});
     });
