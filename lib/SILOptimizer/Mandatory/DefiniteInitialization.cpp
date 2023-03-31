@@ -2337,8 +2337,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
       if (auto *mmci =
               dyn_cast<MarkMustCheckInst>(stripAccessMarkers(AI->getDest()))) {
         if (mmci->getCheckKind() ==
-                MarkMustCheckInst::CheckKind::AssignableButNotConsumable &&
-            isa<RefElementAddrInst>(stripAccessMarkers(mmci->getOperand()))) {
+                MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
           mmci->setCheckKind(
               MarkMustCheckInst::CheckKind::InitableButNotConsumable);
         }

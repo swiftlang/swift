@@ -18,10 +18,9 @@ func invokedDeinit() {}
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test9MaybeFileOAASivg
   // CHECK:    [[SELF_BOX:%.*]] = alloc_box ${ let MaybeFile }, let, name "self", argno 1
-  // CHECK:    project_box
-  // CHECK:    store {{.*}} to [init]
   // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX]] : ${ let MaybeFile }, 0
-  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [assignable_but_not_consumable] [[SELF_REF]] : $*MaybeFile
+  // CHECK:    store {{.*}} to [init]
+  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*MaybeFile
   // CHECK:    [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*MaybeFile
   // CHECK:    switch_enum [[SELF_VAL]] : $MaybeFile, case #MaybeFile.some!enumelt: bb1, case #MaybeFile.none!enumelt: bb2
   //
@@ -46,12 +45,10 @@ func invokedDeinit() {}
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test4FileV14takeDescriptorSiyF
   // CHECK:  [[SELF_BOX:%.*]] = alloc_box ${ let File }, let, name "self", argno 1
-  // CHECK:  project_box
-  // CHECK:  store {{.*}} to [init]
-  // CHECK:  project_box
-  // CHECK:  load_borrow {{.*}} : $*File
   // CHECK:  [[SELF_REF:%.*]] = project_box [[SELF_BOX]] : ${ let File }, 0
-  // CHECK:  [[SELF_MMC:%.*]] = mark_must_check [assignable_but_not_consumable] [[SELF_REF]] : $*File
+  // CHECK:  store {{.*}} to [init]
+  // CHECK:  load_borrow {{.*}} : $*File
+  // CHECK:  [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_REF]] : $*File
   // CHECK:  [[SELF_VAL:%.*]] = load [copy] [[SELF_MMC]] : $*File
   // CHECK:  end_lifetime [[SELF_VAL]] : $File
 
@@ -83,14 +80,14 @@ func invokedDeinit() {}
 // CHECK:     [[SELF_BOX:%.*]] = alloc_box ${ var PointerTree }, var, name "self"
 // CHECK:     [[MUI:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]] : ${ var PointerTree }
 // CHECK:     [[SELF:%.*]] = begin_borrow [lexical] [[MUI]] : ${ var PointerTree }
+// CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF]] : ${ var PointerTree }, 0
 //            .. skip to the conditional test ..
 // CHECK:     [[SHOULD_THROW:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
 // CHECK:     cond_br [[SHOULD_THROW]], bb1, bb2
 //
 // CHECK:   bb1:
-// CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF]] : ${ var PointerTree }, 0
 // CHECK:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF_PTR]] : $*PointerTree
-// CHECK:     [[MMC:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS]] : $*PointerTree
+// CHECK:     [[MMC:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]] : $*PointerTree
 // CHECK:     [[COPIED_SELF:%.*]] = load [copy] [[MMC]] : $*PointerTree
 // CHECK:     end_access [[ACCESS]] : $*PointerTree
 // CHECK:     ([[LEFT:%.*]], [[FILE:%.*]], {{%.*}}, [[RIGHT:%.*]]) = destructure_struct [[COPIED_SELF]] : $PointerTree
@@ -160,15 +157,15 @@ final class Wallet {
   }
   // As of now, we allow reinitialization after forget. Not sure if this is intended.
   // CHECK-LABEL: sil hidden [ossa] @$s4test6TicketO8inWalletAcA0D0CSg_tcfC
+  // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX:%.*]] : ${ var Ticket }, 0
   // CHECK:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
-  // CHECK:  bb2(%22 : @owned $Wallet):
+  // CHECK:  bb2({{%.*}} : @owned $Wallet):
   // CHECK:    br bb3
   // >> now we begin the destruction sequence, which involves pattern matching on self to destroy its innards
   // CHECK:  bb3:
-  // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX:%.*]] : ${ var Ticket }, 0
-  // CHECK:    [[SELF_ACCESS:%.*]] = begin_access [read] [unknown] %27 : $*Ticket
-  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [assignable_but_not_consumable] %28 : $*Ticket
-  // CHECK:    [[SELF_COPY:%.*]] = load [copy] %29 : $*Ticket
+  // CHECK:    [[SELF_ACCESS:%.*]] = begin_access [read] [unknown] {{%.*}} : $*Ticket
+  // CHECK:    [[SELF_MMC:%.*]] = mark_must_check [no_consume_or_assign] [[SELF_ACCESS]]
+  // CHECK:    [[SELF_COPY:%.*]] = load [copy] [[SELF_MMC]] : $*Ticket
   // CHECK:    end_access [[SELF_ACCESS:%.*]] : $*Ticket
   // CHECK:    switch_enum [[SELF_COPY]] : $Ticket, case #Ticket.empty!enumelt: bb4, case #Ticket.within!enumelt: bb5
   // CHECK:  bb4:
@@ -178,9 +175,8 @@ final class Wallet {
   // CHECK:    br bb6
   // >> from here on we are reinitializing self.
   // CHECK:  bb6:
-  // CHECK:    [[SELF_REF2:%.*]] = project_box [[SELF_BOX]] : ${ var Ticket }, 0
   // CHECK:    [[NEW_SELF_VAL:%.*]] = enum $Ticket, #Ticket.within!enumelt, {{.*}} : $Wallet
-  // CHECK:    [[SELF_ACCESS2:%.*]] = begin_access [modify] [unknown] [[SELF_REF2]] : $*Ticket
+  // CHECK:    [[SELF_ACCESS2:%.*]] = begin_access [modify] [unknown] [[SELF_REF]] : $*Ticket
   // CHECK:    [[SELF_MMC2:%.*]] = mark_must_check [assignable_but_not_consumable] [[SELF_ACCESS2]] : $*Ticket
   // CHECK:    assign [[NEW_SELF_VAL]] to [[SELF_MMC2]] : $*Ticket
   // CHECK:    end_access [[SELF_ACCESS2]] : $*Ticket
