@@ -169,3 +169,13 @@ func test() {
   let _: [MacroOrType.Nested] = []
   _ = [MacroOrType.Nested]()
 }
+
+// Make sure we have the right declaration context for type-checking the result
+// types of macros. At one point, we would reject the following macro.
+protocol MyProto {
+}
+struct MyStruct<T: MyProto> {
+}
+
+@freestanding(expression) macro myMacro<T : MyProto>(_ value: MyStruct<T>) -> MyStruct<T> = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}

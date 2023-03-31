@@ -574,6 +574,8 @@ DeclContext *Decl::getInnermostDeclContext() const {
     return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
     return const_cast<TopLevelCodeDecl*>(topLevel);
+  if (auto macro = dyn_cast<MacroDecl>(this))
+    return const_cast<MacroDecl*>(macro);
 
   return getDeclContext();
 }
@@ -1098,6 +1100,8 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
     return *containingContext;
   }
 
+  // FIXME: Adopt AvailabilityInference::parentDeclForInferredAvailability()
+  // here instead of duplicating the logic.
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 

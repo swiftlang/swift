@@ -1572,6 +1572,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (Lowering::shouldSkipLowering(opaque))
+    return;
+
   if (IRGen.Opts.EnableAnonymousContextMangledNames) {
     // If we're emitting anonymous context mangled names for debuggability,
     // then emit all opaque type descriptors and make them runtime-discoverable
