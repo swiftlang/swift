@@ -528,11 +528,13 @@ struct ASTContext::Implementation {
   /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
   PluginRegistry *Plugins = nullptr;
 
-  /// Cache of loaded symbols.
-  llvm::StringMap<void *> LoadedSymbols;
+  /// `Plugins` storage if this ASTContext owns it.
+  std::unique_ptr<PluginRegistry> OwnedPluginRegistry = nullptr;
 
   /// Map a module name to an executable plugin path that provides the module.
   llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
+
+  llvm::StringSet<> LoadedPluginLibraryPaths;
 
   /// The permanent arena.
   Arena Permanent;
@@ -704,8 +706,7 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
 
-  // FIXME: Delay this so the client e.g. SourceKit can inject plugin registry.
-  loadCompilerPlugins();
+  createModuleToExecutablePluginMap();
 }
 
 ASTContext::~ASTContext() {
@@ -6272,73 +6273,22 @@ PluginRegistry *ASTContext::getPluginRegistry() const {
   // Create a new one if it hasn't been set.
   if (!registry) {
     registry = new PluginRegistry();
-    const_cast<ASTContext *>(this)->addCleanup([registry]{
-      delete registry;
-    });
+    getImpl().OwnedPluginRegistry.reset(registry);
   }
 
   assert(registry != nullptr);
   return registry;
 }
 
-void ASTContext::loadCompilerPlugins() {
-  auto fs = this->SourceMgr.getFileSystem();
-  for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    SmallString<128> resolvedPath;
-    if (auto err = fs->getRealPath(path, resolvedPath)) {
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     err.message());
-      continue;
-    }
-    auto loaded = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
-    if (!loaded) {
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     llvm::toString(loaded.takeError()));
-    }
-  }
-
+void ASTContext::createModuleToExecutablePluginMap() {
   for (auto &arg : SearchPathOpts.getCompilerPluginExecutablePaths()) {
-    // 'arg' is '<path to executable>#<module names>' where the module names are
-    // comma separated.
-
     // Create a moduleName -> pluginPath mapping.
-    StringRef path;
-    StringRef modulesStr;
-    std::tie(path, modulesStr) = StringRef(arg).rsplit('#');
-    SmallVector<StringRef, 1> modules;
-    modulesStr.split(modules, ',');
-
-    if (modules.empty() || path.empty()) {
-      // TODO: Error messsage.
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, arg, "");
-    }
-    auto pathStr = AllocateCopy(path);
-    for (auto moduleName : modules) {
+    assert(!arg.ExecutablePath.empty() && "empty plugin path");
+    auto pathStr = AllocateCopy(arg.ExecutablePath);
+    for (auto moduleName : arg.ModuleNames) {
       getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
     }
   }
-}
-
-void *ASTContext::getAddressOfSymbol(const char *name,
-                                     void *libraryHandleHint) {
-  auto lookup = getImpl().LoadedSymbols.try_emplace(name, nullptr);
-  void *&address = lookup.first->getValue();
-#if !defined(_WIN32)
-  if (lookup.second) {
-    auto *handle = libraryHandleHint ? libraryHandleHint : RTLD_DEFAULT;
-    address = dlsym(handle, name);
-
-    // If we didn't know where to look, look specifically in each plugin.
-    if (!address && !libraryHandleHint) {
-      for (const auto &plugin : getPluginRegistry()->getLoadedLibraryPlugins()) {
-        address = dlsym(plugin.second, name);
-        if (address)
-          break;
-      }
-    }
-  }
-#endif
-  return address;
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
@@ -6374,6 +6324,35 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
+}
+
+Optional<std::string>
+ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
+  auto fs = SourceMgr.getFileSystem();
+
+  // Look for 'lib${module name}(.dylib|.so)'.
+  SmallString<64> expectedBasename;
+  expectedBasename.append("lib");
+  expectedBasename.append(moduleName.str());
+  expectedBasename.append(LTDL_SHLIB_EXT);
+
+  // Try '-plugin-path'.
+  for (const auto &searchPath : SearchPathOpts.PluginSearchPaths) {
+    SmallString<128> fullPath(searchPath);
+    llvm::sys::path::append(fullPath, expectedBasename);
+    if (fs->exists(fullPath)) {
+      return std::string(fullPath);
+    }
+  }
+
+  // Try '-load-plugin-library'.
+  for (const auto &libPath : SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    if (llvm::sys::path::filename(libPath) == expectedBasename) {
+      return libPath;
+    }
+  }
+
+  return None;
 }
 
 Optional<StringRef>
@@ -6416,6 +6395,32 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   }
 
   return plugin.get();
+}
+
+void *ASTContext::loadLibraryPlugin(StringRef path) {
+  // Remember the path (even if it fails to load.)
+  getImpl().LoadedPluginLibraryPaths.insert(path);
+
+  SmallString<128> resolvedPath;
+  auto fs = this->SourceMgr.getFileSystem();
+  if (auto err = fs->getRealPath(path, resolvedPath)) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   err.message());
+    return nullptr;
+  }
+
+  // Load the plugin.
+  auto plugin = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
+  if (!plugin) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   llvm::toString(plugin.takeError()));
+  }
+
+  return plugin.get();
+}
+
+const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
+  return getImpl().LoadedPluginLibraryPaths;
 }
 
 bool ASTContext::supportsMoveOnlyTypes() const {
