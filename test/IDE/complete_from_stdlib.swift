@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -disable-implicit-concurrency-module-import -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %target-swift-ide-test -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 // NO_STDLIB_PRIVATE-NOT: Decl{{[^:]*}}/IsSystem: _
 
