@@ -28,8 +28,12 @@ enum class CustomAttributeKind : uint8_t {
   ResultBuilder = 1 << 1,
   /// A type that can be used as a global actor.
   GlobalActor = 1 << 2,
-  /// A macro can be used as a custom attribute.
-  Macro = 1 << 3,
+  /// A macro that can be used on variables or subscripts.
+  VarMacro = 1 << 3,
+  /// A macro that can be used on any type context.
+  ContextMacro = 1 << 4,
+  /// A macro that can be used on any declaration.
+  DeclMacro = 1 << 5,
 };
 
 /// The expected contextual type(s) for code-completion.

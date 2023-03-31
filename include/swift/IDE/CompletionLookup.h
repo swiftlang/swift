@@ -137,7 +137,6 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsUnwrappedOptional = false;
   SourceLoc DotLoc;
   bool NeedLeadingDot = false;
-  bool NeedLeadingMacroPound = false;
 
   bool NeedOptionalUnwrap = false;
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
@@ -186,53 +185,27 @@ private:
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
-    bool OnlyTypes;
-    bool OnlyPrecedenceGroups;
-    bool OnlyMacros;
+    CodeCompletionFilter Filter;
     bool NeedLeadingDot;
-    bool NeedPound;
-    bool IncludeModuleQualifier;
 
-    static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
-      return {TheModule, false, false, false, false, false, true};
+    static RequestedResultsTy fromModule(const ModuleDecl *mod,
+                                         CodeCompletionFilter filter) {
+      return {mod, filter, /*NeedLeadingDot=*/false};
     }
 
-    RequestedResultsTy onlyTypes() const {
-      return {TheModule, true, false, false, NeedLeadingDot, false,
-              IncludeModuleQualifier};
+    static RequestedResultsTy topLevelResults(CodeCompletionFilter filter) {
+      return {nullptr, filter, /*NeedLeadingDot=*/false};
     }
 
-    RequestedResultsTy onlyPrecedenceGroups() const {
-      assert(!OnlyTypes && "onlyTypes() already includes precedence groups");
-      return {TheModule, false, true, false, false, false, true};
-    }
-
-    RequestedResultsTy onlyMacros(bool needPound) const {
-      return {TheModule, false, false, true, false, needPound, false};
-    }
-
-    RequestedResultsTy needLeadingDot(bool NeedDot) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros, NeedDot,
-              NeedPound, IncludeModuleQualifier};
-    }
-
-    RequestedResultsTy withModuleQualifier(bool IncludeModule) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros,
-              NeedLeadingDot, NeedPound, IncludeModule};
-    }
-
-    static RequestedResultsTy toplevelResults() {
-      return {nullptr, false, false, false, false, true, true};
+    RequestedResultsTy needLeadingDot(bool needDot) const {
+      return {TheModule, Filter, needDot};
     }
 
     friend bool operator==(const RequestedResultsTy &LHS,
                            const RequestedResultsTy &RHS) {
-      return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
-             LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
-             LHS.OnlyMacros == RHS.OnlyMacros &&
-             LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
-             LHS.NeedPound == RHS.NeedPound &&
-             LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
+      return LHS.TheModule == RHS.TheModule &&
+             LHS.Filter.containsOnly(RHS.Filter) &&
+             LHS.NeedLeadingDot == RHS.NeedLeadingDot;
     }
   };
 
@@ -524,7 +497,7 @@ public:
       Type ExprType, const ValueDecl *VD,
       Optional<SemanticContextKind> SemanticContext = None);
 
-  bool tryModuleCompletions(Type ExprType, bool TypesOnly = false);
+  bool tryModuleCompletions(Type ExprType, CodeCompletionFilter Filter);
 
   /// If the given ExprType is optional, this adds completions for the unwrapped
   /// type.
@@ -562,7 +535,7 @@ public:
 
   void addObjCPoundKeywordCompletions(bool needPound);
 
-  void getMacroCompletions(bool needPound);
+  void getMacroCompletions(CodeCompletionMacroRoles roles);
 
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
@@ -626,7 +599,7 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc,
                                        bool ModuleQualifier = true);
 
-  void getToplevelCompletions(bool OnlyTypes, bool OnlyMacros);
+  void getToplevelCompletions(CodeCompletionFilter Filter);
 
   void lookupExternalModuleDecls(const ModuleDecl *TheModule,
                                  ArrayRef<std::string> AccessPath,
@@ -645,18 +618,15 @@ using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
 template <>
 struct DenseMapInfo<RequestedResultsTy> {
   static inline RequestedResultsTy getEmptyKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
-            false, false, false, false};
+    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), {}, false};
   }
   static inline RequestedResultsTy getTombstoneKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
-            false, false, false, false};
+    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), {}, false};
   }
   static unsigned getHashValue(const RequestedResultsTy &Val) {
     return hash_combine(
         DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
-        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.OnlyMacros,
-        Val.NeedLeadingDot, Val.NeedPound, Val.IncludeModuleQualifier);
+        Val.Filter.toRaw(), Val.NeedLeadingDot);
   }
   static bool isEqual(const RequestedResultsTy &LHS,
                       const RequestedResultsTy &RHS) {

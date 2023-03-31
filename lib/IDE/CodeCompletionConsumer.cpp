@@ -18,9 +18,9 @@ using namespace swift::ide;
 
 static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
-    bool onlyTypes, bool onlyPrecedenceGroups, bool onlyMacros,
-    const ExpectedTypeContext *TypeContext, const DeclContext *DC,
-    bool CanCurrDeclContextHandleAsync) {
+    CodeCompletionFilter filter, const ExpectedTypeContext *TypeContext,
+    const DeclContext *DC, bool CanCurrDeclContextHandleAsync) {
+  assert(filter && "Should never have an empty filter");
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -28,61 +28,53 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
   targetSink.ForeignAllocators.push_back(source.Allocator);
   auto startSize = targetSink.Results.size();
 
+  CodeCompletionMacroRoles expectedMacroRoles = getCompletionMacroRoles(filter);
   std::function<bool(const ContextFreeCodeCompletionResult *)>
-      shouldIncludeResult;
-  if (onlyTypes) {
-    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
-      if (R->getKind() != CodeCompletionResultKind::Declaration)
-        return false;
-      switch (R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::Module:
-      case CodeCompletionDeclKind::Class:
-      case CodeCompletionDeclKind::Actor:
-      case CodeCompletionDeclKind::Struct:
-      case CodeCompletionDeclKind::Enum:
-      case CodeCompletionDeclKind::Protocol:
-      case CodeCompletionDeclKind::TypeAlias:
-      case CodeCompletionDeclKind::AssociatedType:
-      case CodeCompletionDeclKind::GenericTypeParam:
-        return true;
-      case CodeCompletionDeclKind::PrecedenceGroup:
-      case CodeCompletionDeclKind::EnumElement:
-      case CodeCompletionDeclKind::Constructor:
-      case CodeCompletionDeclKind::Destructor:
-      case CodeCompletionDeclKind::Subscript:
-      case CodeCompletionDeclKind::StaticMethod:
-      case CodeCompletionDeclKind::InstanceMethod:
-      case CodeCompletionDeclKind::PrefixOperatorFunction:
-      case CodeCompletionDeclKind::PostfixOperatorFunction:
-      case CodeCompletionDeclKind::InfixOperatorFunction:
-      case CodeCompletionDeclKind::FreeFunction:
-      case CodeCompletionDeclKind::StaticVar:
-      case CodeCompletionDeclKind::InstanceVar:
-      case CodeCompletionDeclKind::LocalVar:
-      case CodeCompletionDeclKind::GlobalVar:
-      case CodeCompletionDeclKind::Macro:
-        return false;
-      }
+      shouldIncludeResult =
+          [filter, expectedMacroRoles](
+              const ContextFreeCodeCompletionResult *R) -> bool {
+    if (R->getKind() != CodeCompletionResultKind::Declaration)
+      return false;
 
-      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
-    };
-  } else if (onlyPrecedenceGroups) {
-    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
-      return R->getAssociatedDeclKind() ==
-      CodeCompletionDeclKind::PrecedenceGroup;
-    };
-  } else if (onlyMacros) {
-    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
-      return R->getAssociatedDeclKind() ==
-      CodeCompletionDeclKind::Macro;
-    };
-  } else {
-    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
-      // PrecedenceGroups are only valid in 'onlyPrecedenceGroups'.
-      return R->getAssociatedDeclKind() !=
-             CodeCompletionDeclKind::PrecedenceGroup;
-    };
-  }
+    switch (R->getAssociatedDeclKind()) {
+    case CodeCompletionDeclKind::PrefixOperatorFunction:
+    case CodeCompletionDeclKind::PostfixOperatorFunction:
+    case CodeCompletionDeclKind::InfixOperatorFunction:
+    case CodeCompletionDeclKind::FreeFunction:
+    case CodeCompletionDeclKind::GlobalVar:
+      return filter.contains(CodeCompletionFilterFlag::Expr);
+
+    case CodeCompletionDeclKind::Module:
+    case CodeCompletionDeclKind::Class:
+    case CodeCompletionDeclKind::Actor:
+    case CodeCompletionDeclKind::Struct:
+    case CodeCompletionDeclKind::Enum:
+    case CodeCompletionDeclKind::Protocol:
+    case CodeCompletionDeclKind::TypeAlias:
+    case CodeCompletionDeclKind::AssociatedType:
+    case CodeCompletionDeclKind::GenericTypeParam:
+      return filter.contains(CodeCompletionFilterFlag::Type);
+
+    case CodeCompletionDeclKind::PrecedenceGroup:
+      return filter.contains(CodeCompletionFilterFlag::PrecedenceGroup);
+
+    case CodeCompletionDeclKind::Macro:
+      return (bool)(R->getMacroRoles() & expectedMacroRoles);
+
+    case CodeCompletionDeclKind::EnumElement:
+    case CodeCompletionDeclKind::Constructor:
+    case CodeCompletionDeclKind::Destructor:
+    case CodeCompletionDeclKind::Subscript:
+    case CodeCompletionDeclKind::StaticMethod:
+    case CodeCompletionDeclKind::InstanceMethod:
+    case CodeCompletionDeclKind::StaticVar:
+    case CodeCompletionDeclKind::InstanceVar:
+    case CodeCompletionDeclKind::LocalVar:
+      break;
+    }
+
+    return false;
+  };
 
   USRBasedTypeContext USRTypeContext(TypeContext, source.USRTypeArena);
 
@@ -151,9 +143,9 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.has_value());
-    auto newItems = copyCodeCompletionResults(
-        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups,
-        R.OnlyMacros, TypeContext, DC, CanCurrDeclContextHandleAsync);
+    auto newItems = copyCodeCompletionResults(context.getResultSink(), **V,
+                                              R.Filter, TypeContext, DC,
+                                              CanCurrDeclContextHandleAsync);
     postProcessCompletionResults(newItems, context.CodeCompletionKind, DC,
                                  &context.getResultSink());
   }
