@@ -209,7 +209,9 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  parseSourceFileViaASTGen(items, existingParsingTransaction);
+  if (!SF.getParsingOptions()
+      .contains(SourceFile::ParsingFlags::DisableSwiftParserASTGen))
+    parseSourceFileViaASTGen(items, existingParsingTransaction);
 #endif
 
   // Prime the lexer.
@@ -259,36 +261,39 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   }
 
 #if SWIFT_SWIFT_PARSER
-  if (existingParsingTransaction)
-    existingParsingTransaction->abort();
+  if (!SF.getParsingOptions().contains(
+          SourceFile::ParsingFlags::DisableSwiftParserASTGen)) {
+    if (existingParsingTransaction)
+      existingParsingTransaction->abort();
 
-  // Perform round-trip and/or validation checking.
-  if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
-       Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
-      SF.exportedSourceFile) {
-    if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
-        swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+    // Perform round-trip and/or validation checking.
+    if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+         Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
+        SF.exportedSourceFile) {
+      if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+          swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
+        SourceLoc loc;
+        if (auto bufferID = SF.getBufferID()) {
+          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+        }
+        diagnose(loc, diag::parser_round_trip_error);
+      } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
+                 !Context.Diags.hadAnyError() &&
+                 swift_ASTGen_emitParserDiagnostics(
+                     &Context.Diags, SF.exportedSourceFile,
+                     /*emitOnlyErrors=*/true,
+                     /*downgradePlaceholderErrorsToWarnings=*/
+                     Context.LangOpts.Playground ||
+                         Context.LangOpts.WarnOnEditorPlaceholder)) {
+        // We might have emitted warnings in the C++ parser but no errors, in
+        // which case we still have `hadAnyError() == false`. To avoid emitting
+        // the same warnings from SwiftParser, only emit errors from SwiftParser
+        SourceLoc loc;
+        if (auto bufferID = SF.getBufferID()) {
+          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+        }
+        diagnose(loc, diag::parser_new_parser_errors);
       }
-      diagnose(loc, diag::parser_round_trip_error);
-    } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
-               !Context.Diags.hadAnyError() &&
-               swift_ASTGen_emitParserDiagnostics(
-                   &Context.Diags, SF.exportedSourceFile,
-                   /*emitOnlyErrors=*/true,
-                   /*downgradePlaceholderErrorsToWarnings=*/
-                       Context.LangOpts.Playground ||
-                       Context.LangOpts.WarnOnEditorPlaceholder)) {
-      // We might have emitted warnings in the C++ parser but no errors, in
-      // which case we still have `hadAnyError() == false`. To avoid emitting
-      // the same warnings from SwiftParser, only emit errors from SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
-      diagnose(loc, diag::parser_new_parser_errors);
     }
   }
 #endif

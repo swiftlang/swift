@@ -1369,6 +1369,12 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     opts |= SourceFile::ParsingFlags::SuppressWarnings;
   }
 
+  // Dependency scanning does not require an AST, so disable Swift Parser
+  // ASTGen parsing completely.
+  if (frontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::ScanDependencies)
+    opts |= SourceFile::ParsingFlags::DisableSwiftParserASTGen;
+
   // Enable interface hash computation for primaries or emit-module-separately,
   // but not in WMO, as it's only currently needed for incremental mode.
   if (forPrimary ||

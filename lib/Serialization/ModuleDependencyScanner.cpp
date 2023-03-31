@@ -16,6 +16,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -157,8 +158,13 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     // Create a source file.
     unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
     auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
+
+    // Dependency scanning does not require an AST, so disable Swift Parser
+    // ASTGen parsing completely.
+    SourceFile::ParsingOptions parsingOpts;
+    parsingOpts |= SourceFile::ParsingFlags::DisableSwiftParserASTGen;
     auto sourceFile = new (Ctx) SourceFile(
-        *moduleDecl, SourceFileKind::Interface, bufferID);
+        *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
     moduleDecl->addAuxiliaryFile(*sourceFile);
 
     // Walk the source file to find the import declarations.
