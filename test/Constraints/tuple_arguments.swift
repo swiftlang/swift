@@ -1799,3 +1799,9 @@ func variadicSplat() {
     _ = y.count
   }
 }
+
+func tuple_splat_with_a_label() {
+  func test(vals: Int, _: String, _: Float) {} // expected-note 2 {{'test(vals:_:_:)' declared here}}
+  test(vals: (23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  test((vals: 23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+}
