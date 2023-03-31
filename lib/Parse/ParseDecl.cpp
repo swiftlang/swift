@@ -186,9 +186,10 @@ extern "C" int swift_ASTGen_roundTripCheck(void *sourceFile);
 
 /// Emit parser diagnostics for given source file.. Returns non-zero if any
 /// diagnostics were emitted.
-extern "C" int swift_ASTGen_emitParserDiagnostics(void *diagEngine,
-                                                  void *sourceFile,
-                                                  int emitOnlyErrors);
+extern "C" int
+swift_ASTGen_emitParserDiagnostics(void *diagEngine, void *sourceFile,
+                                   int emitOnlyErrors,
+                                   int downgradePlaceholderErrorsToWarnings);
 
 // Build AST nodes for the top-level entities in the syntax.
 extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
@@ -274,9 +275,12 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       diagnose(loc, diag::parser_round_trip_error);
     } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
                !Context.Diags.hadAnyError() &&
-               swift_ASTGen_emitParserDiagnostics(&Context.Diags,
-                                                  SF.exportedSourceFile,
-                                                  /*emitOnlyErrors=*/true)) {
+               swift_ASTGen_emitParserDiagnostics(
+                   &Context.Diags, SF.exportedSourceFile,
+                   /*emitOnlyErrors=*/true,
+                   /*downgradePlaceholderErrorsToWarnings=*/
+                       Context.LangOpts.Playground ||
+                       Context.LangOpts.WarnOnEditorPlaceholder)) {
       // We might have emitted warnings in the C++ parser but no errors, in
       // which case we still have `hadAnyError() == false`. To avoid emitting
       // the same warnings from SwiftParser, only emit errors from SwiftParser
@@ -316,7 +320,10 @@ Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
          Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&
         !suppressDiagnostics &&
         swift_ASTGen_emitParserDiagnostics(
-            &Context.Diags, SF.exportedSourceFile, /*emitOnlyErrors=*/false) &&
+            &Context.Diags, SF.exportedSourceFile, /*emitOnlyErrors=*/false,
+            /*downgradePlaceholderErrorsToWarnings=*/
+                Context.LangOpts.Playground ||
+                Context.LangOpts.WarnOnEditorPlaceholder) &&
         Context.Diags.hadAnyError() &&
         !Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
       // Errors were emitted, and we're still using the C++ parser, so

@@ -89,6 +89,7 @@ func emitDiagnostic(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
   diagnostic: Diagnostic,
+  diagnosticSeverity: DiagnosticSeverity,
   messageSuffix: String? = nil
 ) {
   // Emit the main diagnostic
@@ -96,7 +97,7 @@ func emitDiagnostic(
     diagEnginePtr: diagEnginePtr,
     sourceFileBuffer: sourceFileBuffer,
     message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-    severity: diagnostic.diagMessage.severity,
+    severity: diagnosticSeverity,
     position: diagnostic.position,
     highlights: diagnostic.highlights
   )
@@ -107,7 +108,8 @@ func emitDiagnostic(
         diagEnginePtr: diagEnginePtr,
         sourceFileBuffer: sourceFileBuffer,
         message: fixIt.message.message,
-        severity: .note, position: diagnostic.position,
+        severity: .note,
+        position: diagnostic.position,
         fixItChanges: fixIt.changes.changes
     )
   }
@@ -118,7 +120,8 @@ func emitDiagnostic(
       diagEnginePtr: diagEnginePtr,
       sourceFileBuffer: sourceFileBuffer,
       message: note.message,
-      severity: .note, position: note.position
+      severity: .note,
+      position: note.position
     )
   }
 }
