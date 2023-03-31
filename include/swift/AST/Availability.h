@@ -329,6 +329,11 @@ public:
   bool isAvailableAsSPI() const {
     return SPI && *SPI;
   }
+
+  /// Returns a representation of this range as a string for debugging purposes.
+  std::string getAsString() const {
+    return "AvailabilityContext(" + OSVersion.getAsString() + (isAvailableAsSPI() ? ", spi" : "") + ")";
+  }
 };
 
 

@@ -891,6 +891,9 @@ public:
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
+  /// The the availability since when distributed actors are able to have custom executors.
+  AvailabilityContext getConcurrencyDistributedActorWithCustomExecutorAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
@@ -933,6 +936,14 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
   AvailabilityContext getSwift57Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.8
+  /// compiler for the target platform.
+  AvailabilityContext getSwift58Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  AvailabilityContext getSwift59Availability();
 
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
