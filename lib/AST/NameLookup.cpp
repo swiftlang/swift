@@ -1639,13 +1639,9 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
     // that weren't introduced by the macro.
     MacroIntroducedNameTracker nameTracker;
     if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
-      auto declRef = evaluateOrDefault(
-          ctx.evaluator, ResolveMacroRequest{med, dc},
-          nullptr);
-      if (!declRef)
-        continue;
-      auto *macro = dyn_cast<MacroDecl>(declRef.getDecl());
-      nameTracker(macro, macro->getMacroRoleAttr(MacroRole::Declaration));
+      forEachPotentialResolvedMacro(
+          member->getModuleContext(), med->getMacroName(),
+          MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
       nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
       forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
