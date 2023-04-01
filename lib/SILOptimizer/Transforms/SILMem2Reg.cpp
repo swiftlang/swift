@@ -1475,6 +1475,12 @@ void StackAllocationPromoter::pruneAllocStackUsage() {
   for (auto *use : asi->getUses())
     functionBlocks.insert(use->getUser()->getParent());
 
+  for (auto *sbi : asi->getUsersOfType<StoreBorrowInst>()) {
+    for (auto *use : sbi->getUses()) {
+      functionBlocks.insert(use->getUser()->getParent());
+    }
+  }
+
   for (auto block : functionBlocks)
     if (auto si = promoteAllocationInBlock(block)) {
       // There was a final store/store_borrow instruction which was not
