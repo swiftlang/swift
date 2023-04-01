@@ -54,46 +54,43 @@ var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error {
 
 struct Outer {
   @available(OSX, unavailable)
-  var osx_init_osx = osx() // OK
-
-  @available(OSX, unavailable)
-  lazy var osx_lazy_osx = osx() // OK
+  static var osx_init_osx = osx() // OK
 
   @available(OSXApplicationExtension, unavailable)
-  var osx_extension_init_osx = osx() // expected-error {{'osx()' is unavailable}}
+  static var osx_extension_init_osx = osx() // expected-error {{'osx()' is unavailable}}
 
   @available(OSXApplicationExtension, unavailable)
-  var osx_extension_lazy_osx = osx() // expected-error {{'osx()' is unavailable}}
+  static var osx_extension_lazy_osx = osx() // expected-error {{'osx()' is unavailable}}
 
   @available(OSX, unavailable)
-  var osx_init_multi1_osx = osx(), osx_init_multi2_osx = osx() // OK
+  static var osx_init_multi1_osx = osx(), osx_init_multi2_osx = osx() // OK
 
   @available(OSXApplicationExtension, unavailable)
-  var osx_extension_init_multi1_osx = osx(), osx_extension_init_multi2_osx = osx() // expected-error 2 {{'osx()' is unavailable}}
+  static var osx_extension_init_multi1_osx = osx(), osx_extension_init_multi2_osx = osx() // expected-error 2 {{'osx()' is unavailable}}
 
   @available(OSX, unavailable)
-  var (osx_init_deconstruct1_osx, osx_init_deconstruct2_osx) = osx_pair() // OK
+  static var (osx_init_deconstruct1_osx, osx_init_deconstruct2_osx) = osx_pair() // OK
 
   @available(OSXApplicationExtension, unavailable)
-  var (osx_extension_init_deconstruct1_osx, osx_extension_init_deconstruct2_osx) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
+  static var (osx_extension_init_deconstruct1_osx, osx_extension_init_deconstruct2_osx) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
 
   @available(OSX, unavailable)
-  var (_, osx_init_deconstruct2_only_osx) = osx_pair() // OK
+  static var (_, osx_init_deconstruct2_only_osx) = osx_pair() // OK
   
   @available(OSXApplicationExtension, unavailable)
-  var (_, osx_extension_init_deconstruct2_only_osx) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
+  static var (_, osx_extension_init_deconstruct2_only_osx) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
 
   @available(OSX, unavailable)
-  var (osx_init_deconstruct1_only_osx, _) = osx_pair() // OK
+  static var (osx_init_deconstruct1_only_osx, _) = osx_pair() // OK
   
   @available(OSXApplicationExtension, unavailable)
-  var (osx_extension_init_deconstruct1_only_osx, _) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
+  static var (osx_extension_init_deconstruct1_only_osx, _) = osx_pair() // expected-error {{'osx_pair()' is unavailable}}
 
   @available(OSX, unavailable)
-  var osx_inner_init_osx = { let inner_var = osx() } // OK
+  static var osx_inner_init_osx = { let inner_var = osx() } // OK
   
   @available(OSXApplicationExtension, unavailable)
-  var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error {{'osx()' is unavailable}}
+  static var osx_extension_inner_init_osx = { let inner_var = osx() } // expected-error {{'osx()' is unavailable}}
 }
 
 extension Outer {
