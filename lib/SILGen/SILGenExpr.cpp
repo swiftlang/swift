@@ -39,6 +39,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
@@ -2152,9 +2153,56 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   return emitBoolLiteral(SGF, E, isa, C);
 }
 
-RValue RValueEmitter::visitIsCaseExpr(IsCaseExpr *E, SGFContext C) {
-  // TODO: Emit SIL for IsCaseExpr. Not sure how.
-  abort();
+RValue RValueEmitter::visitIsCaseExpr(IsCaseExpr *E, SGFContext silGenContext) {
+  ASTContext &C = SGF.getASTContext();
+  
+  // generate `case E->getPattern(): true`
+  auto truePattern = CaseLabelItem(E->getPattern());
+  auto trueBooleanLiteral = new (C) BooleanLiteralExpr(true, SourceLoc());
+  trueBooleanLiteral->setType(C.getBoolType());
+  trueBooleanLiteral->setBuiltinInitializer(C.getBoolBuiltinInitDecl());
+  auto trueBraceStmt = BraceStmt::createImplicit(C, ArrayRef<ASTNode>(trueBooleanLiteral));
+  
+  auto trueCaseStmt = CaseStmt::create(C,
+                                       CaseParentKind::Switch,
+                                       /* ItemIntroducerLoc */ SourceLoc(),
+                                       /* CaseLabelItems */ ArrayRef(truePattern),
+                                       /* UnknownAttrLoc */ SourceLoc(),
+                                       /* ItemTerminatorLoc */ SourceLoc(),
+                                       /* Body */ trueBraceStmt,
+                                       /* CaseBodyVariables */ None);
+  
+  // generate `default: false`
+  auto falsePattern = CaseLabelItem::getDefault(AnyPattern::createImplicit(C));
+  auto falseBooleanLiteral = new (C) BooleanLiteralExpr(false, SourceLoc());
+  falseBooleanLiteral->setType(C.getBoolType());
+  falseBooleanLiteral->setBuiltinInitializer(C.getBoolBuiltinInitDecl());
+  auto falseBraceStmt = BraceStmt::createImplicit(C, ArrayRef<ASTNode>(falseBooleanLiteral));
+  
+  auto falseCaseStmt = CaseStmt::create(C,
+                                       CaseParentKind::Switch,
+                                       /* ItemIntroducerLoc */ SourceLoc(),
+                                       /* CaseLabelItems */ ArrayRef(falsePattern),
+                                       /* UnknownAttrLoc */ SourceLoc(),
+                                       /* ItemTerminatorLoc */ SourceLoc(),
+                                       /* Body */ falseBraceStmt,
+                                       /* CaseBodyVariables */ None);
+  
+  // generate the switch stmt
+  SmallVector<ASTNode, 4> cases;
+  cases.push_back(trueCaseStmt);
+  cases.push_back(falseCaseStmt);
+  
+  auto switchStmt = SwitchStmt::createImplicit(LabeledStmtInfo(),
+                                               /* SubjectExpr */ E->getSubExpr(),
+                                               /* Cases */ cases,
+                                               C);
+  
+  // generate a single-value expr wrapping the switch stmt,
+  // which we can generate in place of the `IsCaseExpr`
+  auto singleValueExpr = SingleValueStmtExpr::create(C, switchStmt, nullptr);
+  singleValueExpr->setType(E->getType());
+  return visitSingleValueStmtExpr(singleValueExpr, silGenContext);
 }
 
 RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
