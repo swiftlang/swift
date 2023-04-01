@@ -2145,6 +2145,11 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     (void)evaluateOrDefault(ctx.evaluator,
                             ExpandSynthesizedMemberMacroRequest{current},
                             false);
+    for (auto ext : current->getExtensions()) {
+      (void)evaluateOrDefault(ctx.evaluator,
+                              ExpandSynthesizedMemberMacroRequest{ext},
+                              false);
+    }
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
