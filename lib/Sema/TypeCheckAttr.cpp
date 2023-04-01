@@ -1858,31 +1858,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
+  // FIXME: This seems like it could be diagnosed during parsing instead.
   while (attr->IsSPI) {
     if (attr->hasPlatform() && attr->Introduced.has_value())
       break;
     diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
     break;
-  }
-
-  if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->isProtocolRequirement()) {
-        if (attr->isActivePlatform(Ctx) ||
-            attr->isLanguageVersionSpecific() ||
-            attr->isPackageDescriptionVersionSpecific()) {
-          auto versionAvailability = attr->getVersionAvailability(Ctx);
-          if (attr->isUnconditionallyUnavailable() ||
-              versionAvailability == AvailableVersionComparison::Obsoleted ||
-              versionAvailability == AvailableVersionComparison::Unavailable) {
-              if (!PD->isObjC()) {
-                diagnoseAndRemoveAttr(attr, diag::unavailable_method_non_objc_protocol);
-                return;
-              }
-            }
-          }
-        }
-    }
   }
 
   if (attr->isNoAsync()) {
@@ -1911,7 +1892,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       D->getASTContext().Diags.diagnose(
           D->getLoc(), diag::invalid_decl_attribute, attr);
     }
-
   }
 
   // Skip the remaining diagnostics in swiftinterfaces.
@@ -1919,10 +1899,37 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (SF && SF->Kind == SourceFileKind::Interface)
     return;
 
-  if (!attr->hasPlatform() || !attr->isActivePlatform(Ctx) ||
-      !attr->Introduced.has_value()) {
+  // The remaining diagnostics are only for attributes that are active for the
+  // current target triple.
+  if (!attr->isActivePlatform(Ctx) && !attr->isLanguageVersionSpecific() &&
+      !attr->isPackageDescriptionVersionSpecific())
     return;
+
+  SourceLoc attrLoc = attr->getLocation();
+  auto versionAvailability = attr->getVersionAvailability(Ctx);
+  if (versionAvailability == AvailableVersionComparison::Obsoleted ||
+      versionAvailability == AvailableVersionComparison::Unavailable) {
+    if (auto cannotBeUnavailable =
+            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
+      diagnose(attrLoc, cannotBeUnavailable.value());
+      return;
+    }
+
+    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->isProtocolRequirement() && !PD->isObjC()) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::unavailable_method_non_objc_protocol);
+          return;
+        }
+      }
+    }
   }
+
+  // The remaining diagnostics are only for attributes with introduced versions
+  // for specific platforms.
+  if (!attr->hasPlatform() || !attr->Introduced.has_value())
+    return;
 
   // Make sure there isn't a more specific attribute we should be using instead.
   // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
@@ -1933,8 +1940,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       return;
     }
   }
-
-  SourceLoc attrLoc = attr->getLocation();
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
@@ -4459,6 +4464,10 @@ Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
+  // A destructor is always called if declared.
+  if (auto *DD = dyn_cast<DestructorDecl>(D))
+    return diag::availability_deinit_no_potential;
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return None;
@@ -4488,6 +4497,27 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
         return diag::availability_enum_element_no_potential;
       }
     }
+  }
+
+  return None;
+}
+
+Optional<Diag<>>
+TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
+  auto parentIsUnavailable = [](const Decl *D) -> bool {
+    if (auto *parent =
+            AvailabilityInference::parentDeclForInferredAvailability(D)) {
+      return parent->getSemanticUnavailableAttr() != None;
+    }
+    return false;
+  };
+
+  // A destructor is always called if declared.
+  if (auto *DD = dyn_cast<DestructorDecl>(D)) {
+    if (parentIsUnavailable(D))
+      return None;
+
+    return diag::availability_deinit_no_unavailable;
   }
 
   return None;
