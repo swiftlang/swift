@@ -826,6 +826,9 @@ namespace {
 
       if (isa<ClosureExpr>(expr))
         return Action::SkipChildren(expr);
+      
+      if (isa<IsCaseExpr>(expr))
+        return Action::SkipChildren(expr);
 
       return Action::Continue(expr);
     }

@@ -1092,7 +1092,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
       }
     }
-    
+
     if(Pattern *sub = doIt(E->getPattern())) {
       E->setPattern(sub);
     } else {
