@@ -133,12 +133,12 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:1 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=57:2 %s -- ${COMPILER_ARGS[@]} -parse-as-library -enable-experimental-feature FreestandingMacros | %FileCheck -check-prefix=EXPAND_MACRO_DECL %s
 // EXPAND_MACRO_DECL: source.edit.kind.active:
-// EXPAND_MACRO_DECL-NEXT: 57:1-57:28 (@__swiftmacro_9MacroUser14anonymousTypesfMf0_.swift) "class $s9MacroUser14anonymousTypesfMf0_4namefMu_ {
+// EXPAND_MACRO_DECL-NEXT: 57:1-57:28 (@__swiftmacro_9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_.swift) "class $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_4namefMu_ {
 // EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
 // EXPAND_MACRO_DECL-NEXT:     "hello"
 // EXPAND_MACRO_DECL-NEXT:   }
 // EXPAND_MACRO_DECL-NEXT: }
-// EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser14anonymousTypesfMf0_4namefMu0_ {
+// EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_4namefMu0_ {
 // EXPAND_MACRO_DECL-NEXT:   case apple
 // EXPAND_MACRO_DECL-NEXT:   case banana
 // EXPAND_MACRO_DECL-EMPTY:

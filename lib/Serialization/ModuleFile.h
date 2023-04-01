@@ -301,8 +301,8 @@ private:
   llvm::DenseMap<uint32_t,
            std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
-  llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
-  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
+  llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -884,7 +884,7 @@ public:
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;

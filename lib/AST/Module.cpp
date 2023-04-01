@@ -990,7 +990,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
         return true;
       auto enclosingFile =
         cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
-      auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
+      auto discriminator = enclosingFile->getDiscriminatorForPrivateDecl(VD);
       return discriminator != privateDiscriminator;
     });
     results.erase(newEnd, results.end());
@@ -3818,7 +3818,7 @@ ASTScope &SourceFile::getScope() {
 }
 
 Identifier
-SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
+SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this ||
          D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
 
@@ -3947,7 +3947,7 @@ SynthesizedFileUnit::SynthesizedFileUnit(FileUnit &FU)
 }
 
 Identifier
-SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
+SynthesizedFileUnit::getDiscriminatorForPrivateDecl(const Decl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
 
   // Use cached primitive discriminator if it exists.
@@ -3955,7 +3955,7 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
     return PrivateDiscriminator;
 
   // Start with the discriminator that the file we belong to would use.
-  auto ownerDiscriminator = getFileUnit().getDiscriminatorForPrivateValue(D);
+  auto ownerDiscriminator = getFileUnit().getDiscriminatorForPrivateDecl(D);
 
   // Hash that with a special string to produce a different value that preserves
   // the entropy of the original.
