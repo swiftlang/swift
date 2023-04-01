@@ -402,8 +402,9 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
 
 void ArgsToFrontendOptionsConverter::computeTBDOptions() {
   using namespace options;
+  using Mode = FrontendOptions::TBDValidationMode;
+
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
-    using Mode = FrontendOptions::TBDValidationMode;
     StringRef value = A->getValue();
     if (value == "none") {
       Opts.ValidateTBDAgainstIR = Mode::None;
@@ -415,6 +416,16 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                      A->getOption().getPrefixedName(), value);
     }
+  } else if (Args.hasArg(OPT_enable_experimental_cxx_interop) ||
+             Args.hasArg(OPT_cxx_interoperability_mode)) {
+    // TBD validation currently emits diagnostics when C++ interop is enabled,
+    // which is likely caused by IRGen incorrectly applying attributes to
+    // symbols, forcing the user to pass `-validate-tbd-against-ir=none`.
+    // If no explicit TBD validation mode was specified, disable it if C++
+    // interop is enabled.
+    // See https://github.com/apple/swift/issues/56458.
+    // FIXME: the TBD validation diagnostics are correct and should be enabled.
+    Opts.ValidateTBDAgainstIR = Mode::None;
   }
 }
 
