@@ -528,6 +528,12 @@ public:
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getType()).getLoweredType();
       auto lifetime = SGF.F.getLifetime(decl, loweredType);
+      // The box itself isn't lexical--neither a weak reference nor an unsafe
+      // pointer to a box can be formed; and the box doesn't synchronize on
+      // deinit.
+      //
+      // Only add a lexical lifetime to the box if the the variable it stores
+      // requires one.
       if (lifetime.isLexical()) {
         Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
       }
