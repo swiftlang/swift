@@ -4157,34 +4157,29 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     SILModule &M = SGF.SGM.M;
     SILBuilder &B = SGF.B;
 
-    StructInst *S = nullptr;
+    GlobalAddrInst *ModuleBase = nullptr;
+
     if (M.getASTContext().LangOpts.Target.isOSWindows()) {
       auto ImageBase = M.lookUpGlobalVariable("__ImageBase");
       if (!ImageBase)
         ImageBase =
             SILGlobalVariable::create(M, SILLinkage::Public, IsNotSerialized,
                                       "__ImageBase", BuiltinRawPtrTy);
-
-      auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
-      auto ImageBasePointer =
-          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy,
-              /*needsStackProtection=*/ false);
-      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
+      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase);
     } else {
-      auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
-      if (!DSOGlobal)
-        DSOGlobal =
-            SILGlobalVariable::create(M, SILLinkage::PublicExternal,
-                                      IsNotSerialized, "__dso_handle",
-                                      BuiltinRawPtrTy);
-
-      auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
-      auto DSOPointer =
-          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy,
-              /*needsStackProtection=*/ false);
-      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
+      auto DSOHandle = M.lookUpGlobalVariable("__dso_handle");
+      if (!DSOHandle)
+        DSOHandle = SILGlobalVariable::create(M, SILLinkage::PublicExternal,
+                                              IsNotSerialized, "__dso_handle",
+                                              BuiltinRawPtrTy);
+      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle);
     }
 
+    auto ModuleBasePointer =
+        B.createAddressToPointer(SILLoc, ModuleBase, BuiltinRawPtrTy,
+                                 /*needsStackProtection=*/ false);
+    StructInst *S =
+        B.createStruct(SILLoc, UnsafeRawPtrTy, { ModuleBasePointer });
     return RValue(SGF, E, ManagedValue::forUnmanaged(S));
   }
   }
