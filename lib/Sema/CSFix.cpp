@@ -2506,6 +2506,14 @@ bool AddExplicitExistentialCoercion::isRequired(
           RequiresCoercion = true;
           return Action::Stop;
         }
+        
+        if (auto *const nominal = erasedMemberTy->getAs<NominalOrBoundGenericNominalType>()) {
+          // Bound Generic Nominals 
+          if (!hasConstrainedAssociatedTypes(member, *existentialType)) {
+            RequiresCoercion = true;
+            return Action::Stop;
+          }
+        }
 
         return Action::SkipChildren;
       }
@@ -2554,6 +2562,7 @@ bool AddExplicitExistentialCoercion::isRequired(
         case RequirementKind::Layout: {
           if (isAnchoredOn(req.getFirstType(), member->getAssocType()))
             return true;
+          
           break;
         }
 

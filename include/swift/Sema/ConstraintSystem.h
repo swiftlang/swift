@@ -5534,6 +5534,10 @@ Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
                                          TypePosition outermostPosition);
 
+Type transformFn(Type type, Type existentialBaseType,
+                            TypePosition initialPos);
+
+
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.
 ///

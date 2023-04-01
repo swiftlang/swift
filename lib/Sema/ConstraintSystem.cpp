@@ -2103,7 +2103,7 @@ typeEraseExistentialSelfReferences(
       if (t->is<GenericTypeParamType>()) {
         erasedTy = baseTy;
       } else {
-        erasedTy = existentialSig->getDependentUpperBounds(t);
+        erasedTy = existentialSig->getNonDependentUpperBounds(t);
       }
 
       if (metatypeDepth) {
@@ -2114,8 +2114,7 @@ typeEraseExistentialSelfReferences(
       return erasedTy;
     });
   };
-
-  return transformFn(refTy, outermostPosition);
+  return transformFn(refTy, outermostPosition);    
 }
 
 Type constraints::typeEraseOpenedExistentialReference(

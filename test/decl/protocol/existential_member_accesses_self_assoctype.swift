@@ -914,31 +914,31 @@ do {
   let _: Any = exist.method1()
   let _: AnyObject = exist.method2()
   let _: any CovariantAssocTypeErasure = exist.method3()
-  let _: Class2Base = exist.method4()
-  let _: Class2Base = exist.method5()
+  let _: Class2Base = exist.method4() // expected-error {{inferred result type 'Class2Base' requires explicit coercion due to loss of generic requirements}}
+  let _: Class2Base = exist.method5() // expected-error {{inferred result type 'Class2Derived<any CovariantAssocTypeErasure>' requires explicit coercion due to loss of generic requirements}}
   let _: any Class2Base & CovariantAssocTypeErasure = exist.method6()
   let _: any Class2Base & CovariantAssocTypeErasure = exist.method7()
 
-  let _: Any? = exist.method8()
+  let _: Any? = exist.method8() // expected-error {{inferred result type 'Optional<Any>' requires explicit coercion due to loss of generic requirements}}
   let _: (AnyObject, Bool) = exist.method9()
   let _: any CovariantAssocTypeErasure.Type = exist.method10()
-  let _: Array<Class2Base> = exist.method11()
-  let _: Dictionary<String, Class2Base> = exist.method12()
+  let _: Array<Class2Base> = exist.method11() // expected-error {{inferred result type 'Array<Class2Base>' requires explicit coercion due to loss of generic requirements}}
+  let _: Dictionary<String, Class2Base> = exist.method12() //expected-error {{inferred result type 'Dictionary<String, Class2Derived<any CovariantAssocTypeErasure>>' requires explicit coercion due to loss of generic requirements}}
 }
 do {
   let exist: any CovariantAssocTypeErasureDerived
 
   let _: any CovariantAssocTypeErasureDerived = exist.method1()
-  let _: Class2Base = exist.method2()
+  let _: Class2Base = exist.method2() //expected-error {{inferred result type 'Class2Base' requires explicit coercion due to loss of generic requirements}}
   let _: any CovariantAssocTypeErasureDerived = exist.method3()
   let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method4()
   let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method5()
   let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method6()
   let _: any Class2Base & CovariantAssocTypeErasure & Sequence = exist.method7()
 
-  let _: (any CovariantAssocTypeErasureDerived)? = exist.method8()
+  let _: (any CovariantAssocTypeErasureDerived)? = exist.method8() //expected-error {{inferred result type 'Optional<any CovariantAssocTypeErasureDerived>' requires explicit coercion due to loss of generic requirements}}
   let _: (Class2Base, Bool) = exist.method9()
   let _: any CovariantAssocTypeErasureDerived.Type = exist.method10()
-  let _: Array<any Class2Base & CovariantAssocTypeErasureDerived> = exist.method11()
-  let _: Dictionary<String, any Class2Base & CovariantAssocTypeErasureDerived> = exist.method12()
+  let _: Array<any Class2Base & CovariantAssocTypeErasureDerived> = exist.method11() //expected-error {{inferred result type 'Array<any Class2Base & CovariantAssocTypeErasureDerived>' requires explicit coercion due to loss of generic requirements}}
+  let _: Dictionary<String, any Class2Base & CovariantAssocTypeErasureDerived> = exist.method12() //expected-error {{inferred result type 'Dictionary<String, any Class2Derived<any CovariantAssocTypeErasureDerived> & CovariantAssocTypeErasureDerived>' requires explicit coercion due to loss of generic requirements}}
 }

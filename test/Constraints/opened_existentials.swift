@@ -305,3 +305,55 @@ func testExplicitCoercionRequirement(v: any B, otherV: any B & D) {
   getP((getC(v) as any P))   // Ok - parens avoid opening suppression
   getP((v.getC() as any P))  // Ok - parens avoid opening suppression
 }
+
+// Generic Class Types
+class C1 {}
+class C2<T>: C1 {}
+
+// Protocols With Associated Types
+protocol P1 {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P1) { // should return C1
+  let _ = p.returnAssocTypeB() // expected-error {{inferred result type 'C2<(any T).A>' requires explicit coercion due to loss of generic requirements}} {{29-29=as C2<(any P1).A>}}
+}
+
+
+// Protocols With Associated Types
+protocol P2<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+}
+
+func testAssocReturn(p: any P2<Int>) { // should return C2<A>
+  let _ = p.returnAssocTypeB() // expected-error {{inferred result type 'C2<(any P2).A>' requires explicit coercion due to loss of generic requirements}} {{29-29=as C2<(any P2).A>}}
+}
+
+// Protocols With Primary Associated Types
+protocol U<A> {
+  associatedtype A
+  associatedtype B: C2<A>
+
+  func returnAssocTypeB() -> B
+  func returnPrimaryAssocTypeA() -> A
+  func returnAssocTypeCollection() -> any Collection<A>
+}
+
+func testPrimaryAssocReturn(p: any U<String>) {
+  let _ = p.returnAssocTypeB() // expected-error {{inferred result type 'C2<(any U<String>).A>' requires explicit coercion due to loss of generic requirements}} {{29-29=as C2<(any U<String>).A>}}
+}
+
+func testPrimaryAssocReturn(p: any U<Int>) {
+  let _ = p.returnPrimaryAssocTypeA()
+}
+
+func testPrimaryAssocCollection(p: any U<Float>) -> any Collection {
+  let x = p.returnAssocTypeCollection()
+  return x
+}
