@@ -4693,6 +4693,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify an equal-or-optional constraint.
+  SolutionKind
+  simplifyEqualOrOptionalConstraint(Type first, Type second,
+                                    TypeMatchOptions flags,
+                                    ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,

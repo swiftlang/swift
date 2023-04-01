@@ -74,6 +74,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -152,6 +153,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::ValueMember:
@@ -309,6 +311,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::Defaultable:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
@@ -493,6 +496,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
+  case ConstraintKind::EqualOrOptional:
+    Out << " equal to or optional of ";
+    break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
@@ -727,6 +733,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::Defaultable:
   case ConstraintKind::SubclassOf:
   case ConstraintKind::ConformsTo:

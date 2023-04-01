@@ -2710,7 +2710,24 @@ namespace {
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
 
-        return setType(TupleType::get(tupleTypeElts, CS.getASTContext()));
+        Type patternTy = TupleType::get(tupleTypeElts, CS.getASTContext());
+
+        // 1. Allow optional promotion only when the matching is conditional,
+        //    i.e., not in pattern binding declarations.
+        // 2. A single-element tuple can only mean that we are matching the
+        //    payload of an enum case without splatting, in which case optional
+        //    promotion is irrelevant.
+        if (!patternBinding && tupleTypeElts.size() > 1) {
+          Type tyVar = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                             TVO_CanBindToNoEscape);
+          CS.addConstraint(
+              ConstraintKind::EqualOrOptional, tyVar, patternTy,
+              locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
+
+          patternTy = tyVar;
+        }
+
+        return setType(patternTy);
       }
 
       case PatternKind::OptionalSome: {

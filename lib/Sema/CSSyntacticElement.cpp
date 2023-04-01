@@ -624,8 +624,8 @@ private:
       return;
     }
 
-    // Convert the contextual type to the pattern, which establishes the
-    // bindings.
+    // Require a conversion from the contextual type to the pattern type, which
+    // establishes the bindings.
     cs.addConstraint(ConstraintKind::Conversion, context.getType(), patternType,
                      locator);
 

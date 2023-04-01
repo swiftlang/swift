@@ -158,6 +158,11 @@ enum class ConstraintKind : char {
   /// The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
+  /// The first type is an optional of non-negative depth of the second type,
+  /// ignoring lvalueness (because the constraint is currently applied only to
+  /// pattern types, which are always rvalue). For example, given a RHS of
+  /// 'Int', a LHS of 'Int' or 'Int??' would satisfy this constraint.
+  EqualOrOptional,
   /// The first type is the same function type as the second type, but
   /// made @escaping.
   EscapableFunctionOf,
@@ -696,6 +701,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::EqualOrOptional:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:

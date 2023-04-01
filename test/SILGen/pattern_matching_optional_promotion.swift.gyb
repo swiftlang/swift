@@ -1,0 +1,243 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -D EXPLICIT=1 %s -o %t/generated.swift
+// RUN: %target-swift-emit-silgen -module-name m %t/generated.swift > %t/explicit.sil
+// RUN: %gyb -D EXPLICIT=0 %s -o %t/generated.swift
+// RUN: %target-swift-emit-silgen -module-name m %t/generated.swift > %t/implicit.sil
+// RUN: %diff -u %t/explicit.sil %t/implicit.sil
+
+// Test that implicitly optional-promoted patterns produce the same SIL as their
+// explicit counterparts.
+
+%{
+  explicit = int(EXPLICIT) != 0
+  contexts = ['do_block', 'closure', 'result_builder_closure']
+  question = '?' if explicit else ''
+
+  def get_test_case_introducer(context):
+    if context == 'do_block':
+      return 'do'
+    elif context == 'closure':
+      return 'let _: () -> Void ='
+    elif context == 'result_builder_closure':
+      return '@DummyBuilder var x: Void'
+
+    assert False, 'unhandled context!'
+}%
+
+indirect enum E {
+  case a
+  case b(e: E)
+  case ot((E, E)?)
+  case oot((((E, E))?)?)
+}
+
+@resultBuilder
+struct DummyBuilder {
+  static func buildBlock(_ components: Void...) -> Void { () }
+  static func buildOptional(_ component: Void?) -> Void { () }
+  static func buildEither(first: Void) -> Void { () }
+  static func buildEither(second: Void) -> Void { () }
+  static func buildArray(_ components: [Void]) -> Void { () }
+}
+
+// Enum element patterns.
+func enumElementPatterns(oe: E?, ooe: E??) {
+% for context in contexts:
+%   for case in ['.a', '.b', '.b(e: .a)']:
+  do {
+    ${get_test_case_introducer(context)} {
+      if case ${case}${question} = oe {}
+      if case ${case}${question}${question} = ooe {}
+      if case ${case}?${question} = ooe {}
+      if case .some(${case}${question}) = ooe {}
+
+%     if context != 'result_builder_closure':
+      guard case ${case}${question} = oe else {}
+      guard case ${case}${question}${question} = ooe else {}
+      guard case ${case}?${question} = ooe else {}
+      guard case .some(${case}${question}) = ooe else {}
+
+      while case ${case}${question} = oe {}
+      while case ${case}${question}${question} = ooe {}
+      while case ${case}?${question} = ooe {}
+      while case .some(${case}${question}) = ooe {}
+%     end
+
+      for case ${case}${question} in [oe] {}
+      for case ${case}${question}${question} in [ooe] {}
+      for case ${case}?${question} in [ooe] {}
+      for case .some(${case}${question}) in [ooe] {}
+
+      switch oe {
+        case ${case}${question}: ()
+        default: ()
+      }
+      switch ooe {
+        case ${case}${question}${question}: ()
+        default: ()
+      }
+      switch ooe {
+        case ${case}?${question}: ()
+        default: ()
+      }
+      switch ooe {
+        case .some(${case}${question}): ()
+        default: ()
+      }
+    }
+  }
+
+%   end
+% end
+}
+
+// Tuple patterns.
+func tuplePatterns(ot: (E, E)?, oot: (E, E)??, tot: ((E, E)?, E), splat: E) {
+% for context in contexts:
+  ${get_test_case_introducer(context)} {
+    if case (.a, .a)${question} = ot {}
+    if case let (x, y)${question} = ot {}
+    if case (.a, .a)${question}${question} = oot {}
+    if case (.a, .a)?${question} = oot {}
+    if case ((.a, .a)${question}, .a) = tot {}
+    if case .ot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat {}
+    if case .oot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat {}
+
+%   if context != 'result_builder_closure':
+    guard case (.a, .a)${question} = ot else {}
+    guard case let (x, y)${question} = ot else {}
+    guard case (.a, .a)${question}${question} = oot else {}
+    guard case (.a, .a)?${question} = oot else {}
+    guard case ((.a, .a)${question}, .a) = tot else {}
+    guard case .ot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat else {}
+    guard case .oot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat else {}
+
+    while case (.a, .a)${question} = ot {}
+    while case let (x, y)${question} = ot {}
+    while case (.a, .a)${question}${question} = oot {}
+    while case (.a, .a)?${question} = oot {}
+    while case ((.a, .a)${question}, .a) = tot {}
+    while case .ot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat {}
+    while case .oot(${'(.a, .a)?' if explicit else '.a, .a'}) = splat {}
+%   end
+
+    // FIXME: Make these for-in loops work directly with array literals.
+    let otArr = [ot]
+    let ootArr = [oot]
+    let totArr = [tot]
+    let splatArr = [splat]
+
+    for case (.a, .a)${question} in otArr {}
+    for case let (x, y)${question} in otArr {}
+    for case (.a, .a)${question}${question} in ootArr {}
+    for case (.a, .a)?${question} in ootArr {}
+    for case ((.a, .a)${question}, .a) in totArr {}
+    for case .ot(${'(.a, .a)?' if explicit else '.a, .a'}) in splatArr {}
+    for case .oot(${'(.a, .a)?' if explicit else '.a, .a'}) in splatArr {}
+
+    switch ot {
+      case (.a, .a)${question}: ()
+      default: ()
+    }
+    switch ot {
+      case let (x, y)${question}: ()
+      default: ()
+    }
+    switch oot {
+      case (.a, .a)${question}${question}: ()
+      default: ()
+    }
+    switch oot {
+      case (.a, .a)?${question}: ()
+      default: ()
+    }
+    switch tot {
+      case ((.a, .a)${question}, .a): ()
+      default: ()
+    }
+    switch splat {
+      case .ot(${'(.a, .a)?' if explicit else '.a, .a'}): ()
+      default: ()
+    }
+    switch splat {
+      case .oot(${'(.a, .a)?' if explicit else '.a, .a'}): ()
+      default: ()
+    }
+  }
+
+% end
+}
+
+class A {}
+class B: A {}
+
+// 'is' patterns.
+func isPatterns(oa: A?, ooa: A??, oaooa: (A?, A??)) {
+% for context in contexts:
+  ${get_test_case_introducer(context)} {
+    if case (is B)${question} = oa {}
+    if case (is B)${question}${question} = ooa {}
+    if case (is B)?${question} = ooa {}
+    if case .some((is B)${question}) = ooa {}
+    if case ((is B)${question}, (is B)${question}${question}) = oaooa {}
+    if case ((is B)${question}, (is B)?${question}) = oaooa {}
+    if case ((is B)${question}, .some((is B)${question})) = oaooa {}
+
+%   if context != 'result_builder_closure':
+    guard case (is B)${question} = oa else {}
+    guard case (is B)${question}${question} = ooa else {}
+    guard case (is B)?${question} = ooa else {}
+    guard case .some((is B)${question}) = ooa else {}
+    guard case ((is B)${question}, (is B)${question}${question}) = oaooa else {}
+    guard case ((is B)${question}, (is B)?${question}) = oaooa else {}
+    guard case ((is B)${question}, .some((is B)${question})) = oaooa else {}
+
+    while case (is B)${question} = oa {}
+    while case (is B)${question}${question} = ooa {}
+    while case (is B)?${question} = ooa {}
+    while case .some((is B)${question}) = ooa {}
+    while case ((is B)${question}, (is B)${question}${question}) = oaooa {}
+    while case ((is B)${question}, (is B)?${question}) = oaooa {}
+    while case ((is B)${question}, .some((is B)${question})) = oaooa {}
+%   end
+
+    for case (is B)${question} in [oa] {}
+    for case (is B)${question}${question} in [ooa] {}
+    for case (is B)?${question} in [ooa] {}
+    for case .some((is B)${question}) in [ooa] {}
+    for case ((is B)${question}, (is B)${question}${question}) in [oaooa] {}
+    for case ((is B)${question}, (is B)?${question}) in [oaooa] {}
+    for case ((is B)${question}, .some((is B)${question})) in [oaooa] {}
+
+    switch oa {
+      case (is B)${question}: ()
+      default: ()
+    }
+    switch ooa {
+      case (is B)${question}${question}: ()
+      default: ()
+    }
+    switch ooa {
+      case (is B)?${question}: ()
+      default: ()
+    }
+    switch ooa {
+      case .some((is B)${question}): ()
+      default: ()
+    }
+    switch oaooa {
+      case ((is B)${question}, (is B)${question}${question}): ()
+      default: ()
+    }
+    switch oaooa {
+      case ((is B)${question}, (is B)?${question}): ()
+      default: ()
+    }
+    switch oaooa {
+      case ((is B)${question}, .some((is B)${question})): ()
+      default: ()
+    }
+  }
+
+% end
+}

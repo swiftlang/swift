@@ -2244,6 +2244,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -2619,6 +2620,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -3126,6 +3128,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::EqualOrOptional:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -6732,6 +6735,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::EqualOrOptional:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
@@ -8870,6 +8874,60 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
   // Equate it to the other type in the constraint.
   addConstraint(ConstraintKind::Bind, objectTy, second, locator);
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyEqualOrOptionalConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  // Reify all the type variables we can.
+  first = getFixedTypeRecursive(first, flags, /*wantRValue=*/false);
+  second = getFixedTypeRecursive(second, flags, /*wantRValue=*/false);
+
+  assert(!first->hasLValueType() && !second->hasLValueType() &&
+         "Unexpected lvalue; constraint operand is not a pattern type?");
+
+  if (first->isEqual(second)) {
+    return SolutionKind::Solved;
+  }
+
+  // Unwrap both types simultaneously until one of them is no longer optional.
+  while (true) {
+    if (auto firstObject = first->getOptionalObjectType()) {
+      if (auto secondObject = second->getOptionalObjectType()) {
+        first = firstObject;
+        second = secondObject;
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  const Type firstUnwrapped = first->lookThroughAllOptionalTypes();
+
+  // At this point at most one of the two types is a known optional. The
+  // constraint can be reduced to an equation between the fully unwrapped LHS
+  // and the RHS — and thus solved — if the following conditions are met:
+  // 1. The fully unwrapped LHS is not a type variable.
+  // 2. Either the LHS is not optional to begin with, or the RHS is not a
+  //    type variable.
+
+  if (firstUnwrapped->isTypeVariableOrMember() ||
+      (first->isOptional() && second->isTypeVariableOrMember())) {
+    if (!flags.contains(TMF_GenerateConstraints)) {
+      return SolutionKind::Unsolved;
+    }
+
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::EqualOrOptional, first,
+                           second, getConstraintLocator(locator)));
+    return SolutionKind::Solved;
+  }
+
+  addConstraint(ConstraintKind::Bind, firstUnwrapped, second, locator);
+
   return SolutionKind::Solved;
 }
 
@@ -14528,6 +14586,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::EqualOrOptional:
+    return simplifyEqualOrOptionalConstraint(first, second, subflags, locator);
+
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(first, second, subflags, locator);
 
@@ -15074,7 +15135,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                             constraint.getSecondType(),
                                             /*flags*/ None,
                                             constraint.getLocator());
-      
+
+  case ConstraintKind::EqualOrOptional:
+    return simplifyEqualOrOptionalConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ None, constraint.getLocator());
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
     return simplifyMemberConstraint(constraint.getKind(),

@@ -138,3 +138,30 @@ func patternBindingWithTwoEntries() {
   let x2 = 1, (_, _) = (1, 2)
   // expected-warning@-1 {{immutable value 'x2' was never used; consider replacing with '_' or removing it}}
 }
+
+// Optional promotion in patterns is allowed only when pattern matching is
+// allowed to fail.
+do {
+  let (_, _): (Int, Int)? // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)?'}}
+  let (a1, a2): (Int, Int)? // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)?'}}
+  let (b1, b2): (Int, Int)?? // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)??'}}
+  let (c1, (c2, c3)): (Int, (Int, Int)?) // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)?'}}
+  let (x: d1, y: d2): (Int, Int)? // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)?'}}
+}
+
+// Pattern binding oddities.
+do {
+  let (x: a1): Bool // FIXME: OK?
+  // FIXME: Not OK?
+  let (x: a2) = true // expected-error {{cannot convert value of type 'Bool' to specified type '(x: _)'}}
+
+  let (x: a3): (Int, Int) // FIXME: OK?
+
+  // FIXME: Suggested fix does not parse
+  let (b1, x: b2): (Int, Int) // expected-error {{tuple pattern element label 'x' must be '_'}}
+  let (b3, _: b4): (Int, Int) // expected-error {{expected ',' separator}} expected-error{{expected pattern}}
+
+  let (c1, c2): (x: Int, y: Int) // OK
+  let (c3, c4) = (true, x: true) // OK
+  let (x: c5, y: c6) = (true, true) // OK
+}
