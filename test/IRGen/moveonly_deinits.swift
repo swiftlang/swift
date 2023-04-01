@@ -9,6 +9,9 @@
 // REQUIRES: asserts
 // REQUIRES: CODEGENERATOR=X86
 
+// rdar://107495541 Test needs to be updated for 32bit.
+// REQUIRES: PTRSIZE=64
+
 //////////////////////
 // Misc Declaration //
 //////////////////////
