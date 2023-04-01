@@ -50,6 +50,7 @@
 
 # include
 /include/swift/AST/                                @hborla @slavapestov @xedin
+/include/swift/AST/*Availability*                  @tshortli
 /include/swift/AST/*Conformance*                   @slavapestov
 /include/swift/AST/*Distributed*                   @ktoso
 /include/swift/AST/*Generic*                       @hborla @slavapestov
@@ -76,6 +77,8 @@
 
 # lib
 /lib/AST/                                           @hborla @slavapestov @xedin
+/lib/AST/*Availability*                             @tshortli
+/lib/AST/ASTPrinter.cpp                             @hborla @slavapestov @xedin @tshortli
 /lib/AST/*Conformance*                              @slavapestov
 /lib/AST/*Generic*                                  @hborla @slavapestov
 /lib/AST/*Requirement*                              @hborla @slavapestov
@@ -88,7 +91,7 @@
 /lib/ClangImporter                                  @zoecarver @hyp @egorzhdan
 /lib/DependencyScan                                 @artemcm
 /lib/Driver                                         @artemcm
-/lib/Frontend/ModuleInterfaceLoader.cpp             @artemcm
+/lib/Frontend/*ModuleInterface*                     @artemcm @tshortli
 # TODO: /lib/IRGen/
 /lib/IDE/                                           @ahoppen @bnbarham @rintaro
 /lib/IDETool/                                       @ahoppen @bnbarham @rintaro
