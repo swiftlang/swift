@@ -1156,6 +1156,10 @@ public:
 
   bool isAvailableAsSPI() const;
 
+  /// Determine whether this Decl has either Private or FilePrivate access,
+  /// and its DeclContext does not.
+  bool isOutermostPrivateOrFilePrivateScope() const;
+
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
   ///
@@ -2569,10 +2573,6 @@ public:
   /// \sa getFormalAccessScope
   /// \sa hasOpenAccess
   AccessLevel getFormalAccess() const;
-
-  /// Determine whether this Decl has either Private or FilePrivate access,
-  /// and its DeclContext does not.
-  bool isOutermostPrivateOrFilePrivateScope() const;
 
   /// Returns the outermost DeclContext from which this declaration can be
   /// accessed, or null if the declaration is public.

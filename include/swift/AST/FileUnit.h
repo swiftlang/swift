@@ -200,7 +200,7 @@ public:
   /// Since this value is used in name mangling, it should be a valid ASCII-only
   /// identifier.
   virtual Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
+  getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
 
   virtual bool shouldCollectDisplayDecls() const { return true; }
 
@@ -389,7 +389,7 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
+  getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private values in the Builtin module");
   }
 
@@ -431,7 +431,7 @@ public:
     return getModuleDefiningPath();
   }
 
-  virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
+  virtual StringRef getFilenameForPrivateDecl(const Decl *decl) const {
     return StringRef();
   }
 

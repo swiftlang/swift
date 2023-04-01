@@ -1784,7 +1784,7 @@ private:
     // Retrieve the private discriminator.
     auto *MSC = Decl->getDeclContext()->getModuleScopeContext();
     auto *FU = cast<FileUnit>(MSC);
-    Identifier PD = FU->getDiscriminatorForPrivateValue(Decl);
+    Identifier PD = FU->getDiscriminatorForPrivateDecl(Decl);
     bool ExportSymbols = true;
     return DBuilder.createNameSpace(Parent, PD.str(), ExportSymbols);
   }
