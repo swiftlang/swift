@@ -9,6 +9,9 @@
 // REQUIRES: asserts
 // REQUIRES: CPU=x86_64
 
+// rdar://107495541 Test needs to be updated for 32bit.
+// REQUIRES: PTRSIZE=64
+
 //////////////////////
 // Misc Declaration //
 //////////////////////
