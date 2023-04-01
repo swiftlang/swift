@@ -1538,10 +1538,12 @@ static void
 populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
                                             MemberLookupTable &table,
                                             DeclName name,
-                                            NominalTypeDecl *dc) {
+                                            TypeOrExtensionDecl container) {
+  auto dc = container.getAsDeclContext();
   auto *moduleScopeCtx = dc->getModuleScopeContext();
-  auto *module = dc->getModuleContext();
-  for (auto *member : dc->getCurrentMembersWithoutLoading()) {
+  auto *module = dc->getParentModule();
+  auto idc = container.getAsIterableDeclContext();
+  for (auto *member : idc->getCurrentMembersWithoutLoading()) {
     // Collect all macro introduced names, along with its corresponding macro
     // reference. We need the macro reference to prevent adding auxiliary decls
     // that weren't introduced by the macro.
@@ -1773,6 +1775,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   if (!Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
     populateLookupTableEntryFromMacroExpansions(
         ctx, Table, macroExpansionKey, decl);
+    for (auto ext : decl->getExtensions()) {
+      populateLookupTableEntryFromMacroExpansions(
+          ctx, Table, macroExpansionKey, ext);
+    }
     Table.markLazilyCompleteForMacroExpansion(macroExpansionKey);
   }
 

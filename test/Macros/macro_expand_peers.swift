@@ -36,12 +36,26 @@ struct S {
   }
 }
 
-// CHECK-DUMP: @__swiftmacro_18macro_expand_peers1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
-// CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
-// CHECK-DUMP:   Task {
-// CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
-// CHECK-DUMP:   }
-// CHECK-DUMP: }
+extension S {
+  @addCompletionHandler
+  func g(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+
+  // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1g1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
+  // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
+  // CHECK-DUMP:   Task {
+  // CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
+  // CHECK-DUMP:   }
+  // CHECK-DUMP: }
+
+}
+
+func useCompletionHandlerG(s: S, _ body: @escaping (String) -> Void) {
+  s.g(a: 1, for: "hahaha local", 2.0) {
+    body($0)
+  }
+}
 
 @addCompletionHandler
 func f(a: Int, for b: String, _ value: Double) async -> String {
