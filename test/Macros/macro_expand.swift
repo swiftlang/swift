@@ -39,7 +39,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV0dE0fMf0_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }

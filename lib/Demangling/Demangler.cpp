@@ -4095,9 +4095,14 @@ NodePointer Demangler::demangleMacroExpansion() {
   }
 
   NodePointer name = popNode(Node::Kind::Identifier);
+  NodePointer privateDiscriminator = popNode(Node::Kind::PrivateDeclName);
   NodePointer context = popNode(isMacroExpansionNodeKind);
   if (!context)
     context = popContext();
   NodePointer discriminator = demangleIndexAsNode();
-  return createWithChildren(kind, context, name, discriminator);
+  auto result = createWithChildren(
+      kind, context, name, discriminator);
+  if (privateDiscriminator)
+    result->addChild(privateDiscriminator, *this);
+  return result;
 }
