@@ -1060,6 +1060,11 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
+/// Returns a diagnostic indicating why the declaration cannot be annotated
+/// with an @available() attribute indicating it is unavailable or None if this
+/// is allowed.
+Optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+
 /// Same as \c checkDeclarationAvailability but doesn't give a reason for
 /// unavailability.
 bool isDeclarationUnavailable(
