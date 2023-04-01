@@ -31,7 +31,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   access to a value provided by the caller, or by `consuming` a value that the
   callee is allowed to take ownership of:
 
-  ```
+  ```swift
   struct HealthyFoods {
     var values: [String] = []
 
@@ -269,10 +269,10 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
   ```swift
-    func delayedHello() async throws {
-      try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
-      print("hello delayed world")
-    }
+  func delayedHello() async throws {
+    try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
+    print("hello delayed world")
+  }
   ```
 
   `Clock` also has methods to measure the elapsed duration of the execution of work. In the case of the `SuspendingClock` and `ContinuousClock` this measures with high resolution and is suitable for benchmarks.
@@ -294,17 +294,17 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   `any` type having the same constraints as the associated type. For example:
 
   ```swift
-    protocol Surface {...}
-    
-    protocol Solid {
-      associatedtype SurfaceType: Surface
-      func boundary() -> SurfaceType
-    }
-    
-    let solid: any Solid = ...
-    
-    // Type of 'boundary' is 'any Surface'
-    let boundary = solid.boundary()
+  protocol Surface {...}
+  
+  protocol Solid {
+    associatedtype SurfaceType: Surface
+    func boundary() -> SurfaceType
+  }
+  
+  let solid: any Solid = ...
+  
+  // Type of 'boundary' is 'any Surface'
+  let boundary = solid.boundary()
   ```
 
   Protocol methods that take an associated type or `Self` cannot be used with `any`,
@@ -317,21 +317,21 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Protocols can now declare a list of one or more _primary associated types_, which enable writing same-type requirements on those associated types using angle bracket syntax:
 
   ```swift
-    protocol Graph<Vertex, Edge> {
-      associatedtype Vertex
-      associatedtype Edge
-    }
+  protocol Graph<Vertex, Edge> {
+    associatedtype Vertex
+    associatedtype Edge
+  }
   ```
 
   You can now write a protocol name followed by type arguments in angle brackets, like
   `Graph<Int, String>`, anywhere that a protocol conformance requirement may appear:
 
   ```swift
-    func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
+  func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
 
-    extension Graph<Int, String> {...}
+  extension Graph<Int, String> {...}
 
-    func build() -> some Graph<Int, String> {}
+  func build() -> some Graph<Int, String> {}
   ```
 
   A protocol name followed by angle brackets is shorthand for a conformance requirement,
@@ -339,10 +339,10 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   The first two examples above are equivalent to the following:
 
   ```swift
-    func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
-      where G: Graph, G.Vertex == V, G.Edge == E
+  func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
+    where G: Graph, G.Vertex == V, G.Edge == E
 
-    extension Graph where Vertex == Int, Edge == String {...}
+  extension Graph where Vertex == Int, Edge == String {...}
   ```
 
   The `build()` function returning `some Graph<Int, String>` can't be written using a
