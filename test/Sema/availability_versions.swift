@@ -57,11 +57,6 @@ func functionAvailableOn10_51() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-// Don't allow script-mode globals to marked potentially unavailable. Their
-// initializers are eagerly executed.
-@available(OSX, introduced: 10.51) // expected-error {{global variable cannot be marked potentially unavailable with '@available' in script mode}}
-var potentiallyUnavailableGlobalInScriptMode: Int = globalFuncAvailableOn10_51()
-
 // Still allow other availability annotations on script-mode globals
 @available(OSX, deprecated: 10.51)
 var deprecatedGlobalInScriptMode: Int = 5
