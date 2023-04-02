@@ -1258,7 +1258,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     if (auto nominal = dyn_cast<NominalTypeDecl>(attachedTo)) {
       rightBraceLoc = nominal->getBraces().End;
     } else {
-      auto ext = cast<ExtensionDecl>(parentDecl);
+      auto ext = cast<ExtensionDecl>(attachedTo);
       rightBraceLoc = ext->getBraces().End;
     }
 

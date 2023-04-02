@@ -335,6 +335,12 @@ func testFreestandingMacroExpansion() {
 }
 testFreestandingMacroExpansion()
 
+// Explicit structs to force macros to be parsed as decl.
+struct ContainerOfNumberedStructs {
+  #bitwidthNumberedStructs("MyIntOne")
+  #bitwidthNumberedStructs("MyIntTwo")
+}
+
 // Avoid re-type-checking declaration macro arguments.
 @freestanding(declaration)
 macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")

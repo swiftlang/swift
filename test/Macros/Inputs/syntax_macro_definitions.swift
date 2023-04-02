@@ -554,6 +554,37 @@ public struct AddMembers: MemberMacro {
   }
 }
 
+public struct AddExtMembers: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let uniqueClassName = context.createUniqueName("uniqueClass")
+
+    let instanceMethod: DeclSyntax =
+      """
+      func extInstanceMethod() {}
+      """
+
+    let staticMethod: DeclSyntax =
+      """
+      static func extStaticMethod() {}
+      """
+
+    let classDecl: DeclSyntax =
+      """
+      class \(uniqueClassName) { }
+      """
+
+    return [
+      instanceMethod,
+      staticMethod,
+      classDecl,
+    ]
+  }
+}
+
 public struct AddArbitraryMembers: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
