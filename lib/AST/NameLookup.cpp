@@ -1601,11 +1601,12 @@ namespace {
       macro->getIntroducedNames(
           attr->getMacroRole(), attachedTo, introducedNames);
       for (auto name : introducedNames)
-        allIntroducedNames.insert(name);
+        allIntroducedNames.insert(name.getBaseName());
     }
 
     bool shouldExpandForName(DeclName name) const {
-      return introducesArbitraryNames || allIntroducedNames.contains(name);
+      return introducesArbitraryNames ||
+          allIntroducedNames.contains(name.getBaseName());
     }
   };
 }
