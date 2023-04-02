@@ -9,6 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#ifndef SWIFT_PLUGIN_REGISTRY_H
+#define SWIFT_PLUGIN_REGISTRY_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
@@ -170,3 +172,5 @@ public:
 };
 
 } // namespace swift
+
+#endif // SWIFT_PLUGIN_REGISTRY_H
