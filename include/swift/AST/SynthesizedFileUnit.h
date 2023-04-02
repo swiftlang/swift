@@ -50,7 +50,7 @@ public:
       ObjCSelector selector,
       SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
 
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 

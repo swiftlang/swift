@@ -1320,7 +1320,7 @@ ModuleFile::getGroupNameByUSR(StringRef USR) const {
   return None;
 }
 
-Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
+Identifier ModuleFile::getDiscriminatorForPrivateDecl(const Decl *D) {
   Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
   assert(!discriminator.empty() && "no discriminator found for decl");
   return discriminator;

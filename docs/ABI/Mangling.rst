@@ -394,13 +394,15 @@ Entities
   RELATED-DISCRIMINATOR ::= [a-j]
   RELATED-DISCRIMINATOR ::= [A-J]
 
-  macro-discriminator-list ::= macro-discriminator-list? 'fM' macro-expansion-operator INDEX
+  macro-discriminator-list ::= macro-discriminator-list? file-discriminator? macro-expansion-operator INDEX
 
-  macro-expansion-operator ::= identifier 'a' // accessor attached macro
-  macro-expansion-operator ::= identifier 'A' // member-attribute attached macro
-  macro-expansion-operator ::= identifier 'f' // freestanding macro
-  macro-expansion-operator ::= identifier 'm' // member attached macro
-  macro-expansion-operator ::= identifier 'u' // uniquely-named entity
+  macro-expansion-operator ::= identifier 'fMa' // attached accessor macro
+  macro-expansion-operator ::= identifier 'fMA' // attached member-attribute macro
+  macro-expansion-operator ::= identifier 'fMf' // freestanding macro
+  macro-expansion-operator ::= identifier 'fMm' // attached member macro
+  macro-expansion-operator ::= identifier 'fMp' // attached peer macro
+  macro-expansion-operator ::= identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 
