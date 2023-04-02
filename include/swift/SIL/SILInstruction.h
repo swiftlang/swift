@@ -8318,8 +8318,8 @@ public:
     ConsumableAndAssignable,
 
     /// A signal to the move only checker to perform no consume or assign
-    /// checking. This forces the result of this instruction owned value to never
-    /// be consumed (for let/var semantics) or assigned over (for var
+    /// checking. This forces the result of this instruction owned value to
+    /// never be consumed (for let/var semantics) or assigned over (for var
     /// semantics). Of course, we still allow for non-consuming uses.
     NoConsumeOrAssign,
 
@@ -8330,6 +8330,11 @@ public:
     /// uninitialized state), but we are ok with the user assigning a new value,
     /// completely assigning over the value at once.
     AssignableButNotConsumable,
+
+    /// A signal to the move checker that the given value cannot be consumed or
+    /// assigned, but is allowed to be initialized. This is used for situations
+    /// like class initializers.
+    InitableButNotConsumable,
   };
 
 private:
@@ -8348,6 +8353,8 @@ private:
 public:
   CheckKind getCheckKind() const { return kind; }
 
+  void setCheckKind(CheckKind newKind) { kind = newKind; }
+
   bool hasMoveCheckerKind() const {
     switch (kind) {
     case CheckKind::Invalid:
@@ -8355,6 +8362,7 @@ public:
     case CheckKind::ConsumableAndAssignable:
     case CheckKind::NoConsumeOrAssign:
     case CheckKind::AssignableButNotConsumable:
+    case CheckKind::InitableButNotConsumable:
       return true;
     }
   }

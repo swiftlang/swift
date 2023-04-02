@@ -500,7 +500,11 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
 
     if (isa<GlobalAddrInst>(stripAccessMarkers(operand)))
       return true;
+
+  if (auto *rei = dyn_cast<RefElementAddrInst>(stripAccessMarkers(operand)))
+    return true;
   }
+
 
   return false;
 }
@@ -2159,6 +2163,19 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       insertUndefDebugValue(insertPt);
     } else {
       auto *inst = cast<SILInstruction>(defPair.first);
+
+      // If we have a dead def that is our mark must check and that mark must
+      // check was an init but not consumable, then do not destroy that
+      // def. This is b/c we are in some sort of class initialization and we are
+      // looking at the initial part of the live range before the initialization
+      // has occured. This is our way of makinmg this fit the model that the
+      // checker expects (which is that values are always initialized at the def
+      // point).
+      if (markedValue &&
+          markedValue->getCheckKind() ==
+              MarkMustCheckInst::CheckKind::InitableButNotConsumable)
+        continue;
+
       auto *insertPt = inst->getNextInstruction();
       assert(insertPt && "def instruction was a terminator");
       insertDestroyBeforeInstruction(addressUseState, insertPt,
