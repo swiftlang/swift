@@ -1534,75 +1534,129 @@ static DeclName adjustLazyMacroExpansionNameKey(
   return name;
 }
 
+/// Call the given function body with each macro declaration and its associated
+/// role attribute for the given role.
+///
+/// This routine intentionally avoids calling `forEachAttachedMacro`, which
+/// triggers request cycles.
+static void forEachPotentialResolvedMacro(
+    DeclContext *moduleScopeCtx, DeclNameRef macroName, MacroRole role,
+    llvm::function_ref<void(MacroDecl *, const MacroRoleAttr *)> body
+) {
+  ASTContext &ctx = moduleScopeCtx->getASTContext();
+  UnqualifiedLookupDescriptor lookupDesc{macroName, moduleScopeCtx};
+  auto lookup = evaluateOrDefault(
+      ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
+  for (auto result : lookup.allResults()) {
+    auto *vd = result.getValueDecl();
+    auto *macro = dyn_cast<MacroDecl>(vd);
+    if (!macro)
+      continue;
+
+    auto *macroRoleAttr = macro->getMacroRoleAttr(role);
+    if (!macroRoleAttr)
+      continue;
+
+    body(macro, macroRoleAttr);
+  }
+}
+
+/// For each macro with the given role that might be attached to the given
+/// declaration, call the body.
+static void forEachPotentialAttachedMacro(
+    Decl *decl, MacroRole role,
+    llvm::function_ref<void(MacroDecl *macro, const MacroRoleAttr *)> body
+) {
+  // We intentionally avoid calling `forEachAttachedMacro` in order to avoid
+  // a request cycle.
+  auto moduleScopeCtx = decl->getDeclContext()->getModuleScopeContext();
+  for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
+    auto *attr = const_cast<CustomAttr *>(attrConst);
+    UnresolvedMacroReference macroRef(attr);
+    auto macroName = macroRef.getMacroName();
+    forEachPotentialResolvedMacro(moduleScopeCtx, macroName, role, body);
+  }
+}
+
+namespace {
+  /// Function object that tracks macro-introduced names.
+  struct MacroIntroducedNameTracker {
+    ValueDecl *attachedTo = nullptr;
+
+    llvm::SmallSet<DeclName, 4> allIntroducedNames;
+    bool introducesArbitraryNames = false;
+
+    /// Augment the set of names with those introduced by the given macro.
+    void operator()(MacroDecl *macro, const MacroRoleAttr *attr) {
+      // First check for arbitrary names.
+      if (attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+        introducesArbitraryNames = true;
+      }
+
+      // If this introduces arbitrary names, there's nothing more to do.
+      if (introducesArbitraryNames)
+        return;
+
+      SmallVector<DeclName, 4> introducedNames;
+      macro->getIntroducedNames(
+          attr->getMacroRole(), attachedTo, introducedNames);
+      for (auto name : introducedNames)
+        allIntroducedNames.insert(name.getBaseName());
+    }
+
+    bool shouldExpandForName(DeclName name) const {
+      return introducesArbitraryNames ||
+          allIntroducedNames.contains(name.getBaseName());
+    }
+  };
+}
+
 static void
 populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
                                             MemberLookupTable &table,
                                             DeclName name,
-                                            NominalTypeDecl *dc) {
-  auto *moduleScopeCtx = dc->getModuleScopeContext();
-  auto *module = dc->getModuleContext();
-  for (auto *member : dc->getCurrentMembersWithoutLoading()) {
+                                            TypeOrExtensionDecl container) {
+
+  // Trigger the expansion of member macros on the container, if any of the
+  // names match.
+  {
+    MacroIntroducedNameTracker nameTracker;
+    auto decl = container.getAsDecl();
+    forEachPotentialAttachedMacro(decl, MacroRole::Member, nameTracker);
+    if (nameTracker.shouldExpandForName(name)) {
+      (void)evaluateOrDefault(
+          ctx.evaluator,
+          ExpandSynthesizedMemberMacroRequest{decl},
+          false);
+    }
+  }
+
+  auto dc = container.getAsDeclContext();
+  auto *module = dc->getParentModule();
+  auto idc = container.getAsIterableDeclContext();
+  for (auto *member : idc->getCurrentMembersWithoutLoading()) {
     // Collect all macro introduced names, along with its corresponding macro
     // reference. We need the macro reference to prevent adding auxiliary decls
     // that weren't introduced by the macro.
-    llvm::SmallSet<DeclName, 4> allIntroducedNames;
-    bool introducesArbitraryNames = false;
+    MacroIntroducedNameTracker nameTracker;
     if (auto *med = dyn_cast<MacroExpansionDecl>(member)) {
-      auto declRef = evaluateOrDefault(
-          ctx.evaluator, ResolveMacroRequest{med, dc},
-          nullptr);
-      if (!declRef)
-        continue;
-      auto *macro = dyn_cast<MacroDecl>(declRef.getDecl());
-      if (macro->getMacroRoleAttr(MacroRole::Declaration)
-          ->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary))
-        introducesArbitraryNames = true;
-      else {
-        SmallVector<DeclName, 4> introducedNames;
-        macro->getIntroducedNames(MacroRole::Declaration, nullptr,
-                                  introducedNames);
-        for (auto name : introducedNames)
-          allIntroducedNames.insert(name);
-      }
+      forEachPotentialResolvedMacro(
+          member->getModuleContext(), med->getMacroName(),
+          MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      // We intentionally avoid calling `forEachAttachedMacro` in order to avoid
-      // a request cycle.
-      for (auto attrConst : member->getSemanticAttrs().getAttributes<CustomAttr>()) {
-        auto *attr = const_cast<CustomAttr *>(attrConst);
-        UnresolvedMacroReference macroRef(attr);
-        auto macroName = macroRef.getMacroName();
-        UnqualifiedLookupDescriptor lookupDesc{macroName, moduleScopeCtx};
-        auto lookup = evaluateOrDefault(
-            ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
-        for (auto result : lookup.allResults()) {
-          auto *vd = result.getValueDecl();
-          auto *macro = dyn_cast<MacroDecl>(vd);
-          if (!macro)
-            continue;
-          auto *macroRoleAttr = macro->getMacroRoleAttr(MacroRole::Peer);
-          if (!macroRoleAttr)
-            continue;
-          if (macroRoleAttr->hasNameKind(
-                  MacroIntroducedDeclNameKind::Arbitrary))
-            introducesArbitraryNames = true;
-          else {
-            SmallVector<DeclName, 4> introducedNames;
-            macro->getIntroducedNames(
-                MacroRole::Peer, dyn_cast<ValueDecl>(member), introducedNames);
-            for (auto name : introducedNames)
-              allIntroducedNames.insert(name);
-          }
-        }
-      }
+      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
     }
-    // Expand macros based on the name.
-    if (introducesArbitraryNames || allIntroducedNames.contains(name))
+
+    // Expand macros on this member.
+    if (nameTracker.shouldExpandForName(name)) {
       member->visitAuxiliaryDecls([&](Decl *decl) {
         auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
         // Bail out if the auxiliary decl was not produced by a macro.
         if (!sf || sf->Kind != SourceFileKind::MacroExpansion) return;
         table.addMember(decl);
       });
+    }
   }
 }
 
@@ -1773,6 +1827,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   if (!Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
     populateLookupTableEntryFromMacroExpansions(
         ctx, Table, macroExpansionKey, decl);
+    for (auto ext : decl->getExtensions()) {
+      populateLookupTableEntryFromMacroExpansions(
+          ctx, Table, macroExpansionKey, ext);
+    }
     Table.markLazilyCompleteForMacroExpansion(macroExpansionKey);
   }
 
@@ -2133,12 +2191,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
     // Make sure we've resolved property wrappers, if we need them.
     installPropertyWrapperMembersIfNeeded(current, member);
-
-    // Expand synthesized member macros.
-    auto &ctx = current->getASTContext();
-    (void)evaluateOrDefault(ctx.evaluator,
-                            ExpandSynthesizedMemberMacroRequest{current},
-                            false);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);

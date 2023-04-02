@@ -50,3 +50,8 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
   let x = $0
   return x
 }
+
+struct HasInnerClosure {
+  #freestandingWithClosure(0) { x in x }
+  #freestandingWithClosure(1) { x in x }
+}

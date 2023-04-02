@@ -23,11 +23,24 @@ struct S {
   }
 }
 
+@attached(
+  member,
+  names: named(extInstanceMethod), named(extStaticMethod)
+)
+macro addExtMembers() = #externalMacro(module: "MacroDefinition", type: "AddExtMembers")
+
+@addExtMembers
+extension S { }
+
 let s = S()
 
 // CHECK: synthesized method
 // CHECK: Storage
 s.useSynthesized()
+
+// Members added via extension.
+s.extInstanceMethod()
+S.extStaticMethod()
 
 @attached(member, names: arbitrary)
 macro addArbitraryMembers() = #externalMacro(module: "MacroDefinition", type: "AddArbitraryMembers")
