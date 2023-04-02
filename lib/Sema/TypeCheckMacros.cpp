@@ -358,13 +358,14 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
   // Check dynamic link library plugins.
   // i.e. '-plugin-path', and '-load-plugin-library'.
-  if (auto found = loadLibraryPluginByName(*ctx, moduleName))
-    return LoadedCompilerPlugin::inProcess(found);
+  if (auto found = loadLibraryPluginByName(*ctx, moduleName)) {
+    return found;
+  }
 
   // Fall back to executable plugins.
   // i.e. '-external-plugin-path', and '-load-plugin-executable'.
   if (auto *found = loadExecutablePluginByName(*ctx, moduleName)) {
-    return LoadedCompilerPlugin::executable(found);
+    return found;
   }
 
   return nullptr;
@@ -421,7 +422,7 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   LoadedCompilerPlugin loaded =
       evaluateOrDefault(evaluator, loadRequest, nullptr);
 
-  if (auto loadedLibrary = loaded.getAsInProcessPlugin()) {
+  if (auto loadedLibrary = loaded.getAsLibraryPlugin()) {
     if (auto inProcess = resolveInProcessMacro(
             *ctx, moduleName, typeName, loadedLibrary))
       return *inProcess;
