@@ -26,10 +26,7 @@ public struct ColorLiteralMacro: ExpressionMacro {
       of: macro.argumentList, with: "_colorLiteralRed"
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
-    if let leadingTrivia = macro.leadingTrivia {
-      return initSyntax.with(\.leadingTrivia, leadingTrivia)
-    }
-    return initSyntax
+    return initSyntax.with(\.leadingTrivia, macro.leadingTrivia)
   }
 }
 
@@ -48,10 +45,7 @@ public struct FileIDMacro: ExpressionMacro {
     }
 
     let fileLiteral: ExprSyntax = "\(literal: fileID)"
-    if let leadingTrivia = macro.leadingTrivia {
-      return fileLiteral.with(\.leadingTrivia, leadingTrivia)
-    }
-    return fileLiteral
+    return fileLiteral.with(\.leadingTrivia, macro.leadingTrivia)
   }
 }
 
