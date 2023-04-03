@@ -6122,6 +6122,13 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
+ERROR(availability_deinit_no_potential, none,
+      "deinitializer cannot be marked potentially unavailable with "
+      "'@available'", ())
+
+ERROR(availability_deinit_no_unavailable, none,
+      "deinitializer cannot be marked unavailable with '@available'", ())
+
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
