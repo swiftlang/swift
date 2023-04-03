@@ -1,4 +1,6 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
+//
+// REQUIRES: swift_stdlib_asserts
 
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
