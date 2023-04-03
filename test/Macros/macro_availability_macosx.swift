@@ -1,5 +1,6 @@
+// REQUIRES: swift_swift_parser, OS=macosx
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name MacrosTest -target %target-cpu-apple-macosx11
-// REQUIRES: OS=macosx
 
 @available(macOS 12.0, *)
 struct X { }

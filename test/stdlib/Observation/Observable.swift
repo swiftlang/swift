@@ -1,10 +1,10 @@
+// REQUIRES: swift_swift_parser, executable_test
+
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins)
 
-// REQUIRES: executable_test
 // REQUIRES: observation
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
