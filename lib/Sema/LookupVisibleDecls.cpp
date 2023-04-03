@@ -253,6 +253,21 @@ static void doGlobalExtensionLookup(Type BaseType,
 
     synthesizePropertyWrapperVariables(extension);
 
+    // Expand member macros.
+    ASTContext &ctx = nominal->getASTContext();
+    (void)evaluateOrDefault(
+        ctx.evaluator,
+        ExpandSynthesizedMemberMacroRequest{extension},
+        false);
+
+    // Expand peer macros.
+    for (auto *member : extension->getMembers()) {
+      (void)evaluateOrDefault(
+          ctx.evaluator,
+          ExpandPeerMacroRequest{member},
+          {});
+    }
+
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
 
