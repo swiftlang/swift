@@ -337,3 +337,38 @@ bb3:
   return %8 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_store_borrow_use_in_block_without_alloc_stack_use : {{.*}} {
+// CHECK:         [[OWNED:%[^,]+]] = apply
+// CHECK:         [[GUARANTEED:%[^,]+]] = begin_borrow [[OWNED]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GUARANTEED]]
+// CHECK:         apply undef([[LIFETIME]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         end_borrow [[GUARANTEED]]
+// CHECK:         destroy_value [[OWNED]]
+// CHECK-LABEL: } // end sil function 'test_store_borrow_use_in_block_without_alloc_stack_use'
+sil [ossa] @test_store_borrow_use_in_block_without_alloc_stack_use : $@convention(thin) () -> () {
+bb0:
+  %owned = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %guaranteed = begin_borrow %owned : $Klass
+  %stack = alloc_stack [lexical] $Klass
+  %stored = store_borrow %guaranteed to %stack : $*Klass
+  %load = load_borrow %stored : $*Klass
+  apply undef(%load) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %load : $Klass
+  br bb1
+
+bb1:
+  end_borrow %stored : $*Klass
+  br bb3
+
+bb3:
+  dealloc_stack %stack : $*Klass
+  end_borrow %guaranteed : $Klass
+  destroy_value %owned : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
