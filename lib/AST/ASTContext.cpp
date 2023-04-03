@@ -1152,7 +1152,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   if (!M)
     return nullptr;
   M->lookupValue(getIdentifier(getProtocolName(kind)),
-                 NLKind::UnqualifiedLookup, results);
+                 NLKind::UnqualifiedLookup,
+                 ModuleLookupFlags::ExcludeMacroExpansions,
+                 results);
 
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
@@ -6307,7 +6309,7 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
       if (auto module = clangUnit->getOverlayModule())
         module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     } else {
-      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, { }, results);
     }
   }
 

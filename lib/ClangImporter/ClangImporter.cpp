@@ -3344,6 +3344,7 @@ void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recu
 }
 
 void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
+                                  OptionSet<ModuleLookupFlags> flags,
                                   SmallVectorImpl<ValueDecl*> &results) const {
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
