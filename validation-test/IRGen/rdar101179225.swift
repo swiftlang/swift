@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -c %s -o %t/main.o
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-ir > /dev/null
 
 struct Section: Identifiable {
     let id: Int
