@@ -14,6 +14,9 @@
 // CHECK-NOT: s:27SkipProtocolImplementations04SomeB0PAAE9bonusFuncyyF::SYNTHESIZED::s:27SkipProtocolImplementations10SomeStructV
 // CHECK-NOT: s:27SkipProtocolImplementations10SomeStructV8someFuncyyF
 
+// ...as well as the inner type from `OtherProtocol` on `OtherStruct`
+// CHECK-NOT: "s:27SkipProtocolImplementations11OtherStructV5InnerV"
+
 // CHECK-LABEL: "symbols": [
 
 // SomeStruct.otherFunc() should be present because it has its own doc comment
@@ -26,6 +29,7 @@
 
 // SomeStruct.otherFunc() should be the only one with sourceOrigin information
 // COUNT-COUNT-1: sourceOrigin
+// COUNT-NOT: sourceOrigin
 
 public protocol SomeProtocol {
     /// Base docs
@@ -45,3 +49,15 @@ public struct SomeStruct: SomeProtocol {
     /// Local docs
     public func otherFunc() {}
 }
+
+// Make sure that protocol conformances added in extensions don't create bogus symbol relationships (rdar://107432084)
+
+public protocol OtherProtocol {
+    associatedtype Inner
+}
+
+public struct OtherStruct: OtherProtocol {
+    public struct Inner {}
+}
+
+extension OtherStruct.Inner: Sendable {}
