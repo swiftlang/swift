@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
-// REQUIRES: swift_stdlib_asserts
 
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
@@ -14,6 +13,13 @@ import Builtin
 //////////////////
 
 typealias AnyObject = Builtin.AnyObject
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+sil @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+sil @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
 
 enum MyNever {}
 enum FakeOptional<T> {
@@ -882,4 +888,35 @@ bb2:
 bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
   dealloc_stack %allocStack : $*Builtin.NativeObject
   return %result : $FakeOptional<Builtin.NativeObject>
+}
+
+// Don't do this optimization:
+//   Eliminate borrowed copy with useless lifetime:
+//   %5 = copy_value %0 : ${ var Bool }
+//
+// CHECK: sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+// CHECK:   load [trivial] %{{.*}} : $*Bool
+// CHECK:   destroy_value %0 : ${ var Bool }
+sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+bb0:
+  // var test = false
+  %0 = alloc_box ${ var Bool }, var, name "test"
+  %1 = project_box %0 : ${ var Bool }, 0
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  store %3 to [trivial] %1 : $*Bool
+
+  // capture test in an escaping closure
+  %5 = copy_value %0 : ${ var Bool }
+  %6 = function_ref @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %8 = function_ref @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+
+  // return test
+  %10 = begin_access [read] [dynamic] %1 : $*Bool
+  %11 = load [trivial] %10 : $*Bool
+  end_access %10 : $*Bool
+  destroy_value %0 : ${ var Bool }
+  return %11 : $Bool
 }
