@@ -66,6 +66,7 @@ public:
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *

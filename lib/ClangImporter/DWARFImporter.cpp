@@ -33,6 +33,7 @@ public:
   /// DWARFimporterDelegate.
   virtual void
   lookupValue(DeclName name, NLKind lookupKind,
+              OptionSet<ModuleLookupFlags> Flags,
               SmallVectorImpl<ValueDecl *> &results) const override {
     Owner.lookupValueDWARF(name, lookupKind,
                            getParentModule()->getName(), results);

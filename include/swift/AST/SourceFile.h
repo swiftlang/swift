@@ -442,6 +442,7 @@ public:
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ImportPath::Access accessPath,
