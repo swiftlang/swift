@@ -373,14 +373,16 @@ bool TypeRefBuilder::getFieldTypeRefs(
     if (!Unsubstituted)
       return false;
 
+    // TODO: Consider `struct S<T> { enum E { case a(T); case b(T?) }}`
+    // This test identifies `a` as a generic case, but not `b`
+    bool IsGeneric = isa<GenericTypeParameterTypeRef>(Unsubstituted);
+
     auto Substituted = Unsubstituted->subst(*this, *Subs);
 
-    if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(), FieldValue, Substituted));
-      continue;
-    }
+    bool IsIndirect = FD->isEnum() && Field->isIndirectCase();
 
-    Fields.push_back(FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
+    auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted, IsIndirect, IsGeneric);
+    Fields.push_back(FieldTI);
   }
   return true;
 }

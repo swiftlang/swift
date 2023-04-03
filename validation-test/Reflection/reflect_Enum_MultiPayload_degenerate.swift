@@ -26,6 +26,11 @@ reflect(enum: FooVoid.a([]))
 
 // CHECK: Type info:
 
+// Note: MemoryLayout<FooVoid> says that this really is size=8, alignment=8, stride=8
+// Explanation: [Int] is a pointer, so this enum can use NULL to represent the other case
+// Aside: In TypeLowering.cpp, enum FooVoid does not have a FixedDescriptor even though
+// its not generic.  This is why we check for having only a single payload first.
+
 // CHECK-64: (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483646 bitwise_takable=1
 // CHECK-64:   (case name=a index=0 offset=0
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1

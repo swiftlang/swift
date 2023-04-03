@@ -288,21 +288,18 @@ struct FieldTypeInfo {
   int Value;
   const TypeRef *TR;
   bool Indirect;
+  bool Generic;
 
-  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false) {}
-  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect)
-    : Name(Name), Value(Value), TR(TR), Indirect(Indirect) {}
+  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false), Generic(false) {}
+  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect, bool Generic)
+    : Name(Name), Value(Value), TR(TR), Indirect(Indirect), Generic(Generic) {}
 
   static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
-    return FieldTypeInfo(Name, Value, nullptr, false);
-  }
-
-  static FieldTypeInfo forIndirectCase(std::string Name, int Value, const TypeRef *TR) {
-    return FieldTypeInfo(Name, Value, TR, true);
+    return FieldTypeInfo(Name, Value, nullptr, false, false);
   }
 
   static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
-    return FieldTypeInfo(Name, Value, TR, false);
+    return FieldTypeInfo(Name, Value, TR, false, false);
   }
 };
 
