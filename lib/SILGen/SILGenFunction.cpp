@@ -358,7 +358,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](VarLoc entryVarLoc) -> SILValue {
-      SILValue entryValue = entryVarLoc.getValueOrBoxedValue(*this, vd);
+      SILValue entryValue = entryVarLoc.value;
       if (SGM.M.useLoweredAddresses()
           && SGM.Types
                  .getTypeLowering(
@@ -383,7 +383,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Constant: {
       // let declarations.
       auto &tl = getTypeLowering(valueType);
-      SILValue Val = Entry.getValueOrBoxedValue(*this);
+      SILValue Val = Entry.value;
       bool eliminateMoveOnlyWrapper =
           Val->getType().isMoveOnlyWrapped() &&
           !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
