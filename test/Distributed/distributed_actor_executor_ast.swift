@@ -27,7 +27,7 @@ distributed actor DefaultWorker {
 // CHECK:  (class_decl range=[{{.*}}] "DefaultWorker" interface type='DefaultWorker.Type' access=internal non-resilient actor
 // The unowned executor property:
 // CHECK:    (var_decl implicit "localUnownedExecutor" type='Optional<UnownedSerialExecutor>' interface type='Optional<UnownedSerialExecutor>' access=internal final readImpl=getter immutable
-// CHECK:     (accessor_decl implicit 'anonname={{.*}}' interface type='(DefaultWorker) -> () -> Optional<UnownedSerialExecutor>' access=internal final get_for=localUnownedExecutor
+// CHECK:     (accessor_decl implicit 'anonname={{.*}}' interface type='(DefaultWorker) -> () -> Optional<UnownedSerialExecutor>' access=internal {{.*}}get_for=localUnownedExecutor
 // CHECK:       (parameter "self" type='DefaultWorker' interface type='DefaultWorker')
 // CHECK:       (parameter_list)
 // CHECK:       (brace_stmt implicit
