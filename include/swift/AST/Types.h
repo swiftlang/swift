@@ -71,6 +71,7 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PackExpansionType;
 class PackType;
 enum class ParamSpecifier : uint8_t;
 class PlaceholderTypeRepr;
@@ -2413,6 +2414,12 @@ public:
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
   unsigned getNumElements() const { return Bits.TupleType.Count; }
+
+  /// Returns the number of non-PackExpansionType elements. This is the
+  /// minimum length of the tuple after substitution; a tuple with
+  /// zero or one scalar elements is unwrapped if it would otherwise be
+  /// a one-element tuple after substitution.
+  unsigned getNumScalarElements() const;
 
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
@@ -6838,6 +6845,8 @@ public:
 
   bool containsPackExpansionType() const;
 
+  PackExpansionType *unwrapSingletonPackExpansion() const;
+
   CanTypeWrapper<PackType> getReducedShape();
 
 public:
@@ -6876,6 +6885,8 @@ BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
   CanTypeArrayRef getElementTypes() const {
     return CanTypeArrayRef(getPointer()->getElementTypes());
   }
+
+  CanTypeWrapper<PackExpansionType> unwrapSingletonPackExpansion() const;
 END_CAN_TYPE_WRAPPER(PackType, Type)
 
 inline CanPackType CanTupleType::getInducedPackType() const {
@@ -6963,6 +6974,13 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
     return CanType(getPointer()->getCountType());
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
+
+inline CanTypeWrapper<PackExpansionType>
+CanPackType::unwrapSingletonPackExpansion() const {
+  return CanPackExpansionType(
+      getPointer()->unwrapSingletonPackExpansion());
+}
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

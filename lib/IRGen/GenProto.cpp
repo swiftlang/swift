@@ -3730,13 +3730,11 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   // FIXME: Remove this
   bool wasUnwrappedPack = false;
   if (auto packType = dyn_cast<PackType>(type)) {
-    if (packType->getNumElements() == 1) {
-      auto eltType = packType.getElementType(0);
-      if (auto expansionType = dyn_cast<PackExpansionType>(eltType)) {
-        if (auto archetypeType = dyn_cast<PackArchetypeType>(expansionType.getPatternType())) {
-          type = archetypeType;
-          wasUnwrappedPack = true;
-        }
+    if (auto expansionType = packType.unwrapSingletonPackExpansion()) {
+      if (auto archetypeType = dyn_cast_or_null<PackArchetypeType>(
+            expansionType.getPatternType())) {
+        type = archetypeType;
+        wasUnwrappedPack = true;
       }
     }
   }
