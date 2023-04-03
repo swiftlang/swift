@@ -44,6 +44,7 @@ public:
   void addTopLevelDecl(Decl *D) { TopLevelDecls.push_back(D); }
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl *> &result) const override;
 
   void lookupObjCMethods(

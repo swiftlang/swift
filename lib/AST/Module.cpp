@@ -172,9 +172,6 @@ class swift::SourceLookupCache {
   template<typename Range>
   void addToMemberCache(Range decls);
 
-  using MacroDeclMap = llvm::DenseMap<Identifier, TinyPtrVector<MacroDecl *>>;
-  MacroDeclMap MacroDecls;
-
   using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
   AuxiliaryDeclMap TopLevelAuxiliaryDecls;
   SmallVector<Decl *, 4> MayHaveAuxiliaryDecls;
@@ -190,6 +187,7 @@ public:
   void invalidate();
 
   void lookupValue(DeclName Name, NLKind LookupKind,
+                   OptionSet<ModuleLookupFlags> Flags,
                    SmallVectorImpl<ValueDecl*> &Result);
 
   /// Retrieves all the operator decls. The order of the results is not
@@ -263,6 +261,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       // a malformed context.
       if (ED->isInvalid()) continue;
 
+      if (ED->getAttrs().hasAttribute<CustomAttr>()) {
+        MayHaveAuxiliaryDecls.push_back(ED);
+      }
+
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
@@ -272,9 +274,6 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
 
     else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
-
-    else if (auto *macro = dyn_cast<MacroDecl>(D))
-      MacroDecls[macro->getBaseIdentifier()].push_back(macro);
 
     else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
       MayHaveAuxiliaryDecls.push_back(MED);
@@ -353,32 +352,26 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto attrConst : decl->getAttrs().getAttributes<CustomAttr>()) {
       auto *attr = const_cast<CustomAttr *>(attrConst);
       UnresolvedMacroReference macroRef(attr);
-      auto macroName = macroRef.getMacroName().getBaseIdentifier();
-
-      auto found = MacroDecls.find(macroName);
-      if (found == MacroDecls.end())
-        continue;
-
-      for (const auto *macro : found->second) {
-        macro->getIntroducedNames(MacroRole::Peer,
-                                  dyn_cast<ValueDecl>(decl),
-                                  introducedNames[attr]);
-      }
+      namelookup::forEachPotentialResolvedMacro(
+          decl->getDeclContext()->getModuleScopeContext(),
+          macroRef.getMacroName(), MacroRole::Peer,
+          [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            macro->getIntroducedNames(MacroRole::Peer,
+                                      dyn_cast<ValueDecl>(decl),
+                                      introducedNames[attr]);
+          });
     }
 
     if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
       UnresolvedMacroReference macroRef(med);
-      auto macroName = macroRef.getMacroName().getBaseIdentifier();
-
-      auto found = MacroDecls.find(macroName);
-      if (found == MacroDecls.end())
-        continue;
-
-      for (const auto *macro : found->second) {
-        macro->getIntroducedNames(MacroRole::Declaration,
-                                  /*attachedTo*/ nullptr,
-                                  introducedNames[med]);
-      }
+      namelookup::forEachPotentialResolvedMacro(
+          decl->getDeclContext()->getModuleScopeContext(),
+          macroRef.getMacroName(), MacroRole::Declaration,
+          [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            macro->getIntroducedNames(MacroRole::Declaration,
+                                      /*attachedTo*/ nullptr,
+                                      introducedNames[med]);
+          });
     }
 
     // Add macro-introduced names to the top-level auxiliary decl cache as
@@ -425,6 +418,7 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M)
 }
 
 void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
+                                    OptionSet<ModuleLookupFlags> Flags,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   auto I = TopLevelValues.find(Name);
   if (I != TopLevelValues.end()) {
@@ -432,6 +426,10 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
     for (ValueDecl *Elt : I->second)
       Result.push_back(Elt);
   }
+
+  // If we aren't supposed to find names introduced by macros, we're done.
+  if (Flags.contains(ModuleLookupFlags::ExcludeMacroExpansions))
+    return;
 
   // Add top-level auxiliary decls to the result.
   //
@@ -863,17 +861,18 @@ static bool isParsedModule(const ModuleDecl *mod) {
 }
 
 void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
+                             OptionSet<ModuleLookupFlags> Flags,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
     ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
-    getSourceLookupCache().lookupValue(Name, LookupKind, Result);
+    getSourceLookupCache().lookupValue(Name, LookupKind, Flags, Result);
     return;
   }
 
-  FORWARD(lookupValue, (Name, LookupKind, Result));
+  FORWARD(lookupValue, (Name, LookupKind, Flags, Result));
 }
 
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
@@ -967,6 +966,7 @@ void ModuleDecl::lookupImportedSPIGroups(
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
+                              OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
@@ -978,8 +978,9 @@ void BuiltinUnit::lookupObjCMethods(
 }
 
 void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
+                             OptionSet<ModuleLookupFlags> flags,
                              SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name, lookupKind, result);
+  getCache().lookupValue(name, lookupKind, flags, result);
 }
 
 void ModuleDecl::lookupVisibleDecls(ImportPath::Access AccessPath,
@@ -3922,6 +3923,7 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
 void SynthesizedFileUnit::lookupValue(
     DeclName name, NLKind lookupKind,
+    OptionSet<ModuleLookupFlags> Flags,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
     if (auto VD = dyn_cast<ValueDecl>(decl)) {

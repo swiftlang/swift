@@ -1539,12 +1539,16 @@ static DeclName adjustLazyMacroExpansionNameKey(
 ///
 /// This routine intentionally avoids calling `forEachAttachedMacro`, which
 /// triggers request cycles.
-static void forEachPotentialResolvedMacro(
+void namelookup::forEachPotentialResolvedMacro(
     DeclContext *moduleScopeCtx, DeclNameRef macroName, MacroRole role,
     llvm::function_ref<void(MacroDecl *, const MacroRoleAttr *)> body
 ) {
   ASTContext &ctx = moduleScopeCtx->getASTContext();
-  UnqualifiedLookupDescriptor lookupDesc{macroName, moduleScopeCtx};
+  UnqualifiedLookupDescriptor lookupDesc{
+    macroName, moduleScopeCtx, SourceLoc(),
+    UnqualifiedLookupFlags::ExcludeMacroExpansions
+  };
+
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
   for (auto result : lookup.allResults()) {
