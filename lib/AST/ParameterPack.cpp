@@ -300,6 +300,18 @@ CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
   return CanPackType(PackType::getSingletonPackExpansion(param));
 }
 
+PackExpansionType *PackType::unwrapSingletonPackExpansion() const {
+  if (getNumElements() == 1) {
+    if (auto expansion = getElementTypes()[0]->getAs<PackExpansionType>()) {
+      auto pattern = expansion->getPatternType();
+      if (pattern->isParameterPack() || pattern->is<PackArchetypeType>())
+        return expansion;
+    }
+  }
+
+  return nullptr;
+}
+
 bool SILPackType::containsPackExpansionType() const {
   for (auto type : getElementTypes()) {
     if (isa<PackExpansionType>(type))

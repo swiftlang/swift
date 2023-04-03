@@ -37,15 +37,9 @@ using namespace irgen;
 
 static CanPackArchetypeType
 getForwardedPackArchetypeType(CanPackType packType) {
-  if (packType->getNumElements() != 1)
-    return CanPackArchetypeType();
-  auto uncastElement = packType.getElementType(0);
-  auto element = dyn_cast<PackExpansionType>(uncastElement);
-  if (!element)
-    return CanPackArchetypeType();
-  auto patternType = element.getPatternType();
-  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
-  return packArchetype;
+  if (auto expansion = packType.unwrapSingletonPackExpansion())
+    return dyn_cast<PackArchetypeType>(expansion.getPatternType());
+  return CanPackArchetypeType();
 }
 
 static MetadataResponse

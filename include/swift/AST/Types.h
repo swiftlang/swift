@@ -6845,6 +6845,8 @@ public:
 
   bool containsPackExpansionType() const;
 
+  PackExpansionType *unwrapSingletonPackExpansion() const;
+
   CanTypeWrapper<PackType> getReducedShape();
 
 public:
@@ -6883,6 +6885,8 @@ BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
   CanTypeArrayRef getElementTypes() const {
     return CanTypeArrayRef(getPointer()->getElementTypes());
   }
+
+  CanTypeWrapper<PackExpansionType> unwrapSingletonPackExpansion() const;
 END_CAN_TYPE_WRAPPER(PackType, Type)
 
 inline CanPackType CanTupleType::getInducedPackType() const {
@@ -6970,6 +6974,13 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
     return CanType(getPointer()->getCountType());
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
+
+inline CanTypeWrapper<PackExpansionType>
+CanPackType::unwrapSingletonPackExpansion() const {
+  return CanPackExpansionType(
+      getPointer()->unwrapSingletonPackExpansion());
+}
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {
