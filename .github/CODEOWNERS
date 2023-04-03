@@ -106,6 +106,7 @@
 # TODO: /lib/SILOptimizer/
 /lib/SILOptimizer/Utils/Distributed*                @ktoso
 /lib/Sema/                                          @hborla @slavapestov @xedin
+/lib/Sema/*Availability*                            @tshortli
 /lib/Sema/CS*                                       @hborla @xedin
 /lib/Sema/CodeSynthesisDistributed*                 @hborla @ktoso
 /lib/Sema/Constraint*                               @hborla @xedin
