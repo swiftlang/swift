@@ -3781,6 +3781,9 @@ ParameterizedProtocolType *ParameterizedProtocolType::get(const ASTContext &C,
 
   auto size = totalSizeToAlloc<Type>(args.size());
   auto mem = C.Allocate(size, alignof(ParameterizedProtocolType), arena);
+
+  properties |= RecursiveTypeProperties::HasParameterizedExistential;
+
   auto paramTy = new (mem) ParameterizedProtocolType(
         isCanonical ? &C : nullptr, baseTy, args, properties);
   C.getImpl().getArena(arena).ParameterizedProtocolTypes.InsertNode(
@@ -3871,8 +3874,6 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
     T = existential->getConstraintType();
 
   auto properties = T->getRecursiveProperties();
-  if (T->is<ParameterizedProtocolType>())
-    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -4742,8 +4743,6 @@ Type ExistentialType::get(Type constraint) {
     printWithAny = false;
 
   auto properties = constraint->getRecursiveProperties();
-  if (constraint->is<ParameterizedProtocolType>())
-    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];

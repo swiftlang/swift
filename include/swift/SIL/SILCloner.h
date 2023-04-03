@@ -279,34 +279,22 @@ public:
     if (type->getNumElements() == 0) return false;
 
     // Do a first pass over the tuple elements to check out the
-    // non-expansions.  If there's more than one of them, or any of them
-    // is labeled, we definitely stay a tuple and don't need to substitute
-    // any of the expansions.
-    unsigned numScalarElements = 0;
-    for (auto index : indices(type->getElements())) {
-      auto eltType = type.getElementType(index);
-      // Ignore pack expansions in this pass.
-      if (isa<PackExpansionType>(eltType)) continue;
-
-      // If there's a labeled scalar element, we'll stay a tuple.
-      if (type->getElement(index).hasName()) return false;
-
-      // If there are multiple scalar elements, we'll stay a tuple.
-      if (++numScalarElements > 1) return false;
-    }
-
-    assert(numScalarElements <= 1);
-
-    // We must have expansions if we got here: if all the elements were
-    // scalar, and none of them were labelled, and there wasn't more than
-    // one of them, and there was at least one of them, then somehow
-    // we had a tuple with a single unlabeled element.
+    // non-expansions.  If there's more than one of them we definitely
+    // stay a tuple and don't need to substitute any of the expansions.
+    unsigned numScalarElements = type->getNumScalarElements();
+    if (numScalarElements > 1)
+      return false;
 
     // Okay, we need to substitute the count types for the expansions.
     for (auto index : indices(type->getElements())) {
       // Ignore non-expansions because we've already counted them.
       auto expansion = dyn_cast<PackExpansionType>(type.getElementType(index));
-      if (!expansion) continue;
+      if (!expansion) {
+        // If we have a non-expansion with a label, we stay a tuple.
+        if (type->getElement(index).hasName())
+          return false;
+        continue;
+      }
 
       // Substitute the shape class of the expansion.
       auto newShapeClass = getOpASTType(expansion.getCountType());

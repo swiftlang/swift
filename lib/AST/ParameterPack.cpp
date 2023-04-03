@@ -102,6 +102,16 @@ CanType PackExpansionType::getReducedShape() {
   return CanType(PackExpansionType::get(reducedShape, reducedShape));
 }
 
+unsigned TupleType::getNumScalarElements() const {
+  unsigned n = 0;
+  for (auto elt : getElements()) {
+    if (!elt.getType()->is<PackExpansionType>())
+      ++n;
+  }
+
+  return n;
+}
+
 bool TupleType::containsPackExpansionType() const {
   for (auto elt : getElements()) {
     if (elt.getType()->is<PackExpansionType>())
@@ -288,6 +298,18 @@ PackType *PackType::getSingletonPackExpansion(Type param) {
 
 CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
   return CanPackType(PackType::getSingletonPackExpansion(param));
+}
+
+PackExpansionType *PackType::unwrapSingletonPackExpansion() const {
+  if (getNumElements() == 1) {
+    if (auto expansion = getElementTypes()[0]->getAs<PackExpansionType>()) {
+      auto pattern = expansion->getPatternType();
+      if (pattern->isParameterPack() || pattern->is<PackArchetypeType>())
+        return expansion;
+    }
+  }
+
+  return nullptr;
 }
 
 bool SILPackType::containsPackExpansionType() const {

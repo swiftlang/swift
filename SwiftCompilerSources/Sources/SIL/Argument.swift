@@ -122,10 +122,26 @@ public enum ArgumentConvention {
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
 
+  /// This argument is a value pack of mutable references to storage,
+  /// which the function is being given exclusive access to.  The elements
+  /// must be passed indirectly.
+  case packInout
+
+  /// This argument is a value pack, and ownership of the elements is being
+  /// transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packOwned
+
+  /// This argument is a value pack, and ownership of the elements is not
+  /// being transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packGuaranteed
+
   public var isIndirect: Bool {
     switch self {
     case .indirectIn, .indirectInGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout, .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
       return false
@@ -134,20 +150,23 @@ public enum ArgumentConvention {
 
   public var isIndirectIn: Bool {
     switch self {
-    case .indirectIn, .indirectInGuaranteed:
+    case .indirectIn, .indirectInGuaranteed,
+         .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout:
       return false
     }
   }
 
   public var isGuaranteed: Bool {
     switch self {
-    case .indirectInGuaranteed, .directGuaranteed:
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed:
       return true
     case .indirectIn, .directOwned, .directUnowned,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout, .packOwned:
       return false
     }
   }
@@ -157,7 +176,10 @@ public enum ArgumentConvention {
     case .indirectIn,
          .indirectOut,
          .indirectInGuaranteed,
-         .indirectInout:
+         .indirectInout,
+         .packInout,
+         .packOwned,
+         .packGuaranteed:
       return true
 
     case .indirectInoutAliasable,
@@ -171,7 +193,8 @@ public enum ArgumentConvention {
   public var isInout: Bool {
     switch self {
     case .indirectInout,
-         .indirectInoutAliasable:
+         .indirectInoutAliasable,
+         .packInout:
       return true
 
     case .indirectIn,
@@ -179,7 +202,9 @@ public enum ArgumentConvention {
          .indirectInGuaranteed,
          .directUnowned,
          .directGuaranteed,
-         .directOwned:
+         .directOwned,
+         .packOwned,
+         .packGuaranteed:
       return false
     }
   }
@@ -204,6 +229,9 @@ extension BridgedArgumentConvention {
       case .Direct_Owned:            return .directOwned
       case .Direct_Unowned:          return .directUnowned
       case .Direct_Guaranteed:       return .directGuaranteed
+      case .Pack_Inout:              return .packInout
+      case .Pack_Owned:              return .packOwned
+      case .Pack_Guaranteed:         return .packGuaranteed
       default:
         fatalError("unsupported argument convention")
     }

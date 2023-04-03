@@ -297,9 +297,8 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
               IGF, requirements,
               Address(bindingsBufPtr, IGM.TypeMetadataPtrTy,
                       IGM.getPointerAlignment()),
-              MetadataState::Complete, [&](CanType t) {
-                return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-              });
+              MetadataState::Complete,
+              genericEnv->getForwardingSubstitutionMap());
         }
 
         auto ret = IGF.emitTypeMetadataRefForLayout(ty);

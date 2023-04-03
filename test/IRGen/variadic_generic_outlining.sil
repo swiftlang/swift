@@ -14,7 +14,10 @@ struct Wrapper<Value> {
 // an opened element type.
 //
 // CHECK-LABEL: define{{.*}}void @test_outlining
-// CHECK:       [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** %T, [[INT]]
+// CHECK:       [[PACK_ADDR:%.*]] = ptrtoint %swift.type** %T to [[INT]]
+// CHECK-NEXT:  [[PACK_ADDR2:%.*]] = and [[INT]] [[PACK_ADDR]], -2
+// CHECK-NEXT:  [[PACK:%.*]] = inttoptr [[INT]] [[PACK_ADDR2]] to %swift.type**
+// CHECK-NEXT:  [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[PACK]], [[INT]]
 // CHECK-NEXT:  [[ELT_TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align
 //   Test that we do the copy through the VWT for the element type.
 // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[ELT_TYPE]] to i8***
