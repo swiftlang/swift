@@ -90,6 +90,10 @@ public:
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
     SuppressWarnings = 1 << 4,
+
+    /// Whether to disable the Swift Parser ASTGen
+    /// e.g. in dependency scanning, where an AST is not needed.
+    DisableSwiftParserASTGen = 1 << 5,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
