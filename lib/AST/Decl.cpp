@@ -9895,6 +9895,14 @@ Decl *TypeOrExtensionDecl::getAsDecl() const {
 DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
   return getAsDecl()->getInnermostDeclContext();
 }
+
+IterableDeclContext *TypeOrExtensionDecl::getAsIterableDeclContext() const {
+  if (auto nominal = Decl.dyn_cast<NominalTypeDecl *>())
+    return nominal;
+
+  return Decl.get<ExtensionDecl *>();
+}
+
 NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
   return getAsDeclContext()->getSelfNominalTypeDecl();
 }

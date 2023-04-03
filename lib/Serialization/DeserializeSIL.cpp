@@ -2200,17 +2200,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
-  case SILInstructionKind::MarkMustCheckInst: {
-    using CheckKind = MarkMustCheckInst::CheckKind;
-    auto Ty = MF->getType(TyID);
-    auto CKind = CheckKind(Attr);
-    ResultInst = Builder.createMarkMustCheckInst(
-        Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        CKind);
-    break;
-  }
-
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst: {
     using Kind = MarkUnresolvedReferenceBindingInst::Kind;
     auto ty = MF->getType(TyID);
@@ -2286,6 +2275,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Kind = (MarkUninitializedInst::Kind)Attr;
     auto Val = getLocalValue(ValID, Ty);
     ResultInst = Builder.createMarkUninitialized(Loc, Val, Kind);
+    break;
+  }
+  case SILInstructionKind::MarkMustCheckInst: {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    auto Ty = MF->getType(TyID);
+    auto CKind = CheckKind(Attr);
+    ResultInst = Builder.createMarkMustCheckInst(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        CKind);
     break;
   }
   case SILInstructionKind::StoreInst: {

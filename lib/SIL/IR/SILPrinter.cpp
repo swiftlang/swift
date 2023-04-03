@@ -2010,6 +2010,9 @@ public:
     case CheckKind::AssignableButNotConsumable:
       *this << "[assignable_but_not_consumable] ";
       break;
+    case CheckKind::InitableButNotConsumable:
+      *this << "[initable_but_not_consumable] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
