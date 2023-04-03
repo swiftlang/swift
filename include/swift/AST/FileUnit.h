@@ -65,6 +65,7 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
   /// Look up a local type declaration by its mangled name.
@@ -381,6 +382,7 @@ public:
   explicit BuiltinUnit(ModuleDecl &M);
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   /// Find all Objective-C methods with the given selector.

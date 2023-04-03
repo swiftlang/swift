@@ -32,3 +32,6 @@ public macro Observable() = #externalMacro(module: "MacroDefinition", type: "Obs
 
 @attached(accessor)
 public macro ObservableProperty() = #externalMacro(module: "MacroDefinition", type: "ObservablePropertyMacro")
+
+@attached(peer, names: overloaded)
+public macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
