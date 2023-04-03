@@ -23,7 +23,6 @@ typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
 @available(SwiftStdlib 5.7, *)
 distributed actor FiveSevenActor_NothingExecutor {
-//  @available(SwiftStdlib 5.9, *) // because of `localUnownedExecutor`
   nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
@@ -85,6 +84,7 @@ distributed actor FiveSevenActor_FiveNineExecutor {
 
       let system = LocalTestingDistributedActorSystem()
 
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
       tests.test("5.7 actor, no availability executor property => no custom executor") {
         expectCrashLater(withMessage: "Fatal error: Incorrect actor executor assumption; Expected 'MainActor' executor.")
         try! await FiveSevenActor_NothingExecutor(actorSystem: system).test(x: 42)
@@ -98,6 +98,22 @@ distributed actor FiveSevenActor_FiveNineExecutor {
         expectCrashLater(withMessage: "Fatal error: Incorrect actor executor assumption; Expected 'MainActor' executor.")
         try! await FiveSevenActor_FiveNineExecutor(actorSystem: system).test(x: 42)
       }
+      #else
+      // On non-apple platforms the SDK comes with the toolchains,
+      // so the feature works because we're executing in a 5.9 context already,
+      // which otherwise could not have been compiled
+      tests.test("non apple platform: 5.7 actor, no availability executor property => no custom executor") {
+        try! await FiveSevenActor_NothingExecutor(actorSystem: system).test(x: 42)
+      }
+
+      tests.test("non apple platform: 5.9 actor, no availability executor property => custom executor") {
+        try! await FiveNineActor_NothingExecutor(actorSystem: system).test(x: 42)
+      }
+
+      tests.test("non apple platform: 5.7 actor, 5.9 executor property => no custom executor") {
+        try! await FiveSevenActor_FiveNineExecutor(actorSystem: system).test(x: 42)
+      }
+      #endif
 
       await runAllTestsAsync()
     }
