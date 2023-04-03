@@ -182,14 +182,12 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
 static CanType getSingletonPackExpansionParameter(CanPackType packType,
                     const FulfillmentMap::InterestingKeysCallback &keys,
                     Optional<unsigned> &packExpansionComponent) {
-  if (packType->getNumElements() != 1)
-    return CanType();
-  auto expansion = dyn_cast<PackExpansionType>(packType.getElementType(0));
-  if (!expansion || !keys.isInterestingPackExpansion(expansion))
-    return CanType();
-
-  packExpansionComponent = 0;
-  return expansion.getPatternType();
+  if (auto expansion = packType.unwrapSingletonPackExpansion()) {
+    if (keys.isInterestingPackExpansion(expansion)) {
+      packExpansionComponent = 0;
+      return expansion.getPatternType();
+    }
+  }
 }
 
 bool FulfillmentMap::searchTypeMetadataPack(IRGenModule &IGM,
@@ -405,10 +403,7 @@ bool FulfillmentMap::searchShapeRequirement(IRGenModule &IGM, CanType argType,
   // there aren't expansions over pack parameters with different shapes,
   // we should always be able to turn this into the equation
   // `ax + b = <fulfilled count>` and then solve that.
-  if (packType->getNumElements() != 1)
-    return false;
-  auto expansion =
-    dyn_cast<PackExpansionType>(packType.getElementType(0));
+  auto expansion = packType.unwrapSingletonPackExpansion();
   if (!expansion)
     return false;
 
