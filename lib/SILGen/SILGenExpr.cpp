@@ -4163,8 +4163,9 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
       auto ImageBase = M.lookUpGlobalVariable("__ImageBase");
       if (!ImageBase)
         ImageBase =
-            SILGlobalVariable::create(M, SILLinkage::Public, IsNotSerialized,
-                                      "__ImageBase", BuiltinRawPtrTy);
+            SILGlobalVariable::create(M, SILLinkage::DefaultForDeclaration,
+                                      IsNotSerialized, "__ImageBase",
+                                      BuiltinRawPtrTy);
       ModuleBase = B.createGlobalAddr(SILLoc, ImageBase);
     } else {
       auto DSOHandle = M.lookUpGlobalVariable("__dso_handle");
