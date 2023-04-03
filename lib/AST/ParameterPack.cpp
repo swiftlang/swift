@@ -102,6 +102,16 @@ CanType PackExpansionType::getReducedShape() {
   return CanType(PackExpansionType::get(reducedShape, reducedShape));
 }
 
+unsigned TupleType::getNumScalarElements() const {
+  unsigned n = 0;
+  for (auto elt : getElements()) {
+    if (!elt.getType()->is<PackExpansionType>())
+      ++n;
+  }
+
+  return n;
+}
+
 bool TupleType::containsPackExpansionType() const {
   for (auto elt : getElements()) {
     if (elt.getType()->is<PackExpansionType>())

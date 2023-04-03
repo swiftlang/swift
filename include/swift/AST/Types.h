@@ -71,6 +71,7 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PackExpansionType;
 class PackType;
 enum class ParamSpecifier : uint8_t;
 class PlaceholderTypeRepr;
@@ -2413,6 +2414,12 @@ public:
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
   unsigned getNumElements() const { return Bits.TupleType.Count; }
+
+  /// Returns the number of non-PackExpansionType elements. This is the
+  /// minimum length of the tuple after substitution; a tuple with
+  /// zero or one scalar elements is unwrapped if it would otherwise be
+  /// a one-element tuple after substitution.
+  unsigned getNumScalarElements() const;
 
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
