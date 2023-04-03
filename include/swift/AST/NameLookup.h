@@ -240,6 +240,8 @@ enum class UnqualifiedLookupFlags {
   // This lookup should include results that are @inlinable or
   // @usableFromInline.
   IncludeUsableFromInline = 1 << 5,
+  /// This lookup should exclude any names introduced by macro expansions.
+  ExcludeMacroExpansions = 1 << 6,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -542,6 +544,17 @@ void pruneLookupResultSet(const DeclContext *dc, NLOptions options,
 template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
+
+/// Call the given function body with each macro declaration and its associated
+/// role attribute for the given role.
+///
+/// This routine intentionally avoids calling `forEachAttachedMacro`, which
+/// triggers request cycles, and should only be used when resolving macro
+/// names for the purposes of (other) name lookup.
+void forEachPotentialResolvedMacro(
+    DeclContext *moduleScopeCtx, DeclNameRef macroName, MacroRole role,
+    llvm::function_ref<void(MacroDecl *, const MacroRoleAttr *)> body
+);
 
 } // end namespace namelookup
 

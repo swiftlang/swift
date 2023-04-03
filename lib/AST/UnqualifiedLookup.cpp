@@ -520,6 +520,8 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(Flags::ExcludeMacroExpansions))
+    nlOptions |= NL_ExcludeMacroExpansions;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 
