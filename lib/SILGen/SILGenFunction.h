@@ -436,25 +436,6 @@ public:
       Result.box = box;
       return Result;
     }
-
-    static VarLoc getForBox(SILValue box) {
-      VarLoc Result;
-      Result.value = SILValue();
-      Result.box = box;
-      return Result;
-    }
-
-    /// Return either the value if we have one or if we only have a box, project
-    /// our a new box address and return that.
-    SILValue getValueOrBoxedValue(SILGenFunction &SGF,
-                                  SILLocation loc = SILLocation::invalid()) {
-      if (value)
-        return value;
-      assert(box);
-      if (loc.isNull())
-        loc = SGF.CurrentSILLoc;
-      return SGF.B.createProjectBox(loc, box, 0);
-    }
   };
   
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
@@ -1540,9 +1521,6 @@ public:
   // FIXME: demote this to private state.
   ManagedValue maybeEmitValueOfLocalVarDecl(
       VarDecl *var, AccessKind accessKind);
-
-  ManagedValue maybeEmitAddressForBoxOfLocalVarDecl(SILLocation loc,
-                                                    VarDecl *var);
 
   /// Produce an RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified expression.  Try to

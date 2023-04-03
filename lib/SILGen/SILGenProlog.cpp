@@ -674,10 +674,9 @@ private:
         SGF.emitManagedRValueWithCleanup(box);
 
         // We manually set calledCompletedUpdate to true since we want to use
-        // VarLoc::getForBox and use the debug info from the box rather than
-        // insert a custom debug_value.
+        // the debug info from the box rather than insert a custom debug_value.
         calledCompletedUpdate = true;
-        SGF.VarLocs[pd] = SILGenFunction::VarLoc::getForBox(box);
+        SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(destAddr, box);
         return;
       }
 
@@ -947,14 +946,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
-    if (box->getType().getSILBoxFieldType(&SGF.F, 0).isMoveOnly()) {
-      SGF.VarLocs[VD] = SILGenFunction::VarLoc::getForBox(box);
-    } else {
-      SILValue addr = SGF.B.createProjectBox(VD, box, 0);
-      SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-      SILDebugVariable DbgVar(VD->isLet(), ArgNo);
-      SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
-    }
+    SILValue addr = SGF.B.createProjectBox(VD, box, 0);
+    SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
+    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
+    SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
   case CaptureKind::Immutable:
