@@ -3505,8 +3505,27 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  auto resultMatchKind = subKind;
+  // Performance optimization: Propagate fully or partially resolved contextual
+  // type down into the body of result builder transformed closure by eagerly
+  // binding intermediate body result type to the contextual one. This helps to
+  // determine when closure body could be solved early.
+  //
+  // TODO: This could be extended to cover all multi-statement closures.
+  //
+  // See \c BindingSet::favoredOverConjunction for more details.
+  if (resultMatchKind >= ConstraintKind::Subtype &&
+      !func2->getResult()->isTypeVariableOrMember()) {
+    if (auto *closure = getAsExpr<ClosureExpr>(locator.trySimplifyToExpr())) {
+      if (!closure->hasExplicitResultType() &&
+          getAppliedResultBuilderTransform(closure)) {
+        resultMatchKind = ConstraintKind::Equal;
+      }
+    }
+  }
+
   // Result type can be covariant (or equal).
-  return matchTypes(func1->getResult(), func2->getResult(), subKind,
+  return matchTypes(func1->getResult(), func2->getResult(), resultMatchKind,
                     subflags,
                     locator.withPathElement(ConstraintLocator::FunctionResult));
 }
@@ -6646,40 +6665,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               type2->is<AnyFunctionType>())
             return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
                                          formUnsolvedResult);
-        }
-
-        // Performance optimization: Propagate fully or partially resolved
-        // contextual type down into the body of result builder transformed
-        // closure by eagerly binding intermediate body result type to the
-        // contextual one. This helps to determine when closure body could be
-        // solved early.
-        //
-        // TODO: This could be extended to cover all multi-statement closures.
-        //
-        // See \c BindingSet::favoredOverConjunction for more details.
-        if (!typeVar2 && locator.endsWith<LocatorPathElt::FunctionResult>()) {
-          SmallVector<LocatorPathElt> path;
-          auto anchor = locator.getLocatorParts(path);
-
-          // Drop `FunctionResult` element.
-          path.pop_back();
-
-          ClosureExpr *closure = nullptr;
-          {
-            // This avoids a new locator allocation.
-            SourceRange range;
-            ArrayRef<LocatorPathElt> scratchPath(path);
-            simplifyLocator(anchor, scratchPath, range);
-
-            if (scratchPath.empty())
-              closure = getAsExpr<ClosureExpr>(anchor);
-          }
-
-          if (closure && !closure->hasExplicitResultType() &&
-              getAppliedResultBuilderTransform(closure)) {
-            return matchTypesBindTypeVar(typeVar1, type2, ConstraintKind::Equal,
-                                         flags, locator, formUnsolvedResult);
-          }
         }
       }
 
