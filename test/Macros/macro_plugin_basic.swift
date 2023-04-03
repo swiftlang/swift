@@ -1,4 +1,4 @@
-// REQUIRES: OS=macosx
+// REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
