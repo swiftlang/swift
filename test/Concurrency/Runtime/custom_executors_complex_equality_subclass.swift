@@ -86,7 +86,7 @@ actor MyActor {
   }
 
   func test(expectedExecutor: BaseExecutor, expectedQueue: DispatchQueue) {
-    preconditionTaskOnExecutor(expectedExecutor, message: "Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
+    expectedExecutor.preconditionIsolated("Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
     print("\(Self.self): [\(self.executor.name)] on same context as [\(expectedExecutor.name)]")
   }
 }

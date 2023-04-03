@@ -21,14 +21,14 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchronous! */ -> String {
-  assumeOnLocalDistributedActorExecutor(of: actor) { dist in
+  actor.assumeIsolated { dist in
     print("gained access to: \(dist.isolatedProperty)")
     return dist.isolatedProperty
   }
 }
 
 func checkAssumeMainActor(actor: MainDistributedFriend) /* synchronous! */ {
-  assumeOnMainActorExecutor {
+  MainActor.assumeIsolated {
     print("yay")
   }
 }
@@ -63,7 +63,7 @@ actor OtherMain {
   }
 
   func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchronous! */ {
-    _ = assumeOnLocalDistributedActorExecutor(of: actor) { dist in
+    _ = actor.assumeIsolated { dist in
       print("gained access to: \(dist.isolatedProperty)")
       return dist.isolatedProperty
     }
@@ -94,7 +94,7 @@ actor OtherMain {
       }
 
       tests.test("assumeOnLocalDistributedActorExecutor: on remote actor reference") {
-        expectCrashLater(withMessage: "Cannot assume to be 'isolated MainDistributedFriend' since distributed actor 'a.MainDistributedFriend' is remote.")
+        expectCrashLater(withMessage: "Cannot assume to be 'isolated MainDistributedFriend' since distributed actor 'a.MainDistributedFriend' is a remote actor reference.")
         let remoteRef = try! MainDistributedFriend.resolve(id: distLocal.id, using: system)
         await OtherMain().checkAssumeLocalDistributedActor(actor: remoteRef)
       }

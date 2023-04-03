@@ -38,7 +38,7 @@ protocol Worker: DistributedActor {
 
 extension Worker {
   distributed func preconditionSameExecutor(as other: some Worker) {
-    preconditionOnExecutor(of: other, "Expected for [\(self)] share executor with [\(other)]")
+    other.preconditionIsolated("Expected for [\(self)] share executor with [\(other)]")
   }
 }
 
