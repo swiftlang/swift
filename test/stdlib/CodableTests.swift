@@ -672,7 +672,7 @@ class TestCodable : TestCodableSuper {
     // MARK: - Never
     @available(SwiftStdlib 5.9, *)
     func test_Never() {
-        struct Nope {
+        struct Nope: Codable {
             var no: Never
         }
       
