@@ -39,6 +39,7 @@ func check(actor: MainDistributedFriend) {
   checkAssumeMainActor(actor: actor)
 }
 
+@available(SwiftStdlib 5.9, *)
 distributed actor MainDistributedFriend {
   nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned executor")

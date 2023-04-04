@@ -21,6 +21,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
+@available(SwiftStdlib 5.9, *)
 distributed actor Worker {
   nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
     print("get unowned 'local' executor via ID")
