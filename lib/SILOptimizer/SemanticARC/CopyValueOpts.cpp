@@ -493,6 +493,12 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
           }))
         return false;
   }
+  // Check whether the uses considered immediately above are all effectively
+  // instantaneous uses. Pointer escapes propagate values ways that may not be
+  // discoverable.
+  if (hasPointerEscape(operand)) {
+    return false;
+  }
 
   // Ok, we now know that we can eliminate this value.
   LLVM_DEBUG(llvm::dbgs()
