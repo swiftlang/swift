@@ -472,9 +472,16 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
                                             ValueDecl *requirementDecl) {
   Mangle::ASTMangler Mangler;
 
+  std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
-  addSymbol(Mangler.mangleWitnessThunk(C, requirementDecl),
-            SymbolSource::forUnknown());
+  addSymbol(decorated, SymbolSource::forUnknown());
+
+  if (requirementDecl->isProtocolRequirement()) {
+    ValueDecl *PWT = C->getWitness(requirementDecl).getDecl();
+    if (const auto *AFD = dyn_cast<AbstractFunctionDecl>(PWT))
+      if (AFD->hasAsync())
+        addSymbol(decorated + "Tu", SymbolSource::forUnknown());
+  }
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
