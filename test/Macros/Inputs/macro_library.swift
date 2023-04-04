@@ -35,3 +35,6 @@ public macro ObservableProperty() = #externalMacro(module: "MacroDefinition", ty
 
 @attached(peer, names: overloaded)
 public macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
+
+@attached(peer, names: suffixed(Builder))
+public macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition", type: "AddClassReferencingSelfMacro")
