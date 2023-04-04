@@ -6395,7 +6395,9 @@ static bool hasIteratorAPIAttr(const clang::Decl *decl) {
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   // Probably a class template that has not yet been specialized:
   if (!decl->getDefinition())
-    return false;
+    // If the definition is unknown, there is no way to determine if the type
+    // stores pointers. Stay on the safe side and assume that it does.
+    return true;
 
   auto checkType = [](clang::QualType t) {
     if (t->isPointerType())
@@ -6690,9 +6692,10 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return false;
         }
 
-        // Mark this as safe to help our diganostics down the road.
         if (!cxxRecordReturnType->getDefinition()) {
-          return true;
+          // This is a templated type that has not been instantiated yet. We do
+          // not know if it is safe. Assume that it isn't.
+          return false;
         }
 
         if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
