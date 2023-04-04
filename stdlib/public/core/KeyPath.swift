@@ -3897,8 +3897,7 @@ internal func _instantiateKeyPathBuffer(
 public func _createOffsetBasedKeyPath(
   root: Any.Type,
   value: Any.Type,
-  offset: Int,
-  isClass: Bool = false
+  offset: Int
 ) -> AnyKeyPath {
   func openRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
     func openValue<Value>(_: Value.Type) -> AnyKeyPath.Type {
@@ -3924,7 +3923,7 @@ public func _createOffsetBasedKeyPath(
     builder.pushHeader(header)
 
     let componentHeader = RawKeyPathComponent.Header(
-      stored: isClass ? .class : .struct,
+      stored: .struct,
       mutable: false,
       inlineOffset: UInt32(offset)
     )
