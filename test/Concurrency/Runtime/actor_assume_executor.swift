@@ -103,19 +103,19 @@ final class MainActorEcho {
     if #available(SwiftStdlib 5.9, *) {
       // === MainActor --------------------------------------------------------
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from 'main() async'") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from 'main() async'") {
         await checkAssumeMainActor(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from MainActor method") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from MainActor method") {
         await mainActorCallCheck(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from actor on MainActor executor") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from actor on MainActor executor") {
         await MainFriend().callCheck(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: wrongly assume the main executor, from actor on other executor") {
+      tests.test("MainActor.assumeIsolated: wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor(echo: echo)
       }
