@@ -233,10 +233,12 @@ static LValueTypeData getPhysicalStorageTypeData(TypeExpansionContext context,
                                                  SILGenModule &SGM,
                                                  SGFAccessKind accessKind,
                                                  AbstractStorageDecl *storage,
+                                                 SubstitutionMap subs,
                                                  CanType substFormalType) {
   assert(!isa<ReferenceStorageType>(substFormalType));
   auto origFormalType = SGM.Types.getAbstractionPattern(storage)
-                                 .getReferenceStorageReferentType();
+                                 .getReferenceStorageReferentType()
+                                 .withSubstitutions(subs);
   return getAbstractedTypeData(context, SGM, accessKind, origFormalType,
                                substFormalType);
 }
@@ -2810,22 +2812,25 @@ namespace {
   struct AccessEmitter {
     SILGenFunction &SGF;
     StorageType *Storage;
+    SubstitutionMap Subs;
     CanType FormalRValueType;
     SGFAccessKind AccessKind;
 
     Impl &asImpl() { return static_cast<Impl&>(*this); }
 
     AccessEmitter(SILGenFunction &SGF, StorageType *storage,
-                  SGFAccessKind accessKind, CanType formalRValueType)
-      : SGF(SGF), Storage(storage), FormalRValueType(formalRValueType),
-        AccessKind(accessKind) {}
+                  SubstitutionMap subs, SGFAccessKind accessKind,
+                  CanType formalRValueType)
+      : SGF(SGF), Storage(storage), Subs(subs),
+        FormalRValueType(formalRValueType), AccessKind(accessKind) {}
 
     void emitUsingStrategy(AccessStrategy strategy) {
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                       AccessKind, Storage, FormalRValueType);
+                                       AccessKind, Storage, Subs,
+                                       FormalRValueType);
         return asImpl().emitUsingStorage(typeData);
       }
 
@@ -2871,7 +2876,8 @@ namespace {
       case AccessorKind::MutableAddress: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                       AccessKind, Storage, FormalRValueType);
+                                       AccessKind, Storage, Subs,
+                                       FormalRValueType);
         return asImpl().emitUsingAddressor(accessor, isDirect, typeData);
       }
 
@@ -2879,7 +2885,8 @@ namespace {
       case AccessorKind::Modify: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                       AccessKind, Storage, FormalRValueType);
+                                       AccessKind, Storage, Subs,
+                                       FormalRValueType);
         return asImpl().emitUsingCoroutineAccessor(accessor, isDirect,
                                                    typeData);
       }
@@ -2953,7 +2960,6 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       AccessEmitter<NonMemberVarAccessEmitter, VarDecl> {
     LValue &LV;
     SILLocation Loc;
-    SubstitutionMap Subs;
     LValueOptions Options;
     Optional<ActorIsolation> ActorIso;
 
@@ -2964,8 +2970,8 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                               LValueOptions options,
                               Optional<ActorIsolation> actorIso,
                               LValue &lv)
-      : AccessEmitter(SGF, var, accessKind, formalRValueType),
-        LV(lv), Loc(loc), Subs(subs), Options(options), ActorIso(actorIso) {}
+      : AccessEmitter(SGF, var, subs, accessKind, formalRValueType),
+        LV(lv), Loc(loc), Options(options), ActorIso(actorIso) {}
 
     void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
                             LValueTypeData typeData) {
@@ -3512,6 +3518,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   using super = AccessEmitter<Impl, StorageType>;
   using super::SGF;
   using super::Storage;
+  using super::Subs;
   using super::FormalRValueType;
   LValue &LV;
   LValueOptions Options;
@@ -3519,7 +3526,6 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   bool IsSuper;
   bool IsOnSelfParameter; // Is self the self parameter in context.
   CanType BaseFormalType;
-  SubstitutionMap Subs;
   ArgumentList *ArgListForDiagnostics;
   PreparedArguments Indices;
   // If any, holds the actor we must switch to when performing the access.
@@ -3532,9 +3538,9 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                              LValue &lv, ArgumentList *argListForDiagnostics,
                              PreparedArguments &&indices, bool isSelf = false,
                              Optional<ActorIsolation> actorIso = None)
-      : super(SGF, storage, accessKind, formalRValueType), LV(lv),
+      : super(SGF, storage, subs, accessKind, formalRValueType), LV(lv),
         Options(options), Loc(loc), IsSuper(isSuper), IsOnSelfParameter(isSelf),
-        BaseFormalType(lv.getSubstFormalType()), Subs(subs),
+        BaseFormalType(lv.getSubstFormalType()),
         ArgListForDiagnostics(argListForDiagnostics),
         Indices(std::move(indices)), ActorIso(actorIso) {}
 
