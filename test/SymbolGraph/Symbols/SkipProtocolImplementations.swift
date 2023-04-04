@@ -20,15 +20,20 @@
 // CHECK-LABEL: "symbols": [
 
 // SomeStruct.otherFunc() should be present because it has its own doc comment
-// CHECK: s:27SkipProtocolImplementations10SomeStructV9otherFuncyyF
+// CHECK-DAG: s:27SkipProtocolImplementations10SomeStructV9otherFuncyyF
+
+// Same for ExtraStruct.Inner
+// CHECK-DAG: s:27SkipProtocolImplementations11ExtraStructV5InnerV
 
 // CHECK-LABEL: "relationships": [
 
 // we want to make sure that the conformance relationship itself stays
 // CHECK-DAG: conformsTo
 
-// SomeStruct.otherFunc() should be the only one with sourceOrigin information
-// COUNT-COUNT-1: sourceOrigin
+// SomeStruct.otherFunc() and ExtraStruct.Inner should be the only ones with sourceOrigin information
+// (ExtraStruct.Inner will have two sourceOrigins because it has two relationships: a memberOf and a
+// conformsTo)
+// COUNT-COUNT-3: sourceOrigin
 // COUNT-NOT: sourceOrigin
 
 public protocol SomeProtocol {
@@ -61,3 +66,10 @@ public struct OtherStruct: OtherProtocol {
 }
 
 extension OtherStruct.Inner: Sendable {}
+
+public struct ExtraStruct: OtherProtocol {
+    /// This time with a doc comment!
+    public struct Inner {}
+}
+
+extension ExtraStruct.Inner: Sendable {}
