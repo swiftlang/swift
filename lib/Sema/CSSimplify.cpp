@@ -4282,16 +4282,17 @@ ConstraintSystem::matchTypesBindTypeVar(
   // pack expansion expression.
   if (!typeVar->getImpl().canBindToPack() &&
       (type->is<PackArchetypeType>() || type->is<PackType>())) {
-    if (shouldAttemptFixes()) {
-      auto *fix = AllowInvalidPackReference::create(*this, type,
-                                                    getConstraintLocator(locator));
-      if (!recordFix(fix)) {
-        recordPotentialHole(typeVar);
-        return getTypeMatchSuccess();
-      }
-    }
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
 
-    return getTypeMatchFailure(locator);
+    auto *fix = AllowInvalidPackReference::create(
+        *this, type, getConstraintLocator(locator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+
+    // Don't allow the invalid pack reference to propagate to other
+    // bindings.
+    type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
   }
 
   // Binding to a pack expansion type is always an error in Swift 6 mode.
