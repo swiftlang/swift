@@ -373,12 +373,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
     if (!Unsubstituted)
       return false;
 
-    // TODO: Consider `struct S<T> { enum E { case a(T); case b(T?) }}`
-    // This test identifies `a` as a generic case, but not `b`
-    bool IsGeneric = isa<GenericTypeParameterTypeRef>(Unsubstituted);
-
-    auto Substituted = Unsubstituted->subst(*this, *Subs);
-
+    // We need this for enums; an enum case "is generic" if any generic type
+    // parameter substitutions occurred on the payload.  E.g.,
+    // `case a([T?])` is generic, but `case a([Int?])` is not.
+    bool IsGeneric = false;
+    auto Substituted = Unsubstituted->subst(*this, *Subs, IsGeneric);
     bool IsIndirect = FD->isEnum() && Field->isIndirectCase();
 
     auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted, IsIndirect, IsGeneric);
