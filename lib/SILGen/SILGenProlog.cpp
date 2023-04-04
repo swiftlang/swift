@@ -377,7 +377,8 @@ public:
       } else {
         assert(init);
         expandPack(origEltType, substEltTypes, elt.getSubstIndex(),
-                   eltInits, elements);
+                   eltInits.slice(elt.getSubstIndex(), substEltTypes.size()),
+                   elements);
       }
     });
 

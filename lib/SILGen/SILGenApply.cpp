@@ -2191,43 +2191,35 @@ ManagedValue SILGenFunction::emitStringLiteral(SILLocation loc,
 
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
-static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType) {
-  // The count is always 1 unless the substituted type is a tuple.
-  auto substTuple = dyn_cast<TupleType>(substType);
-  if (!substTuple)
+static unsigned getFlattenedValueCount(AbstractionPattern origType) {
+  // The count is always 1 unless the original type is a tuple.
+  if (!origType.isTuple())
     return 1;
 
-  // If the original type is opaque, the count is 1 anyway.
-  if (origType.isTypeParameter())
-    return 1;
-
-  // Otherwise, add up the elements.
+  // Add up the elements.
   unsigned count = 0;
-  origType.forEachTupleElement(substTuple, [&](TupleElementGenerator &elt) {
-    // Expansion components turn into a single parameter.
-    if (elt.isOrigPackExpansion()) {
+  for (auto elt : origType.getTupleElementTypes()) {
+    // Expansion components turn into a single pack parameter.
+    if (elt.isPackExpansion()) {
       count++;
 
     // Recursively expand scalar components.
     } else {
-      count += getFlattenedValueCount(elt.getOrigType(),
-                                      elt.getSubstTypes()[0]);
+      count += getFlattenedValueCount(elt);
     }
-  });
+  }
   return count;
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType,
                                        ImportAsMemberStatus foreignSelf) {
   // C functions imported as static methods don't consume any real arguments.
   if (foreignSelf.isStatic())
     return 0;
 
-  return getFlattenedValueCount(origType, substType);
+  return getFlattenedValueCount(origType);
 }
 
 namespace {
@@ -3195,7 +3187,6 @@ public:
       auto defArg = std::move(arg).asKnownDefaultArg();
 
       auto numParams = getFlattenedValueCount(origParamType,
-                                              substParamType,
                                               ImportAsMemberStatus());
       DelayedArguments.emplace_back(defArg,
                                     defArg->getDefaultArgsOwner(),
@@ -3352,11 +3343,19 @@ private:
   void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
     assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
+    // If the original parameter type is a vanishing tuple, we want to emit
+    // this as if the argument source was wrapped in an extra level of
+    // tuple literal.
+    bool origTupleVanishes =
+      origParamType.getVanishingTupleElementPatternType().hasValue();
+
+    auto substType = arg.getSubstRValueType();
+
     // If we're working with an r-value, just expand it out and emit
     // all the elements individually.
+    // FIXME: this code is not doing the right thing with packs
     if (arg.isRValue()) {
-      if (CanTupleType substArgType =
-              dyn_cast<TupleType>(arg.getSubstRValueType())) {
+      if (CanTupleType substArgType = dyn_cast<TupleType>(substType)) {
         // The original type isn't necessarily a tuple.
         if (!origParamType.matchesTuple(substArgType))
           origParamType = origParamType.getTupleElementType(0);
@@ -3385,22 +3384,28 @@ private:
     Expr *e = std::move(arg).asKnownExpr();
 
     // If the source expression is a tuple literal, we can break it
-    // up directly.
-    if (auto tuple = dyn_cast<TupleExpr>(e)) {
-      auto substTupleType =
-        cast<TupleType>(e->getType()->getCanonicalType());
-      origParamType.forEachTupleElement(substTupleType,
+    // up directly.  We can also do this if the orig type is a vanishing
+    // tuple, because we want to treat that like it was the sole element
+    // of a tuple.  Note that vanishing tuples take priority: the
+    // singleton element could itself be a tuple.
+    auto tupleExpr = dyn_cast<TupleExpr>(e);
+    if (origTupleVanishes || tupleExpr) {
+      auto getElementExpr = [&](unsigned index) {
+        assert(!origTupleVanishes || index == 0);
+        return (origTupleVanishes ? e : tupleExpr->getElement(index));
+      };
+      origParamType.forEachTupleElement(substType,
                                         [&](TupleElementGenerator &elt) {
         if (!elt.isOrigPackExpansion()) {
-          emit(tuple->getElement(elt.getSubstIndex()), elt.getOrigType());
+          emit(getElementExpr(elt.getSubstIndex()), elt.getOrigType());
           return;
         }
 
         auto substEltTypes = elt.getSubstTypes();
         SmallVector<ArgumentSource, 4> eltArgs;
         eltArgs.reserve(substEltTypes.size());
-        for (auto i : range(elt.getSubstIndex(), substEltTypes.size())) {
-          eltArgs.emplace_back(tuple->getElement(i));
+        for (auto i : elt.getSubstIndexRange()) {
+          eltArgs.emplace_back(getElementExpr(i));
         }
         emitPackArg(eltArgs, elt.getOrigType());
       });
@@ -3576,7 +3581,7 @@ private:
 
   void emitExpandedBorrowed(Expr *arg, AbstractionPattern origParamType) {
     CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto count = getFlattenedValueCount(origParamType);
     auto claimedParams = claimNextParameters(count);
 
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
@@ -3626,7 +3631,7 @@ private:
 
   void emitExpandedConsumed(Expr *arg, AbstractionPattern origParamType) {
     CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto count = getFlattenedValueCount(origParamType);
     auto claimedParams = claimNextParameters(count);
 
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
@@ -4432,10 +4437,8 @@ struct ParamLowering {
           if (substParam.isInOut()) {
             count += 1;
           } else {
-            count += getFlattenedValueCount(
-                origParamType,
-                substParam.getParameterType()->getCanonicalType(),
-                ImportAsMemberStatus());
+            count += getFlattenedValueCount(origParamType,
+                                            ImportAsMemberStatus());
           }
         }
       }
