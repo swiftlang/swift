@@ -24,6 +24,8 @@ import macro_library
 #else
 @attached(peer, names: overloaded)
 macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
+@attached(peer, names: suffixed(Builder))
+macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition", type: "AddClassReferencingSelfMacro")
 #endif
 
 struct S {
@@ -112,3 +114,6 @@ struct Main {
     // CHECK-EXEC: hahaha global
   }
 }
+
+@AddClassReferencingSelf
+protocol MyProto { }
