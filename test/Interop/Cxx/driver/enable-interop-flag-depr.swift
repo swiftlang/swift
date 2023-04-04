@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -cxx-interoperability-mode=swift-5.9 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -cxx-interoperability-mode=default 2>&1 | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module Test {

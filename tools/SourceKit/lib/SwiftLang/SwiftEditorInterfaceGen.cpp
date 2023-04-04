@@ -724,7 +724,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
       }
       if (retryWithCxxEnabled) {
           std::vector<const char *> AdjustedArgs(Args.begin(), Args.end());
-          AdjustedArgs.push_back("-cxx-interoperability-mode=swift-5.9");
+          AdjustedArgs.push_back("-cxx-interoperability-mode=default");
           return editorOpenInterface(Consumer, Name, ModuleName, Group, AdjustedArgs,
                                      SynthesizedExtensions, InterestedUSR);
       }
