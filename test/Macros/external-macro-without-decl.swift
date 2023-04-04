@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name Swift -parse-stdlib
 // REQUIRES: swift_swift_parser
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
+
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name Swift -parse-stdlib
 
 // expected-warning@+2{{@expression has been removed in favor of @freestanding(expression)}}
 // expected-warning@+1{{external macro implementation type 'A.B' could not be found for macro 'myMacro()'; the type must be public and provided via '-load-plugin-library'}}

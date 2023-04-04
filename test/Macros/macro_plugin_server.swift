@@ -7,8 +7,6 @@
 //== Build the plugin library
 // RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
-// RUN:   -I %swift-host-lib-dir \
-// RUN:   -L %swift-host-lib-dir \
 // RUN:   -emit-library \
 // RUN:   -o %t/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name=MacroDefinition \
@@ -17,8 +15,6 @@
 
 // RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
-// RUN:   -I %swift-host-lib-dir \
-// RUN:   -L %swift-host-lib-dir \
 // RUN:   -emit-library \
 // RUN:   -o %t/plugins/%target-library-name(EvilMacros) \
 // RUN:   -module-name=EvilMacros \

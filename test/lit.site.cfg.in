@@ -158,15 +158,15 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 if "@BOOTSTRAPPING_MODE@" != "OFF":
   config.available_features.add('swift_in_compiler')
 
-if "@SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR@" != "":
-  config.available_features.add('swift_swift_parser')
-
 if "@BOOTSTRAPPING_MODE@" == 'HOSTTOOLS':
   config.available_features.add('hosttools_mode')
 elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':
   config.available_features.add('bootstrapping_mode')
 elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING-WITH-HOSTLIBS':
   config.available_features.add('bootstrapping_with_hostlibs_mode')
+
+if '@SWIFT_SWIFT_PARSER@' == 'TRUE':
+  config.available_features.add('swift_swift_parser')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
