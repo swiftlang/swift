@@ -96,8 +96,8 @@ class CommandRunner(object):
                 return
 
             stdout, stderr = remote_proc.communicate()
-            stdout = stdout.decode('utf-8')
-            stderr = stderr.decode('utf-8')
+            stdout = stdout.decode(encoding='utf-8', errors='replace')
+            stderr = stderr.decode(encoding='utf-8', errors='replace')
 
             # Print stdout to screen
             print(stdout, end='')
@@ -140,8 +140,8 @@ class CommandRunner(object):
             if self.verbose:
                 print(sources, file=sys.stderr)
             stdout, stderr = rsync_proc.communicate(sources.encode('utf-8'))
-            stdout = stdout.decode('utf-8')
-            stderr = stderr.decode('utf-8')
+            stdout = stdout.decode(encoding='utf-8', errors='replace')
+            stderr = stderr.decode(encoding='utf-8', errors='replace')
 
             # Print stdout to screen
             print(stdout, end='')
