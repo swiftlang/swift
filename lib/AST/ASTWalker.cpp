@@ -442,6 +442,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", MED);
+#endif
     bool shouldWalkArguments, shouldWalkExpansion;
     std::tie(shouldWalkArguments, shouldWalkExpansion) =
         Walker.shouldWalkMacroArgumentsAndExpansion();
@@ -1340,6 +1343,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     bool shouldWalkArguments, shouldWalkExpansion;
     std::tie(shouldWalkArguments, shouldWalkExpansion) =
         Walker.shouldWalkMacroArgumentsAndExpansion();
+
+    if (auto *substituteDecl = E->getSubstituteDecl()) {
+      if (doIt(substituteDecl))
+        return nullptr;
+      // Visiting the substitute macro expansion decl will visit the same
+      // argument list. Skip visiting it again.
+      shouldWalkArguments = false;
+    }
 
     if (shouldWalkArguments && E->getArgs()) {
       ArgumentList *args = doIt(E->getArgs());

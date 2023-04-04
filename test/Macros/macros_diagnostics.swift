@@ -162,6 +162,11 @@ func callMacroWithDefaults() {
 public macro MacroOrType() = #externalMacro(module: "A", type: "MacroOrType")
 // expected-warning@-1{{external macro implementation type}}
 
+@freestanding(codeItem, names: named(foo))
+public macro badCodeItemMacro() = #externalMacro(module: "A", type: "B")
+// expected-error@-2{{'codeItem' macros are not allowed to introduce names}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found}}
+
 struct MacroOrType {
   typealias Nested = Int
 }

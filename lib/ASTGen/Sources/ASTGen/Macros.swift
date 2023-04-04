@@ -606,6 +606,21 @@ func expandFreestandingMacroInProcess(
       evaluatedSyntax = Syntax(CodeBlockItemListSyntax(
         decls.map { CodeBlockItemSyntax(item: .decl($0)) }))
 
+    case let codeItemMacro as CodeItemMacro.Type:
+      func expandCodeItemMacro<Node: FreestandingMacroExpansionSyntax>(
+        _ node: Node
+      ) throws -> [CodeBlockItemSyntax] {
+        return try codeItemMacro.expansion(
+          of: sourceManager.detach(
+            node,
+            foldingWith: OperatorTable.standardOperators
+          ),
+          in: context
+        )
+      }
+      let items = try _openExistential(parentExpansion, do: expandCodeItemMacro)
+      evaluatedSyntax = Syntax(CodeBlockItemListSyntax(items))
+
     default:
       print("not an expression macro or a declaration macro")
       return nil
