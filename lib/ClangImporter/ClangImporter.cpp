@@ -4408,8 +4408,8 @@ static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Imp
                                               HeaderLoc loc, Diagnostic diag) {
   auto importedLoc =
     Impl.SwiftContext.getClangModuleLoader()->importSourceLocation(loc.clangLoc);
-  Impl.diagnose(loc, diag)
-    .fixItInsert(importedLoc, "SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>) ");
+  Impl.diagnose(loc, diag).fixItInsert(
+      importedLoc, "SHARED_REFERENCE(<#retain#>, <#release#>) ");
 }
 
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
