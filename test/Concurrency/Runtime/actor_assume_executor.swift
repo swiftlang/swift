@@ -16,7 +16,7 @@ import StdlibUnittest
 
 func checkAssumeMainActor(echo: MainActorEcho) /* synchronous! */ {
   // Echo.get("any") // error: main actor isolated, cannot perform async call here
-  assumeOnMainActorExecutor {
+  MainActor.assumeIsolated {
     let input = "example"
     let got = echo.get(input)
     precondition(got == "example", "Expected echo to match \(input)")
@@ -40,7 +40,7 @@ actor MainFriend {
 
 func checkAssumeSomeone(someone: Someone) /* synchronous */ {
   // someone.something // can't access, would need a hop but we can't
-  assumeOnActorExecutor(someone) { someone in
+  someone.assumeIsolated { someone in
     let something = someone.something
     let expected = "isolated something"
     precondition(something == expected, "expected '\(expected)', got: \(something)")

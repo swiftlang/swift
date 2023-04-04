@@ -30,7 +30,7 @@ distributed actor Worker {
 
   distributed func test(x: Int) async throws {
     print("executed: \(#function)")
-    assumeOnMainActorExecutor {
+    MainActor.assumeIsolated {
       print("assume: this distributed actor shares executor with MainActor")
     }
     print("done executed: \(#function)")

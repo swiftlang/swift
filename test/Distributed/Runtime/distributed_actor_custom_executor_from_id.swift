@@ -28,10 +28,14 @@ distributed actor Worker {
     return self.id.executorPreference
   }
 
-  distributed func test(x: Int) async throws {
+  distributed func test(x: Int) {
     print("executed: \(#function)")
-    assumeOnMainActorExecutor {
+    MainActor.assumeIsolated {
       print("assume: this distributed actor shares executor with MainActor")
+    }
+    self.assumeIsolated { isolatedSelf in
+      // it of course is isolated by "itself"
+      print("assume: this distributed actor is isolated by itself")
     }
     print("done executed: \(#function)")
   }
@@ -55,6 +59,7 @@ extension DefaultDistributedActorSystem.ActorID {
     // CHECK: get unowned 'local' executor
     // CHECK: executed: test(x:)
     // CHECK: assume: this distributed actor shares executor with MainActor
+    // CHECK: assume: this distributed actor is isolated by itself
     // CHECK: done executed: test(x:)
 
     print("OK") // CHECK: OK
