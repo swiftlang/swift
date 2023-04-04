@@ -2004,40 +2004,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
     }
   };
-  
-  // A walker that verifies whether or not `exprToMatch`
-  // is a descendent of the AST node being walked
-  class ExprIsDescendantWalker : public BaseDiagnosticWalker {
-    Expr *exprToMatch;
-  public:
-    bool exprIsDescendant = false;
-    
-    explicit ExprIsDescendantWalker(Expr *exprToMatch)
-      : exprToMatch(exprToMatch) { }
-    
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return true;
-    }
-    
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (E == exprToMatch) {
-        exprIsDescendant = true;
-        return Action::Stop();
-      }
-      
-      return Action::Continue(E);
-    }
-    
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      // We need to look at all AST nodes, so make sure to check the children of statements
-      return Action::Continue(S);
-    }
-    
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      // We need to look at all AST nodes, so make sure to check the children of decls
-      return Action::Continue();
-    }
-  };
 
   auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;
@@ -2047,17 +2013,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
           ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
-    }
-  }
-  
-  // Verify E is actually a descendant of ACE before we use it.
-  // Otherwise we'd be diagnosing E within the context of a closure
-  // that it isn't actually a part of.
-  if (ACE) {
-    auto isDescendantWalker = ExprIsDescendantWalker(const_cast<Expr *>(E));
-    ACE->walk(isDescendantWalker);
-    if (!isDescendantWalker.exprIsDescendant) {
-      ACE = nullptr;
     }
   }
   
