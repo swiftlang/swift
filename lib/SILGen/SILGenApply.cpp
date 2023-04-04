@@ -3343,11 +3343,19 @@ private:
   void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
     assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
+    // If the original parameter type is a vanishing tuple, we want to emit
+    // this as if the argument source was wrapped in an extra level of
+    // tuple literal.
+    bool origTupleVanishes =
+      origParamType.getVanishingTupleElementPatternType().hasValue();
+
+    auto substType = arg.getSubstRValueType();
+
     // If we're working with an r-value, just expand it out and emit
     // all the elements individually.
+    // FIXME: this code is not doing the right thing with packs
     if (arg.isRValue()) {
-      if (CanTupleType substArgType =
-              dyn_cast<TupleType>(arg.getSubstRValueType())) {
+      if (CanTupleType substArgType = dyn_cast<TupleType>(substType)) {
         // The original type isn't necessarily a tuple.
         if (!origParamType.matchesTuple(substArgType))
           origParamType = origParamType.getTupleElementType(0);
@@ -3376,22 +3384,28 @@ private:
     Expr *e = std::move(arg).asKnownExpr();
 
     // If the source expression is a tuple literal, we can break it
-    // up directly.
-    if (auto tuple = dyn_cast<TupleExpr>(e)) {
-      auto substTupleType =
-        cast<TupleType>(e->getType()->getCanonicalType());
-      origParamType.forEachTupleElement(substTupleType,
+    // up directly.  We can also do this if the orig type is a vanishing
+    // tuple, because we want to treat that like it was the sole element
+    // of a tuple.  Note that vanishing tuples take priority: the
+    // singleton element could itself be a tuple.
+    auto tupleExpr = dyn_cast<TupleExpr>(e);
+    if (origTupleVanishes || tupleExpr) {
+      auto getElementExpr = [&](unsigned index) {
+        assert(!origTupleVanishes || index == 0);
+        return (origTupleVanishes ? e : tupleExpr->getElement(index));
+      };
+      origParamType.forEachTupleElement(substType,
                                         [&](TupleElementGenerator &elt) {
         if (!elt.isOrigPackExpansion()) {
-          emit(tuple->getElement(elt.getSubstIndex()), elt.getOrigType());
+          emit(getElementExpr(elt.getSubstIndex()), elt.getOrigType());
           return;
         }
 
         auto substEltTypes = elt.getSubstTypes();
         SmallVector<ArgumentSource, 4> eltArgs;
         eltArgs.reserve(substEltTypes.size());
-        for (auto i : range(elt.getSubstIndex(), substEltTypes.size())) {
-          eltArgs.emplace_back(tuple->getElement(i));
+        for (auto i : elt.getSubstIndexRange()) {
+          eltArgs.emplace_back(getElementExpr(i));
         }
         emitPackArg(eltArgs, elt.getOrigType());
       });
