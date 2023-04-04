@@ -1821,9 +1821,13 @@ public:
 
   void visit(Decl *decl) {
     // Visit auxiliary decls first.
-    decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      this->visit(auxiliaryDecl);
-    });
+    // We don't do this for members of classes because it happens as part of
+    // visiting their ABI members.
+    if (!isa<ClassDecl>(decl->getDeclContext())) {
+      decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        this->visit(auxiliaryDecl);
+      });
+    }
 
     if (auto *Stats = getASTContext().Stats)
       ++Stats->getFrontendCounters().NumDeclsTypechecked;
