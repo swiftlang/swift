@@ -318,7 +318,7 @@ public:
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
-  /// Always recompile the output even the module hash might match.
+  /// Always recompile the output even if the module hash might match.
   unsigned AlwaysCompile : 1;
 
   /// Whether we should embed the bitcode file.

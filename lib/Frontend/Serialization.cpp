@@ -40,19 +40,21 @@ static void emitABIDescriptor(ModuleOrSourceFile DC,
       auto &OutputBackend = getContext(DC).getOutputBackend();
       auto ABIDesFile = OutputBackend.createFile(options.ABIDescriptorPath);
       if (!ABIDesFile) {
-        getContext(DC).Diags.diagnose(SourceLoc(), diag::cannot_open_file,
+        getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
                                       options.ABIDescriptorPath,
                                       toString(ABIDesFile.takeError()));
         return;
       }
+      SWIFT_DEFER {
+        if (auto E = ABIDesFile->keep()) {
+          getContext(DC).Diags.diagnose(SourceLoc(), diag::error_closing_output,
+                                        options.ABIDescriptorPath,
+                                        toString(std::move(E)));
+          return;
+        }
+      };
       dumpModuleContent(DC.get<ModuleDecl *>(), *ABIDesFile, true,
                         options.emptyABIDescriptor);
-      if (auto E = ABIDesFile->keep()) {
-        getContext(DC).Diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                                      options.ABIDescriptorPath,
-                                      toString(std::move(E)));
-        return;
-      }
     }
   }
 }
@@ -72,7 +74,7 @@ void swift::serializeToBuffers(
     llvm::raw_svector_ostream stream(buf);
     serialization::writeToStream(stream, DC, M, options,
                                  /*dependency info*/ nullptr);
-    bool hadError = withOutputFile(
+    bool hadError = withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.OutputPath, [&](raw_ostream &out) {
           out << stream.str();
@@ -94,7 +96,7 @@ void swift::serializeToBuffers(
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     serialization::writeDocToStream(stream, DC, options.GroupInfoPath);
-    (void)withOutputFile(getContext(DC).Diags,
+    (void)withOutputPath(getContext(DC).Diags,
                             getContext(DC).getOutputBackend(),
                             options.DocOutputPath, [&](raw_ostream &out) {
                               out << stream.str();
@@ -112,7 +114,7 @@ void swift::serializeToBuffers(
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     serialization::writeSourceInfoToStream(stream, DC);
-    (void)withOutputFile(
+    (void)withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
           out << stream.str();
@@ -139,7 +141,7 @@ void swift::serialize(
     return;
   }
 
-  bool hadError = withOutputFile(
+  bool hadError = withOutputPath(
       getContext(DC).Diags, getContext(DC).getOutputBackend(),
       options.OutputPath, [&](raw_ostream &out) {
         FrontendStatsTracer tracer(getContext(DC).Stats,
@@ -151,7 +153,7 @@ void swift::serialize(
     return;
 
   if (!options.DocOutputPath.empty()) {
-    (void)withOutputFile(
+    (void)withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.DocOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,
@@ -162,7 +164,7 @@ void swift::serialize(
   }
 
   if (!options.SourceInfoOutputPath.empty()) {
-    (void)withOutputFile(
+    (void)withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,

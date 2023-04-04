@@ -141,7 +141,7 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
   });
 
   if (auto error = out->keep()) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
+    diags.diagnose(SourceLoc(), diag::error_closing_output,
                    dependenciesFilePath, toString(std::move(error)));
     return true;
   }

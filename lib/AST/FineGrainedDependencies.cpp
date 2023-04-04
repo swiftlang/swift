@@ -377,7 +377,7 @@ void SourceFileDepGraph::emitDotFile(llvm::vfs::OutputBackend &outputBackend,
                                      StringRef outputPath,
                                      DiagnosticEngine &diags) {
   std::string dotFileName = outputPath.str() + ".dot";
-  withOutputFile(
+  withOutputPath(
       diags, outputBackend, dotFileName, [&](llvm::raw_pwrite_stream &out) {
         DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
         return false;

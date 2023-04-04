@@ -83,11 +83,10 @@ TEST(ClangImporterTest, emitPCHInMemory) {
       ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
                       symbolGraphOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
-  auto backend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
   ASSERT_FALSE(importer->canReadPCH(PCH));
-  ASSERT_FALSE(importer->emitBridgingPCH(backend, options.BridgingHeader, PCH));
+  ASSERT_FALSE(importer->emitBridgingPCH(options.BridgingHeader, PCH));
   ASSERT_TRUE(importer->canReadPCH(PCH));
 
   // Overwrite the PCH with garbage.  We should still be able to read it from

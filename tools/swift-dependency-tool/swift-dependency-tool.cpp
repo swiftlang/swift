@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
     }
 
     bool hadError =
-      withOutputFile(diags, outputBackend, options::OutputFilename,
+      withOutputPath(diags, outputBackend, options::OutputFilename,
         [&](llvm::raw_pwrite_stream &out) {
           out << "# Fine-grained v0\n";
           llvm::yaml::Output yamlWriter(out);

@@ -461,7 +461,7 @@ class CompilerInstance {
   std::unique_ptr<UnifiedStatsReporter> Stats;
 
   /// Virtual OutputBackend.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> TheOutputBackend = nullptr;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend = nullptr;
 
   /// The verification output backend.
   using HashBackendTy = llvm::vfs::HashingOutputBackend<llvm::BLAKE3>;
@@ -518,11 +518,11 @@ public:
   }
 
   llvm::vfs::OutputBackend &getOutputBackend() const {
-    return *TheOutputBackend;
+    return *OutputBackend;
   }
   void
   setOutputBackend(llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
-    TheOutputBackend = std::move(Backend);
+    OutputBackend = std::move(Backend);
   }
   using HashingBackendPtrTy = llvm::IntrusiveRefCntPtr<HashBackendTy>;
   HashingBackendPtrTy getHashingBackend() { return HashBackend; }

@@ -1898,9 +1898,8 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines,
     "breakage-allowlist-", "txt", preprocessedFilePath)) {
     return 1;
   }
-  if (importer->runPreprocessor(
-          llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>(),
-          BreakageAllowlistPath, preprocessedFilePath.str())) {
+  if (importer->runPreprocessor(BreakageAllowlistPath,
+                                preprocessedFilePath.str())) {
     return 1;
   }
   return readFileLineByLine(preprocessedFilePath, lines);

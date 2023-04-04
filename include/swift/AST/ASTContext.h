@@ -285,7 +285,7 @@ public:
   DiagnosticEngine &Diags;
 
   /// OutputBackend for writing outputs.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -1525,13 +1525,13 @@ public:
   /// Get the output backend. The output backend needs to be initialized via
   /// constructor or `setOutputBackend`.
   llvm::vfs::OutputBackend &getOutputBackend() const {
-    assert(Backend && "OutputBackend is not setup");
-    return *Backend;
+    assert(OutputBackend && "OutputBackend is not setup");
+    return *OutputBackend;
   }
   /// Set output backend for virtualized outputs.
   void setOutputBackend(
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
-    Backend = std::move(OutputBackend);
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend) {
+    OutputBackend = std::move(OutBackend);
   }
 
 private:

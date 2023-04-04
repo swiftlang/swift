@@ -939,7 +939,7 @@ class ModuleInterfaceLoaderImpl {
       depsAdjustedToMTime.push_back(adjustedDep);
     }
 
-    auto hadError = withOutputFile(diags, backend, outputPath,
+    auto hadError = withOutputPath(diags, backend, outputPath,
                                       [&](llvm::raw_pwrite_stream &out) {
                                         llvm::yaml::Output yamlWriter(out);
                                         yamlWriter << fwd;
@@ -1267,7 +1267,7 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
                                                    deps, moduleBuffer)) {
       // If so, emit a forwarding module to the candidate.
       ForwardingModule FM(mod);
-      auto hadError = withOutputFile(Ctx.Diags, backend, outputPath,
+      auto hadError = withOutputPath(Ctx.Diags, backend, outputPath,
                                         [&](llvm::raw_pwrite_stream &out) {
                                           llvm::yaml::Output yamlWriter(out);
                                           yamlWriter << FM;

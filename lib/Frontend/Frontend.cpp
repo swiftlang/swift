@@ -247,12 +247,11 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   Invocation.getLangOptions().RecordRequestReferences
     = !isWholeModuleCompilation();
 
-  // Make sure the output backend is initialized.
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      SourceMgr, Diagnostics, TheOutputBackend));
+      SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -398,10 +397,10 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 void CompilerInstance::setupOutputBackend() {
   // Skip if output backend is not setup, default to OnDiskOutputBackend.
-  if (TheOutputBackend)
+  if (OutputBackend)
     return;
 
-  TheOutputBackend =
+  OutputBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 
   // Setup verification backend.
@@ -410,8 +409,8 @@ void CompilerInstance::setupOutputBackend() {
   // some output file in later stages.
   if (Invocation.getFrontendOptions().DeterministicCheck) {
     HashBackend = llvm::makeIntrusiveRefCnt<HashBackendTy>();
-    TheOutputBackend =
-        llvm::vfs::makeMirroringOutputBackend(TheOutputBackend, HashBackend);
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, HashBackend);
   }
 }
 

@@ -130,29 +130,15 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
       });
 }
 
-/// Diagnose output file error to ASTContext.
-void diagnoseOutputError(ASTContext &Ctx, StringRef OutputFilename,
-                         llvm::Error Err) {
-  Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, OutputFilename,
-                     toString(std::move(Err)));
-}
-
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, ModuleDecl *M, const SILOptions &Opts,
                      StringRef OutputFilename,
                      llvm::vfs::OutputBackend &Backend) {
-  auto OutFile = Backend.createFile(OutputFilename);
-  if (!OutFile) {
-    diagnoseOutputError(M->getASTContext(), OutputFilename,
-                        OutFile.takeError());
-    return true;
-  }
-  SM.print(*OutFile, M, Opts);
-  if (auto E = OutFile->keep()) {
-    diagnoseOutputError(M->getASTContext(), OutputFilename, std::move(E));
-    return true;
-  }
-  return M->getASTContext().hadError();
+  return withOutputPath(M->getDiags(), Backend, OutputFilename,
+                        [&](raw_ostream &out) -> bool {
+                          SM.print(out, M, Opts);
+                          return M->getASTContext().hadError();
+                        });
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
@@ -178,7 +164,7 @@ static bool printAsClangHeaderIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     clang::HeaderSearch &clangHeaderSearchInfo) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(
+  return withOutputPath(
       M->getDiags(), outputBackend, outputPath, [&](raw_ostream &out) -> bool {
         return printAsClangHeader(out, M, bridgingHeader, frontendOpts,
                                   irGenOpts, clangHeaderSearchInfo);
@@ -212,7 +198,7 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     diags.diagnose(SourceLoc(),
                    diag::warn_unsupported_module_interface_library_evolution);
   }
-  return withOutputFile(diags, outputBackend, outputPath,
+  return withOutputPath(diags, outputBackend, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
                           return swift::emitSwiftInterface(out, Opts, M);
                         });
@@ -383,12 +369,10 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
-    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash,
-                                             OutputBackend);
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
     return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
-      OutputBackend,
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
@@ -398,7 +382,6 @@ static bool precompileClangModule(const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->emitPrecompiledModule(
-      Instance.getOutputBackend().clone(),
       opts.InputsAndOutputs.getFilenameOfFirstInput(), opts.ModuleName,
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
@@ -408,7 +391,6 @@ static bool dumpPrecompiledClangModule(const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->dumpPrecompiledModule(
-      Instance.getOutputBackend().clone(),
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
       opts.InputsAndOutputs.getSingleOutputFilename());
 }
@@ -529,18 +511,13 @@ static bool dumpAST(CompilerInstance &Instance) {
     for (SourceFile *sourceFile: primaryFiles) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
       auto OutputFilename = PSPs.OutputFilename;
-      auto OutFile = Instance.getOutputBackend().createFile(OutputFilename);
-      if (!OutFile) {
-        diagnoseOutputError(Instance.getASTContext(), OutputFilename,
-                            OutFile.takeError());
+      if (withOutputPath(Instance.getASTContext().Diags,
+                         Instance.getOutputBackend(), OutputFilename,
+                         [&](raw_ostream &out) -> bool {
+                           sourceFile->dump(out, /*parseIfNeeded*/ true);
+                           return false;
+                         }))
         return true;
-      }
-      sourceFile->dump(*OutFile, /*parseIfNeeded*/ true);
-      if (auto E = OutFile->keep()) {
-        diagnoseOutputError(Instance.getASTContext(), OutputFilename,
-                            std::move(E));
-        return true;
-      }
     }
   } else {
     // Some invocations don't have primary files. In that case, we default to
@@ -1466,7 +1443,7 @@ static bool serializeModuleSummary(SILModule *SM,
                                    const PrimarySpecificPaths &PSPs,
                                    const ASTContext &Context) {
   auto summaryOutputPath = PSPs.SupplementaryOutputs.ModuleSummaryOutputPath;
-  return withOutputFile(Context.Diags, Context.getOutputBackend(),
+  return withOutputPath(Context.Diags, Context.getOutputBackend(),
                            summaryOutputPath, [&](llvm::raw_ostream &out) {
                              out << "Some stuff";
                              return false;

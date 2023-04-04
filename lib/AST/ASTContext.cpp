@@ -661,12 +661,12 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
-      Backend(std::move(OutputBackend)), evaluator(Diags, langOpts),
+      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
       TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -714,8 +714,8 @@ ASTContext::ASTContext(
 
   createModuleToExecutablePluginMap();
   // Provide a default OnDiskOutputBackend if user didn't supply one.
-  if (!Backend)
-    Backend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+  if (!OutputBackend)
+    OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 }
 
 ASTContext::~ASTContext() {

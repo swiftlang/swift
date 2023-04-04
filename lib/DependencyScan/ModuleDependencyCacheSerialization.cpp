@@ -1151,7 +1151,7 @@ bool swift::dependencies::module_dependency_cache_serialization::
         StringRef path, const SwiftDependencyScanningService &cache) {
   PrettyStackTraceStringAction stackTrace(
       "saving inter-module dependency graph", path);
-  return withOutputFile(diags, backend, path, [&](llvm::raw_ostream &out) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeInterModuleDependenciesCache(Writer, cache);

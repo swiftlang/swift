@@ -44,6 +44,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -935,6 +936,25 @@ static void writeJSON(llvm::raw_ostream &out,
   }
 }
 
+static bool writePrescanJSONToOutput(DiagnosticEngine &diags,
+                                     llvm::vfs::OutputBackend &backend,
+                                     StringRef path,
+                                     const swiftscan_import_set_t importSet) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_pwrite_stream &os) {
+    writePrescanJSON(os, importSet);
+    return false;
+  });
+}
+
+static bool writeJSONToOutput(DiagnosticEngine &diags,
+                              llvm::vfs::OutputBackend &backend, StringRef path,
+                              const swiftscan_dependency_graph_t dependencies) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_pwrite_stream &os) {
+    writeJSON(os, dependencies);
+    return false;
+  });
+}
+
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(CompilerInstance &instance,
                             ModuleDependenciesCache &cache,
@@ -1420,11 +1440,8 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
     return true;
   auto dependencies = std::move(*dependenciesOrErr);
 
-  if (withOutputFile(Context.Diags, instance.getOutputBackend(), path,
-                     [&](llvm::raw_pwrite_stream &os) {
-                       writeJSON(os, dependencies);
-                       return false;
-                     }))
+  if (writeJSONToOutput(Context.Diags, instance.getOutputBackend(), path,
+                        dependencies))
     return true;
 
   // This process succeeds regardless of whether any errors occurred.
@@ -1453,11 +1470,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   auto importSet = std::move(*importSetOrErr);
 
   // Serialize and output main module dependencies only and exit.
-  if (withOutputFile(Context.Diags, instance.getOutputBackend(), path,
-                     [&](llvm::raw_pwrite_stream &os) {
-                       writePrescanJSON(os, importSet);
-                       return false;
-                     }))
+  if (writePrescanJSONToOutput(Context.Diags, instance.getOutputBackend(), path,
+                               importSet))
     return true;
 
   // This process succeeds regardless of whether any errors occurred.
@@ -1498,12 +1512,9 @@ bool swift::dependencies::batchScanDependencies(
     if ((*iresults).getError())
       return true;
 
-    if (withOutputFile(instance.getASTContext().Diags,
-                       instance.getOutputBackend(), (*ientries).outputPath,
-                       [&](llvm::raw_pwrite_stream &os) {
-                         writeJSON(os, **iresults);
-                         return false;
-                       }))
+    if (writeJSONToOutput(instance.getASTContext().Diags,
+                          instance.getOutputBackend(), (*ientries).outputPath,
+                          **iresults))
       return true;
   }
   return false;
@@ -1537,12 +1548,9 @@ bool swift::dependencies::batchPrescanDependencies(
     if ((*iresults).getError())
       return true;
 
-    if (withOutputFile(instance.getASTContext().Diags,
-                       instance.getOutputBackend(), (*ientries).outputPath,
-                       [&](llvm::raw_pwrite_stream &os) {
-                         writePrescanJSON(os, **iresults);
-                         return false;
-                       }))
+    if (writePrescanJSONToOutput(instance.getASTContext().Diags,
+                                 instance.getOutputBackend(),
+                                 (*ientries).outputPath, **iresults))
       return true;
   }
   return false;

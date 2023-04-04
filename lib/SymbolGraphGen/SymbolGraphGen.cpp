@@ -40,7 +40,7 @@ int serializeSymbolGraph(SymbolGraph &SG,
   SmallString<1024> OutputPath(Options.OutputDir);
   llvm::sys::path::append(OutputPath, FileName);
 
-  return withOutputFile(
+  return withOutputPath(
       SG.M.getASTContext().Diags, SG.M.getASTContext().getOutputBackend(),
       OutputPath, [&](raw_ostream &OS) {
         llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);

@@ -114,7 +114,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
   }
 
   if (auto error = out->keep()) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
+    diags.diagnose(SourceLoc(), diag::error_closing_output,
                    path, toString(std::move(error)));
     return true;
   }

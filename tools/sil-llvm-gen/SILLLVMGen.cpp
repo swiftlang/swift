@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
   }
   auto closeFile = llvm::make_scope_exit([&]() {
     if (auto E = outFile->keep()) {
-      CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
+      CI.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
                              OutputFilename, toString(std::move(E)));
     }
   });

@@ -569,14 +569,14 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   }
 
   llvm::Optional<llvm::vfs::OutputFile> OutputFile;
-  auto CloseOutputFile = llvm::make_scope_exit([&]() {
+  SWIFT_DEFER {
     if (!OutputFile)
       return;
     if (auto E = OutputFile->keep()) {
-      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_closing_output,
                    OutputFilename, toString(std::move(E)));
     }
-  });
+  };
   if (!OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.

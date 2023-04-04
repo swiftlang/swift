@@ -194,8 +194,7 @@ namespace {
         Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
       }
 
-      auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash,
-                                         Ctx.getOutputBackend().clone());
+      auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       if (PCH.has_value()) {
         Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
             PCH.value();
@@ -944,8 +943,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 }
 
 Optional<std::string> ClangImporter::getOrCreatePCH(
-    const ClangImporterOptions &ImporterOptions, StringRef SwiftPCHHash,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
+    const ClangImporterOptions &ImporterOptions, StringRef SwiftPCHHash) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -962,8 +960,7 @@ Optional<std::string> ClangImporter::getOrCreatePCH(
       return None;
     }
     auto FailedToEmit =
-        emitBridgingPCH(std::move(Backend), ImporterOptions.BridgingHeader,
-                        PCHFilename.value());
+        emitBridgingPCH(ImporterOptions.BridgingHeader, PCHFilename.value());
     if (FailedToEmit) {
       return None;
     }
@@ -1696,12 +1693,12 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   clonedInstance->setFileManager(&fileManager);
   clonedInstance->createSourceManager(fileManager);
   clonedInstance->setTarget(&Impl.Instance->getTarget());
+  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
 
 bool ClangImporter::emitBridgingPCH(
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> backend,
     StringRef headerPath, StringRef outputPCHPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
@@ -1718,8 +1715,6 @@ bool ClangImporter::emitBridgingPCH(
   FrontendOpts.OutputFile = outputPCHPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
-  emitInstance->setOutputBackend(std::move(backend));
-
   auto action = wrapActionForIndexingIfEnabled(
       FrontendOpts, std::make_unique<clang::GeneratePCHAction>());
   emitInstance->ExecuteAction(*action);
@@ -1734,7 +1729,6 @@ bool ClangImporter::emitBridgingPCH(
 }
 
 bool ClangImporter::runPreprocessor(
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> backend,
     StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
@@ -1753,8 +1747,6 @@ bool ClangImporter::runPreprocessor(
   FrontendOpts.OutputFile = outputPath.str();
   FrontendOpts.ProgramAction = clang::frontend::PrintPreprocessedInput;
 
-  emitInstance->setOutputBackend(std::move(backend));
-
   auto action = wrapActionForIndexingIfEnabled(
       FrontendOpts, std::make_unique<clang::PrintPreprocessedAction>());
   emitInstance->ExecuteAction(*action);
@@ -1762,7 +1754,6 @@ bool ClangImporter::runPreprocessor(
 }
 
 bool ClangImporter::emitPrecompiledModule(
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> backend,
     StringRef moduleMapPath, StringRef moduleName, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
@@ -1784,8 +1775,6 @@ bool ClangImporter::emitPrecompiledModule(
   FrontendOpts.OutputFile = outputPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GenerateModule;
 
-  emitInstance->setOutputBackend(std::move(backend));
-
   auto action = wrapActionForIndexingIfEnabled(
       FrontendOpts,
       std::make_unique<clang::GenerateModuleFromModuleMapAction>());
@@ -1800,7 +1789,6 @@ bool ClangImporter::emitPrecompiledModule(
 }
 
 bool ClangImporter::dumpPrecompiledModule(
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> backend,
     StringRef modulePath, StringRef outputPath) {
   auto dumpInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = dumpInstance->getInvocation();
@@ -1812,8 +1800,6 @@ bool ClangImporter::dumpPrecompiledModule(
   auto &FrontendOpts = invocation.getFrontendOpts();
   FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OutputFile = outputPath.str();
-
-  dumpInstance->setOutputBackend(std::move(backend));
 
   auto action = std::make_unique<clang::DumpModuleInfoAction>();
   dumpInstance->ExecuteAction(*action);

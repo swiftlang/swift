@@ -26,7 +26,7 @@ namespace swift {
 /// \returns true if there were any errors, either from the filesystem
 /// operations or from \p action returning true.
 inline bool
-withOutputFile(DiagnosticEngine &diags, llvm::vfs::OutputBackend &Backend,
+withOutputPath(DiagnosticEngine &diags, llvm::vfs::OutputBackend &Backend,
                StringRef outputPath,
                llvm::function_ref<bool(llvm::raw_pwrite_stream &)> action) {
   assert(!outputPath.empty());
@@ -37,15 +37,19 @@ withOutputFile(DiagnosticEngine &diags, llvm::vfs::OutputBackend &Backend,
   if (!outputFile) {
     diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
                    toString(outputFile.takeError()));
-    return false;
+    return true;
   }
 
   bool failed = action(*outputFile);
   // If there is an error, discard output. Otherwise keep the output file.
   if (auto error = failed ? outputFile->discard() : outputFile->keep()) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                   toString(std::move(error)));
-    return false;
+    // Don't diagnose discard error.
+    if (failed)
+      consumeError(std::move(error));
+    else
+      diags.diagnose(SourceLoc(), diag::error_closing_output, outputPath,
+                     toString(std::move(error)));
+    return true;
   }
   return failed;
 }

@@ -502,7 +502,7 @@ bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
     DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend, StringRef path,
     const SourceFileDepGraph &g) {
   PrettyStackTraceStringAction stackTrace("saving fine-grained dependency graph", path);
-  return withOutputFile(diags, backend, path, [&](llvm::raw_ostream &out) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeFineGrainedDependencyGraph(Writer, g, Purpose::ForSwiftDeps);

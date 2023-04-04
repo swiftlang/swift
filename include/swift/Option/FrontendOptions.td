@@ -1176,9 +1176,9 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
-def enable_swift_deterministic_check :
-  Flag<["-"], "enable-swift-deterministic-check">,
-  HelpText<"Check swift compiler output determinisim by run it twice">;
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  HelpText<"Check compiler output determinisim by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;

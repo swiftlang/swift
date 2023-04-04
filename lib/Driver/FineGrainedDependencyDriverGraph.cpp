@@ -535,7 +535,7 @@ void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags,
   unsigned seqNo = dotFileSequenceNumber[baseName.str()]++;
   std::string fullName =
       baseName.str() + "-post-integration." + std::to_string(seqNo) + ".dot";
-  withOutputFile(diags, *backend, fullName, [&](llvm::raw_ostream &out) {
+  withOutputPath(diags, *backend, fullName, [&](llvm::raw_ostream &out) {
     emitDotFile(out);
     return false;
   });
