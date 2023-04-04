@@ -1270,8 +1270,7 @@ public:
   void destructure(AbstractionPattern origType, CanType substType) {
     // Recur into tuples.
     if (origType.isTuple()) {
-      auto substTupleType = cast<TupleType>(substType);
-      origType.forEachTupleElement(substTupleType,
+      origType.forEachTupleElement(substType,
                                    [&](TupleElementGenerator &elt) {
         // If the original element type is not a pack expansion, just
         // pull off the next substituted element type.
@@ -1646,7 +1645,7 @@ private:
 
     // Tuples get expanded unless they're inout.
     if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, forSelf, origType, cast<TupleType>(substType),
+      expandTuple(ownership, forSelf, origType, substType,
                   isNonDifferentiable);
       return;
     }
@@ -1683,7 +1682,7 @@ private:
 
   /// Recursively expand a tuple type into separate parameters.
   void expandTuple(ValueOwnership ownership, bool forSelf,
-                   AbstractionPattern origType, CanTupleType substType,
+                   AbstractionPattern origType, CanType substType,
                    bool isNonDifferentiable) {
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
