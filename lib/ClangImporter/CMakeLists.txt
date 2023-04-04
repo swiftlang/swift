@@ -50,6 +50,7 @@ set(SWIFTINC_DIR
 
 add_custom_command(
     OUTPUT "${SWIFTINC_DIR}/bridging"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/bridging"
     COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/bridging" "${SWIFTINC_DIR}")
 
 add_custom_target("copy_cxxInterop_support_header"

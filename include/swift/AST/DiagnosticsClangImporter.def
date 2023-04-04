@@ -189,8 +189,8 @@ NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
 NOTE(mark_self_contained, none, "Mark type '%0' as 'SELF_CONTAINED' in C++ to "
                                  "make methods that use it available in Swift. ",
      (StringRef))
-NOTE(mark_safe_to_import, none, "Mark method '%0' as 'SAFE_TO_IMPORT' in C++ to "
-                                "make it available in Swift. ",
+NOTE(mark_safe_to_import, none, "annotate method '%0' with 'RETURNS_INDEPENDENT_VALUE' in C++ to "
+                                "make it available in Swift",
      (StringRef))
 
 NOTE(at_to_subscript, none, "Do you want to replace it with a call "
