@@ -7032,6 +7032,11 @@ ERROR(invalid_macro_introduced_name,none,
 ERROR(global_freestanding_macro_script,none,
       "global freestanding macros not yet supported in script mode",
       ())
+ERROR(invalid_macro_role_for_macro_syntax,none,
+      "invalid macro role for %{a freestanding|an attached}0 macro",
+      (unsigned))
+ERROR(macro_cannot_introduce_names,none,
+      "'%0' macros are not allowed to introduce names", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

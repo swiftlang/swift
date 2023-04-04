@@ -885,10 +885,13 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   NullTerminatedStringRef evaluatedSource;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
-  assert(macro->getMacroRoles().contains(MacroRole::Declaration));
+  auto macroRoles = macro->getMacroRoles();
+  assert(macroRoles.contains(MacroRole::Declaration) ||
+         macroRoles.contains(MacroRole::CodeItem));
 
   if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression) ||
-      isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration)) {
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::CodeItem)) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return None;
   }
@@ -934,12 +937,20 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
       return None;
     }
 
-    // Make sure freestanding macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::FreestandingMacros) &&
-        !macro->getMacroRoles().contains(MacroRole::Expression)) {
-      med->diagnose(
-          diag::macro_experimental, "freestanding", "FreestandingMacros");
-      return None;
+    // Currently only expression macros are enabled by default. Declaration
+    // macros need the `FreestandingMacros` feature flag, and code item macros
+    // need both `FreestandingMacros` and `CodeItemMacros`.
+    if (!macroRoles.contains(MacroRole::Expression)) {
+      if (!ctx.LangOpts.hasFeature(Feature::FreestandingMacros)) {
+        med->diagnose(diag::macro_experimental, "freestanding",
+                      "FreestandingMacros");
+        return None;
+      }
+      if (!macroRoles.contains(MacroRole::Declaration) &&
+          !ctx.LangOpts.hasFeature(Feature::CodeItemMacros)) {
+        med->diagnose(diag::macro_experimental, "code item", "CodeItemMacros");
+        return None;
+      }
     }
 
 #if SWIFT_SWIFT_PARSER
@@ -1284,6 +1295,7 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
 
   case MacroRole::Expression:
   case MacroRole::Declaration:
+  case MacroRole::CodeItem:
     llvm_unreachable("freestanding macro in attached macro evaluation");
   }
 

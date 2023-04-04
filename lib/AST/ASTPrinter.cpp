@@ -2838,6 +2838,14 @@ static bool usesFeatureFreestandingMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Declaration);
 }
 
+static bool usesFeatureCodeItemMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::CodeItem);
+}
+
 static bool usesFeatureAttachedMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)
