@@ -5,7 +5,7 @@
 
 struct SomeValue {}
 
-@_moveOnly class NoncopyableClass {} // expected-error {{'moveOnly' only applies to structs or enums}}
+@_moveOnly class NoncopyableClass {} // expected-error {{only structs or enums can be noncopyable}}
                                      // expected-warning@-1 {{'@_moveOnly' attribute is deprecated}}
 
 @_moveOnly struct NoncopyableEnum {} // expected-warning {{'@_moveOnly' attribute is deprecated}}

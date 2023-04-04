@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
 
-@_moveOnly
-class C {}
+class C : ~Copyable {}
 
 @_silgen_name("getC")
 func getC() -> C

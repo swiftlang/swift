@@ -29,8 +29,7 @@ public func consumeVal(_ x: __owned EnumTy) {}
 public func consumeVal(_ x: __owned NonTrivialStruct) {}
 public func consumeVal(_ x: __owned NonTrivialStruct2) {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass : ~Copyable {
     var intField: Int
     var k: Klass
     init() {
@@ -41,16 +40,14 @@ public final class Klass {
 
 var boolValue: Bool { return true }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct : ~Copyable {
     var k = Klass()
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public struct NonTrivialStruct2 : ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
@@ -63,16 +60,14 @@ public struct NonTrivialCopyableStruct2 {
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum : ~Copyable {
     case first
     case second(Klass)
     case third(NonTrivialStruct)
     case fourth(CopyableKlass)
 }
 
-@_moveOnly
-public final class FinalKlass {
+public final class FinalKlass : ~Copyable {
     var k: Klass = Klass()
 }
 
@@ -718,14 +713,12 @@ public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
 // Aggregate Struct //
 //////////////////////
 
-@_moveOnly
-public struct KlassPair {
+public struct KlassPair : ~Copyable {
     var lhs: Klass = Klass()
     var rhs: Klass = Klass()
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct : ~Copyable {
     var lhs: Klass = Klass()
     var center: Int = 5
     var rhs: Klass = Klass()
@@ -988,8 +981,7 @@ public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
 // Aggregate Generic Struct //
 //////////////////////////////
 
-@_moveOnly
-public struct AggGenericStruct<T> {
+public struct AggGenericStruct<T> : ~Copyable {
     var lhs: Klass = Klass()
     var rhs: UnsafeRawPointer? = nil
     var pair: KlassPair = KlassPair()
@@ -1465,8 +1457,7 @@ public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct
 // Enum Test Cases //
 /////////////////////
 
-@_moveOnly
-public enum EnumTy {
+public enum EnumTy : ~Copyable {
     case klass(Klass)
     case int(Int)
 
@@ -2513,8 +2504,7 @@ func borrowAndConsumeAtSameTimeTest2(x: consuming NonTrivialStruct) { // expecte
 
 func yieldTest() {  
   // Make sure we do not crash on this.
-  @_moveOnly
-  struct S {
+   struct S : ~Copyable {
     var c = CopyableKlass()
     var c2: CopyableKlass {
       _read { yield c }
@@ -2526,8 +2516,7 @@ func yieldTest() {
 // Empty Struct Test //
 ///////////////////////
 
-@_moveOnly
-struct EmptyStruct {
+struct EmptyStruct: ~Copyable {
   var bool: Bool { false }
   func doSomething() {}
   mutating func doSomething2() {}
@@ -2614,8 +2603,7 @@ func testEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-@_moveOnly
-struct StructContainingEmptyStruct {
+struct StructContainingEmptyStruct: ~Copyable {
   var x: EmptyStruct
 }
 
@@ -2665,8 +2653,7 @@ func testStructContainingEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-@_moveOnly
-struct StructContainingTwoEmptyStruct {
+struct StructContainingTwoEmptyStruct: ~Copyable {
   var x: EmptyStruct
   var y: EmptyStruct
 }
@@ -2725,14 +2712,12 @@ func testStructContainingTwoEmptyStruct() {
 // Enum Containing Empty Struct //
 //////////////////////////////////
 
-@_moveOnly
-enum MyEnum2 {
+enum MyEnum2: ~Copyable {
 case first(EmptyStruct)
 case second(String)
 }
 
-@_moveOnly
-enum MyEnum {
+enum MyEnum: ~Copyable {
 case first(EmptyStruct)
 case second(String)
 case third(MyEnum2)

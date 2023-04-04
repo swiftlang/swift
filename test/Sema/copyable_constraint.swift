@@ -9,6 +9,6 @@
 
 func nextTime<T>(_ t: T) {}
 
-@_moveOnly struct MO {}
+struct MO : ~Copyable {}
 
 nextTime(MO()) // expected-error {{move-only type 'MO' cannot be used with generics yet}}

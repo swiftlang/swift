@@ -4,13 +4,11 @@
 
 class CopyableKlass {}
 
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
     init?() {} // expected-error {{move-only types cannot have failable initializers yet}}
 }
 
-@_moveOnly
-class MoveOnlyStruct {
+class MoveOnlyStruct: ~Copyable {
     init?(one: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
     init!(two: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
 }
@@ -21,8 +19,7 @@ class C {
     var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
-@_moveOnly
-class CMoveOnly {
+class CMoveOnly: ~Copyable {
     var copyable: CopyableKlass? = nil
     var moveOnlyC: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
     var moveOnlyS: MoveOnlyStruct? = nil // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
@@ -47,11 +44,10 @@ struct S { // expected-error {{struct 'S' cannot contain a move-only type withou
     var moveOnly2: MoveOnlyStruct? // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
     var moveOnly: MoveOnlyStruct // expected-note {{contained move-only property 'S.moveOnly'}}
     var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
-    var moveOnly3: OptionalGrandField<MoveOnlyStruct> // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
+    var moveOnly4: OptionalGrandField<MoveOnlyStruct> // expected-error {{move-only type 'MoveOnlyStruct' cannot be used with generics yet}}
 }
 
-@_moveOnly
-struct SMoveOnly {
+struct SMoveOnly: ~Copyable {
     var copyable: CopyableKlass
     var moveOnly: MoveOnlyKlass
 }
@@ -62,8 +58,7 @@ enum E { // expected-error {{enum 'E' cannot contain a move-only type without al
     case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
 }
 
-@_moveOnly
-enum EMoveOnly {
+enum EMoveOnly: ~Copyable {
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass)
 
@@ -84,8 +79,7 @@ func foo() {
         var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
     }
 
-    @_moveOnly
-    class C2MoveOnly {
+    class C2MoveOnly: ~Copyable {
         var copyable: CopyableKlass? = nil
         var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
     }
@@ -95,8 +89,7 @@ func foo() {
         var moveOnly: MoveOnlyKlass // expected-note {{contained move-only property 'S2.moveOnly'}}
     }
 
-    @_moveOnly
-    struct S2MoveOnly {
+    struct S2MoveOnly: ~Copyable {
         var copyable: CopyableKlass
         var moveOnly: MoveOnlyKlass
     }
@@ -106,8 +99,7 @@ func foo() {
         case rhs(MoveOnlyKlass) // expected-note {{contained move-only enum case 'E2.rhs'}}
     }
 
-    @_moveOnly
-    enum E2MoveOnly {
+    enum E2MoveOnly: ~Copyable {
         case lhs(CopyableKlass)
         case rhs(MoveOnlyKlass)
     }
@@ -117,8 +109,7 @@ func foo() {
             var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
         }
 
-        @_moveOnly
-        class C3MoveOnly {
+        class C3MoveOnly: ~Copyable {
             var copyable: CopyableKlass? = nil
             var moveOnly: MoveOnlyKlass? = nil // expected-error {{move-only type 'MoveOnlyKlass' cannot be used with generics yet}}
         }
@@ -128,8 +119,7 @@ func foo() {
             var moveOnly: MoveOnlyKlass // expected-note {{contained move-only property 'S3.moveOnly'}}
         }
 
-        @_moveOnly
-        struct S3MoveOnly {
+        struct S3MoveOnly: ~Copyable {
             var copyable: CopyableKlass
             var moveOnly: MoveOnlyKlass
         }
@@ -139,8 +129,7 @@ func foo() {
             case rhs(MoveOnlyKlass) // expected-note {{contained move-only enum case 'E3.rhs'}}
         }
 
-        @_moveOnly
-        enum E3MoveOnly {
+        enum E3MoveOnly: ~Copyable {
             case lhs(CopyableKlass)
             case rhs(MoveOnlyKlass)
         }
@@ -161,11 +150,11 @@ struct UnsafePointerWithOwner<T> {
 // protocol.
 protocol P {}
 protocol Q {}
-@_moveOnly class ProtocolCheckMoveOnlyKlass {}
-@_moveOnly struct ProtocolCheckMoveOnlyStruct {
+class ProtocolCheckMoveOnlyKlass: ~Copyable {}
+struct ProtocolCheckMoveOnlyStruct: ~Copyable {
     var k: MoveOnlyKlass
 }
-@_moveOnly enum ProtocolCheckMoveOnlyEnum {}
+enum ProtocolCheckMoveOnlyEnum: ~Copyable {}
 
 extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform to 'P'}}
 extension ProtocolCheckMoveOnlyStruct : P, Q {}
@@ -193,19 +182,15 @@ extension ProtocolCheckMoveOnlyStruct {}
 extension ProtocolCheckMoveOnlyEnum {}
 
 // Check if we define a move only type and make it conform on the base type
-@_moveOnly
-class MoveOnlyKlassP : P {} // expected-error {{move-only class 'MoveOnlyKlassP' cannot conform to 'P'}}
-@_moveOnly
-struct MoveOnlyStructP : P { // expected-error {{move-only struct 'MoveOnlyStructP' cannot conform to 'P'}}
+class MoveOnlyKlassP : P, ~Copyable {} // expected-error {{move-only class 'MoveOnlyKlassP' cannot conform to 'P'}}
+struct MoveOnlyStructP : ~Copyable, P { // expected-error {{move-only struct 'MoveOnlyStructP' cannot conform to 'P'}}
     var mv: MoveOnlyKlass
 }
-@_moveOnly
-enum MoveOnlyEnumP : P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to 'P'}}
+enum MoveOnlyEnumP : ~Copyable, P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to 'P'}}
 
 // ensure there is no auto-synthesis of Equatable, Hashable, etc, for this move-only enum,
 // because it normally would be synthesized since it only has cases without associated values.
-@_moveOnly
-enum Color {
+enum Color: ~Copyable {
     case red
     case green
     case blue
@@ -216,8 +201,7 @@ enum Color {
     }
 }
 
-@_moveOnly
-enum StrengthLevel: Int { // ensure move-only raw enums do not conform to RawRepresentable
+enum StrengthLevel: Int, ~Copyable { // ensure move-only raw enums do not conform to RawRepresentable
     case none = 0
     case low
     case high
@@ -242,5 +226,13 @@ struct StructHolder {
         get async throws {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
     }
 }
+
+protocol DanceHall: ~Copyable {} // expected-error {{cannot suppress conformances here}}
+
+// FIXME: why does adding this cause warnings about @_moveOnly being deprecated?
+// <unknown>:0: error: unexpected warning produced: '@_moveOnly' attribute is deprecated; use the ~Copyable constraint suppression instead; this is an error in Swift 6
+//<unknown>:0: warning: diagnostic produced elsewhere: '@_moveOnly' attribute is deprecated; use the ~Copyable constraint suppression instead; this is an error in Swift 6
+actor Speedcore: ~Copyable {}
+
 
 

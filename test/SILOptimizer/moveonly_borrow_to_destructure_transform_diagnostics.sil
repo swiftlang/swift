@@ -4,43 +4,39 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
 //////////////////
 
 class Klass {}
-@_moveOnly
-class MoveOnlyKlass {
+
+class MoveOnlyKlass: ~Copyable {
   var value: Builtin.Int32
 }
 
-@_moveOnly
-struct KlassPair {
+struct KlassPair: ~Copyable {
   var lhs: Klass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct {
+struct AggStruct: ~Copyable {
   var pair: KlassPair
 }
 
-@_moveOnly
-struct KlassPair2 {
+struct KlassPair2: ~Copyable {
   var lhs: MoveOnlyKlass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct2 {
+struct AggStruct2: ~Copyable {
   var lhs: MoveOnlyKlass
   var pair: KlassPair2
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct SingleIntContainingStruct {
+struct SingleIntContainingStruct: ~Copyable {
     var value: Builtin.Int32
 }
 

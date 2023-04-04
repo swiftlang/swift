@@ -18,8 +18,7 @@ import Builtin
 
 public class CopyableKlass {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init()
@@ -27,32 +26,27 @@ public final class Klass {
 
 sil @get_klass : $@convention(thin) () -> @owned Klass
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var k = Klass()
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
 }
 
-@_moveOnly
-public struct NonTrivialStructPair {
+public struct NonTrivialStructPair: ~Copyable {
     var lhs: NonTrivialStruct
     var rhs: NonTrivialStruct
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public struct NonTrivialStruct2: ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct KlassPair {
+public struct KlassPair: ~Copyable {
     var lhs: Klass = Klass()
     var rhs: Klass = Klass()
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct: ~Copyable {
     var lhs: Klass
     var center: Int
     var rhs: Klass

@@ -8,19 +8,16 @@ public final class CopyableKlass {
     var fd = FD()
 }
 
-@_moveOnly
-public struct FD {
+public  struct FD : ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public  struct NonTrivialStruct2 : ~Copyable {
     var fd = FD()
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public  struct NonTrivialStruct : ~Copyable {
     var fd = FD()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var copyableKlass = CopyableKlass()
@@ -37,8 +34,7 @@ public struct NonTrivialCopyableStruct {
     var nonTrivialCopyableStruct2 = NonTrivialCopyableStruct2()
 }
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum : ~Copyable {
     case first
     case second(CopyableKlass)
     case third(NonTrivialStruct)
@@ -543,14 +539,12 @@ func assignCopyableKlass(_ x: CopyableKlass) {
 ///////////////////////
 
 enum EnumSwitchTests {
-    @_moveOnly
-    enum E2 {
+     enum E2 : ~Copyable {
         case lhs(CopyableKlass)
         case rhs(FD)
     }
 
-    @_moveOnly
-    enum E {
+     enum E : ~Copyable {
         case first(NonTrivialStruct2)
         case second(NonTrivialStruct)
         case third(CopyableKlass)
@@ -786,8 +780,7 @@ func checkMarkMustCheckOnCaptured(x: __owned FD) {
 // Empty Struct //
 //////////////////
 
-@_moveOnly
-struct EmptyStruct {
+struct EmptyStruct: ~Copyable {
   // Make sure we explicitly initialize empty struct as appropriate despite the
   // fact we do not have any fields.
   //

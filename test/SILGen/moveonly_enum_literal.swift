@@ -3,8 +3,7 @@
 // This test makes sure that we properly setup enums when we construct moveonly
 // enums from literals.
 
-@_moveOnly
-enum MoveOnlyIntPair {
+enum MoveOnlyIntPair : ~Copyable {
 case lhs(Int)
 case rhs(Int)
 }

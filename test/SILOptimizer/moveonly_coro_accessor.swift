@@ -2,8 +2,7 @@
 
 @inline(never) func someFunction() {}
 
-@_moveOnly
-public struct File {
+public struct File : ~Copyable {
   var x = 0
   var associatedFiles: ListOfFiles = ListOfFiles()
 

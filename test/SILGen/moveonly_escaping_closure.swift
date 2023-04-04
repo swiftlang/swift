@@ -1,11 +1,9 @@
 // RUN: %target-swift-emit-silgen -module-name moveonly_closure %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name moveonly_closure -verify %s
 
-@_moveOnly
-struct Empty {}
+struct Empty: ~Copyable {}
 
-@_moveOnly
-struct SingleElt {
+struct SingleElt: ~Copyable {
     var e = Empty()
 }
 

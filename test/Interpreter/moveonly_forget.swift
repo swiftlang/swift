@@ -9,8 +9,7 @@ func print_closing_MFD() { print("closing MaybeFileDescriptor") }
 
 enum E: Error { case err }
 
-@_moveOnly
-struct FileDescriptor {
+ struct FileDescriptor : ~Copyable {
   var fd: Int
   static var nextFD: Int = 0
 
@@ -57,7 +56,7 @@ struct FileDescriptor {
   }
 }
 
-@_moveOnly enum MaybeFileDescriptor {
+ enum MaybeFileDescriptor : ~Copyable {
   case some(FileDescriptor)
   case nothing
 

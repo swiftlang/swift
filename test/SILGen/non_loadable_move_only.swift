@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-silgen -module-name=test -primary-file %s | %FileCheck %s
 
-@_moveOnly
-public struct GenericMoveOnly<T> {
+public struct GenericMoveOnly<T>: ~Copyable {
   var i: Int
   var s: T
 
@@ -14,5 +13,3 @@ public struct GenericMoveOnly<T> {
   deinit {
   }
 }
-
-

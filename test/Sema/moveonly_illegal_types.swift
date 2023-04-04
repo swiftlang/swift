@@ -14,11 +14,11 @@ class Klass {}
 let asdf: any Hashable & Klass
 
 // a concrete move-only type
-@_moveOnly struct MO {
+ struct MO : ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct GenericMO<T> {
+ struct GenericMO<T> : ~Copyable {
   var t: T
 }
 

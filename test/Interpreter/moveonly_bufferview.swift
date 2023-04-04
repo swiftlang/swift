@@ -7,8 +7,7 @@
 // Until we get support for emitting value witnesses for deinits, do not run
 // this with optimizations.
 
-@_moveOnly
-public struct BufferView<T> {
+public  struct BufferView<T> : ~Copyable {
     var ptr: UnsafeBufferPointer<T>
 
     var count: Int {

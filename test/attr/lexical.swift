@@ -44,9 +44,9 @@ func foo() {
   _ = s3
 }
 
-@_moveOnly struct MoveOnly {}
+struct MoveOnly: ~Copyable {}
 
-@_eagerMove @_moveOnly struct MoveOnlyEagerly {} // expected-error {{@_eagerMove cannot be applied to NonCopyable types}}
+@_eagerMove struct MoveOnlyEagerly: ~Copyable {} // expected-error {{@_eagerMove cannot be applied to NonCopyable types}}
 
 func zoo(@_eagerMove _ : consuming MoveOnly) {} // expected-error {{@_eagerMove cannot be applied to NonCopyable types}}
 

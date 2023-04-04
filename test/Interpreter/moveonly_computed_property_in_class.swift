@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-@_moveOnly
-struct FileDescriptor {
+
+struct FileDescriptor: ~Copyable {
   let desc: Int
 
   var empty: Bool { return desc == Int.min }

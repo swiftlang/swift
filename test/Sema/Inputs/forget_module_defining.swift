@@ -1,10 +1,8 @@
-@_moveOnly
-public struct Regular {
+public struct Regular : ~Copyable {
   private let sorry = 0
 }
 
-@_moveOnly
-@frozen public struct Frozen {
+@frozen public struct Frozen : ~Copyable {
   private let lotfan = 0
 }
 

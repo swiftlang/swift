@@ -9,37 +9,31 @@
 
 class Klass {}
 
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
   var value: Int = 0
 }
 
-@_moveOnly
-struct KlassPair {
+struct KlassPair: ~Copyable {
   var lhs: Klass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct {
+struct AggStruct: ~Copyable {
   var pair: KlassPair
 }
 
-@_moveOnly
-struct KlassPair2 {
+struct KlassPair2: ~Copyable {
   var lhs: MoveOnlyKlass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct2 {
+struct AggStruct2: ~Copyable {
   var lhs: MoveOnlyKlass
   var pair: KlassPair2
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct SingleIntContainingStruct {
+struct SingleIntContainingStruct: ~Copyable {
     var value: Int = 0
 }
 
@@ -50,8 +44,7 @@ func consume(_ x: consuming Klass) {}
 // Test Top Level //
 ////////////////////
 
-@_moveOnly
-struct DeinitStruct {
+struct DeinitStruct: ~Copyable {
   var first: Klass
   var second: (Klass, Klass)
   var third: KlassPair
@@ -102,8 +95,7 @@ func testConsumeNonCopyable4(_ x: consuming DeinitStruct) {
 // Test Fields //
 /////////////////
 
-@_moveOnly
-struct StructContainDeinitStruct {
+struct StructContainDeinitStruct: ~Copyable {
   var first: DeinitStruct
   var second: (DeinitStruct, DeinitStruct)
   var third: Klass

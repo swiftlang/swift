@@ -1,8 +1,7 @@
 
 public class Message { var s: String = "hello" }
 
-@_moveOnly
-public struct FileDescriptor {
+public struct FileDescriptor : ~Copyable {
   public var x: Int = 0
   public var msg: Message = Message()
 }

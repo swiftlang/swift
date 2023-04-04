@@ -1,11 +1,11 @@
 // RUN: %target-typecheck-verify-swift
 
 // a concrete move-only type
-@_moveOnly struct MO {
+ struct MO : ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct Container {
+ struct Container : ~Copyable {
   var mo: MO = MO()
 }
 
@@ -150,8 +150,7 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
   let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-  let _: Copyable = mo // expected-error {{'Copyable' is unavailable}}
-                        // expected-error@-1 {{move-only type 'MO' cannot be used with generics yet}}
+  let _: Copyable = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 
@@ -255,7 +254,7 @@ class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to 
 }
 
 struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
-  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
+  struct Ty : ~Copyable {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
 protocol Gives: HasType {

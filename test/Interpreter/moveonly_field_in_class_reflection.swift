@@ -5,8 +5,7 @@
 // a move-only field does not trap from trying to reflect and copy those
 // move-only fields.
 
-@_moveOnly
-public struct MO {
+public struct MO : ~Copyable {
     var x: Int8 = 0
     var y: Int8 = 0
     var z: Int8 = 0

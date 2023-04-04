@@ -3,11 +3,12 @@
 // Applying a computed property to a move-only field in a class should occur
 // entirely within a formal access to the class property. rdar://105794506
 
-@_moveOnly
-struct FileDescriptor {
+struct FileDescriptor: ~Copyable {
   private let desc: Int
 
   var empty: Bool { return desc == Int.min }
+
+  deinit {}
 }
 
 final class Wrapper {

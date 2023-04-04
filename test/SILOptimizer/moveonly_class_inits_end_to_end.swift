@@ -3,8 +3,7 @@
 // A test that makes sure end to end in a copyable class containing a
 // non-copyable type, in the init, we only have a single destroy_addr.
 
-@_moveOnly
-public struct MO {
+public struct MO : ~Copyable {
   var x: Int8 = 0
   deinit { print("destroyed MO") }
 }
