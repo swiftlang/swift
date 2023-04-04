@@ -33,7 +33,7 @@ distributed actor FiveSevenActor_NothingExecutor {
     defer {
       print("done executed: \(#function)")
     }
-    assumeOnMainActorExecutor {
+    MainActor.assumeIsolated {
       // ignore
     }
   }
@@ -52,7 +52,7 @@ distributed actor FiveNineActor_NothingExecutor {
     defer {
       print("done executed: \(#function)")
     }
-    assumeOnMainActorExecutor {
+    MainActor.assumeIsolated {
       // ignore
     }
   }
@@ -71,7 +71,7 @@ distributed actor FiveSevenActor_FiveNineExecutor {
     defer {
       print("done executed: \(#function)")
     }
-    assumeOnMainActorExecutor {
+    MainActor.assumeIsolated {
       // ignore
     }
   }
