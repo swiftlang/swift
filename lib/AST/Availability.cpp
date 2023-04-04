@@ -489,6 +489,10 @@ AvailabilityContext ASTContext::getBackDeployedConcurrencyAvailability() {
   return getSwift51Availability();
 }
 
+AvailabilityContext ASTContext::getConcurrencyDistributedActorWithCustomExecutorAvailability() {
+  return getSwift59Availability();
+}
+
 AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
@@ -642,6 +646,28 @@ AvailabilityContext ASTContext::getSwift57Availability() {
   }
 }
 
+AvailabilityContext ASTContext::getSwift58Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(13, 3, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(16, 4, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 4, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift59Availability() {
+  // TODO: Update Availability impl when Swift 5.9 is released
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 
@@ -671,6 +697,8 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 5: return getSwift55Availability();
     case 6: return getSwift56Availability();
     case 7: return getSwift57Availability();
+    case 8: return getSwift58Availability();
+    case 9: return getSwift59Availability();
     default: break;
     }
   }
