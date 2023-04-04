@@ -69,6 +69,14 @@ func useCompletionHandlerG(s: S, _ body: @escaping (String) -> Void) {
   }
 }
 
+class C {
+  @addCompletionHandler
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+}
+
+
 @addCompletionHandler
 func f(a: Int, for b: String, _ value: Double) async -> String {
   return b
