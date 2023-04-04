@@ -284,6 +284,14 @@ func callVariadicMemberwiseInit() -> MemberwiseTupleHolder<Int, String> {
   return MemberwiseTupleHolder(content: (0, "hello"))
 }
 
+@_eagerMove struct MyString {
+  var guts: AnyObject
+}
+
+func callVariadicMemberwiseInit(_ ms: MyString) -> MemberwiseTupleHolder<Int, MyString> {
+  return MemberwiseTupleHolder(content: (0, ms))
+}
+
 // rdar://107151145: when we tuple-destructure a black hole
 // initialization, the resulting element initializations need to
 // handle pack expansion initialization
