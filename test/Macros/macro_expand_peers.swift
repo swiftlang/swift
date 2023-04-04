@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser
+// REQUIRES: swift_swift_parser, executable_test
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
