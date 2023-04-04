@@ -36,6 +36,7 @@ extension Never: Equatable, Comparable, Hashable {}
 
 @available(SwiftStdlib 5.5, *)
 extension Never: Identifiable {
+  @available(SwiftStdlib 5.5, *)
   public var id: Never {
     switch self {}
   }
@@ -43,11 +44,13 @@ extension Never: Identifiable {
 
 @available(SwiftStdlib 5.9, *)
 extension Never: Encodable {
+  @available(SwiftStdlib 5.9, *)
   public func encode(to: Encoder) throws {}
 }
 
 @available(SwiftStdlib 5.9, *)
 extension Never: Decodable {
+  @available(SwiftStdlib 5.9, *)
   public init(from decoder: Decoder) throws {
     let context = DecodingError.Context(
       codingPath: decoder.codingPath,
