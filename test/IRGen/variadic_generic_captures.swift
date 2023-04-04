@@ -23,7 +23,7 @@ public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
 // CHECK: [[T_ADDR2:%.*]] = bitcast %swift.type** [[T_ADDR]] to %swift.type***
 // CHECK: store %swift.type** [[T_HEAP]], %swift.type*** [[T_ADDR2]]
 
-// CHECK: [[CONTEXT1:%.*]] = insertvalue {{.*}} @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlFyycfU_TA"
+// CHECK: [[CONTEXT1:%.*]] = insertvalue {{.*}} @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlFyycfU_TA{{(\.ptrauth)?}}"
 // CHECK: ret { i8*, %swift.refcounted* } [[CONTEXT1]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlFyycfU_TA"(%swift.refcounted* swiftself %0)
