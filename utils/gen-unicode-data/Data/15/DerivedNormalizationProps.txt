@@ -1,11 +1,11 @@
-# DerivedNormalizationProps-14.0.0.txt
-# Date: 2021-06-04, 02:19:20 GMT
-# © 2021 Unicode®, Inc.
+# DerivedNormalizationProps-15.0.0.txt
+# Date: 2022-04-02, 01:29:03 GMT
+# © 2022 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see http://www.unicode.org/terms_of_use.html
+# For terms of use, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
-#   For documentation, see http://www.unicode.org/reports/tr44/
+#   For documentation, see https://www.unicode.org/reports/tr44/
 
 # ================================================
 
@@ -739,7 +739,7 @@ FB46..FB4E    ; Full_Composition_Exclusion # Lo   [9] HEBREW LETTER TSADI WITH D
 
 # ================================================
 
-# Property: NFD_Quick_Check
+# Property:	NFD_Quick_Check
 
 #  All code points not explicitly listed for NFD_Quick_Check
 #  have the value Yes (Y).
@@ -998,7 +998,7 @@ FB46..FB4E    ; NFD_QC; N # Lo   [9] HEBREW LETTER TSADI WITH DAGESH..HEBREW LET
 
 # ================================================
 
-# Property: NFC_Quick_Check
+# Property:	NFC_Quick_Check
 
 #  All code points not explicitly listed for NFC_Quick_Check
 #  have the value Yes (Y).
@@ -1138,7 +1138,7 @@ FB46..FB4E    ; NFC_QC; N # Lo   [9] HEBREW LETTER TSADI WITH DAGESH..HEBREW LET
 
 # ================================================
 
-# Property: NFKD_Quick_Check
+# Property:	NFKD_Quick_Check
 
 #  All code points not explicitly listed for NFKD_Quick_Check
 #  have the value Yes (Y).
@@ -1652,6 +1652,7 @@ FFED..FFEE    ; NFKD_QC; N # So   [2] HALFWIDTH BLACK SQUARE..HALFWIDTH WHITE CI
 1D7C3         ; NFKD_QC; N # Sm       MATHEMATICAL SANS-SERIF BOLD ITALIC PARTIAL DIFFERENTIAL
 1D7C4..1D7CB  ; NFKD_QC; N # L&   [8] MATHEMATICAL SANS-SERIF BOLD ITALIC EPSILON SYMBOL..MATHEMATICAL BOLD SMALL DIGAMMA
 1D7CE..1D7FF  ; NFKD_QC; N # Nd  [50] MATHEMATICAL BOLD DIGIT ZERO..MATHEMATICAL MONOSPACE DIGIT NINE
+1E030..1E06D  ; NFKD_QC; N # Lm  [62] MODIFIER LETTER CYRILLIC SMALL A..MODIFIER LETTER CYRILLIC SMALL STRAIGHT U WITH STROKE
 1EE00..1EE03  ; NFKD_QC; N # Lo   [4] ARABIC MATHEMATICAL ALEF..ARABIC MATHEMATICAL DAL
 1EE05..1EE1F  ; NFKD_QC; N # Lo  [27] ARABIC MATHEMATICAL WAW..ARABIC MATHEMATICAL DOTLESS QAF
 1EE21..1EE22  ; NFKD_QC; N # Lo   [2] ARABIC MATHEMATICAL INITIAL BEH..ARABIC MATHEMATICAL INITIAL JEEM
@@ -1697,11 +1698,11 @@ FFED..FFEE    ; NFKD_QC; N # So   [2] HALFWIDTH BLACK SQUARE..HALFWIDTH WHITE CI
 1FBF0..1FBF9  ; NFKD_QC; N # Nd  [10] SEGMENTED DIGIT ZERO..SEGMENTED DIGIT NINE
 2F800..2FA1D  ; NFKD_QC; N # Lo [542] CJK COMPATIBILITY IDEOGRAPH-2F800..CJK COMPATIBILITY IDEOGRAPH-2FA1D
 
-# Total code points: 16967
+# Total code points: 17029
 
 # ================================================
 
-# Property: NFKC_Quick_Check
+# Property:	NFKC_Quick_Check
 
 #  All code points not explicitly listed for NFKC_Quick_Check
 #  have the value Yes (Y).
@@ -2060,6 +2061,7 @@ FFED..FFEE    ; NFKC_QC; N # So   [2] HALFWIDTH BLACK SQUARE..HALFWIDTH WHITE CI
 1D7C3         ; NFKC_QC; N # Sm       MATHEMATICAL SANS-SERIF BOLD ITALIC PARTIAL DIFFERENTIAL
 1D7C4..1D7CB  ; NFKC_QC; N # L&   [8] MATHEMATICAL SANS-SERIF BOLD ITALIC EPSILON SYMBOL..MATHEMATICAL BOLD SMALL DIGAMMA
 1D7CE..1D7FF  ; NFKC_QC; N # Nd  [50] MATHEMATICAL BOLD DIGIT ZERO..MATHEMATICAL MONOSPACE DIGIT NINE
+1E030..1E06D  ; NFKC_QC; N # Lm  [62] MODIFIER LETTER CYRILLIC SMALL A..MODIFIER LETTER CYRILLIC SMALL STRAIGHT U WITH STROKE
 1EE00..1EE03  ; NFKC_QC; N # Lo   [4] ARABIC MATHEMATICAL ALEF..ARABIC MATHEMATICAL DAL
 1EE05..1EE1F  ; NFKC_QC; N # Lo  [27] ARABIC MATHEMATICAL WAW..ARABIC MATHEMATICAL DOTLESS QAF
 1EE21..1EE22  ; NFKC_QC; N # Lo   [2] ARABIC MATHEMATICAL INITIAL BEH..ARABIC MATHEMATICAL INITIAL JEEM
@@ -2105,7 +2107,7 @@ FFED..FFEE    ; NFKC_QC; N # So   [2] HALFWIDTH BLACK SQUARE..HALFWIDTH WHITE CI
 1FBF0..1FBF9  ; NFKC_QC; N # Nd  [10] SEGMENTED DIGIT ZERO..SEGMENTED DIGIT NINE
 2F800..2FA1D  ; NFKC_QC; N # Lo [542] CJK COMPATIBILITY IDEOGRAPH-2F800..CJK COMPATIBILITY IDEOGRAPH-2FA1D
 
-# Total code points: 4866
+# Total code points: 4928
 
 # ================================================
 
@@ -8076,6 +8078,68 @@ FFF0..FFF8    ; NFKC_CF;                # Cn   [9] <reserved-FFF0>..<reserved-FF
 1D7FD         ; NFKC_CF; 0037           # Nd       MATHEMATICAL MONOSPACE DIGIT SEVEN
 1D7FE         ; NFKC_CF; 0038           # Nd       MATHEMATICAL MONOSPACE DIGIT EIGHT
 1D7FF         ; NFKC_CF; 0039           # Nd       MATHEMATICAL MONOSPACE DIGIT NINE
+1E030         ; NFKC_CF; 0430           # Lm       MODIFIER LETTER CYRILLIC SMALL A
+1E031         ; NFKC_CF; 0431           # Lm       MODIFIER LETTER CYRILLIC SMALL BE
+1E032         ; NFKC_CF; 0432           # Lm       MODIFIER LETTER CYRILLIC SMALL VE
+1E033         ; NFKC_CF; 0433           # Lm       MODIFIER LETTER CYRILLIC SMALL GHE
+1E034         ; NFKC_CF; 0434           # Lm       MODIFIER LETTER CYRILLIC SMALL DE
+1E035         ; NFKC_CF; 0435           # Lm       MODIFIER LETTER CYRILLIC SMALL IE
+1E036         ; NFKC_CF; 0436           # Lm       MODIFIER LETTER CYRILLIC SMALL ZHE
+1E037         ; NFKC_CF; 0437           # Lm       MODIFIER LETTER CYRILLIC SMALL ZE
+1E038         ; NFKC_CF; 0438           # Lm       MODIFIER LETTER CYRILLIC SMALL I
+1E039         ; NFKC_CF; 043A           # Lm       MODIFIER LETTER CYRILLIC SMALL KA
+1E03A         ; NFKC_CF; 043B           # Lm       MODIFIER LETTER CYRILLIC SMALL EL
+1E03B         ; NFKC_CF; 043C           # Lm       MODIFIER LETTER CYRILLIC SMALL EM
+1E03C         ; NFKC_CF; 043E           # Lm       MODIFIER LETTER CYRILLIC SMALL O
+1E03D         ; NFKC_CF; 043F           # Lm       MODIFIER LETTER CYRILLIC SMALL PE
+1E03E         ; NFKC_CF; 0440           # Lm       MODIFIER LETTER CYRILLIC SMALL ER
+1E03F         ; NFKC_CF; 0441           # Lm       MODIFIER LETTER CYRILLIC SMALL ES
+1E040         ; NFKC_CF; 0442           # Lm       MODIFIER LETTER CYRILLIC SMALL TE
+1E041         ; NFKC_CF; 0443           # Lm       MODIFIER LETTER CYRILLIC SMALL U
+1E042         ; NFKC_CF; 0444           # Lm       MODIFIER LETTER CYRILLIC SMALL EF
+1E043         ; NFKC_CF; 0445           # Lm       MODIFIER LETTER CYRILLIC SMALL HA
+1E044         ; NFKC_CF; 0446           # Lm       MODIFIER LETTER CYRILLIC SMALL TSE
+1E045         ; NFKC_CF; 0447           # Lm       MODIFIER LETTER CYRILLIC SMALL CHE
+1E046         ; NFKC_CF; 0448           # Lm       MODIFIER LETTER CYRILLIC SMALL SHA
+1E047         ; NFKC_CF; 044B           # Lm       MODIFIER LETTER CYRILLIC SMALL YERU
+1E048         ; NFKC_CF; 044D           # Lm       MODIFIER LETTER CYRILLIC SMALL E
+1E049         ; NFKC_CF; 044E           # Lm       MODIFIER LETTER CYRILLIC SMALL YU
+1E04A         ; NFKC_CF; A689           # Lm       MODIFIER LETTER CYRILLIC SMALL DZZE
+1E04B         ; NFKC_CF; 04D9           # Lm       MODIFIER LETTER CYRILLIC SMALL SCHWA
+1E04C         ; NFKC_CF; 0456           # Lm       MODIFIER LETTER CYRILLIC SMALL BYELORUSSIAN-UKRAINIAN I
+1E04D         ; NFKC_CF; 0458           # Lm       MODIFIER LETTER CYRILLIC SMALL JE
+1E04E         ; NFKC_CF; 04E9           # Lm       MODIFIER LETTER CYRILLIC SMALL BARRED O
+1E04F         ; NFKC_CF; 04AF           # Lm       MODIFIER LETTER CYRILLIC SMALL STRAIGHT U
+1E050         ; NFKC_CF; 04CF           # Lm       MODIFIER LETTER CYRILLIC SMALL PALOCHKA
+1E051         ; NFKC_CF; 0430           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER A
+1E052         ; NFKC_CF; 0431           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER BE
+1E053         ; NFKC_CF; 0432           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER VE
+1E054         ; NFKC_CF; 0433           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER GHE
+1E055         ; NFKC_CF; 0434           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER DE
+1E056         ; NFKC_CF; 0435           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER IE
+1E057         ; NFKC_CF; 0436           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER ZHE
+1E058         ; NFKC_CF; 0437           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER ZE
+1E059         ; NFKC_CF; 0438           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER I
+1E05A         ; NFKC_CF; 043A           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER KA
+1E05B         ; NFKC_CF; 043B           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER EL
+1E05C         ; NFKC_CF; 043E           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER O
+1E05D         ; NFKC_CF; 043F           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER PE
+1E05E         ; NFKC_CF; 0441           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER ES
+1E05F         ; NFKC_CF; 0443           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER U
+1E060         ; NFKC_CF; 0444           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER EF
+1E061         ; NFKC_CF; 0445           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER HA
+1E062         ; NFKC_CF; 0446           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER TSE
+1E063         ; NFKC_CF; 0447           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER CHE
+1E064         ; NFKC_CF; 0448           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER SHA
+1E065         ; NFKC_CF; 044A           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER HARD SIGN
+1E066         ; NFKC_CF; 044B           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER YERU
+1E067         ; NFKC_CF; 0491           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER GHE WITH UPTURN
+1E068         ; NFKC_CF; 0456           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER BYELORUSSIAN-UKRAINIAN I
+1E069         ; NFKC_CF; 0455           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER DZE
+1E06A         ; NFKC_CF; 045F           # Lm       CYRILLIC SUBSCRIPT SMALL LETTER DZHE
+1E06B         ; NFKC_CF; 04AB           # Lm       MODIFIER LETTER CYRILLIC SMALL ES WITH DESCENDER
+1E06C         ; NFKC_CF; A651           # Lm       MODIFIER LETTER CYRILLIC SMALL YERU WITH BACK YER
+1E06D         ; NFKC_CF; 04B1           # Lm       MODIFIER LETTER CYRILLIC SMALL STRAIGHT U WITH STROKE
 1E900         ; NFKC_CF; 1E922          # L&       ADLAM CAPITAL LETTER ALIF
 1E901         ; NFKC_CF; 1E923          # L&       ADLAM CAPITAL LETTER DAALI
 1E902         ; NFKC_CF; 1E924          # L&       ADLAM CAPITAL LETTER LAAM
@@ -8937,7 +9001,7 @@ E0080..E00FF  ; NFKC_CF;                # Cn [128] <reserved-E0080>..<reserved-E
 E0100..E01EF  ; NFKC_CF;                # Mn [240] VARIATION SELECTOR-17..VARIATION SELECTOR-256
 E01F0..E0FFF  ; NFKC_CF;                # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 
-# Total code points: 10429
+# Total code points: 10491
 
 # ================================================
 
@@ -9895,6 +9959,7 @@ FFF0..FFF8    ; Changes_When_NFKC_Casefolded # Cn   [9] <reserved-FFF0>..<reserv
 1D7C3         ; Changes_When_NFKC_Casefolded # Sm       MATHEMATICAL SANS-SERIF BOLD ITALIC PARTIAL DIFFERENTIAL
 1D7C4..1D7CB  ; Changes_When_NFKC_Casefolded # L&   [8] MATHEMATICAL SANS-SERIF BOLD ITALIC EPSILON SYMBOL..MATHEMATICAL BOLD SMALL DIGAMMA
 1D7CE..1D7FF  ; Changes_When_NFKC_Casefolded # Nd  [50] MATHEMATICAL BOLD DIGIT ZERO..MATHEMATICAL MONOSPACE DIGIT NINE
+1E030..1E06D  ; Changes_When_NFKC_Casefolded # Lm  [62] MODIFIER LETTER CYRILLIC SMALL A..MODIFIER LETTER CYRILLIC SMALL STRAIGHT U WITH STROKE
 1E900..1E921  ; Changes_When_NFKC_Casefolded # L&  [34] ADLAM CAPITAL LETTER ALIF..ADLAM CAPITAL LETTER SHA
 1EE00..1EE03  ; Changes_When_NFKC_Casefolded # Lo   [4] ARABIC MATHEMATICAL ALEF..ARABIC MATHEMATICAL DAL
 1EE05..1EE1F  ; Changes_When_NFKC_Casefolded # Lo  [27] ARABIC MATHEMATICAL WAW..ARABIC MATHEMATICAL DOTLESS QAF
@@ -9948,6 +10013,6 @@ E0080..E00FF  ; Changes_When_NFKC_Casefolded # Cn [128] <reserved-E0080>..<reser
 E0100..E01EF  ; Changes_When_NFKC_Casefolded # Mn [240] VARIATION SELECTOR-17..VARIATION SELECTOR-256
 E01F0..E0FFF  ; Changes_When_NFKC_Casefolded # Cn [3600] <reserved-E01F0>..<reserved-E0FFF>
 
-# Total code points: 10429
+# Total code points: 10491
 
 # EOF
