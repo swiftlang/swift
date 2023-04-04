@@ -31,8 +31,6 @@ struct AllocatingStr : P {
   }
 }
 
-/* Currently disabled: rdar://90495704
-
 func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
   return a[i].x
 }
@@ -41,7 +39,6 @@ func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
 func callArrayGet(_ a: [Str]) -> Int {
   return noRTCallsForArrayGet(a, 0)
 }
-*/
 
 @_noLocks
 func arcOperations(_ x: Cl) -> Cl {

@@ -176,8 +176,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() && EnableDestroyHoisting) {
-    P.addDestroyHoisting();
+  if (Options.shouldOptimize()) {
+    if (EnableDestroyHoisting) {
+      P.addDestroyHoisting();
+    } else if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
+      P.addDestroyAddrHoisting();
+    }
   }
   P.addMandatoryInlining();
   P.addMandatorySILLinker();

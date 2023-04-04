@@ -91,7 +91,7 @@ tests.test("simpleArrayVarTest") {
     expectTrue(x._buffer.isUniquelyReferenced())
 
     var y = x
-    expectTrue(x._buffer.isUniquelyReferenced())
+    expectFalse(x._buffer.isUniquelyReferenced())
     let _ = y
     expectTrue(x._buffer.isUniquelyReferenced())
     y = []
@@ -101,7 +101,7 @@ tests.test("simpleArrayVarTest") {
 tests.test("simpleArrayInoutVarTest") {
     func inOutTest(_ x: inout [Enum]) {
         var y = x
-        expectTrue(x._buffer.isUniquelyReferenced())
+        expectFalse(x._buffer.isUniquelyReferenced())
         let _ = y
         expectTrue(x._buffer.isUniquelyReferenced())
         y = []
