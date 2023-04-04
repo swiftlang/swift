@@ -48,7 +48,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   // expressions followed by (e.g.) let/var decls.
   //
   if (InBindingPattern && isOnlyStartOfMatchingPattern()) {
-    ParserResult<Pattern> pattern = parseMatchingPattern(/*isExprBasic*/false);
+    ParserResult<Pattern> pattern = parseMatchingPattern(/*isExprBasic*/false, /*inIsCaseExpr*/false);
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (pattern.isNull())
@@ -84,7 +84,7 @@ ParserResult<Expr> Parser::parseExprIsCase() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   SourceLoc caseLoc = consumeToken(tok::kw_case);
   
-  ParserResult<Pattern> patternResult = parseMatchingPattern(true);
+  ParserResult<Pattern> patternResult = parseMatchingPattern(true, /*inIsCaseExpr*/true);
   
   return makeParserResult(IsCaseExpr::create(Context, patternResult.get(), isLoc, caseLoc));
 }

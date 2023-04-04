@@ -8287,7 +8287,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         CancellableBacktrackingScope backtrack(*this);
         llvm::SaveAndRestore<decltype(InBindingPattern)> T(
             InBindingPattern, PatternBindingState::InMatchingPattern);
-        parseMatchingPattern(/*isExprBasic*/false);
+        parseMatchingPattern(/*isExprBasic*/false, /*inIsCaseExpr*/false);
 
         // Reset async attribute in parser context.
         llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,

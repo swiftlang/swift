@@ -1592,10 +1592,10 @@ public:
   
   ParserResult<Pattern>
   parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P);
-  ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);
+  ParserResult<Pattern> parseMatchingPattern(bool isExprBasic, bool inIsCaseExpr);
   ParserResult<Pattern>
   parseMatchingPatternAsBinding(PatternBindingState newState, SourceLoc VarLoc,
-                                bool isExprBasic);
+                                bool isExprBasic, bool inIsCaseExpr);
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
                                     VarDecl::Introducer introducer);

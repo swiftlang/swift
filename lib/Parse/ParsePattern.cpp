@@ -1282,7 +1282,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
 /// matching-pattern ::= matching-pattern-var
 /// matching-pattern ::= expr
 ///
-ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
+ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic, bool inIsCaseExpr) {
   // TODO: Since we expect a pattern in this position, we should optimistically
   // parse pattern nodes for productions shared by pattern and expression
   // grammar. For short-term ease of initial implementation, we always go
@@ -1292,12 +1292,19 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   if (Tok.isAny(tok::kw_var, tok::kw_let) ||
       (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
        Tok.isAny(tok::kw_inout))) {
+    if (inIsCaseExpr) {
+      auto newBindingState = PatternBindingState(Tok);
+      unsigned index = *newBindingState.getSelectIndexForIntroducer();
+      diagnose(Tok, diag::var_pattern_in_is_case_expr, index);
+      return nullptr;
+    }
+
     assert(Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_inout) && "expects var or let");
     auto newPatternBindingState = PatternBindingState(Tok);
     SourceLoc varLoc = consumeToken();
 
     return parseMatchingPatternAsBinding(newPatternBindingState, varLoc,
-                                         isExprBasic);
+                                         isExprBasic, /*inIsCaseExpr*/false);
   }
 
   // matching-pattern ::= 'is' type
@@ -1345,7 +1352,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
 
 ParserResult<Pattern>
 Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
-                                      SourceLoc varLoc, bool isExprBasic) {
+                                      SourceLoc varLoc, bool isExprBasic, bool inIsCaseExpr) {
   // 'var', 'let', 'inout' patterns shouldn't nest.
   if (InBindingPattern.getIntroducer().hasValue()) {
     auto diag = diag::var_pattern_in_var;
@@ -1368,7 +1375,7 @@ Parser::parseMatchingPatternAsBinding(PatternBindingState newState,
   // Reset async attribute in parser context.
   llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
-  ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
+  ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic, inIsCaseExpr);
   if (subPattern.isNull())
     return nullptr;
   auto *varP = new (Context) BindingPattern(

@@ -1138,7 +1138,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   if (patternResult.isNull()) {
     llvm::SaveAndRestore<decltype(P.InBindingPattern)> T(
         P.InBindingPattern, PatternBindingState::InMatchingPattern);
-    patternResult = P.parseMatchingPattern(isExprBasic);
+    patternResult = P.parseMatchingPattern(isExprBasic, /*inIsCaseExpr*/false);
   }
 
   // If that didn't work, use a bogus pattern so that we can fill out
@@ -1636,7 +1636,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
-    ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+    ThePattern = parseMatchingPattern(/*isExprBasic*/ true, /*inIsCaseExpr*/ false);
   } else if (Tok.is(tok::kw_case)) {
     // If will probably be a common typo to write "if let case" instead of
     // "if case let" so detect this and produce a nice fixit.
@@ -1658,7 +1658,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
-    ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+    ThePattern = parseMatchingPattern(/*isExprBasic*/ true, /*inIsCaseExpr*/false);
     
     if (ThePattern.isNonNull()) {
       auto *P = new (Context)
@@ -1680,7 +1680,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
         PatternBindingState::get(BindingKindStr)
             .getValueOr(PatternBindingState(PatternBindingState::InVar)),
         IntroducerLoc,
-        /*isExprBasic*/ true);
+        /*isExprBasic*/ true,
+        /*inIsCaseExpr*/ false);
     // The let/var pattern is part of the statement.
     if (Pattern *P = ThePattern.getPtrOrNull())
       P->setImplicit();
@@ -2300,7 +2301,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     // Reset async attribute in parser context.
     llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute, false);
 
-    pattern = parseMatchingPattern(/*isExprBasic*/true);
+    pattern = parseMatchingPattern(/*isExprBasic*/true, /*inIsCaseExpr*/false);
     pattern = parseOptionalPatternTypeAnnotation(pattern);
   } else if (!IsCStyleFor || Tok.is(tok::kw_var)) {
     // Change the parser state to know that the pattern we're about to parse is
