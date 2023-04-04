@@ -178,6 +178,8 @@ namespace {
   class TypeClassifierBase
     : public CanTypeVisitor<Impl, RetTy, AbstractionPattern, IsTypeExpansionSensitive_t>
   {
+    using super =
+      CanTypeVisitor<Impl, RetTy, AbstractionPattern, IsTypeExpansionSensitive_t>;
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
     TypeConverter &TC;
@@ -283,6 +285,15 @@ namespace {
     getOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forOpaque());
+    }
+
+    RetTy visit(CanType substType, AbstractionPattern origType,
+                IsTypeExpansionSensitive_t isSensitive) {
+      if (auto origEltType = origType.getVanishingTupleElementPatternType()) {
+        return visit(substType, *origEltType, isSensitive);
+      }
+
+      return super::visit(substType, origType, isSensitive);
     }
 
 #define IMPL(TYPE, LOWERING)                                                 \
@@ -2900,7 +2911,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     LoweredRValueTypeVisitor(TypeConverter &TC,
                              TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
-        : TC(TC), forExpansion(forExpansion), origType(origType) {}
+        : TC(TC), forExpansion(forExpansion), origType(origType) {
+      if (auto origEltType = origType.getVanishingTupleElementPatternType())
+        origType = *origEltType;
+    }
 
     // AST function types are turned into SIL function types:
     //   - the type is uncurried as desired
