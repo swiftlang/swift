@@ -281,66 +281,54 @@ static void desugarConformanceRequirement(Requirement req,
                                           SourceLoc loc,
                                           SmallVectorImpl<Requirement> &result,
                                           SmallVectorImpl<RequirementError> &errors) {
+  SmallVector<Requirement, 2> subReqs;
+
+  auto constraintType = req.getSecondType();
+
   // Fast path.
-  if (req.getSecondType()->is<ProtocolType>()) {
+  if (constraintType->is<ProtocolType>()) {
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
     }
 
     // Check if the subject type actually conforms.
-    auto *protoDecl = req.getProtocolDecl();
-    auto *module = protoDecl->getParentModule();
-    auto conformance = module->lookupConformance(
-        req.getFirstType(), protoDecl, /*allowMissing=*/true);
-    if (conformance.isInvalid()) {
+    switch (req.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::PackRequirement:
+    case CheckRequirementResult::ConditionalConformance:
+      errors.push_back(RequirementError::forRedundantRequirement(req, loc));
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
       errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
-      return;
+      break;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      break;
+    }
+  } else if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
+    subReqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
+                         paramType->getBaseType());
+    paramType->getRequirements(req.getFirstType(), subReqs);
+  } else if (auto *compositionType = constraintType->castTo<ProtocolCompositionType>()) {
+    if (compositionType->hasExplicitAnyObject()) {
+      subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
+                           LayoutConstraint::getLayoutConstraint(
+                             LayoutConstraintKind::Class));
     }
 
-    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
-
-    if (conformance.isConcrete()) {
-      // Introduce conditional requirements if the conformance is concrete.
-      for (auto condReq : conformance.getConcrete()->getConditionalRequirements()) {
-        desugarRequirement(condReq, loc, result, errors);
-      }
+    for (auto memberType : compositionType->getMembers()) {
+      subReqs.emplace_back(
+          memberType->isConstraintType()
+            ? RequirementKind::Conformance
+            : RequirementKind::Superclass,
+          req.getFirstType(), memberType);
     }
-
-    return;
   }
 
-  if (auto *paramType = req.getSecondType()->getAs<ParameterizedProtocolType>()) {
-    SmallVector<Requirement, 2> reqs;
-
-    reqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
-                      paramType->getBaseType());
-    paramType->getRequirements(req.getFirstType(), reqs);
-
-    for (const auto &req : reqs)
-      desugarRequirement(req, loc, result, errors);
-
-    return;
-  }
-
-  auto *compositionType = req.getSecondType()->castTo<ProtocolCompositionType>();
-  SmallVector<Requirement, 2> memberReqs;
-  if (compositionType->hasExplicitAnyObject()) {
-    memberReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
-                            LayoutConstraint::getLayoutConstraint(
-                              LayoutConstraintKind::Class));
-  }
-
-  for (auto memberType : compositionType->getMembers()) {
-    memberReqs.emplace_back(
-        memberType->isConstraintType()
-          ? RequirementKind::Conformance
-          : RequirementKind::Superclass,
-        req.getFirstType(), memberType);
-  }
-
-  for (auto memberReq : memberReqs)
-    desugarRequirement(memberReq, loc, result, errors);
+  for (auto subReq : subReqs)
+    desugarRequirement(subReq, loc, result, errors);
 }
 
 /// Desugar same-shape requirements by equating the shapes of the
