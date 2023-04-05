@@ -13,6 +13,7 @@
 #define UnitTestSourceFileDepGraphFactory_h
 
 #include "swift/AST/AbstractSourceFileDepGraphFactory.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 namespace swift {
 namespace fine_grained_dependencies {
@@ -30,10 +31,10 @@ public:
       bool hadCompilationError, StringRef swiftDeps,
       Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
       const DependencyDescriptions &dependencyDescriptions,
-      DiagnosticEngine &diags)
+      DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend)
       : AbstractSourceFileDepGraphFactory(
             hadCompilationError, swiftDeps, fileFingerprint,
-            emitDotFileAfterConstruction, diags),
+            emitDotFileAfterConstruction, diags, backend),
         dependencyDescriptions(dependencyDescriptions) {}
 
   ~UnitTestSourceFileDepGraphFactory() override = default;

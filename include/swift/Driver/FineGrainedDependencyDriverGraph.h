@@ -20,11 +20,14 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
+#include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -201,6 +204,9 @@ private:
                           std::vector<const ModuleDepGraphNode *>>
       dependencyPathsToJobs;
 
+  /// VirtualOutputBackend for emitting graphs.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> backend;
+
   /// For helping with performance tuning, may be null:
   UnifiedStatsReporter *stats;
 
@@ -306,6 +312,10 @@ public:
                 : None),
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");
+
+    // Create a OnDiskOutputBackend for emitting graphs. Currently, this is
+    // only used by driver so the backend is not shared with a CompilerInstance.
+    backend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
   }
 
   /// For unit tests.
