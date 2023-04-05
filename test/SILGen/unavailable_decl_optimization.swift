@@ -88,7 +88,11 @@ public struct S<T> {
   // CHECK-STRIP-NOT: s4Test1SV19unavailablePropertyxvs
   // CHECK-STRIP-NOT: s4Test1SV19unavailablePropertyxvM
   @available(*, unavailable)
-  public var unavailableProperty: T
+  public var unavailableProperty: T {
+    get { fatalError() }
+    set { fatalError() }
+    _modify { fatalError() }
+  }
 
   // CHECK-NO-STRIP: s4Test1SVyACyxGxcfC
   // CHECK-STRIP-NOT: s4Test1SVyACyxGxcfC
@@ -128,7 +132,11 @@ public class C<T> {
   // CHECK-STRIP-NOT: s4Test1CC19unavailablePropertyxvs
   // CHECK-STRIP-NOT: s4Test1CC19unavailablePropertyxvM
   @available(*, unavailable)
-  public var unavailableProperty: T
+  public var unavailableProperty: T {
+    get { fatalError() }
+    set { fatalError() }
+    _modify { fatalError() }
+  }
 
   // CHECK-NO-STRIP: s4Test1CCyACyxGxcfC
   // CHECK-NO-STRIP: s4Test1CCyACyxGxcfc

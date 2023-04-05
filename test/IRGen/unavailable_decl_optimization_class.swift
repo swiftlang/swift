@@ -10,7 +10,11 @@ public class AvailableClass<T> {
   // CHECK-STRIP-NOT: s4Test14AvailableClassC19unavailablePropertyxvs
   // CHECK-STRIP-NOT: s4Test14AvailableClassC19unavailablePropertyxvM
   @available(*, unavailable)
-  public var unavailableProperty: T
+  public var unavailableProperty: T {
+    get { fatalError() }
+    set { fatalError() }
+    _modify { fatalError() }
+  }
 
   // CHECK-NO-STRIP: s4Test14AvailableClassCyACyxGxcfC
   // CHECK-NO-STRIP: s4Test14AvailableClassCyACyxGxcfc
