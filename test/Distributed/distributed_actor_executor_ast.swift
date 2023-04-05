@@ -13,6 +13,9 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
+// rdar://107385732 the test seems to be a bit not deterministic, perhaps order of the binding and var decl?
+// REQUIRES: rdar107385732
+
 import StdlibUnittest
 import Distributed
 import FakeDistributedActorSystems
