@@ -10,9 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 #include "swift/Basic/BlockList.h"
+#include "swift/Basic/SourceManager.h"
 
 struct swift::BlockListStore::Implementation {
+  llvm::StringMap<std::vector<BlockListAction>> ModuleActionDict;
+  llvm::StringMap<std::vector<BlockListAction>> ProjectActionDict;
   void addConfigureFilePath(StringRef path);
   bool hasBlockListAction(StringRef key, BlockListKeyKind keyKind,
                           BlockListAction action);
@@ -33,7 +40,12 @@ void swift::BlockListStore::addConfigureFilePath(StringRef path) {
 
 bool swift::BlockListStore::Implementation::hasBlockListAction(StringRef key,
     BlockListKeyKind keyKind, BlockListAction action) {
-  return false;
+  auto *dict = keyKind == BlockListKeyKind::ModuleName ? &ModuleActionDict :
+    &ProjectActionDict;
+  auto it = dict->find(key);
+  if (it == dict->end())
+    return false;
+  return llvm::is_contained(it->second, action);
 }
 
 void swift::BlockListStore::Implementation::addConfigureFilePath(StringRef path) {
