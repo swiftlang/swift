@@ -2539,6 +2539,8 @@ public:
     switch (Action) {
     case ActionType::DumpSDK: {
       llvm::StringSet<> Modules;
+      if (prepareForDump(InitInvoke, Modules))
+        return 1;
       auto JsonOut =
           getJsonOutputFilePath(InitInvoke.getLangOptions().Target,
                                 CheckerOpts.ABI, OutputFile, OutputDir);
@@ -2548,9 +2550,7 @@ public:
         llvm::errs() << "Cannot open JSON output file: " << JsonOut << "\n";
         return 1;
       }
-      return (prepareForDump(InitInvoke, Modules))
-                 ? 1
-                 : dumpSDKContent(InitInvoke, Modules, fs, CheckerOpts);
+      return dumpSDKContent(InitInvoke, Modules, fs, CheckerOpts);
     }
     case ActionType::MigratorGen:
     case ActionType::DiagnoseSDKs: {

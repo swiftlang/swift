@@ -2555,8 +2555,6 @@ void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, PayLoad load,
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
   SwiftDeclCollector::serialize(os, Root, load);
-  // if (Opts.Verbose)
-  //   llvm::errs() << "Dumped to "<< OutputFile << "\n";
 }
 
 void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, llvm::raw_ostream &os) {
