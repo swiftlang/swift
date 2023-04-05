@@ -42,22 +42,13 @@ extension DistributedActor {
       return
     }
 
-    guard __isLocalActor(self) else {
-      return
-    }
-
-    guard let unownedExecutor = self.localUnownedExecutor else {
-      preconditionFailure(
-          "Incorrect actor executor assumption; Distributed actor \(self) is 'local' but has no executor!",
-          file: file, line: line)
-    }
-
+    let unownedExecutor = self.unownedExecutor
     let expectationCheck = _taskIsCurrentExecutor(unownedExecutor._executor)
 
     // TODO: offer information which executor we actually got
     precondition(expectationCheck,
         // TODO: figure out a way to get the typed repr out of the unowned executor
-        "Incorrect actor executor assumption; Expected '\(unownedExecutor)' executor. \(message())",
+        "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
 }
@@ -89,16 +80,7 @@ extension DistributedActor {
       return
     }
 
-    guard __isLocalActor(self) else {
-      return
-    }
-
-    guard let unownedExecutor = self.localUnownedExecutor else {
-      preconditionFailure(
-          "Incorrect actor executor assumption; Distributed actor \(self) is 'local' but has no executor!",
-          file: file, line: line)
-    }
-
+    let unownedExecutor = self.unownedExecutor
     guard _taskIsCurrentExecutor(unownedExecutor._executor) else {
       // TODO: offer information which executor we actually got
       // TODO: figure out a way to get the typed repr out of the unowned executor
@@ -147,16 +129,12 @@ extension DistributedActor {
     typealias YesActor = (isolated Self) throws -> T
     typealias NoActor = (Self) throws -> T
 
-      guard __isLocalActor(self) else {
-        fatalError("Cannot assume to be 'isolated \(Self.self)' since distributed actor '\(self)' is a remote actor reference.")
-      }
-
-    /// This is guaranteed to be fatal if the check fails,
-    /// as this is our "safe" version of this API.
-    guard let executor = self.localUnownedExecutor else {
-      fatalError("Distributed local actor MUST have executor, but was nil")
+    guard __isLocalActor(self) else {
+      fatalError("Cannot assume to be 'isolated \(Self.self)' since distributed actor '\(self)' is a remote actor reference.")
     }
-    guard _taskIsCurrentExecutor(executor._executor) else {
+
+    let unownedExecutor = self.unownedExecutor
+    guard _taskIsCurrentExecutor(unownedExecutor._executor) else {
       // TODO: offer information which executor we actually got when
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }

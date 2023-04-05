@@ -73,7 +73,7 @@ final class DA2: DistributedActor {
   nonisolated var actorSystem: ActorSystem {
     fatalError()
   }
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
     fatalError()
   }
 
