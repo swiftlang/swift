@@ -5590,9 +5590,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
-  void printGenericArgs(PackType *flatArgs) {
+  void printGenericArgs(ArrayRef<Type> flatArgs) {
     Printer << "<";
-    interleave(flatArgs->getElementTypes(),
+    interleave(flatArgs,
                [&](Type arg) { visit(arg); },
                [&] { Printer << ", "; });
     Printer << ">";
@@ -5601,7 +5601,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   void printGenericArgs(ASTContext &ctx,
                         TypeArrayView<GenericTypeParamType> params,
                         ArrayRef<Type> args) {
-    printGenericArgs(PackType::get(ctx, params, args));
+    printGenericArgs(PackType::getExpandedGenericArgs(params, args));
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -5952,7 +5952,7 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgsPack());
+      printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6057,7 +6057,7 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgsPack());
+    printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {

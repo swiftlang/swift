@@ -2081,7 +2081,7 @@ public:
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const;
 
-  PackType *getExpandedGenericArgsPack();
+  SmallVector<Type, 2> getExpandedGenericArgs();
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -2562,7 +2562,7 @@ public:
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
-  PackType *getExpandedGenericArgsPack();
+  SmallVector<Type, 2> getExpandedGenericArgs();
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent(), getGenericArgs());
@@ -6820,14 +6820,14 @@ public:
   /// Creates a pack from the types in \p elements.
   static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
 
-  static PackType *get(const ASTContext &C,
-                       TypeArrayView<GenericTypeParamType> params,
-                       ArrayRef<Type> args);
-
   /// Given a type T, which must be a pack parameter, a member type
   /// of a pack parameter, or a pack archetype, construct the type
   /// Pack{repeat each T}.
   static PackType *getSingletonPackExpansion(Type packParameter);
+
+  static SmallVector<Type, 2> getExpandedGenericArgs(
+      TypeArrayView<GenericTypeParamType> params,
+      ArrayRef<Type> args);
 
 public:
   /// Retrieves the number of elements in this pack.
