@@ -2750,6 +2750,7 @@ bool TypeConverter::visitAggregateLeaves(
   auto isAggregate = [](CanType ty) {
     return isa<SILPackType>(ty) ||
            isa<TupleType>(ty) ||
+           isa<PackExpansionType>(ty) ||
            ty.getEnumOrBoundGenericEnum() ||
            ty.getStructOrBoundGenericStruct();
   };
@@ -2781,6 +2782,10 @@ bool TypeConverter::visitAggregateLeaves(
                                  tupleIndex);
               ++tupleIndex;
             });
+      } else if (auto expansion = dyn_cast<PackExpansionType>(ty)) {
+        insertIntoWorklist(expansion.getPatternType(),
+                           origTy.getPackExpansionPatternType(),
+                           field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap(&M, decl);
