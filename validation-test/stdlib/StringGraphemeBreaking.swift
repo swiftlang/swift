@@ -52,7 +52,7 @@ func check(
     file: file, line: line)
 }
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 5.9, *) {
   StringGraphemeBreaking.test("grapheme breaking") {
     for test in graphemeBreakTests {
       check(test.string, test.pieces)
@@ -102,7 +102,7 @@ extension _StringGuts {
   func _isForeign() -> Bool
 }
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 5.9, *) {
   StringGraphemeBreaking.test("grapheme breaking foreign") {
     for test in graphemeBreakTests {
       let foreign = NonContiguousNSString(test.string.utf16)
