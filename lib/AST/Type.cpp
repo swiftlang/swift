@@ -5119,12 +5119,18 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
     if (innerDC->isInnermostContextGeneric()) {
       if (auto sig = innerDC->getGenericSignatureOfContext()) {
         for (auto param : sig.getInnermostGenericParams()) {
-          auto *genericParam = param->getCanonicalType()
-              ->castTo<GenericTypeParamType>();
-          substitutions[genericParam] =
-            (genericEnv
-             ? genericEnv->mapTypeIntoContext(param)
-             : param);
+          Type substGenericParam = param;
+          if (param->isParameterPack()) {
+            substGenericParam = PackType::getSingletonPackExpansion(
+                param);
+          }
+          if (genericEnv) {
+            substGenericParam = genericEnv->mapTypeIntoContext(
+                substGenericParam);
+          }
+
+          auto *key = param->getCanonicalType()->castTo<GenericTypeParamType>();
+          substitutions[key] = substGenericParam;
         }
       }
     }
