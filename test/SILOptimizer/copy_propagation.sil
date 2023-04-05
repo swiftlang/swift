@@ -22,6 +22,7 @@ sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
 sil [ossa] @getOwnedB : $@convention(thin) () -> (@owned B)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
+sil [ossa] @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
@@ -1013,6 +1014,36 @@ entry(%instance : @owned $C):
   destroy_value %instance : $C
   apply %barrier() : $@convention(thin) () -> ()
   destroy_value %copy : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned_lexical_value_to_callee : {{.*}} {
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'forward_owned_lexical_value_to_callee'
+sil [ossa] @forward_owned_lexical_value_to_callee : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %copy = copy_value %instance : $C
+  %consume = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  apply %consume(%copy) : $@convention(thin) (@owned C) -> ()
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cantForwardBecauseBorrowing : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[CONSUME_AND_BORROW:%[^,]+]] = function_ref @takeOwnedCAndGuaranteedC
+// CHECK:         apply [[CONSUME_AND_BORROW]]([[COPY]], [[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'cantForwardBecauseBorrowing'
+sil [ossa] @cantForwardBecauseBorrowing :$@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %copy = copy_value %instance : $C
+  %consumeAndBorrow = function_ref @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed C) -> ()
+  apply %consumeAndBorrow(%copy, %instance) : $@convention(thin) (@owned C, @guaranteed C) -> ()
+  destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
 }
