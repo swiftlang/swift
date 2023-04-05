@@ -475,6 +475,16 @@ REMARK(interface_file_backup_used,none,
 
 WARNING(warn_flag_deprecated,none, "flag '%0' is deprecated", (StringRef))
 
+// Output deterministic check
+ERROR(error_nondeterministic_output,none,
+      "output file '%0' is not deterministic: hash value '%1' vs '%2' between two compilations",
+      (StringRef, StringRef, StringRef))
+ERROR(error_output_missing,none,
+      "output file '%0' is missing from %select{first|second}1 compilation for deterministic check",
+      (StringRef, /*SecondRun=*/bool))
+REMARK(matching_output_produced,none,
+      "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "

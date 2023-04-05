@@ -66,6 +66,7 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -74,6 +75,7 @@
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
 #include <memory>
@@ -940,10 +942,8 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.str().str();
 }
 
-
-Optional<std::string>
-ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              StringRef SwiftPCHHash) {
+Optional<std::string> ClangImporter::getOrCreatePCH(
+    const ClangImporterOptions &ImporterOptions, StringRef SwiftPCHHash) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -959,8 +959,8 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
         << EC.message();
       return None;
     }
-    auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.value());
+    auto FailedToEmit =
+        emitBridgingPCH(ImporterOptions.BridgingHeader, PCHFilename.value());
     if (FailedToEmit) {
       return None;
     }
@@ -1693,13 +1693,13 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   clonedInstance->setFileManager(&fileManager);
   clonedInstance->createSourceManager(fileManager);
   clonedInstance->setTarget(&Impl.Instance->getTarget());
+  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
 
-bool
-ClangImporter::emitBridgingPCH(StringRef headerPath,
-                               StringRef outputPCHPath) {
+bool ClangImporter::emitBridgingPCH(
+    StringRef headerPath, StringRef outputPCHPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
@@ -1728,7 +1728,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
-bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
+bool ClangImporter::runPreprocessor(
+    StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
   auto LangOpts = invocation.getLangOpts();
@@ -1752,9 +1753,8 @@ bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
   return emitInstance->getDiagnostics().hasErrorOccurred();
 }
 
-bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
-                                          StringRef moduleName,
-                                          StringRef outputPath) {
+bool ClangImporter::emitPrecompiledModule(
+    StringRef moduleMapPath, StringRef moduleName, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
@@ -1788,8 +1788,8 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
   return false;
 }
 
-bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
-                                          StringRef outputPath) {
+bool ClangImporter::dumpPrecompiledModule(
+    StringRef modulePath, StringRef outputPath) {
   auto dumpInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = dumpInstance->getInvocation();
 

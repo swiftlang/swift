@@ -38,6 +38,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
@@ -45,6 +46,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <llvm/ADT/StringExtras.h>
 
 using namespace swift;
@@ -249,7 +251,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      SourceMgr, Diagnostics));
+      SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -393,11 +395,31 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
+void CompilerInstance::setupOutputBackend() {
+  // Skip if output backend is not setup, default to OnDiskOutputBackend.
+  if (OutputBackend)
+    return;
+
+  OutputBackend =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Setup verification backend.
+  // Create a mirroring outputbackend to produce hash for output files.
+  // We cannot skip disk here since swift compiler is expecting to read back
+  // some output file in later stages.
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    HashBackend = llvm::makeIntrusiveRefCnt<HashBackendTy>();
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, HashBackend);
+  }
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
   Invocation = Invoke;
 
   setupDependencyTrackerIfNeeded();
+  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.

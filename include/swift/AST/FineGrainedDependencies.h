@@ -24,6 +24,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -357,8 +358,9 @@ private:
 /// \Note The returned graph should not be escaped from the callback.
 bool withReferenceDependencies(
     llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
-    const DependencyTracker &depTracker, StringRef outputPath,
-    bool alsoEmitDotFile, llvm::function_ref<bool(SourceFileDepGraph &&)>);
+    const DependencyTracker &depTracker, llvm::vfs::OutputBackend &backend,
+    StringRef outputPath, bool alsoEmitDotFile,
+    llvm::function_ref<bool(SourceFileDepGraph &&)>);
 
 //==============================================================================
 // MARK: Enums
@@ -895,7 +897,8 @@ public:
 
   bool verifySequenceNumber() const;
 
-  void emitDotFile(StringRef outputPath, DiagnosticEngine &diags);
+  void emitDotFile(llvm::vfs::OutputBackend &outputBackend,
+                   StringRef outputPath, DiagnosticEngine &diags);
 
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
