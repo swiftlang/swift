@@ -124,13 +124,15 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   }
   if (!Opts.TrapFuncName.empty()) {
