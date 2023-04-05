@@ -396,7 +396,6 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]
-// CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]

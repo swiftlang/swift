@@ -2138,6 +2138,8 @@ static void rewriteFunction(StructLoweringState &pass,
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
         SILBuilderWithScope debugBuilder(instr);
+        // SILBuilderWithScope skips over metainstructions.
+        debugBuilder.setCurrentDebugScope(instr->getDebugScope());
         debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
                                           *instr->getVarInfo());
         instr->getParent()->erase(instr);

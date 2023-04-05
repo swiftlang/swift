@@ -64,16 +64,16 @@ public var falseValue: Bool { false }
 // DWARF-NEXT: DW_AT_external	(true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(
-// DWARF-NEXT: DW_AT_name	("m")
+// DWARF-NEXT: DW_AT_location	(0x{{[a-z0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT: DW_AT_name	("k")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
 // DWARF-NEXT: DW_AT_type	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(0x{{[a-z0-9]+}}:
-// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// DWARF-NEXT: DW_AT_name	("k")
+// DWARF-NEXT: DW_AT_location	(
+// DWARF-NEXT: DW_AT_name	("m")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
 // DWARF-NEXT: DW_AT_type	(
@@ -149,13 +149,6 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_external	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(
-// DWARF-NEXT: DW_AT_name	("m")
-// DWARF-NEXT: DW_AT_decl_file	(
-// DWARF-NEXT: DW_AT_decl_line	(
-// DWARF-NEXT: DW_AT_type	(
-//
-// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location	(0x{{[a-z0-9]+}}:
 // We check that we get two separate locations for the different lifetimes of
 // the values.
@@ -165,6 +158,14 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
 // DWARF-NEXT: DW_AT_type	(
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location	(
+// DWARF-NEXT: DW_AT_name	("m")
+// DWARF-NEXT: DW_AT_decl_file	(
+// DWARF-NEXT: DW_AT_decl_line	(
+// DWARF-NEXT: DW_AT_type	(
+
 public func copyableVarTest() {
     var k = Klass()
     k.doSomething()
@@ -245,16 +246,16 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
+// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT: DW_AT_name      ("k")
 // DWARF-NEXT: DW_AT_decl_file (
 // DWARF-NEXT: DW_AT_decl_line (
 // DWARF-NEXT: DW_AT_type      (
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
-// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// DWARF-NEXT: DW_AT_name      ("k")
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("m")
 // DWARF-NEXT: DW_AT_decl_file (
 // DWARF-NEXT: DW_AT_decl_line (
 // DWARF-NEXT: DW_AT_type      (

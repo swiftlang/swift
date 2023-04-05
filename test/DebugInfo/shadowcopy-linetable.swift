@@ -13,9 +13,9 @@ func foo(_ x: inout Int64) {
   // CHECK: store %Ts5Int64V* %0, %Ts5Int64V** %[[X]], align {{(4|8)}}
   // CHECK-SAME: !dbg ![[LOC0:.*]]
   // CHECK-NEXT: getelementptr inbounds %Ts5Int64V, %Ts5Int64V* %0, i32 0, i32 0,
-  // CHECK-SAME: !dbg ![[LOC1:.*]]
+  // CHECK-SAME: !dbg ![[LOC0]]
   // CHECK: ![[LOC0]] = !DILocation(line: 0,
-  // CHECK: ![[LOC1]] = !DILocation(line: [[@LINE+1]],
+  // CHECK: !DILocation(line: [[@LINE+1]],
   x = x + 2
 }
 

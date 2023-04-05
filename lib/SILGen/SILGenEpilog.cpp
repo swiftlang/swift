@@ -290,7 +290,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
     assert(directResults.size() ==
            F.getConventions().getNumExpandedDirectSILResults(
                getTypeExpansionContext()));
-    returnValue = buildReturnValue(*this, topLevel, directResults);
+    returnValue = buildReturnValue(*this, cleanupLoc, directResults);
   }
 
   return {returnValue, *returnLoc};
@@ -319,6 +319,11 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
     // Return () if no return value was given.
     if (!returnValue)
       returnValue = emitEmptyTuple(CleanupLocation(TopLevel));
+    //{
+    //  RegularLocation loc(returnLoc);
+    //  loc.pointToEnd();
+    //  returnValue = emitEmptyTuple(loc);
+    //}
 
     B.createReturn(returnLoc, returnValue);
   }

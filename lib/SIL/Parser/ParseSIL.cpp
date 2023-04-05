@@ -2774,7 +2774,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
   SILType Ty;
-  SILLocation InstLoc = RegularLocation(OpcodeLoc);
+  SILLocation InstLoc = RegularLocation(OpcodeLoc, /*implicit*/ false);
   this->parsedComma = false;
 
   auto parseFormalTypeAndValue = [&](CanType &formalType,
