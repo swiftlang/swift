@@ -1906,6 +1906,16 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       !attr->isPackageDescriptionVersionSpecific())
     return;
 
+  // Make sure there isn't a more specific attribute we should be using instead.
+  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
+  // an iOS attribute while building for macCatalyst.
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
+
   SourceLoc attrLoc = attr->getLocation();
   auto versionAvailability = attr->getVersionAvailability(Ctx);
   if (versionAvailability == AvailableVersionComparison::Obsoleted ||
@@ -1931,16 +1941,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // for specific platforms.
   if (!attr->hasPlatform() || !attr->Introduced.has_value())
     return;
-
-  // Make sure there isn't a more specific attribute we should be using instead.
-  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
-  // an iOS attribute while building for macCatalyst.
-  if (attr->Platform == PlatformKind::iOS &&
-      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
-      return;
-    }
-  }
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
