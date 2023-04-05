@@ -257,7 +257,23 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
                        [&](auto *inst) {
                          if (inst == def)
                            return true;
-                         return isDeinitBarrier(inst, calleeAnalysis);
+                         if (!isDeinitBarrier(inst, calleeAnalysis))
+                           return false;
+                         // For the most part, instructions that are deinit
+                         // barriers in the abstract are also deinit barriers
+                         // for the purposes of canonicalizing def's lifetime.
+                         //
+                         // There is an important exception: transferring an
+                         // owned lexical lifetime into a callee.  If the
+                         // instruction is a full apply which consumes def,
+                         // then it isn't a deinit barrier.  Keep looking for
+                         // barriers above it.
+                         auto apply = FullApplySite::isa(inst);
+                         if (!apply)
+                           return true;
+                         return liveness->isInterestingUser(inst) !=
+                                PrunedLiveness::IsInterestingUser::
+                                    LifetimeEndingUse;
                        });
   for (auto *barrier : barriers.instructions) {
     liveness->updateForUse(barrier, /*lifetimeEnding*/ false);
