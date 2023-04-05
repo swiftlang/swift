@@ -15,18 +15,18 @@ struct HasPack<each A>: HasAssoc {}
 protocol P {}
 
 protocol HasPackRequirements {
-  func doStuff1<each U>(_ value: repeat each U) -> (repeat Array<each U>)
-  func doStuff2<each U>(_ value: repeat each U) -> (repeat Array<each U>)
+  func doStuff1<each U: P>(_ value: repeat each U) -> (repeat Array<each U>)
+  func doStuff2<each U: P>(_ value: repeat each U) -> (repeat Array<each U>)
 }
 
 extension HasPackRequirements {
-  func doStuff1<each U>(_ value: repeat each U) -> (repeat Array<each U>) {
+  func doStuff1<each U: P>(_ value: repeat each U) -> (repeat Array<each U>) {
     return (repeat [each value])
   }
 }
 
 struct ConformsPackRequirements<each T>: HasPackRequirements {
-  func doStuff2<each U>(_ value: repeat each U) -> (repeat Array<each U>) {
+  func doStuff2<each U: P>(_ value: repeat each U) -> (repeat Array<each U>) {
     return (repeat [each value])
   }
 }
