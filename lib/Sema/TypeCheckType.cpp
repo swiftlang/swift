@@ -42,8 +42,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -4615,14 +4616,21 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
   if (!packReference->isParameterPack()) {
     auto diag =
         ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
+    bool addEachFixitApplied = false;
     if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
       if (auto *packIdentBinding = packIdent->getBoundDecl()) {
         if (packIdentBinding->getLoc().isValid()) {
           diag.fixItInsert(packIdentBinding->getLoc(), "each ");
+          addEachFixitApplied = true;
         }
       }
     }
-    // TODO: else 'each' probably should be removed preceding repr
+    if (const auto eachLoc = repr->getEachLoc();
+        !addEachFixitApplied && eachLoc.isValid()) {
+      const auto eachLocEnd =
+          Lexer::getLocForEndOfToken(ctx.SourceMgr, eachLoc);
+      diag.fixItRemoveChars(eachLoc, eachLocEnd);
+    }
     return packReference;
   }
 

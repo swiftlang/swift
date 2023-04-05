@@ -153,13 +153,14 @@ func packElementInvalidBinding<each T>(_ arg: repeat each T) {
   let x = 1
   repeat print(each x)
   // expected-error@-1 {{'each' cannot be applied to non-pack type 'Int'}}
+  // TODO: fixit to remove 'each' keyword
 }
 
 func copyIntoTuple<each T>(_ arg: repeat each T) -> (repeat each T) {
   return (repeat each arg)
 }
 func callCopyAndBind<T>(_ arg: repeat each T) {
-  // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}
+  // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}{{22-22=each }}
   // expected-error@-2 {{pack expansion 'T' must contain at least one pack reference}}
 
   // Don't propagate errors for invalid declaration reference
