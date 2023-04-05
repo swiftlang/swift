@@ -32,6 +32,9 @@
 
 namespace llvm {
 class FileCollectorBase;
+namespace vfs {
+class OutputBackend;
+}
 }
 
 namespace clang {
@@ -156,6 +159,7 @@ public:
   virtual bool tryEmitForwardingModule(StringRef moduleName,
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
+                               llvm::vfs::OutputBackend &backend,
                                StringRef outPath) = 0;
   virtual ~ModuleInterfaceChecker() = default;
 };

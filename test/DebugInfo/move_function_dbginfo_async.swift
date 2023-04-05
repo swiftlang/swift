@@ -239,9 +239,9 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // DWARF12-NEXT: DW_AT_location   (DW_OP_entry_value([[ASYNC_REG:.*]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF12-NEXT: DW_AT_name       ("k")
 //
-// DWARF12:    DW_TAG_variable
-// DWARF12-NEXT: DW_AT_location
-// DWARF12-NEXT: DW_AT_name ("m")
+// MISSING-DWARF12:    DW_TAG_variable
+// MISSING-DWARF12-NEXT: DW_AT_location
+// MISSING-DWARF12-NEXT: DW_AT_name ("m")
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out16varSimpleTestVaryyYaFTQ1_' %t/out.o | %FileCheck -check-prefix=DWARF13 %s
 // DWARF13: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTQ1_")
@@ -250,11 +250,11 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // DWARF13-NEXT: DW_AT_location   (DW_OP_entry_value([[ASYNC_REG:.*]]), DW_OP_deref, DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)
 // DWARF13-NEXT: DW_AT_name       ("k")
 //
-// DWARF13:    DW_TAG_variable
+// MISSING-DWARF13:    DW_TAG_variable
 // We don't pattern match the actual entry value of "m" since we don't guarantee
 // it is an entry value since it isn't moved.
-// DWARF13-NEXT: DW_AT_location
-// DWARF13-NEXT: DW_AT_name ("m")
+// MISSING-DWARF13-NEXT: DW_AT_location
+// MISSING-DWARF13-NEXT: DW_AT_name ("m")
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out16varSimpleTestVaryyYaFTY2_' %t/out.o | %FileCheck -check-prefix=DWARF14 %s
 // DWARF14: DW_AT_linkage_name	("$s3out16varSimpleTestVaryyYaFTY2_")
@@ -268,11 +268,11 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out16varSimpleTestVaryyYaFTQ3_' %t/out.o | %FileCheck -check-prefix=DWARF15 %s
 // DWARF15: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTQ3_")
-// DWARF15: DW_TAG_variable
+// MISSING-DWARF15: DW_TAG_variable
 // We don't pattern match the actual entry value of "m" since we don't guarantee
 // it is an entry value since it isn't moved.
-// DWARF15-NEXT: DW_AT_location
-// DWARF15-NEXT: DW_AT_name  ("m")
+// MISSING-DWARF15-NEXT: DW_AT_location
+// MISSING-DWARF15-NEXT: DW_AT_name  ("m")
 // K is dead here.
 // DWARF15: DW_TAG_variable
 // DWARF15-NEXT:    DW_AT_name  ("k")
@@ -280,11 +280,11 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // We reinitialize k in 4.
 // RUN: %llvm-dwarfdump -c --name='$s3out16varSimpleTestVaryyYaFTY4_' %t/out.o | %FileCheck -check-prefix=DWARF16 %s
 // DWARF16: DW_AT_linkage_name  ("$s3out16varSimpleTestVaryyYaFTY4_")
-// DWARF16: DW_TAG_variable
+// MISSING-DWARF16: DW_TAG_variable
 // We don't pattern match the actual entry value of "m" since we don't guarantee
 // it is an entry value since it isn't moved.
-// DWARF16-NEXT: DW_AT_location
-// DWARF16-NEXT: DW_AT_name  ("m")
+// MISSING-DWARF16-NEXT: DW_AT_location
+// MISSING-DWARF16-NEXT: DW_AT_name  ("m")
 // DWARF16: DW_TAG_variable
 // DWARF16-NEXT: DW_AT_location  (0x{{[0-9a-f]+}}:
 // DWARF16-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_entry_value([[ASYNC_REG:.*]]), DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8)

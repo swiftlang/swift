@@ -784,8 +784,8 @@ public:
   void deSerialize(StringRef Filename);
 
   // Serialize the content of all roots to a given file using JSON format.
-  void serialize(StringRef Filename);
-  static void serialize(StringRef Filename, SDKNode *Root, PayLoad otherInfo);
+  void serialize(llvm::raw_ostream &os);
+  static void serialize(llvm::raw_ostream &os, SDKNode *Root, PayLoad otherInfo);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -835,14 +835,15 @@ SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 
-void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
-void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
+void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, llvm::raw_ostream &os);
+void dumpSDKRoot(SDKNodeRoot *Root, llvm::raw_ostream &os);
 
 int dumpSDKContent(const CompilerInvocation &InitInvoke,
                    const llvm::StringSet<> &ModuleNames,
-                   StringRef OutputFile, CheckerOptions Opts);
+                   llvm::raw_ostream &os, CheckerOptions Opts);
 
-void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI, bool Empty);
+void dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os, bool ABI,
+                       bool Empty);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,

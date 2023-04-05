@@ -44,9 +44,9 @@ SILLocation::SILLocation(Pattern *P) : SILLocation(ASTNodeTy(P), RegularKind) {
     kindAndFlags.fields.implicit = true;
 }
 
-SILLocation::SILLocation(SourceLoc L, LocationKind K)
+SILLocation::SILLocation(SourceLoc L, LocationKind K, bool Implicit)
     : storage(L), kindAndFlags(K, SourceLocKind) {
-  kindAndFlags.fields.implicit = true;
+  kindAndFlags.fields.implicit = Implicit;
 }
 
 SILLocation::FilenameAndLocation *
@@ -216,7 +216,7 @@ static void printSourceLoc(SourceLoc loc, raw_ostream &OS) {
 
 void SILLocation::dump() const {
   if (isNull()) {
-    llvm::dbgs() << "<no loc>";
+    llvm::dbgs() << "<no loc>" << "\n";
     return;
   }
   if (auto D = getAsASTNode<Decl>())
@@ -242,8 +242,9 @@ void SILLocation::dump() const {
   if (hasASTNodeForDebugging()) {
     llvm::dbgs() << ":debug[";
     printSourceLoc(getSourceLocForDebugging(), llvm::dbgs());
-    llvm::dbgs() << "]\n";
+    llvm::dbgs() << "]";
   }
+  llvm::dbgs() << "\n";
 }
 
 void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
@@ -268,6 +269,11 @@ void SILLocation::print(raw_ostream &OS) const {
   }
 }
 
+RegularLocation::RegularLocation(Decl *D, SILLocation LocForDebugging,
+                                 SILModule &Module)
+    : SILLocation(new(Module) ExtendedASTNodeLoc(
+                      {D, 0}, LocForDebugging.getPrimaryASTNode()),
+                  RegularKind) {}
 RegularLocation::RegularLocation(Stmt *S, Pattern *P, SILModule &Module)
   : SILLocation(new(Module) ExtendedASTNodeLoc({S, 0}, {P, 0}), RegularKind) {}
 

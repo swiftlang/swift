@@ -190,7 +190,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   if (Instance.getASTContext()
           .getModuleInterfaceChecker()
           ->tryEmitForwardingModule(Invocation.getModuleName(), InterfacePath,
-                                    CompiledCandidates, OutputPath)) {
+                                    CompiledCandidates,
+                                    Instance.getOutputBackend(), OutputPath)) {
     return std::error_code();
   }
   FrontendOptions &FEOpts = Invocation.getFrontendOptions();

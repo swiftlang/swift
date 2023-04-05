@@ -28,6 +28,7 @@ namespace llvm {
   template<typename Fn> class function_ref;
   namespace vfs {
     class FileSystem;
+    class OutputBackend;
   }
 }
 
@@ -394,8 +395,7 @@ public:
   /// replica.
   ///
   /// \sa clang::GeneratePCHAction
-  bool emitBridgingPCH(StringRef headerPath,
-                       StringRef outputPCHPath);
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out

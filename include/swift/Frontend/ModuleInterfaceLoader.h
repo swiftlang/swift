@@ -447,6 +447,7 @@ public:
   bool tryEmitForwardingModule(StringRef moduleName,
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
+                               llvm::vfs::OutputBackend &backend,
                                StringRef outPath) override;
   bool isCached(StringRef DepPath);
 };
