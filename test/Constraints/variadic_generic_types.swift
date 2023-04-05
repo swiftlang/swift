@@ -22,5 +22,5 @@ func g<each T>(_: repeat each T) {
 
   _ = (repeat each Int).self
   // expected-error@-1 {{pack expansion 'Int' must contain at least one pack reference}}
-  // expected-error@-2 {{'each' cannot be applied to non-pack type 'Int'}}
+  // expected-error@-2 {{'each' cannot be applied to non-pack type 'Int'}}{{15-19=}}
 }
