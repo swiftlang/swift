@@ -438,9 +438,24 @@ enum class CxxCompatMode {
 static CxxCompatMode validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return CxxCompatMode::off;
+  if (mode == "default")
+    return CxxCompatMode::enabled;
+  // FIXME: Drop swift-5.9.
   if (mode == "swift-5.9")
     return CxxCompatMode::enabled;
   return CxxCompatMode::invalid;
+}
+
+static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
+                                         DiagnosticEngine &diags) {
+  // General invalid argument error
+  diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                 verArg->getAsString(Args), verArg->getValue());
+
+  // Note valid C++ interoperability modes.
+  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default")};
+  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
+  diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -940,10 +955,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
     Opts.EnableCXXInterop |= (interopCompatMode == CxxCompatMode::enabled);
 
-    if (interopCompatMode == CxxCompatMode::invalid) {
-      Diags.diagnose(SourceLoc(), diag::invalid_interop_compat_mode);
-      Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
-    }
+    if (interopCompatMode == CxxCompatMode::invalid)
+      diagnoseCxxInteropCompatMode(A, Args, Diags);
   }
   
   if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
