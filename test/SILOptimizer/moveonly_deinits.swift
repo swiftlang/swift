@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
 
 class Klass {}
 

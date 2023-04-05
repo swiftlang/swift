@@ -424,6 +424,8 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
       "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+ERROR(destructor_decl_on_noncopyable_enum,none,
+      "deinitializers are not yet supported on noncopyable enums", ())
 ERROR(destructor_decl_on_objc_enum,none,
       "deinitializers cannot be declared on an @objc enum type", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
