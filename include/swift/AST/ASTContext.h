@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -359,6 +360,8 @@ public:
   /// The Swift module currently being compiled.
   ModuleDecl *MainModule = nullptr;
 
+  /// The block list where we can find special actions based on module name;
+  BlockListStore blockListConfig;
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
