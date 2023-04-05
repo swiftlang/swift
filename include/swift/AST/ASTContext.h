@@ -891,8 +891,10 @@ public:
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
-  /// The the availability since when distributed actors are able to have custom executors.
-  AvailabilityContext getConcurrencyDistributedActorWithCustomExecutorAvailability();
+  /// The the availability since when distributed actors are able to have custom
+  /// executors.
+  AvailabilityContext
+  getConcurrencyDistributedActorWithCustomExecutorAvailability();
 
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
