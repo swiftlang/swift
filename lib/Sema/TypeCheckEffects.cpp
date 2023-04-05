@@ -413,6 +413,8 @@ public:
     } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
       if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
+    } else if (auto macroExpansionDecl = dyn_cast<MacroExpansionDecl>(D)) {
+      recurse = ShouldRecurse;
     } else {
       recurse = ShouldNotRecurse;
     }
@@ -444,6 +446,8 @@ public:
       recurse = asImpl().checkDeclRef(declRef);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
+    } else if (auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(E)) {
+      recurse = ShouldRecurse;
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was

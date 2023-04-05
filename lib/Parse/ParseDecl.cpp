@@ -2204,6 +2204,7 @@ static Optional<MacroRole> getMacroRole(
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
       .Case("declaration", MacroRole::Declaration)
       .Case("expression", MacroRole::Expression)
+      .Case("codeItem", MacroRole::CodeItem)
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttribute", MacroRole::MemberAttribute)
       .Case("member", MacroRole::Member)
