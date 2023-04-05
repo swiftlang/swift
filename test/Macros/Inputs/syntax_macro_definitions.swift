@@ -1290,3 +1290,26 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
     ]
   }
 }
+
+public struct AddClassReferencingSelfMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let protocolDecl = declaration.as(ProtocolDeclSyntax.self) else {
+      throw CustomError.message("Macro can only be applied to a protocol declarations.")
+    }
+
+    let className = "\(protocolDecl.identifier.text)Builder"
+    return [
+      """
+      struct \(raw: className) {
+       init(_ build: (_ builder: Self) -> Self) {
+         _ = build(self)
+       }
+      }
+      """
+    ]
+  }
+}
