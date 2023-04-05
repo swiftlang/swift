@@ -3328,7 +3328,7 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
 static void
 suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressingFreestandingExpression = true;
   action();
 }
@@ -3336,7 +3336,7 @@ suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressNoAsyncAvailabilityAttr = true;
   action();
 }
@@ -3347,6 +3347,43 @@ static bool usesFeatureReferenceBindings(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinModule(Decl *decl) {
+  return false;
+}
+
+static bool hasParameterPacks(Decl *decl) {
+  if (auto genericContext = decl->getAsGenericContext()) {
+    auto sig = genericContext->getGenericSignature();
+    if (llvm::any_of(
+          sig.getGenericParams(),
+          [&](const GenericTypeParamType *GP) { return GP->isParameterPack(); })) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// A declaration needs the $ParameterPacks feature if it declares a
+/// generic parameter pack, or if its type references a generic nominal
+/// or type alias which declares a generic parameter pack.
+static bool usesFeatureParameterPacks(Decl *decl) {
+  if (hasParameterPacks(decl))
+    return true;
+
+  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (valueDecl->getInterfaceType().findIf(
+        [&](Type t) {
+          if (auto *alias = dyn_cast<TypeAliasType>(t.getPointer()))
+            return hasParameterPacks(alias->getDecl());
+          if (auto *nominal = t->getAnyNominal())
+            return hasParameterPacks(nominal);
+
+          return false;
+        })) {
+      return true;
+    }
+  }
+
   return false;
 }
 
