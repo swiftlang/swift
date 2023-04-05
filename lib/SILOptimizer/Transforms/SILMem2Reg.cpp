@@ -374,6 +374,189 @@ static void collectLoads(SILInstruction *i,
   }
 }
 
+/// Returns true if \p I is an address of a LoadInst, skipping struct and
+/// tuple address projections. Sets \p singleBlock to null if the load (or
+/// it's address is not in \p singleBlock.
+/// This function looks for these patterns:
+/// 1. (load %ASI)
+/// 2. (load (struct_element_addr/tuple_element_addr/unchecked_addr_cast %ASI))
+static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
+                             bool &involvesUntakableProjection) {
+  if (auto *li = dyn_cast<LoadInst>(load)) {
+    // SILMem2Reg is disabled when we find a load [take] of an untakable
+    // projection.  See below for further discussion.
+    if (involvesUntakableProjection &&
+        li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      return false;
+    }
+    return true;
+  }
+
+  if (isa<LoadBorrowInst>(load)) {
+    if (involvesUntakableProjection) {
+      return false;
+    }
+    return true;
+  }
+
+  if (!isa<UncheckedAddrCastInst>(load) && !isa<StructElementAddrInst>(load) &&
+      !isa<TupleElementAddrInst>(load))
+    return false;
+
+  // None of the projections are lowered to owned values:
+  //
+  // struct_element_addr and tuple_element_addr instructions are lowered to
+  // struct_extract and tuple_extract instructions respectively.  These both
+  // have guaranteed ownership (since they forward ownership and can only be
+  // used on a guaranteed value).
+  //
+  // unchecked_addr_cast instructions are lowered to unchecked_bitwise_cast
+  // instructions.  These have unowned ownership.
+  //
+  // So in no case can a load [take] be lowered into the new projected value
+  // (some sequence of struct_extract, tuple_extract, and
+  // unchecked_bitwise_cast instructions) taking over ownership of the original
+  // value.  Without additional changes.
+  //
+  // For example, for a sequence of element_addr projections could be
+  // transformed into a sequence of destructure instructions, followed by a
+  // sequence of structure instructions where all the original values are
+  // kept in place but the taken value is "knocked out" and replaced with
+  // undef.  The running value would then be set to the newly structed
+  // "knockout" value.
+  //
+  // Alternatively, a new copy of the running value could be created and a new
+  // set of destroys placed after its last uses.
+  involvesUntakableProjection = true;
+
+  // Recursively search for other (non-)loads in the instruction's uses.
+  auto *svi = cast<SingleValueInstruction>(load);
+  for (auto *use : svi->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (user->getParent() != singleBlock)
+      singleBlock = nullptr;
+
+    if (!isAddressForLoad(user, singleBlock, involvesUntakableProjection))
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
+static bool isDeadAddrProjection(SILInstruction *inst) {
+  if (!isa<UncheckedAddrCastInst>(inst) && !isa<StructElementAddrInst>(inst) &&
+      !isa<TupleElementAddrInst>(inst))
+    return false;
+
+  // Recursively search for uses which are dead themselves.
+  for (auto UI : cast<SingleValueInstruction>(inst)->getUses()) {
+    SILInstruction *II = UI->getUser();
+    if (!isDeadAddrProjection(II))
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if this \p def is captured.
+/// Sets \p inSingleBlock to true if all uses of \p def are in a single block.
+static bool isCaptured(SILValue def, bool *inSingleBlock) {
+  SILBasicBlock *singleBlock = def->getParentBlock();
+
+  // For all users of the def
+  for (auto *use : def->getUses()) {
+    SILInstruction *user = use->getUser();
+
+    if (user->getParent() != singleBlock)
+      singleBlock = nullptr;
+
+    // Loads are okay.
+    bool involvesUntakableProjection = false;
+    if (isAddressForLoad(user, singleBlock, involvesUntakableProjection))
+      continue;
+
+    // We can store into an AllocStack (but not the pointer).
+    if (auto *si = dyn_cast<StoreInst>(user))
+      if (si->getDest() == def)
+        continue;
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
+      if (sbi->getDest() == def) {
+        if (isCaptured(sbi, inSingleBlock)) {
+          return true;
+        }
+        continue;
+      }
+    }
+
+    // Deallocation is also okay, as are DebugValue w/ address value. We will
+    // promote the latter into normal DebugValue.
+    if (isa<DeallocStackInst>(user) || DebugValueInst::hasAddrVal(user))
+      continue;
+
+    if (isa<EndBorrowInst>(user))
+      continue;
+
+    // Destroys of loadable types can be rewritten as releases, so
+    // they are fine.
+    if (auto *dai = dyn_cast<DestroyAddrInst>(user))
+      if (dai->getOperand()->getType().isLoadable(*dai->getFunction()))
+        continue;
+
+    // Other instructions are assumed to capture the AllocStack.
+    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *user);
+    return true;
+  }
+
+  // None of the users capture the AllocStack.
+  *inSingleBlock = (singleBlock != nullptr);
+  return false;
+}
+
+/// Returns true if the \p def is only stored into.
+static bool isWriteOnlyAllocation(SILValue def) {
+  assert(isa<AllocStackInst>(def) || isa<StoreBorrowInst>(def));
+
+  // For all users of the def:
+  for (auto *use : def->getUses()) {
+    SILInstruction *user = use->getUser();
+
+    // It is okay to store into the AllocStack.
+    if (auto *si = dyn_cast<StoreInst>(user))
+      if (!isa<AllocStackInst>(si->getSrc()))
+        continue;
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
+      // Since all uses of the alloc_stack will be via store_borrow, check if
+      // there are any non-writes from the store_borrow location.
+      if (!isWriteOnlyAllocation(sbi)) {
+        return false;
+      }
+      continue;
+    }
+
+    // Deallocation is also okay.
+    if (isa<DeallocStackInst>(user))
+      continue;
+
+    if (isa<EndBorrowInst>(user))
+      continue;
+
+    // If we haven't already promoted the AllocStack, we may see
+    // DebugValue uses.
+    if (DebugValueInst::hasAddrVal(user))
+      continue;
+
+    if (isDeadAddrProjection(user))
+      continue;
+
+    // Can't do anything else with it.
+    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *user);
+    return false;
+  }
+
+  return true;
+}
+
 static void
 replaceLoad(SILInstruction *inst, SILValue newValue, AllocStackInst *asi,
             SILBuilderContext &ctx, InstructionDeleter &deleter,
@@ -1664,9 +1847,6 @@ class MemoryToRegisters {
     return *domTreeLevels;
   }
 
-  /// Check if \p def is a write-only allocation.
-  bool isWriteOnlyAllocation(SILValue def);
-
   /// Promote all of the AllocStacks in a single basic block in one
   /// linear scan. Note: This function deletes all of the users of the
   /// AllocStackInst, including the DeallocStackInst but it does not remove the
@@ -1688,189 +1868,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Returns true if \p I is an address of a LoadInst, skipping struct and
-/// tuple address projections. Sets \p singleBlock to null if the load (or
-/// it's address is not in \p singleBlock.
-/// This function looks for these patterns:
-/// 1. (load %ASI)
-/// 2. (load (struct_element_addr/tuple_element_addr/unchecked_addr_cast %ASI))
-static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
-                             bool &involvesUntakableProjection) {
-  if (auto *li = dyn_cast<LoadInst>(load)) {
-    // SILMem2Reg is disabled when we find a load [take] of an untakable
-    // projection.  See below for further discussion.
-    if (involvesUntakableProjection &&
-        li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-      return false;
-    }
-    return true;
-  }
-
-  if (isa<LoadBorrowInst>(load)) {
-    if (involvesUntakableProjection) {
-      return false;
-    }
-    return true;
-  }
-
-  if (!isa<UncheckedAddrCastInst>(load) && !isa<StructElementAddrInst>(load) &&
-      !isa<TupleElementAddrInst>(load))
-    return false;
-
-  // None of the projections are lowered to owned values:
-  //
-  // struct_element_addr and tuple_element_addr instructions are lowered to
-  // struct_extract and tuple_extract instructions respectively.  These both
-  // have guaranteed ownership (since they forward ownership and can only be
-  // used on a guaranteed value).
-  //
-  // unchecked_addr_cast instructions are lowered to unchecked_bitwise_cast
-  // instructions.  These have unowned ownership.
-  //
-  // So in no case can a load [take] be lowered into the new projected value
-  // (some sequence of struct_extract, tuple_extract, and
-  // unchecked_bitwise_cast instructions) taking over ownership of the original
-  // value.  Without additional changes.
-  //
-  // For example, for a sequence of element_addr projections could be
-  // transformed into a sequence of destructure instructions, followed by a
-  // sequence of structure instructions where all the original values are
-  // kept in place but the taken value is "knocked out" and replaced with
-  // undef.  The running value would then be set to the newly structed
-  // "knockout" value.
-  //
-  // Alternatively, a new copy of the running value could be created and a new
-  // set of destroys placed after its last uses.
-  involvesUntakableProjection = true;
-
-  // Recursively search for other (non-)loads in the instruction's uses.
-  auto *svi = cast<SingleValueInstruction>(load);
-  for (auto *use : svi->getUses()) {
-    SILInstruction *user = use->getUser();
-    if (user->getParent() != singleBlock)
-      singleBlock = nullptr;
-
-    if (!isAddressForLoad(user, singleBlock, involvesUntakableProjection))
-      return false;
-  }
-  return true;
-}
-
-/// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
-static bool isDeadAddrProjection(SILInstruction *inst) {
-  if (!isa<UncheckedAddrCastInst>(inst) && !isa<StructElementAddrInst>(inst) &&
-      !isa<TupleElementAddrInst>(inst))
-    return false;
-
-  // Recursively search for uses which are dead themselves.
-  for (auto UI : cast<SingleValueInstruction>(inst)->getUses()) {
-    SILInstruction *II = UI->getUser();
-    if (!isDeadAddrProjection(II))
-      return false;
-  }
-  return true;
-}
-
-/// Returns true if this \p def is captured.
-/// Sets \p inSingleBlock to true if all uses of \p def are in a single block.
-static bool isCaptured(SILValue def, bool *inSingleBlock) {
-  SILBasicBlock *singleBlock = def->getParentBlock();
-
-  // For all users of the def
-  for (auto *use : def->getUses()) {
-    SILInstruction *user = use->getUser();
-
-    if (user->getParent() != singleBlock)
-      singleBlock = nullptr;
-
-    // Loads are okay.
-    bool involvesUntakableProjection = false;
-    if (isAddressForLoad(user, singleBlock, involvesUntakableProjection))
-      continue;
-
-    // We can store into an AllocStack (but not the pointer).
-    if (auto *si = dyn_cast<StoreInst>(user))
-      if (si->getDest() == def)
-        continue;
-
-    if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
-      if (sbi->getDest() == def) {
-        if (isCaptured(sbi, inSingleBlock)) {
-          return true;
-        }
-        continue;
-      }
-    }
-
-    // Deallocation is also okay, as are DebugValue w/ address value. We will
-    // promote the latter into normal DebugValue.
-    if (isa<DeallocStackInst>(user) || DebugValueInst::hasAddrVal(user))
-      continue;
-
-    if (isa<EndBorrowInst>(user))
-      continue;
-
-    // Destroys of loadable types can be rewritten as releases, so
-    // they are fine.
-    if (auto *dai = dyn_cast<DestroyAddrInst>(user))
-      if (dai->getOperand()->getType().isLoadable(*dai->getFunction()))
-        continue;
-
-    // Other instructions are assumed to capture the AllocStack.
-    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *user);
-    return true;
-  }
-
-  // None of the users capture the AllocStack.
-  *inSingleBlock = (singleBlock != nullptr);
-  return false;
-}
-
-/// Returns true if the \p def is only stored into.
-bool MemoryToRegisters::isWriteOnlyAllocation(SILValue def) {
-  assert(isa<AllocStackInst>(def) || isa<StoreBorrowInst>(def));
-
-  // For all users of the def:
-  for (auto *use : def->getUses()) {
-    SILInstruction *user = use->getUser();
-
-    // It is okay to store into the AllocStack.
-    if (auto *si = dyn_cast<StoreInst>(user))
-      if (!isa<AllocStackInst>(si->getSrc()))
-        continue;
-
-    if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
-      // Since all uses of the alloc_stack will be via store_borrow, check if
-      // there are any non-writes from the store_borrow location.
-      if (!isWriteOnlyAllocation(sbi)) {
-        return false;
-      }
-      continue;
-    }
-
-    // Deallocation is also okay.
-    if (isa<DeallocStackInst>(user))
-      continue;
-
-    if (isa<EndBorrowInst>(user))
-      continue;
-
-    // If we haven't already promoted the AllocStack, we may see
-    // DebugValue uses.
-    if (DebugValueInst::hasAddrVal(user))
-      continue;
-
-    if (isDeadAddrProjection(user))
-      continue;
-
-    // Can't do anything else with it.
-    LLVM_DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *user);
-    return false;
-  }
-
-  return true;
-}
 
 void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting in-block: " << *asi);
