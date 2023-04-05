@@ -102,11 +102,19 @@ func testFileID(a: Int, b: Int) {
   // CHECK-SIL: sil_scope [[EXPANSION_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]:22 parent [[SRC_SCOPE]]
   // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":[[@LINE-3]]:22 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} inlined_at [[EXPANSION_SCOPE]] }
   // CHECK-SIL: string_literal utf8 "MacroUser/macro_expand.swift", loc "@__swiftmacro_9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_.swift":1:1, scope [[MACRO_SCOPE]]
-  // CHECK-IR: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
+  // CHECK-IR-DAG: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
 
   // CHECK: Builtin result is MacroUser/macro_expand.swift
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
+  print(
+    /// CHECK-IR-DAG: ![[L1:[0-9]+]] = !DILocation(line: [[@LINE+1]], column: 5
+    #addBlocker(
+      /// CHECK-IR-DAG: ![[L2:[0-9]+]] = !DILocation({{.*}}inlinedAt: ![[L1]])
+      /// CHECK-IR-DAG: ![[L3:[0-9]+]] = !DILocation({{.*}}inlinedAt: ![[L2]])
+      #stringify(a - b)
+      )
+    )
 }
 
 testFileID(a: 1, b: 2)
