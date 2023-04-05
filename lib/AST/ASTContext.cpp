@@ -707,6 +707,10 @@ ASTContext::ASTContext(
   registerNameLookupRequestFunctions(evaluator);
 
   createModuleToExecutablePluginMap();
+  // Insert all block list config paths.
+  for (auto path: langOpts.BlocklistConfigFilePath) {
+    blockListConfig.addConfigureFilePath(path);
+  }
 }
 
 ASTContext::~ASTContext() {

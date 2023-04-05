@@ -240,6 +240,9 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
