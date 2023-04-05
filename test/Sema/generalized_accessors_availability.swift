@@ -136,7 +136,10 @@ func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unav
 extension Butt {
   struct NestedInSPIAvailableExtension {
     @available(macOS, unavailable)
-    public var unavailable: Int // expected-note {{'unavailable' has been explicitly marked unavailable here}}
+    public var unavailable: Int {// expected-note {{'unavailable' has been explicitly marked unavailable here}}
+      get { 0 }
+      set {}
+    }
   }
 }
 

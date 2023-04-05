@@ -4521,6 +4521,24 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     return diag::availability_deinit_no_unavailable;
   }
 
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (!VD->hasStorageOrWrapsStorage())
+      return None;
+
+    if (parentIsUnavailable(D))
+      return None;
+
+    // Do not permit unavailable script-mode global variables; their initializer
+    // expression is not lazily evaluated, so this would not be safe.
+    if (VD->isTopLevelGlobal())
+      return diag::availability_global_script_no_unavailable;
+
+    // Globals and statics are lazily initialized, so they are safe for
+    // unavailability.
+    if (!VD->isStatic() && !D->getDeclContext()->isModuleScopeContext())
+      return diag::availability_stored_property_no_unavailable;
+  }
+
   return None;
 }
 
