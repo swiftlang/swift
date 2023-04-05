@@ -694,6 +694,10 @@ ASTContext::ASTContext(
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
+  // Insert all block list config paths.
+  for (auto path: langOpts.BlocklistConfigFilePath) {
+    blockListConfig.addConfigureFilePath(path);
+  }
 }
 
 ASTContext::~ASTContext() {
