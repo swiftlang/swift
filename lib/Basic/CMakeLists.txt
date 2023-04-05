@@ -78,6 +78,7 @@ add_swift_host_library(swiftBasic STATIC
   Unicode.cpp
   UUID.cpp
   Version.cpp
+  BlockList.cpp
 
   ${llvm_revision_inc}
   ${clang_revision_inc}
