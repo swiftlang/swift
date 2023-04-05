@@ -4,6 +4,28 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.9
 
+* Marking stored properties as unavailable with `@available` has been banned,
+  closing an unintentional soundness hole that had allowed arbitrary
+  unavailable code to run and unavailable type metadata to be used at runtime:
+  
+  ```swift
+  @available(*, unavailable)
+  struct Unavailable {
+    init() {
+      print("Unavailable.init()")
+    }
+  }
+
+  struct S {
+    @available(*, unavailable)
+    var x = Unavailable()
+  }
+
+  _ = S() // prints "Unavailable.init()"
+  ```
+  
+  Marking `deinit` as unavailable has also been banned for similar reasons.
+
 * [SE-0366][]:
 
   The lifetime of a local variable value can be explicitly ended using the

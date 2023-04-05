@@ -191,15 +191,6 @@ SymbolGraph::isRequirementOrDefaultImplementation(const ValueDecl *VD) const {
 // MARK: - Symbols (Nodes)
 
 void SymbolGraph::recordNode(Symbol S) {
-  if (Walker.Options.SkipProtocolImplementations && S.getInheritedDecl()) {
-    const auto *DocCommentProvidingDecl =
-      getDocCommentProvidingDecl(S.getLocalSymbolDecl(), /*AllowSerialized=*/true);
-
-    // allow implementation symbols to remain if they have their own comment
-    if (DocCommentProvidingDecl != S.getLocalSymbolDecl())
-      return;
-  }
-
   Nodes.insert(S);
 
   // Record all of the possible relationships (edges) originating
@@ -637,6 +628,19 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
+namespace {
+
+const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
+  auto reqs = VD->getSatisfiedProtocolRequirements();
+
+  if (!reqs.empty())
+    return reqs.front();
+  else
+    return nullptr;
+}
+
+}
+
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -697,6 +701,15 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // If we've been asked to skip protocol implementations, filter them out here.
+    if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
+      // Allow them to stay if they have their own doc comment
+      const auto *DocCommentProvidingDecl =
+        getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true);
+      if (DocCommentProvidingDecl != VD)
+        return true;
+    }
 
     // Symbols from exported-imported modules should only be included if they
     // were originally public.

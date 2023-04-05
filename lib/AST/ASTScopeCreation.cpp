@@ -261,6 +261,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
+    case MacroRole::CodeItem:
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
     case MacroRole::Conformance:
@@ -269,7 +270,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Peer: {
       ASTContext &ctx = SF->getASTContext();
       SourceManager &sourceMgr = ctx.SourceMgr;
-      const auto &generatedSourceInfo =
+      auto generatedSourceInfo =
           *sourceMgr.getGeneratedSourceInfo(*SF->getBufferID());
 
       ASTNode node = ASTNode::getFromOpaqueValue(generatedSourceInfo.astNode);

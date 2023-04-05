@@ -60,8 +60,9 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        return a*b
      } else {
        // CHECK-DAG: ![[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]]
+       // CHECK-DAG: ![[VARSCOPE:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE+1]]
        var c: Int64 = 42
-       // CHECK-DAG: ![[CONDITION:[0-9]+]] = distinct !DILexicalBlock(scope: ![[PARENT]], {{.*}}, line: [[@LINE+1]]
+       // CHECK-DAG: ![[CONDITION:[0-9]+]] = distinct !DILexicalBlock(scope: ![[VARSCOPE]], {{.*}}, line: [[@LINE+1]]
        if a == 0 {
          // CHECK-DAG: !DILexicalBlock(scope: ![[CONDITION]], {{.*}}, line: [[@LINE-1]]
          // What about a nested scope?

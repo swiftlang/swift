@@ -507,22 +507,20 @@ bb0(%0 : @guaranteed $C):
 // CHECK-LABEL: begin running test 1 of 1 on testMultiDefUseAddressReinit
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def instruction:   store %{{.*}} to [init] [[ADR:%.*]] : $*C
-// CHECK:   def instruction:   destroy_addr [[ADR]] : $*C
-// CHECK: bb0: LiveWithin
+// CHECK:   def instruction:   store %0 to [init] [[ADR]] : $*C
+// CHECK: bb0: LiveOut
 // CHECK: bb1: LiveWithin
 // CHECK: regular user: %{{.*}} = load [copy] [[ADR]] : $*C
 // CHECK: last user:    %{{.*}} = load [copy] [[ADR]] : $*C
-//
-// FIXME: This store is not really a dead def!
-// CHECK: dead def:   store %2 to [init] %1 : $*C
-// CHECK: dead def:   destroy_addr %1 : $*C
+// CHECK: boundary edge: bb2
+// CHECK: dead def:   store %0 to [init] %1 : $*C
 // CHECK-LABEL: end running test 1 of 1 on testMultiDefUseAddressReinit
 sil [ossa] @testMultiDefUseAddressReinit : $@convention(thin) (@owned C) -> () {
 bb0(%0: @owned $C):
   %1 = alloc_stack $C
   %2 = copy_value %0 : $C
   test_specification """
-                     multidefuse-liveness defs: @instruction @block[1].instruction[1]
+                     multidefuse-liveness defs: @instruction @block[1].instruction[2]
                      uses: @block[1].instruction[0]
                      """
   store %2 to [init] %1 : $*C

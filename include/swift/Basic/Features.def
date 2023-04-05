@@ -100,6 +100,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(
         hasSwiftSwiftParser)
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
+LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -112,6 +113,7 @@ EXPERIMENTAL_FEATURE(VariadicGenerics, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(FreestandingMacros, true)
+EXPERIMENTAL_FEATURE(CodeItemMacros, true)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those

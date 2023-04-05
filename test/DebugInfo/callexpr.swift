@@ -19,8 +19,10 @@ markUsed(r)
 struct MyType {}
 func bar(x: MyType = MyType()) {}
 
+// Room for improvement:
+// Because the default argument is implicit it inherits the previous source location.
 // CHECK2: call {{.*}}MyType{{.*}}, !dbg ![[DEFAULTARG:.*]]
 // CHECK2: call {{.*}}bar{{.*}}, !dbg ![[BARCALL:.*]]
-bar() // CHECK2: ![[DEFAULTARG]] = !DILocation(line: [[@LINE]], column: 4
+bar() // CHECK2: ![[DEFAULTARG]] = !DILocation(line: [[@LINE-9]]
       // CHECK2: ![[BARCALL]] = !DILocation(line: [[@LINE-1]], column: 1
 

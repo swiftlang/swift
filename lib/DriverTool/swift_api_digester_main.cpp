@@ -36,6 +36,9 @@
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Support/VirtualOutputBackends.h"
+#include "llvm/Support/raw_ostream.h"
 #include <functional>
 
 using namespace swift;
@@ -2536,13 +2539,18 @@ public:
     switch (Action) {
     case ActionType::DumpSDK: {
       llvm::StringSet<> Modules;
-      return (prepareForDump(InitInvoke, Modules))
-                 ? 1
-                 : dumpSDKContent(InitInvoke, Modules,
-                                  getJsonOutputFilePath(
-                                      InitInvoke.getLangOptions().Target,
-                                      CheckerOpts.ABI, OutputFile, OutputDir),
-                                  CheckerOpts);
+      if (prepareForDump(InitInvoke, Modules))
+        return 1;
+      auto JsonOut =
+          getJsonOutputFilePath(InitInvoke.getLangOptions().Target,
+                                CheckerOpts.ABI, OutputFile, OutputDir);
+      std::error_code EC;
+      llvm::raw_fd_ostream fs(JsonOut, EC);
+      if (EC) {
+        llvm::errs() << "Cannot open JSON output file: " << JsonOut << "\n";
+        return 1;
+      }
+      return dumpSDKContent(InitInvoke, Modules, fs, CheckerOpts);
     }
     case ActionType::MigratorGen:
     case ActionType::DiagnoseSDKs: {
@@ -2606,7 +2614,13 @@ public:
     }
     case ActionType::GenerateEmptyBaseline: {
       SDKContext Ctx(CheckerOpts);
-      dumpSDKRoot(getEmptySDKNodeRoot(Ctx), OutputFile);
+      std::error_code EC;
+      llvm::raw_fd_ostream fs(OutputFile, EC);
+      if (EC) {
+        llvm::errs() << "Cannot open output file: " << OutputFile << "\n";
+        return 1;
+      }
+      dumpSDKRoot(getEmptySDKNodeRoot(Ctx), fs);
       return 0;
     }
     case ActionType::FindUsr: {

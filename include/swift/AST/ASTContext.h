@@ -45,6 +45,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -232,6 +233,7 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
 
 public:
@@ -249,6 +251,7 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
   ~ASTContext();
 
@@ -281,6 +284,9 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  /// OutputBackend for writing outputs.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -894,8 +900,10 @@ public:
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
-  /// The the availability since when distributed actors are able to have custom executors.
-  AvailabilityContext getConcurrencyDistributedActorWithCustomExecutorAvailability();
+  /// The the availability since when distributed actors are able to have custom
+  /// executors.
+  AvailabilityContext
+  getConcurrencyDistributedActorWithCustomExecutorAvailability();
 
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
@@ -1518,6 +1526,18 @@ public:
   void setPluginRegistry(PluginRegistry *newValue);
 
   const llvm::StringSet<> &getLoadedPluginLibraryPaths() const;
+
+  /// Get the output backend. The output backend needs to be initialized via
+  /// constructor or `setOutputBackend`.
+  llvm::vfs::OutputBackend &getOutputBackend() const {
+    assert(OutputBackend && "OutputBackend is not setup");
+    return *OutputBackend;
+  }
+  /// Set output backend for virtualized outputs.
+  void setOutputBackend(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend) {
+    OutputBackend = std::move(OutBackend);
+  }
 
 private:
   friend Decl;

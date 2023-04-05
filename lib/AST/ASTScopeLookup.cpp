@@ -160,7 +160,8 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
 
             auto generatedInfo =
                 sourceMgr.getGeneratedSourceInfo(*potentialLCA->getBufferID());
-            expansionLoc = generatedInfo->originalSourceRange.getStart();
+            if (generatedInfo)
+              expansionLoc = generatedInfo->originalSourceRange.getStart();
             potentialLCA = potentialLCA->getEnclosingSourceFile();
           }
         }

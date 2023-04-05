@@ -20,7 +20,7 @@ public func copyAssign() {
 // CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE:.*]])
 // CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE2:.*]])
 // CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(%struct.NonTrivialCopyAndCopyMoveAssign* %[[COPY_INSTANCE]])
-// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_Tm|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@AEBU0@@Z"}}(%struct.NonTrivialCopyAndCopyMoveAssign*
+// CHECK: call {{void|\%struct.NonTrivialCopyAndCopyMoveAssign\*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1EOS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2EOS_|_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS_Tm|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_Tm|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@AEBU0@@Z"}}(
 // CHECK-SAME: %[[COPY_INSTANCE]],
 // CHECK-SAME: %struct.NonTrivialCopyAndCopyMoveAssign*
 // CHECK-SAME: %[[COPY_INSTANCE2]])

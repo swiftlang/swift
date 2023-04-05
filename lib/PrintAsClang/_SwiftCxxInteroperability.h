@@ -30,16 +30,19 @@
 
 #if __has_attribute(transparent_stepping)
 #define SWIFT_INLINE_THUNK_ATTRIBUTES                                          \
-  __attribute__((transparent_stepping)) 
+  __attribute__((transparent_stepping))
+#elif __has_attribute(always_inline) && __has_attribute(nodebug)
+ #define SWIFT_INLINE_THUNK_ATTRIBUTES                                          \
+   __attribute__((always_inline)) __attribute__((nodebug))
+#else
+#define SWIFT_INLINE_THUNK_ATTRIBUTES
+#endif
+
 #if defined(DEBUG) && __has_attribute(used)
 // Additional 'used' attribute is used in debug mode to make inline thunks
 // accessible to LLDB.
 #define SWIFT_INLINE_THUNK_USED_ATTRIBUTE __attribute__((used))
 #else
-#define SWIFT_INLINE_THUNK_USED_ATTRIBUTE
-#endif
-#else
-#define SWIFT_INLINE_THUNK_ATTRIBUTES
 #define SWIFT_INLINE_THUNK_USED_ATTRIBUTE
 #endif
 

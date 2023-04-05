@@ -5394,8 +5394,8 @@ namespace {
           }
         }
         // For a non-expression macro, expand it as a declaration.
-        else if (macro->getMacroRoles().contains(MacroRole::Declaration)) {
-          auto &ctx = cs.getASTContext();
+        else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
+                 macro->getMacroRoles().contains(MacroRole::CodeItem)) {
           if (!E->getSubstituteDecl()) {
             auto *med = E->createSubstituteDecl();
             TypeChecker::typeCheckDecl(med);

@@ -20,6 +20,7 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 
 #include <sstream>
 
@@ -187,8 +188,9 @@ void DependencyScanningTool::serializeCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
+  llvm::vfs::OnDiskOutputBackend Backend;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, path, *ScanningService);
+      Diags, Backend, path, *ScanningService);
 }
 
 bool DependencyScanningTool::loadCache(llvm::StringRef path) {

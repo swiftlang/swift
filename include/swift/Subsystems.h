@@ -35,6 +35,9 @@ namespace llvm {
   class Module;
   class TargetOptions;
   class TargetMachine;
+  namespace vfs {
+    class OutputBackend;
+  }
 }
 
 namespace swift {
@@ -276,6 +279,7 @@ namespace swift {
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
   /// \param OutputFilename Filename for output.
+  /// \param Backend OutputBackend for writing output.
   bool performLLVM(const IRGenOptions &Opts,
                    DiagnosticEngine &Diags,
                    llvm::sys::Mutex *DiagMutex,
@@ -283,6 +287,7 @@ namespace swift {
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
                    StringRef OutputFilename,
+                   llvm::vfs::OutputBackend &Backend,
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.

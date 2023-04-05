@@ -2034,7 +2034,6 @@ bool swift::writeEmptyOutputFilesFor(
   const ASTContext &Context,
   std::vector<std::string>& ParallelOutputFilenames,
   const IRGenOptions &IRGenOpts) {
-
   for (auto fileName : ParallelOutputFilenames) {
     // The first output file, was use for genuine output.
     if (fileName == ParallelOutputFilenames[0])

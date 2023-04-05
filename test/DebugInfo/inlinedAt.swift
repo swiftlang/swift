@@ -42,10 +42,9 @@ public func f(_ i : Int) -> Int { // 301
 
 // CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 10,
 // CHECK-SAME:                     scope: ![[F:.*]])
-// CHECK: ![[G1:[0-9]+]] = distinct !DILexicalBlock(scope: ![[G]],
 // CHECK: ![[H:.*]] = distinct !DISubprogram(name: "h",
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 203, column: 10, scope: ![[G1]],
+// CHECK: ![[L2]] = !DILocation(line: 203, column: 10, scope: ![[G]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
 

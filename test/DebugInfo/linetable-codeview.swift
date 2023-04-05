@@ -73,7 +73,7 @@ func foo() {
   // CHECK: call void @llvm.dbg.declare(metadata %TSa* %[[MYARRAY]],
   // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
   // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
-  // CHECK-SAME: !dbg ![[ARRAY]]
+  // CHECK-SAME: !dbg ![[ARRAY_ALLOC:[0-9]+]]
   // CHECK: ret void
 
 // CHECK-DAG: ![[ADD]] = !DILocation(line: 6, scope:
@@ -94,3 +94,4 @@ func foo() {
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:
 // CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 27, scope:
 // CHECK-DAG: ![[ARRAY]] = !DILocation(line: 31, scope:
+// CHECK-DAG: ![[ARRAY_ALLOC]] = !DILocation(line: 31, scope:

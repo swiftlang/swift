@@ -13,6 +13,8 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "SILDebugVariable.h"
+#include "SILInstruction.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -22,6 +24,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
+#include <type_traits>
 
 namespace swift {
 
@@ -168,26 +171,32 @@ public:
   /// location.
   ///
   /// SILBuilderContext must outlive this SILBuilder instance.
-  SILBuilder(SILInstruction *I, const SILDebugScope *DS, SILBuilderContext &C)
+  SILBuilder(SILInstruction *I, SILBuilderContext &C,
+             const SILDebugScope *DS = nullptr)
       : TempContext(C.getModule()), C(C), F(I->getFunction()) {
-    assert(DS && "instruction has no debug scope");
-    setCurrentDebugScope(DS);
     setInsertionPoint(I);
+    if (DS)
+      setCurrentDebugScope(DS);
   }
 
-  SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilder &B)
-      : SILBuilder(BB, DS, B.getBuilderContext()) {}
+  SILBuilder(SILBasicBlock *BB, SILBuilder &B,
+             const SILDebugScope *DS = nullptr)
+      : SILBuilder(BB, B.getBuilderContext(), DS) {}
 
   /// Build instructions before the given insertion point, inheriting the debug
   /// location.
   ///
   /// SILBuilderContext must outlive this SILBuilder instance.
-  SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilderContext &C)
+  SILBuilder(SILBasicBlock *BB, SILBuilderContext &C,
+             const SILDebugScope *DS = nullptr)
       : TempContext(C.getModule()), C(C), F(BB->getParent()) {
     assert(DS && "block has no debug scope");
-    setCurrentDebugScope(DS);
     setInsertionPoint(BB);
+    if (DS)
+      setCurrentDebugScope(DS);
   }
+
+  virtual ~SILBuilder() {}
 
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
@@ -238,7 +247,8 @@ public:
   }
 
   /// Convenience function for building a SILDebugLocation.
-  SILDebugLocation getSILDebugLocation(SILLocation Loc) {
+  virtual SILDebugLocation
+  getSILDebugLocation(SILLocation Loc, bool ForMetaInstruction = false) {
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
     auto Scope = getCurrentDebugScope();
@@ -247,6 +257,17 @@ public:
     auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
     return SILDebugLocation(overriddenLoc, Scope);
   }
+
+  /// When the frontend generates synthesized conformances it generates a
+  /// fully-typechecked AST without source locations. This means that the
+  /// ASTScope-based mechanism to generate SILDebugScopes doesn't work, which
+  /// means we can't disambiguate local variables in different lexical
+  /// scopes. To avoid a verification error later in the pipeline, drop all
+  /// variables without a proper source location.
+  bool shouldDropVariable(SILDebugVariable Var, SILLocation Loc) {
+    return !Var.ArgNo && Loc.isSynthesizedAST();
+  }
+
 
   /// If we have a SILFunction, return SILFunction::hasOwnership(). If we have a
   /// SILGlobalVariable, just return false.
@@ -369,7 +390,7 @@ public:
   SILBasicBlock *createFallthroughBlock(SILLocation loc,
                                         SILBasicBlock *targetBB) {
     auto *newBB = F->createBasicBlock();
-    SILBuilder(newBB, this->getCurrentDebugScope(), this->getBuilderContext())
+    SILBuilder(newBB, this->getBuilderContext(), this->getCurrentDebugScope())
         .createBranch(loc, targetBB);
     return newBB;
   }
@@ -382,6 +403,8 @@ public:
   Optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
                           Optional<SILDebugVariable> Var, SILLocation Loc) {
+    if (Var && shouldDropVariable(*Var, Loc))
+      return {};
     if (!Var || !Var->ArgNo || !Var->Name.empty())
       return Var;
 
@@ -397,14 +420,21 @@ public:
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
-                                   bool isLexical = false,
-                                   bool wasMoved = false) {
+                                   bool isLexical = false, bool wasMoved = false
+#ifndef NDEBUG
+                                   ,
+                                   bool skipVarDeclAssert = false
+#endif
+  ) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
-    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
-           "location is a VarDecl, but SILDebugVariable is empty");
+#ifndef NDEBUG
+    if (dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()))
+      assert((skipVarDeclAssert || Loc.isSynthesizedAST() || Var) &&
+             "location is a VarDecl, but SILDebugVariable is empty");
+#endif
     return insert(AllocStackInst::create(
-        getSILDebugLocation(Loc), elementType, getFunction(),
+        getSILDebugLocation(Loc, true), elementType, getFunction(),
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
         wasMoved));
   }
@@ -455,15 +485,20 @@ public:
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false,
                                bool reflection = false,
-                               bool usesMoveableValueDebugInfo = false) {
+                               bool usesMoveableValueDebugInfo = false
+#ifndef NDEBUG
+                               , bool skipVarDeclAssert = false
+#endif
+                               ) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
-    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
+    assert((skipVarDeclAssert ||
+            !dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
-    return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
-                                       substituteAnonymousArgs(Name, Var, Loc),
-                                       hasDynamicLifetime, reflection,
-                                       usesMoveableValueDebugInfo));
+    return insert(AllocBoxInst::create(
+        getSILDebugLocation(Loc, true), BoxType, *F,
+        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, reflection,
+        usesMoveableValueDebugInfo));
   }
 
   AllocExistentialBoxInst *
@@ -2918,7 +2953,21 @@ private:
 class SILBuilderWithScope : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
     assert(I->getDebugScope() && "instruction has no debug scope");
-    setCurrentDebugScope(I->getDebugScope());
+    SILBasicBlock::iterator II(*I);
+    auto End = I->getParent()->end();
+    const SILDebugScope *DS = II->getDebugScope();
+    assert(DS);
+    // Skip over meta instructions, since debug_values may originate from outer
+    // scopes. Don't do any of this after inlining.
+    while (!DS->InlinedCallSite && II != End && II->isMetaInstruction())
+      ++II;
+    if (II != End) {
+      auto nextScope = II->getDebugScope();
+      if (!nextScope->InlinedCallSite)
+        DS = nextScope;
+    }
+    assert(DS);
+    setCurrentDebugScope(DS);
   }
 
 public:
@@ -2927,29 +2976,33 @@ public:
   ///
   /// Clients should prefer this constructor.
   SILBuilderWithScope(SILInstruction *I, SILBuilderContext &C)
-    : SILBuilder(I, I->getDebugScope(), C)
-  {}
+      : SILBuilder(I, C) {
+    inheritScopeFrom(I);
+  }
 
   /// Build instructions before the given insertion point, inheriting the debug
   /// location and using the context from the passed in builder.
   ///
   /// Clients should prefer this constructor.
   SILBuilderWithScope(SILInstruction *I, SILBuilder &B)
-      : SILBuilder(I, I->getDebugScope(), B.getBuilderContext()) {}
+      : SILBuilder(I, B.getBuilderContext()) {
+    inheritScopeFrom(I);
+  }
 
   explicit SILBuilderWithScope(
       SILInstruction *I,
       SmallVectorImpl<SILInstruction *> *InsertedInstrs = nullptr)
       : SILBuilder(I, InsertedInstrs) {
-    assert(I->getDebugScope() && "instruction has no debug scope");
-    setCurrentDebugScope(I->getDebugScope());
+    inheritScopeFrom(I);
   }
 
   explicit SILBuilderWithScope(SILBasicBlock::iterator I)
       : SILBuilderWithScope(&*I) {}
 
   explicit SILBuilderWithScope(SILBasicBlock::iterator I, SILBuilder &B)
-      : SILBuilder(&*I, &*I->getDebugScope(), B.getBuilderContext()) {}
+      : SILBuilder(&*I, B.getBuilderContext()) {
+    inheritScopeFrom(&*I);
+  }
 
   explicit SILBuilderWithScope(SILInstruction *I,
                                SILInstruction *InheritScopeFrom)
@@ -2971,12 +3024,13 @@ public:
 
   explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilder &B,
                                SILInstruction *InheritScopeFrom)
-      : SILBuilder(BB, InheritScopeFrom->getDebugScope(),
-                   B.getBuilderContext()) {}
+      : SILBuilder(BB, B.getBuilderContext()) {
+    inheritScopeFrom(InheritScopeFrom);
+  }
 
   explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilderContext &C,
                                const SILDebugScope *debugScope)
-      : SILBuilder(BB, debugScope, C) {}
+      : SILBuilder(BB, C, debugScope) {}
 
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first

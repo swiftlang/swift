@@ -15,7 +15,11 @@ public struct AvailableStruct<T> {
   // CHECK-STRIP-NOT: s4Test15AvailableStructV19unavailablePropertyxvs
   // CHECK-STRIP-NOT: s4Test15AvailableStructV19unavailablePropertyxvM
   @available(*, unavailable)
-  public var unavailableProperty: T
+  public var unavailableProperty: T {
+    get { fatalError() }
+    set { fatalError() }
+    _modify { fatalError() }
+  }
 
   // CHECK-NO-STRIP: s4Test15AvailableStructVyACyxGxcfC
   // CHECK-STRIP-NOT: s4Test15AvailableStructVyACyxGxcfC

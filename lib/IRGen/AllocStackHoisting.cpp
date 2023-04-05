@@ -155,6 +155,8 @@ void moveAllocStackToBeginningOfBlock(
   if (haveMovedElt) {
     if (auto varInfo = AS->getVarInfo()) {
       SILBuilderWithScope Builder(AS);
+      // SILBuilderWithScope skips over meta instructions when picking a scope.
+      Builder.setCurrentDebugScope(AS->getDebugScope());
       auto *DVI = Builder.createDebugValue(AS->getLoc(), AS, *varInfo);
       DVI->setUsesMoveableValueDebugInfo();
       DebugValueToBreakBlocksAt.push_back(DVI);
