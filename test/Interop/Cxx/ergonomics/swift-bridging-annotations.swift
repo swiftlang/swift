@@ -5,6 +5,8 @@
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=CxxModule -I %t -I %t/Inputs -I %swift_src_root/lib/ClangImporter -source-filename=x -enable-experimental-cxx-interop -Xcc -DINCMOD | %FileCheck %s
+
 //--- SwiftMod.swift
 
 public protocol Proto {
@@ -21,7 +23,11 @@ module CxxModule {
 // Note: in actuality, this will be included
 // as <swift/bridging>, but in this test we include
 // it directly.
+#ifndef INCMOD
 #include "bridging"
+#else
+#pragma clang module import SwiftBridging
+#endif
 
 class SELF_CONTAINED SelfContained {
 public:
