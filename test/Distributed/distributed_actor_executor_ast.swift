@@ -26,39 +26,19 @@ distributed actor DefaultWorker {
 // Check DefaultWorker, the DefaultActor version of the synthesis:
 // CHECK:  (class_decl range=[{{.*}}] "DefaultWorker" interface type='DefaultWorker.Type' access=internal non-resilient actor
 // The unowned executor property:
-// CHECK:    (var_decl implicit "localUnownedExecutor" type='Optional<UnownedSerialExecutor>' interface type='Optional<UnownedSerialExecutor>' access=internal final readImpl=getter immutable
-// CHECK:     (accessor_decl implicit 'anonname={{.*}}' interface type='(DefaultWorker) -> () -> Optional<UnownedSerialExecutor>' access=internal {{.*}}get_for=localUnownedExecutor
-// CHECK:       (parameter "self" type='DefaultWorker' interface type='DefaultWorker')
-// CHECK:       (parameter_list)
-// CHECK:       (brace_stmt implicit
+// CHECK:    (var_decl implicit "unownedExecutor" type='UnownedSerialExecutor' interface type='UnownedSerialExecutor' access=internal final readImpl=getter immutable
+
 // We guard the rest of the body; we only return a default executor if the actor is local:
 // CHECK:       (guard_stmt implicit
 // CHECK:         (call_expr implicit type='Bool' nothrow
 // CHECK:           (declref_expr implicit type='@_NO_EXTINFO (AnyObject) -> Bool' decl=Distributed.(file).__isLocalActor function_ref=unapplied)
-// CHECK:           (argument_list implicit
-// CHECK:             (argument
-// CHECK:               (erasure_expr implicit type='AnyObject'
-// CHECK:                 (declref_expr implicit type='DefaultWorker' decl=main.(file).DefaultWorker.<anonymous>.self function_ref=unapplied)))))
-// CHECK:           (brace_stmt implicit
-// CHECK:             (return_stmt implicit
-// CHECK:               (nil_literal_expr implicit type='Optional<UnownedSerialExecutor>' initializer=**NULL**))))
-// If the actor is not local, we return a default executor for it, same as normal actors:
-// CHECK:         (return_stmt implicit
-// CHECK:           (inject_into_optional implicit type='Optional<UnownedSerialExecutor>'
-// CHECK:             (call_expr implicit type='UnownedSerialExecutor' nothrow
-// CHECK:               (constructor_ref_call_expr implicit type='(Builtin.Executor) -> UnownedSerialExecutor' nothrow
-// CHECK:                 (declref_expr implicit type='(UnownedSerialExecutor.Type) -> (Builtin.Executor) -> UnownedSerialExecutor' decl=_Concurrency.(file).UnownedSerialExecutor.init(_:) function_ref=unapplied)
-// CHECK:                 (argument_list implicit
-// CHECK:                   (argument
-// CHECK:                     (type_expr implicit type='UnownedSerialExecutor.Type' typerepr='<<NULL>>'))))
-// CHECK:               (argument_list implicit
-// CHECK:                 (argument
-// CHECK:                   (call_expr implicit type='Builtin.Executor' nothrow
-// CHECK:                     (declref_expr implicit type='(DefaultWorker) -> Builtin.Executor' decl=Builtin.(file).buildDefaultActorExecutorRef [with (substitution_map generic_signature=<T where T : AnyObject> (substitution T -> DefaultWorker))] function_ref=unapplied)
-// CHECK:                     (argument_list implicit
-// CHECK:                       (argument
-// CHECK:                         (declref_expr implicit type='DefaultWorker' decl=main.(file).DefaultWorker.<anonymous>.self function_ref=unapplied))))))))))))
-// CHECK:   (pattern_binding_decl implicit
-// CHECK:     (pattern_typed implicit type='Optional<UnownedSerialExecutor>'
-// CHECK:       (pattern_named implicit type='Optional<UnownedSerialExecutor>' 'localUnownedExecutor')))
 
+// Check that we create the "remote reference" executor:
+// CHECK: (return_stmt implicit
+// CHECK:   (call_expr implicit type='UnownedSerialExecutor' nothrow
+// CHECK:     (declref_expr implicit type='(DefaultWorker) -> UnownedSerialExecutor' decl=Distributed.(file).buildDefaultDistributedRemoteActorExecutor [with (substitution_map generic_signature=<Act where Act : DistributedActor> (substitution Act -> DefaultWorker))]
+
+// Check the default executor synthesis for local actor otherwise:
+// CHECK: (return_stmt implicit
+// CHECK:   (call_expr implicit type='Builtin.Executor' nothrow
+// CHECK:     (declref_expr implicit type='(DefaultWorker) -> Builtin.Executor' decl=Builtin.(file).buildDefaultActorExecutorRef [with (substitution_map generic_signature=<T where T : AnyObject> (substitution T -> DefaultWorker))] function_ref=unapplied)

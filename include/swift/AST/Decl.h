@@ -4535,7 +4535,6 @@ public:
 
   /// Fetch this class's unownedExecutor property, if it has one.
   const VarDecl *getUnownedExecutorProperty() const;
-  const VarDecl *getLocalUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;
