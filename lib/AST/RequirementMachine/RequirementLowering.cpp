@@ -282,12 +282,27 @@ static void desugarLayoutRequirement(Requirement req,
     return;
   }
 
-  if (req.getLayoutConstraint()->isClass() &&
-      req.getFirstType()->isAnyClassReferenceType()) {
+  SmallVector<Requirement, 2> subReqs;
+
+  switch (req.checkRequirement(subReqs)) {
+  case CheckRequirementResult::Success:
+  case CheckRequirementResult::PackRequirement:
     errors.push_back(RequirementError::forRedundantRequirement(req, loc));
-  } else {
+    break;
+
+  case CheckRequirementResult::RequirementFailure:
     errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
+    break;
+
+  case CheckRequirementResult::SubstitutionFailure:
+    break;
+
+  case CheckRequirementResult::ConditionalConformance:
+    llvm_unreachable("Unexpected CheckRequirementResult");
   }
+
+  for (auto subReq : subReqs)
+    desugarRequirement(subReq, loc, result, errors);
 }
 
 /// Desugar a protocol conformance requirement by splitting up protocol
