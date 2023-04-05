@@ -1986,9 +1986,11 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       SDK = *It;
   }
 
+  bool EnableCXXInterop =
+      IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
   TheCU = DBuilder.createCompileUnit(
-      Lang, MainFile, Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
-      MajorRuntimeVersion, SplitName,
+      Lang, MainFile, Producer, Opts.shouldOptimize(),
+      Opts.getDebugFlags(PD, EnableCXXInterop), MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,
