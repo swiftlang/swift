@@ -131,6 +131,7 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // EXPAND_MACRO_DECL-NEXT:   func hello() -> String {
 // EXPAND_MACRO_DECL-NEXT:     "hello"
 // EXPAND_MACRO_DECL-NEXT:   }
+// EXPAND_MACRO_DECL:        func getSelf() -> Any.Type { return Self.self }
 // EXPAND_MACRO_DECL-NEXT: }
 // EXPAND_MACRO_DECL-NEXT: enum $s9MacroUser33_70D4178875715FB9B8B50C58F66F8D53Ll14anonymousTypesfMf0_4namefMu0_ {
 // EXPAND_MACRO_DECL-NEXT:   case apple
