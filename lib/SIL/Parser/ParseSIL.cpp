@@ -3698,6 +3698,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::DropDeinitInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDropDeinit(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::MarkMustCheckInst: {
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {

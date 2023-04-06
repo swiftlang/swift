@@ -5915,6 +5915,14 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkDropDeinitInst(DropDeinitInst *ddi) {
+    require(ddi->getType() == ddi->getOperand()->getType(),
+            "Result and operand must have the same type.");
+    require(ddi->getType().isMoveOnlyNominalType(),
+            "drop_deinit only allowed for move-only types");
+    require(F.hasOwnership(), "drop_deinit only allowed in OSSA");
+  }
+
   void checkMarkMustCheckInst(MarkMustCheckInst *i) {
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "

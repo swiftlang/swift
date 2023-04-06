@@ -6117,6 +6117,29 @@ a type `T` into the move only value space.
 The ``lexical`` attribute specifies that the value corresponds to a local
 variable in the Swift source.
 
+
+drop_deinit
+```````````
+
+::
+
+   sil-instruction ::= 'drop_deinit' sil-operand
+
+   %1 = drop_deinit %0 : $T
+   // T must be a move-only type
+   // %1 is an @owned T
+   %3 = drop_deinit %2 : $*T
+   // T must be a move-only type
+   // %2 has type *T
+
+This instruction is a marker for a following destroy instruction to suppress
+the call of the move-only type's deinitializer.
+The instruction accepts an object or address type.
+If its argument is an object type it takes in an `@owned T` and produces a new
+`@owned T`. If its argument is an address type, it's an identity projection.
+
+The instruction is only valid in ownership SIL.
+
 release_value
 `````````````
 
