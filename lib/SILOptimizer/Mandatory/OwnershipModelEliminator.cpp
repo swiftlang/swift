@@ -141,6 +141,10 @@ struct OwnershipModelEliminatorVisitor
     eraseInstructionAndRAUW(mvi, mvi->getOperand());
     return true;
   }
+  bool visitDropDeinitInst(DropDeinitInst *ddi) {
+    eraseInstructionAndRAUW(ddi, ddi->getOperand());
+    return true;
+  }
   bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
     eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;

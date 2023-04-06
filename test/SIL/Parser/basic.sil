@@ -48,6 +48,12 @@ class Class2 {
   init()
 }
 
+@_moveOnly struct MoveOnlyStruct {
+  @_hasStorage var i: Int
+  deinit
+}
+
+
 sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@convention(thin) (Class1, Int)
 
 // Instructions
@@ -1657,6 +1663,16 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
   end_lifetime %1 : $Builtin.NativeObject
   return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_drop_deinit :
+sil [ossa] @test_drop_deinit : $@convention(thin) (@owned MoveOnlyStruct) -> () {
+bb0(%0 : @owned $MoveOnlyStruct):
+  // CHECK: drop_deinit %0 : $MoveOnlyStruct
+  %1 = drop_deinit %0 : $MoveOnlyStruct
+  destroy_value %1 : $MoveOnlyStruct
+  %3 = tuple ()
+  return %3 : $()
 }
 
 sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {

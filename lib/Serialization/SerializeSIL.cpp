@@ -1487,6 +1487,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
