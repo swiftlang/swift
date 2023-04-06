@@ -100,6 +100,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(
         hasSwiftSwiftParser)
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
+LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)

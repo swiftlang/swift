@@ -3328,7 +3328,7 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
 static void
 suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressingFreestandingExpression = true;
   action();
 }
@@ -3336,7 +3336,7 @@ suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressNoAsyncAvailabilityAttr = true;
   action();
 }
@@ -3344,6 +3344,43 @@ suppressingFeatureNoAsyncAvailability(PrintOptions &options,
 static bool usesFeatureReferenceBindings(Decl *decl) {
   auto *vd = dyn_cast<VarDecl>(decl);
   return vd && vd->getIntroducer() == VarDecl::Introducer::InOut;
+}
+
+static bool hasParameterPacks(Decl *decl) {
+  if (auto genericContext = decl->getAsGenericContext()) {
+    auto sig = genericContext->getGenericSignature();
+    if (llvm::any_of(
+          sig.getGenericParams(),
+          [&](const GenericTypeParamType *GP) { return GP->isParameterPack(); })) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// A declaration needs the $ParameterPacks feature if it declares a
+/// generic parameter pack, or if its type references a generic nominal
+/// or type alias which declares a generic parameter pack.
+static bool usesFeatureParameterPacks(Decl *decl) {
+  if (hasParameterPacks(decl))
+    return true;
+
+  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (valueDecl->getInterfaceType().findIf(
+        [&](Type t) {
+          if (auto *alias = dyn_cast<TypeAliasType>(t.getPointer()))
+            return hasParameterPacks(alias->getDecl());
+          if (auto *nominal = t->getAnyNominal())
+            return hasParameterPacks(nominal);
+
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /// Suppress the printing of a particular feature.
@@ -5596,9 +5633,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
-  void printGenericArgs(PackType *flatArgs) {
+  void printGenericArgs(ArrayRef<Type> flatArgs) {
     Printer << "<";
-    interleave(flatArgs->getElementTypes(),
+    interleave(flatArgs,
                [&](Type arg) { visit(arg); },
                [&] { Printer << ", "; });
     Printer << ">";
@@ -5607,7 +5644,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   void printGenericArgs(ASTContext &ctx,
                         TypeArrayView<GenericTypeParamType> params,
                         ArrayRef<Type> args) {
-    printGenericArgs(PackType::get(ctx, params, args));
+    printGenericArgs(PackType::getExpandedGenericArgs(params, args));
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -5958,7 +5995,7 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgsPack());
+      printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6063,7 +6100,7 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgsPack());
+    printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
