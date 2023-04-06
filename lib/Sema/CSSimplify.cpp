@@ -2083,9 +2083,7 @@ static bool isPackExpansionType(Type type) {
     return true;
 
   if (auto *typeVar = type->getAs<TypeVariableType>())
-    return typeVar->getImpl()
-        .getLocator()
-        ->isLastElement<LocatorPathElt::PackExpansionType>();
+    return typeVar->getImpl().isPackExpansion();
 
   return false;
 }
@@ -4307,6 +4305,11 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
+  // FIXME: Add a fix for this.
+  if (typeVar->getImpl().isPackExpansion() && !type->is<PackExpansionType>()) {
+    return getTypeMatchFailure(locator);
+  }
+
   // Binding to a pack expansion type is always an error in Swift 6 mode.
   // This indicates that a pack expansion expression was used in a context
   // that doesn't support it.
@@ -4318,7 +4321,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // generic parameter - `init(_ data: repeat each T)`.
   //
   // See BindTupleOfFunctionParams constraint for more details.
-  if (type->is<PackExpansionType>()) {
+  if (!typeVar->getImpl().isPackExpansion() && type->is<PackExpansionType>()) {
     bool representsParameterList =
         typeVar->getImpl()
             .getLocator()
