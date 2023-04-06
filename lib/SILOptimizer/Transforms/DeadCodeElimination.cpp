@@ -280,6 +280,8 @@ void DCE::markLive() {
         if (phi && (phi->isLexical() || hasPointerEscape(phi))) {
           markInstructionLive(&I);
         }
+        // The instruction is live only if it's operand value is also live
+        addReverseDependency(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
