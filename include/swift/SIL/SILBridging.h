@@ -246,7 +246,7 @@ struct BridgedFunction {
   }
 
   bool hasSemanticsAttr(llvm::StringRef attrName) const {
-    return getFunction()->hasSemanticsAttr(attrName) ? 1 : 0;
+    return getFunction()->hasSemanticsAttr(attrName);
   }
 
   swift::EffectsKind getEffectAttribute() const {
@@ -538,7 +538,7 @@ struct BridgedInstruction {
     return getAs<swift::RefElementAddrInst>()->getFieldIndex();
   }
 
-  SwiftInt RefElementAddrInst_fieldIsLet() const {
+  bool RefElementAddrInst_fieldIsLet() const {
     return getAs<swift::RefElementAddrInst>()->getField()->isLet();
   }
 
@@ -569,15 +569,19 @@ struct BridgedInstruction {
     return swift::ApplySite(getInst()).getCalleeArgIndexOfFirstAppliedArg();
   }
 
-  SwiftInt PartialApplyInst_isOnStack() const {
-    return getAs<swift::PartialApplyInst>()->isOnStack() ? 1 : 0;
+  bool PartialApplyInst_isOnStack() const {
+    return getAs<swift::PartialApplyInst>()->isOnStack();
   }
 
-  SwiftInt AllocRefInstBase_isObjc() const {
+  bool AllocStackInst_hasDynamicLifetime() const {
+    return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
+  }
+
+  bool AllocRefInstBase_isObjc() const {
     return getAs<swift::AllocRefInstBase>()->isObjC();
   }
 
-  SwiftInt AllocRefInstBase_canAllocOnStack() const {
+  bool AllocRefInstBase_canAllocOnStack() const {
     return getAs<swift::AllocRefInstBase>()->canAllocOnStack();
   }
 
@@ -613,12 +617,12 @@ struct BridgedInstruction {
     return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Static;
   }
 
-  SwiftInt CopyAddrInst_isTakeOfSrc() const {
-    return getAs<swift::CopyAddrInst>()->isTakeOfSrc() ? 1 : 0;
+  bool CopyAddrInst_isTakeOfSrc() const {
+    return getAs<swift::CopyAddrInst>()->isTakeOfSrc();
   }
 
-  SwiftInt CopyAddrInst_isInitializationOfDest() const {
-    return getAs<swift::CopyAddrInst>()->isInitializationOfDest() ? 1 : 0;
+  bool CopyAddrInst_isInitializationOfDest() const {
+    return getAs<swift::CopyAddrInst>()->isInitializationOfDest();
   }
 
   void RefCountingInst_setIsAtomic(bool isAtomic) const {

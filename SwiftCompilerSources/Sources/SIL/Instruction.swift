@@ -236,10 +236,10 @@ final public class CopyAddrInst : Instruction {
   public var destination: Value { return destinationOperand.value }
   
   public var isTakeOfSrc: Bool {
-    bridged.CopyAddrInst_isTakeOfSrc() != 0
+    bridged.CopyAddrInst_isTakeOfSrc()
   }
   public var isInitializationOfDest: Bool {
-    bridged.CopyAddrInst_isInitializationOfDest() != 0
+    bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
 
@@ -534,7 +534,7 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var instance: Value { operand.value }
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
-  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() != 0 }
+  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -664,7 +664,7 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
-  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() != 0 }
+  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
   public func calleeArgIndex(callerArgIndex: Int) -> Int {
     bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
@@ -719,13 +719,14 @@ class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation {
+  public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
-  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() != 0 }
+  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
 
   final public var canAllocOnStack: Bool {
-    bridged.AllocRefInstBase_canAllocOnStack() != 0
+    bridged.AllocRefInstBase_canAllocOnStack()
   }
 }
 
