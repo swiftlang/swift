@@ -8,6 +8,16 @@ import Swift
 public struct S {
   var o: AnyObject
 }
+
+typealias Int1 = Builtin.Int1
+
+class C {}
+
+struct CAndBit {
+    var c: C
+    var bit: Int1
+}
+
 sil @dummy : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @dead1 :
@@ -361,4 +371,39 @@ bb0(%0 : @guaranteed $S):
   dealloc_stack %2 : $*S
   %8 = tuple ()
   return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destroy_of_live_copy : {{.*}} {
+// CHECK:         [[COPY:%[^,]+]] = copy_value
+// CHECK:         cond_br {{%[^,]+}}, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'dce_destroy_of_live_copy'
+sil [ossa] @dce_destroy_of_live_copy : $@convention(thin) (Int1) -> () {
+entry(%condition : $Int1):
+  %instance = apply undef() : $@convention(thin) () -> (@owned C)
+  %borrow = begin_borrow %instance : $C
+  %aggregate = struct $CAndBit(%borrow : $C, %condition : $Int1)
+  %copy = copy_value %aggregate : $CAndBit
+  end_borrow %borrow : $C
+  %borrow2 = begin_borrow %copy : $CAndBit
+  %bit = struct_extract %borrow2 : $CAndBit, #CAndBit.bit
+  end_borrow %borrow2 : $CAndBit
+  apply undef(%bit) : $@convention(thin) (Int1) -> ()
+  cond_br %condition, left, right
+left:
+  destroy_value %copy : $CAndBit
+  br exit
+right:
+  destroy_value %copy : $CAndBit
+  br exit
+exit:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
 }
