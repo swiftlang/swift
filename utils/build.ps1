@@ -86,6 +86,10 @@ if (-not (Test-Path $python))
   }
 }
 
+# Work around limitations of cmd passing in arrays to PowerShell
+if ($SDKs.Length -eq 1) { $SDKs = $SDKs[0].Split(",") }
+if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
+
 if ($Test -contains "*")
 {
   $Test = @("swift", "dispatch", "foundation", "xctest")

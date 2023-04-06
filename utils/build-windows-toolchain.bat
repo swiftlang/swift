@@ -19,8 +19,14 @@ set SourceRoot=%CD%
 :: Identify the BuildRoot
 set BuildRoot=%SourceRoot%\build
 
+md %BuildRoot%
+subst T: /d
+subst T: %BuildRoot% || (exit /b)
+set BuildRoot=T:
+
 :: Identify the PackageRoot
 set PackageRoot=%BuildRoot%\package
+
 md %PackageRoot%
 
 :: Setup temporary directories
@@ -30,6 +36,8 @@ set TMP=%BuildRoot%\tmp
 set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
+
+if "%CMAKE_BUILD_TYPE%"=="" (set CMAKE_BUILD_TYPE=Release)
 
 :: Build the -Test argument, if any
 set TestArg=-Test swift,dispatch,foundation,xctest,
@@ -43,7 +51,7 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
-powershell.exe -ExecutionPolicy RemoteSigned -Command %~dp0\build.ps1 ^
+powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -BuildType %CMAKE_BUILD_TYPE% ^
