@@ -555,8 +555,17 @@ static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
 /// Exclude macros in the direct lookup descriptor if we need to.
 static DirectLookupDescriptor excludeMacrosIfNeeded(
     DirectLookupDescriptor descriptor) {
-  // FIXME: Direct lookups don't currently have an "exclude macro expansions"
-  // flag.
+  if (descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
+    return descriptor;
+
+  auto &evaluator = descriptor.DC->getASTContext().evaluator;
+  if (!evaluator.hasActiveResolveMacroRequest())
+    return descriptor;
+
+  descriptor.Options |=
+      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+
   return descriptor;
 }
 
