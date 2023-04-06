@@ -24,11 +24,13 @@
 namespace swift {
 
 enum class BlockListAction: uint8_t {
-  ShouldUseBinaryModule = 0,
+  Undefined = 0,
+  ShouldUseBinaryModule,
   ShouldUseTextualModule,
 };
 
 enum class BlockListKeyKind: uint8_t {
+  Undefined = 0,
   ModuleName,
   ProjectName
 };
@@ -36,13 +38,12 @@ enum class BlockListKeyKind: uint8_t {
 class BlockListStore {
 public:
   struct Implementation;
+  void addConfigureFilePath(StringRef path);
   bool hasBlockListAction(StringRef key, BlockListKeyKind keyKind,
                           BlockListAction action);
   BlockListStore();
   ~BlockListStore();
 private:
-  friend class ASTContext;
-  void addConfigureFilePath(StringRef path);
   Implementation &Impl;
 };
 
