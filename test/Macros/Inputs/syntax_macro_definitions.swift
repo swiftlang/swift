@@ -1259,6 +1259,20 @@ public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
   }
 }
 
+extension TupleExprElementListSyntax {
+  /// Retrieve the first element with the given label.
+  func first(labeled name: String) -> Element? {
+    return first { element in
+      if let label = element.label, label.text == name {
+        return true
+      }
+
+      return false
+    }
+  }
+}
+
+
 public struct DefineAnonymousTypesMacro: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -1267,13 +1281,22 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
     guard let body = node.trailingClosure else {
       throw CustomError.message("#anonymousTypes macro requires a trailing closure")
     }
+
+    let accessSpecifier: String
+    if let _ = node.argumentList.first(labeled: "public") {
+      accessSpecifier = "public "
+    } else {
+      accessSpecifier = ""
+    }
     return [
       """
 
-      class \(context.makeUniqueName("name")) {
-        func hello() -> String {
+      \(raw:accessSpecifier)class \(context.makeUniqueName("name")) {
+        \(raw:accessSpecifier)func hello() -> String {
           \(body.statements)
         }
+
+        \(raw:accessSpecifier)func getSelf() -> Any.Type { return Self.self }
       }
       """,
       """
