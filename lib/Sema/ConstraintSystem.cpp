@@ -984,6 +984,32 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
+Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
+                                             OpenedTypeMap &replacements) {
+  auto patternType = openType(expansion->getPatternType(), replacements);
+  auto shapeType = openType(expansion->getCountType(), replacements);
+
+  auto openedPackExpansion = PackExpansionType::get(patternType, shapeType);
+
+  auto known = OpenedPackExpansionTypes.find(openedPackExpansion);
+  if (known != OpenedPackExpansionTypes.end())
+    return known->second;
+
+  auto *expansionVar = createTypeVariable(
+      getConstraintLocator({}, ConstraintLocator::PackExpansionType),
+      TVO_PackExpansion);
+
+  // This constraint is important to make sure that pack expansion always
+  // has a binding and connect pack expansion var to any type variables
+  // that appear in pattern and shape types.
+  addUnsolvedConstraint(Constraint::create(
+      *this, ConstraintKind::Defaultable, expansionVar, openedPackExpansion,
+      getConstraintLocator({}, ConstraintLocator::PackExpansionType)));
+
+  OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
+  return expansionVar;
+}
+
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
   auto opaqueDecl = opaque->getDecl();

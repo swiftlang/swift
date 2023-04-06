@@ -1590,6 +1590,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }
   }
 
+  if (!OpenedPackExpansionTypes.empty()) {
+    out.indent(indent) << "Opened pack expansion types:\n";
+    for (const auto &expansion : OpenedPackExpansionTypes) {
+      out.indent(indent + 2);
+      out << expansion.first->getString(PO);
+      out << " opens to " << expansion.second->getString(PO);
+      out << "\n";
+    }
+  }
+
   if (!DefaultedConstraints.empty()) {
     out.indent(indent) << "Defaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
