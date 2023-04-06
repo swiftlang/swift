@@ -144,6 +144,7 @@
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
 @frozen
+@_eagerMove
 public struct Set<Element: Hashable> {
   @usableFromInline
   internal var _variant: _Variant

@@ -18,6 +18,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH=\"${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}\"")
+endif()
+
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
@@ -62,6 +67,7 @@ set(swift_runtime_sources
     MetadataLookup.cpp
     Numeric.cpp
     Once.cpp
+    Paths.cpp
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
@@ -73,6 +79,10 @@ set(swift_runtime_sources
     AccessibleFunction.cpp
     Win32.cpp)
 
+set(swift_runtime_backtracing_sources
+  Backtrace.cpp
+  CrashHandlerMacOS.cpp)
+
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
     SwiftRT-COFF.cpp
@@ -80,7 +90,12 @@ set(LLVM_OPTIONAL_SOURCES
     SwiftRT-WASM.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
-    ${swift_runtime_leaks_sources})
+    ${swift_runtime_leaks_sources}
+    ${swift_runtime_backtracing_sources})
+
+if(SWIFT_ENABLE_BACKTRACING)
+  list(APPEND swift_runtime_sources ${swift_runtime_backtracing_sources})
+endif()
 
 set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)

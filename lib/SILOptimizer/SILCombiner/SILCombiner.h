@@ -23,21 +23,22 @@
 
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -54,6 +55,8 @@ class SILCombiner :
   SILFunctionTransform *parentTransform;
 
   AliasAnalysis *AA;
+
+  BasicCalleeAnalysis *CA;
 
   DominanceAnalysis *DA;
 

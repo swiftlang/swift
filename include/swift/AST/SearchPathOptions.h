@@ -174,6 +174,19 @@ public:
                             llvm::vfs::FileSystem *FS, bool IsOSDarwin);
 };
 
+/// Pair of a plugin path and the module name that the plugin provides.
+struct PluginExecutablePathAndModuleNames {
+  std::string ExecutablePath;
+  std::vector<std::string> ModuleNames;
+};
+
+/// Pair of a plugin search path and the corresponding plugin server executable
+/// path.
+struct ExternalPluginSearchPathAndServerPath {
+  std::string SearchPath;
+  std::string ServerPath;
+};
+
 /// Options for controlling search path behavior.
 class SearchPathOptions {
   /// To call \c addImportSearchPath and \c addFrameworkSearchPath from
@@ -235,8 +248,7 @@ private:
   std::vector<std::string> CompilerPluginLibraryPaths;
 
   /// Compiler plugin executable paths and providing module names.
-  /// Format: '<path>#<module names>'
-  std::vector<std::string> CompilerPluginExecutablePaths;
+  std::vector<PluginExecutablePathAndModuleNames> CompilerPluginExecutablePaths;
 
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
@@ -265,6 +277,11 @@ private:
                            FrameworkSearchPaths.size() - 1);
   }
 
+  llvm::Optional<StringRef> WinSDKRoot = llvm::None;
+  llvm::Optional<StringRef> WinSDKVersion = llvm::None;
+  llvm::Optional<StringRef> VCToolsRoot = llvm::None;
+  llvm::Optional<StringRef> VCToolsVersion = llvm::None;
+
 public:
   StringRef getSDKPath() const { return SDKPath; }
 
@@ -281,6 +298,26 @@ public:
                                           frameworksScratch.str().str()};
 
     Lookup.searchPathsDidChange();
+  }
+
+  llvm::Optional<StringRef> getWinSDKRoot() const { return WinSDKRoot; }
+  void setWinSDKRoot(StringRef root) {
+    WinSDKRoot = root;
+  }
+
+  llvm::Optional<StringRef> getWinSDKVersion() const { return WinSDKVersion; }
+  void setWinSDKVersion(StringRef version) {
+    WinSDKVersion = version;
+  }
+
+  llvm::Optional<StringRef> getVCToolsRoot() const { return VCToolsRoot; }
+  void setVCToolsRoot(StringRef root) {
+    VCToolsRoot = root;
+  }
+
+  llvm::Optional<StringRef> getVCToolsVersion() const { return VCToolsVersion; }
+  void setVCToolsVersion(StringRef version) {
+    VCToolsVersion = version;
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
@@ -329,12 +366,13 @@ public:
   }
 
   void setCompilerPluginExecutablePaths(
-      std::vector<std::string> NewCompilerPluginExecutablePaths) {
-    CompilerPluginExecutablePaths = NewCompilerPluginExecutablePaths;
+      std::vector<PluginExecutablePathAndModuleNames> &&newValue) {
+    CompilerPluginExecutablePaths = std::move(newValue);
     Lookup.searchPathsDidChange();
   }
 
-  ArrayRef<std::string> getCompilerPluginExecutablePaths() const {
+  ArrayRef<PluginExecutablePathAndModuleNames>
+  getCompilerPluginExecutablePaths() const {
     return CompilerPluginExecutablePaths;
   }
 
@@ -356,6 +394,12 @@ public:
   /// Paths that contain compiler plugins loaded on demand for, e.g.,
   /// macro implementations.
   std::vector<std::string> PluginSearchPaths;
+
+  /// Pairs of external compiler plugin search paths and the corresponding
+  /// plugin server executables.
+  /// e.g. {"/path/to/usr/lib/swift/host/plugins",
+  ///       "/path/to/usr/bin/plugin-server"}
+  std::vector<ExternalPluginSearchPathAndServerPath> ExternalPluginSearchPaths;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;

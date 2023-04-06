@@ -974,7 +974,7 @@ public:
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
-    bool IsSystem = D->getModuleContext()->isSystemModule();
+    bool IsSystem = D->getModuleContext()->isNonUserModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }
 };
@@ -1198,6 +1198,8 @@ static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
     return AccessLevel::Private;
+  case DeclContextKind::Package:
+    return AccessLevel::Package;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:
@@ -1525,6 +1527,10 @@ private:
     : PlaceholderLoc(PlaceholderLoc), Found(Found) {
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
@@ -1557,6 +1563,10 @@ private:
     bool FoundFunctionTypeRepr = false;
     explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
       Info(Info) { }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {

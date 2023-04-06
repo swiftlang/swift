@@ -36,7 +36,7 @@ enum class TypeLayoutEntryKind : uint8_t {
 };
 
 enum class ScalarKind : uint8_t {
-  POD,
+  TriviallyDestroyable,
   Immovable,
   ErrorReference,
   NativeStrongReference,
@@ -51,6 +51,7 @@ enum class ScalarKind : uint8_t {
   BlockStorage,
   ThickFunc,
   ExistentialReference,
+  CustomReference,
 };
 
 /// Convert a ReferenceCounting into the appropriate Scalar reference
@@ -96,8 +97,8 @@ public:
   /// Return the size of the type if known statically
   virtual llvm::Optional<Size> fixedSize(IRGenModule &IGM) const;
 
-  /// Return if the type and its subtypes are POD.
-  virtual bool isPOD() const;
+  /// Return if the type and its subtypes are trivially destructible.
+  virtual bool isTriviallyDestroyable() const;
   virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                                    unsigned index) const;
   virtual bool isSingleRetainablePointer() const;
@@ -149,6 +150,8 @@ public:
 
   const EnumTypeLayoutEntry *getAsEnum() const;
 
+  bool isAlignedGroup() const;
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   LLVM_DUMP_METHOD virtual void dump() const {
     assert(isEmpty() && "Missing subclass implementation?");
@@ -199,7 +202,7 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
@@ -261,7 +264,7 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
@@ -321,7 +324,7 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
@@ -386,7 +389,7 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
@@ -464,8 +467,9 @@ public:
   enum CopyDestroyStrategy {
     /// No special behavior.
     Normal,
-    /// The payload is POD, so copying is bitwise, and destruction is a noop.
-    POD,
+    /// The payload is trivially destructible, so copying is bitwise (if
+    /// allowed), and destruction is a noop.
+    TriviallyDestroyable,
     /// The payload is a single reference-counted value, and we have
     /// a single no-payload case which uses the null extra inhabitant, so
     /// copy and destroy can pass through to retain and release entry
@@ -507,7 +511,7 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;
@@ -656,7 +660,7 @@ public:
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
-  bool isPOD() const override;
+  bool isTriviallyDestroyable() const override;
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override;
   bool isSingleRetainablePointer() const override;

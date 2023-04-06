@@ -103,7 +103,8 @@ std::string swift::ide::removeCodeCompletionTokens(
 
 namespace {
 
-class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
+                                    public DoneParsingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -123,7 +124,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  IDEInspectionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -233,9 +234,8 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : IDEInspectionCallbacks(P), CompletionContext(CompletionContext),
-        Consumer(Consumer) {
-  }
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        CompletionContext(CompletionContext), Consumer(Consumer) {}
 
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
@@ -273,7 +273,7 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) override;
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -484,7 +484,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
-    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
+    CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -1284,9 +1284,7 @@ void swift::ide::deliverCompletionResults(
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
-    SF.getImportedModules(directImport,
-                          {ModuleDecl::ImportFilterKind::Default,
-                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    SF.getImportedModules(directImport, ModuleDecl::getImportFilterLocal());
     for (auto import : directImport)
       explictlyImportedModules.insert(import.importedModule);
 
@@ -1383,13 +1381,7 @@ void swift::ide::deliverCompletionResults(
 
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
-      SF.getImportedModules(
-          Imports, {
-                       ModuleDecl::ImportFilterKind::Exported,
-                       ModuleDecl::ImportFilterKind::Default,
-                       ModuleDecl::ImportFilterKind::ImplementationOnly,
-                       ModuleDecl::ImportFilterKind::SPIAccessControl,
-                   });
+      SF.getImportedModules(Imports, ModuleDecl::getImportFilterLocal());
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))
@@ -1441,8 +1433,12 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // switch case where there control expression is invalid). Having normal
     // typechecking still resolve even these cases would be beneficial for
     // tooling in general though.
-    if (!Lookup.gotCallback())
+    if (!Lookup.gotCallback()) {
+      if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+        llvm::errs() << "--- Fallback typecheck for code completion ---\n";
+      }
       Lookup.fallbackTypeCheck(CurDeclContext);
+    }
   };
 
   switch (Kind) {
@@ -1475,7 +1471,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::KeyPathExprSwift: {
     assert(CurDeclContext);
 
-    // IDEInspectionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
+    // CodeCompletionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
     // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
     auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
@@ -1802,6 +1798,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
     }
+    ExpectedCustomAttributeKinds |= CustomAttributeKind::Macro;
+
     Lookup.setExpectedTypes(/*Types=*/{},
                             /*isImplicitSingleExpressionReturn=*/false,
                             /*preferNonVoid=*/false,
@@ -1809,11 +1807,15 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
-    // - ParamDecl/VarDecl/FuncDecl: Function Builders.
+    // - ParamDecl/VarDecl/FuncDecl: Result Builders.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getIDEInspectionTargetLoc());
+
+    // Macro name at attribute position after '@'.
+    Lookup.getToplevelCompletions(
+        /*OnlyTypes=*/false, /*OnlyMacros=*/true);
     break;
   }
   case CompletionKind::AttributeDeclParen: {
@@ -2029,8 +2031,10 @@ public:
                                      CodeCompletionConsumer &Consumer)
       : CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-      IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-    return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
+  Callbacks createCallbacks(Parser &P) override {
+    auto callbacks = std::make_shared<CodeCompletionCallbacksImpl>(
+        P, CompletionContext, Consumer);
+    return {callbacks, callbacks};
   }
 };
 } // end anonymous namespace

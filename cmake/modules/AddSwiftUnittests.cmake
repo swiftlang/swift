@@ -10,6 +10,8 @@ function(add_swift_unittest test_dirname)
   # function defined by AddLLVM.cmake.
   add_unittest(SwiftUnitTests ${test_dirname} ${ARGN})
 
+  set_target_properties(${test_dirname} PROPERTIES LINKER_LANGUAGE CXX)
+
   # TODO: _add_variant_c_compile_link_flags and these tests should share some
   # sort of logic.
   #

@@ -13,7 +13,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     BlocksRuntime)
 endif()
 target_link_libraries(sourcekitd-repl PRIVATE
-  libedit)
+  LibEdit::LibEdit)
 
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
   set_target_properties(sourcekitd-repl PROPERTIES

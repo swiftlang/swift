@@ -49,6 +49,7 @@ struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
+class LoadedExecutablePlugin;
 class MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
@@ -2133,7 +2134,8 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determines the specifier for a parameter (inout, __owned, etc).
+/// Determines the ownership specifier for a parameter
+/// (inout/consuming/borrowing)
 class ParamSpecifierRequest
     : public SimpleRequest<ParamSpecifierRequest,
                            ParamSpecifier(ParamDecl *),
@@ -2216,6 +2218,74 @@ public:
   bool isCached() const { return true; }
   Optional<NamedPattern *> getCachedResult() const;
   void cacheResult(NamedPattern *P) const;
+};
+
+class ExprPatternMatchResult {
+  VarDecl *MatchVar;
+  Expr *MatchExpr;
+
+  friend class ExprPattern;
+
+  // Should only be used as the default value for the request, as the caching
+  // logic assumes the request always produces a non-null result.
+  ExprPatternMatchResult(llvm::NoneType)
+      : MatchVar(nullptr), MatchExpr(nullptr) {}
+
+public:
+  ExprPatternMatchResult(VarDecl *matchVar, Expr *matchExpr)
+      : MatchVar(matchVar), MatchExpr(matchExpr) {
+    // Note the caching logic currently requires the request to produce a
+    // non-null result.
+    assert(matchVar && matchExpr);
+  }
+
+  VarDecl *getMatchVar() const { return MatchVar; }
+  Expr *getMatchExpr() const { return MatchExpr; }
+};
+
+/// Compute the match VarDecl and expression for an ExprPattern, which applies
+/// the \c ~= operator.
+class ExprPatternMatchRequest
+    : public SimpleRequest<ExprPatternMatchRequest,
+                           ExprPatternMatchResult(const ExprPattern *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExprPatternMatchResult evaluate(Evaluator &evaluator,
+                                  const ExprPattern *EP) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ExprPatternMatchResult> getCachedResult() const;
+  void cacheResult(ExprPatternMatchResult result) const;
+};
+
+/// Creates a corresponding ExprPattern from the original Expr of an
+/// EnumElementPattern. This needs to be a cached request to ensure we don't
+/// generate multiple ExprPatterns along different constraint solver paths.
+class EnumElementExprPatternRequest
+    : public SimpleRequest<EnumElementExprPatternRequest,
+                           ExprPattern *(const EnumElementPattern *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExprPattern *evaluate(Evaluator &evaluator,
+                        const EnumElementPattern *EEP) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 class InterfaceTypeRequest :
@@ -3367,6 +3437,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Report default imports if other imports of the same target from this
+/// module have an explicitly defined access level. In such a case, all imports
+/// of the target module need an explicit access level or it may be made public
+/// by error. This applies only to pre-Swift 6 mode.
+class CheckInconsistentAccessLevelOnImport
+    : public SimpleRequest<CheckInconsistentAccessLevelOnImport,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Checks to see if any of the imports in a module use \c @_weakLinked
 /// in one file and not in another.
 ///
@@ -3813,7 +3904,7 @@ public:
 /// Find the definition of a given macro.
 class ExpandMacroExpansionDeclRequest
     : public SimpleRequest<ExpandMacroExpansionDeclRequest,
-                           ArrayRef<Decl *>(MacroExpansionDecl *),
+                           Optional<unsigned>(MacroExpansionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3821,8 +3912,8 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
-                            MacroExpansionDecl *med) const;
+  Optional<unsigned>
+  evaluate(Evaluator &evaluator, MacroExpansionDecl *med) const;
 
 public:
   bool isCached() const { return true; }
@@ -3910,19 +4001,51 @@ public:
 /// Load a plugin module with the given name.
 ///
 ///
+class LoadedCompilerPlugin {
+  enum class PluginKind : uint8_t {
+    None,
+    InProcess,
+    Executable,
+  };
+  PluginKind kind;
+  void *ptr;
+
+  LoadedCompilerPlugin(PluginKind kind, void *ptr) : kind(kind), ptr(ptr) {
+    assert(ptr != nullptr || kind == PluginKind::None);
+  }
+
+public:
+  LoadedCompilerPlugin(std::nullptr_t) : kind(PluginKind::None), ptr(nullptr) {}
+
+  static LoadedCompilerPlugin inProcess(void *ptr) {
+    return {PluginKind::InProcess, ptr};
+  }
+  static LoadedCompilerPlugin executable(LoadedExecutablePlugin *ptr) {
+    return {PluginKind::Executable, ptr};
+  }
+
+  void *getAsInProcessPlugin() const {
+    return kind == PluginKind::InProcess ? ptr : nullptr;
+  }
+  LoadedExecutablePlugin *getAsExecutablePlugin() const {
+    return kind == PluginKind::Executable
+               ? static_cast<LoadedExecutablePlugin *>(ptr)
+               : nullptr;
+  }
+};
+
 class CompilerPluginLoadRequest
-  : public SimpleRequest<CompilerPluginLoadRequest,
-                         void *(ASTContext *, Identifier),
-                         RequestFlags::Cached> {
+    : public SimpleRequest<CompilerPluginLoadRequest,
+                           LoadedCompilerPlugin(ASTContext *, Identifier),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  void *evaluate(
-      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
-  ) const;
+  LoadedCompilerPlugin evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                Identifier moduleName) const;
 
 public:
   // Source location
@@ -4043,11 +4166,52 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks that all of a class's \c \@objcImplementation extensions provide
+/// complete and correct implementations for their corresponding interfaces.
+/// This is done on all of a class's implementations at once to improve diagnostics.
+class TypeCheckObjCImplementationRequest
+    : public SimpleRequest<TypeCheckObjCImplementationRequest,
+                           evaluator::SideEffect(ExtensionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 void simple_display(llvm::raw_ostream &out, ResultBuilderBodyPreCheck pck);
+
+/// Computes whether a module is part of the stdlib or contained within the
+/// SDK. If no SDK was specified, falls back to whether the module was
+/// specified as a system module (ie. it's on the system search path).
+class IsNonUserModuleRequest
+    : public SimpleRequest<IsNonUserModuleRequest,
+                           bool(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+
+public:
+  bool isCached() const { return true; }
+};
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

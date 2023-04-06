@@ -299,6 +299,7 @@ bool CompileInstance::setupCI(
     assert(Diags.hadAnyError());
     return false;
   }
+  CI->getASTContext().setPluginRegistry(Plugins.get());
 
   return true;
 }

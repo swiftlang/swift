@@ -937,6 +937,29 @@ static bool canInheritDesignatedInits(Evaluator &eval, ClassDecl *decl) {
          areAllStoredPropertiesDefaultInitializable(eval, decl);
 }
 
+static ValueDecl *findImplementedObjCDecl(ValueDecl *VD) {
+  // If VD has an ObjC name...
+  if (auto vdSelector = VD->getObjCRuntimeName()) {
+    // and it's in an extension...
+    if (auto implED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+      // and that extension is the @objcImplementation of a class's main body...
+      if (auto interfaceCD =
+              dyn_cast_or_null<ClassDecl>(implED->getImplementedObjCDecl())) {
+        // Find the initializer in the class's main body that matches VD.
+        for (auto interfaceVD : interfaceCD->getAllMembers()) {
+          if (auto interfaceCtor = dyn_cast<ConstructorDecl>(interfaceVD)) {
+            if (vdSelector == interfaceCtor->getObjCRuntimeName()) {
+              return interfaceCtor;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return VD;
+}
+
 static void collectNonOveriddenSuperclassInits(
     ClassDecl *subclass, SmallVectorImpl<ConstructorDecl *> &results) {
   auto *superclassDecl = subclass->getSuperclassDecl();
@@ -968,6 +991,15 @@ static void collectNonOveriddenSuperclassInits(
       subOptions, lookupResults);
 
   for (auto decl : lookupResults) {
+    // HACK: If an @objcImplementation extension declares an initializer, its
+    // interface usually also has a declaration. We need the interface decl for
+    // access control computations, but the name lookup returns the
+    // implementation decl because it's in the Swift module. Go find the
+    // matching interface decl.
+    // (Note that this is necessary for both newly-declared inits and overrides,
+    // even implicit ones.)
+    decl = findImplementedObjCDecl(decl);
+
     auto superclassCtor = cast<ConstructorDecl>(decl);
 
     // Skip invalid superclass initializers.

@@ -59,31 +59,111 @@ class CommandRunner(object):
 
         self.run_rsync_from(remote_prefix, remote_to_local_files, output_prefix)
 
+    # Recover from random and transient errors that occur when SSHing to devices, in particular devicecompute
+    @staticmethod
+    def should_remote_command_retry(stderr):
+        if "banner line contains invalid characters" in stderr:
+            return True
+
+        if "Connection to localhost closed by remote host" in stderr:
+            return True
+
+        if "kex_exchange_identification: Connection closed by remote host" in stderr:
+            return True
+
+        if "rsync error: unexplained error" in stderr:
+            return True
+
+        # Fallthrough. The error is not known and shouldn't be retried
+        return False
+
     def run_remote(self, command, remote_env={}):
         env_strings = ['{0}={1}'.format(k,v) for k,v in sorted(remote_env.items())]
         remote_invocation = self.remote_invocation(
             ['/usr/bin/env'] + env_strings + command)
-        remote_proc = self.popen(remote_invocation, stdin=subprocess.PIPE,
-                                 stdout=None, stderr=None)
-        if self.dry_run:
-            return
-        _, _ = remote_proc.communicate()
-        if remote_proc.returncode:
-            # FIXME: We may still want to fetch the output files to see what
-            # went wrong.
+        attempt = 1
+        remote_proc = None
+
+        while attempt <= 3:
+            remote_proc = self.popen(
+                remote_invocation,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            if self.dry_run:
+                return
+
+            stdout, stderr = remote_proc.communicate()
+            stdout = stdout.decode(encoding='utf-8', errors='replace')
+            stderr = stderr.decode(encoding='utf-8', errors='replace')
+
+            # Print stdout to screen
+            print(stdout, end='')
+
+            # This is a transient and random error, and if this occurs, we should simply retry our ssh command.
+            if self.should_remote_command_retry(stderr):
+                attempt += 1
+                continue
+
+            print(stderr, end='', file=sys.stderr)
+
+            # Process error code
+            if remote_proc.returncode:
+                # FIXME: We may still want to fetch the output files to see what
+                # went wrong.
+                sys.exit(remote_proc.returncode)
+            else:
+                # Nothing went wrong. Return
+                return
+
+        if attempt > 3 and remote_proc is not None:
             sys.exit(remote_proc.returncode)
 
     def run_rsync(self, invocation, sources):
-        rsync_proc = self.popen(invocation,
-                                stdin=subprocess.PIPE,
-                                stdout=None, stderr=None)
-        if self.dry_run:
-            return
-        sources = '\n'.join(sources)
-        if self.verbose:
-            print(sources, file=sys.stderr)
-        _, _ = rsync_proc.communicate(sources.encode('utf-8'))
-        if not self.ignore_rsync_failure and rsync_proc.returncode:
+        attempt = 1
+        rsync_proc = None
+
+        while attempt <= 3:
+            rsync_proc = self.popen(
+                invocation,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            if self.dry_run:
+                return
+
+            sources = '\n'.join(sources)
+            if self.verbose:
+                print(sources, file=sys.stderr)
+            stdout, stderr = rsync_proc.communicate(sources.encode('utf-8'))
+            stdout = stdout.decode(encoding='utf-8', errors='replace')
+            stderr = stderr.decode(encoding='utf-8', errors='replace')
+
+            # Print stdout to screen
+            print(stdout, end='')
+
+            # This is a transient and random error, and if this occurs, we should simply retry our ssh command.
+            if self.should_remote_command_retry(stderr):
+                attempt += 1
+                continue
+
+            print(stderr, end='', file=sys.stderr)
+
+            # Process error code
+            if rsync_proc.returncode:
+                if self.ignore_rsync_failure:
+                    return
+                else:
+                    sys.exit(rsync_proc.returncode)
+            else:
+                # Nothing went wrong. Return
+                return
+
+        if attempt > 3 and rsync_proc is not None:
             sys.exit(rsync_proc.returncode)
 
     def run_rsync_to(self, prefix, sources, dest):
@@ -155,11 +235,21 @@ def strip_sep(name):
         name = name[lsep:]
     return name
 
-class ArgumentProcessor(object):
+class RemotePathSet(object):
+    def __init__(self):
+        self.inputs = set()
+        self.nodir_inputs = set()
+        self.existing_outputs = set()
+        self.outputs = set()
+        self.existing_nodir_outputs = set()
+        self.nodir_outputs = set()
+
+class PrefixProcessor(object):
     def __init__(self,
                  input_prefix, output_prefix,
-                 remote_dir, remote_input_prefix, remote_output_prefix,
-                 arguments):
+                 remote_dir, remote_input_prefix,
+                 remote_output_prefix,
+                 path_set):
         assert not remote_input_prefix.startswith('..')
         assert not remote_output_prefix.startswith('..')
 
@@ -168,7 +258,7 @@ class ArgumentProcessor(object):
         self.remote_dir = remote_dir
         self.remote_input_prefix = remote_input_prefix
         self.remote_output_prefix = remote_output_prefix
-        self.original_args = arguments
+        self.path_set = path_set
 
         if self.input_prefix:
             while self.input_prefix.endswith(posixpath.sep):
@@ -177,54 +267,85 @@ class ArgumentProcessor(object):
             while self.output_prefix.endswith(posixpath.sep):
                 self.output_prefix = self.output_prefix[:-len(posixpath.sep)]
 
+        if self.input_prefix:
+            split = posixpath.split(self.input_prefix)
+            self.input_prefix_split = (len(self.input_prefix), split[0], split[1])
+        else:
+            self.input_prefix_split = (0, '', '')
+
+        if self.output_prefix:
+            split = posixpath.split(self.output_prefix)
+            self.output_prefix_split = (len(self.output_prefix),
+                                        split[0],
+                                        split[1])
+        else:
+            self.output_prefix_split = (0, '', '')
+
+    def process_one(self, orig_name):
+        iplen, ipfxdir, ipfx = self.input_prefix_split
+        oplen, opfxdir, opfx = self.output_prefix_split
+
+        if iplen and orig_name.startswith(self.input_prefix):
+            name = orig_name[iplen:]
+            if not name.startswith(posixpath.sep):
+                name = ipfx + name
+                self.path_set.nodir_inputs.add(name)
+            else:
+                name = strip_sep(name)
+                self.path_set.inputs.add(name)
+            return posixpath.join(self.remote_dir,
+                                  self.remote_input_prefix,
+                                  name)
+
+        if oplen and orig_name.startswith(self.output_prefix):
+            name = orig_name[oplen:]
+            if not name.startswith(posixpath.sep):
+                name = opfx + name
+                self.path_set.nodir_outputs.add(name)
+                if os.path.exists(orig_name):
+                    self.path_set.existing_nodir_outputs.add(name)
+            else:
+                name = strip_sep(name)
+                self.path_set.outputs.add(name)
+                if os.path.exists(orig_name):
+                    self.path_set.existing_outputs.add(name)
+            return posixpath.join(self.remote_dir,
+                                  self.remote_output_prefix,
+                                  name)
+
+        return orig_name
+
+class ArgumentProcessor(PrefixProcessor):
+    def __init__(self,
+                 input_prefix, output_prefix,
+                 remote_dir, remote_input_prefix, remote_output_prefix,
+                 path_set, arguments):
+        super().__init__(input_prefix, output_prefix,
+                         remote_dir, remote_input_prefix, remote_output_prefix,
+                         path_set)
+        self.original_args = arguments
+
     def process_args(self):
         self.args = []
-        self.inputs = set()
-        self.nodir_inputs = set()
-        self.existing_outputs = set()
-        self.outputs = set()
-        self.existing_nodir_outputs = set()
-        self.nodir_outputs = set()
 
-        iplen = 0
-        oplen = 0
-        if self.input_prefix:
-            iplen = len(self.input_prefix)
-            ipfxdir, ipfx = posixpath.split(self.input_prefix)
-        if self.output_prefix:
-            oplen = len(self.output_prefix)
-            opfxdir, opfx = posixpath.split(self.output_prefix)
         for arg in self.original_args:
-            if iplen and arg.startswith(self.input_prefix):
-                name = arg[iplen:]
-                if not name.startswith(posixpath.sep):
-                    name = ipfx + name
-                    self.nodir_inputs.add(name)
-                else:
-                    name = strip_sep(name)
-                    self.inputs.add(name)
+            self.args.append(self.process_one(arg))
 
-                self.args.append(posixpath.join(self.remote_dir,
-                                                self.remote_input_prefix,
-                                                name))
-            elif oplen and arg.startswith(self.output_prefix):
-                name = arg[oplen:]
-                if not name.startswith(posixpath.sep):
-                    name = opfx + name
-                    self.nodir_outputs.add(name)
-                    if os.path.exists(arg):
-                        self.existing_nodir_outputs.add(name)
-                else:
-                    name = strip_sep(name)
-                    self.outputs.add(name)
-                    if os.path.exists(arg):
-                        self.existing_outputs.add(name)
+class EnvVarProcessor(PrefixProcessor):
+    def __init__(self,
+                 input_prefix, output_prefix,
+                 remote_dir, remote_input_prefix, remote_output_prefix,
+                 path_set, environment):
+        super().__init__(input_prefix, output_prefix,
+                         remote_dir, remote_input_prefix, remote_output_prefix,
+                         path_set)
+        self.original_env = environment
 
-                self.args.append(posixpath.join(self.remote_dir,
-                                                self.remote_output_prefix,
-                                                name))
-            else:
-                self.args.append(arg)
+    def process_env(self):
+        self.env = dict()
+
+        for key, value in self.original_env.items():
+            self.env[key] = self.process_one(value)
 
 def collect_remote_env(local_env=os.environ, prefix='REMOTE_RUN_CHILD_'):
     return dict((key[len(prefix):], value)
@@ -290,14 +411,27 @@ def main():
 
     assert not args.remote_dir == '/'
 
+    path_set = RemotePathSet()
+
     argproc = ArgumentProcessor(args.input_prefix,
                                 args.output_prefix,
                                 args.remote_dir,
                                 posixpath.normpath(args.remote_input_prefix),
                                 posixpath.normpath(args.remote_output_prefix),
+                                path_set,
                                 args.command)
 
     argproc.process_args()
+
+    envproc = EnvVarProcessor(args.input_prefix,
+                              args.output_prefix,
+                              args.remote_dir,
+                              posixpath.normpath(args.remote_input_prefix),
+                              posixpath.normpath(args.remote_output_prefix),
+                              path_set,
+                              collect_remote_env())
+
+    envproc.process_env()
 
     input_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
     output_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
@@ -306,36 +440,34 @@ def main():
         runner.run_remote(['/bin/rm', '-rf', output_dir])
 
     dirs = set()
-    for output in argproc.outputs:
+    for output in path_set.outputs:
         dirs.add(posixpath.join(output_dir, posixpath.dirname(output)))
-    for output in argproc.nodir_outputs:
+    for output in path_set.nodir_outputs:
         dirs.add(posixpath.join(output_dir, posixpath.dirname(output)))
     runner.mkdirs_remote(list(dirs))
 
-    if argproc.inputs:
-        runner.send(args.input_prefix, input_dir, argproc.inputs)
+    if path_set.inputs:
+        runner.send(args.input_prefix, input_dir, path_set.inputs)
 
-    if argproc.nodir_inputs:
+    if path_set.nodir_inputs:
         runner.send(posixpath.dirname(args.input_prefix),
-                    input_dir, argproc.nodir_inputs)
+                    input_dir, path_set.nodir_inputs)
 
-    if argproc.existing_outputs:
-        runner.send(args.output_prefix, output_dir, argproc.existing_outputs)
+    if path_set.existing_outputs:
+        runner.send(args.output_prefix, output_dir, path_set.existing_outputs)
 
-    if argproc.existing_nodir_outputs:
+    if path_set.existing_nodir_outputs:
         runner.send(posixpath.dirname(args.output_prefix),
-                    output_dir, argproc.existing_nodir_outputs)
+                    output_dir, path_set.existing_nodir_outputs)
 
-    remote_env = collect_remote_env()
+    runner.run_remote(argproc.args, envproc.env)
 
-    runner.run_remote(argproc.args, remote_env)
+    if path_set.outputs:
+        runner.fetch(args.output_prefix, output_dir, path_set.outputs)
 
-    if argproc.outputs:
-        runner.fetch(args.output_prefix, output_dir, argproc.outputs)
-
-    if argproc.nodir_outputs:
+    if path_set.nodir_outputs:
         runner.fetch(posixpath.dirname(args.output_prefix),
-                     output_dir, argproc.nodir_outputs)
+                     output_dir, path_set.nodir_outputs)
 
 if __name__ == "__main__":
     main()

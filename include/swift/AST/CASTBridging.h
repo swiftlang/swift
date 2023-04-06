@@ -102,6 +102,16 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : long {
 
 typedef void* BridgedDiagnostic;
 
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : ptrdiff_t {
+  /// An expanded macro.
+  BridgedExpandedMacro = 0,
+  /// An external macro, spelled with either the old spelling (Module.Type)
+  /// or the new spelling `#externalMacro(module: "Module", type: "Type")`.
+  BridgedExternalMacro,
+  /// The builtin definition for "externalMacro".
+  BridgedBuiltinExternalMacro
+} BridgedMacroDefinitionKind;
+
 #ifdef __cplusplus
 extern "C" {
 
@@ -118,17 +128,18 @@ extern "C" {
 /// information and then must be finished via \c SwiftDiagnostic_finish.
 BridgedDiagnostic SwiftDiagnostic_create(
     void *diagnosticEngine, BridgedDiagnosticSeverity severity,
-    void *_Nullable sourceLoc,
+    const void *_Nullable sourceLoc,
     const uint8_t *_Nullable text, long textLen);
 
 /// Highlight a source range as part of the diagnostic.
 void SwiftDiagnostic_highlight(
-    BridgedDiagnostic diag, void *_Nullable startLoc, void *_Nullable endLoc);
+    BridgedDiagnostic diag, const void *_Nullable startLoc, const void *_Nullable endLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
 void SwiftDiagnostic_fixItReplace(
     BridgedDiagnostic diag,
-    void *_Nullable replaceStartLoc, void *_Nullable replaceEndLoc,
+    const void *_Nullable replaceStartLoc,
+    const void *_Nullable replaceEndLoc,
     const uint8_t *_Nullable newText, long newTextLen);
 
 /// Finish the given diagnostic and emit it.
@@ -268,7 +279,7 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
                               BridgedArrayRef reqs, void *rAngleLoc);
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable ellipsisLoc, long index,
+                                  void *_Nullable eachLoc, long index,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty);
 
@@ -305,6 +316,9 @@ void Plugin_lock(PluginHandle handle);
 
 /// Unlock the plugin.
 void Plugin_unlock(PluginHandle handle);
+
+/// Launch the plugin if it's not running.
+_Bool Plugin_spawnIfNeeded(PluginHandle handle);
 
 /// Sends the message to the plugin, returns true if there was an error.
 /// Clients should receive the response  by \c Plugin_waitForNextMessage .

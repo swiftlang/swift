@@ -33,4 +33,3 @@ struct MysteryIslandDetail {
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MysteryIsland2#]; name=self
 // CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: chance[#Int#]; name=chance
-// CHECK: End completions

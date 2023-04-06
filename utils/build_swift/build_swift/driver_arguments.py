@@ -452,6 +452,12 @@ def create_argument_parser():
            help='enable sanitizer coverage for swift tools. Necessary for '
                 'fuzzing swiftc')
 
+    option('--swift-enable-backtracing', toggle_true,
+           default=True,
+           help='enable backtracing support')
+    option('--swift-runtime-fixed-backtracer-path', store,
+           help='if set, provide a fixed path for the Swift backtracer')
+
     option('--compiler-vendor', store,
            choices=['none', 'apple', 'swiftwasm'],
            default=defaults.COMPILER_VENDOR,
@@ -735,6 +741,9 @@ def create_argument_parser():
            toggle_true('build_swift_inspect'),
            help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
+    option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
+           help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1073,6 +1082,14 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-swift-remote-mirror', toggle_true,
+           default=True,
+           help='Build Remote Mirror')
+
+    option('--build-swift-libexec', toggle_true,
+           default=True,
+           help='build auxiliary executables')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
@@ -1307,9 +1324,9 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift string processing.')
 
-    option('--enable-experimental-reflection', toggle_true,
+    option('--enable-experimental-observation', toggle_true,
            default=True,
-           help='Enable experimental Swift reflection.')
+           help='Enable experimental Swift observation.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

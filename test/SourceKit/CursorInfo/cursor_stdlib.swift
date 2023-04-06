@@ -34,7 +34,6 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-OVERLAY-NEXT: UInt
 // CHECK-OVERLAY-NEXT: $sSuD
 // CHECK-OVERLAY-NEXT: Foundation
-// CHECK-OVERLAY-NEXT: SYSTEM
 // CHECK-OVERLAY-NEXT: <Declaration>let NSUTF8StringEncoding: <Type usr="s:Su">UInt</Type></Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=5:13 %s -- %s -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK-ITERATOR %s

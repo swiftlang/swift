@@ -5,7 +5,7 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
-public func foo<T...>(args: repeat each T) {
+public func foo<each T>(args: repeat each T) {
   // CHECK: define {{.*}} @"$s1a3foo4argsyxxQp_tRvzlF"
   // CHECK-SAME: %swift.type** %[[TYPE_PACK_ARG:.*]])
   // CHECK: %[[TYPE_PACK_ALLOCA:.*]] = alloca %swift.type**

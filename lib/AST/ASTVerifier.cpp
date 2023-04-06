@@ -271,6 +271,10 @@ public:
     return Verifier(topDC->getParentModule(), DC);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::None;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPreExpr(static_cast<ID##Expr*>(E))
@@ -473,7 +477,7 @@ public:
         // For @objc enums, we serialize the pre-type-checked integer
         // literal raw values, and thus when they are deserialized
         // they do not have a type on them.
-        if (!isa<IntegerLiteralExpr>(E)) {
+        if (!isa<IntegerLiteralExpr>(E) && !isa<MacroExpansionExpr>(E)) {
           Out << "expression has no type\n";
           E->dump(Out);
           abort();
@@ -597,6 +601,18 @@ public:
       if (type->hasTypeVariable()) {
         Out << "a type variable escaped the type checker\n";
         abort();
+      }
+
+      // Check for invalid pack expansion shape types.
+      if (auto *expansion = type->getAs<PackExpansionType>()) {
+        auto countType = expansion->getCountType();
+        if (!(countType->is<PackType>() ||
+              countType->is<PackArchetypeType>() ||
+              (countType->is<GenericTypeParamType>() &&
+               countType->castTo<GenericTypeParamType>()->isParameterPack()))) {
+          Out << "non-pack shape type" << countType->getString() << "\n";
+          abort();
+        }
       }
 
       if (!type->hasArchetype())
@@ -753,6 +769,7 @@ public:
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
     FUNCTION_LIKE(SubscriptDecl)
+    FUNCTION_LIKE(MacroDecl)
     TYPE_LIKE(NominalTypeDecl)
     TYPE_LIKE(ExtensionDecl)
 
@@ -947,12 +964,6 @@ public:
       if (D->hasAccess()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (!D->getASTContext().isAccessControlDisabled()) {
-          if (D->getFormalAccessScope().isPackage() &&
-              D->getFormalAccess() < AccessLevel::Package) {
-            Out << "non-package decl has no formal access scope\n";
-            D->dump(Out);
-            abort();
-          }
           if (D->getFormalAccessScope().isPublic() &&
               D->getFormalAccess() < AccessLevel::Public) {
             Out << "non-public decl has no formal access scope\n";

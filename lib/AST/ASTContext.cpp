@@ -67,10 +67,13 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Config/config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <algorithm>
 #include <memory>
 #include <queue>
@@ -527,11 +530,13 @@ struct ASTContext::Implementation {
   /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
   PluginRegistry *Plugins = nullptr;
 
-  /// Cache of loaded symbols.
-  llvm::StringMap<void *> LoadedSymbols;
+  /// `Plugins` storage if this ASTContext owns it.
+  std::unique_ptr<PluginRegistry> OwnedPluginRegistry = nullptr;
 
   /// Map a module name to an executable plugin path that provides the module.
   llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
+
+  llvm::StringSet<> LoadedPluginLibraryPaths;
 
   /// The permanent arena.
   Arena Permanent;
@@ -632,6 +637,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -643,9 +649,10 @@ ASTContext *ASTContext::get(
   impl = reinterpret_cast<void *>(
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
-                              ClangImporterOpts, SymbolGraphOpts, SourceMgr,
-                              Diags, PreModuleImportCallback);
+  return new (mem)
+      ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
+                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags,
+                 std::move(OutputBackend), PreModuleImportCallback);
 }
 
 ASTContext::ASTContext(
@@ -654,17 +661,19 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
-      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
+      TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       PreModuleImportCallback(PreModuleImportCallback),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
-      TheUnresolvedType(new (*this, AllocationArena::Permanent)
+      TheUnresolvedType(new(*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
@@ -703,8 +712,10 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
 
-  // FIXME: Delay this so the client e.g. SourceKit can inject plugin registry.
-  loadCompilerPlugins();
+  createModuleToExecutablePluginMap();
+  // Provide a default OnDiskOutputBackend if user didn't supply one.
+  if (!OutputBackend)
+    OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 }
 
 ASTContext::~ASTContext() {
@@ -1120,6 +1131,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
+  case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
@@ -1133,6 +1145,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxConvertibleToCollection:
   case KnownProtocolKind::CxxDictionary:
   case KnownProtocolKind::CxxPair:
+  case KnownProtocolKind::CxxOptional:
   case KnownProtocolKind::CxxRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
@@ -1148,7 +1161,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   if (!M)
     return nullptr;
   M->lookupValue(getIdentifier(getProtocolName(kind)),
-                 NLKind::UnqualifiedLookup, results);
+                 NLKind::UnqualifiedLookup,
+                 ModuleLookupFlags::ExcludeMacroExpansions,
+                 results);
 
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
@@ -3247,17 +3262,7 @@ PackExpansionType::PackExpansionType(Type patternType, Type countType,
                                      RecursiveTypeProperties properties,
                                      const ASTContext *canCtx)
   : TypeBase(TypeKind::PackExpansion, canCtx, properties),
-    patternType(patternType), countType(countType) {
-
-  // TODO: it would be nice if the solver didn't stick PlaceholderTypes and
-  // UnresolvedTypes in here.
-  assert(countType->is<PackType>() ||
-         countType->is<TypeVariableType>() ||
-         countType->is<PackArchetypeType>() ||
-         countType->is<PlaceholderType>() ||
-         countType->is<UnresolvedType>() ||
-         countType->castTo<GenericTypeParamType>()->isParameterPack());
-}
+    patternType(patternType), countType(countType) {}
 
 CanPackExpansionType
 CanPackExpansionType::get(CanType patternType, CanType countType) {
@@ -3265,6 +3270,12 @@ CanPackExpansionType::get(CanType patternType, CanType countType) {
 }
 
 PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
+  assert(!patternType->is<PackExpansionType>());
+  assert(!countType->is<PackExpansionType>());
+  // FIXME: stop doing this deliberately in PackExpansionMatcher
+  //assert(!patternType->is<PackType>());
+  //assert(!countType->is<PackType>());
+
   auto properties = patternType->getRecursiveProperties();
   properties |= countType->getRecursiveProperties();
 
@@ -3280,8 +3291,19 @@ PackExpansionType *PackExpansionType::get(Type patternType, Type countType) {
           .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
+  // The canonical pack expansion type uses the canonical shape.
+  // For interface types, we'd need a signature to do this properly,
+  // but for archetypes we can do it directly.
+  bool countIsCanonical = countType->isCanonical();
+  if (countIsCanonical) {
+    if (auto archetype = dyn_cast<PackArchetypeType>(countType.getPointer())) {
+      auto reducedShape = archetype->getReducedShape();
+      countIsCanonical = (reducedShape.getPointer() == archetype);
+    }
+  }
+
   const ASTContext *canCtx =
-      (patternType->isCanonical() && countType->isCanonical())
+      (patternType->isCanonical() && countIsCanonical)
       ? &context : nullptr;
   PackExpansionType *expansionType =
       new (context, arena) PackExpansionType(patternType, countType, properties,
@@ -3304,6 +3326,22 @@ PackType *PackType::getEmpty(const ASTContext &C) {
 
 CanPackType CanPackType::get(const ASTContext &C, ArrayRef<CanType> elements) {
   SmallVector<Type, 8> ncElements(elements.begin(), elements.end());
+  return CanPackType(PackType::get(C, ncElements));
+}
+
+CanPackType CanPackType::get(const ASTContext &C,
+                             CanTupleEltTypeArrayRef elements) {
+  SmallVector<Type, 8> ncElements(elements.begin(), elements.end());
+  return CanPackType(PackType::get(C, ncElements));
+}
+
+CanPackType CanPackType::get(const ASTContext &C,
+                             AnyFunctionType::CanParamArrayRef params) {
+  SmallVector<Type, 8> ncElements;
+  ncElements.reserve(params.size());
+  for (auto param : params) {
+    ncElements.push_back(param.getParameterType());
+  }
   return CanPackType(PackType::get(C, ncElements));
 }
 
@@ -3487,8 +3525,14 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   auto flags = ParameterTypeFlags().withIsolated(isIsolated);
   switch (selfAccess) {
+  case SelfAccessKind::LegacyConsuming:
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::LegacyOwned);
+    break;
   case SelfAccessKind::Consuming:
-    flags = flags.withOwned(true);
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::Consuming);
+    break;
+  case SelfAccessKind::Borrowing:
+    flags = flags.withOwnershipSpecifier(ParamSpecifier::Borrowing);
     break;
   case SelfAccessKind::Mutating:
     flags = flags.withInOut(true);
@@ -3746,6 +3790,9 @@ ParameterizedProtocolType *ParameterizedProtocolType::get(const ASTContext &C,
 
   auto size = totalSizeToAlloc<Type>(args.size());
   auto mem = C.Allocate(size, alignof(ParameterizedProtocolType), arena);
+
+  properties |= RecursiveTypeProperties::HasParameterizedExistential;
+
   auto paramTy = new (mem) ParameterizedProtocolType(
         isCanonical ? &C : nullptr, baseTy, args, properties);
   C.getImpl().getArena(arena).ParameterizedProtocolTypes.InsertNode(
@@ -3836,8 +3883,6 @@ ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
     T = existential->getConstraintType();
 
   auto properties = T->getRecursiveProperties();
-  if (T->is<ParameterizedProtocolType>())
-    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   unsigned reprKey;
@@ -4175,6 +4220,13 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               Type result,
                                               Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
+
+  // We do not allow type variables in GenericFunctionTypes. Note that if this
+  // ever changes, we'll need to setup arena-specific allocation for
+  // GenericFunctionTypes.
+  assert(llvm::none_of(params, [](Param param) {
+    return param.getPlainType()->hasTypeVariable();
+  }));
   assert(!result->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
@@ -4341,20 +4393,27 @@ SILFunctionType::SILFunctionType(
   if (coroutineKind == SILCoroutineKind::None) {
     assert(yields.empty());
     NumAnyResults = normalResults.size();
-    NumAnyIndirectFormalResults =
-      std::count_if(normalResults.begin(), normalResults.end(),
-                    [](const SILResultInfo &resultInfo) {
-                      return resultInfo.isFormalIndirect();
-                    });
+    NumAnyIndirectFormalResults = 0;
+    NumPackResults = 0;
+    for (auto &resultInfo : normalResults) {
+      if (resultInfo.isFormalIndirect())
+        NumAnyIndirectFormalResults++;
+      if (resultInfo.isPack())
+        NumPackResults++;
+    }
     memcpy(getMutableResults().data(), normalResults.data(),
            normalResults.size() * sizeof(SILResultInfo));
   } else {
-    assert(normalResults.empty());    
+    assert(normalResults.empty());
     NumAnyResults = yields.size();
-    NumAnyIndirectFormalResults = std::count_if(
-        yields.begin(), yields.end(), [](const SILYieldInfo &yieldInfo) {
-          return yieldInfo.isFormalIndirect();
-        });
+    NumAnyIndirectFormalResults = 0;
+    NumPackResults = 0;
+    for (auto &yieldInfo : yields) {
+      if (yieldInfo.isFormalIndirect())
+        NumAnyIndirectFormalResults++;
+      if (yieldInfo.isPack())
+        NumPackResults++;
+    }
     memcpy(getMutableYields().data(), yields.data(),
            yields.size() * sizeof(SILYieldInfo));
   }
@@ -4693,8 +4752,6 @@ Type ExistentialType::get(Type constraint) {
     printWithAny = false;
 
   auto properties = constraint->getRecursiveProperties();
-  if (constraint->is<ParameterizedProtocolType>())
-    properties |= RecursiveTypeProperties::HasParameterizedExistential;
   auto arena = getArena(properties);
 
   auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];
@@ -5127,7 +5184,8 @@ GenericEnvironment::forOpenedExistential(
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedElement(GenericSignature signature,
-                                     UUID uuid, CanType shapeClass,
+                                     UUID uuid,
+                                     CanGenericTypeParamType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
@@ -5138,6 +5196,7 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   if (found != openedElementEnvironments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
+    assert(existingEnv->getOpenedElementShapeClass()->isEqual(shapeClass));
     assert(existingEnv->getOpenedElementUUID() == uuid);
 
     return existingEnv;
@@ -5145,10 +5204,12 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
+  unsigned numOpenedParams = signature.getInnermostGenericParams().size();
   size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
                                   OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
-      0, 0, 1, numGenericParams);
+                                  OpenedElementEnvironmentData,
+                                  Type>(
+      0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv = new (mem) GenericEnvironment(signature,
                                                   uuid, shapeClass,
@@ -5717,7 +5778,7 @@ ASTContext::getOpenedExistentialSignature(Type type, GenericSignature parentSig)
 
 CanGenericSignature
 ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
-                                      CanType shapeClass) {
+                                      CanGenericTypeParamType shapeClass) {
   auto &sigs = getImpl().ElementSignatures;
   auto key = std::make_pair(shapeClass, baseGenericSig.getPointer());
   auto found = sigs.find(key);
@@ -5756,7 +5817,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
 
     // Only include opened element parameters for packs in the given
     // shape equivalence class.
-    if (!baseGenericSig->haveSameShape(paramType, shapeClass->mapTypeOutOfContext()))
+    if (!baseGenericSig->haveSameShape(paramType, shapeClass))
       continue;
 
     auto *elementParam = GenericTypeParamType::get(/*isParameterPack*/false,
@@ -6222,72 +6283,22 @@ PluginRegistry *ASTContext::getPluginRegistry() const {
   // Create a new one if it hasn't been set.
   if (!registry) {
     registry = new PluginRegistry();
-    const_cast<ASTContext *>(this)->addCleanup([registry]{
-      delete registry;
-    });
+    getImpl().OwnedPluginRegistry.reset(registry);
   }
 
   assert(registry != nullptr);
   return registry;
 }
 
-void ASTContext::loadCompilerPlugins() {
-  auto fs = this->SourceMgr.getFileSystem();
-  for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    SmallString<128> resolvedPath;
-    if (auto err = fs->getRealPath(path, resolvedPath)) {
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     err.message());
-      continue;
-    }
-    if (auto error = getPluginRegistry()->loadLibraryPlugin(resolvedPath)) {
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                     llvm::toString(std::move(error)));
-    }
-  }
-
+void ASTContext::createModuleToExecutablePluginMap() {
   for (auto &arg : SearchPathOpts.getCompilerPluginExecutablePaths()) {
-    // 'arg' is '<path to executable>#<module names>' where the module names are
-    // comma separated.
-
     // Create a moduleName -> pluginPath mapping.
-    StringRef path;
-    StringRef modulesStr;
-    std::tie(path, modulesStr) = StringRef(arg).rsplit('#');
-    SmallVector<StringRef, 1> modules;
-    modulesStr.split(modules, ',');
-
-    if (modules.empty() || path.empty()) {
-      // TODO: Error messsage.
-      Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, arg, "");
-    }
-    auto pathStr = AllocateCopy(path);
-    for (auto moduleName : modules) {
+    assert(!arg.ExecutablePath.empty() && "empty plugin path");
+    auto pathStr = AllocateCopy(arg.ExecutablePath);
+    for (auto moduleName : arg.ModuleNames) {
       getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
     }
   }
-}
-
-void *ASTContext::getAddressOfSymbol(const char *name,
-                                     void *libraryHandleHint) {
-  auto lookup = getImpl().LoadedSymbols.try_emplace(name, nullptr);
-  void *&address = lookup.first->getValue();
-#if !defined(_WIN32)
-  if (lookup.second) {
-    auto *handle = libraryHandleHint ? libraryHandleHint : RTLD_DEFAULT;
-    address = dlsym(handle, name);
-
-    // If we didn't know where to look, look specifically in each plugin.
-    if (!address && !libraryHandleHint) {
-      for (const auto &plugin : getPluginRegistry()->getLoadedLibraryPlugins()) {
-        address = dlsym(plugin.second, name);
-        if (address)
-          break;
-      }
-    }
-  }
-#endif
-  return address;
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
@@ -6307,7 +6318,7 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
       if (auto module = clangUnit->getOverlayModule())
         module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     } else {
-      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, { }, results);
     }
   }
 
@@ -6325,15 +6336,59 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   return decl->getDeclaredInterfaceType();
 }
 
-LoadedExecutablePlugin *
+Optional<std::string>
+ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
+  auto fs = SourceMgr.getFileSystem();
+
+  // Look for 'lib${module name}(.dylib|.so)'.
+  SmallString<64> expectedBasename;
+  expectedBasename.append("lib");
+  expectedBasename.append(moduleName.str());
+  expectedBasename.append(LTDL_SHLIB_EXT);
+
+  // Try '-plugin-path'.
+  for (const auto &searchPath : SearchPathOpts.PluginSearchPaths) {
+    SmallString<128> fullPath(searchPath);
+    llvm::sys::path::append(fullPath, expectedBasename);
+    if (fs->exists(fullPath)) {
+      return std::string(fullPath);
+    }
+  }
+
+  // Try '-load-plugin-library'.
+  for (const auto &libPath : SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    if (llvm::sys::path::filename(libPath) == expectedBasename) {
+      return libPath;
+    }
+  }
+
+  return None;
+}
+
+Optional<StringRef>
 ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
   auto &execPluginPaths = getImpl().ExecutablePluginPaths;
   auto found = execPluginPaths.find(moduleName);
   if (found == execPluginPaths.end())
-    return nullptr;
+    return None;
+  return found->second;
+}
 
-  // Let the VFS to map the path.
-  auto &path = found->second;
+Optional<std::pair<std::string, std::string>>
+ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
+  auto fs = this->SourceMgr.getFileSystem();
+  for (auto &pair : SearchPathOpts.ExternalPluginSearchPaths) {
+    SmallString<128> fullPath(pair.SearchPath);
+    llvm::sys::path::append(fullPath, "lib" + moduleName.str() + LTDL_SHLIB_EXT);
+
+    if (fs->exists(fullPath)) {
+      return {{std::string(fullPath), pair.ServerPath}};
+    }
+  }
+  return None;
+}
+
+LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   SmallString<128> resolvedPath;
   auto fs = this->SourceMgr.getFileSystem();
   if (auto err = fs->getRealPath(path, resolvedPath)) {
@@ -6350,4 +6405,35 @@ ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
   }
 
   return plugin.get();
+}
+
+void *ASTContext::loadLibraryPlugin(StringRef path) {
+  // Remember the path (even if it fails to load.)
+  getImpl().LoadedPluginLibraryPaths.insert(path);
+
+  SmallString<128> resolvedPath;
+  auto fs = this->SourceMgr.getFileSystem();
+  if (auto err = fs->getRealPath(path, resolvedPath)) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   err.message());
+    return nullptr;
+  }
+
+  // Load the plugin.
+  auto plugin = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
+  if (!plugin) {
+    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
+                   llvm::toString(plugin.takeError()));
+  }
+
+  return plugin.get();
+}
+
+const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
+  return getImpl().LoadedPluginLibraryPaths;
+}
+
+bool ASTContext::supportsMoveOnlyTypes() const {
+  // currently the only thing holding back whether the types can appear is this.
+  return SILOpts.LexicalLifetimes != LexicalLifetimesOption::Off;
 }

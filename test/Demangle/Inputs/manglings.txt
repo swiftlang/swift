@@ -457,3 +457,4 @@ $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfM
 @__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_ ---> accessor macro expansion #1 of myPropertyWrapper in accessor_macros.MyStruct.name : Swift.String
 @__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_ ---> peer macro expansion #1 of addCompletionHandler in macro_expand_peers.S.f(a: Swift.Int, for: Swift.String, _: Swift.Double) async -> Swift.String
 @__swiftmacro_25macro_expand_conformances7GenericV20DelegatedConformancefMc_ ---> conformance macro expansion #1 of DelegatedConformance in macro_expand_conformances.Generic
+@__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered

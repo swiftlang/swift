@@ -151,11 +151,11 @@ public:
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
-  LLVM_NODISCARD bool collectFrom();
+  [[nodiscard]] bool collectFrom();
 
 private:
-  LLVM_NODISCARD bool collectUses(SILValue Pointer);
-  LLVM_NODISCARD bool collectContainerUses(SILValue boxValue);
+  [[nodiscard]] bool collectUses(SILValue Pointer);
+  [[nodiscard]] bool collectContainerUses(SILValue boxValue);
 };
 } // end anonymous namespace
 
@@ -289,7 +289,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     if (auto *si = dyn_cast<StoreInst>(User)) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
         if (auto tupleType = PointeeType.getAs<TupleType>()) {
-          if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+          if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
+              !tupleType->containsPackExpansionType()) {
             UsesToScalarize.push_back(User);
             continue;
           }
@@ -325,7 +326,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
       // have an access that crosses elements.
       if (auto tupleType = PointeeType.getAs<TupleType>()) {
-        if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType)) {
+        if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
+            !tupleType->containsPackExpansionType()) {
           UsesToScalarize.push_back(CAI);
           continue;
         }

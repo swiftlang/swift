@@ -40,7 +40,6 @@ func test() {
 // A: Begin completions, 2 items
 // A-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: foo({#arg: Bool#})[#A<X>#];
 // A-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: bar({#arg: Int#})[#A<Y>#];
-// A: End completions
 }
 
 func test() {
@@ -50,7 +49,6 @@ func test() {
 // B: Begin completions, 2 items
 // B-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: baz[#B#]; name=baz
 // B-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#B#]; name=init()
-// B: End completions
 }
 
 func test() {
@@ -62,5 +60,4 @@ func test() {
   }
 // D: Begin completions, 1 items
 // D-DAG: Keyword[self]/CurrNominal:          self[#X#];
-// D: End completions
 }

@@ -85,7 +85,7 @@ private:
   /// The alias() method uses this map to cache queries.
   llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
 
-  using MemoryBehavior = SILInstruction::MemoryBehavior;
+  using MemoryBehavior = MemoryBehavior;
 
   /// MemoryBehavior value cache.
   ///
@@ -169,7 +169,7 @@ public:
 
   /// Returns true if \p Inst may read from memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayRead.
+  /// For details see MemoryBehavior::MayRead.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayRead ||
@@ -180,7 +180,7 @@ public:
   /// Returns true if \p Inst may write to memory or deinitialize memory at
   /// address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayWrite.
+  /// For details see MemoryBehavior::MayWrite.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayWrite ||
@@ -191,7 +191,7 @@ public:
   /// Returns true if \p Inst may read from memory, write to memory or
   /// deinitialize memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return MemoryBehavior::None != B;

@@ -441,6 +441,14 @@ def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
 
+def enable_implicit_backtracing_module_import : Flag<["-"],
+  "enable-implicit-backtracing-module-import">,
+  HelpText<"Enable the implicit import of the _Backtracing module.">;
+
+def disable_implicit_backtracing_module_import : Flag<["-"],
+  "disable-implicit-backtracing-module-import">,
+  HelpText<"Disable the implicit import of the _Backtracing module.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
@@ -1094,6 +1102,12 @@ def clang_header_expose_decls:
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"all-public|has-expose-attr">;
 
+def clang_header_expose_module:
+  Separate<["-"], "clang-header-expose-module">,
+  HelpText<"Allow the compiler to assume that APIs from the specified module are exposed to C/C++/Objective-C in another generated header, so that APIs in the current module that depend on declarations from the specified module can be exposed in the generated header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"<imported-module-name>=<generated-header-name>">;
+
 def weak_link_at_target :
   Flag<["-"], "weak-link-at-target">,
   HelpText<"Weakly link symbols for declarations that were introduced at the "
@@ -1162,7 +1176,18 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  HelpText<"Check compiler output determinisim by running it twice">;
+def always_compile_output_files :
+  Flag<["-"], "always-compile-output-files">,
+  HelpText<"Always compile output files even it might not change the results">;
+
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
+
+def enable_ossa_complete_lifetimes :
+  Flag<["-"], "enable-ossa-complete-lifetimes">,
+  HelpText<"Require linear OSSA lifetimes after SILGen">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

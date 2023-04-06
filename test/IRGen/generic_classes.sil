@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
 // RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 import Builtin
 import Swift
@@ -54,7 +54,7 @@ import Swift
 // --       ivar destroyer
 // CHECK-SAME:   i32 0,
 // --       flags
-// CHECK_SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       immediate pattern size
 // CHECK-native-SAME:   i16 0,
 // CHECK-objc-SAME:     i16 5,
@@ -95,15 +95,15 @@ import Swift
 
 // CHECK: @"$s15generic_classes14RootNonGenericCMf" = internal global <{ {{.*}} }> <{
 // -- destructor
-// CHECK-SAME:                void (%T15generic_classes14RootNonGenericC*)* @"$s15generic_classes14RootNonGenericCfD",
+// CHECK-SAME:                void (%T15generic_classes14RootNonGenericC*)*{{.*}} @"$s15generic_classes14RootNonGenericCfD{{[^,]*}}"{{[^,]*}},
 // -- witness table pointer
-// CHECK-DIRECT-SAME:         i8** @"$sBoWV",
+// CHECK-DIRECT-SAME:         i8** {{.*}}@"$sBoWV{{(\.[^"]*)?}}",
 // CHECK-INDIRECT-SAME:       i8** null,
 // -- swift object type
-// CHECK-objc-SAME:           i64 ptrtoint (%objc_class* @"$s15generic_classes14RootNonGenericCMm" to i64),
+// CHECK-objc-SAME:           i64 {{.*}}@"$s15generic_classes14RootNonGenericCMm{{(\.[^"]*)?}}"
 // CHECK-native-SAME:         i64 0,
 // -- superclass
-// CHECK-DIRECT-objc-SAME:    %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-DIRECT-objc-SAME:    %objc_class* {{.*}}@"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject{{(.ptrauth)?}}"
 // CHECK-INDIRECT-objc-SAME:  %swift.type* null,
 // CHECK-native-SAME:         %swift.type* null,
 // -- objc only fields
@@ -115,7 +115,7 @@ import Swift
 // CHECK-SAME:                i16 7,
 // CHECK-SAME:                i16 0,
 // -- nominal type descriptor
-// CHECK-SAME:                {{.*}}* @"$s15generic_classes14RootNonGenericCMn"
+// CHECK-SAME:                {{.*}}* @"$s15generic_classes14RootNonGenericCMn{{[^,]*}}"
 // CHECK-SAME: }>
 
 // CHECK: @"$s15generic_classes015GenericInheritsC0CMn" = hidden constant
@@ -133,7 +133,7 @@ import Swift
 // --       ivar destroyer
 // CHECK-SAME:   i32 0,
 // --       class flags
-// CHECK_SAME:   i32 3,
+// CHECK-SAME:   i32 2,
 // --       extra data pattern offset
 // CHECK-objc-SAME:     i16 5,
 // --       extra data pattern size
@@ -356,7 +356,7 @@ entry(%c : $RootGeneric<Int32>):
  */
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes11RootGenericCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
-// CHECK:   [[METADATA:%.*]] = call{{( tail)?}} %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK:   [[METADATA:%.*]] = call{{( tail)?}} %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* {{%[0-9,a-z,A-Z]+}}, i8** %1, i8* %2)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
@@ -365,7 +365,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK: }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
-// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* {{%[0-9,a-z,A-Z]+}}, i8** %1, i8* %2)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes22RootGenericFixedLayoutCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
@@ -379,7 +379,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
 // CHECK:   %B  = load %swift.type*, %swift.type** [[T1]]
 //   Construct the class.
-// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* {{%[0-9,a-z,A-Z]+}}, i8** %1, i8* %2)
 // CHECK-NEXT:   ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes015GenericInheritsC0CMr"
@@ -398,7 +398,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[B_CHECKED]] to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %{{[0-9a-zA-Z.]+}}, i32 8
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK:   store i8** [[T0]], i8*** [[T1]], align 8
 

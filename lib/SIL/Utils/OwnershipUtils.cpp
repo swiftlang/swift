@@ -25,59 +25,82 @@
 
 using namespace swift;
 
-bool swift::hasPointerEscape(BorrowedValue value) {
-  assert(value.kind == BorrowedValueKind::BeginBorrow ||
-         value.kind == BorrowedValueKind::LoadBorrow);
-  GraphNodeWorklist<Operand *, 8> worklist;
-  for (Operand *use : value->getUses()) {
-    if (use->getOperandOwnership() != OperandOwnership::NonUse)
-      worklist.insert(use);
+bool swift::hasPointerEscape(BorrowedValue original) {
+  ValueWorklist worklist(original->getFunction());
+  worklist.push(*original);
+
+  if (auto *phi = SILArgument::asPhi(*original)) {
+    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
+      worklist.pushIfNotVisited(operand->get());
+      return true;
+    });
   }
 
-  while (Operand *op = worklist.pop()) {
-    switch (op->getOperandOwnership()) {
-    case OperandOwnership::NonUse:
-    case OperandOwnership::TrivialUse:
-    case OperandOwnership::ForwardingConsume:
-    case OperandOwnership::DestroyingConsume:
-      llvm_unreachable("this operand cannot handle an inner guaranteed use");
-
-    case OperandOwnership::ForwardingUnowned:
-    case OperandOwnership::PointerEscape:
-      return true;
-
-    case OperandOwnership::Borrow:
-    case OperandOwnership::EndBorrow:
-    case OperandOwnership::InstantaneousUse:
-    case OperandOwnership::UnownedInstantaneousUse:
-    case OperandOwnership::InteriorPointer:
-    case OperandOwnership::BitwiseEscape:
-      break;
-    case OperandOwnership::Reborrow: {
-      SILArgument *phi = cast<BranchInst>(op->getUser())
-                             ->getDestBB()
-                             ->getArgument(op->getOperandNumber());
-      for (auto *use : phi->getUses()) {
-        if (use->getOperandOwnership() != OperandOwnership::NonUse)
-          worklist.insert(use);
-      }
-      break;
-    }
-    case OperandOwnership::GuaranteedForwarding: {
-      // This may follow a guaranteed phis.
-      ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
-        // Do not include transitive uses with 'none' ownership
-        if (result->getOwnershipKind() == OwnershipKind::None)
-          return true;
-        for (auto *resultUse : result->getUses()) {
-          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
-            worklist.insert(resultUse);
-          }
-        }
+  while (auto value = worklist.pop()) {
+    for (auto *op : value->getUses()) {
+      switch (op->getOperandOwnership()) {
+      case OperandOwnership::ForwardingUnowned:
+      case OperandOwnership::PointerEscape:
         return true;
-      });
-      break;
+
+      case OperandOwnership::Reborrow: {
+        SILArgument *phi = PhiOperand(op).getValue();
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+
+      case OperandOwnership::GuaranteedForwarding: {
+        // This may follow guaranteed phis.
+        ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
+          // Do not include transitive uses with 'none' ownership
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
+        break;
+      }
+      default:
+        break;
+      }
     }
+  }
+  return false;
+}
+
+bool swift::hasPointerEscape(SILValue original) {
+  if (auto borrowedValue = BorrowedValue(original)) {
+    return hasPointerEscape(borrowedValue);
+  }
+  assert(original->getOwnershipKind() == OwnershipKind::Owned);
+
+  ValueWorklist worklist(original->getFunction());
+  worklist.push(original);
+  if (auto *phi = SILArgument::asPhi(original)) {
+    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
+      worklist.pushIfNotVisited(operand->get());
+      return true;
+    });
+  }
+  while (auto value = worklist.pop()) {
+    for (auto use : value->getUses()) {
+      switch (use->getOperandOwnership()) {
+      case OperandOwnership::PointerEscape:
+      case OperandOwnership::ForwardingUnowned:
+        return true;
+      case OperandOwnership::ForwardingConsume: {
+        auto *branch = dyn_cast<BranchInst>(use->getUser());
+        if (!branch) {
+          // Non-phi forwarding consumes end the lifetime of an owned value.
+          break;
+        }
+        auto *phi = branch->getDestBB()->getArgument(use->getOperandNumber());
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
   return false;
@@ -1175,7 +1198,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   // --- A reference with no borrow scope! Currently happens for project_box.
 
   // Compute the reference value's liveness.
-  SSAPrunedLiveness liveness;
+  SSAPrunedLiveness liveness(root->getFunction());
   liveness.initializeDef(root);
   LiveRangeSummary summary = liveness.computeSimple();
   // Conservatively ignore InnerBorrowKind::Reborrowed and
@@ -2342,4 +2365,79 @@ bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
     }
     return false;
   });
+}
+
+bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
+  // Given: %moved_to_value = move_value %original_value
+  //
+  // Check whether the original value's lifetime and the moved-to value's
+  // lifetime have the same (1) ownership, (2) lexicality, and (3) escaping.
+  //
+  // Along the way, also check for cases where they have different values for
+  // those characteristics but it doesn't matter because of how limited the uses
+  // of the original value are (for now, whether the move is the only consuming
+  // use).
+
+  auto original = mvi->getOperand();
+
+  // (1) Ownership matches?
+  // (The new value always has owned ownership.)
+  if (original->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+
+  // (2) Lexicality matches?
+  if (mvi->isLexical() != original->isLexical()) {
+    return false;
+  }
+
+  // The move doesn't alter constraints: ownership and lexicality match.
+
+  // Before checking whether escaping matches, check whether the move_value is
+  // redundant regardless on account of how its uses are limited.
+  //
+  // At this point, ownership and lexicality are known to match.  If the
+  // original value doesn't escape, then merging the two lifetimes won't make
+  // it harder to optimize the portion of the merged lifetime corresponding to
+  // the moved-to value.  If the original's only consuming use is the
+  // move_value, then the original value's lifetime couldn't be shortened
+  // anyway.
+  //
+  // Summary: !escaping(original)
+  //       && singleConsumingUser(original) == move
+  //       => redundant(mvi)
+  //
+  // Check this in two ways, one cheaper than the other.
+
+  // First, avoid calling hasPointerEscape(original).
+  //
+  // If the original value is not a phi (a phi's incoming values might have
+  // escaping uses) and its only user is the move, then it doesn't escape. Also
+  // if its only user is the move, then its only _consuming_ user is the move.
+  auto *singleUser =
+      original->getSingleUse() ? original->getSingleUse()->getUser() : nullptr;
+  if (mvi == singleUser && !SILArgument::asPhi(original)) {
+    assert(!hasPointerEscape(original));
+    assert(original->getSingleConsumingUse()->getUser() == mvi);
+    // - !escaping(original)
+    // - singleConsumingUser(original) == move
+    return true;
+  }
+
+  // Second, call hasPointerEscape(original).
+  //
+  // Explicitly check both
+  // - !escaping(original)
+  // - singleConsumingUser(original) == move
+  auto originalHasEscape = hasPointerEscape(original);
+  auto *singleConsumingUser = original->getSingleConsumingUse()
+                                  ? original->getSingleConsumingUse()->getUser()
+                                  : nullptr;
+  if (mvi == singleConsumingUser && !originalHasEscape) {
+    return true;
+  }
+
+  // (3) Escaping matches?  (Expensive check, saved for last.)
+  auto moveHasEscape = hasPointerEscape(mvi);
+  return moveHasEscape == originalHasEscape;
 }

@@ -252,9 +252,6 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
-  /// Should we use the legacy pass manager.
-  unsigned LegacyPassManager : 1;
-
   OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
@@ -320,6 +317,9 @@ public:
 
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
+
+  /// Always recompile the output even if the module hash might match.
+  unsigned AlwaysCompile : 1;
 
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
@@ -474,7 +474,7 @@ public:
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), LegacyPassManager(0), OptMode(OptimizationMode::NotSet),
+        Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false),
@@ -484,7 +484,7 @@ public:
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         Playground(false),
         EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
-        FunctionSections(false), PrintInlineTree(false),
+        FunctionSections(false), PrintInlineTree(false), AlwaysCompile(false),
         EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),

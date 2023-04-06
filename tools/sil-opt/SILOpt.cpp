@@ -110,6 +110,10 @@ EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
 static llvm::cl::opt<bool>
+EnableOSSACompleteLifetimes("enable-ossa-complete-lifetimes",
+                      llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+
+static llvm::cl::opt<bool>
 EnableObjCInterop("enable-objc-interop",
                   llvm::cl::desc("Enable Objective-C interoperability."));
 
@@ -577,8 +581,13 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(EnableExperimentalMoveOnly);
-  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly)
+  if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
+    // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
     Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
+    Invocation.getLangOptions().Features.insert(Feature::NoImplicitCopy);
+    Invocation.getLangOptions().Features.insert(
+        Feature::OldOwnershipOperatorSpellings);
+  }
   for (auto &featureName : ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().Features.insert(*feature);
@@ -659,6 +668,7 @@ int main(int argc, char **argv) {
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
+  SILOpts.OSSACompleteLifetimes = EnableOSSACompleteLifetimes;
 
   if (CopyPropagationState) {
     SILOpts.CopyPropagation = *CopyPropagationState;

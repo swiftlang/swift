@@ -14,22 +14,22 @@ func +(lhs: X, rhs: X) -> X {} // okay
 func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
 
 extension X {
-    static func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+    static func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
 }
 
 extension X {
     struct Z {
-        static func <=> (lhs: Z, rhs: Z) -> Z {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+        static func <=> (lhs: Z, rhs: Z) -> Z {} // expected-error {{operator implementation without matching operator declaration}}{{-2:1-1=infix operator <=> : <# Precedence Group #>\n}}
     }
 }
 
 extension X {
-    static prefix func <=>(lhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+    static prefix func <=>(lhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{-1:1-1=prefix operator <=> : <# Precedence Group #>\n}}
 }
 
 extension X {
     struct ZZ {
-        static prefix func <=>(lhs: ZZ) -> ZZ {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+        static prefix func <=>(lhs: ZZ) -> ZZ {} // expected-error {{operator implementation without matching operator declaration}}{{-2:1-1=prefix operator <=> : <# Precedence Group #>\n}}
     }
 }
 

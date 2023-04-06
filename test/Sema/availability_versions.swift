@@ -57,11 +57,6 @@ func functionAvailableOn10_51() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
-// Don't allow script-mode globals to marked potentially unavailable. Their
-// initializers are eagerly executed.
-@available(OSX, introduced: 10.51) // expected-error {{global variable cannot be marked potentially unavailable with '@available' in script mode}}
-var potentiallyUnavailableGlobalInScriptMode: Int = globalFuncAvailableOn10_51()
-
 // Still allow other availability annotations on script-mode globals
 @available(OSX, deprecated: 10.51)
 var deprecatedGlobalInScriptMode: Int = 5
@@ -1426,7 +1421,7 @@ class ClassForFixit {
       let _ = 6
     }
         // expected-error@-4 {{'globalFuncAvailableOn10_51()' is only available in macOS 10.51 or newer}}
-        // expected-note@-5 {{add 'if #available' version check}} {{5-6=if #available(macOS 10.51, *) {\n        if (globalFuncAvailableOn10_51() > 1066) {\n          let _ = 5\n          let _ = 6\n        }\n    } else {\n        // Fallback on earlier versions\n    }}}
+        // expected-note@-5 {{add 'if #available' version check}} {{5-+3:6=if #available(macOS 10.51, *) {\n        if (globalFuncAvailableOn10_51() > 1066) {\n          let _ = 5\n          let _ = 6\n        }\n    } else {\n        // Fallback on earlier versions\n    }}}
   }
 }
 
@@ -1731,12 +1726,11 @@ struct HasUnavailableExtension {
 
 @available(OSX, unavailable)
 extension HasUnavailableExtension {
-    // expected-note@-1 {{enclosing scope has been explicitly marked unavailable here}}
 
   public func inheritsUnavailable() { }
       // expected-note@-1 {{'inheritsUnavailable()' has been explicitly marked unavailable here}}
 
-  @available(OSX 10.9, *) // expected-warning {{instance method cannot be more available than unavailable enclosing scope}}
+  @available(OSX 10.9, *)
   public func moreAvailableButStillUnavailable() { }
       // expected-note@-1 {{'moreAvailableButStillUnavailable()' has been explicitly marked unavailable here}}
 }

@@ -558,9 +558,6 @@ public:
   void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
                                    CodeCompletionLiteralKind kind);
 
-  /// Add '#file', '#line', et at.
-  void addPoundLiteralCompletions(bool needPound);
-
   void addValueLiteralCompletions();
 
   void addObjCPoundKeywordCompletions(bool needPound);
@@ -617,7 +614,7 @@ public:
   void collectPrecedenceGroups();
 
   void getPrecedenceGroupCompletions(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK);
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK);
 
   void getPoundAvailablePlatformCompletions();
 

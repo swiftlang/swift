@@ -6,9 +6,9 @@
 // REQUIRES: objc_interop
 
 
-// CHECK: [[ADR:%.*]] = ref_element_addr %{{.*}} : $RecursibleDirectoryContentsGenerator, #RecursibleDirectoryContentsGenerator.fileSystem, loc {{.*}}:39:5, scope 2
+// CHECK: [[ADR:%.*]] = ref_element_addr %{{.*}} : $RecursibleDirectoryContentsGenerator, #RecursibleDirectoryContentsGenerator.fileSystem, loc {{.*}}:39:5, scope [[SCOPE:[0-9]+]]
 // CHECK: [[ADR_ACCESS:%.*]] = begin_access [deinit] [static] [[ADR]]
-// CHECK: destroy_addr [[ADR_ACCESS]] : $*any FileSystem, loc {{.*}}:39:5, scope 2
+// CHECK: destroy_addr [[ADR_ACCESS]] : $*any FileSystem, loc {{.*}}:39:5, scope [[SCOPE]]
 
 
 import Foundation

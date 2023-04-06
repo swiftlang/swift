@@ -58,22 +58,28 @@ protected:
   LoadableTypeInfo(llvm::Type *type, Size size,
                    const SpareBitVector &spareBits,
                    Alignment align,
-                   IsPOD_t pod, IsFixedSize_t alwaysFixedSize,
+                   IsTriviallyDestroyable_t pod,
+                   IsCopyable_t copy,
+                   IsFixedSize_t alwaysFixedSize,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, spareBits, align, pod,
                       // All currently implemented loadable types are bitwise-takable.
-                      IsBitwiseTakable, alwaysFixedSize, stik) {
+                      IsBitwiseTakable,
+                      copy, alwaysFixedSize, stik) {
     assert(isLoadable());
   }
 
   LoadableTypeInfo(llvm::Type *type, Size size,
                    SpareBitVector &&spareBits,
                    Alignment align,
-                   IsPOD_t pod, IsFixedSize_t alwaysFixedSize,
+                   IsTriviallyDestroyable_t pod,
+                   IsCopyable_t copy,
+                   IsFixedSize_t alwaysFixedSize,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, std::move(spareBits), align, pod,
                       // All currently implemented loadable types are bitwise-takable.
-                      IsBitwiseTakable, alwaysFixedSize, stik) {
+                      IsBitwiseTakable,
+                      copy, alwaysFixedSize, stik) {
     assert(isLoadable());
   }
 

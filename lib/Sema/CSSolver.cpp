@@ -185,7 +185,7 @@ Solution ConstraintSystem::finalize() {
     solution.contextualTypes.push_back({entry.first, entry.second.first});
   }
 
-  solution.solutionApplicationTargets = solutionApplicationTargets;
+  solution.targets = targets;
   solution.caseLabelItems = caseLabelItems;
   solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
   solution.preconcurrencyClosures.append(preconcurrencyClosures.begin(),
@@ -295,9 +295,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the statement condition targets.
-  for (const auto &target : solution.solutionApplicationTargets) {
-    if (!getSolutionApplicationTarget(target.first))
-      setSolutionApplicationTarget(target.first, target.second);
+  for (const auto &target : solution.targets) {
+    if (!getTargetFor(target.first))
+      setTargetFor(target.first, target.second);
   }
 
   // Register the statement condition targets.
@@ -601,7 +601,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
-  numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
+  numTargets = cs.targets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
   numIsolatedParams = cs.isolatedParams.size();
   numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
@@ -710,8 +710,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any contextual types.
   truncate(cs.contextualTypes, numContextualTypes);
 
-  // Remove any solution application targets.
-  truncate(cs.solutionApplicationTargets, numSolutionApplicationTargets);
+  // Remove any targets.
+  truncate(cs.targets, numTargets);
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
@@ -975,6 +975,10 @@ void ConstraintSystem::shrink(Expr *expr) {
 
     ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
         : PrimaryExpr(expr), CS(cs), Domains(domains) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // A dictionary expression is just a set of tuples; try to solve ones
@@ -1304,8 +1308,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-static bool debugConstraintSolverForTarget(
-   ASTContext &C, SolutionApplicationTarget target) {
+static bool debugConstraintSolverForTarget(ASTContext &C,
+                                           SyntacticElementTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
@@ -1338,10 +1342,9 @@ static bool debugConstraintSolverForTarget(
   return startBound != endBound;
 }
 
-Optional<std::vector<Solution>> ConstraintSystem::solve(
-    SolutionApplicationTarget &target,
-    FreeTypeVariableBinding allowFreeTypeVariables
-) {
+Optional<std::vector<Solution>>
+ConstraintSystem::solve(SyntacticElementTarget &target,
+                        FreeTypeVariableBinding allowFreeTypeVariables) {
   llvm::SaveAndRestore<ConstraintSystemOptions> debugForExpr(Options);
   if (debugConstraintSolverForTarget(getASTContext(), target)) {
     Options |= ConstraintSystemFlags::DebugConstraints;
@@ -1427,7 +1430,10 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     case SolutionResult::Ambiguous:
       // If salvaging produced an ambiguous result, it has already been
       // diagnosed.
-      if (stage == 1) {
+      // If we have found an ambiguous solution in the first stage, salvaging
+      // won't produce more solutions, so we can inform the solution callback
+      // about the current ambiguous solutions straight away.
+      if (stage == 1 || Context.SolutionCallback) {
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return None;
@@ -1446,8 +1452,10 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
       LLVM_FALLTHROUGH;
 
     case SolutionResult::UndiagnosedError:
-      if (shouldSuppressDiagnostics()) {
-        reportSolutionsToSolutionCallback(solution);
+      /// If we have a SolutionCallback, we are inspecting constraint system
+      /// solutions directly and thus also want to receive ambiguous solutions.
+      /// Hence always run the second (salvaging) stage.
+      if (shouldSuppressDiagnostics() && !Context.SolutionCallback) {
         solution.markAsDiagnosed();
         return None;
       }
@@ -1469,7 +1477,7 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
 }
 
 SolutionResult
-ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
+ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (isDebugMode()) {
     auto &log = llvm::errs();
@@ -1666,7 +1674,7 @@ void ConstraintSystem::solveForCodeCompletion(
 }
 
 bool ConstraintSystem::solveForCodeCompletion(
-    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
+    SyntacticElementTarget &target, SmallVectorImpl<Solution> &solutions) {
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.
     setContextualType(expr, target.getExprContextualTypeLoc(),

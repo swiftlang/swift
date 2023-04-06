@@ -10,6 +10,8 @@ public struct Foo : MyProto {
     let init1 = Bar()
     let init2: Bat = .init()
     let init3 = Bat(buz: "hello", fuz: adder(2, 3))
+    static var init4: Bar? = Bar()
+
     let func1: Int = adder(2, 3)
 }
 
@@ -111,8 +113,21 @@ public struct Bat {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
-// CHECK-NEXT:        "line": 13,
+// CHECK-NEXT:        "line": 15,
 // CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "label": "init4",
+// CHECK-NEXT:        "type": "Swift.Optional<ExtractCalls.Bar>",
+// CHECK-NEXT:        "isStatic": "true",
+// CHECK-NEXT:        "isComputed": "false",
+// CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:        "line": 13,
+// CHECK-NEXT:        "valueKind": "InitCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "type": "ExtractCalls.Bar",
+// CHECK-NEXT:          "arguments": []
+// CHECK-NEXT:        }
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "ext1",
@@ -120,7 +135,7 @@ public struct Bat {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
-// CHECK-NEXT:        "line": 19,
+// CHECK-NEXT:        "line": 21,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractCalls.Foo.Boo",

@@ -30,7 +30,7 @@ enum class ObjCSelectorContext {
 };
 
 /// Parser's interface to code completion.
-class IDEInspectionCallbacks {
+class CodeCompletionCallbacks {
 protected:
   Parser &P;
   ASTContext &Context;
@@ -55,11 +55,9 @@ protected:
   std::vector<Expr *> leadingSequenceExprs;
 
 public:
-  IDEInspectionCallbacks(Parser &P)
-      : P(P), Context(P.Context) {
-  }
+  CodeCompletionCallbacks(Parser &P) : P(P), Context(P.Context) {}
 
-  virtual ~IDEInspectionCallbacks() {}
+  virtual ~CodeCompletionCallbacks() {}
 
   bool isInsideObjCSelector() const {
     return CompleteExprSelectorContext != ObjCSelectorContext::None;
@@ -81,10 +79,10 @@ public:
   }
 
   class InEnumElementRawValueRAII {
-    IDEInspectionCallbacks *Callbacks;
+    CodeCompletionCallbacks *Callbacks;
 
   public:
-    InEnumElementRawValueRAII(IDEInspectionCallbacks *Callbacks)
+    InEnumElementRawValueRAII(CodeCompletionCallbacks *Callbacks)
         : Callbacks(Callbacks) {
       if (Callbacks)
         Callbacks->InEnumElementRawValue = true;
@@ -99,10 +97,10 @@ public:
   /// RAII type that temporarily sets the "in Objective-C #selector expression"
   /// flag on the code completion callbacks object.
   class InObjCSelectorExprRAII {
-    IDEInspectionCallbacks *Callbacks;
+    CodeCompletionCallbacks *Callbacks;
 
   public:
-    InObjCSelectorExprRAII(IDEInspectionCallbacks *Callbacks,
+    InObjCSelectorExprRAII(CodeCompletionCallbacks *Callbacks,
                            ObjCSelectorContext SelectorContext)
         : Callbacks(Callbacks) {
       if (Callbacks)
@@ -251,20 +249,31 @@ public:
   virtual void completeTypeAttrBeginning() {};
 
   virtual void completeOptionalBinding(){};
+};
+
+class DoneParsingCallback {
+public:
+  virtual ~DoneParsingCallback() {}
 
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing(SourceFile *SrcFile) = 0;
 };
 
-/// A factory to create instances of \c IDEInspectionCallbacks.
+/// A factory to create instances of \c CodeCompletionCallbacks and
+/// \c DoneParsingCallback.
 class IDEInspectionCallbacksFactory {
 public:
   virtual ~IDEInspectionCallbacksFactory() {}
 
+  struct Callbacks {
+    std::shared_ptr<CodeCompletionCallbacks> CompletionCallbacks;
+    std::shared_ptr<DoneParsingCallback> DoneParsingCallback;
+  };
+
   /// Create an instance of \c IDEInspectionCallbacks.  The result
   /// should be deallocated with 'delete'.
-  virtual IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) = 0;
+  virtual Callbacks createCallbacks(Parser &P) = 0;
 };
 
 } // namespace swift

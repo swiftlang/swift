@@ -65,6 +65,11 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   bool nonEmpty = builder.addFields(Elements, strategy);
 
+  auto deinit = (decl && decl->getValueTypeDestructor())
+    ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
+  auto copyable = (decl && decl->isMoveOnly())
+    ? IsNotCopyable : IsCopyable;
+
   // Special-case: there's nothing to store.
   // In this case, produce an opaque type;  this tends to cause lovely
   // assertions.
@@ -75,9 +80,10 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits.clear();
     IsFixedLayout = true;
-    IsKnownPOD = IsPOD;
+    IsKnownTriviallyDestroyable = deinit;
     IsKnownBitwiseTakable = IsBitwiseTakable;
     IsKnownAlwaysFixedSize = IsFixedSize;
+    IsKnownCopyable = copyable;
     Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
   } else {
     MinimumAlign = builder.getAlignment();
@@ -85,9 +91,10 @@ StructLayout::StructLayout(IRGenModule &IGM,
     headerSize = builder.getHeaderSize();
     SpareBits = builder.getSpareBits();
     IsFixedLayout = builder.isFixedLayout();
-    IsKnownPOD = builder.isPOD();
+    IsKnownTriviallyDestroyable = deinit & builder.isTriviallyDestroyable();
     IsKnownBitwiseTakable = builder.isBitwiseTakable();
     IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
+    IsKnownCopyable = copyable & builder.isCopyable();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -217,7 +224,30 @@ void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
   assert(CurSize.isMultipleOf(IGM.getPointerSize()));
   assert(align >= CurAlignment);
   assert(CurSize == getDefaultActorStorageFieldOffset(IGM));
-  elt.completeFixed(IsNotPOD, CurSize, /*struct index*/ 1);
+  elt.completeFixed(IsNotTriviallyDestroyable, CurSize, /*struct index*/ 1);
+  CurSize += size;
+  CurAlignment = align;
+  StructFields.push_back(ty);
+  headerSize = CurSize;
+}
+
+void StructLayoutBuilder::addNonDefaultDistributedActorHeader(ElementLayout &elt) {
+  assert(StructFields.size() == 1 &&
+         StructFields[0] == IGM.RefCountedStructTy &&
+         "adding default actor header at wrong offset");
+
+  // These must match the NonDefaultDistributedActor class in Actor.h.
+  auto size = NumWords_NonDefaultDistributedActor * IGM.getPointerSize();
+  auto align = Alignment(Alignment_NonDefaultDistributedActor);
+  auto ty = llvm::ArrayType::get(IGM.Int8PtrTy, NumWords_NonDefaultDistributedActor);
+
+  // Note that we align the *entire structure* to the new alignment,
+  // not the storage we're adding.  Otherwise we would potentially
+  // get internal padding.
+  assert(CurSize.isMultipleOf(IGM.getPointerSize()));
+  assert(align >= CurAlignment);
+  assert(CurSize == getNonDefaultDistributedActorStorageFieldOffset(IGM));
+  elt.completeFixed(IsNotTriviallyDestroyable, CurSize, /*struct index*/ 1);
   CurSize += size;
   CurAlignment = align;
   StructFields.push_back(ty);
@@ -225,6 +255,10 @@ void StructLayoutBuilder::addDefaultActorHeader(ElementLayout &elt) {
 }
 
 Size irgen::getDefaultActorStorageFieldOffset(IRGenModule &IGM) {
+  return IGM.RefCountedStructSize;
+}
+
+Size irgen::getNonDefaultDistributedActorStorageFieldOffset(IRGenModule &IGM) {
   return IGM.RefCountedStructSize;
 }
 
@@ -245,7 +279,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
 bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
   auto &eltTI = elt.getType();
-  IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
+  IsKnownTriviallyDestroyable &= eltTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
 
@@ -342,7 +376,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
   auto byteOffset = isFixedLayout() ? CurSize : Size(0);
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), byteOffset);
+  elt.completeEmpty(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal), byteOffset);
 }
 
 /// Add an element at the fixed offset of the current end of the
@@ -351,7 +385,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
   auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
-  elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeFixed(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
   StructFields.push_back(elt.getType().getStorageType());
   
@@ -362,7 +396,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeNonFixed(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
   CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
@@ -372,7 +406,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(isFixedLayout());
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  elt.completeInitialNonFixedSize(elt.getType().isTriviallyDestroyable(ResilienceExpansion::Maximal));
   CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
 
@@ -410,8 +444,11 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   auto numFields =
     target->getStoredPropertiesAndMissingMemberPlaceholders().size();
   if (auto cls = dyn_cast<ClassDecl>(target)) {
-    if (cls->isRootDefaultActor())
+    if (cls->isRootDefaultActor()) {
       numFields++;
+    } else if (cls->isNonDefaultExplicitDistributedActor()) {
+      numFields++;
+    }
   }
   return numFields;
 }
@@ -419,8 +456,12 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
 void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (classDecl && classDecl->isRootDefaultActor()) {
-    fn(Field::DefaultActorStorage);
+  if (classDecl) {
+    if (classDecl->isRootDefaultActor()) {
+      fn(Field::DefaultActorStorage);
+    } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+      fn(Field::NonDefaultDistributedActorStorage);
+    }
   }
 
   for (auto decl :
@@ -443,6 +484,9 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
+  case Field::NonDefaultDistributedActorStorage:
+    return SILType::getPrimitiveObjectType(
+                             IGM.Context.TheNonDefaultDistributedActorStorageType);
   }
   llvm_unreachable("bad field kind");
 }
@@ -455,6 +499,8 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
+  case Field::NonDefaultDistributedActorStorage:
+    return IGM.Context.TheNonDefaultDistributedActorStorageType;
   }
   llvm_unreachable("bad field kind");
 }
@@ -467,6 +513,8 @@ StringRef Field::getName() const {
     llvm_unreachable("cannot ask for type of missing member");
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
+  case Field::NonDefaultDistributedActorStorage:
+    return NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME;
   }
   llvm_unreachable("bad field kind");
 }

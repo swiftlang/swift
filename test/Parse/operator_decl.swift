@@ -52,6 +52,7 @@ infix operator aa--: A // expected-error {{'aa' is considered an identifier and 
 infix operator <<$$@< // expected-error {{'$$' is considered an identifier and must not appear within an operator name}}
 infix operator !!@aa // expected-error {{'@' is not allowed in operator names}}
 infix operator #++= // expected-error {{'#' is not allowed in operator names}}
+// expected-error@-1 {{expected a macro identifier}}
 infix operator ++=# // expected-error {{'#' is not allowed in operator names}}
 infix operator -># // expected-error {{'#' is not allowed in operator names}}
 
@@ -60,6 +61,7 @@ infix operator -># // expected-error {{'#' is not allowed in operator names}}
 infix operator =#=
 // expected-error@-1 {{'#' is not allowed in operator names}}
 // expected-error@-2 {{'=' must have consistent whitespace on both sides}}
+// expected-error@-3 {{expected a macro identifier}}
 
 infix operator +++=
 infix operator *** : A

@@ -43,10 +43,47 @@ else()
   set(CMAKE_JOB_POOL_LINK local_jobs)
 endif()
 
-ENABLE_LANGUAGE(C)
+enable_language(C)
+enable_language(CXX)
 
-# Use C++14.
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+# On Windows, use MASM or MARMASM
+set(SWIFT_ASM_DIALECT ASM)
+set(SWIFT_ASM_EXT S)
+set(SWIFT_ASM_AVAILABLE YES)
+if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+    if(CMAKE_VERSION VERSION_LESS "3.26")
+      message(warning "We can't build assembly language for ARM64 until CMake 3.26")
+      set(SWIFT_ASM_AVAILABLE NO)
+    else()
+      set(SWIFT_ASM_DIALECT ASM_MARMASM)
+    endif()
+  else()
+    set(SWIFT_ASM_DIALECT ASM_MASM)
+  endif()
+  set(SWIFT_ASM_EXT asm)
+endif()
+
+if(SWIFT_ASM_AVAILABLE)
+  enable_language(${SWIFT_ASM_DIALECT})
+endif()
+
+# Use C++17.
+set(SWIFT_MIN_CXX_STANDARD 17)
+
+# Unset CMAKE_CXX_STANDARD if it's too low and in the CMakeCache.txt
+if($CACHE{CMAKE_CXX_STANDARD} AND $CACHE{CMAKE_CXX_STANDARD} LESS ${SWIFT_MIN_CXX_STANDARD})
+  message(WARNING "Resetting cache value for CMAKE_CXX_STANDARD to ${SWIFT_MIN_CXX_STANDARD}")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
+
+# Allow manually specified CMAKE_CXX_STANDARD if it's greater than the minimum
+# required C++ version
+if(DEFINED CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD LESS ${SWIFT_MIN_CXX_STANDARD})
+  message(FATAL_ERROR "Requested CMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD} which is less than the minimum C++ standard ${SWIFT_MIN_CXX_STANDARD}")
+endif()
+
+set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
@@ -55,6 +92,8 @@ include(SwiftUtils)
 include(CheckSymbolExists)
 include(CMakeDependentOption)
 include(CheckLanguage)
+include(GNUInstallDirs)
+include(SwiftImplicitImport)
 
 # Enable Swift for the host compiler build if we have the language. It is
 # optional until we have a bootstrap story.
@@ -265,12 +304,7 @@ endif()
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 
-# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
-# can be reused when a new version of Swift comes out (assuming the user hasn't
-# manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION_MAJOR 5)
-set(SWIFT_VERSION_MINOR 9)
-set(SWIFT_VERSION "${SWIFT_VERSION_MAJOR}.${SWIFT_VERSION_MINOR}")
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/SwiftVersion.cmake)
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -322,6 +356,10 @@ if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
   endif()
   add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
 endif()
+
+set(SWIFT_TOOLS_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH
+  "Path for binary subdirectory to use during installation.
+  Used by add_swift_tool_symlink in AddSwift.cmake so that llvm_install_symlink generates the installation script properly.")
 
 #
 # User-configurable Swift Standard Library specific options.
@@ -560,6 +598,10 @@ option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   "Implicitly import the Swift concurrency module"
   TRUE)
 
+option(SWIFT_IMPLICIT_BACKTRACING_IMPORT
+  "Implicitly import the Swift backtracing module"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable build of the Swift concurrency module"
   FALSE)
@@ -572,8 +614,8 @@ option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   "Enable experimental string processing"
   FALSE)
 
-option(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION
-  "Enable build of the Swift reflection module"
+option(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION
+  "Enable build of the Swift observation module"
   FALSE)
 
 option(SWIFT_ENABLE_DISPATCH
@@ -601,6 +643,10 @@ option(SWIFT_ENABLE_MACCATALYST
   "Build the Standard Library and overlays with MacCatalyst support"
   FALSE)
 
+option(SWIFT_ENABLE_BACKTRACING
+  "Build backtracing runtime support"
+  FALSE)
+
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "14.5" CACHE STRING
   "Minimum deployment target version for macCatalyst")
 
@@ -614,7 +660,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BUILT_STANDALONE)
-  project(Swift C CXX ASM)
+  project(Swift C CXX ${SWIFT_ASM_DIALECT})
 endif()
 
 if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
@@ -684,8 +730,19 @@ execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
 message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Assembler (${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER}) Version: ${CMAKE_${SWIFT_ASM_DIALECT}_COMPILER_VERSION}")
 if (CMAKE_Swift_COMPILER)
   message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
+
+  # Check if the current Swift compiler has implicit _StringProcessing module.
+  swift_supports_implicit_module("string-processing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
+  message(STATUS "  Implicit 'string-processing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT}")
+
+  # Same for _Backtracing.
+  swift_supports_implicit_module("backtracing"
+    SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
+  message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
@@ -731,6 +788,7 @@ include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
+include(AddPureSwift)
 
 # Configure swift include, install, build components.
 swift_configure_components()
@@ -1120,11 +1178,22 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support:          ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Backtracing Support:                ${SWIFT_ENABLE_BACKTRACING}")
   message(STATUS "Unicode Support:                    ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
-  message(STATUS "Reflection Support:                 ${SWIFT_ENABLE_EXPERIMENTAL_REFLECTION}")
+  message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
+  message(STATUS "")
+endif()
+
+if(SWIFT_BUILD_LIBEXEC)
+  message(STATUS "Building Swift auxiliary executables for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "")
+endif()
+
+if(SWIFT_BUILD_REMOTE_MIRROR)
+  message(STATUS "Building Swift Remote Mirror for SDKs: ${SWIFT_SDKS}")
   message(STATUS "")
 endif()
 
@@ -1212,6 +1281,19 @@ else()
   # so ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
+  endif()
+
+  # We might want to build Remote Mirror separately
+  if(SWIFT_BUILD_REMOTE_MIRROR)
+    add_subdirectory(stdlib/public/LLVMSupport)
+    add_subdirectory(stdlib/public/Demangling)
+    add_subdirectory(stdlib/public/RemoteInspection)
+    add_subdirectory(stdlib/public/SwiftRemoteMirror)
+  endif()
+
+  # We might also want to build the things in libexec seaprately
+  if(SWIFT_BUILD_LIBEXEC)
+    add_subdirectory(stdlib/public/libexec)
   endif()
 endif()
 

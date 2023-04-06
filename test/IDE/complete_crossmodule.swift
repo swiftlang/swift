@@ -16,7 +16,5 @@ import MyModule
 
 struct MyValue: HasAssocWithConstraint {
   var #^OPAQUE_RESULT^#
-// OPAQUE_RESULT: Begin completions
 // OPAQUE_RESULT-DAG: Decl[InstanceVar]/Super: value: some HasAssocWithConstraint;
-// OPAQUE_RESULT: End completions
 }

@@ -53,13 +53,61 @@ extension std.u16string: ExpressibleByStringLiteral {
   }
 }
 
+// MARK: Concatenating and comparing C++ strings
+
+extension std.string: Equatable {
+  public static func ==(lhs: std.string, rhs: std.string) -> Bool {
+    return lhs.compare(rhs) == 0
+  }
+
+  public static func +=(lhs: inout std.string, rhs: std.string) {
+    lhs.__appendUnsafe(rhs) // ignore the returned pointer
+  }
+
+  public static func +(lhs: std.string, rhs: std.string) -> std.string {
+    var copy = lhs
+    copy += rhs
+    return copy
+  }
+}
+
+extension std.u16string: Equatable {
+  public static func ==(lhs: std.u16string, rhs: std.u16string) -> Bool {
+    return lhs.compare(rhs) == 0
+  }
+
+  public static func +=(lhs: inout std.u16string, rhs: std.u16string) {
+    lhs.__appendUnsafe(rhs) // ignore the returned pointer
+  }
+
+  public static func +(lhs: std.u16string, rhs: std.u16string) -> std.u16string {
+    var copy = lhs
+    copy += rhs
+    return copy
+  }
+}
+
+// MARK: Getting a Swift description of a C++ string
+
 extension std.string: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "std.string(\(String(self)))"
   }
 }
 
+extension std.u16string: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "std.u16string(\(String(self)))"
+  }
+}
+
 extension std.string: CustomStringConvertible {
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension std.u16string: CustomStringConvertible {
   public var description: String {
     return String(self)
   }

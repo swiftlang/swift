@@ -780,7 +780,9 @@ class C : Abstractable {
 // CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegd_SiIegr_TR
 // CHECK-NEXT:   [[THUNKED_OLD_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[OLD_FN]])
 // CHECK-NEXT:   [[CONVERTED_OLD_FN:%.*]] = convert_function [[THUNKED_OLD_FN]]
-// CHECK-NEXT:   store [[CONVERTED_OLD_FN]] to [init] [[TEMP]] :
+// CHECK-NEXT:   [[TEMP_ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]] :
+// CHECK-NEXT:   store [[CONVERTED_OLD_FN]] to [init] [[TEMP_ACCESS]] :
+// CHECK-NEXT:   end_access [[TEMP_ACCESS]]
 // CHECK-NEXT:   yield [[TEMP]] : {{.*}}, resume bb1, unwind bb2
 
 // CHECK:      bb1:

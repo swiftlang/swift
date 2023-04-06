@@ -84,3 +84,33 @@ do {
   let _: (Int, Int).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int, Swift.Int)'}}
   let _: ((Int) -> Void).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int) -> Swift.Void'}}
 }
+
+// Accept member type expressions rooted on 'Self' or non-identifier qualifiers
+// until Swift 6.
+do {
+  struct Test {
+    enum E {}
+
+    func blackHole<T>(_: T.Type) {}
+
+    func test() {
+      blackHole(Self.E)
+      // expected-warning@-1 {{expected member name or constructor call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole((Test).E)
+      // expected-warning@-1 {{expected member name or constructor call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole([Test].Element)
+      // expected-warning@-1 {{expected member name or constructor call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      // expected-note@-3 {{add arguments after the type to construct a value of the type}}
+      blackHole([Int : Test].Element)
+      // expected-warning@-1 {{expected member name or constructor call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole(Test?.Wrapped)
+      // expected-warning@-1 {{expected member name or constructor call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      // expected-note@-3 {{add arguments after the type to construct a value of the type}}
+    }
+  }
+}

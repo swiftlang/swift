@@ -971,6 +971,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setLifetimeAnnotation(lifetime);
       bool isClosureCapture = (Args[I + 1] >> 19) & 0x1;
       fArg->setClosureCapture(isClosureCapture);
+      bool isFormalParameterPack = (Args[I + 1] >> 20) & 0x1;
+      fArg->setFormalParameterPack(isFormalParameterPack);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
@@ -1308,13 +1310,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::TestSpecificationInst:
     llvm_unreachable("not supported");
 
-  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    bool hasDynamicLifetime = Attr & 0x1;
+    bool reflection = (Attr >> 1) & 0x1;
+    bool usesMoveableValueDebugInfo = (Attr >> 2) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        /*bool hasDynamicLifetime*/ Attr & 1,
-        /*bool reflection*/ Attr & 2);
+        hasDynamicLifetime, reflection, usesMoveableValueDebugInfo);
     break;
+  }
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     bool hasDynamicLifetime = Attr & 0x1;
@@ -2195,14 +2200,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
-  case SILInstructionKind::MarkMustCheckInst: {
-    using CheckKind = MarkMustCheckInst::CheckKind;
-    auto Ty = MF->getType(TyID);
-    auto CKind = CheckKind(Attr);
-    ResultInst = Builder.createMarkMustCheckInst(
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst: {
+    using Kind = MarkUnresolvedReferenceBindingInst::Kind;
+    auto ty = MF->getType(TyID);
+    auto kind = Kind(Attr);
+    ResultInst = Builder.createMarkUnresolvedReferenceBindingInst(
         Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        CKind);
+        getLocalValue(ValID, getSILType(ty, (SILValueCategory)TyCategory, Fn)),
+        kind);
     break;
   }
 
@@ -2270,6 +2275,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Kind = (MarkUninitializedInst::Kind)Attr;
     auto Val = getLocalValue(ValID, Ty);
     ResultInst = Builder.createMarkUninitialized(Loc, Val, Kind);
+    break;
+  }
+  case SILInstructionKind::MarkMustCheckInst: {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    auto Ty = MF->getType(TyID);
+    auto CKind = CheckKind(Attr);
+    ResultInst = Builder.createMarkMustCheckInst(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        CKind);
     break;
   }
   case SILInstructionKind::StoreInst: {

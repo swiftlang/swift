@@ -264,18 +264,67 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
+        // If a type is noncopyable, lie about the resolved type unless the
+        // runtime is sufficiently aware of noncopyable types.
+        if (substT->isPureMoveOnly()) {
+          // Darwin-based platforms have ABI stability, and we want binaries
+          // that use noncopyable types nongenerically today to be forward
+          // compatible with a future OS runtime that supports noncopyable
+          // generics. On other platforms, a new Swift compiler and runtime
+          // require recompilation anyway, so this dance is unnecessary, and
+          // for now, we can unconditionally lie.
+          bool useForwardCompatibility =
+            IGM.Context.LangOpts.Target.isOSDarwin();
+          
+          llvm::Instruction *br = nullptr;
+          llvm::BasicBlock *supportedBB = nullptr;
+          if (useForwardCompatibility) {
+            auto runtimeSupportsNoncopyableTypesSymbol
+              = IGM.Module.getOrInsertGlobal("swift_runtimeSupportsNoncopyableTypes",
+                                             IGM.Int8Ty);
+            cast<llvm::GlobalVariable>(runtimeSupportsNoncopyableTypesSymbol)
+              ->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+              
+            auto runtimeSupportsNoncopyableTypes
+              = IGF.Builder.CreateIsNotNull(runtimeSupportsNoncopyableTypesSymbol,
+                                            "supports.noncopyable");
+            supportedBB = IGF.createBasicBlock("does.support.noncopyable");
+            auto unsupportedBB = IGF.createBasicBlock("does.not.support.noncopyable");
+            br = IGF.Builder.CreateCondBr(runtimeSupportsNoncopyableTypes,
+                                     supportedBB,
+                                     unsupportedBB);
+                                     
+            IGF.Builder.emitBlock(unsupportedBB);
+          }
+          
+          // If the runtime does not yet support noncopyable types, lie that the
+          // field is an empty tuple, so the runtime doesn't try to do anything
+          // with the actual value.
+          auto phonyRet = IGF.emitTypeMetadataRef(IGM.Context.TheEmptyTupleType);
+          IGF.Builder.CreateRet(phonyRet);
+
+          if (!useForwardCompatibility) {
+            goto done_building_function;
+          }
+          
+          // Emit the type metadata normally otherwise.
+          IGF.Builder.SetInsertPoint(br);
+          IGF.Builder.emitBlock(supportedBB);
+        }
+
+        SubstitutionMap subs;
+        if (genericEnv)
+          subs = genericEnv->getForwardingSubstitutionMap();
+
         bindFromGenericRequirementsBuffer(
             IGF, requirements,
             Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
-            MetadataState::Complete, [&](CanType t) {
-              return genericEnv
-                ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
-                : t;
-            });
+            MetadataState::Complete, subs);
 
         auto ret = IGF.emitTypeMetadataRef(substT);
         IGF.Builder.CreateRet(ret);
       }
+    done_building_function:
       // Form the mangled name with its relative reference.
       auto S = B.beginStruct();
       S.setPacked(true);
@@ -315,6 +364,21 @@ getTypeRefImpl(IRGenModule &IGM,
   case MangledTypeRefRole::FlatUnique:
     useFlatUnique = true;
     break;
+    
+  case MangledTypeRefRole::FieldMetadata:
+    // We want to keep fields of noncopyable type from being exposed to
+    // in-process runtime reflection libraries in older Swift runtimes, since
+    // they more than likely assume they can copy field values, and the language
+    // support for noncopyable types as dynamic or generic types isn't yet
+    // implemented as of the writing of this comment. If the type is
+    // noncopyable, use a function to emit the type ref which will look for a
+    // signal from future runtimes whether they support noncopyable types before
+    // exposing their metadata to them.
+    if (type->isPureMoveOnly()) {
+      IGM.IRGen.noteUseOfTypeMetadata(type);
+      return getTypeRefByFunction(IGM, sig, type);
+    }
+    LLVM_FALLTHROUGH;
 
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -421,9 +485,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             bindFromGenericRequirementsBuffer(
                 IGF, requirements,
                 Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
-                MetadataState::Complete, [&](CanType t) {
-                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-                });
+                MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
@@ -724,14 +786,14 @@ private:
       if (type->isForeignReferenceType()) {
         auto opaqueType = type->getASTContext().getOpaquePointerType();
         // The standard library's Mirror demangles metadata from field
-        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // descriptors, so use MangledTypeRefRole::FieldMetadata to ensure
         // runtime metadata is available.
-        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::Metadata);
+        addTypeRef(opaqueType, genericSig, MangledTypeRefRole::FieldMetadata);
       } else {
         // The standard library's Mirror demangles metadata from field
-        // descriptors, so use MangledTypeRefRole::Metadata to ensure
+        // descriptors, so use MangledTypeRefRole::FieldMetadata to ensure
         // runtime metadata is available.
-        addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
+        addTypeRef(type, genericSig, MangledTypeRefRole::FieldMetadata);
       }
     }
 
@@ -756,6 +818,9 @@ private:
     case Field::MissingMember:
       llvm_unreachable("emitting reflection for type with missing member");
     case Field::DefaultActorStorage:
+      flags.setIsArtificial();
+      break;
+    case Field::NonDefaultDistributedActorStorage:
       flags.setIsArtificial();
       break;
     }
@@ -1146,15 +1211,37 @@ public:
       Subs(Subs),
       Layout(Layout) {}
 
-  using MetadataSourceMap
-    = std::vector<std::pair<CanType, const reflection::MetadataSource*>>;
+  struct Entry {
+    enum Kind {
+      Metadata,
+      Shape
+    };
 
-  void addMetadataSource(const reflection::MetadataSource *Source) {
+    Kind kind;
+
+    CanType type;
+    const reflection::MetadataSource *source;
+
+    Entry(Kind kind, CanType type, const reflection::MetadataSource *source)
+      : kind(kind), type(type), source(source) {}
+  };
+
+  using MetadataSourceMap = std::vector<Entry>;
+
+  void addMetadataSource(Entry::Kind Kind, const reflection::MetadataSource *Source) {
     if (Source == nullptr) {
       B.addInt32(0);
     } else {
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
+      switch (Kind) {
+      case Entry::Kind::Shape:
+        OS << "s";
+        break;
+      case Entry::Kind::Metadata:
+        break;
+      }
+
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
@@ -1166,21 +1253,22 @@ public:
 
   /// Give up if we captured an opened existential type. Eventually we
   /// should figure out how to represent this.
-  static bool hasOpenedExistential(CanSILFunctionType OrigCalleeType,
-                                   const HeapLayout &Layout) {
+  static bool hasLocalArchetype(CanSILFunctionType OrigCalleeType,
+                                const HeapLayout &Layout) {
     if (!OrigCalleeType->isPolymorphic() ||
         OrigCalleeType->isPseudogeneric())
       return false;
 
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
-      // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].isWitnessTable())
+      // Skip protocol requirements and counts.  It shouldn't be possible
+      // to get an opened existential type in a conformance requirement
+      // without having one in the generic arguments.
+      if (!Bindings[i].isAnyMetadata())
         continue;
 
-      assert(Bindings[i].isMetadata());
-
-      if (Bindings[i].getTypeParameter()->hasOpenedExistential())
+      if (Bindings[i].getTypeParameter().subst(Bindings.getSubstitutionMap())
+            ->hasLocalArchetype())
         return true;
     }
 
@@ -1188,7 +1276,7 @@ public:
         Layout.getElementTypes().slice(Layout.getIndexAfterBindings());
     for (auto ElementType : ElementTypes) {
       auto SwiftType = ElementType.getASTType();
-      if (SwiftType->hasOpenedExistential())
+      if (SwiftType->hasLocalArchetype())
         return true;
     }
 
@@ -1220,23 +1308,31 @@ public:
     // the bindings structure directly.
     auto &Bindings = Layout.getBindings();
     for (unsigned i = 0; i < Bindings.size(); ++i) {
-      // Skip protocol requirements (FIXME: for now?)
-      if (Bindings[i].isWitnessTable())
-        continue;
-
-      assert(Bindings[i].isMetadata());
-
-      auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Bindings[i].getTypeParameter();
-      auto InterfaceType = BindingType->mapTypeOutOfContext();
-      SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
+      switch (Bindings[i].getKind()) {
+      case GenericRequirement::Kind::Shape:
+      case GenericRequirement::Kind::Metadata:
+      case GenericRequirement::Kind::MetadataPack: {
+        auto Kind = (Bindings[i].getKind() == GenericRequirement::Kind::Shape
+                     ? Entry::Kind::Shape
+                     : Entry::Kind::Metadata);
+        auto Source = SourceBuilder.createClosureBinding(i);
+        auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
+        auto InterfaceType = BindingType->mapTypeOutOfContext();
+        SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Source);
+        break;
+      }
+      case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::WitnessTablePack:
+        // Skip protocol requirements (FIXME: for now?)
+        break;
+      }
     }
 
     // Check if any requirements were fulfilled by metadata stored inside a
     // captured value.
 
     enumerateGenericParamFulfillments(IGM, OrigCalleeType,
-        [&](CanType GenericParam,
+        [&](GenericRequirement Req,
             const irgen::MetadataSource &Source,
             const MetadataPath &Path) {
 
@@ -1264,15 +1360,31 @@ public:
         break;
       }
 
+      Entry::Kind Kind;
+      switch (Req.getKind()) {
+      case GenericRequirement::Kind::Shape:
+        Kind = Entry::Kind::Shape;
+        break;
+
+      case GenericRequirement::Kind::Metadata:
+      case GenericRequirement::Kind::MetadataPack:
+        Kind = Entry::Kind::Metadata;
+        break;
+
+      case GenericRequirement::Kind::WitnessTable:
+      case GenericRequirement::Kind::WitnessTablePack:
+        llvm_unreachable("Bad kind");
+      }
+
       // The metadata might be reached via a non-trivial path (eg,
       // dereferencing an isa pointer or a generic argument). Record
       // the path. We assume captured values map 1-1 with function
       // parameters.
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
-      auto SubstType = GenericParam.subst(Subs);
+      auto SubstType = Req.getTypeParameter().subst(Subs);
       auto InterfaceType = SubstType->mapTypeOutOfContext();
-      SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
+      SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Src);
     });
 
     return SourceMap;
@@ -1330,12 +1442,9 @@ public:
 
     // Add the pairs that make up the generic param -> metadata source map
     // to the struct.
-    for (auto GenericAndSource : MetadataSources) {
-      auto GenericParam = GenericAndSource.first->getCanonicalType();
-      auto Source = GenericAndSource.second;
-
-      addTypeRef(GenericParam, sig);
-      addMetadataSource(Source);
+    for (auto entry : MetadataSources) {
+      addTypeRef(entry.type, sig);
+      addMetadataSource(entry.kind, entry.source);
     }
   }
 
@@ -1449,7 +1558,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
+  if (CaptureDescriptorBuilder::hasLocalArchetype(OrigCalleeType, Layout))
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   CaptureDescriptorBuilder builder(*this,

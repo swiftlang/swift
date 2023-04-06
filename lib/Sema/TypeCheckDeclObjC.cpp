@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
@@ -1451,6 +1452,11 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
+  // A member implementation of an @objcImplementation extension is @objc.
+  if (VD->isObjCMemberImplementation())
+    // FIXME: New ObjCReason::Kind?
+    return ObjCReason(ObjCReason::ImplicitlyObjC);
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -2756,4 +2762,556 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   }
 
   return anyDiagnosed;
+}
+
+void TypeChecker::checkObjCImplementation(ExtensionDecl *ED) {
+  if (!ED->getImplementedObjCDecl())
+    return;
+
+  evaluateOrDefault(ED->getASTContext().evaluator,
+                    TypeCheckObjCImplementationRequest{ED},
+                    evaluator::SideEffect());
+}
+
+static Optional<Located<StaticSpellingKind>>
+getLocatedStaticSpelling(ValueDecl *VD) {
+  using Ret = Optional<Located<StaticSpellingKind>>;
+
+  if (auto FD = dyn_cast<FuncDecl>(VD)) {
+    return Ret({ FD->getCorrectStaticSpelling(), FD->getStaticLoc() });
+  }
+  else if (auto ASD = dyn_cast<AbstractStorageDecl>(VD)) {
+    if (auto SD = dyn_cast<SubscriptDecl>(ASD)) {
+      return Ret({ SD->getCorrectStaticSpelling(), SD->getStaticLoc() });
+    }
+    else if (auto VD = dyn_cast<VarDecl>(ASD)) {
+      if (auto PBD = VD->getParentPatternBinding())
+        return Ret({ PBD->getCorrectStaticSpelling(), PBD->getStaticLoc() });
+    }
+    else {
+      llvm_unreachable("unknown AbstractStorageDecl");
+    }
+  }
+  return None;
+}
+
+static Optional<StaticSpellingKind> getStaticSpelling(ValueDecl *VD) {
+  if (auto locSpelling = getLocatedStaticSpelling(VD))
+    return locSpelling->Item;
+  return None;
+}
+
+static void
+fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
+                             Optional<StaticSpellingKind> newSpelling) {
+  auto spelling = getLocatedStaticSpelling(VD);
+  if (!newSpelling || !spelling)
+    return;
+
+  // If we're changing to `static`, remove explicit `final` keyword.
+  if (newSpelling == StaticSpellingKind::KeywordStatic)
+    if (auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>())
+      diag.fixItRemove(finalAttr->getRange());
+
+  auto spellingLoc = spelling->Loc;
+
+  switch (spelling->Item) {
+  case StaticSpellingKind::None:
+    switch (*newSpelling) {
+    case StaticSpellingKind::None:
+      // Do nothing
+      return;
+
+    case StaticSpellingKind::KeywordClass:
+      diag.fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "class ");
+      return;
+
+    case StaticSpellingKind::KeywordStatic:
+      diag.fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+      return;
+    }
+
+  case StaticSpellingKind::KeywordClass:
+    switch (*newSpelling) {
+    case StaticSpellingKind::None:
+      diag.fixItRemove(spellingLoc);
+      return;
+
+    case StaticSpellingKind::KeywordClass:
+      // Do nothing
+      return;
+
+    case StaticSpellingKind::KeywordStatic:
+      diag.fixItReplace(spellingLoc, "static");
+      return;
+    }
+
+  case StaticSpellingKind::KeywordStatic:
+    switch (*newSpelling) {
+    case StaticSpellingKind::None:
+      diag.fixItReplace(spellingLoc, "final");
+      return;
+
+    case StaticSpellingKind::KeywordClass:
+      diag.fixItReplace(spellingLoc, "class");
+      return;
+
+    case StaticSpellingKind::KeywordStatic:
+      // Do nothing
+      return;
+    }
+  }
+
+  llvm_unreachable("unknown StaticSpellingKind");
+}
+
+namespace {
+class ObjCImplementationChecker {
+  DiagnosticEngine &diags;
+
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+    auto diag = diags.diagnose(std::forward<ArgTypes>(Args)...);
+    return diag;
+  }
+
+  SmallSetVector<ValueDecl *, 16> unmatchedRequirements;
+
+  /// Candidates with their explicit ObjC names, if any.
+  llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
+
+public:
+  ObjCImplementationChecker(ExtensionDecl *ext)
+      : diags(ext->getASTContext().Diags)
+  {
+    assert(!ext->hasClangNode() && "passed interface, not impl, to checker");
+
+    // Did we actually match this extension to an interface? (In invalid code,
+    // we might not have.)
+    auto interfaceDecl = ext->getImplementedObjCDecl();
+    if (!interfaceDecl)
+      return;
+
+    // Add the @_objcImplementation extension's members as candidates.
+    addCandidates(ext);
+
+    // Add its interface's members as requirements.
+    auto interface = cast<IterableDeclContext>(interfaceDecl);
+    addRequirements(interface);
+  }
+
+private:
+  void addRequirements(IterableDeclContext *idc) {
+    assert(idc->getDecl()->hasClangNode());
+    for (Decl *_member : idc->getMembers()) {
+      // Skip accessors; we'll match their storage instead. Also skip overrides;
+      // the override checker handles those.
+      auto member = dyn_cast<ValueDecl>(_member);
+      if (!member || isa<AccessorDecl>(member) || member->getOverriddenDecl())
+        continue;
+
+      // Skip alternate Swift names for other language modes.
+      if (member->getAttrs().isUnavailable(member->getASTContext()))
+        continue;
+
+      auto inserted = unmatchedRequirements.insert(member);
+      assert(inserted && "objc interface member added twice?");
+    }
+  }
+
+  void addCandidates(ExtensionDecl *ext) {
+    assert(ext->isObjCImplementation());
+    for (Decl *_member : ext->getMembers()) {
+      // Skip accessors; we'll match their storage instead.
+      auto member = dyn_cast<ValueDecl>(_member);
+      if (!member || isa<AccessorDecl>(member) || isa<DestructorDecl>(member))
+        continue;
+
+      // Skip non-member implementations.
+      // FIXME: Should we consider them if they were only rejected for privacy?
+      if (!member->isObjCMemberImplementation())
+        continue;
+
+      // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
+      // in `matchRequirementsAtThreshold()`, so just precompute it.
+      auto inserted =
+          unmatchedCandidates.insert({ member, getExplicitObjCName(member) });
+      assert(inserted.second && "member implementation added twice?");
+
+    }
+  }
+
+  static ObjCSelector getExplicitObjCName(ValueDecl *VD) {
+    if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
+      return attr->getName().getValueOr(ObjCSelector());
+    return ObjCSelector();
+  }
+
+public:
+  void matchRequirements() {
+    // Try matching requirements with decreasing stringency.
+    // By working in several rounds like this, we ensure that all requirements
+    // matched by an explicit @objc(<selector>) are removed from consideration
+    // before we try Swift name matches, and likewise for Swift name matches and
+    // "wrong" matches.
+    matchRequirementsAtThreshold(MatchOutcome::MatchWithExplicitObjCName);
+    matchRequirementsAtThreshold(MatchOutcome::Match);
+    matchRequirementsAtThreshold(MatchOutcome::AnyRelationship);
+  }
+
+private:
+  /// Describes how closely a requirement and candidate match each other.
+  ///
+  /// The cases in this enum are arranged from worst match to best match, so
+  /// the most severe mismatches are given lower values. This order should be
+  /// the same as the order in which the problems are detected by
+  /// \c matches() .
+  enum class MatchOutcome : uint8_t {
+    /// There is absolutely no reason to think these two members are connected
+    /// to one another.
+    NoRelationship,
+
+    WrongExplicitObjCName,
+    WrongSwiftName,
+    WrongImplicitObjCName,
+    WrongStaticness,
+    WrongCategory,
+
+    Match,
+    MatchWithExplicitObjCName,
+
+    AnyRelationship = WrongExplicitObjCName,
+  };
+
+  /// A list of matches which all have the same outcome. The list only includes
+  /// matches with the highest-ranked outcome ever inserted into it.
+  struct BestMatchList {
+    MatchOutcome currentOutcome;
+    TinyPtrVector<ValueDecl *> matches;
+
+    BestMatchList(MatchOutcome minimumOutcome = MatchOutcome::AnyRelationship)
+        : currentOutcome(minimumOutcome), matches()
+    {}
+
+    void insert(ValueDecl *newMatch, MatchOutcome newOutcome) {
+      // Does this match meet the bar to be included?
+      if (currentOutcome > newOutcome)
+        return;
+
+      // Will this match raise the bar? If so, clear the old matches.
+      if (currentOutcome < newOutcome) {
+        currentOutcome = newOutcome;
+        matches.clear();
+      }
+
+      if (!llvm::is_contained(matches, newMatch))
+        matches.push_back(newMatch);
+    }
+  };
+
+  void matchRequirementsAtThreshold(MatchOutcome threshold) {
+    SmallString<32> scratch;
+
+    // We want to diagnose both (a) many-requirements-for-one-candidate and
+    // (b) many-candidates-for-one-requirement situations. We also want to
+    // remove matched candidates and requirements from being considered in
+    // future calls to this function, but we don't want them to change during
+    // this call. So we perform three passes:
+    //
+    // 1. Loop through `this->candidates`. Find matching requirements from
+    //    `this->requirements` and either add them to `matchesByRequirement`
+    //    (a data structure where each requirement is paired with a list of
+    //    candidates it matched), or diagnose (a).
+    //
+    // 2. Loop through `matchesByRequirement`, looking at the same declarations
+    //    but with each requirement paired with a complete list of candidates
+    //    it matched. Either diagnose (b), or diagnose any issues with the
+    //    single match we found.
+    //
+    // 3. Remove all requirements and candidates matched by 1 and 2 (including
+    //    ambiguous ones), so they are no longer matched when we try again at a
+    //    lower threshold or diagnosed as unmatched.
+    //
+    // (We evaluate by candidate first and by requirement second because the
+    // diagnostics for ambiguous candidates are better than the ones for
+    // ambiguous requirements.)
+
+    // Maps candidates to the list of requirements they matched, retaining only
+    // the best matches.
+    llvm::DenseMap<ValueDecl *, BestMatchList> matchesByRequirement;
+
+    // Requirements and candidates that have been matched (even ambiguously) and
+    // should be removed from our unmatched lists.
+    SmallSetVector<ValueDecl *, 16> requirementsToRemove;
+    SmallSetVector<ValueDecl *, 16> candidatesToRemove;
+
+    // First, loop through unsatisfied candidates and try the requirements.
+    for (const auto &pair : unmatchedCandidates) {
+      auto &cand = pair.first;
+      auto &candExplicitObjCName = pair.second;
+
+      PrettyStackTraceDecl t1(
+            "checking @objcImplementation matches to candidate", cand);
+      BestMatchList matchedRequirements{threshold};
+
+      for (ValueDecl *req : unmatchedRequirements) {
+        PrettyStackTraceDecl t2("trying to match header requirement", req);
+
+        auto outcome = matches(req, cand, candExplicitObjCName);
+        matchedRequirements.insert(req, outcome);
+      }
+
+      if (matchedRequirements.matches.empty())
+        continue;
+
+      // We matched these requirements at least once, so we're definitely
+      // removing them.
+      requirementsToRemove.set_union(matchedRequirements.matches);
+
+      if (matchedRequirements.matches.size() == 1) {
+        // Note that this is BestMatchList::insert(), so it'll only keep the
+        // matches with the best outcomes.
+        matchesByRequirement[matchedRequirements.matches.front()]
+          .insert(cand, matchedRequirements.currentOutcome);
+        continue;
+      }
+
+      // Ambiguous match (many requirements match one candidate)
+      cand->diagnose(diag::objc_implementation_multiple_matching_requirements,
+                     cand->getDescriptiveKind(), cand);
+
+      bool shouldOfferFix = !candExplicitObjCName;
+      for (auto req : matchedRequirements.matches) {
+        auto diag =
+            cand->diagnose(diag::objc_implementation_one_matched_requirement,
+                           req->getDescriptiveKind(), req,
+                           *req->getObjCRuntimeName(), shouldOfferFix,
+                           req->getObjCRuntimeName()->getString(scratch));
+        if (shouldOfferFix) {
+          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
+                                 req->getObjCRuntimeName(),
+                                 /*ignoreImpliedName=*/true);
+        }
+      }
+
+      // Schedule removal of this candidate now (since it won't be seen in the
+      // next loop).
+      candidatesToRemove.insert(cand);
+    }
+
+    // Now loop through requirements looking at the best candidate matches for
+    // them.
+    for (auto &pair : matchesByRequirement) {
+      auto req = pair.first;
+
+      // `cands` is a BestMatchList, so this is only the candidates with the
+      // best outcome. If several candidates matched the requirement but some
+      // had better outcomes than others, this will have already dropped the
+      // worse-outcome ones.
+      auto &cands = pair.second;
+
+      // Schedule the removal of these candidates.
+      candidatesToRemove.set_union(cands.matches);
+
+      assert(!cands.matches.empty());
+      if (cands.matches.size() == 1) {
+        auto cand = cands.matches.front();
+        diagnoseOutcome(cands.currentOutcome, req, cand,
+                        unmatchedCandidates[cand]);
+        continue;
+      }
+
+      // Ambiguous match (one requirement matches many candidates)
+      auto reqIDC =
+          cast<IterableDeclContext>(req->getDeclContext()->getAsDecl());
+      auto ext =
+          cast<ExtensionDecl>(reqIDC->getImplementationContext());
+      ext->diagnose(diag::objc_implementation_multiple_matching_candidates,
+                    req->getDescriptiveKind(), req,
+                    *req->getObjCRuntimeName());
+
+      for (auto cand : cands.matches) {
+        bool shouldOfferFix = !unmatchedCandidates[cand];
+        auto diag =
+            cand->diagnose(diag::objc_implementation_candidate_impl_here,
+                           cand->getDescriptiveKind(), cand, shouldOfferFix,
+                           req->getObjCRuntimeName()->getString(scratch));
+
+        if (shouldOfferFix) {
+          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
+                                 req->getObjCRuntimeName(),
+                                 /*ignoreImpliedName=*/true);
+        }
+      }
+
+      req->diagnose(diag::objc_implementation_requirement_here,
+                    req->getDescriptiveKind(), req);
+    }
+
+    // Remove matched candidates and requirements from the unmatched lists.
+    unmatchedRequirements.set_subtract(requirementsToRemove);
+    for (auto cand : candidatesToRemove)
+      unmatchedCandidates.erase(cand);
+  }
+
+  MatchOutcome matches(ValueDecl *req, ValueDecl *cand,
+                       ObjCSelector explicitObjCName) const {
+    bool hasObjCNameMatch =
+        req->getObjCRuntimeName() == cand->getObjCRuntimeName();
+    bool hasSwiftNameMatch = req->getName() == cand->getName();
+
+    // If neither the ObjC nor Swift names match, there's absolutely no reason
+    // to think these two methods are related.
+    if (!hasObjCNameMatch && !hasSwiftNameMatch)
+      return MatchOutcome::NoRelationship;
+
+    // There's at least some reason to treat these as matches.
+
+    if (explicitObjCName
+          && req->getObjCRuntimeName() != explicitObjCName)
+      return MatchOutcome::WrongExplicitObjCName;
+
+    if (!hasSwiftNameMatch)
+      return MatchOutcome::WrongSwiftName;
+
+    if (!hasObjCNameMatch)
+      return MatchOutcome::WrongImplicitObjCName;
+
+    if (req->isInstanceMember() != cand->isInstanceMember())
+      return MatchOutcome::WrongStaticness;
+
+    if (cand->getDeclContext()->getImplementedObjCContext()
+          != req->getDeclContext())
+      return MatchOutcome::WrongCategory;
+
+    // FIXME: Diagnose candidate without a required setter
+    // FIXME: Diagnose declaration kind mismatches
+    // FIXME: Diagnose type mismatches (with allowance for extra optionality)
+
+    // If we got here, everything matched. But at what quality?
+    if (explicitObjCName)
+      return MatchOutcome::MatchWithExplicitObjCName;
+
+    return MatchOutcome::Match;
+  }
+
+  void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
+                       ObjCSelector explicitObjCName) {
+    auto reqObjCName = *req->getObjCRuntimeName();
+
+    switch (outcome) {
+    case MatchOutcome::NoRelationship:
+      llvm::report_fatal_error("trying to diagnoseOutcome a NoRelationship");
+      return;
+
+    case MatchOutcome::Match:
+    case MatchOutcome::MatchWithExplicitObjCName:
+      // Successful outcomes!
+      return;
+
+    case MatchOutcome::WrongImplicitObjCName:
+    case MatchOutcome::WrongExplicitObjCName: {
+      auto diag = diagnose(cand, diag::objc_implementation_wrong_objc_name,
+                           *cand->getObjCRuntimeName(),
+                           cand->getDescriptiveKind(), cand, reqObjCName);
+      fixDeclarationObjCName(diag, cand, explicitObjCName, reqObjCName);
+      return;
+    }
+
+    case MatchOutcome::WrongSwiftName: {
+      auto diag = diagnose(cand, diag::objc_implementation_wrong_swift_name,
+                           reqObjCName, req->getDescriptiveKind(),
+                           req->getName());
+      fixDeclarationName(diag, cand, req->getName());
+      if (!explicitObjCName) {
+        // Changing the Swift name will probably change the implicitly-computed
+        // ObjC name, so let's make that explicit.
+        fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
+                               reqObjCName, /*ignoreImpliedName=*/true);
+      }
+      return;
+    }
+
+    case MatchOutcome::WrongStaticness: {
+      auto diag = diagnose(cand,
+                           diag::objc_implementation_class_or_instance_mismatch,
+                           cand->getDescriptiveKind(), cand,
+                           req->getDescriptiveKind());
+      fixDeclarationStaticSpelling(diag, cand, getStaticSpelling(req));
+      return;
+    }
+
+    case MatchOutcome::WrongCategory:
+      diagnose(cand, diag::objc_implementation_wrong_category,
+               cand->getDescriptiveKind(), cand,
+               getCategoryName(req->getDeclContext()),
+               getCategoryName(cand->getDeclContext()->
+                                 getImplementedObjCContext()));
+      return;
+    }
+
+    llvm_unreachable("Unknown MatchOutcome");
+  }
+
+  static Identifier getCategoryName(DeclContext *dc) {
+    if (auto ED = dyn_cast<ExtensionDecl>(dc))
+      return ED->getObjCCategoryName();
+    return Identifier();
+  }
+
+public:
+  void diagnoseUnmatchedRequirements() {
+    for (auto req : unmatchedRequirements) {
+      auto ext = cast<IterableDeclContext>(req->getDeclContext()->getAsDecl())
+                        ->getImplementationContext();
+
+      diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
+               getCategoryName(req->getDeclContext()),
+               req->getDescriptiveKind(), req);
+
+      // FIXME: Should give fix-it to add stub implementation
+    }
+  }
+
+  void diagnoseUnmatchedCandidates() {
+    for (auto &pair : unmatchedCandidates) {
+      auto cand = pair.first;
+
+      diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
+               cand->getDescriptiveKind(), cand,
+               cand->getDeclContext()->getSelfClassDecl());
+
+      if (canBeRepresentedInObjC(cand))
+        diagnose(cand, diag::fixit_add_private_for_objc_implementation,
+                 cand->getDescriptiveKind())
+            .fixItInsert(cand->getAttributeInsertionLoc(true), "private ");
+
+      diagnose(cand, diag::fixit_add_final_for_objc_implementation,
+               cand->getDescriptiveKind())
+          .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
+    }
+  }
+};
+}
+
+evaluator::SideEffect TypeCheckObjCImplementationRequest::
+evaluate(Evaluator &evaluator, ExtensionDecl *ED) const {
+  PrettyStackTraceDecl trace("checking member implementations of", ED);
+
+  // FIXME: Because we check extension-by-extension, candidates and requirements
+  // from different extensions are never compared, so we never get an
+  // opportunity to emit `diag::objc_implementation_wrong_category`. We probably
+  // need some kind of whole-module step where we compare all of the unmatched
+  // candidates we considered to all unmatched requirements in the module, and
+  // vice versa. The tricky bit is making sure we only diagnose for candidates
+  // and requirements in our primary files!
+  ObjCImplementationChecker checker(ED);
+
+  checker.matchRequirements();
+  checker.diagnoseUnmatchedCandidates();
+  checker.diagnoseUnmatchedRequirements();
+
+  return evaluator::SideEffect();
 }

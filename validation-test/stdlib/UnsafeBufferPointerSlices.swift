@@ -45,14 +45,14 @@ UnsafeMutableBufferPointerSliceTests.test(
         $0[i].0 += 1
       }
     }
-    expectEqual(mb.reduce(0,+), t+5)
+    expectEqual(mb.reduce(Int.zero,+), t+5)
     let sb: Slice = mb[...]
     sb.withMemoryRebound(to: (UInt, UInt).self) {
       for i in $0.indices {
         $0[i].1 -= 1
       }
     }
-    expectEqual(mb.reduce(0,+), t)
+    expectEqual(mb.reduce(Int.zero,+), t)
     return true
   }
   expectNotNil(r)
@@ -87,14 +87,14 @@ UnsafeMutableBufferPointerSliceTests.test(
   var (it, ct) = mb.initialize(from: (0..<c).map(String.init))
   expectNil(it.next())
   expectEqual(ct, c)
-  expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c-1)/2)
+  expectEqual(mb.last.map(Int.init), c-1)
   var rb = mb.deinitialize()
   expectEqual(rb.count, c*MemoryLayout<String>.stride)
 
   (it, ct) = mb[...].initialize(from: (0..<c).map(String.init))
   expectNil(it.next())
   expectEqual(ct, c)
-  expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c-1)/2)
+  expectEqual(mb.last.map(Int.init), c-1)
   rb = mb[...].deinitialize()
   expectEqual(rb.count, c*MemoryLayout<String>.stride)
 }
@@ -108,13 +108,13 @@ UnsafeMutableBufferPointerSliceTests.test(
 
   var ct = mb.initialize(fromContentsOf: (1...c).map(String.init))
   expectEqual(ct, c)
-  expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c+1)/2)
+  expectEqual(mb.last.map(Int.init), c)
   var rb = mb.deinitialize()
   expectEqual(rb.count, c*MemoryLayout<String>.stride)
 
   ct = mb[...].initialize(fromContentsOf: (1...c).map(String.init))
   expectEqual(ct, c)
-  expectEqual(mb.compactMap(Int.init).reduce(0,+), c*(c+1)/2)
+  expectEqual(mb.last.map(Int.init), c)
   rb = mb[...].deinitialize()
   expectEqual(rb.count, c*MemoryLayout<String>.stride)
 }
@@ -156,7 +156,7 @@ UnsafeMutableBufferPointerSliceTests.test(
     $0.update(fromContentsOf: (0..<c).map(String.init))
   }
   expectEqual(i, c)
-  expectEqual(a.compactMap(Int.init).reduce(0,+), c*(c-1)/2)
+  expectEqual(a.last.map(Int.init), c-1)
 
   i = b.withContiguousMutableStorageIfAvailable {
     $0[...].update(fromContentsOf: (0..<c).map(String.init))

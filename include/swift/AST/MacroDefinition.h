@@ -22,6 +22,8 @@
 
 namespace swift {
 
+class ASTContext;
+
 /// A reference to an external macro definition that is understood by ASTGen.
 struct ExternalMacroDefinition {
   enum class PluginKind {
@@ -46,6 +48,35 @@ enum class BuiltinMacroKind: uint8_t {
   ExternalMacro,
 };
 
+/// A single replacement
+struct ExpandedMacroReplacement {
+  unsigned startOffset, endOffset;
+  unsigned parameterIndex;
+};
+
+/// An expansion of another macro.
+class ExpandedMacroDefinition {
+  friend class MacroDefinition;
+
+  /// The expansion text, ASTContext-allocated.
+  StringRef expansionText;
+
+  /// The macro replacements, ASTContext-allocated.
+  ArrayRef<ExpandedMacroReplacement> replacements;
+
+  ExpandedMacroDefinition(
+    StringRef expansionText,
+    ArrayRef<ExpandedMacroReplacement> replacements
+  ) : expansionText(expansionText), replacements(replacements) { }
+
+public:
+  StringRef getExpansionText() const { return expansionText; }
+
+  ArrayRef<ExpandedMacroReplacement> getReplacements() const {
+    return replacements;
+  }
+};
+
 /// Provides the definition of a macro.
 class MacroDefinition {
 public:
@@ -63,6 +94,9 @@ public:
 
     /// A builtin macro definition, which has a separate builtin kind.
     Builtin,
+
+    /// A macro that is defined as an expansion of another macro.
+    Expanded,
   };
 
   Kind kind;
@@ -71,6 +105,7 @@ private:
   union Data {
     ExternalMacroReference external;
     BuiltinMacroKind builtin;
+    ExpandedMacroDefinition expanded;
 
     Data() : builtin(BuiltinMacroKind::ExternalMacro) { }
   } data;
@@ -83,6 +118,10 @@ private:
 
   MacroDefinition(BuiltinMacroKind builtinKind) : kind(Kind::Builtin) {
     data.builtin = builtinKind;
+  }
+
+  MacroDefinition(ExpandedMacroDefinition expanded) : kind(Kind::Expanded) {
+    data.expanded = expanded;
   }
 
 public:
@@ -105,6 +144,13 @@ public:
     return MacroDefinition(builtinKind);
   }
 
+  /// Create a representation of an expanded macro definition.
+  static MacroDefinition forExpanded(
+      ASTContext &ctx,
+      StringRef expansionText,
+      ArrayRef<ExpandedMacroReplacement> replacements
+  );
+
   /// Retrieve the external macro being referenced.
   ExternalMacroReference getExternalMacro() const {
     assert(kind == Kind::External);
@@ -115,6 +161,11 @@ public:
   BuiltinMacroKind getBuiltinKind() const {
     assert(kind == Kind::Builtin);
     return data.builtin;
+  }
+
+  ExpandedMacroDefinition getExpanded() const {
+    assert(kind == Kind::Expanded);
+    return data.expanded;
   }
 
   operator Kind() const { return kind; }

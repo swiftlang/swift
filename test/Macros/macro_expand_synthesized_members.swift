@@ -1,15 +1,17 @@
+// REQUIRES: swift_swift_parser, executable_test
+//
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5
-// RUN: %target-build-swift -swift-version 5 -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5
+// RUN: %target-build-swift -g -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
-// REQUIRES: executable_test
 
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
-
-@attached(member) macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
+@attached(
+  member,
+  names: named(Storage), named(storage), named(getStorage), named(method), named(`init`)
+)
+macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
 @addMembers
 struct S {
@@ -19,11 +21,37 @@ struct S {
   }
 }
 
+@attached(
+  member,
+  names: named(extInstanceMethod), named(extStaticMethod)
+)
+macro addExtMembers() = #externalMacro(module: "MacroDefinition", type: "AddExtMembers")
+
+@addExtMembers
+extension S { }
+
 let s = S()
 
 // CHECK: synthesized method
 // CHECK: Storage
 s.useSynthesized()
+
+// Members added via extension.
+s.extInstanceMethod()
+S.extStaticMethod()
+
+@attached(member, names: arbitrary)
+macro addArbitraryMembers() = #externalMacro(module: "MacroDefinition", type: "AddArbitraryMembers")
+
+@addArbitraryMembers
+struct MyType {}
+
+// CHECK: MyType1
+// CHECK: MyType2
+// CHECK: MyType3
+print(MyType.MyType1.self)
+print(MyType.MyType2.self)
+print(MyType.MyType3.self)
 
 @attached(
   member,
@@ -50,3 +78,14 @@ struct Base {
 
 @empty(.member())
 struct TestMacroTypechecking {}
+
+// Macros adding to an enum
+@attached(member, names: named(unknown), arbitrary)
+public macro ExtendableEnum() = #externalMacro(module: "MacroDefinition", type: "ExtendableEnum")
+
+@ExtendableEnum
+enum ElementType {
+  case paper
+}
+
+print(ElementType.paper.unknown())

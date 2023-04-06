@@ -42,6 +42,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
@@ -2190,22 +2191,22 @@ ManagedValue SILGenFunction::emitStringLiteral(SILLocation loc,
 
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
-static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType) {
-  // The count is always 1 unless the substituted type is a tuple.
-  auto substTuple = dyn_cast<TupleType>(substType);
-  if (!substTuple)
+static unsigned getFlattenedValueCount(AbstractionPattern origType) {
+  // The count is always 1 unless the original type is a tuple.
+  if (!origType.isTuple())
     return 1;
 
-  // If the original type is opaque, the count is 1 anyway.
-  if (origType.isTypeParameter())
-    return 1;
-
-  // Otherwise, add up the elements.
+  // Add up the elements.
   unsigned count = 0;
-  for (auto i : indices(substTuple.getElementTypes())) {
-    count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                    substTuple.getElementType(i));
+  for (auto elt : origType.getTupleElementTypes()) {
+    // Expansion components turn into a single pack parameter.
+    if (elt.isPackExpansion()) {
+      count++;
+
+    // Recursively expand scalar components.
+    } else {
+      count += getFlattenedValueCount(elt);
+    }
   }
   return count;
 }
@@ -2213,13 +2214,12 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType,
                                        ImportAsMemberStatus foreignSelf) {
   // C functions imported as static methods don't consume any real arguments.
   if (foreignSelf.isStatic())
     return 0;
 
-  return getFlattenedValueCount(origType, substType);
+  return getFlattenedValueCount(origType);
 }
 
 namespace {
@@ -2939,7 +2939,48 @@ done:
   }
 }
 
-static Expr *findStorageReferenceExprForBorrow(Expr *e) {
+namespace {
+/// Container to hold the result of a search for the storage reference
+/// when determining to emit a borrow.
+struct StorageRefResult {
+private:
+  Expr *storageRef;
+  Expr *transitiveRoot;
+
+public:
+  // Represents an empty result
+  StorageRefResult() : storageRef(nullptr), transitiveRoot(nullptr) {}
+  bool isEmpty() const { return transitiveRoot == nullptr; }
+  operator bool() const { return !isEmpty(); }
+
+  /// The root of the expression that accesses the storage in \c storageRef.
+  /// When in doubt, this is probably what you want, as it includes the
+  /// entire expression tree involving the reference.
+  Expr *getTransitiveRoot() const { return transitiveRoot; }
+
+  /// The direct storage reference that was discovered.
+  Expr *getStorageRef() const { return storageRef; }
+
+  StorageRefResult(Expr *storageRef, Expr *transitiveRoot)
+      : storageRef(storageRef), transitiveRoot(transitiveRoot) {
+    assert(storageRef && transitiveRoot && "use the zero-arg init for empty");
+  }
+
+  // Initializes a storage reference where the base matches the ref.
+  StorageRefResult(Expr *storageRef)
+      : StorageRefResult(storageRef, storageRef) {}
+
+  StorageRefResult withTransitiveRoot(StorageRefResult refResult) const {
+    return withTransitiveRoot(refResult.transitiveRoot);
+  }
+
+  StorageRefResult withTransitiveRoot(Expr *newRoot) const {
+    return StorageRefResult(storageRef, newRoot);
+  }
+};
+} // namespace
+
+static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
   e = e->getSemanticsProvidingExpr();
 
   // These are basically defined as the cases implemented by SILGenLValue.
@@ -2962,71 +3003,100 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   // sub-expression is a storage reference, but don't return the
   // sub-expression.
   } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(tue->getBase()))
-      return tue;
+    if (auto result = findStorageReferenceExprForBorrow(tue->getBase()))
+      return result.withTransitiveRoot(tue);
+
   } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(fve->getSubExpr()))
-      return fve;
+    if (auto result = findStorageReferenceExprForBorrow(fve->getSubExpr()))
+      return result.withTransitiveRoot(fve);
+
   } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(boe->getSubExpr()))
-      return boe;
+    if (auto result = findStorageReferenceExprForBorrow(boe->getSubExpr()))
+      return result.withTransitiveRoot(boe);
+
   } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()) &&
-        findStorageReferenceExprForBorrow(oe->getSubExpr()))
-      return oe;
+    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()))
+      if (auto result = findStorageReferenceExprForBorrow(oe->getSubExpr()))
+        return result.withTransitiveRoot(oe);
+
   } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(bie->getRHS()))
-      return bie;
+    if (auto result = findStorageReferenceExprForBorrow(bie->getRHS()))
+      return result.withTransitiveRoot(bie);
+
   } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
-    if (findStorageReferenceExprForBorrow(te->getSubExpr()))
-      return te;
+    if (auto result = findStorageReferenceExprForBorrow(te->getSubExpr()))
+      return result.withTransitiveRoot(te);
+
   } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
     return ioe;
   }
 
-  return nullptr;
+  return StorageRefResult();
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForMoveOnlyBorrow(
-    SILGenFunction &SGF) && {
+Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
+    SILGenFunction &SGF, StorageReferenceOperationKind kind) && {
   if (!isExpr())
     return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *li = dyn_cast<LoadExpr>(argExpr);
-  if (!li)
-    return nullptr;
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(li->getSubExpr());
-
-  // Claim the value of this argument if we found a storage reference that has a
-  // move only base.
-  if (lvExpr) {
-    // We want to perform a borrow if our initial type is a pure move only /or/
-    // if after looking through multiple copyable member ref expr, we get to a
-    // move only member ref expr or a move only decl ref expr.
-    //
-    // NOTE: We purposely do not look through load implying that if we have
-    // copyable types extracted from a move only class, we will not borrow.
-    auto *iterExpr = lvExpr;
-    while (true) {
-      SILType ty = SGF.getLoweredType(
-          iterExpr->getType()->getWithoutSpecifierType()->getCanonicalType());
-      if (ty.isPureMoveOnly())
-        break;
-
-      if (auto *mre = dyn_cast<MemberRefExpr>(iterExpr)) {
-        iterExpr = mre->getBase();
-        continue;
-      }
-
-      return nullptr;
-    }
-
-    (void)std::move(*this).asKnownExpr();
+  // If there's a load around the outer part of this arg expr, look past it.
+  bool sawLoad = false;
+  if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
+    argExpr = li->getSubExpr();
+    sawLoad = true;
   }
 
-  return lvExpr;
+  // If we're consuming instead, then the load _must_ have been there.
+  if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
+    return nullptr;
+
+  auto result = ::findStorageReferenceExprForBorrow(argExpr);
+
+  if (!result)
+    return nullptr;
+
+  // We want to perform a borrow/consume if the first piece of storage being
+  // referenced is a move-only type.
+
+  VarDecl *storage = nullptr;
+  Type type;
+  if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
+    storage = dyn_cast<VarDecl>(dre->getDecl());
+    type = dre->getType();
+  } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
+    storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
+    type = mre->getType();
+  }
+
+  if (!storage)
+      return nullptr;
+  assert(type);
+
+  SILType ty =
+      SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
+  if (!ty.isPureMoveOnly())
+      return nullptr;
+
+  // It makes sense to borrow any kind of storage we refer to at this stage,
+  // but SILGenLValue does not currently handle some kinds of references well.
+  //
+  // When rejecting to do the LValue-style borrow here, it'll end up going thru
+  // the RValue-style emission, after which the extra copy will get eliminated.
+  //
+  // If we did not see a LoadExpr around the argument expression, then only
+  // do the borrow if the storage is non-local.
+  // FIXME: I don't have a principled reason for why this matters and hope that
+  // we can fix the AST we're working with.
+  if (!sawLoad && storage->getDeclContext()->isLocalContext())
+      return nullptr;
+
+  // Claim the value of this argument since we found a storage reference that
+  // has a move only base.
+  (void)std::move(*this).asKnownExpr();
+
+  return result.getTransitiveRoot();
 }
 
 Expr *
@@ -3054,7 +3124,8 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (!borrowExpr)
     return nullptr;
 
-  auto *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr());
+  Expr *lvExpr = ::findStorageReferenceExprForBorrow(borrowExpr->getSubExpr())
+                     .getTransitiveRoot();
 
   // Claim the value of this argument.
   if (lvExpr) {
@@ -3068,7 +3139,8 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   if (!isExpr()) return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
+  auto *lvExpr =
+      ::findStorageReferenceExprForBorrow(argExpr).getTransitiveRoot();
 
   // Claim the value of this argument if we found a storage reference.
   if (lvExpr) {
@@ -3115,7 +3187,6 @@ public:
       auto defArg = std::move(arg).asKnownDefaultArg();
 
       auto numParams = getFlattenedValueCount(origParamType,
-                                              substParamType,
                                               ImportAsMemberStatus());
       DelayedArguments.emplace_back(defArg,
                                     defArg->getDefaultArgsOwner(),
@@ -3157,16 +3228,13 @@ public:
 
       // Otherwise we need to emit a pack argument.
       } else {
-        SmallVector<AbstractionPattern, 4> origPackEltPatterns;
-        origFormalParamType.forEachPackExpandedComponent(
-                              [&](AbstractionPattern pattern) {
-          origPackEltPatterns.push_back(pattern);
-        });
+        auto numComponents =
+          origFormalParamType.getNumPackExpandedComponents();
 
         auto argSourcesSlice =
-          argSources.slice(nextArgSourceIndex, origPackEltPatterns.size());
-        emitPackArg(argSourcesSlice, origPackEltPatterns);
-        nextArgSourceIndex += origPackEltPatterns.size();
+          argSources.slice(nextArgSourceIndex, numComponents);
+        emitPackArg(argSourcesSlice, origFormalParamType);
+        nextArgSourceIndex += numComponents;
       }
     }
 
@@ -3275,11 +3343,19 @@ private:
   void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
     assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
+    // If the original parameter type is a vanishing tuple, we want to emit
+    // this as if the argument source was wrapped in an extra level of
+    // tuple literal.
+    bool origTupleVanishes =
+      origParamType.getVanishingTupleElementPatternType().hasValue();
+
+    auto substType = arg.getSubstRValueType();
+
     // If we're working with an r-value, just expand it out and emit
     // all the elements individually.
+    // FIXME: this code is not doing the right thing with packs
     if (arg.isRValue()) {
-      if (CanTupleType substArgType =
-              dyn_cast<TupleType>(arg.getSubstRValueType())) {
+      if (CanTupleType substArgType = dyn_cast<TupleType>(substType)) {
         // The original type isn't necessarily a tuple.
         if (!origParamType.matchesTuple(substArgType))
           origParamType = origParamType.getTupleElementType(0);
@@ -3308,18 +3384,37 @@ private:
     Expr *e = std::move(arg).asKnownExpr();
 
     // If the source expression is a tuple literal, we can break it
-    // up directly.
-    if (auto tuple = dyn_cast<TupleExpr>(e)) {
-      for (auto i : indices(tuple->getElements())) {
-        emit(tuple->getElement(i),
-             origParamType.getTupleElementType(i));
-      }
+    // up directly.  We can also do this if the orig type is a vanishing
+    // tuple, because we want to treat that like it was the sole element
+    // of a tuple.  Note that vanishing tuples take priority: the
+    // singleton element could itself be a tuple.
+    auto tupleExpr = dyn_cast<TupleExpr>(e);
+    if (origTupleVanishes || tupleExpr) {
+      auto getElementExpr = [&](unsigned index) {
+        assert(!origTupleVanishes || index == 0);
+        return (origTupleVanishes ? e : tupleExpr->getElement(index));
+      };
+      origParamType.forEachTupleElement(substType,
+                                        [&](TupleElementGenerator &elt) {
+        if (!elt.isOrigPackExpansion()) {
+          emit(getElementExpr(elt.getSubstIndex()), elt.getOrigType());
+          return;
+        }
+
+        auto substEltTypes = elt.getSubstTypes();
+        SmallVector<ArgumentSource, 4> eltArgs;
+        eltArgs.reserve(substEltTypes.size());
+        for (auto i : elt.getSubstIndexRange()) {
+          eltArgs.emplace_back(getElementExpr(i));
+        }
+        emitPackArg(eltArgs, elt.getOrigType());
+      });
       return;
     }
 
     if (IsYield) {
-      if (auto lvExpr = findStorageReferenceExprForBorrow(e)) {
-        emitExpandedBorrowed(lvExpr, origParamType);
+      if (auto result = findStorageReferenceExprForBorrow(e)) {
+        emitExpandedBorrowed(result.getTransitiveRoot(), origParamType);
         return;
       }
     }
@@ -3431,7 +3526,8 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as a borrowed l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
+        SGF, ArgumentSource::StorageReferenceOperationKind::Borrow);
     if (!lvExpr)
       return false;
 
@@ -3485,7 +3581,7 @@ private:
 
   void emitExpandedBorrowed(Expr *arg, AbstractionPattern origParamType) {
     CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto count = getFlattenedValueCount(origParamType);
     auto claimedParams = claimNextParameters(count);
 
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
@@ -3503,8 +3599,9 @@ private:
                                ClaimedParamsRef paramsSlice) {
     assert(paramsSlice.size() == 1);
 
-    // Try to find an expression we can emit as a borrowed l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnlyBorrow(SGF);
+    // Try to find an expression we can emit as a consumed l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForMoveOnly(
+        SGF, ArgumentSource::StorageReferenceOperationKind::Consume);
     if (!lvExpr)
       return false;
 
@@ -3534,7 +3631,7 @@ private:
 
   void emitExpandedConsumed(Expr *arg, AbstractionPattern origParamType) {
     CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto count = getFlattenedValueCount(origParamType);
     auto claimedParams = claimNextParameters(count);
 
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
@@ -3609,7 +3706,7 @@ private:
   }
 
   void emitPackArg(MutableArrayRef<ArgumentSource> args,
-                   ArrayRef<AbstractionPattern> origFormalTypes) {
+                   AbstractionPattern origExpansionType) {
     // Adjust for the foreign error or async argument if necessary.
     maybeEmitForeignArgument();
 
@@ -3641,7 +3738,7 @@ private:
     auto formalPackType = getFormalPackType(args);
 
     bool consumed = param.getConvention() == ParameterConvention::Pack_Owned;
-    emitIndirectIntoPack(args, origFormalTypes, pack, formalPackType,
+    emitIndirectIntoPack(args, origExpansionType, pack, formalPackType,
                          consumed);
   }
 
@@ -3654,12 +3751,10 @@ private:
   }
 
   void emitIndirectIntoPack(MutableArrayRef<ArgumentSource> args,
-                            ArrayRef<AbstractionPattern> origFormalTypes,
+                            AbstractionPattern origExpansionType,
                             SILValue packAddr,
                             CanPackType formalPackType,
                             bool consumed) {
-    assert(args.size() == origFormalTypes.size());
-
     auto packTy = packAddr->getType().castTo<SILPackType>();
     assert(packTy->getNumElements() == args.size() &&
            "wrong pack shape for arguments");
@@ -3668,22 +3763,24 @@ private:
 
     for (auto i : indices(args)) {
       ArgumentSource &&arg = std::move(args[i]);
-      const AbstractionPattern &origFormalType = origFormalTypes[i];
       auto expectedEltTy = packTy->getSILElementType(i);
 
+      bool isPackExpansion = expectedEltTy.is<PackExpansionType>();
+
       auto cleanup = CleanupHandle::invalid();
-      if (origFormalType.isPackExpansion()) {
+      if (isPackExpansion) {
         cleanup =
-          emitPackExpansionIntoPack(std::move(arg), origFormalType,
+          emitPackExpansionIntoPack(std::move(arg), origExpansionType,
                                     expectedEltTy, consumed,
                                     packAddr, formalPackType, i);
       } else {
         cleanup =
-          emitScalarIntoPack(std::move(arg), origFormalType,
+          emitScalarIntoPack(std::move(arg),
+                             origExpansionType.getPackExpansionPatternType(),
                              expectedEltTy, consumed,
                              packAddr, formalPackType, i);
       }
-      if (cleanup.isValid()) eltCleanups.push_back(cleanup);
+      if (consumed && cleanup.isValid()) eltCleanups.push_back(cleanup);
     }
 
     if (!consumed) {
@@ -3708,15 +3805,12 @@ private:
   }
 
   CleanupHandle emitPackExpansionIntoPack(ArgumentSource &&arg,
-                                          AbstractionPattern origFormalType,
+                                          AbstractionPattern origExpansionType,
                                           SILType expectedParamType,
                                           bool consumed,
                                           SILValue packAddr,
                                           CanPackType formalPackType,
                                           unsigned packComponentIndex) {
-    auto expansionLoweredType =
-      expectedParamType.castTo<PackExpansionType>();
-
     // TODO: we'll need to handle already-emitted packs for things like
     // subscripts
     assert(arg.isExpr() && "emitting a non-expression pack expansion");
@@ -3739,8 +3833,7 @@ private:
 
     auto openedElementEnv = expansionExpr->getGenericEnvironment();
     SGF.emitDynamicPackLoop(expansionExpr, formalPackType,
-                            packComponentIndex, /*limit*/ nullptr,
-                            openedElementEnv, /*reverse*/false,
+                            packComponentIndex, openedElementEnv,
                             [&](SILValue indexWithinComponent,
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
@@ -3756,12 +3849,18 @@ private:
       // elements in this slice of the pack (then pop it before we exit
       // this scope).
 
-      // Turn pack archetypes in the lowered pack expansion type into
-      // opened element archetypes.  This should work fine on SIL types
-      // since we're not changing any interesting structure.
-      auto expectedLoweredElementType =
-        openedElementEnv->mapPackTypeIntoElementContext(
-          expansionLoweredType.getPatternType())->getCanonicalType();
+      // Turn pack archetypes in the pattern type of the lowered pack
+      // expansion type into opened element archetypes.  These AST-level
+      // manipulations should work fine on SIL types since we're not
+      // changing any interesting structure.
+      SILType expectedElementType = [&] {
+        auto loweredPatternType =
+          expectedParamType.castTo<PackExpansionType>().getPatternType();
+        auto loweredElementType =
+          openedElementEnv->mapContextualPackTypeIntoElementContext(
+            loweredPatternType);
+        return SILType::getPrimitiveAddressType(loweredElementType);
+      }();
 
       // Project the tuple element.  This projection uses the
       // pack expansion index because the tuple is only for the
@@ -3769,19 +3868,34 @@ private:
       auto eltAddr =
         SGF.B.createTuplePackElementAddr(expansionExpr,
                                          packExpansionIndex, tupleAddr,
-          SILType::getPrimitiveAddressType(expectedLoweredElementType));
+                                         expectedElementType);
       auto &eltTL = SGF.getTypeLowering(eltAddr->getType());
 
       // Evaluate the pattern expression into that address.
-      auto pattern = expansionExpr->getPatternExpr();
-      auto init = SGF.useBufferAsTemporary(eltAddr, eltTL);
-      SGF.emitExprInto(pattern, init.get());
+      auto patternExpr = expansionExpr->getPatternExpr();
+      auto bufferInit = SGF.useBufferAsTemporary(eltAddr, eltTL);
+      Initialization *innermostInit = bufferInit.get();
+
+      // Wrap it in a ConversionInitialization if required.
+      Optional<ConvertingInitialization> convertingInit;
+      auto substPatternType = patternExpr->getType()->getCanonicalType();
+      auto loweredPatternTy = SGF.getLoweredRValueType(substPatternType);
+      if (loweredPatternTy != expectedElementType.getASTType()) {
+        convertingInit.emplace(
+            Conversion::getSubstToOrig(
+                origExpansionType.getPackExpansionPatternType(),
+                substPatternType, expectedElementType),
+            SGFContext(innermostInit));
+        innermostInit = &*convertingInit;
+      }
+
+      SGF.emitExprInto(patternExpr, innermostInit);
 
       // Deactivate any cleanup associated with that value.  In later
       // iterations of this loop, we're managing this with our
       // partial-array cleanup; after the loop, we're managing this
       // with our full-tuple cleanup.
-      init->getManagedAddress().forward(SGF);
+      bufferInit->getManagedAddress().forward(SGF);
 
       // Store the element address into the pack.
       SGF.B.createPackElementSet(expansionExpr, eltAddr, packIndex,
@@ -4317,18 +4431,14 @@ struct ParamLowering {
         auto origParamType = origFormalType.getFunctionParamType(i);
         if (origParamType.isPackExpansion()) {
           count++;
-          origParamType.forEachPackExpandedComponent([&](AbstractionPattern) {
-            nextSubstParamIndex++;
-          });
+          nextSubstParamIndex += origParamType.getNumPackExpandedComponents();
         } else {
           auto substParam = substParams[nextSubstParamIndex++];
           if (substParam.isInOut()) {
             count += 1;
           } else {
-            count += getFlattenedValueCount(
-                origParamType,
-                substParam.getParameterType()->getCanonicalType(),
-                ImportAsMemberStatus());
+            count += getFlattenedValueCount(origParamType,
+                                            ImportAsMemberStatus());
           }
         }
       }
@@ -4962,7 +5072,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // Then finish our value.
   if (resultPlan.has_value()) {
     return std::move(*resultPlan)
-        ->finish(SGF, loc, formalResultType, directResultsFinal, SILValue());
+        ->finish(SGF, loc, directResultsFinal, SILValue());
   } else {
     return RValue(
         SGF, *uncurriedLoc, formalResultType, directResultsFinal[0]);
@@ -5098,11 +5208,10 @@ bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
   switch (fn->getSelfAccessKind()) {
   case SelfAccessKind::Mutating:
     return false;
-  case SelfAccessKind::Consuming:
-    return true;
   case SelfAccessKind::NonMutating:
-    // TODO: borrow 'self' for nonmutating methods on methods on value types.
-    // return selfType->hasReferenceSemantics();
+  case SelfAccessKind::LegacyConsuming:
+  case SelfAccessKind::Consuming:
+  case SelfAccessKind::Borrowing:
     return true;
   }
   llvm_unreachable("bad self-access kind");
@@ -5114,7 +5223,7 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
     return false;
 
   assert(method->getDeclContext()->isTypeContext());
-  assert(method->isNonMutating() || method->isConsuming());
+  assert(!method->isMutating());
 
   auto fnType = M.Types.getConstantFunctionType(TypeExpansionContext::minimal(),
                                                 methodRef);
@@ -5170,7 +5279,6 @@ RValue SILGenFunction::emitApply(
     ApplyOptions options, SGFContext evalContext,
     Optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
-  auto substResultType = calleeTypeInfo.substResultType;
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
@@ -5422,8 +5530,8 @@ RValue SILGenFunction::emitApply(
   }
 
   auto directResultsArray = makeArrayRef(directResults);
-  RValue result = resultPlan->finish(*this, loc, substResultType,
-                                     directResultsArray, bridgedForeignError);
+  RValue result = resultPlan->finish(*this, loc, directResultsArray,
+                                     bridgedForeignError);
   assert(directResultsArray.empty() && "didn't claim all direct results");
 
   return result;

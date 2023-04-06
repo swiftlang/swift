@@ -332,7 +332,7 @@ func testOverloadAmbiguity() {
   overloadOnLabelSomeDefaultArgs(1) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{35-37=, a: }} {{39-39=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{35-37=, b: }} {{39-39=)}}
   overloadOnLabelSomeDefaultArgs(1, x: 2) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{41-43=, a: }} {{45-45=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{41-43=, b: }} {{45-45=)}}
 
-  overloadOnLabelSomeDefaultArgs( // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{12-5=, a: }} {{4-4=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{12-5=, b: }} {{4-4=)}}
+  overloadOnLabelSomeDefaultArgs( // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{+1:12-+2:5=, a: }} {{+4:4-4=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{+1:12-+2:5=, b: }} {{+4:4-4=)}}
     1, x: 2
   ) {
     // some

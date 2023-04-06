@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend  -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
 
 // REQUIRES: concurrency
+// rdar://106849189 move-only types should be supported in freestanding mode
+// UNSUPPORTED: freestanding
 
 sil_stage canonical
 

@@ -21,20 +21,20 @@ public final class ClassWithIntField {
   }
 }
 
-// CHECK: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
+// CHECK: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
 
-// CHECK: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
+// CHECK: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: class SWIFT_SYMBOL("s:5Class0A12WithIntFieldC") ClassWithIntField;
 // CHECK-NEXT: } // end namespace
 
 // CHECK: namespace
-// CHECK-SAME: swift {
+// CHECK-SAME: swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -43,7 +43,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: } // namespace swift
 
 // CHECK: namespace
-// CHECK-SAME: Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
+// CHECK-SAME: Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: namespace
 // CHECK-SAME: _impl {
@@ -63,6 +63,14 @@ public final class ClassWithIntField {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ClassWithIntField(void * _Nonnull ptr) noexcept : RefCountedClass(ptr) {}
 // CHECK-NEXT: private:
 // CHECK-NEXT:   friend class _impl::_impl_ClassWithIntField;
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wreserved-identifier"
+// CHECK-NEXT:   typedef char $s5Class0A12WithIntFieldCD;
+// CHECK-NEXT:   static inline constexpr $s5Class0A12WithIntFieldCD __swift_mangled_name = 0;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT:namespace _impl {
@@ -76,7 +84,7 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -92,7 +100,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Class __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Class") {
+// CHECK-NEXT: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: SWIFT_INLINE_THUNK ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class011passThroughA12WithIntFieldyAA0adeF0CADF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));

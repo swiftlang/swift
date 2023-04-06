@@ -647,6 +647,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
       packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
       packedMetadata |= unsigned(SFA->isClosureCapture()) << 19;      // 1 bit
+      packedMetadata |= unsigned(SFA->isFormalParameterPack()) << 20; // 1 bit
     }
     // Used: 19 bits. Free: 13.
     //
@@ -1034,9 +1035,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    unsigned flags
-      = (ABI->hasDynamicLifetime() ? 1 : 0)
-      | (ABI->emitReflectionMetadata() ? 2 : 0);
+    unsigned flags = 0;
+    flags |= unsigned(ABI->hasDynamicLifetime());
+    flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
+    flags |= unsigned(ABI->getUsesMoveableValueDebugInfo()) << 2;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
@@ -1079,7 +1081,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr = 0;
     attr |= unsigned(ASI->hasDynamicLifetime());
     attr |= unsigned(ASI->isLexical()) << 1;
-    attr |= unsigned(ASI->getWasMoved()) << 2;
+    attr |= unsigned(ASI->getUsesMoveableValueDebugInfo()) << 2;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
@@ -1480,7 +1482,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
-  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestroyValueInst:
@@ -1546,6 +1548,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              (unsigned(MVI->isLexical() << 1));
     } else if (auto *I = dyn_cast<MarkMustCheckInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
+    } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
+      Attr = unsigned(I->getKind());
     } else if (auto *I = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(&SI)) {
       Attr = I->getForwardingOwnershipKind() == OwnershipKind::Owned ? true
                                                                      : false;
@@ -1554,6 +1558,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                                                      : false;
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::MarkMustCheckInst: {
+    unsigned Attr = unsigned(cast<MarkMustCheckInst>(&SI)->getCheckKind());
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
   case SILInstructionKind::MarkUninitializedInst: {

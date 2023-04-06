@@ -29,7 +29,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_SUBSCRIPT_BODY | %FileCheck %s -check-prefix=ENUM_STATIC
 
 
-// STRUCT_INSTANCE: Begin completions
 // STRUCT_INSTANCE-NOT: init()
 // STRUCT_INSTANCE-NOT: staticVar
 // STRUCT_INSTANCE-NOT: staticFunc
@@ -38,9 +37,7 @@
 // STRUCT_INSTANCE-NOT: init()
 // STRUCT_INSTANCE-NOT: staticVar
 // STRUCT_INSTANCE-NOT: staticFunc
-// STRUCT_INSTANCE: End completions
 
-// STRUCT_STATIC: Begin completions
 // STRUCT_STATIC-NOT: init()
 // STRUCT_STATIC-NOT: instanceVar 
 // STRUCT_STATIC-DAG: Decl[StaticVar]/CurrNominal: staticVar[#Int#];
@@ -48,7 +45,6 @@
 // STRUCT_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyStruct#})[#() -> Int#];
 // STRUCT_STATIC-NOT: init()
 // STRUCT_STATIC-NOT: instanceVar 
-// STRUCT_STATIC: End completions
 
 struct MyStruct {
   init() { self = MyEnum.east }
@@ -83,7 +79,6 @@ struct MyStruct {
   }
 }
 
-// ENUM_INSTANCE: Begin completions
 // ENUM_INSTANCE-NOT: east
 // ENUM_INSTANCE-NOT: west
 // ENUM_INSTANCE-NOT: init()
@@ -96,9 +91,7 @@ struct MyStruct {
 // ENUM_INSTANCE-NOT: init()
 // ENUM_INSTANCE-NOT: staticVar
 // ENUM_INSTANCE-NOT: staticFunc
-// ENUM_INSTANCE: End completions
 
-// ENUM_STATIC: Begin completions
 // ENUM_STATIC-NOT: init()
 // ENUM_STATIC-NOT: instanceVar 
 // ENUM_STATIC-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
@@ -108,7 +101,6 @@ struct MyStruct {
 // ENUM_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyEnum#})[#() -> Int#];
 // ENUM_STATIC-NOT: init()
 // ENUM_STATIC-NOT: instanceVar 
-// ENUM_STATIC: End completions
 
 enum MyEnum {
   case east, west

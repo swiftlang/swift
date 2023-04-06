@@ -129,6 +129,9 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
+
+  case OverloadChoiceKind::MaterializePack:
+    return true;
   }
 
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
@@ -957,6 +960,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The kinds of overload choice match, but the contents don't.
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::MaterializePack:
       continue;
 
     case OverloadChoiceKind::KeyPathApplication:

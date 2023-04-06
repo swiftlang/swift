@@ -492,7 +492,7 @@ static bool validateInputBlock(
 
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
-                         llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
+                         std::size(SWIFTMODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 
@@ -544,7 +544,7 @@ ValidationInfo serialization::validateSerializedAST(
           requiresOSSAModules, requiresRevisionMatch,
           requiredSDK,
           extendedInfo, localObfuscator);
-      if (result.status == Status::Malformed)
+      if (result.status != Status::Valid)
         return result;
     } else if ((dependencies || searchPaths) &&
                result.status == Status::Valid &&
@@ -1021,6 +1021,10 @@ getActualImportControl(unsigned rawValue) {
     return ModuleDecl::ImportFilterKind::Exported;
   case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
     return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  case static_cast<unsigned>(serialization::ImportControl::InternalOrBelow):
+    return ModuleDecl::ImportFilterKind::InternalOrBelow;
+  case static_cast<unsigned>(serialization::ImportControl::PackageOnly):
+    return ModuleDecl::ImportFilterKind::PackageOnly;
   default:
     return None;
   }
@@ -1678,3 +1682,66 @@ ModuleFileSharedCore::ModuleFileSharedCore(
 bool ModuleFileSharedCore::hasSourceInfo() const {
   return !!DeclUSRsTable;
 }
+
+ModuleLoadingBehavior
+ModuleFileSharedCore::getTransitiveLoadingBehavior(
+                                          const Dependency &dependency,
+                                          bool debuggerMode,
+                                          bool isPartialModule,
+                                          StringRef packageName,
+                                          bool forTestable) const {
+  if (isPartialModule) {
+    // Keep the merge-module behavior for legacy support. In that case
+    // we load all transitive dependencies from partial modules and
+    // error if it fails.
+    return ModuleLoadingBehavior::Required;
+  }
+
+  bool moduleIsResilient = getResilienceStrategy() ==
+                             ResilienceStrategy::Resilient;
+  if (dependency.isImplementationOnly()) {
+    // Implementation-only dependencies are not usually loaded from
+    // transitive imports.
+    if (debuggerMode || forTestable) {
+      // In the debugger, try to load the module if possible.
+      // Same in the case of a testable import, try to load the dependency
+      // but don't fail if it's missing as this could be source breaking.
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      // When building normally, ignore transitive implementation-only
+      // imports.
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
+  if (dependency.isInternalOrBelow()) {
+    // Non-public imports are similar to implementation-only, the module
+    // loading behavior differs on loading those dependencies
+    // on testable imports.
+    if (forTestable || !moduleIsResilient) {
+      return ModuleLoadingBehavior::Required;
+    } else if (debuggerMode) {
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
+  if (dependency.isPackageOnly()) {
+    // Package dependencies are usually loaded only for import from the same
+    // package.
+    if ((!packageName.empty() && packageName == getModulePackageName()) ||
+        forTestable ||
+        !moduleIsResilient) {
+      return ModuleLoadingBehavior::Required;
+    } else if (debuggerMode) {
+      return ModuleLoadingBehavior::Optional;
+    } else {
+      return ModuleLoadingBehavior::Ignored;
+    }
+  }
+
+  // By default, imports are required dependencies.
+  return ModuleLoadingBehavior::Required;
+}
+

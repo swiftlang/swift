@@ -851,12 +851,11 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
-OrigDeclAttributes::OrigDeclAttributes(DeclAttributes allAttributes, ModuleDecl *mod) {
-  for (auto *attr : allAttributes) {
-    if (!mod->isInGeneratedBuffer(attr->AtLoc)) {
-      attributes.emplace_back(attr);
-    }
-  }
+Optional<const DeclAttribute *>
+OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
+  if (!mod || mod->isInGeneratedBuffer(Attr->AtLoc))
+    return None;
+  return Attr;
 }
 
 static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
@@ -1347,6 +1346,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
+
+    if (Options.SuppressingFreestandingExpression &&
+        Attr->getMacroSyntax() == MacroSyntax::Freestanding &&
+        Attr->getMacroRole() == MacroRole::Expression) {
+      Printer.printAttrName("@expression");
+      break;
+    }
+
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
       Printer.printAttrName("@freestanding");
@@ -1365,7 +1372,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           [&](MacroIntroducedDeclName name) {
             Printer << getMacroIntroducedDeclNameString(name.getKind());
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
-              Printer << "(" << name.getIdentifier() << ")";
+              StringRef nameText = name.getIdentifier().str();
+              bool shouldEscape = escapeKeywordInContext(
+                  nameText, PrintNameContext::Normal) || nameText == "$";
+              Printer << "(";
+              if (shouldEscape)
+                Printer << "`";
+              Printer << nameText;
+              if (shouldEscape)
+                Printer << "`";
+              Printer << ")";
             }
           },
           [&] {
@@ -1373,6 +1389,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           }
       );
     }
+    Printer << ")";
+    break;
+  }
+
+  case DAK_Documentation: {
+    auto *attr = cast<DocumentationAttr>(this);
+
+    Printer.printAttrName("@_documentation");
+    Printer << "(";
+
+    bool needs_comma = !attr->Metadata.empty() && attr->Visibility;
+
+    if (attr->Visibility) {
+      Printer << "visibility: ";
+      Printer << getAccessLevelSpelling(*attr->Visibility);
+    }
+
+    if (needs_comma) {
+      Printer << ", ";
+    }
+
+    if (!attr->Metadata.empty()) {
+      Printer << "metadata: ";
+      Printer << attr->Metadata;
+    }
+
     Printer << ")";
     break;
   }

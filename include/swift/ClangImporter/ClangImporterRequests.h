@@ -303,6 +303,7 @@ private:
 enum class CxxRecordSemanticsKind {
   Trivial,
   Owned,
+  MoveOnly,
   Reference,
   Iterator,
   // An API that has be annotated as explicitly unsafe, but still importable.
@@ -311,7 +312,9 @@ enum class CxxRecordSemanticsKind {
   // A record that is either not copyable or not destructible.
   MissingLifetimeOperation,
   // A record that contains a pointer (aka non-trivial type).
-  UnsafePointerMember
+  UnsafePointerMember,
+  // A C++ record that represents a Swift class type exposed to C++ from Swift.
+  SwiftClassType
 };
 
 struct CxxRecordSemanticsDescriptor final {
@@ -342,6 +345,12 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 
 /// What pattern does this C++ API fit? Uses attributes such as
 /// import_owned and import_as_reference to determine the pattern.
+///
+/// Do not evaluate this request before importing has started. For example, it
+/// is OK to invoke this request when importing a decl, but it is not OK to
+/// import this request when importing names. This is because when importing
+/// names, Clang sema has not yet defined implicit special members, so the
+/// results will be flakey/incorrect.
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
@@ -358,6 +367,23 @@ private:
   // Evaluation.
   CxxRecordSemanticsKind evaluate(Evaluator &evaluator,
                                   CxxRecordSemanticsDescriptor) const;
+};
+
+/// Does this C++ record represent a Swift type.
+class CxxRecordAsSwiftType
+    : public SimpleRequest<CxxRecordAsSwiftType,
+                           ValueDecl *(CxxRecordSemanticsDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
 };
 
 struct SafeUseOfCxxDeclDescriptor final {
@@ -387,12 +413,9 @@ SourceLoc extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc);
 
 class IsSafeUseOfCxxDecl
     : public SimpleRequest<IsSafeUseOfCxxDecl, bool(SafeUseOfCxxDeclDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };

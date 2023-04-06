@@ -35,6 +35,16 @@
 /// TODO: Cleanup the resulting SIL by deleting instructions that produce dead
 /// values (after removing its copies).
 ///
+/// PASS DEPENDENCIES:
+/// - ComputeSideEffects
+///
+/// ANALYSES USED:
+/// - BasicCalleeAnalysis
+/// - DeadEndBlocksAnalysis
+/// - DominanceAnalysis
+/// - NonLocalAccessBlockAnalysis
+/// - PostOrderAnalysis
+///
 /// ===----------------------------------------------------------------------===
 
 #define DEBUG_TYPE "copy-propagation"
@@ -42,6 +52,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -104,7 +115,7 @@ struct CanonicalDefWorklist {
         }
       }
       if (!canonicalizeBorrows) {
-        ownedValues.insert(def);
+        recordOwnedValue(def);
         return;
       }
       // Look through hoistable owned forwarding instructions on the
@@ -123,7 +134,7 @@ struct CanonicalDefWorklist {
       // Add any forwarding uses of this owned def. This may include uses that
       // we looked through above, but may also include other uses.
       addForwardingUses(def);
-      ownedValues.insert(def);
+      recordOwnedValue(def);
       return;
     }
   }
@@ -156,6 +167,24 @@ struct CanonicalDefWorklist {
       borrowedValues.remove(result);
     }
     ownedForwards.remove(i);
+  }
+
+private:
+  void recordOwnedValue(SILValue def) {
+    ownedValues.insert(def);
+    // Direct copies of owned lexical values are not themselves lexical and
+    // consequently need to be canonicalized separately because the
+    // canonicalization of the canonical def will respect deinit barriers
+    // but canonicalization of the copies should not.
+    //
+    // Add these copies to the worklist _after_ the canonical def because the
+    // worklist is drained backwards and canonicalizing the copies first
+    // enables the canonical lexical defs to be further canonicalized.
+    if (def->isLexical()) {
+      for (auto *cvi : def->getUsersOfType<CopyValueInst>()) {
+        ownedValues.insert(cvi);
+      }
+    }
   }
 };
 
@@ -261,6 +290,27 @@ static bool convertExtractsToDestructures(CanonicalDefWorklist &copiedDefs,
     deleter.recursivelyDeleteUsersIfDead(extract);
   }
   return changed;
+}
+
+//===----------------------------------------------------------------------===//
+//                MARK: Eliminate redundant moves
+//===----------------------------------------------------------------------===//
+
+/// If the specified move_value is redundant (there's no benefit to separating
+/// the lifetime at it), replace its uses with uses of the moved-from value and
+/// delete it.
+static bool eliminateRedundantMove(MoveValueInst *mvi,
+                                   InstructionDeleter &deleter,
+                                   CanonicalDefWorklist &defWorklist) {
+  if (!isRedundantMoveValue(mvi))
+    return false;
+  auto original = mvi->getOperand();
+  mvi->replaceAllUsesWith(original);
+  // Call InstructionDeleter::forceDeleteWithUsers to avoid "fixing up"
+  // ownership of the moved-from value, i.e. inserting a destroy_value.
+  deleter.forceDeleteWithUsers(mvi);
+  defWorklist.updateForCopy(original);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -400,6 +450,7 @@ void CopyPropagation::run() {
   auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
   auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
   DominanceInfo *domTree = dominanceAnalysis->get(f);
 
   // Label for unit testing with debug output.
@@ -419,7 +470,8 @@ void CopyPropagation::run() {
   InstructionDeleter deleter(std::move(callbacks));
   bool changed = false;
 
-  GraphNodeWorklist<BeginBorrowInst *, 16> beginBorrowsToShrink;
+  StackList<BeginBorrowInst *> beginBorrowsToShrink(f);
+  StackList<MoveValueInst *> moveValues(f);
 
   // Driver: Find all copied or borrowed defs.
   for (auto &bb : *f) {
@@ -427,7 +479,9 @@ void CopyPropagation::run() {
       if (auto *copy = dyn_cast<CopyValueInst>(&i)) {
         defWorklist.updateForCopy(copy);
       } else if (auto *borrow = dyn_cast<BeginBorrowInst>(&i)) {
-        beginBorrowsToShrink.insert(borrow);
+        beginBorrowsToShrink.push_back(borrow);
+      } else if (auto *move = dyn_cast<MoveValueInst>(&i)) {
+        moveValues.push_back(move);
       } else if (canonicalizeAll) {
         if (auto *destroy = dyn_cast<DestroyValueInst>(&i)) {
           defWorklist.updateForCopy(destroy->getOperand());
@@ -440,13 +494,11 @@ void CopyPropagation::run() {
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(
       pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
-      accessBlockAnalysis, domTree, deleter);
-  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
-
+      getFunction(), accessBlockAnalysis, domTree, calleeAnalysis, deleter);
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.
-  while (auto *bbi = beginBorrowsToShrink.pop()) {
+  for (auto *bbi : beginBorrowsToShrink) {
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
@@ -480,8 +532,12 @@ void CopyPropagation::run() {
           hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
+      eliminateRedundantMove(folded, deleter, defWorklist);
       firstRun = false;
     }
+  }
+  for (auto *mvi : moveValues) {
+    eliminateRedundantMove(mvi, deleter, defWorklist);
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
@@ -500,7 +556,7 @@ void CopyPropagation::run() {
   }
   // borrowCanonicalizer performs all modifications through deleter's
   // callbacks, so we don't need to explicitly check for changes.
-  CanonicalizeBorrowScope borrowCanonicalizer(deleter);
+  CanonicalizeBorrowScope borrowCanonicalizer(f, deleter);
   // The utilities in this loop cannot delete borrows before they are popped
   // from the worklist.
   while (true) {

@@ -47,12 +47,25 @@ enum class PatternKind : uint8_t {
 enum : unsigned { NumPatternKindBits =
   countBitsUsed(static_cast<unsigned>(PatternKind::Last_Pattern)) };
 
-/// Diagnostic printing of PatternKinds.
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
+enum class DescriptivePatternKind : uint8_t {
+  Paren,
+  Tuple,
+  Named,
+  Any,
+  Typed,
+  Is,
+  EnumElement,
+  OptionalSome,
+  Bool,
+  Expr,
+  Var,
+  Let
+};
 
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern : public ASTAllocated<Pattern> {
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
@@ -74,9 +87,9 @@ protected:
     Value : 1
   );
 
-  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 1,
-    /// True if this is a let pattern, false if a var pattern.
-    IsLet : 1
+  SWIFT_INLINE_BITFIELD(BindingPattern, Pattern, 2,
+    /// Corresponds to VarDecl::Introducer
+    Introducer : 2
   );
 
   SWIFT_INLINE_BITFIELD(AnyPattern, Pattern, 1,
@@ -84,6 +97,7 @@ protected:
                         IsAsyncLet : 1);
 
   } Bits;
+  // clang-format on
 
   Pattern(PatternKind kind) {
     Bits.OpaqueBits = 0;
@@ -103,12 +117,19 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(Bits.Pattern.Kind); }
 
+  /// Retrieve the descriptive pattern kind for this pattern.
+  DescriptivePatternKind getDescriptiveKind() const;
+
   /// Retrieve the name of the given pattern kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(PatternKind K);
+
+  /// Produce a name for the given descriptive pattern kind, which
+  /// is suitable for use in diagnostics.
+  static StringRef getDescriptivePatternKindName(DescriptivePatternKind K);
 
   /// A pattern is implicit if it is compiler-generated and there
   /// exists no source code for it.
@@ -506,25 +527,29 @@ class EnumElementPattern : public Pattern {
   DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
+  DeclContext *DC;
 
 public:
   EnumElementPattern(TypeExpr *ParentType, SourceLoc DotLoc,
                      DeclNameLoc NameLoc, DeclNameRef Name,
-                     EnumElementDecl *Element, Pattern *SubPattern)
+                     EnumElementDecl *Element, Pattern *SubPattern,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(ParentType),
         DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern),
+        DC(DC) {
     assert(ParentType && "Missing parent type?");
   }
 
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc, DeclNameLoc NameLoc, DeclNameRef Name,
-                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr)
+                     Pattern *SubPattern, Expr *UnresolvedOriginalExpr,
+                     DeclContext *DC)
       : Pattern(PatternKind::EnumElement), ParentType(nullptr), DotLoc(DotLoc),
         NameLoc(NameLoc), Name(Name),
         ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
-        SubPattern(SubPattern) {}
+        SubPattern(SubPattern), DC(DC) {}
 
   bool hasSubPattern() const { return SubPattern; }
 
@@ -537,6 +562,8 @@ public:
   }
 
   void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  DeclContext *getDeclContext() const { return DC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -639,48 +666,63 @@ public:
   }
 };
 
-
 /// A pattern which matches a value obtained by evaluating an expression.
 /// The match will be tested using user-defined '~=' operator function lookup;
 /// the match succeeds if 'patternValue ~= matchedValue' produces a true value.
 class ExprPattern : public Pattern {
   llvm::PointerIntPair<Expr *, 1, bool> SubExprAndIsResolved;
 
-  /// An expression constructed during type-checking that produces a call to the
-  /// '~=' operator comparing the match expression on the left to the matched
-  /// value on the right.
-  Expr *MatchExpr;
+  DeclContext *DC;
 
-  /// An implicit variable used to represent the RHS value of the match.
-  VarDecl *MatchVar;
+  /// A synthesized call to the '~=' operator comparing the match expression
+  /// on the left to the matched value on the right.
+  mutable Expr *MatchExpr = nullptr;
+
+  /// An implicit variable used to represent the RHS value of the synthesized
+  /// match expression.
+  mutable VarDecl *MatchVar = nullptr;
+
+  ExprPattern(Expr *E, DeclContext *DC, bool isResolved)
+      : Pattern(PatternKind::Expr), SubExprAndIsResolved(E, isResolved),
+        DC(DC) {}
+
+  friend class ExprPatternMatchRequest;
 
 public:
-  /// Construct an ExprPattern.
-  ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar);
+  /// Create a new parsed unresolved ExprPattern.
+  static ExprPattern *createParsed(ASTContext &ctx, Expr *E, DeclContext *DC);
 
-  /// Construct an unresolved ExprPattern.
-  ExprPattern(Expr *e)
-    : ExprPattern(e, false, nullptr, nullptr)
-  {}
+  /// Create a new resolved ExprPattern. This should be used in cases
+  /// where a user-written expression should be treated as an ExprPattern.
+  static ExprPattern *createResolved(ASTContext &ctx, Expr *E, DeclContext *DC);
 
-  /// Construct a resolved ExprPattern.
-  ExprPattern(Expr *e, Expr *matchExpr, VarDecl *matchVar)
-    : ExprPattern(e, true, matchExpr, matchVar)
-  {}
+  /// Create a new implicit resolved ExprPattern.
+  static ExprPattern *createImplicit(ASTContext &ctx, Expr *E, DeclContext *DC);
 
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
 
-  Expr *getMatchExpr() const { return MatchExpr; }
-  void setMatchExpr(Expr *e) {
-    assert(isResolved() && "cannot set match fn for unresolved expr patter");
-    MatchExpr = e;
-  }
+  DeclContext *getDeclContext() const { return DC; }
 
-  VarDecl *getMatchVar() const { return MatchVar; }
-  void setMatchVar(VarDecl *v) {
-    assert(isResolved() && "cannot set match var for unresolved expr patter");
-    MatchVar = v;
+  /// The match expression if it has been computed, \c nullptr otherwise.
+  /// Should only be used by the ASTDumper and ASTWalker.
+  Expr *getCachedMatchExpr() const { return MatchExpr; }
+
+  /// The match variable if it has been computed, \c nullptr otherwise.
+  /// Should only be used by the ASTDumper and ASTWalker.
+  VarDecl *getCachedMatchVar() const { return MatchVar; }
+
+  /// A synthesized call to the '~=' operator comparing the match expression
+  /// on the left to the matched value on the right.
+  Expr *getMatchExpr() const;
+
+  /// An implicit variable used to represent the RHS value of the synthesized
+  /// match expression.
+  VarDecl *getMatchVar() const;
+
+  void setMatchExpr(Expr *e) {
+    assert(MatchExpr && "Should only update an existing MatchExpr");
+    MatchExpr = e;
   }
 
   SourceLoc getLoc() const;
@@ -702,20 +744,41 @@ public:
 class BindingPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
+
 public:
-  BindingPattern(SourceLoc loc, bool isLet, Pattern *sub)
+  BindingPattern(SourceLoc loc, VarDecl::Introducer introducer, Pattern *sub)
       : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
-    Bits.BindingPattern.IsLet = isLet;
+    setIntroducer(introducer);
   }
 
-  static BindingPattern *createImplicit(ASTContext &Ctx, bool isLet,
+  VarDecl::Introducer getIntroducer() const {
+    return VarDecl::Introducer(Bits.BindingPattern.Introducer);
+  }
+
+  void setIntroducer(VarDecl::Introducer introducer) {
+    Bits.BindingPattern.Introducer = uint8_t(introducer);
+  }
+
+  static BindingPattern *createImplicit(ASTContext &Ctx,
+                                        VarDecl::Introducer introducer,
                                         Pattern *sub) {
-    auto *VP = new (Ctx) BindingPattern(SourceLoc(), isLet, sub);
+    auto *VP = new (Ctx) BindingPattern(SourceLoc(), introducer, sub);
     VP->setImplicit();
     return VP;
   }
 
-  bool isLet() const { return Bits.BindingPattern.IsLet; }
+  bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
+
+  StringRef getIntroducerStringRef() const {
+    switch (getIntroducer()) {
+    case VarDecl::Introducer::Let:
+      return "let";
+    case VarDecl::Introducer::Var:
+      return "var";
+    case VarDecl::Introducer::InOut:
+      return "inout";
+    }
+  }
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
@@ -829,6 +892,9 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const ContextualPattern &pattern);
+void simple_display(llvm::raw_ostream &out, const Pattern *pattern);
+
+SourceLoc extractNearestSourceLoc(const Pattern *pattern);
 
 } // end namespace swift
 

@@ -49,6 +49,11 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
+# SWIFTLIBEXEC_DIR is the directory in the build tree where Swift auxiliary
+# executables should be placed.
+set(SWIFTLIBEXEC_DIR
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libexec/swift")
+
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -689,6 +694,8 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
+  target_link_directories(${name} PUBLIC ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
   # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
@@ -973,8 +980,8 @@ function(add_swift_fuzzer_host_tool executable)
 endfunction()
 
 macro(add_swift_tool_symlink name dest component)
-  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
-  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+  llvm_add_tool_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
 endmacro()
 
 # Declare that files in this library are built with LLVM's support

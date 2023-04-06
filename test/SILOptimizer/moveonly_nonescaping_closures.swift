@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 // TODO: test with (-DNONTRIVIAL | -DADDRESS_ONLY) * (REABSTRACT)
 
 protocol P {}

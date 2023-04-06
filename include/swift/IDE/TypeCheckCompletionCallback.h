@@ -82,6 +82,43 @@ void getSolutionSpecificVarTypes(
     const constraints::Solution &S,
     llvm::SmallDenseMap<const VarDecl *, Type> &Result);
 
+/// While this RAII is alive the interface types of the variables defined in
+/// \c SolutionSpecificVarTypes are temporarily set to the types in the map.
+/// Afterwards, their types are restored.
+struct WithSolutionSpecificVarTypesRAII {
+  llvm::SmallDenseMap<const VarDecl *, Type> RestoreVarTypes;
+
+  WithSolutionSpecificVarTypesRAII(
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+    for (auto SolutionVarType : SolutionSpecificVarTypes) {
+      if (SolutionVarType.first->hasInterfaceType()) {
+        RestoreVarTypes[SolutionVarType.first] =
+            SolutionVarType.first->getInterfaceType();
+      } else {
+        RestoreVarTypes[SolutionVarType.first] = Type();
+      }
+      if (!SolutionVarType.second->hasArchetype()) {
+        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
+                         SolutionVarType.second);
+      } else {
+        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
+                         ErrorType::get(SolutionVarType.second));
+      }
+    }
+  }
+
+  ~WithSolutionSpecificVarTypesRAII() {
+    for (auto Var : RestoreVarTypes) {
+      setInterfaceType(const_cast<VarDecl *>(Var.first), Var.second);
+    }
+  }
+
+private:
+  /// Sets the interface type of \p VD, similar to \c VD->setInterfaceType
+  /// but also allows resetting the interface type of \p VD to null.
+  static void setInterfaceType(VarDecl *VD, Type Ty);
+};
+
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.
 ///

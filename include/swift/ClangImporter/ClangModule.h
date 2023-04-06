@@ -66,6 +66,7 @@ public:
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *
@@ -104,7 +105,7 @@ public:
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
+  getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private decls in Clang modules");
   }
 

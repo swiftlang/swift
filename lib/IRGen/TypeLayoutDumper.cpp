@@ -51,6 +51,10 @@ public:
   NominalTypeWalker(std::vector<NominalTypeDecl *> &Results)
     : Results(Results) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       Results.push_back(NTD);

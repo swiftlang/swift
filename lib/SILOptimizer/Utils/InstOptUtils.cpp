@@ -22,7 +22,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
@@ -1307,7 +1306,7 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
     return;
   }
 
-  // Incidental uses of an addres are meaningless with regard to the loaded
+  // Incidental uses of an address are meaningless with regard to the loaded
   // value.
   if (isIncidentalUse(inst) || isa<BeginUnpairedAccessInst>(inst))
     return;

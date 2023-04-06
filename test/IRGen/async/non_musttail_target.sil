@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -disable-legacy-type-info -parse-stdlib %s -disable-llvm-optzns -disable-swift-specific-llvm-optzns -disable-objc-interop -module-name main -emit-ir -o - | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: OS=wasi || OS=windows-msvc
+// REQUIRES: OS=wasi
 
 sil_stage canonical
 

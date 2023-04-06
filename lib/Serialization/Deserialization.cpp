@@ -415,8 +415,10 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
-    auto result =
-        BindingPattern::createImplicit(getContext(), isLet, subPattern);
+    auto result = BindingPattern::createImplicit(
+        getContext(),
+        isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -860,6 +862,7 @@ static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
     return RequirementKind::KIND;
 
   switch (rawKind) {
+  CASE(SameShape)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
@@ -1290,7 +1293,8 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
         parentSigOrError.get(), UUID::fromTime(),
-        existentialOrShapeTypeOrError.get()->getCanonicalType(),
+        cast<GenericTypeParamType>(
+          existentialOrShapeTypeOrError.get()->getCanonicalType()),
         contextSubsOrError.get());
   }
 
@@ -2508,8 +2512,12 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::NonMutating;
   case serialization::SelfAccessKind::Mutating:
     return swift::SelfAccessKind::Mutating;
+  case serialization::SelfAccessKind::LegacyConsuming:
+    return swift::SelfAccessKind::LegacyConsuming;
   case serialization::SelfAccessKind::Consuming:
     return swift::SelfAccessKind::Consuming;
+  case serialization::SelfAccessKind::Borrowing:
+    return swift::SelfAccessKind::Borrowing;
   }
   return None;
 }
@@ -2524,8 +2532,10 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
     return swift::ParamDecl::Specifier::ID;
   CASE(Default)
   CASE(InOut)
-  CASE(Shared)
-  CASE(Owned)
+  CASE(Borrowing)
+  CASE(Consuming)
+  CASE(LegacyShared)
+  CASE(LegacyOwned)
   }
 #undef CASE
   return None;
@@ -2539,6 +2549,7 @@ getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
     return swift::VarDecl::Introducer::ID;
   CASE(Let)
   CASE(Var)
+  CASE(InOut)
   }
 #undef CASE
   return None;
@@ -2660,6 +2671,7 @@ getActualMacroRole(uint8_t context) {
   CASE(Member)
   CASE(Peer)
   CASE(Conformance)
+  CASE(CodeItem)
 #undef CASE
   }
   return None;
@@ -4647,8 +4659,8 @@ public:
 
     dtor->setGenericSignature(MF.getGenericSignature(genericSigID));
 
-    dtor->setAccess(std::max(cast<NominalTypeDecl>(DC)->getFormalAccess(),
-                             AccessLevel::Internal));
+    auto *nom = cast<NominalTypeDecl>(DC->getImplementedObjCContext());
+    dtor->setAccess(std::max(nom->getFormalAccess(), AccessLevel::Internal));
 
     if (isImplicit)
       dtor->setImplicit();
@@ -4666,6 +4678,7 @@ public:
     uint8_t rawAccessLevel;
     unsigned numArgNames;
     unsigned builtinID;
+    uint8_t hasExpandedMacroDefinition;
     IdentifierID externalModuleNameID;
     IdentifierID externalMacroTypeNameID;
 
@@ -4679,6 +4692,7 @@ public:
                                          rawAccessLevel,
                                          numArgNames,
                                          builtinID,
+                                         hasExpandedMacroDefinition,
                                          externalModuleNameID,
                                          externalMacroTypeNameID,
                                          argNameAndDependencyIDs);
@@ -4771,6 +4785,58 @@ public:
             MF.getIdentifier(externalModuleNameID),
             MF.getIdentifier(externalMacroTypeNameID)
          )
+      );
+    } else if (hasExpandedMacroDefinition) {
+      // Macro expansion definition block.
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        return macro;
+
+      SmallVector<uint64_t, 16> scratch;
+      scratch.clear();
+      StringRef expansionText;
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &expansionText));
+      if (recordID != decls_block::EXPANDED_MACRO_DEFINITION)
+        return macro;
+
+      uint8_t hasReplacements;
+      decls_block::ExpandedMacroDefinitionLayout::readRecord(
+          scratch, hasReplacements);
+
+      // Macro replacements block.
+      SmallVector<ExpandedMacroReplacement, 2> replacements;
+      if (hasReplacements) {
+        llvm::BitstreamEntry entry =
+            MF.fatalIfUnexpected(
+              MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+        if (entry.Kind == llvm::BitstreamEntry::Record) {
+          scratch.clear();
+          unsigned recordID = MF.fatalIfUnexpected(
+              MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+          if (recordID != decls_block::EXPANDED_MACRO_REPLACEMENTS)
+            return macro;
+
+          ArrayRef<uint64_t> serializedReplacements;
+          decls_block::ExpandedMacroReplacementsLayout::readRecord(
+              scratch, serializedReplacements);
+          if (serializedReplacements.size() % 3 == 0) {
+            for (unsigned i : range(0, serializedReplacements.size() / 3)) {
+              ExpandedMacroReplacement replacement{
+                static_cast<unsigned>(serializedReplacements[3*i]),
+                static_cast<unsigned>(serializedReplacements[3*i + 1]),
+                static_cast<unsigned>(serializedReplacements[3*i + 2])
+              };
+              replacements.push_back(replacement);
+            }
+          }
+        }
+      }
+
+      ctx.evaluator.cacheOutput(
+          MacroDefinitionRequest{macro},
+          MacroDefinition::forExpanded(ctx, expansionText, replacements)
       );
     }
 
@@ -5475,17 +5541,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
       }
 
-      // Do a quick check to see if this attribute is a move only attribute. If
-      // so, emit a nice error if we don't have experimental move only enabled.
-      if (Attr && Attr->getKind() == DeclAttrKind::DAK_MoveOnly &&
-          !MF.getContext().LangOpts.Features.contains(Feature::MoveOnly)) {
-        MF.getContext().Diags.diagnose(
-            SourceLoc(),
-            diag::
-                experimental_moveonly_feature_can_only_be_imported_when_enabled,
-            MF.getAssociatedModule()->getName());
-      }
-
       if (!skipAttr) {
         if (!Attr)
           return llvm::Error::success();
@@ -5711,23 +5766,6 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   case serialization::ReferenceOwnership::Name: \
     return swift::ReferenceOwnership::Name;
 #include "swift/AST/ReferenceStorage.def"
-  }
-  return None;
-}
-
-/// Translate from the serialization ValueOwnership enumerators, which are
-/// guaranteed to be stable, to the AST ones.
-static Optional<swift::ValueOwnership>
-getActualValueOwnership(serialization::ValueOwnership raw) {
-  switch (raw) {
-#define CASE(ID) \
-  case serialization::ValueOwnership::ID: \
-    return swift::ValueOwnership::ID;
-  CASE(Default)
-  CASE(InOut)
-  CASE(Shared)
-  CASE(Owned)
-#undef CASE
   }
   return None;
 }
@@ -6105,8 +6143,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
         isCompileTimeConst);
 
-    auto ownership =
-        getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
     if (!ownership)
       return MF.diagnoseFatal();
 
@@ -6341,9 +6379,12 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
       scratch, parameterPack, declIDOrDepth, indexPlusOne);
 
   if (indexPlusOne == 0) {
-    auto genericParam =
-        dyn_cast_or_null<GenericTypeParamDecl>(MF.getDecl(declIDOrDepth));
+    auto genericParamOrError = MF.getDeclChecked(declIDOrDepth);
+    if (!genericParamOrError)
+      return genericParamOrError.takeError();
 
+    auto genericParam =
+        dyn_cast_or_null<GenericTypeParamDecl>(genericParamOrError.get());
     if (!genericParam)
       return MF.diagnoseFatal();
 

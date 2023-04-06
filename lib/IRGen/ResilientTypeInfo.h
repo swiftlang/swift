@@ -20,6 +20,7 @@
 #define SWIFT_IRGEN_RESILIENTTYPEINFO_H
 
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 
 namespace swift {
 namespace irgen {
@@ -42,9 +43,12 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
+  ResilientTypeInfo(llvm::Type *type,
+                    IsCopyable_t copyable,
+                    IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable,
+                                 IsNotTriviallyDestroyable, IsNotBitwiseTakable,
+                                 copyable,
                                  abiAccessible) {}
 
 public:

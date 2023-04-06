@@ -1346,6 +1346,18 @@ bool SILClosureSpecializerTransform::gatherCallSites(
           continue;
         }
 
+        // Specializing a readnone, readonly, releasenone function with a
+        // nontrivial context is illegal. Inserting a release in such a function
+        // results in miscompilation after other optimizations.
+        // For now, the specialization is disabled.
+        //
+        // TODO: A @noescape closure should never be converted to an @owned
+        // argument regardless of the function attribute.
+        if (!OnlyHaveThinToThickClosure
+            && ApplyCallee->getEffectsKind() <= EffectsKind::ReleaseNone) {
+          continue;
+        }
+
         // Avoid an infinite specialization loop caused by repeated runs of
         // ClosureSpecializer and CapturePropagation.
         // CapturePropagation propagates constant function-literals. Such

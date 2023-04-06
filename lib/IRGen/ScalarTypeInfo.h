@@ -99,8 +99,8 @@ public:
 
   // Subclasses must implement the following four operations:
 
-  // Is the scalar POD?
-  // static const bool IsScalarPOD;
+  // Is the scalar trivially destructible?
+  // static const bool IsScalarTriviallyDestroyable;
 
   // Make the scalar +1.
   // void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const;
@@ -167,7 +167,7 @@ public:
 
     // Grab the old value if we need to.
     llvm::Value *oldValue = nullptr;
-    if (!Derived::IsScalarPOD) {
+    if (!Derived::IsScalarTriviallyDestroyable) {
       oldValue = IGF.Builder.CreateLoad(dest, "oldValue");
     }
 
@@ -175,7 +175,7 @@ public:
     storeAsBytes(IGF, src, dest);
 
     // Release the old value if we need to.
-    if (!Derived::IsScalarPOD) {
+    if (!Derived::IsScalarTriviallyDestroyable) {
       asDerived().emitScalarRelease(IGF, oldValue, IGF.getDefaultAtomicity());
     }
   }
@@ -200,7 +200,7 @@ public:
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
                bool isOutlined) const override {
-    if (!Derived::IsScalarPOD) {
+    if (!Derived::IsScalarTriviallyDestroyable) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
       asDerived().emitScalarRelease(IGF, value, IGF.getDefaultAtomicity());
@@ -254,7 +254,7 @@ public:
   TypeLayoutEntry *
   buildTypeLayoutEntry(IRGenModule &IGM,
                        SILType T,
-                       bool useStructLayouts = false) const override {
+                       bool useStructLayouts) const override {
     if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
@@ -276,7 +276,9 @@ protected:
                           SpareBitVector spareBits,
                           Alignment align, T &&...args)
     : SingleScalarTypeInfo<Derived, Base>(storage, size, spareBits, align,
-                                          IsPOD, IsFixedSize,
+                                          IsTriviallyDestroyable,
+                                          IsCopyable,
+                                          IsFixedSize,
                                           ::std::forward<T>(args)...) {}
 
   const Derived &asDerived() const {
@@ -285,7 +287,7 @@ protected:
 
 private:
   friend class SingleScalarTypeInfo<Derived, Base>;
-  static const bool IsScalarPOD = true;
+  static const bool IsScalarTriviallyDestroyable = true;
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const {}
@@ -304,7 +306,7 @@ private:
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(asDerived(), T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,
-                                                      ScalarKind::POD);
+                                                      ScalarKind::TriviallyDestroyable);
   }
 
 };

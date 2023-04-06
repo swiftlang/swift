@@ -39,6 +39,22 @@ public:
   void *PrivateData[NumWords_DefaultActor];
 };
 
+/// The non-default distributed actor implementation.
+class alignas(Alignment_NonDefaultDistributedActor) NonDefaultDistributedActor : public HeapObject {
+public:
+  // These constructors do not initialize the actor instance, and the
+  // destructor does not destroy the actor instance; you must call
+  // swift_nonDefaultDistributedActor_initialize yourself.
+  constexpr NonDefaultDistributedActor(const HeapMetadata *metadata)
+    : HeapObject(metadata), PrivateData{} {}
+
+  constexpr NonDefaultDistributedActor(const HeapMetadata *metadata,
+                                       InlineRefCounts::Immortal_t immortal)
+    : HeapObject(metadata, immortal), PrivateData{} {}
+
+  void *PrivateData[NumWords_NonDefaultDistributedActor];
+};
+
 } // end namespace swift
 
 #endif

@@ -1,5 +1,8 @@
 // RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s
 
+// Note: test has not been updated to match the swift-syntax style.
+// REQUIRES: newswiftsyntaxstyle
+
 // Error split between the real file and a virtual one.
 #sourceLocation(file: "abc.swift", line: 9)
 let x = 1

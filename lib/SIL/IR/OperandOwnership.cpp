@@ -367,6 +367,7 @@ FORWARDING_OWNERSHIP(InitExistentialRef)
 FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
 FORWARDING_OWNERSHIP(MarkMustCheck)
+FORWARDING_OWNERSHIP(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
 #undef FORWARDING_OWNERSHIP
@@ -930,6 +931,7 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
+BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeNonDefaultDistributedActor)
 
 BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffAllocateSubcontext)
 BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
@@ -939,6 +941,7 @@ BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinarySerialExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildComplexEqualitySerialExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 

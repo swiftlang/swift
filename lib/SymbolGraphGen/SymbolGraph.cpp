@@ -12,6 +12,7 @@
 
 #include "clang/AST/DeclObjC.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -62,12 +63,13 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.PrintFunctionRepresentationAttrs =
     PrintOptions::FunctionRepresentationMode::None;
   Opts.PrintUserInaccessibleAttrs = false;
-  Opts.SkipPrivateStdlibDecls = true;
-  Opts.SkipUnderscoredStdlibProtocols = true;
+  Opts.SkipPrivateStdlibDecls = !Walker.Options.PrintPrivateStdlibSymbols;
+  Opts.SkipUnderscoredStdlibProtocols = !Walker.Options.PrintPrivateStdlibSymbols;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
   Opts.ExplodeEnumCaseDecls = true;
   Opts.PrintFactoryInitializerComment = false;
+  Opts.PrintMacroDefinitions = false;
 
   Opts.ExclusiveAttrList.clear();
 
@@ -264,6 +266,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     case swift::DeclContextKind::SubscriptDecl:
     case swift::DeclContextKind::AbstractFunctionDecl:
     case swift::DeclContextKind::SerializedLocal:
+    case swift::DeclContextKind::Package:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:
     case swift::DeclContextKind::MacroDecl:
@@ -294,7 +297,7 @@ bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
 }
 
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers) {
+  if (!Walker.Options.EmitSynthesizedMembers || Walker.Options.SkipProtocolImplementations) {
     return;
   }
   const auto D = S.getLocalSymbolDecl();
@@ -625,6 +628,19 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
+namespace {
+
+const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
+  auto reqs = VD->getSatisfiedProtocolRequirements();
+
+  if (!reqs.empty())
+    return reqs.front();
+  else
+    return nullptr;
+}
+
+}
+
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -685,6 +701,15 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // If we've been asked to skip protocol implementations, filter them out here.
+    if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
+      // Allow them to stay if they have their own doc comment
+      const auto *DocCommentProvidingDecl =
+        getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true);
+      if (DocCommentProvidingDecl != VD)
+        return true;
+    }
 
     // Symbols from exported-imported modules should only be included if they
     // were originally public.

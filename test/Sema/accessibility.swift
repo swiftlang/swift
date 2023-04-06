@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 -package-name mylib
 
 /// Test structs with protocols and extensions
 public protocol PublicProto {
@@ -641,7 +641,7 @@ public struct Subscripts {
   package subscript (x: PrivateStruct, y: String) -> String { return "" } // expected-error {{subscript cannot be declared package because its index uses a private type}}
   package subscript (x: String, y: PrivateStruct) -> String { return "" } // expected-error {{subscript cannot be declared package because its index uses a private type}}
   package subscript (x: InternalStruct, y: FilePrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared package because its index uses a fileprivate type}}
-  package subscript (x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared package because its index uses a fileprivate type}}
+  package subscript (x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared package because its element type uses a private type}}
   package subscript (x: String, y: String) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared package because its element type uses an internal type}}
 }
 
@@ -659,7 +659,7 @@ public struct Methods {
   package func x(x: PrivateStruct, y: String) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
   package func y(x: String, y: PrivateStruct) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
   package func z(x: InternalStruct, y: FilePrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its parameter uses a fileprivate type}}
-  package func w(x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared package because its parameter uses a fileprivate type}}
+  package func w(x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared package because its result uses a private type}}
   package func v(x: String, y: String) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its result uses an internal type}}
   package func q() -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its result uses an internal type}}
 }
@@ -1021,8 +1021,8 @@ public struct PublicWithInternalSettersConformPublic : PublicMutationOperations 
 }
 
 public struct PublicWithPackageSettersConformPublic : PublicMutationOperations {
-  public package(set) var size = 0 // FIXME: rdar://104987295 this should error
-  public package(set) subscript (_: Int) -> Int { // FIXME: rdar://104987295 this should error
+  public package(set) var size = 0 // expected-error {{setter for property 'size' must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the property as 'public' to satisfy the requirement}} {{10-23=}}
+  public package(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared public because it matches a requirement in public protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the subscript as 'public' to satisfy the requirement}} {{10-23=}}
     get { return 42 }
     set {}
   }
@@ -1471,7 +1471,11 @@ public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGen
   public func publicReq() {}
 }
 
-// FIXME: rdar://104987455 should have expected note and error 'class cannot be declared public because its superclass is internal'
+fileprivate typealias FilePrivateConcreteGenericCompositionPkg = InternalGenericClass<Int> & InternalProto
+public class DerivedFromFilePrivateConcreteGenericCompositionPkg : FilePrivateConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses an internal type as a generic parameter}}
+  public func internalReq() {}
+}
+
 internal typealias InternalConcreteGenericCompositionPkg = PackageGenericClass<Int> & PackageProto
 public class DerivedFromInternalConcreteGenericCompositionPkg : InternalConcreteGenericCompositionPkg { // expected-error {{class cannot be declared public because its superclass uses a package type as a generic parameter}}
   public func packageReq() {}

@@ -24,7 +24,7 @@ extension Context {
   // The calleeAnalysis is not specific to a function and therefore can be provided in
   // all contexts.
   var calleeAnalysis: CalleeAnalysis {
-    let bridgeCA = PassContext_getCalleeAnalysis(_bridged)
+    let bridgeCA = _bridged.getCalleeAnalysis()
     return CalleeAnalysis(bridged: bridgeCA)
   }
 }
@@ -36,8 +36,8 @@ protocol MutatingContext : Context {
 }
 
 extension MutatingContext {
-  func notifyInvalidatedStackNesting() { PassContext_notifyInvalidatedStackNesting(_bridged) }
-  var needFixStackNesting: Bool { PassContext_getNeedFixStackNesting(_bridged) }
+  func notifyInvalidatedStackNesting() { _bridged.notifyInvalidatedStackNesting() }
+  var needFixStackNesting: Bool { _bridged.getNeedFixStackNesting() }
 
   /// Splits the basic block, which contains `inst`, before `inst` and returns the
   /// new block.
@@ -46,7 +46,7 @@ extension MutatingContext {
   /// instructions _before_ `inst` remain in the original block.
   func splitBlock(at inst: Instruction) -> BasicBlock {
     notifyBranchesChanged()
-    return PassContext_splitBlock(inst.bridged).block
+    return _bridged.splitBlock(inst.bridged).block
   }
 
   func erase(instruction: Instruction) {
@@ -58,7 +58,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
-    PassContext_eraseInstruction(_bridged, instruction.bridged)
+    _bridged.eraseInstruction(instruction.bridged)
   }
 
   func erase(instructionIncludingDebugUses inst: Instruction) {
@@ -72,25 +72,25 @@ extension MutatingContext {
   }
 
   func tryDeleteDeadClosure(closure: SingleValueInstruction) -> Bool {
-    PassContext_tryDeleteDeadClosure(_bridged, closure.bridged)
+    _bridged.tryDeleteDeadClosure(closure.bridged)
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
-    SubstitutionMap(PassContext_getContextSubstitutionMap(_bridged, type.bridged))
+    SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
   }
 
   // Private utilities
 
   fileprivate func notifyInstructionsChanged() {
-    PassContext_notifyChanges(_bridged, instructionsChanged)
+    _bridged.asNotificationHandler().notifyChanges(.instructionsChanged)
   }
 
   fileprivate func notifyCallsChanged() {
-    PassContext_notifyChanges(_bridged, callsChanged)
+    _bridged.asNotificationHandler().notifyChanges(.callsChanged)
   }
 
   fileprivate func notifyBranchesChanged() {
-    PassContext_notifyChanges(_bridged, branchesChanged)
+    _bridged.asNotificationHandler().notifyChanges(.branchesChanged)
   }
 }
 
@@ -102,8 +102,8 @@ struct FunctionPassContext : MutatingContext {
   var notifyInstructionChanged: (Instruction) -> () { return { inst in } }
 
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
-    let bridgedInst = OptionalBridgedInstruction(obj: inst?.bridged.obj)
-    return PassContext_continueWithNextSubpassRun(_bridged, bridgedInst) != 0
+    let bridgedInst = OptionalBridgedInstruction(inst?.bridged.obj)
+    return _bridged.continueWithNextSubpassRun(bridgedInst)
   }
 
   func createSimplifyContext(preserveDebugInfo: Bool, notifyInstructionChanged: @escaping (Instruction) -> ()) -> SimplifyContext {
@@ -111,33 +111,33 @@ struct FunctionPassContext : MutatingContext {
   }
 
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = PassContext_getAliasAnalysis(_bridged)
+    let bridgedAA = _bridged.getAliasAnalysis()
     return AliasAnalysis(bridged: bridgedAA)
   }
 
   var deadEndBlocks: DeadEndBlocksAnalysis {
-    let bridgeDEA = PassContext_getDeadEndBlocksAnalysis(_bridged)
+    let bridgeDEA = _bridged.getDeadEndBlocksAnalysis()
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)
   }
 
   var dominatorTree: DominatorTree {
-    let bridgedDT = PassContext_getDomTree(_bridged)
+    let bridgedDT = _bridged.getDomTree()
     return DominatorTree(bridged: bridgedDT)
   }
 
   var postDominatorTree: PostDominatorTree {
-    let bridgedPDT = PassContext_getPostDomTree(_bridged)
+    let bridgedPDT = _bridged.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
   }
 
   func loadFunction(name: StaticString) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      PassContext_loadFunction(_bridged, llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
+      _bridged.loadFunction(llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
     }
   }
 
   func erase(block: BasicBlock) {
-    PassContext_eraseBlock(_bridged, block.bridged)
+    _bridged.eraseBlock(block.bridged)
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
@@ -146,7 +146,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   fileprivate func notifyEffectsChanged() {
-    PassContext_notifyChanges(_bridged, effectsChanged)
+    _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
   }
 }
 
@@ -164,23 +164,23 @@ extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     self.init(insertAt: .before(insPnt), location: location,
-              context.notifyInstructionChanged, context._bridged)
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts _before_ `insPnt`, using the location of `insPnt`.
   init(before insPnt: Instruction, _ context: some MutatingContext) {
     self.init(insertAt: .before(insPnt), location: insPnt.location,
-              context.notifyInstructionChanged, context._bridged)
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
   init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
     if let nextInst = insPnt.next {
       self.init(insertAt: .before(nextInst), location: location,
-                context.notifyInstructionChanged, context._bridged)
+                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
     } else {
       self.init(insertAt: .atEndOf(insPnt.parentBlock), location: location,
-                context.notifyInstructionChanged, context._bridged)
+                context.notifyInstructionChanged, context._bridged.asNotificationHandler())
     }
   }
 
@@ -192,14 +192,14 @@ extension Builder {
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     self.init(insertAt: .atEndOf(block), location: location,
-              context.notifyInstructionChanged, context._bridged)
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
   init(atBeginOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: location,
-              context.notifyInstructionChanged, context._bridged)
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
@@ -207,7 +207,7 @@ extension Builder {
   init(atBeginOf block: BasicBlock, _ context: some MutatingContext) {
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: firstInst.location,
-              context.notifyInstructionChanged, context._bridged)
+              context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 }
 
@@ -217,31 +217,31 @@ extension Builder {
 
 extension Undef {
   static func get(type: Type, _ context: some MutatingContext) -> Undef {
-    SILUndef_get(type.bridged, context._bridged).getAs(Undef.self)
+    context._bridged.getSILUndef(type.bridged).value as! Undef
   }
 }
 
 extension BasicBlock {
   func addBlockArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> BlockArgument {
     context.notifyInstructionsChanged()
-    return SILBasicBlock_addBlockArgument(bridged, type.bridged, ownership._bridged).blockArgument
+    return bridged.addBlockArgument(type.bridged, ownership._bridged).blockArgument
   }
   
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
-    SILBasicBlock_eraseArgument(bridged, index)
+    bridged.eraseArgument(index)
   }
 
   func moveAllInstructions(toBeginOf otherBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     context.notifyBranchesChanged()
-    SILBasicBlock_moveAllInstructionsToBegin(bridged, otherBlock.bridged)
+    bridged.moveAllInstructionsToBegin(otherBlock.bridged)
   }
 
   func moveAllInstructions(toEndOf otherBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     context.notifyBranchesChanged()
-    SILBasicBlock_moveAllInstructionsToEnd(bridged, otherBlock.bridged)
+    bridged.moveAllInstructionsToEnd(otherBlock.bridged)
   }
 
   func eraseAllArguments(_ context: some MutatingContext) {
@@ -252,14 +252,14 @@ extension BasicBlock {
   }
 
   func moveAllArguments(to otherBlock: BasicBlock, _ context: some MutatingContext) {
-    BasicBlock_moveArgumentsTo(bridged, otherBlock.bridged)
+    bridged.moveArgumentsTo(otherBlock.bridged)
   }
 }
 
 extension AllocRefInstBase {
   func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
-    AllocRefInstBase_setIsStackAllocatable(bridged)
+    bridged.AllocRefInstBase_setIsStackAllocatable()
     context.notifyInstructionChanged(self)
   }
 }
@@ -278,7 +278,7 @@ extension Instruction {
       context.notifyCallsChanged()
     }
     context.notifyInstructionsChanged()
-    SILInstruction_setOperand(bridged, index, value.bridged)
+    bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
   }
 }
@@ -286,7 +286,7 @@ extension Instruction {
 extension RefCountingInst {
   func setAtomicity(isAtomic: Bool, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
-    RefCountingInst_setIsAtomic(bridged, isAtomic)
+    bridged.RefCountingInst_setIsAtomic(isAtomic)
     context.notifyInstructionChanged(self)
   }
 }
@@ -294,18 +294,17 @@ extension RefCountingInst {
 extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()
-    TermInst_replaceBranchTarget(bridged, fromBlock.bridged, toBlock.bridged)
+    bridged.TermInst_replaceBranchTarget(fromBlock.bridged, toBlock.bridged)
   }
 }
 
 extension Function {
   func set(needStackProtection: Bool, _ context: FunctionPassContext) {
     context.notifyEffectsChanged()
-    SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
+    bridged.setNeedStackProtection(needStackProtection)
   }
 
   func fixStackNesting(_ context: FunctionPassContext) {
-    PassContext_fixStackNesting(context._bridged, bridged)
+    context._bridged.fixStackNesting(bridged)
   }
-
 }

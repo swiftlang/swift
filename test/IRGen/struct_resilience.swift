@@ -339,3 +339,8 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
 // CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], i32* {{.*}})
+
+// coverage for rdar://106669967 where a SIL crash can happen under `-enable-library-evolution -O`
+public struct StructWithResilientInit {
+  public init() {}
+}

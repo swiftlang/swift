@@ -37,16 +37,13 @@ struct ConcreteMyProtocol : MyProtocol {
 
 // MARK: 'some' keyword.
 
-// BEGINNING_WITH_SOME: Begin completions
 // BEGINNING_WITH_SOME-DAG: Keyword/None:                       some[#some#]; name=some
 // BEGINNING_WITH_SOME-DAG: Keyword/None:                       Any[#Any#]; name=Any
 // BEGINNING_WITH_SOME-DAG: Decl[Enum]/CurrModule:              MyEnum[#MyEnum#]; name=MyEnum
 // BEGINNING_WITH_SOME-DAG: Decl[Class]/CurrModule:             MyClass[#MyClass#]; name=MyClass
 // BEGINNING_WITH_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
 // BEGINNING_WITH_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// BEGINNING_WITH_SOME: End completions
 
-// BEGINNING_WITHOUT_SOME: Begin completions
 // BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
 // BEGINNING_WITHOUT_SOME-DAG: Keyword/None:                       Any[#Any#]; name=Any
 // BEGINNING_WITHOUT_SOME-DAG: Decl[Enum]/CurrModule:              MyEnum[#MyEnum#]; name=MyEnum
@@ -54,7 +51,6 @@ struct ConcreteMyProtocol : MyProtocol {
 // BEGINNING_WITHOUT_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
 // BEGINNING_WITHOUT_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
-// BEGINNING_WITHOUT_SOME: End completions
 
 func gloabalFunc() -> #^GLOBAL_FUNC^#
 var globalVar: #^GLOBAL_VAR^#
@@ -134,7 +130,6 @@ class TestClass :
     HasAssocWithSameTypeConstraint,
     HasAssocWithConformanceConstraintGeneric {
   #^OVERRIDE_TestClass^#
-// OVERRIDE: Begin completions
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> AssocPlain {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> some MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            var valAssocWithSuperClassConstraint: some MyClass;
@@ -145,7 +140,6 @@ class TestClass :
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintOnProto() -> some MyProtocol {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> ConcreteMyProtocol {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric {|}
-// OVERRIDE: End completions
 }
 
 struct TestStruct :
@@ -165,9 +159,7 @@ struct TestStruct :
 class HasTypealias : HasAssocWithConformanceConstraint {
   typealias AssocWithConformanceConstraint = ConcreteMyProtocol
   #^OVERRIDE_HasTypealias^#
-// OVERRIDE_HasTypealias: Begin completions
 // OVERRIDE_HasTypealias-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> ConcreteMyProtocol {|};
-// OVERRIDE_HasTypealias: End completions
 }
 
 // MARK: Postfix expession for opaque result types.
@@ -194,7 +186,6 @@ func postfixExpr() {
 // POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
 // POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
 // POSTFIX_TestProtocol_DOT-DAG: Keyword[self]/CurrNominal:          self[#TestProtocol#]; name={{.*$}}
-// POSTFIX_TestProtocol_DOT: End completions
 
 // POSTFIX_TestProtocol_NODOT: Begin completions, 5 items
 // POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
@@ -202,7 +193,6 @@ func postfixExpr() {
 // POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: BuiltinOperator/None:                = {#TestProtocol#}[#Void#]; name={{.*$}}
 // POSTFIX_TestProtocol_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#TestProtocol#]; name={{.*$}}
-// POSTFIX_TestProtocol_NODOT-DAG: End completions
 
 protocol TestProtocol2 {
   associatedtype Assoc: Comparable
@@ -216,7 +206,6 @@ extension TestProtocol2 {
 struct ConcreteTestProtocol2: TestProtocol2 {
   func foo() -> some Comparable { 1 }
   #^OVERRIDE_TestProtocol2^#
-// OVERRIDE_TestProtocol2: Begin completions
 // OVERRIDE_TestProtocol2-NOT: foo()
 // OVERRIDE_TestProtocol2-NOT: inExt()
 // OVERRIDE_TestProtocol2-DAG: Decl[InstanceMethod]/Super:         func bar() -> Assoc {|};
@@ -224,15 +213,12 @@ struct ConcreteTestProtocol2: TestProtocol2 {
 // OVERRIDE_TestProtocol2-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#};
 // OVERRIDE_TestProtocol2-NOT: foo()
 // OVERRIDE_TestProtocol2-NOT: inExt()
-// OVERRIDE_TestProtocol2: End completions
 }
 func testUseTestProtocol2(value: ConcreteTestProtocol2) {
   value.#^POSTFIX_ConcreteTestProtocol2^#
-// POSTFIX_ConcreteTestProtocol2: Begin completions
 // POSTFIX_ConcreteTestProtocol2-DAG: Keyword[self]/CurrNominal:          self[#ConcreteTestProtocol2#];
 // POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/CurrNominal:   foo()[#Comparable#];
 // POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         bar()[#ConcreteTestProtocol2.Assoc#];
 // POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         baz({#x: ConcreteTestProtocol2.Assoc#})[#(ConcreteTestProtocol2.Assoc) -> ConcreteTestProtocol2.Assoc#];
 // POSTFIX_ConcreteTestProtocol2-DAG: Decl[InstanceMethod]/Super:         inExt()[#ConcreteTestProtocol2.Assoc#];
-// POSTFIX_ConcreteTestProtocol2: End completions
 }

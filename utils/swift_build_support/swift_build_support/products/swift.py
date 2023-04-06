@@ -55,8 +55,11 @@ class Swift(product.Product):
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
-        # Add experimental reflection flag.
-        self.cmake_options.extend(self._enable_experimental_reflection)
+        # Add backtracing flag.
+        self.cmake_options.extend(self._enable_backtracing)
+
+        # Add experimental observation flag.
+        self.cmake_options.extend(self._enable_experimental_observation)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -179,9 +182,14 @@ updated without updating swift.py?")
                  self.args.enable_experimental_distributed)]
 
     @property
-    def _enable_experimental_reflection(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL',
-                 self.args.enable_experimental_reflection)]
+    def _enable_backtracing(self):
+        return [('SWIFT_ENABLE_BACKTRACING:BOOL',
+                 self.args.swift_enable_backtracing)]
+
+    @property
+    def _enable_experimental_observation(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL',
+                 self.args.enable_experimental_observation)]
 
     @property
     def _enable_stdlib_static_vprintf(self):

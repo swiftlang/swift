@@ -1,6 +1,6 @@
 // TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-emit-sil -enable-experimental-move-only -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SIL %s
 
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
@@ -83,11 +83,11 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -132,11 +132,11 @@ public func testIntPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -184,11 +184,11 @@ public func testIntPairWithDeinit() {
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
 // SILGEN: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -233,11 +233,11 @@ public func testKlassPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits23testKlassPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -367,11 +367,11 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -415,11 +415,11 @@ public func testIntEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -465,11 +465,11 @@ public func testIntEnumPairWithDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -513,11 +513,11 @@ public func testKlassEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3

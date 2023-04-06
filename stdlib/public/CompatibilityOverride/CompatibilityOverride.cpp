@@ -89,6 +89,15 @@ static OverrideSection *getOverrideSectionPtr() {
       return nullptr;                                               \
     return Section->name;                                           \
   }
+
+#define OVERRIDE_NORETURN(name, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  Override_ ## name swift::getOverride_ ## name() {                 \
+    auto *Section = getOverrideSectionPtr();                        \
+    if (Section == nullptr)                                         \
+      nullptr;                                               \
+    Section->name;                                           \
+  }
+
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 #endif // #ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

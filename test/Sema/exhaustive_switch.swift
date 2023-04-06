@@ -810,7 +810,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }
@@ -902,7 +902,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch payload { // expected-warning {{switch covers known cases, but 'NonExhaustivePayload' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  switch payload { // expected-warning {{switch covers known cases, but 'NonExhaustivePayload' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }

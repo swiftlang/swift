@@ -123,7 +123,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set } // expected-note {{found this candidate}}
+  subscript (index : Index) -> Value { get set } // expected-note {{candidate expects value of type 'T.Index' for parameter #1 (got 'T.Value')}}
 }
 
 protocol IntSubscriptable {
@@ -131,7 +131,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  } // expected-note {{found this candidate}}
+  subscript (index : Int) -> ElementType { get  } // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T.Value')}}
 }
 
 func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {

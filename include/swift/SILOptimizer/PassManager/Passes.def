@@ -182,7 +182,7 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoisting of value destroys")
-PASS(SSADestroyHoisting, "ssa-destroy-hoisting",
+PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
@@ -468,6 +468,8 @@ PASS(MoveOnlyBorrowToDestructureTransform,
      "used to convert borrow+projection to destructures. Once this has run, the move "
      "only object checker runs and ensures that the destructures do not create "
      "any move only errors with respect to non-borrow+projection uses")
+PASS(ReferenceBindingTransform, "sil-reference-binding-transform",
+     "Check/transform reference bindings")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

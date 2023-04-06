@@ -917,10 +917,10 @@ public:
   /// interface. Use this to diagnose issues with declarations that are not
   /// imported or that are not reflected in a generated interface.
   template<typename ...Args>
-  void diagnose(HeaderLoc loc, Args &&...args) {
+  InFlightDiagnostic diagnose(HeaderLoc loc, Args &&...args) {
     // If we're in the middle of pretty-printing, suppress diagnostics.
     if (SwiftContext.Diags.isPrettyPrintingDecl()) {
-      return;
+      return InFlightDiagnostic();
     }
 
     auto swiftLoc = loc.fallbackLoc;
@@ -932,7 +932,7 @@ public:
                                                       loc.clangLoc);
     }
 
-    SwiftContext.Diags.diagnose(swiftLoc, std::forward<Args>(args)...);
+    return SwiftContext.Diags.diagnose(swiftLoc, std::forward<Args>(args)...);
   }
 
   void addImportDiagnostic(

@@ -256,11 +256,6 @@ bool ArgsToFrontendOptionsConverter::convert(
       Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
       return true;
     }
-
-    if (Args.hasArg(OPT_check_api_availability_only)) {
-      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_checking_api_availability_only);
-      return true;
-    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
@@ -268,16 +263,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
-
-  if (const Arg *A = Args.getLastArg(OPT_package_name)) {
-    auto pkgName = A->getValue();
-    if (!Lexer::isIdentifier(pkgName))
-      Diags.diagnose(SourceLoc(), diag::error_bad_package_name, pkgName);
-    else if (pkgName == STDLIB_NAME)
-      Diags.diagnose(SourceLoc(), diag::error_stdlib_package_name, pkgName);
-    else
-      Opts.PackageName = pkgName;
-  }
 
   if (const Arg *A = Args.getLastArg(OPT_export_as)) {
     auto exportAs = A->getValue();
@@ -310,15 +295,29 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
-      Opts.ClangHeaderExposedDecls =
-          llvm::StringSwitch<llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(A->getValue())
-              .Case("all-public", FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
-              .Case("has-expose-attr", FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
-              .Default(llvm::None);
+    Opts.ClangHeaderExposedDecls =
+        llvm::StringSwitch<
+            llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(
+            A->getValue())
+            .Case("all-public",
+                  FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
+            .Case("has-expose-attr",
+                  FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
+            .Case("has-expose-attr-or-stdlib",
+                  FrontendOptions::ClangHeaderExposeBehavior::
+                      HasExposeAttrOrImplicitDeps)
+            .Default(llvm::None);
   }
-  Opts.EnableExperimentalCxxInteropInClangHeader =
-      Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
-  
+  for (const auto &arg :
+       Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
+    auto splitArg = StringRef(arg).split('=');
+    if (splitArg.second.empty()) {
+      continue;
+    }
+    Opts.clangHeaderExposedImports.push_back(
+        {splitArg.first.str(), splitArg.second.str()});
+  }
+
   Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
                                                  OPT_no_strict_implicit_module_context,
                                                  false);
@@ -346,6 +345,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
   Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
+  Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
   return false;
 }
 

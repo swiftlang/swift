@@ -2582,44 +2582,53 @@ public:
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
+/// Predicate used to filter attributes to only the original attributes.
+class OrigDeclAttrFilter {
+  ModuleDecl *mod;
+
+public:
+  OrigDeclAttrFilter() : mod(nullptr) {}
+
+  OrigDeclAttrFilter(ModuleDecl *mod) : mod(mod) {}
+
+  Optional<const DeclAttribute *>
+  operator()(const DeclAttribute *Attr) const;
+};
+
 /// Attributes applied directly to the declaration.
 ///
 /// We should really just have \c DeclAttributes and \c SemanticDeclAttributes,
 /// but currently almost all callers expect the latter. Instead of changing all
-/// callers of \c getAttrs, instead provide a way to retrieive the original
+/// callers of \c getAttrs, instead provide a way to retrieve the original
 /// attributes.
 class OrigDeclAttributes {
-  SmallVector<DeclAttribute *> attributes;
-  using AttrListTy = SmallVectorImpl<DeclAttribute *>;
+public:
+  using OrigFilteredRange = OptionalTransformRange<iterator_range<DeclAttributes::const_iterator>, OrigDeclAttrFilter>;
+
+private:
+  OrigFilteredRange origRange;
 
 public:
-  OrigDeclAttributes() = default;
+  OrigDeclAttributes() : origRange(make_range(DeclAttributes::const_iterator(nullptr), DeclAttributes::const_iterator(nullptr)), OrigDeclAttrFilter()) {}
 
-  OrigDeclAttributes(DeclAttributes semanticAttrs, ModuleDecl *mod);
+  OrigDeclAttributes(const DeclAttributes &allAttrs, ModuleDecl *mod) : origRange(make_range(allAttrs.begin(), allAttrs.end()), OrigDeclAttrFilter(mod)) {}
 
-
-  using iterator = AttrListTy::iterator;
-  using const_iterator = AttrListTy::const_iterator;
-
-  iterator begin() { return attributes.begin(); }
-  iterator end() { return attributes.end(); }
-  const_iterator begin() const { return attributes.begin(); }
-  const_iterator end() const { return attributes.end(); }
+  OrigFilteredRange::iterator begin() const { return origRange.begin(); }
+  OrigFilteredRange::iterator end() const { return origRange.end(); }
 
   template <typename AttrType, bool AllowInvalid>
   using AttributeKindRange =
-  OptionalTransformRange<iterator_range<const_iterator>,
-  ToAttributeKind<AttrType, AllowInvalid>, const_iterator>;
+  OptionalTransformRange<OrigFilteredRange, ToAttributeKind<AttrType, AllowInvalid>>;
 
   template <typename AttrType, bool AllowInvalid = false>
   AttributeKindRange<AttrType, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<AttrType, AllowInvalid>(make_range(begin(), end()), ToAttributeKind<AttrType, AllowInvalid>());
+    return AttributeKindRange<AttrType, AllowInvalid>(origRange, ToAttributeKind<AttrType, AllowInvalid>());
   }
 
   /// Retrieve the first attribute of the given attribute class.
   template <typename AttrType>
   const AttrType *getAttribute(bool allowInvalid = false) const {
-    for (auto *attr : attributes) {
+    for (auto *attr : origRange) {
       if (auto *specificAttr = dyn_cast<AttrType>(attr)) {
         if (specificAttr->isValid() || allowInvalid)
           return specificAttr;

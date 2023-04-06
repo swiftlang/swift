@@ -282,6 +282,8 @@ enum class ConversionRestrictionKind {
   InoutToCPointer,
   /// Array-to-pointer conversion.
   ArrayToPointer,
+  /// Converting from array to a C pointer has `PointerToCPointer` semantics.
+  ArrayToCPointer,
   /// String-to-pointer conversion.
   StringToPointer,
   /// Pointer-to-pointer conversion.

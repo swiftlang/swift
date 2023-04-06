@@ -27,6 +27,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -250,6 +251,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinNonDefaultDistributedActorStorage:
   case TypeKind::BuiltinPackIndex:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
@@ -729,6 +731,11 @@ static bool isLegalFormalType(CanType type) {
     return isLegalFormalType(objectType);
   }
 
+  // Expansions are legal if their pattern type is legal.
+  if (auto expansionType = dyn_cast<PackExpansionType>(type)) {
+    return isLegalFormalType(expansionType.getPatternType());
+  }
+
   return true;
 }
 
@@ -821,6 +828,14 @@ Type TypeBase::wrapInOptionalType() const {
 
 CanType CanType::wrapInOptionalTypeImpl(CanType type) {
   return type->wrapInOptionalType()->getCanonicalType();
+}
+
+Type TypeBase::isArrayType() {
+  if (auto boundStruct = getAs<BoundGenericStructType>()) {
+    if (boundStruct->getDecl() == getASTContext().getArrayDecl())
+      return boundStruct->getGenericArgs()[0];
+  }
+  return Type();
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
@@ -1592,12 +1607,17 @@ getCanonicalParams(AnyFunctionType *funcType,
                    SmallVectorImpl<AnyFunctionType::Param> &canParams) {
   auto origParams = funcType->getParams();
   for (auto param : origParams) {
-    // Canonicalize the type and drop the internal label to canonicalize the
-    // Param.
-    canParams.emplace_back(param.getPlainType()->getReducedType(genericSig),
-                           param.getLabel(), param.getParameterFlags(),
-                           /*InternalLabel=*/Identifier());
+    canParams.emplace_back(param.getCanonical(genericSig));
   }
+}
+
+AnyFunctionType::Param
+AnyFunctionType::Param::getCanonical(CanGenericSignature genericSig) const {
+  // Canonicalize the type and drop the internal label to canonicalize the
+  // Param.
+  return Param(getPlainType()->getReducedType(genericSig),
+               getLabel(), getParameterFlags(),
+               /*InternalLabel=*/Identifier());
 }
 
 CanType TypeBase::computeCanonicalType() {
@@ -1653,6 +1673,8 @@ CanType TypeBase::computeCanonicalType() {
     auto *expansion = cast<PackExpansionType>(this);
     auto patternType = expansion->getPatternType()->getCanonicalType();
     auto countType = expansion->getCountType()->getCanonicalType();
+    if (auto packArchetype = dyn_cast<PackArchetypeType>(countType))
+      countType = packArchetype->getReducedShape();
     Result = PackExpansionType::get(patternType, countType);
     break;
   }
@@ -4369,12 +4391,11 @@ CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
            getPointer()->substGenericArgs(subs)->getCanonicalType());
 }
 
-static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
+static Type getMemberForBaseType(InFlightSubstitution &IFS,
                                  Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
-                                 Identifier name,
-                                 SubstOptions options) {
+                                 Identifier name) {
   // Produce a dependent member type for the given base type.
   auto getDependentMemberType = [&](Type baseType) {
     if (assocType)
@@ -4422,7 +4443,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   auto proto = assocType->getProtocol();
   ProtocolConformanceRef conformance =
-      lookupConformances(origBase->getCanonicalType(), substBase, proto);
+    IFS.lookupConformance(origBase->getCanonicalType(), substBase, proto);
 
   if (conformance.isInvalid())
     return failed();
@@ -4437,7 +4458,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
         assocType->getDeclaredInterfaceType());
   } else if (conformance.isConcrete()) {
     auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+        conformance.getConcrete()->getTypeWitnessAndDecl(assocType,
+                                                         IFS.getOptions());
 
     witnessTy = witness.getWitnessType();
     if (!witnessTy || witnessTy->hasError())
@@ -4445,7 +4467,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes) {
+    if (IFS.getOptions() & SubstFlags::DesugarMemberTypes) {
       if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
         witnessTy = aliasType->getSinglyDesugaredType();
 
@@ -4489,6 +4511,24 @@ operator()(CanType dependentType, Type conformingReplacementType,
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
 operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
+  // The places that use this can also produce conformance packs, generally
+  // just for singleton pack expansions.
+  if (auto conformingPack = conformingReplacementType->getAs<PackType>()) {
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    for (auto conformingPackElt : conformingPack->getElementTypes()) {
+      // Look through pack expansions; there's no equivalent conformance
+      // expansion right now.
+      auto expansion = conformingPackElt->getAs<PackExpansionType>();
+      if (expansion) conformingPackElt = expansion->getPatternType();
+
+      auto conformance =
+        (*this)(dependentType, conformingPackElt, conformedProtocol);
+      conformances.push_back(conformance);
+    }
+    return ProtocolConformanceRef(
+        PackConformance::get(conformingPack, conformedProtocol, conformances));
+  }
+
   assert((conformingReplacementType->is<ErrorType>() ||
           conformingReplacementType->is<SubstitutableType>() ||
           conformingReplacementType->is<DependentMemberType>() ||
@@ -4530,8 +4570,9 @@ Type DependentMemberType::substBaseType(Type substBase,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(lookupConformance, getBase(), substBase,
-                              getAssocType(), getName(), None);
+  InFlightSubstitution IFS(nullptr, lookupConformance, None);
+  return getMemberForBaseType(IFS, getBase(), substBase,
+                              getAssocType(), getName());
 }
 
 Type DependentMemberType::substRootParam(Type newRoot,
@@ -4548,15 +4589,12 @@ Type DependentMemberType::substRootParam(Type newRoot,
 }
 
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
-                                     TypeSubstitutionFn substitutions,
-                                     LookupConformanceFn lookupConformances,
-                                     SubstOptions options) {
+                                     InFlightSubstitution &IFS) {
   // Substitute into the function type (without generic signature).
   auto *bareFnType = FunctionType::get(genericFnType->getParams(),
                                        genericFnType->getResult(),
                                        genericFnType->getExtInfo());
-  Type result =
-    Type(bareFnType).subst(substitutions, lookupConformances, options);
+  Type result = Type(bareFnType).subst(IFS);
   if (!result || result->is<ErrorType>()) return result;
 
   auto *fnType = result->castTo<FunctionType>();
@@ -4564,8 +4602,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   bool anySemanticChanges = false;
   SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto param : genericFnType->getGenericParams()) {
-    Type paramTy =
-      Type(param).subst(substitutions, lookupConformances, options);
+    Type paramTy = Type(param).subst(IFS);
     if (!paramTy)
       return Type();
 
@@ -4587,7 +4624,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   SmallVector<Requirement, 2> requirements;
   for (const auto &req : genericFnType->getRequirements()) {
     // Substitute into the requirement.
-    auto substReqt = req.subst(substitutions, lookupConformances, options);
+    auto substReqt = req.subst(IFS);
 
     // Did anything change?
     if (!anySemanticChanges &&
@@ -4617,27 +4654,105 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                   fnType->getResult(), fnType->getExtInfo());
 }
 
-static Type substType(Type derivedType,
-                      TypeSubstitutionFn substitutions,
-                      LookupConformanceFn lookupConformances,
-                      SubstOptions options) {
+void InFlightSubstitution::expandPackExpansionShape(Type origShape,
+    llvm::function_ref<void(Type substComponentShape)> handleComponent) {
+
+  // Substitute the shape using the baseline substitutions, not the
+  // current elementwise projections.
+  auto substShape = origShape.subst(BaselineSubstType,
+                                    BaselineLookupConformance,
+                                    Options);
+
+  auto substPackShape = substShape->getAs<PackType>();
+  if (!substPackShape) {
+    ActivePackExpansions.push_back({/*is subst expansion*/true, 0});
+    handleComponent(substShape);
+    ActivePackExpansions.pop_back();
+    return;
+  }
+
+  ActivePackExpansions.push_back({false, 0});
+  for (auto substElt : substPackShape->getElementTypes()) {
+    auto substExpansion = substElt->getAs<PackExpansionType>();
+    auto substExpansionShape =
+      (substExpansion ? substExpansion->getCountType() : Type());
+
+    ActivePackExpansions.back().isSubstExpansion =
+      (substExpansion != nullptr);
+    handleComponent(substExpansionShape);
+    ActivePackExpansions.back().expansionIndex++;
+  }
+  ActivePackExpansions.pop_back();
+}
+
+Type InFlightSubstitution::substType(SubstitutableType *origType) {
+  auto substType = BaselineSubstType(origType);
+  if (!substType || ActivePackExpansions.empty())
+    return substType;
+
+  auto substPackType = substType->getAs<PackType>();
+  if (!substPackType)
+    return substType;
+
+  auto &activeExpansion = ActivePackExpansions.back();
+  auto index = activeExpansion.expansionIndex;
+  assert(index < substPackType->getNumElements() &&
+         "replacement for pack parameter did not have the right "
+         "size for expansion");
+  auto substEltType = substPackType->getElementType(index);
+  if (activeExpansion.isSubstExpansion) {
+    assert(substEltType->is<PackExpansionType>() &&
+           "substituted shape mismatch: expected an expansion component");
+    substEltType = substEltType->castTo<PackExpansionType>()->getPatternType();
+  } else {
+    assert(!substEltType->is<PackExpansionType>() &&
+           "substituted shape mismatch: expected a scalar component");
+  }
+  return substEltType;
+}
+
+ProtocolConformanceRef
+InFlightSubstitution::lookupConformance(CanType dependentType,
+                                        Type conformingReplacementType,
+                                        ProtocolDecl *conformedProtocol) {
+  auto substConfRef = BaselineLookupConformance(dependentType,
+                                                conformingReplacementType,
+                                                conformedProtocol);
+  if (!substConfRef ||
+      ActivePackExpansions.empty() ||
+      !substConfRef.isPack())
+    return substConfRef;
+
+  auto substPackConf = substConfRef.getPack();
+  auto substPackPatterns = substPackConf->getPatternConformances();
+  auto index = ActivePackExpansions.back().expansionIndex;
+  assert(index < substPackPatterns.size() &&
+         "replacement for pack parameter did not have the right "
+         "size for expansion");
+  return substPackPatterns[index];
+}
+
+bool InFlightSubstitution::isInvariant(Type derivedType) const {
+  return !derivedType->hasArchetype()
+      && !derivedType->hasTypeParameter()
+      && (!shouldSubstituteOpaqueArchetypes()
+          || !derivedType->hasOpaqueArchetype());
+}
+
+static Type substType(Type derivedType, InFlightSubstitution &IFS) {
   // Handle substitutions into generic function types.
   if (auto genericFnType = derivedType->getAs<GenericFunctionType>()) {
-    return substGenericFunctionType(genericFnType, substitutions,
-                                    lookupConformances, options);
+    return substGenericFunctionType(genericFnType, IFS);
   }
 
   // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
-  if (!derivedType->hasArchetype()
-      && !derivedType->hasTypeParameter()
-      && (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
-          || !derivedType->hasOpaqueArchetype()))
+  if (IFS.isInvariant(derivedType))
     return derivedType;
 
   return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
     // FIXME: Add SIL versions of mapTypeIntoContext() and
     // mapTypeOutOfContext() and use them appropriately
-    assert((options.contains(SubstFlags::AllowLoweredTypes) ||
+    assert((IFS.getOptions().contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type)) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
@@ -4646,22 +4761,28 @@ static Type substType(Type derivedType,
     // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
-      auto newSubMap = subMap.subst(substitutions, lookupConformances, options);
+      auto newSubMap = subMap.subst(IFS);
 
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
                              newSubMap);
     }
-    
+
+    if (auto packExpansionTy = dyn_cast<PackExpansionType>(type)) {
+      auto eltTys = IFS.expandPackExpansionType(packExpansionTy);
+      if (eltTys.size() == 1) return eltTys[0];
+      return Type(PackType::get(packExpansionTy->getASTContext(), eltTys));
+    }
+
     if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
       if (silFnTy->isPolymorphic())
         return None;
       if (auto subs = silFnTy->getInvocationSubstitutions()) {
-        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        auto newSubs = subs.subst(IFS);
         return silFnTy->withInvocationSubstitutions(newSubs);
       }
       if (auto subs = silFnTy->getPatternSubstitutions()) {
-        auto newSubs = subs.subst(substitutions, lookupConformances, options);
+        auto newSubs = subs.subst(IFS);
         return silFnTy->withPatternSubstitutions(newSubs);
       }
       return None;
@@ -4671,14 +4792,11 @@ static Type substType(Type derivedType,
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
       Type parentTy;
       if (auto origParentTy = aliasTy->getParent())
-        parentTy = substType(origParentTy,
-                             substitutions, lookupConformances, options);
-      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
-                                    substitutions, lookupConformances, options);
+        parentTy = substType(origParentTy, IFS);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(), IFS);
       if (parentTy && parentTy->isExistentialType())
         return underlyingTy;
-      auto subMap = aliasTy->getSubstitutionMap()
-          .subst(substitutions, lookupConformances, options);
+      auto subMap = aliasTy->getSubstitutionMap().subst(IFS);
       return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
                                      subMap, underlyingTy));
     }
@@ -4688,12 +4806,11 @@ static Type substType(Type derivedType,
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
-      auto newBase = substType(depMemTy->getBase(),
-                               substitutions, lookupConformances, options);
-      return getMemberForBaseType(lookupConformances,
+      auto newBase = substType(depMemTy->getBase(), IFS);
+      return getMemberForBaseType(IFS,
                                   depMemTy->getBase(), newBase,
                                   depMemTy->getAssocType(),
-                                  depMemTy->getName(), options);
+                                  depMemTy->getName());
     }
     
     auto substOrig = dyn_cast<SubstitutableType>(type);
@@ -4702,13 +4819,13 @@ static Type substType(Type derivedType,
 
     // Opaque types can't normally be directly substituted unless we
     // specifically were asked to substitute them.
-    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+    if (!IFS.shouldSubstituteOpaqueArchetypes()
         && isa<OpaqueTypeArchetypeType>(substOrig))
       return None;
 
     // If we have a substitution for this type, use it.
-    if (auto known = substitutions(substOrig)) {
-      if (options.contains(SubstFlags::SubstituteOpaqueArchetypes) &&
+    if (auto known = IFS.substType(substOrig)) {
+      if (IFS.shouldSubstituteOpaqueArchetypes() &&
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
         return None; // Recursively process the substitutions of the opaque type
@@ -4736,8 +4853,7 @@ static Type substType(Type derivedType,
     assert(parent && "Not a nested archetype");
 
     // Substitute into the parent type.
-    Type substParent = substType(parent, substitutions,
-                                 lookupConformances, options);
+    Type substParent = substType(parent, IFS);
 
     // If the parent didn't change, we won't change.
     if (substParent.getPointer() == parent)
@@ -4747,23 +4863,26 @@ static Type substType(Type derivedType,
     AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
         ->castTo<DependentMemberType>()->getAssocType();
 
-    return getMemberForBaseType(lookupConformances, parent, substParent,
-                                assocType, assocType->getName(), options);
+    return getMemberForBaseType(IFS, parent, substParent,
+                                assocType, assocType->getName());
   });
 }
 
 Type Type::subst(SubstitutionMap substitutions,
                  SubstOptions options) const {
-  return substType(*this,
-                   QuerySubstitutionMap{substitutions},
-                   LookUpConformanceInSubstitutionMap(substitutions),
-                   options);
+  InFlightSubstitutionViaSubMap IFS(substitutions, options);
+  return substType(*this, IFS);
 }
 
 Type Type::subst(TypeSubstitutionFn substitutions,
                  LookupConformanceFn conformances,
                  SubstOptions options) const {
-  return substType(*this, substitutions, conformances, options);
+  InFlightSubstitution IFS(substitutions, conformances, options);
+  return substType(*this, IFS);
+}
+
+Type Type::subst(InFlightSubstitution &IFS) const {
+  return substType(*this, IFS);
 }
 
 DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
@@ -4953,6 +5072,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       substTy = ErrorType::get(baseTy->getASTContext());
     else if (genericEnv)
       substTy = genericEnv->mapTypeIntoContext(gp);
+
+    if (gp->isParameterPack() && !substTy->hasError())
+      substTy = PackType::getSingletonPackExpansion(substTy);
 
     auto result = substitutions.insert(
       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
@@ -5147,6 +5269,23 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   });
 }
 
+static PackType *getTransformedPack(Type substType) {
+  if (auto pack = substType->getAs<PackType>()) {
+    return pack;
+  }
+
+  // The pack matchers like to make expansions out of packs, and
+  // these types then propagate out into transforms.  Make sure we
+  // flatten them exactly if they were the underlying pack.
+  // FIXME: stop doing this and make PackExpansionType::get assert
+  // that we never construct these types
+  if (auto expansion = substType->getAs<PackExpansionType>()) {
+    return expansion->getPatternType()->getAs<PackType>();
+  }
+
+  return nullptr;
+}
+
 Type Type::transformRec(
     llvm::function_ref<Optional<Type>(TypeBase *)> fn) const {
   return transformWithPosition(TypePosition::Invariant,
@@ -5265,28 +5404,16 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
-    auto hasTypeErasedGenericClassType = [](Type ty) -> bool {
-      return ty.findIf([](Type subType) -> bool {
-        if (subType->isTypeErasedGenericClassType())
-          return true;
-        else
-          return false;
-      });
-    };
     auto updateSubs = [&](SubstitutionMap &subs) -> bool {
-      // This interface isn't suitable for updating the substitution map in a
-      // substituted SILFunctionType.
-      // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
+      // This interface isn't suitable for doing most transformations on
+      // a substituted SILFunctionType, but it's too hard to come up with
+      // an assertion that meaningfully captures what restrictions are in
+      // place.  Generally the restriction that you can't naively substitute
+      // a SILFunctionType using AST mechanisms will have to be good enough.
       SmallVector<Type, 4> newReplacements;
       for (Type type : subs.getReplacementTypes()) {
         auto transformed =
             type.transformWithPosition(TypePosition::Invariant, fn);
-        assert((type->isEqual(transformed) ||
-                (type->hasTypeParameter() && transformed->hasTypeParameter()) ||
-                (hasTypeErasedGenericClassType(type) &&
-                 hasTypeErasedGenericClassType(transformed))) &&
-               "Substituted SILFunctionType can't be transformed into a "
-               "concrete type");
         newReplacements.push_back(transformed->getCanonicalType());
         if (!type->isEqual(transformed))
           changed = true;
@@ -5596,13 +5723,19 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      elements.push_back(transformedEltTy);
+      // If the transformed type is a pack, immediately expand it.
+      if (auto eltPack = getTransformedPack(transformedEltTy)) {
+        auto eltElements = eltPack->getElementTypes();
+        elements.append(eltElements.begin(), eltElements.end());
+      } else {
+        elements.push_back(transformedEltTy);
+      }
     }
 
     if (!anyChanged)
       return *this;
 
-    return PackType::get(Ptr->getASTContext(), elements)->flattenPackTypes();
+    return PackType::get(Ptr->getASTContext(), elements);
   }
 
   case TypeKind::SILPack: {
@@ -5654,6 +5787,8 @@ case TypeKind::Id:
   case TypeKind::PackExpansion: {
     auto expand = cast<PackExpansionType>(base);
 
+    // Substitution completely replaces this.
+
     Type transformedPat =
         expand->getPatternType().transformWithPosition(pos, fn);
     if (!transformedPat)
@@ -5668,7 +5803,14 @@ case TypeKind::Id:
         transformedCount.getPointer() == expand->getCountType().getPointer())
       return *this;
 
-    return PackExpansionType::get(transformedPat, transformedCount)->expand();
+    // // If we transform the count to a pack type, expand the pattern.
+    // // This is necessary because of how we piece together types in
+    // // the constraint system.
+    // if (auto countPack = transformedCount->getAs<PackType>()) {
+    //   return PackExpansionType::expand(transformedPat, countPack);
+    // }
+
+    return PackExpansionType::get(transformedPat, transformedCount);
   }
 
   case TypeKind::Tuple: {
@@ -5699,13 +5841,35 @@ case TypeKind::Id:
       }
 
       // Add the new tuple element, with the transformed type.
-      elements.push_back(elt.getWithType(transformedEltTy));
+      // Expand packs immediately.
+      if (auto eltPack = getTransformedPack(transformedEltTy)) {
+        bool first = true;
+        for (auto eltElement : eltPack->getElementTypes()) {
+          if (first) {
+            elements.push_back(elt.getWithType(eltElement));
+            first = false;
+          } else {
+            elements.push_back(TupleTypeElt(eltElement));
+          }
+        }
+      } else {
+        elements.push_back(elt.getWithType(transformedEltTy));
+      }
     }
 
     if (!anyChanged)
       return *this;
 
-    return TupleType::get(elements, Ptr->getASTContext())->flattenPackTypes();
+    // If the transform would yield a singleton tuple, and we didn't
+    // start with one, flatten to produce the element type.
+    if (elements.size() == 1 &&
+        !elements[0].getType()->is<PackExpansionType>() &&
+        !(tuple->getNumElements() == 1 &&
+          !tuple->getElementType(0)->is<PackExpansionType>())) {
+      return elements[0].getType();
+    }
+
+    return TupleType::get(elements, Ptr->getASTContext());
   }
 
 
@@ -5759,7 +5923,21 @@ case TypeKind::Id:
         flags = flags.withInOut(true);
       }
 
-      substParams.emplace_back(substType, label, flags, internalLabel);
+      if (auto substPack = getTransformedPack(substType)) {
+        bool first = true;
+        for (auto substEltType : substPack->getElementTypes()) {
+          if (first) {
+            substParams.emplace_back(substEltType, label, flags,
+                                     internalLabel);
+            first = false;
+          } else {
+            substParams.emplace_back(substEltType, Identifier(), flags,
+                                     Identifier());
+          }
+        }
+      } else {
+        substParams.emplace_back(substType, label, flags, internalLabel);
+      }
     }
 
     // Transform result type.
@@ -5801,8 +5979,7 @@ case TypeKind::Id:
         return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
                                       function->getExtInfo()
-                                          .withGlobalActor(globalActorType))
-          ->flattenPackTypes();
+                                          .withGlobalActor(globalActorType));
     }
 
     if (isUnchanged) return *this;
@@ -5811,8 +5988,7 @@ case TypeKind::Id:
       return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
                              function->getExtInfo()
-                                 .withGlobalActor(globalActorType))
-        ->flattenPackTypes();
+                                 .withGlobalActor(globalActorType));
   }
 
   case TypeKind::ArraySlice: {
@@ -6153,6 +6329,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinJob:
   case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
+  case TypeKind::BuiltinNonDefaultDistributedActorStorage:
   case TypeKind::BuiltinPackIndex:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:

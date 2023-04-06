@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -enable-experimental-feature Macros -verify %s
+// RUN: %target-swift-frontend -parse -verify %s
 
 #macro
 
@@ -29,7 +29,7 @@ _ = #trailing(x, y, z) {
 }
 
 _ = #another {
-  // expected-error @+1 {{expected a macro identifier for a pound literal expression}}
+  // expected-error @+1 {{expected a macro identifier}}
   #-
 }
 

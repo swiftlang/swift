@@ -2,6 +2,69 @@
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+## Swift 5.9
+
+* Marking stored properties as unavailable with `@available` has been banned,
+  closing an unintentional soundness hole that had allowed arbitrary
+  unavailable code to run and unavailable type metadata to be used at runtime:
+  
+  ```swift
+  @available(*, unavailable)
+  struct Unavailable {
+    init() {
+      print("Unavailable.init()")
+    }
+  }
+
+  struct S {
+    @available(*, unavailable)
+    var x = Unavailable()
+  }
+
+  _ = S() // prints "Unavailable.init()"
+  ```
+  
+  Marking `deinit` as unavailable has also been banned for similar reasons.
+
+* [SE-0366][]:
+
+  The lifetime of a local variable value can be explicitly ended using the
+  `consume` operator, forwarding ownership to the surrounding call, assignment,
+  or initialization without copying:
+
+  ```swift
+  var x: [String] = []
+  x.append("apples")
+  x.append("bananas")
+  x.append("oranges")
+
+  process(consume x) // forward the current value, without copying
+
+  x = [] // start building a new value
+  x.append("broccoli")
+  x.append("cauliflower")
+  x.append("asparagus")
+  ...
+  ```
+
+* [SE-0377][]:
+
+  Functions can now declare whether they take value parameters by `borrowing`
+  access to a value provided by the caller, or by `consuming` a value that the
+  callee is allowed to take ownership of:
+
+  ```swift
+  struct HealthyFoods {
+    var values: [String] = []
+
+    // Ask to `consume` the parameter, since we want to use it
+    // to incorporate into our own `values` array
+    mutating func add(_ value: consuming String) {
+        values.append(value)
+    }
+  }
+  ```
+
 ## Swift 5.8
 
 * [SE-0376][]:
@@ -228,10 +291,10 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
   ```swift
-    func delayedHello() async throws {
-      try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
-      print("hello delayed world")
-    }
+  func delayedHello() async throws {
+    try await Task.sleep(until: .now + .milliseconds(123), clock: .continuous)
+    print("hello delayed world")
+  }
   ```
 
   `Clock` also has methods to measure the elapsed duration of the execution of work. In the case of the `SuspendingClock` and `ContinuousClock` this measures with high resolution and is suitable for benchmarks.
@@ -253,17 +316,17 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   `any` type having the same constraints as the associated type. For example:
 
   ```swift
-    protocol Surface {...}
-    
-    protocol Solid {
-      associatedtype SurfaceType: Surface
-      func boundary() -> SurfaceType
-    }
-    
-    let solid: any Solid = ...
-    
-    // Type of 'boundary' is 'any Surface'
-    let boundary = solid.boundary()
+  protocol Surface {...}
+  
+  protocol Solid {
+    associatedtype SurfaceType: Surface
+    func boundary() -> SurfaceType
+  }
+  
+  let solid: any Solid = ...
+  
+  // Type of 'boundary' is 'any Surface'
+  let boundary = solid.boundary()
   ```
 
   Protocol methods that take an associated type or `Self` cannot be used with `any`,
@@ -276,21 +339,21 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Protocols can now declare a list of one or more _primary associated types_, which enable writing same-type requirements on those associated types using angle bracket syntax:
 
   ```swift
-    protocol Graph<Vertex, Edge> {
-      associatedtype Vertex
-      associatedtype Edge
-    }
+  protocol Graph<Vertex, Edge> {
+    associatedtype Vertex
+    associatedtype Edge
+  }
   ```
 
   You can now write a protocol name followed by type arguments in angle brackets, like
   `Graph<Int, String>`, anywhere that a protocol conformance requirement may appear:
 
   ```swift
-    func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
+  func shortestPath<V, E>(_: some Graph<V, E>, from: V, to: V) -> [E]
 
-    extension Graph<Int, String> {...}
+  extension Graph<Int, String> {...}
 
-    func build() -> some Graph<Int, String> {}
+  func build() -> some Graph<Int, String> {}
   ```
 
   A protocol name followed by angle brackets is shorthand for a conformance requirement,
@@ -298,10 +361,10 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   The first two examples above are equivalent to the following:
 
   ```swift
-    func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
-      where G: Graph, G.Vertex == V, G.Edge == E
+  func shortestPath<V, E, G>(_: G, from: V, to: V) -> [E]
+    where G: Graph, G.Vertex == V, G.Edge == E
 
-    extension Graph where Vertex == Int, Edge == String {...}
+  extension Graph where Vertex == Int, Edge == String {...}
   ```
 
   The `build()` function returning `some Graph<Int, String>` can't be written using a
@@ -9637,8 +9700,10 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 [SE-0362]: <https://github.com/apple/swift-evolution/blob/main/proposals/0362-piecemeal-future-features.md>
 [SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
+[SE-0366]: <https://github.com/apple/swift-evolution/blob/main/proposals/0366-move-function.md>
 [SE-0370]: <https://github.com/apple/swift-evolution/blob/main/proposals/0370-pointer-family-initialization-improvements.md>
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
+[SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

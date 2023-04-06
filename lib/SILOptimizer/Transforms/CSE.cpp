@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -665,7 +666,7 @@ public:
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
-  bool processLazyPropertyGetters();
+  bool processLazyPropertyGetters(SILFunction &F);
 
   bool canHandle(SILInstruction *Inst);
 
@@ -779,8 +780,9 @@ bool CSE::processFunction(SILFunction &Fm, DominanceInfo *DT) {
 
 /// Replace lazy property getters (which are dominated by the same getter)
 /// by a direct load of the value.
-bool CSE::processLazyPropertyGetters() {
+bool CSE::processLazyPropertyGetters(SILFunction &F) {
   bool changed = false;
+  bool invalidatedStackNesting = false;
   for (ApplyInst *ai : lazyPropertyGetters) {
     SILFunction *getter = ai->getReferencedFunctionOrNull();
     assert(getter && getter->isLazyPropertyGetter());
@@ -807,8 +809,18 @@ bool CSE::processLazyPropertyGetters() {
         builder.createUncheckedEnumData(sei->getLoc(), enumVal, someDecl, ty);
     builder.createBranch(sei->getLoc(), someDest, { ued });
     sei->eraseFromParent();
+    // When inlining an OSSA function into a non-OSSA function, ownership of
+    // nonescaping closures is lowered.  At that point, they are recognized as
+    // stack users.  Since they weren't recognized as such before, they may not
+    // satisfy stack discipline.  Fix that up now.
+    if (getter->hasOwnership() && !ai->getFunction()->hasOwnership()) {
+      invalidatedStackNesting = true;
+    }
     changed = true;
     ++NumCSE;
+  }
+  if (invalidatedStackNesting) {
+    StackNesting::fixNesting(&F);
   }
   return changed;
 }
@@ -880,23 +892,9 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
           return false;
         }
       }
-      Candidates.insert(User);
     }
-    if (!isa<TermInst>(User))
-      continue;
-    // The current use of the opened archetype is a terminator instruction.
-    // Check if any of the successor BBs uses this opened archetype in the
-    // types of its basic block arguments. If this is the case, replace
-    // those uses by the new opened archetype.
-    auto Successors = User->getParent()->getSuccessorBlocks();
-    for (auto Successor : Successors) {
-      if (Successor->args_empty())
-        continue;
-      // If a BB has any arguments, update their types if necessary.
-      updateBasicBlockArgTypes(Successor,
-                               OldOpenedArchetype,
-                               NewOpenedArchetype);
-    }
+
+    Candidates.insert(User);
   }
 
   // Now process candidates.
@@ -914,6 +912,21 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
     auto Candidate = Candidates.pop_back_val();
     if (Processed.contains(Candidate))
       continue;
+
+    if (isa<TermInst>(Candidate)) {
+      // The current use of the opened archetype is a terminator instruction.
+      // Check if any of the successor BBs uses this opened archetype in the
+      // types of its basic block arguments. If this is the case, replace
+      // those uses by the new opened archetype.
+      // FIXME: What about uses of those arguments?
+      for (auto *Successor : Candidate->getParent()->getSuccessorBlocks()) {
+        if (Successor->args_empty())
+          continue;
+        // If a BB has any arguments, update their types if necessary.
+        updateBasicBlockArgTypes(Successor, OldOpenedArchetype,
+                                 NewOpenedArchetype);
+      }
+    }
 
     // Compute if a candidate depends on the old opened archetype.
     // It always does if it has any type-dependent operands.
@@ -935,7 +948,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
 
       // If it does, the candidate depends on the opened existential.
       if (ResultDependsOnOldOpenedArchetype) {
-        DependsOnOldOpenedArchetype |= ResultDependsOnOldOpenedArchetype;
+        DependsOnOldOpenedArchetype = true;
 
         // The users of this candidate are new candidates.
         for (auto Use : CandidateResult->getUses()) {
@@ -1141,7 +1154,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
     auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
-    if (MB == SILInstruction::MemoryBehavior::None)
+    if (MB == MemoryBehavior::None)
       return true;
     
     if (isLazyPropertyGetter(AI))
@@ -1475,7 +1488,7 @@ class SILCSE : public SILFunctionTransform {
 
     // Handle calls to lazy property getters, which are collected in
     // processFunction().
-    if (C.processLazyPropertyGetters()) {
+    if (C.processLazyPropertyGetters(*Fn)) {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

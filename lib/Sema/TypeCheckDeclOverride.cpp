@@ -1489,6 +1489,7 @@ namespace  {
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
     UNINTERESTING_ATTR(Borrowed)
+    UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)
@@ -1519,6 +1520,7 @@ namespace  {
     UNINTERESTING_ATTR(MoveOnly)
     UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
+    UNINTERESTING_ATTR(LegacyConsuming)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
@@ -2037,8 +2039,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
               cast<ClassDecl>(prop->getDeclContext())->isActor() &&
               !prop->isStatic() &&
               prop->getName() == ctx.Id_unownedExecutor &&
-              prop->getInterfaceType()->getAnyNominal() ==
-                ctx.getUnownedSerialExecutorDecl());
+              prop->getName() == ctx.Id_localUnownedExecutor &&
+              prop->getInterfaceType()->getAnyNominal() == ctx.getUnownedSerialExecutorDecl());
     };
 
     if (isActorUnownedExecutor()) {

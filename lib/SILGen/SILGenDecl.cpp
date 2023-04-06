@@ -49,15 +49,97 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 void Initialization::_anchor() {}
 void SILDebuggerClient::anchor() {}
 
+static void copyOrInitPackExpansionInto(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SILValue tupleAddr,
+                                        CanPackType formalPackType,
+                                        unsigned componentIndex,
+                                        CleanupHandle componentCleanup,
+                                        Initialization *expansionInit,
+                                        bool isInit) {
+  auto expansionTy = tupleAddr->getType().getTupleElementType(componentIndex);
+  assert(expansionTy.is<PackExpansionType>());
+
+  auto opening = SGF.createOpenedElementValueEnvironment(expansionTy);
+  auto openedEnv = opening.first;
+  auto eltTy = opening.second;
+
+  assert(expansionInit);
+  assert(expansionInit->canPerformPackExpansionInitialization());
+
+  // Exit the component-wide cleanup for the expansion component.
+  if (componentCleanup.isValid())
+    SGF.Cleanups.forwardCleanup(componentCleanup);
+
+  SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          [&](SILValue indexWithinComponent,
+                              SILValue packExpansionIndex,
+                              SILValue packIndex) {
+    expansionInit->performPackExpansionInitialization(SGF, loc,
+                                                      indexWithinComponent,
+                                                [&](Initialization *eltInit) {
+      // Project the current tuple element.
+      auto eltAddr =
+        SGF.B.createTuplePackElementAddr(loc, packIndex, tupleAddr, eltTy);
+
+      SILValue elt = eltAddr;
+      if (!eltTy.isAddressOnly(SGF.F)) {
+        elt = SGF.B.emitLoadValueOperation(loc, elt,
+                                           LoadOwnershipQualifier::Take);
+      }
+
+      // Enter a cleanup for the current element, which we need to consume
+      // on this iteration of the loop, and the remaining elements in the
+      // expansion component, which we need to destroy if we throw from
+      // the initialization.
+      CleanupHandle eltCleanup = CleanupHandle::invalid();
+      CleanupHandle tailCleanup = CleanupHandle::invalid();
+      if (componentCleanup.isValid()) {
+        eltCleanup = SGF.enterDestroyCleanup(elt);
+        tailCleanup = SGF.enterPartialDestroyRemainingTupleCleanup(tupleAddr,
+                        formalPackType, componentIndex, indexWithinComponent);
+      }
+
+      auto eltMV = ManagedValue(elt, eltCleanup);
+
+      // Perform the initialization.  If this doesn't consume the
+      // element value, that's fine, we'll just destroy it as part of
+      // leaving the iteration.
+      eltInit->copyOrInitValueInto(SGF, loc, eltMV, isInit);
+      eltInit->finishInitialization(SGF);
+
+      // Deactivate the tail cleanup before continuing the loop.
+      if (tailCleanup.isValid())
+        SGF.Cleanups.forwardCleanup(tailCleanup);
+    });
+  });
+
+  expansionInit->finishInitialization(SGF);
+}
+
 void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue value, bool isInit) {
-  // Process all values before initialization all at once to ensure all cleanups
-  // are setup on all tuple elements before a potential early exit.
+  auto sourceType = value.getType().castTo<TupleType>();
+  assert(sourceType->getNumElements() == SubInitializations.size());
+
+  // We have to emit a different pattern when there are pack expansions.
+  // Fortunately, we can assume this doesn't happen with objects because
+  // tuples contain pack expansions are address-only.
+  auto containsPackExpansion = sourceType.containsPackExpansionType();
+
+  CanPackType formalPackType;
+  if (containsPackExpansion)
+    formalPackType = FormalTupleType.getInducedPackType();
+
+  // Process all values before initialization all at once to ensure
+  // all cleanups are setup on all tuple elements before a potential
+  // early exit.
   SmallVector<ManagedValue, 8> destructuredValues;
 
-  // In the object case, emit a destructure operation and return.
+  // In the object case, destructure the tuple.
   if (value.getType().isObject()) {
+    assert(!containsPackExpansion);
     SGF.B.emitDestructureValueOperation(loc, value, destructuredValues);
   } else {
     // In the address case, we forward the underlying value and store it
@@ -67,11 +149,23 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
     CleanupCloner cloner(SGF, value);
     SILValue v = value.forward(SGF);
 
-    auto sourceType = value.getType().castTo<TupleType>();
     auto sourceSILType = value.getType();
-    for (unsigned i : range(sourceType->getNumElements())) {
+    for (auto i : range(sourceType->getNumElements())) {
       SILType fieldTy = sourceSILType.getTupleElementType(i);
-      SILValue elt = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+      if (containsPackExpansion && fieldTy.is<PackExpansionType>()) {
+        destructuredValues.push_back(
+          cloner.cloneForTuplePackExpansionComponent(v, formalPackType, i));
+        continue;
+      }
+
+      SILValue elt;
+      if (containsPackExpansion) {
+        auto packIndex = SGF.B.createScalarPackIndex(loc, i, formalPackType);
+        elt = SGF.B.createTuplePackElementAddr(loc, packIndex, v, fieldTy);
+      } else {
+        elt = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+      }
+
       if (!fieldTy.isAddressOnly(SGF.F)) {
         elt = SGF.B.emitLoadValueOperation(loc, elt,
                                            LoadOwnershipQualifier::Take);
@@ -80,7 +174,24 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
     }
   }
 
-  for (unsigned i : indices(destructuredValues)) {
+  assert(destructuredValues.size() == SubInitializations.size());
+
+  for (auto i : indices(destructuredValues)) {
+    if (containsPackExpansion) {
+      bool isPackExpansion =
+        (destructuredValues[i].getValue() == value.getValue());
+      assert(isPackExpansion ==
+               isa<PackExpansionType>(sourceType.getElementType(i)));
+      if (isPackExpansion) {
+        auto packAddr = destructuredValues[i].getValue();
+        auto componentCleanup = destructuredValues[i].getCleanup();
+        copyOrInitPackExpansionInto(SGF, loc, packAddr, formalPackType,
+                                    i, componentCleanup,
+                                    SubInitializations[i].get(), isInit);
+        continue;
+      }
+    }
+
     SubInitializations[i]->copyOrInitValueInto(SGF, loc, destructuredValues[i],
                                                isInit);
     SubInitializations[i]->finishInitialization(SGF);
@@ -137,10 +248,51 @@ splitSingleBufferIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
                                    CanType type, SILValue baseAddr,
                                    SmallVectorImpl<InitializationPtr> &buf,
                      TinyPtrVector<CleanupHandle::AsPointer> &splitCleanups) {
+  auto tupleType = cast<TupleType>(type);
+
+  // We can still split the initialization of a tuple with a pack
+  // expansion component (as long as the initializer is cooperative),
+  // but we have to emit a different code pattern.
+  bool hasExpansion = tupleType.containsPackExpansionType();
+
+  // If there's an expansion in the tuple, we'll need the induced pack
+  // type for the tuple elements below.
+  CanPackType inducedPackType;
+  if (hasExpansion) {
+    inducedPackType = tupleType.getInducedPackType();
+  }
+
   // Destructure the buffer into per-element buffers.
-  for (auto i : indices(cast<TupleType>(type)->getElementTypes())) {
+  for (auto i : indices(tupleType->getElementTypes())) {
     // Project the element.
-    SILValue eltAddr = SGF.B.createTupleElementAddr(loc, baseAddr, i);
+    SILValue eltAddr;
+
+    // If this element is a pack expansion, we have to produce an
+    // Initialization that will drill appropriately to the right tuple
+    // element within a dynamic pack loop.
+    if (hasExpansion && isa<PackExpansionType>(tupleType.getElementType(i))) {
+      auto expansionInit =
+        TuplePackExpansionInitialization::create(SGF, baseAddr,
+                                                 inducedPackType, i);
+      auto expansionCleanup = expansionInit->getExpansionCleanup();
+      if (expansionCleanup.isValid())
+        splitCleanups.push_back(expansionCleanup);
+      buf.emplace_back(expansionInit.release());
+      continue;
+
+    // If this element is scalar, but it's into a tuple with pack
+    // expansions, produce a structural pack index into the induced
+    // pack type and use that to project the right element.
+    } else if (hasExpansion) {
+      auto packIndex = SGF.B.createScalarPackIndex(loc, i, inducedPackType);
+      auto eltTy = baseAddr->getType().getTupleElementType(i);
+      eltAddr = SGF.B.createTuplePackElementAddr(loc, packIndex, baseAddr,
+                                                 eltTy);
+
+    // Otherwise, we can just use simple projection.
+    } else {
+      eltAddr = SGF.B.createTupleElementAddr(loc, baseAddr, i);
+    }
 
     // Create an initialization to initialize the element.
     auto &eltTL = SGF.getTypeLowering(eltAddr->getType());
@@ -345,7 +497,8 @@ public:
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
                               Optional<MarkUninitializedInst::Kind> kind,
-                              uint16_t ArgNo, SILGenFunction &SGF)
+                              uint16_t ArgNo, bool generateDebugInfo,
+                              SILGenFunction &SGF)
       : decl(decl) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
@@ -361,23 +514,41 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILDebugVariable DbgVar(decl->isLet(), ArgNo);
-    Box = SGF.B.createAllocBox(decl, boxType, DbgVar);
+    
+    Optional<SILDebugVariable> DbgVar;
+    if (generateDebugInfo)
+      DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
+    Box = SGF.B.createAllocBox(decl, boxType, DbgVar, false, false, false
+#ifndef NDEBUG
+                               ,
+                               !generateDebugInfo
+#endif
+    );
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
       Box = SGF.B.createMarkUninitialized(decl, Box, kind.value());
 
+    // If we have a reference binding, mark it.
+    if (decl->getIntroducer() == VarDecl::Introducer::InOut)
+      Box = SGF.B.createMarkUnresolvedReferenceBindingInst(
+          decl, Box, MarkUnresolvedReferenceBindingInst::Kind::InOut);
+
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getType()).getLoweredType();
       auto lifetime = SGF.F.getLifetime(decl, loweredType);
+      // The box itself isn't lexical--neither a weak reference nor an unsafe
+      // pointer to a box can be formed; and the box doesn't synchronize on
+      // deinit.
+      //
+      // Only add a lexical lifetime to the box if the the variable it stores
+      // requires one.
       if (lifetime.isLexical()) {
         Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
       }
     }
 
-    if (!Box->getType().isBoxedNonCopyableType(Box->getFunction()))
-      Addr = SGF.B.createProjectBox(decl, Box, 0);
+    Addr = SGF.B.createProjectBox(decl, Box, 0);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -426,10 +597,7 @@ public:
     /// decl to.
     assert(SGF.VarLocs.count(decl) == 0 && "Already emitted the local?");
 
-    if (Addr)
-      SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
-    else
-      SGF.VarLocs[decl] = SILGenFunction::VarLoc::getForBox(Box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(Addr, Box);
 
     SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
@@ -463,8 +631,7 @@ class LetValueInitialization : public Initialization {
 public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
     const TypeLowering *lowering = nullptr;
-    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        vd->isNoImplicitCopy()) {
+    if (vd->isNoImplicitCopy()) {
       lowering = &SGF.getTypeLowering(
           SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
     } else {
@@ -495,8 +662,7 @@ public:
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only or is noncopyable.
       //
-      // For noncopyable types, we always need to box them and eagerly
-      // reproject.
+      // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
         lowering->getLoweredType().isPureMoveOnly();
@@ -504,8 +670,7 @@ public:
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
+    if (lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
@@ -583,10 +748,6 @@ public:
                                              SILValue value, bool wasPlusOne) {
     // If we have none...
     if (value->getOwnershipKind() == OwnershipKind::None) {
-      // If we don't have move only features enabled, just return, we are done.
-      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
-        return value;
-
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
       if (value->getType().isPureMoveOnly()) {
@@ -609,15 +770,6 @@ public:
       return SGF.B.createMarkMustCheckInst(
           PrologueLoc, value,
           MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
-    }
-
-    // Then if we don't have move only, just perform a lexical borrow if the
-    // lifetime is lexical.
-    if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly)) {
-      if (SGF.F.getLifetime(vd, value->getType()).isLexical())
-        return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
-      else
-        return value;
     }
 
     // Otherwise, we need to perform some additional processing. First, if we
@@ -673,19 +825,17 @@ public:
         MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
   }
 
-  void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne) {
+  void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
+                 SILLocation loc) {
     assert(!SGF.VarLocs.count(vd) && "Already emitted this vardecl?");
     // If we're binding an address to this let value, then we can use it as an
     // address later.  This happens when binding an address only parameter to
     // an argument, for example.
     if (value->getType().isAddress())
       address = value;
-    SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      value = getValueForLexicalLifetimeBinding(SGF, PrologueLoc, value,
-                                                wasPlusOne);
-    }
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
+      value = getValueForLexicalLifetimeBinding(SGF, loc, value, wasPlusOne);
 
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
@@ -693,8 +843,11 @@ public:
     // lifetime, if permitted to do so.
     if (!EmitDebugValueOnInit)
       return;
+
+    // Use the scope from loc and diagnostic location from vd.
+    RegularLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
-    SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
+    SILDebugVariable DbgVar(vd->getName().str(), vd->isLet(), /*ArgNo=*/0);
     SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
   }
 
@@ -713,12 +866,12 @@ public:
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
       bool isPlusOne = value.isPlusOne(SGF);
-      bindValue(value.forward(SGF), SGF, isPlusOne);
+      bindValue(value.forward(SGF), SGF, isPlusOne, loc);
     } else {
       // Disable the expression cleanup of the copy, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF, true);
+      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF, true, loc);
     }
   }
 
@@ -1168,8 +1321,12 @@ struct InitializationForPattern
   /// This is invalid for irrefutable pattern initializations.
   JumpDest patternFailDest;
 
-  InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest)
-    : SGF(SGF), patternFailDest(patternFailDest) {}
+  bool generateDebugInfo = true;
+
+  InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest,
+                           bool generateDebugInfo)
+      : SGF(SGF), patternFailDest(patternFailDest),
+        generateDebugInfo(generateDebugInfo) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
@@ -1197,13 +1354,15 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet());
+    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet(),
+                                            generateDebugInfo);
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
   // TupleInitialization.
   InitializationPtr visitTuplePattern(TuplePattern *P) {
-    TupleInitialization *init = new TupleInitialization();
+    TupleInitialization *init = new TupleInitialization(
+      cast<TupleType>(P->getType()->getCanonicalType()));
     for (auto &elt : P->getElements())
       init->SubInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
@@ -1243,7 +1402,8 @@ struct InitializationForPattern
 } // end anonymous namespace
 
 InitializationPtr
-SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
+                                             bool generateDebugInfo) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
@@ -1280,10 +1440,12 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
-    B.createAllocGlobal(vd, silG);
-    SILValue addr = B.createGlobalAddr(vd, silG);
+    RegularLocation loc(vd);
+    loc.markAutoGenerated();
+    B.createAllocGlobal(loc, silG);
+    SILValue addr = B.createGlobalAddr(loc, silG);
     if (isUninitialized)
-      addr = B.createMarkUninitializedVar(vd, addr);
+      addr = B.createMarkUninitializedVar(loc, addr);
 
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
@@ -1292,7 +1454,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
     if (isUninitialized) {
       uninitKind = MarkUninitializedInst::Kind::Var;
     }
-    Result = emitLocalVariableWithCleanup(vd, uninitKind);
+    Result = emitLocalVariableWithCleanup(vd, uninitKind, /*argno*/ 0,
+                                          generateDebugInfo);
   }
 
   // If we're initializing a weak or unowned variable, this requires a change in
@@ -1303,8 +1466,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   return Result;
 }
 
-void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
-                                        unsigned idx) {
+void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
+                                        bool generateDebugInfo) {
   auto &C = PBD->getASTContext();
 
   // If this is an async let, create a child task to compute the initializer
@@ -1359,8 +1522,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     return;
   }
 
-  auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
-                                                         JumpDest::invalid());
+  auto initialization = emitPatternBindingInitialization(
+      PBD->getPattern(idx), JumpDest::invalid(), generateDebugInfo);
 
   auto getWrappedValueExpr = [&](VarDecl *var) -> Expr * {
     if (auto *orig = var->getOriginalWrappedProperty()) {
@@ -1390,7 +1553,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       }
     }
 
-    emitExprInto(initExpr, initialization.get(), SILLocation(PBD));
+    emitExprInto(initExpr, initialization.get());
   };
 
   auto *singleVar = PBD->getSingleVar();
@@ -1406,12 +1569,13 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   }
 }
 
-void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD,
+                                             bool generateDebugInfo) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   for (unsigned i : range(PBD->getNumPatternEntries())) {
-    emitPatternBinding(PBD, i);
+    emitPatternBinding(PBD, i, generateDebugInfo);
   }
 }
 
@@ -1438,6 +1602,15 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {
     SGM.emitFunction(accessor);
+  });
+}
+
+void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
+  D->forEachExpandedExprOrStmt([&](ASTNode node) {
+    if (auto *expr = node.dyn_cast<Expr *>())
+      emitIgnoredExpr(expr);
+    else if (auto *stmt = node.dyn_cast<Stmt *>())
+      emitStmt(stmt);
   });
 }
 
@@ -1516,7 +1689,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
-      emitExprInto(elt.getInitializer(), initialization.get());
+      emitExprInto(elt.getInitializer(), initialization.get(), loc);
       // Pattern bindings handle their own tests, we don't need a boolean test.
       continue;
     }
@@ -1612,10 +1785,10 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
   }
 }
 
-InitializationPtr
-SILGenFunction::emitPatternBindingInitialization(Pattern *P,
-                                                 JumpDest failureDest) {
-  return InitializationForPattern(*this, failureDest).visit(P);
+InitializationPtr SILGenFunction::emitPatternBindingInitialization(
+    Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
+  return InitializationForPattern(*this, failureDest, generateDebugInfo)
+      .visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.
@@ -1779,9 +1952,10 @@ CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
 
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
-    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo) {
-  return InitializationPtr(
-      new LocalVariableInitialization(vd, kind, ArgNo, *this));
+    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo,
+    bool generateDebugInfo) {
+  return InitializationPtr(new LocalVariableInitialization(
+      vd, kind, ArgNo, generateDebugInfo, *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.
@@ -1966,57 +2140,64 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
-    if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
-      if (mvi->hasMoveCheckerKind()) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-            if (bbi->isLexical()) {
-              B.emitDestroyValueOperation(silLoc, mvi);
-              B.createEndBorrow(silLoc, bbi);
-              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-              return;
-            }
-          }
-        }
-
-        if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
-                mvi->getOperand())) {
-          if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
-            if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-              if (bbi->isLexical()) {
-                B.emitDestroyValueOperation(silLoc, mvi);
-                B.createEndBorrow(silLoc, bbi);
-                B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-                return;
-              }
-            }
-          }
-        }
-
-        if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-            if (bbi->isLexical()) {
-              B.emitDestroyValueOperation(silLoc, mvi);
-              B.createEndBorrow(silLoc, bbi);
-              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-              return;
-            }
-          }
-        }
-
-        // Handle trivial arguments.
-        if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
-          if (move->isLexical()) {
+  if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
+    if (mvi->hasMoveCheckerKind()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+          if (bbi->isLexical()) {
             B.emitDestroyValueOperation(silLoc, mvi);
+            B.createEndBorrow(silLoc, bbi);
+            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
             return;
           }
+        }
+      }
+
+      if (auto *copyToMove = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
+              mvi->getOperand())) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(copyToMove->getOperand())) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              B.emitDestroyValueOperation(silLoc, mvi);
+              B.createEndBorrow(silLoc, bbi);
+              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+              return;
+            }
+          }
+        }
+      }
+
+      if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(mvi->getOperand())) {
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+          if (bbi->isLexical()) {
+            B.emitDestroyValueOperation(silLoc, mvi);
+            B.createEndBorrow(silLoc, bbi);
+            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+            return;
+          }
+        }
+      }
+
+      // Handle trivial arguments.
+      if (auto *move = dyn_cast<MoveValueInst>(mvi->getOperand())) {
+        if (move->isLexical()) {
+          B.emitDestroyValueOperation(silLoc, mvi);
+          return;
         }
       }
     }
   }
 
   llvm_unreachable("unhandled case");
+}
+
+void BlackHoleInitialization::performPackExpansionInitialization(
+                                        SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SILValue indexWithinComponent,
+                          llvm::function_ref<void(Initialization *into)> fn) {
+  BlackHoleInitialization subInit;
+  fn(&subInit);
 }
 
 void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,

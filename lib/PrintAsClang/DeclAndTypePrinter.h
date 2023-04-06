@@ -18,6 +18,7 @@
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang {
   class NamedDecl;
@@ -48,6 +49,7 @@ private:
   SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
   bool requiresExposedAttribute;
+  llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
 
   /// The name 'CFTypeRef'.
@@ -64,13 +66,14 @@ public:
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
                      AccessLevel access, bool requiresExposedAttribute,
+                     llvm::StringSet<> &exposedModules,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
         outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
         typeMapping(typeMapping), interopContext(interopContext),
         minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),
-        outputLang(outputLang) {}
+        exposedModules(exposedModules), outputLang(outputLang) {}
 
   SwiftToClangInteropContext &getInteropContext() { return interopContext; }
 
@@ -80,6 +83,8 @@ public:
 
   void print(const Decl *D);
   void print(Type ty);
+
+  void printAvailability(raw_ostream &os, const Decl *D);
 
   /// Is \p ED empty of members and protocol conformances to include?
   bool isEmptyExtensionDecl(const ExtensionDecl *ED);

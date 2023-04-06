@@ -293,7 +293,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
 }
 
 bool ContextFreeCodeCompletionResult::getDeclIsSystem(const Decl *D) {
-  return D->getModuleContext()->isSystemModule();
+  return D->getModuleContext()->isNonUserModule();
 }
 
 // MARK: - CodeCompletionResult

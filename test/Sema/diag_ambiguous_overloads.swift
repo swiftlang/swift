@@ -148,8 +148,8 @@ do {
   }
 }
 do {
-  func f1(_ u: Int) -> String {} // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
-  func f1(_ u: String) -> Double {} // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
+  func f1(_ u: Int) -> String {} // expected-note 2 {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func f1(_ u: String) -> Double {} // expected-note 2 {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
   func f2(_ u: Int) {}
 
   f2(f1(1 as Double)) // expected-error {{no exact matches in call to local function 'f1'}}

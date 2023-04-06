@@ -420,10 +420,19 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     if (dependency.isHeader())
       continue;
 
-    // Transitive @_implementationOnly dependencies of
-    // binary modules are not required to be imported during normal builds
-    // TODO: This is worth revisiting for debugger purposes
-    if (dependency.isImplementationOnly())
+    // Some transitive dependencies of binary modules are not required to be
+    // imported during normal builds.
+    // TODO: This is worth revisiting for debugger purposes where
+    //       loading the module is optional, and implementation-only imports
+    //       from modules with testing enabled where the dependency is
+    //       optional.
+    ModuleLoadingBehavior transitiveBehavior =
+      loadedModuleFile->getTransitiveLoadingBehavior(dependency,
+                                         /*debuggerMode*/false,
+                                         /*isPartialModule*/false,
+                                         /*package*/Ctx.LangOpts.PackageName,
+                                         loadedModuleFile->isTestable());
+    if (transitiveBehavior != ModuleLoadingBehavior::Required)
       continue;
 
     // Find the top-level module name.
@@ -794,8 +803,18 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
-    if (!loadedModuleFile->getModulePackageName().empty())
+    if (!loadedModuleFile->getModulePackageName().empty()) {
+      if (loadedModuleFile->isBuiltFromInterface() &&
+          loadedModuleFile->getModulePackageName().str() == Ctx.LangOpts.PackageName) {
+        Ctx.Diags.diagnose(SourceLoc(),
+                           diag::in_package_module_not_compiled_from_source,
+                           M.getBaseIdentifier(),
+                           Ctx.LangOpts.PackageName,
+                           loadedModuleFile->getModuleSourceFilename()
+                           );
+      }
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
+    }
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     for (auto name: loadedModuleFile->getAllowableClientNames()) {
       M.addAllowableClientName(Ctx.getIdentifier(name));
@@ -846,11 +865,13 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
         loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
   } else {
-    // Report non-fatal compiler tag mismatch.
+    // Report non-fatal compiler tag mismatch on stderr only to avoid
+    // polluting the IDE UI.
     if (!loadInfo.problematicRevision.empty()) {
-      Ctx.Diags.diagnose(*diagLoc,
-                         diag::serialization_module_problematic_revision,
-                         loadInfo.problematicRevision, moduleBufferID);
+      llvm::errs() << "remark: compiled module was created by a different " <<
+                      "version of the compiler '" <<
+                      loadInfo.problematicRevision <<
+                      "': " << moduleBufferID << "\n";
     }
   }
 
@@ -925,6 +946,91 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleDocBufferID);
     break;
 
+  case serialization::Status::MissingDependency:
+  case serialization::Status::CircularDependency:
+  case serialization::Status::MissingUnderlyingModule:
+    serialization::diagnoseSerializedASTLoadFailureTransitive(
+      Ctx, diagLoc, loadInfo.status,
+      loadedModuleFile, ModuleName, /*forTestable*/false);
+    break;
+
+  case serialization::Status::FailedToLoadBridgingHeader:
+    // We already emitted a diagnostic about the bridging header. Just emit
+    // a generic message here.
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
+                       ModuleName.str());
+    break;
+
+  case serialization::Status::NameMismatch: {
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_name_mismatch;
+    if (Ctx.LangOpts.DebuggerSupport)
+      diagKind = diag::serialization_name_mismatch_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName.str());
+    break;
+  }
+
+  case serialization::Status::TargetIncompatible: {
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_incompatible;
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
+      diagKind = diag::serialization_target_incompatible_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
+                       moduleBufferID);
+    break;
+  }
+
+  case serialization::Status::TargetTooNew: {
+    llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
+
+    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
+        getOSAndVersionForDiagnostics(moduleTarget);
+    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
+        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
+
+    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
+    // this as a non-fatal error.
+    auto diagKind = diag::serialization_target_too_new;
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
+      diagKind = diag::serialization_target_too_new_repl;
+    Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
+                       compilationOSInfo.second, ModuleName,
+                       moduleOSInfo.second, moduleBufferID);
+    break;
+  }
+
+  case serialization::Status::SDKMismatch:
+    auto currentSDK = Ctx.LangOpts.SDKName;
+    auto moduleSDK = loadInfo.sdkName;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
+                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
+  }
+}
+
+void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
+    ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
+    ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable) {
+  switch (status) {
+  case serialization::Status::Valid:
+  case serialization::Status::FormatTooNew:
+  case serialization::Status::FormatTooOld:
+  case serialization::Status::NotInOSSA:
+  case serialization::Status::RevisionIncompatible:
+  case serialization::Status::Malformed:
+  case serialization::Status::MalformedDocumentation:
+  case serialization::Status::FailedToLoadBridgingHeader:
+  case serialization::Status::NameMismatch:
+  case serialization::Status::TargetIncompatible:
+  case serialization::Status::TargetTooNew:
+  case serialization::Status::SDKMismatch:
+    llvm_unreachable("status not handled by "
+        "diagnoseSerializedASTLoadFailureTransitive");
+
   case serialization::Status::MissingDependency: {
     // Figure out /which/ dependencies are missing.
     // FIXME: Dependencies should be de-duplicated at serialization time,
@@ -934,10 +1040,12 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     std::copy_if(
         loadedModuleFile->getDependencies().begin(),
         loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
-        [&duplicates, &Ctx](const ModuleFile::Dependency &dependency) -> bool {
+        [&duplicates, &loadedModuleFile, forTestable](
+            const ModuleFile::Dependency &dependency) -> bool {
           if (dependency.isLoaded() || dependency.isHeader() ||
-              (dependency.isImplementationOnly() &&
-               Ctx.LangOpts.DebuggerSupport)) {
+              loadedModuleFile->getTransitiveLoadingBehavior(dependency,
+                                                             forTestable)
+                != ModuleLoadingBehavior::Required) {
             return false;
           }
           return duplicates.insert(dependency.Core.RawPath).second;
@@ -1002,62 +1110,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     }
     break;
   }
-
-  case serialization::Status::FailedToLoadBridgingHeader:
-    // We already emitted a diagnostic about the bridging header. Just emit
-    // a generic message here.
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
-                       ModuleName.str());
-    break;
-
-  case serialization::Status::NameMismatch: {
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_name_mismatch;
-    if (Ctx.LangOpts.DebuggerSupport)
-      diagKind = diag::serialization_name_mismatch_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName.str());
-    break;
-  }
-
-  case serialization::Status::TargetIncompatible: {
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_target_incompatible;
-    if (Ctx.LangOpts.DebuggerSupport ||
-        Ctx.LangOpts.AllowModuleWithCompilerErrors)
-      diagKind = diag::serialization_target_incompatible_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
-                       moduleBufferID);
-    break;
-  }
-
-  case serialization::Status::TargetTooNew: {
-    llvm::Triple moduleTarget(llvm::Triple::normalize(loadInfo.targetTriple));
-
-    std::pair<StringRef, clang::VersionTuple> moduleOSInfo =
-        getOSAndVersionForDiagnostics(moduleTarget);
-    std::pair<StringRef, clang::VersionTuple> compilationOSInfo =
-        getOSAndVersionForDiagnostics(Ctx.LangOpts.Target);
-
-    // FIXME: This doesn't handle a non-debugger REPL, which should also treat
-    // this as a non-fatal error.
-    auto diagKind = diag::serialization_target_too_new;
-    if (Ctx.LangOpts.DebuggerSupport ||
-        Ctx.LangOpts.AllowModuleWithCompilerErrors)
-      diagKind = diag::serialization_target_too_new_repl;
-    Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
-                       compilationOSInfo.second, ModuleName,
-                       moduleOSInfo.second, moduleBufferID);
-    break;
-  }
-
-  case serialization::Status::SDKMismatch:
-    auto currentSDK = Ctx.LangOpts.SDKName;
-    auto moduleSDK = loadInfo.sdkName;
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
-                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
-    break;
   }
 }
 
@@ -1422,6 +1474,17 @@ void SerializedASTFile::collectLinkLibraries(
   }
 }
 
+void SerializedASTFile::loadDependenciesForTestable(SourceLoc diagLoc) const {
+  serialization::Status status =
+    File.loadDependenciesForFileContext(this, diagLoc, /*forTestable=*/true);
+
+  if (status != serialization::Status::Valid) {
+    serialization::diagnoseSerializedASTLoadFailureTransitive(
+        getASTContext(), diagLoc, status, &File,
+        getParentModule()->getName(), /*forTestable*/true);
+  }
+}
+
 bool SerializedASTFile::isSIB() const {
   return File.isSIB();
 }
@@ -1438,12 +1501,13 @@ bool SerializedASTFile::isSystemModule() const {
 }
 
 void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
+                                    OptionSet<ModuleLookupFlags> Flags,
                                     SmallVectorImpl<ValueDecl*> &results) const{
   File.lookupValue(name, results);
 }
 
 StringRef
-SerializedASTFile::getFilenameForPrivateDecl(const ValueDecl *decl) const {
+SerializedASTFile::getFilenameForPrivateDecl(const Decl *decl) const {
   return File.FilenamesForPrivateValues.lookup(decl);
 }
 
@@ -1625,8 +1689,8 @@ const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
 }
 
 Identifier
-SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
-  Identifier discriminator = File.getDiscriminatorForPrivateValue(D);
+SerializedASTFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
+  Identifier discriminator = File.getDiscriminatorForPrivateDecl(D);
   assert(!discriminator.empty() && "no discriminator found for value");
   return discriminator;
 }

@@ -1217,24 +1217,24 @@ takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expe
 func voidFunc() {
   return 1 
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{16-16= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:16-16= -> <#Return Type#>}}
 }
 
 func voidFuncWithArgs(arg1: Int) {
   return 1 
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{33-33= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:33-33= -> <#Return Type#>}}
 }
 
 func voidFuncWithCondFlow() {
   if Bool.random() {
     return 1
     // expected-error@-1 {{unexpected non-void return value in void function}}
-    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{-2:28-28= -> <#Return Type#>}}
   } else {
     return 2
     // expected-error@-1 {{unexpected non-void return value in void function}}
-    // expected-note@-2 {{did you mean to add a return type?}}{{28-28= -> <#Return Type#>}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{-6:28-28= -> <#Return Type#>}}
   }
 }
 
@@ -1242,21 +1242,21 @@ func voidFuncWithNestedVoidFunc() {
   func nestedVoidFunc() {
     return 1
     // expected-error@-1 {{unexpected non-void return value in void function}}
-    // expected-note@-2 {{did you mean to add a return type?}}{{24-24= -> <#Return Type#>}}
+    // expected-note@-2 {{did you mean to add a return type?}}{{-1:24-24= -> <#Return Type#>}}
   }
 }
 
 func voidFuncWithEffects1() throws {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{35-35= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:35-35= -> <#Return Type#>}}
 }
 
 @available(SwiftStdlib 5.5, *)
 func voidFuncWithEffects2() async throws {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:41-41= -> <#Return Type#>}}
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -1264,27 +1264,27 @@ func voidFuncWithEffects2() async throws {
 func voidFuncWithEffects3() throws async {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:41-41= -> <#Return Type#>}}
 }
 
 @available(SwiftStdlib 5.5, *)
 func voidFuncWithEffects4() async {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{34-34= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:34-34= -> <#Return Type#>}}
 }
 
 func voidFuncWithEffects5(_ closure: () throws -> Void) rethrows {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{65-65= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:65-65= -> <#Return Type#>}}
 }
 
 @available(SwiftStdlib 5.5, *)
 func voidGenericFuncWithEffects<T>(arg: T) async where T: CustomStringConvertible {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{49-49= -> <#Return Type#>}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{-1:49-49= -> <#Return Type#>}}
 }
 
 // Special cases: These should not offer a note + fix-it

@@ -1,4 +1,7 @@
-@freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+@freestanding(expression) public macro publicStringify<T>(_ value: T, label: String? = nil) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@freestanding(expression) public macro unlabeledStringify<T>(_ value: T) -> (T, String) = #publicStringify(value, label: "default label")
+
 
 @freestanding(expression) macro internalStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
@@ -27,7 +30,7 @@ public struct TestMacroArgTypechecking {
 
 @resultBuilder
 public struct Builder {
-  static func buildBlock(_: Int...) -> Void {}
+  public static func buildBlock(_: Int...) -> Void {}
 }
 @freestanding(expression)
 public macro macroWithBuilderArgs(@Builder _: () -> Void) = #externalMacro(module: "A", type: "B")

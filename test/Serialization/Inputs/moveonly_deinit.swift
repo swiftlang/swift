@@ -17,3 +17,11 @@ public enum MoveOnlyEnum {
 
     deinit { }
 }
+
+public struct NormalStruct {
+  private let desc: Int
+
+  public init(desc: Int) {
+    self.desc = desc
+  }
+}

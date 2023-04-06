@@ -86,58 +86,12 @@ bool GenericTypeParamType::isParameterPack() const {
          GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
-/// G<{X1, ..., Xn}, {Y1, ..., Yn}>... => {G<X1, Y1>, ..., G<Xn, Yn>}...
-PackExpansionType *PackExpansionType::expand() {
-  auto countType = getCountType();
-  auto *countPack = countType->getAs<PackType>();
-  if (countPack == nullptr)
-    return this;
-
-  auto patternType = getPatternType();
-  if (patternType->is<PackType>())
-    return this;
-
-  unsigned j = 0;
-  SmallVector<Type, 4> expandedTypes;
-  for (auto type : countPack->getElementTypes()) {
-    Type expandedCount;
-    if (auto *expansion = type->getAs<PackExpansionType>())
-      expandedCount = expansion->getCountType();
-
-    auto expandedPattern = patternType.transformRec(
-      [&](Type t) -> Optional<Type> {
-        if (t->is<PackExpansionType>())
-          return t;
-
-        if (auto *nestedPack = t->getAs<PackType>()) {
-          auto nestedPackElts = nestedPack->getElementTypes();
-          if (j < nestedPackElts.size()) {
-            if (expandedCount) {
-              if (auto *expansion = nestedPackElts[j]->getAs<PackExpansionType>())
-                return expansion->getPatternType();
-            } else {
-              return nestedPackElts[j];
-            }
-          }
-
-          return ErrorType::get(t->getASTContext());
-        }
-
-        return None;
-      });
-
-    if (expandedCount) {
-      expandedTypes.push_back(PackExpansionType::get(expandedPattern,
-                                                     expandedCount));
-    } else {
-      expandedTypes.push_back(expandedPattern);
-    }
-
-    ++j;
+PackType *TypeBase::getPackSubstitutionAsPackType() {
+  if (auto pack = getAs<PackType>()) {
+    return pack;
+  } else {
+    return PackType::getSingletonPackExpansion(this);
   }
-
-  auto *packType = PackType::get(getASTContext(), expandedTypes);
-  return PackExpansionType::get(packType, countType);
 }
 
 CanType PackExpansionType::getReducedShape() {
@@ -146,6 +100,16 @@ CanType PackExpansionType::getReducedShape() {
     return reducedShape;
 
   return CanType(PackExpansionType::get(reducedShape, reducedShape));
+}
+
+unsigned TupleType::getNumScalarElements() const {
+  unsigned n = 0;
+  for (auto elt : getElements()) {
+    if (!elt.getType()->is<PackExpansionType>())
+      ++n;
+  }
+
+  return n;
 }
 
 bool TupleType::containsPackExpansionType() const {
@@ -157,43 +121,13 @@ bool TupleType::containsPackExpansionType() const {
   return false;
 }
 
-/// (W, {X, Y}..., Z) => (W, X, Y, Z)
-TupleType *TupleType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<TupleTypeElt, 4> elts;
-
-  for (unsigned i = 0, e = getNumElements(); i < e; ++i) {
-    auto elt = getElement(i);
-
-    if (auto *expansionType = elt.getType()->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          elts.append(getElements().begin(), getElements().begin() + i);
-          anyChanged = true;
-        }
-
-        bool first = true;
-        for (auto packElt : packType->getElementTypes()) {
-          if (first) {
-            elts.push_back(TupleTypeElt(packElt, elt.getName()));
-            first = false;
-            continue;
-          }
-          elts.push_back(TupleTypeElt(packElt));
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      elts.push_back(elt);
+bool CanTupleType::containsPackExpansionTypeImpl(CanTupleType tuple) {
+  for (auto eltType : tuple.getElementTypes()) {
+    if (isa<PackExpansionType>(eltType))
+      return true;
   }
 
-  if (!anyChanged)
-    return this;
-
-  return TupleType::get(elts, getASTContext());
+  return false;
 }
 
 bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
@@ -205,50 +139,6 @@ bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   return false;
 }
 
-/// (W, {X, Y}..., Z) -> T => (W, X, Y, Z) -> T
-AnyFunctionType *AnyFunctionType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<AnyFunctionType::Param, 4> params;
-
-  for (unsigned i = 0, e = getParams().size(); i < e; ++i) {
-    auto param = getParams()[i];
-
-    if (auto *expansionType = param.getPlainType()->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          params.append(getParams().begin(), getParams().begin() + i);
-          anyChanged = true;
-        }
-
-        bool first = true;
-        for (auto packElt : packType->getElementTypes()) {
-          if (first) {
-            params.push_back(param.withType(packElt));
-            first = false;
-            continue;
-          }
-          params.push_back(param.withType(packElt).getWithoutLabels());
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      params.push_back(param);
-  }
-
-  if (!anyChanged)
-    return this;
-
-  if (auto *genericFuncType = getAs<GenericFunctionType>()) {
-    return GenericFunctionType::get(genericFuncType->getGenericSignature(),
-                                    params, getResult(), getExtInfo());
-  } else {
-    return FunctionType::get(params, getResult(), getExtInfo());
-  }
-}
-
 bool PackType::containsPackExpansionType() const {
   for (auto type : getElementTypes()) {
     if (type->is<PackExpansionType>())
@@ -256,39 +146,6 @@ bool PackType::containsPackExpansionType() const {
   }
 
   return false;
-}
-
-/// {W, {X, Y}..., Z} => {W, X, Y, Z}
-PackType *PackType::flattenPackTypes() {
-  bool anyChanged = false;
-  SmallVector<Type, 4> elts;
-
-  for (unsigned i = 0, e = getNumElements(); i < e; ++i) {
-    auto elt = getElementType(i);
-
-    if (auto *expansionType = elt->getAs<PackExpansionType>()) {
-      if (auto *packType = expansionType->getPatternType()->getAs<PackType>()) {
-        if (!anyChanged) {
-          elts.append(getElementTypes().begin(), getElementTypes().begin() + i);
-          anyChanged = true;
-        }
-
-        for (auto packElt : packType->getElementTypes()) {
-          elts.push_back(packElt);
-        }
-
-        continue;
-      }
-    }
-
-    if (anyChanged)
-      elts.push_back(elt);
-  }
-
-  if (!anyChanged)
-    return this;
-
-  return PackType::get(getASTContext(), elts);
 }
 
 template <class T>
@@ -423,21 +280,36 @@ PackType *PackType::get(const ASTContext &C,
     auto arg = args[i];
 
     if (params[i]->isParameterPack()) {
-      wrappedArgs.push_back(PackExpansionType::get(
-          arg, arg->getReducedShape()));
+      auto argPackElements = arg->castTo<PackType>()->getElementTypes();
+      wrappedArgs.append(argPackElements.begin(), argPackElements.end());
       continue;
     }
 
     wrappedArgs.push_back(arg);
   }
 
-  return get(C, wrappedArgs)->flattenPackTypes();
+  return get(C, wrappedArgs);
 }
 
-CanPackType PackArchetypeType::getSingletonPackType() {
-  SmallVector<Type, 1> types;
-  types.push_back(PackExpansionType::get(this, getReducedShape()));
-  return CanPackType(PackType::get(getASTContext(), types));
+PackType *PackType::getSingletonPackExpansion(Type param) {
+  assert(param->isParameterPack() || param->is<PackArchetypeType>());
+  return get(param->getASTContext(), {PackExpansionType::get(param, param)});
+}
+
+CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
+  return CanPackType(PackType::getSingletonPackExpansion(param));
+}
+
+PackExpansionType *PackType::unwrapSingletonPackExpansion() const {
+  if (getNumElements() == 1) {
+    if (auto expansion = getElementTypes()[0]->getAs<PackExpansionType>()) {
+      auto pattern = expansion->getPatternType();
+      if (pattern->isParameterPack() || pattern->is<PackArchetypeType>())
+        return expansion;
+    }
+  }
+
+  return nullptr;
 }
 
 bool SILPackType::containsPackExpansionType() const {
@@ -447,4 +319,78 @@ bool SILPackType::containsPackExpansionType() const {
   }
 
   return false;
+}
+
+CanPackType
+CanTupleType::getInducedPackTypeImpl(CanTupleType tuple) {
+  return getInducedPackTypeImpl(tuple, 0, tuple->getNumElements());
+}
+
+CanPackType
+CanTupleType::getInducedPackTypeImpl(CanTupleType tuple, unsigned start, unsigned count) {
+  assert(start + count <= tuple->getNumElements() && "range out of range");
+  auto &ctx = tuple->getASTContext();
+  return CanPackType::get(ctx, tuple.getElementTypes().slice(start, count));
+}
+
+static CanType getApproximateFormalElementType(const ASTContext &ctx,
+                                               CanType loweredEltType) {
+  CanType formalEltType = TupleType::getEmpty(ctx);
+  if (auto expansion = dyn_cast<PackExpansionType>(loweredEltType))
+    formalEltType = CanPackExpansionType::get(formalEltType,
+                                              expansion.getCountType());
+  return formalEltType;
+}
+
+template <class Collection>
+static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
+                                                Collection loweredEltTypes) {
+  // Build an array of formal element types, but be lazy about it:
+  // use the original array unless we see an element type that doesn't
+  // work as a legal format type.
+  Optional<SmallVector<CanType, 4>> formalEltTypes;
+  for (auto i : indices(loweredEltTypes)) {
+    auto loweredEltType = loweredEltTypes[i];
+    bool isLegal = loweredEltType->isLegalFormalType();
+
+    // If the type isn't legal as a formal type, substitute the empty
+    // tuple type (or an invariant expansion of it over the count type).
+    CanType formalEltType = loweredEltType;
+    if (!isLegal) {
+      formalEltType = getApproximateFormalElementType(ctx, loweredEltType);
+    }
+
+    // If we're already building an array, unconditionally append to it.
+    // Otherwise, if the type isn't legal, build the array up to this
+    // point and then append.  Otherwise, we're still being lazy.
+    if (formalEltTypes) {
+      formalEltTypes->push_back(formalEltType);
+    } else if (!isLegal) {
+      formalEltTypes.emplace();
+      formalEltTypes->reserve(loweredEltTypes.size());
+      formalEltTypes->append(loweredEltTypes.begin(),
+                             loweredEltTypes.begin() + i);
+      formalEltTypes->push_back(formalEltType);
+    }
+
+    assert(isLegal || formalEltTypes.hasValue());
+  }
+
+  // Use the array we built if we made one (if we ever saw a non-legal
+  // element type).
+  if (formalEltTypes) {
+    return CanPackType::get(ctx, *formalEltTypes);
+  } else {
+    return CanPackType::get(ctx, loweredEltTypes);
+  }
+}
+
+CanPackType SILPackType::getApproximateFormalPackType() const {
+  return ::getApproximateFormalPackType(getASTContext(), getElementTypes());
+}
+
+CanPackType
+CanTupleType::getInducedApproximateFormalPackTypeImpl(CanTupleType tuple) {
+  return ::getApproximateFormalPackType(tuple->getASTContext(),
+                                        tuple.getElementTypes());
 }

@@ -37,10 +37,10 @@ struct Fulfillment {
     : SourceIndex(sourceIndex), State(unsigned(state)), Path(std::move(path)) {}
 
   /// The source index.
-  unsigned SourceIndex : 30;
+  uint64_t SourceIndex : 56;
 
   /// The state of the metadata at the fulfillment.
-  unsigned State : 2;
+  uint64_t State : 8;
 
   /// The path from the source metadata.
   MetadataPath Path;
@@ -61,6 +61,10 @@ public:
     ///
     /// It's okay to conservatively return true here.
     virtual bool hasInterestingType(CanType type) const = 0;
+
+    /// Is the given pack expansion a simple expansion of an interesting
+    /// type?
+    virtual bool isInterestingPackExpansion(CanPackExpansionType type) const = 0;
 
     /// Are we only interested in a subset of the conformances for a
     /// given type?
@@ -98,6 +102,15 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  /// Search the given type metadata pack for useful fulfillments.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchTypeMetadataPack(IRGenModule &IGM, CanPackType type,
+                              IsExact_t isExact,
+                              MetadataState metadataState,
+                              unsigned sourceIndex, MetadataPath &&path,
+                              const InterestingKeysCallback &interestingKeys);
+
   bool searchConformance(IRGenModule &IGM,
                          const ProtocolConformance *conformance,
                          unsigned sourceIndex, MetadataPath &&path,
@@ -109,6 +122,10 @@ public:
   bool searchWitnessTable(IRGenModule &IGM, CanType type, ProtocolDecl *protocol,
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
+
+  /// Consider a shape requirement for the given type.
+  bool searchShapeRequirement(IRGenModule &IGM, CanType type,
+                              unsigned sourceIndex, MetadataPath &&path);
 
   /// Register a fulfillment for the given key.
   ///

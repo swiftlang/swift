@@ -13,8 +13,14 @@
 import CASTBridging
 import CBasicBridging
 import SwiftSyntax
+import swiftLLVMJSON
 
-struct PluginError: Error {}
+enum PluginError: Error {
+  case stalePlugin
+  case failedToSendMessage
+  case failedToReceiveMessage
+  case invalidReponseKind
+}
 
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
@@ -32,7 +38,61 @@ public func _deinitializePlugin(
   plugin.deinitialize()
 }
 
+/// Load the library plugin in the plugin server.
+/// This should be called inside lock.
+@_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
+func swift_ASTGen_pluginServerLoadLibraryPlugin(
+  opaqueHandle: UnsafeMutableRawPointer,
+  libraryPath: UnsafePointer<Int8>,
+  moduleName: UnsafePointer<Int8>,
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
+) -> Bool {
+  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
+  let libraryPath = String(cString: libraryPath)
+  let moduleName = String(cString: moduleName)
+
+  let diagEngine: PluginDiagnosticsEngine?
+  if let cxxDiagnosticEngine = cxxDiagnosticEngine {
+    diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
+  } else {
+    diagEngine = nil
+  }
+
+  do {
+    let result = try plugin.sendMessageAndWaitWithoutLock(
+      .loadPluginLibrary(libraryPath: libraryPath, moduleName: moduleName)
+    )
+    guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
+      throw PluginError.invalidReponseKind
+    }
+    diagEngine?.emit(diagnostics);
+    return loaded
+  } catch {
+    diagEngine?.diagnose(error: error)
+    return false
+  }
+}
+
 struct CompilerPlugin {
+  struct Capability {
+    enum Feature: String {
+      case loadPluginLibrary = "load-plugin-library"
+    }
+
+    var protocolVersion: Int
+    var features: Set<Feature>
+
+    init(_ message: PluginMessage.PluginCapability) {
+      self.protocolVersion = message.protocolVersion
+      if let features = message.features {
+        self.features = Set(features.compactMap(Feature.init(rawValue:)))
+      } else {
+        self.features = []
+      }
+    }
+  }
+
   let opaqueHandle: UnsafeMutableRawPointer
 
   private func withLock<R>(_ body: () throws -> R) rethrows -> R {
@@ -43,14 +103,10 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-//      // FIXME: Add -dump-plugin-message option?
-//      data.withMemoryRebound(to: UInt8.self) { buffer in
-//        print(">> " + String(decoding: buffer, as: UTF8.self))
-//      }
       return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
     }
     if hadError {
-      throw PluginError()
+      throw PluginError.failedToSendMessage
     }
   }
 
@@ -59,44 +115,43 @@ struct CompilerPlugin {
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
     defer { BridgedData_free(result) }
     guard !hadError else {
-      throw PluginError()
+      throw PluginError.failedToReceiveMessage
     }
     let data = UnsafeBufferPointer(start: result.baseAddress, count: result.size)
-//    // FIXME: Add -dump-plugin-message option?
-//    data.withMemoryRebound(to: UInt8.self) { buffer in
-//      print("<< " + String(decoding: buffer, as: UTF8.self))
-//    }
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
+  }
+
+  func sendMessageAndWaitWithoutLock(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
+    try sendMessage(message)
+    return try waitForNextMessage()
   }
 
   func sendMessageAndWait(_ message: HostToPluginMessage) throws -> PluginToHostMessage {
     try self.withLock {
-      try sendMessage(message)
-      return try waitForNextMessage()
+      guard !Plugin_spawnIfNeeded(opaqueHandle) else {
+        throw PluginError.stalePlugin
+      }
+      return try sendMessageAndWaitWithoutLock(message);
     }
   }
 
+  /// Initialize the plugin. This should be called inside lock.
   func initialize() {
-    self.withLock {
+    do {
       // Get capability.
-      let response: PluginToHostMessage
-      do {
-        try self.sendMessage(.getCapability)
-        response = try self.waitForNextMessage()
-      } catch {
-        assertionFailure(String(describing: error))
-        return
+      let response = try self.sendMessageAndWaitWithoutLock(.getCapability)
+      guard case .getCapabilityResult(let capability) = response else {
+        throw PluginError.invalidReponseKind
       }
-      switch response {
-      case .getCapabilityResult(capability: let capability):
-        let ptr = UnsafeMutablePointer<PluginMessage.PluginCapability>.allocate(capacity: 1)
-        ptr.initialize(to: capability)
-        Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
-      default:
-        assertionFailure("invalid response")
-      }
+      let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+      ptr.initialize(to: .init(capability))
+      Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
+    } catch {
+      assertionFailure(String(describing: error))
+      return
     }
   }
+
   func deinitialize() {
     self.withLock {
       if let ptr = Plugin_getCapability(opaqueHandle) {
@@ -108,11 +163,11 @@ struct CompilerPlugin {
     }
   }
 
-  var capability: PluginMessage.PluginCapability {
+  var capability: Capability? {
     if let ptr = Plugin_getCapability(opaqueHandle) {
-      return ptr.assumingMemoryBound(to: PluginMessage.PluginCapability.self).pointee
+      return ptr.assumingMemoryBound(to: Capability.self).pointee
     }
-    return PluginMessage.PluginCapability(protocolVersion: 0)
+    return nil
   }
 }
 
@@ -209,24 +264,43 @@ class PluginDiagnosticsEngine {
     SwiftDiagnostic_finish(diag)
   }
 
+  /// Emit diagnostics.
+  func emit(
+    _ diagnostics: [PluginMessage.Diagnostic],
+    messageSuffix: String? = nil
+  ) {
+    for diagnostic in diagnostics {
+      self.emit(diagnostic)
+    }
+  }
+
+  func diagnose(error: Error) {
+    self.emitSingle(
+      message: String(describing: error),
+      severity: .error,
+      position: .invalid
+    )
+  }
+
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
   private func cxxSourceLocation(
     at offset: Int, in fileName: String
   ) -> CxxSourceLoc? {
     // Find the corresponding exported source file.
-    guard let exportedSourceFile = exportedSourceFileByName[fileName]
+    guard
+      let exportedSourceFile = exportedSourceFileByName[fileName]
     else {
       return nil
     }
 
     // Compute the resulting address.
-    guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
+    guard
+      let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress
     else {
       return nil
     }
-    let address = bufferBaseAddress.advanced(by: offset)
-    return CxxSourceLoc(mutating: address)
+    return bufferBaseAddress.advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.

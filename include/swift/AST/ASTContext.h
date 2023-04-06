@@ -44,6 +44,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -103,6 +104,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class PackageUnit;
   class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -230,6 +232,7 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
 
 public:
@@ -247,6 +250,7 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
   ~ASTContext();
 
@@ -279,6 +283,9 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  /// OutputBackend for writing outputs.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -354,6 +361,9 @@ public:
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
+
+  /// The Swift module currently being compiled.
+  ModuleDecl *MainModule = nullptr;
 
 private:
   /// The current generation number, which reflects the number of
@@ -694,6 +704,9 @@ public:
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
       AbstractFunctionDecl *thunk) const;
 
+  /// Indicates whether move-only / noncopyable types are supported.
+  bool supportsMoveOnlyTypes() const;
+
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).
   //
@@ -884,6 +897,11 @@ public:
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
+  /// The the availability since when distributed actors are able to have custom
+  /// executors.
+  AvailabilityContext
+  getConcurrencyDistributedActorWithCustomExecutorAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
@@ -926,6 +944,14 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
   AvailabilityContext getSwift57Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.8
+  /// compiler for the target platform.
+  AvailabilityContext getSwift58Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  AvailabilityContext getSwift59Availability();
 
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
@@ -1378,7 +1404,7 @@ public:
   /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig,
-                                                CanType shapeClass);
+                                                CanGenericTypeParamType shapeClass);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
@@ -1454,14 +1480,40 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
-  /// search within the library.
-  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
-  
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  LoadedExecutablePlugin *
-  lookupExecutablePluginByModuleName(Identifier moduleName);
+  /// Lookup a library plugin that can handle \p moduleName and return the path
+  /// to it.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<std::string> lookupLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Load the specified dylib plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  void *loadLibraryPlugin(StringRef path);
+
+  /// Lookup an executable plugin that is declared to handle \p moduleName
+  /// module by '-load-plugin-executable'.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
+
+  /// Look for dynamic libraries in paths from `-external-plugin-path` and
+  /// return a pair of `(library path, plugin server executable)` if found.
+  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
+  /// underlying path.
+  Optional<std::pair<std::string, std::string>>
+  lookupExternalLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Launch the specified executable plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
 
   /// Get the plugin registry this ASTContext is using.
   PluginRegistry *getPluginRegistry() const;
@@ -1469,6 +1521,20 @@ public:
   /// Set the plugin registory this ASTContext should use.
   /// This should be called before any plugin is loaded.
   void setPluginRegistry(PluginRegistry *newValue);
+
+  const llvm::StringSet<> &getLoadedPluginLibraryPaths() const;
+
+  /// Get the output backend. The output backend needs to be initialized via
+  /// constructor or `setOutputBackend`.
+  llvm::vfs::OutputBackend &getOutputBackend() const {
+    assert(OutputBackend && "OutputBackend is not setup");
+    return *OutputBackend;
+  }
+  /// Set output backend for virtualized outputs.
+  void setOutputBackend(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend) {
+    OutputBackend = std::move(OutBackend);
+  }
 
 private:
   friend Decl;
@@ -1482,7 +1548,7 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  void loadCompilerPlugins();
+  void createModuleToExecutablePluginMap();
 
   friend TypeBase;
   friend ArchetypeType;

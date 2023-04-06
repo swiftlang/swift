@@ -122,14 +122,14 @@ public:
     if (nhead == sizeof(byteBuffer)) {
       // We have headroom available for all 64 bits. Eagerly compress the
       // now-full buffer into our state.
-      std::copy(bits, bits + sizeof(byteBuffer), byteBuffer);
+      std::copy_n(bits, sizeof(byteBuffer), byteBuffer);
     } else if (N >= available) {
       // There was some excess - append as many bytes as we can hold and
       // compress the buffer into our state.
-      std::copy(bits, bits + nhead, byteBuffer + bufLen);
+      std::copy_n(bits, nhead, byteBuffer + bufLen);
     } else {
       // We have headroom available for these bits.
-      std::copy(bits, bits + N, byteBuffer + bufLen);
+      std::copy_n(bits, N, byteBuffer + bufLen);
       return setBufferLength(bufLen + N);
     }
 
@@ -138,7 +138,7 @@ public:
 
     // Now reseed the buffer with the remaining bytes.
     const uint64_t remainder = N - available;
-    std::copy(bits + available, bits + N, byteBuffer);
+    std::copy_n(bits + available, remainder, byteBuffer);
     return setBufferLength(remainder);
   }
 

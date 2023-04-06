@@ -3,6 +3,6 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
-struct Variadic<T...> where each T: Equatable {}
+struct Variadic<each T> where each T: Equatable {}
 
 _ = Variadic<Int, String>()

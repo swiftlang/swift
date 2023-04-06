@@ -214,30 +214,38 @@ public:
 
   /// Get the number of SIL results passed as address-typed arguments.
   unsigned getNumIndirectSILResults() const {
-    return silConv.loweredAddresses ? funcTy->getNumIndirectFormalResults() : 0;
+    // TODO: Return packs directly in lowered-address mode
+    return silConv.loweredAddresses ? funcTy->getNumIndirectFormalResults()
+                                    : funcTy->getNumPackResults();
   }
 
   /// Are any SIL results passed as address-typed arguments?
   bool hasIndirectSILResults() const { return getNumIndirectSILResults() != 0; }
 
-  using IndirectSILResultIter = SILFunctionType::IndirectFormalResultIter;
-  using IndirectSILResultRange = SILFunctionType::IndirectFormalResultRange;
+  struct IndirectSILResultFilter {
+    bool loweredAddresses;
+    IndirectSILResultFilter(bool loweredAddresses)
+        : loweredAddresses(loweredAddresses) {}
+    bool operator()(SILResultInfo result) const {
+      return (loweredAddresses ? result.isFormalIndirect() : result.isPack());
+    }
+  };
+  using IndirectSILResultIter =
+      llvm::filter_iterator<const SILResultInfo *, IndirectSILResultFilter>;
+  using IndirectSILResultRange = iterator_range<IndirectSILResultIter>;
 
   /// Return a range of indirect result information for results passed as
   /// address-typed SIL arguments.
   IndirectSILResultRange getIndirectSILResults() const {
-    if (silConv.loweredAddresses)
-      return funcTy->getIndirectFormalResults();
-
     return llvm::make_filter_range(
-        llvm::make_range((const SILResultInfo *)0, (const SILResultInfo *)0),
-        SILFunctionType::IndirectFormalResultFilter());
+        funcTy->getResults(),
+        IndirectSILResultFilter(silConv.loweredAddresses));
   }
 
   struct SILResultTypeFunc;
 
   // Gratuitous template parameter is to delay instantiating `mapped_iterator`
-  // on the incomplete type SILParameterTypeFunc.
+  // on the incomplete type SILResultTypeFunc.
   template<bool _ = false>
   using IndirectSILResultTypeIter = typename delay_template_expansion<_, 
       llvm::mapped_iterator, IndirectSILResultIter, SILResultTypeFunc>::type;
@@ -253,7 +261,7 @@ public:
   /// Get the number of SIL results directly returned by SIL value.
   unsigned getNumDirectSILResults() const {
     return silConv.loweredAddresses ? funcTy->getNumDirectFormalResults()
-                                    : funcTy->getNumResults();
+                                    : funcTy->getNumResults() - funcTy->getNumPackResults();
   }
 
   /// Like getNumDirectSILResults but @out tuples, which are not flattened in
@@ -266,7 +274,7 @@ public:
     DirectSILResultFilter(bool loweredAddresses)
         : loweredAddresses(loweredAddresses) {}
     bool operator()(SILResultInfo result) const {
-      return !(loweredAddresses && result.isFormalIndirect());
+      return (loweredAddresses ? !result.isFormalIndirect() : !result.isPack());
     }
   };
   using DirectSILResultIter =

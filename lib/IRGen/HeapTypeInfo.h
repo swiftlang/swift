@@ -102,7 +102,7 @@ public:
     }
   }
 
-  static const bool IsScalarPOD = false;
+  static const bool IsScalarTriviallyDestroyable = false;
 
   // Emit the copy/destroy operations required by SingleScalarTypeInfo
   // using strong reference counting.

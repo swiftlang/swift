@@ -278,8 +278,11 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   ClangArgList.insert(ClangArgList.end(), ArgList.begin(), ArgList.end());
 
   // Create a new Clang compiler invocation.
+  clang::CreateInvocationOptions CIOpts;
+  CIOpts.Diags = ClangDiags;
+  CIOpts.ProbePrecompiled = true;
   std::unique_ptr<clang::CompilerInvocation> ClangInvok =
-      clang::createInvocationFromCommandLine(ClangArgList, ClangDiags);
+      clang::createInvocation(ClangArgList, std::move(CIOpts));
   if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
     for (auto I = DiagBuf.err_begin(), E = DiagBuf.err_end(); I != E; ++I) {
       Error += I->second;

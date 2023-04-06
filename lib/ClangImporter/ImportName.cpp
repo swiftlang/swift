@@ -1848,7 +1848,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName:
+  case clang::DeclarationName::CXXConversionFunctionName: {
+    auto conversionDecl = dyn_cast<clang::CXXConversionDecl>(D);
+    if (!conversionDecl)
+      return ImportedName();
+    auto toType = conversionDecl->getConversionType();
+    // Only import `operator bool()` for now.
+    if (toType->isBooleanType()) {
+      isFunction = true;
+      baseName = "__convertToBool";
+      addEmptyArgNamesForClangFunction(conversionDecl, argumentNames);
+      break;
+    }
+    return ImportedName();
+  }
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:

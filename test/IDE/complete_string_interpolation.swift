@@ -37,7 +37,6 @@ func testMessenger(intVal: Int, fltVal: Float) {
 // OVERLOAD_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: decimal[#MsgInterpolation.IntFormat#];
 // OVERLOAD_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: hex[#MsgInterpolation.IntFormat#];
 // OVERLOAD_INT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MsgInterpolation.IntFormat#})[#(into: inout Hasher) -> Void#];
-// OVERLOAD_INT: End completions
 
   messenger.send("  \(5, format: .#^OVERLOAD_INTLITERAL^#, extraneousArg: 10) ")
 // OVERLOAD_INTLITERAL: Begin completions, 5 items
@@ -46,12 +45,10 @@ func testMessenger(intVal: Int, fltVal: Float) {
 // OVERLOAD_INTLITERAL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MsgInterpolation.IntFormat#})[#(into: inout Hasher) -> Void#];
 // OVERLOAD_INTLITERAL-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: precision({#Int#})[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_INTLITERAL-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: hex[#MsgInterpolation.FloatFormat#];
-// OVERLOAD_INTLITERAL: End completions
 
   messenger.send("  \(fltVal, format: .#^OVERLOAD_FLT^#) ")
   messenger.send("  \(5.0, format: .#^OVERLOAD_FLTLITERAL^#) ")
 // OVERLOAD_FLT: Begin completions, 2 items
 // OVERLOAD_FLT-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: precision({#Int#})[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_FLT-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: hex[#MsgInterpolation.FloatFormat#];
-// OVERLOAD_FLT: End completions
 }

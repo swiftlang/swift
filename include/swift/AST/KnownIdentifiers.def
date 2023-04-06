@@ -231,6 +231,8 @@ IDENTIFIER(className)
 IDENTIFIER(_defaultActorInitialize)
 IDENTIFIER(_defaultActorDestroy)
 IDENTIFIER(unownedExecutor)
+IDENTIFIER(localUnownedExecutor)
+IDENTIFIER(_unwrapLocalUnownedExecutor)
 
 IDENTIFIER_(ErrorType)
 IDENTIFIER(Code)
@@ -262,6 +264,9 @@ IDENTIFIER_(regexString)
 IDENTIFIER(version)
 IDENTIFIER_(StringProcessing)
 IDENTIFIER(RegexBuilder)
+
+// Backtracing
+IDENTIFIER_(Backtracing)
 
 // Distributed actors
 IDENTIFIER(ActorID)

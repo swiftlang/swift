@@ -89,12 +89,11 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
     args =
         IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
   }
+
   bindFromGenericRequirementsBuffer(
       IGF, requirements,
       Address(args, IGF.IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-      MetadataState::Complete, [&](CanType t) {
-        return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-      });
+      MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 }
 
 static llvm::Function *
@@ -299,9 +298,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
       bindFromGenericRequirementsBuffer(
           IGF, requirements,
           Address(args, IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-          MetadataState::Complete, [&](CanType t) {
-            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-          });
+          MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
     }
     
     // Run through the captured index types to determine the size and alignment
@@ -369,7 +366,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
       : component.LoweredType;
     auto &ti = IGM.getTypeInfo(ty);
-    isTrivial &= ti.isPOD(ResilienceExpansion::Minimal);
+    isTrivial &= ti.isTriviallyDestroyable(ResilienceExpansion::Minimal);
   }
   
   llvm::Constant *destroy = nullptr;
@@ -589,9 +586,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       bindFromGenericRequirementsBuffer(
           IGF, requirements,
           Address(src, IGM.Int8Ty, IGF.IGM.getPointerAlignment()),
-          MetadataState::Complete, [&](CanType t) {
-            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-          });
+          MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
     } else {
       offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
@@ -902,12 +897,12 @@ emitKeyPathComponent(IRGenModule &IGM,
                 return None;
               })->getCanonicalType();
 
-              if (reqt.isMetadata()) {
+              if (reqt.isAnyMetadata()) {
                 // Type requirement.
                 externalSubArgs.push_back(emitMetadataTypeRefForKeyPath(
                     IGM, substType, componentCanSig));
               } else {
-                assert(reqt.isWitnessTable());
+                assert(reqt.isAnyWitnessTable());
 
                 // Protocol requirement.
                 auto conformance = subs.lookupConformance(

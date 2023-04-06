@@ -49,6 +49,7 @@ protected:
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                        const ParameterList *PL = nullptr,
                                         bool TopLevel = false) = 0;
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
@@ -61,6 +62,12 @@ protected:
 
   public:
     ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
+
+    /// Walk only the expansion of the macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
         return Action::SkipChildren(S); // don't walk into brace statements; we
@@ -73,7 +80,8 @@ protected:
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
-          BraceStmt *NB = I.transformBraceStmt(B);
+          const ParameterList *PL = CE->getParameters();
+          BraceStmt *NB = I.transformBraceStmt(B, PL);
           CE->setBody(NB, false);
           // just with the entry and exit logging this is going to
           // be more than a single expression!

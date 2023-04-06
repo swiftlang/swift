@@ -42,8 +42,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -918,8 +919,23 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       assert(found != matcher.pairs.end());
 
       auto arg = found->rhs;
-      if (auto *expansionType = arg->getAs<PackExpansionType>())
-        arg = expansionType->getPatternType();
+
+      // PackMatcher will always produce a PackExpansionType as the
+      // arg for a pack parameter, if necessary by wrapping a PackType
+      // in one.  (It's a weird representation.)  Look for that pattern
+      // and unwrap the pack.  Otherwise, we must have matched with a
+      // single component which happened to be an expansion; wrap that
+      // in a PackType.  In either case, we always want arg to end up
+      // a PackType.
+      if (auto *expansionType = arg->getAs<PackExpansionType>()) {
+        auto pattern = expansionType->getPatternType();
+        if (auto pack = pattern->getAs<PackType>()) {
+          arg = pack;
+        } else {
+          arg = PackType::get(ctx, {expansionType});
+        }
+      }
+
       args.push_back(arg);
     }
   }
@@ -2301,19 +2317,17 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
   diagnose(repr->getLoc(),
            diag::moveonly_parameter_missing_ownership);
 
-  // FIXME: this should be 'borrowing'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__shared", "for an immutable reference")
-      .fixItInsert(repr->getStartLoc(), "__shared ");
+           "borrowing", "for an immutable reference")
+      .fixItInsert(repr->getStartLoc(), "borrowing ");
 
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
            "inout", "for a mutable reference")
       .fixItInsert(repr->getStartLoc(), "inout ");
 
-  // FIXME: this should be 'consuming'
   diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "__owned", "to take the value from callers")
-      .fixItInsert(repr->getStartLoc(), "__owned ");
+           "consuming", "to take the value from the caller")
+      .fixItInsert(repr->getStartLoc(), "consuming ");
 
   // to avoid duplicate diagnostics
   repr->setInvalid();
@@ -2352,11 +2366,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
-  case TypeReprKind::InOut:
-  case TypeReprKind::Shared:
-  case TypeReprKind::Owned:
+  case TypeReprKind::Ownership:
     return resolveOwnershipTypeRepr(cast<OwnershipTypeRepr>(repr), options);
-
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::CompileTimeConst:
@@ -3355,23 +3366,15 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     // must appear at the top level of a parameter type.
     auto *nestedRepr = eltTypeRepr->getWithoutParens();
 
-    ValueOwnership ownership = ValueOwnership::Default;
+    ParamSpecifier ownership = ParamSpecifier::Default;
 
     bool isolated = false;
     bool compileTimeConst = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
-        case TypeReprKind::Shared:
-          ownership = ValueOwnership::Shared;
-          nestedRepr = specifierRepr->getBase();
-          continue;
-        case TypeReprKind::InOut:
-          ownership = ValueOwnership::InOut;
-          nestedRepr = specifierRepr->getBase();
-            continue;
-        case TypeReprKind::Owned:
-          ownership = ValueOwnership::Owned;
+        case TypeReprKind::Ownership:
+          ownership = cast<OwnershipTypeRepr>(specifierRepr)->getSpecifier();
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Isolated:
@@ -4086,11 +4089,24 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                              silContext, identBase);
 
     if (result && result->isParameterPack() &&
-        options.contains(TypeResolutionFlags::AllowPackReferences) &&
-        !options.contains(TypeResolutionFlags::FromPackReference)) {
-      diagnose(repr->getLoc(), diag::pack_expansion_missing_pack_reference,
-               repr);
-      return ErrorType::get(result);
+        // Workaround to allow 'shape' type checking of SIL.
+        // TODO: Explicitly pass along whether in a 'shape' context.
+        !options.contains(TypeResolutionFlags::SILMode)) {
+      bool invalid = false;
+      if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+        diagnose(repr->getLoc(), diag::pack_reference_must_be_in_expansion,
+                 repr);
+        invalid = true;
+      }
+      if (!options.contains(TypeResolutionFlags::FromPackReference)) {
+        diagnose(repr->getLoc(), diag::pack_type_requires_keyword_each,
+                 repr)
+            .fixItInsert(repr->getLoc(), "each ");
+        invalid = true;
+      }
+      if (invalid) {
+        return ErrorType::get(result);
+      }
     }
   } else {
     result = resolveType(baseComp, options);
@@ -4232,6 +4248,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
+  auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
   // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
   // function parameters.
   if (!options.is(TypeResolverContext::FunctionInput) ||
@@ -4247,24 +4264,14 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
       diagID = diag::attr_only_on_parameters;
     }
     StringRef name;
-    switch (repr->getKind()) {
-    case TypeReprKind::InOut:
-      name = "inout";
-      break;
-    case TypeReprKind::Shared:
-      name = "__shared"; // FIXME: use 'borrowing'
-      break;
-    case TypeReprKind::Owned:
-      name = "__owned";  // FIXME: use 'consuming'
-      break;
-    default:
-      llvm_unreachable("unknown SpecifierTypeRepr kind");
+    if (ownershipRepr) {
+      name = ownershipRepr->getSpecifierSpelling();
     }
     diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(getASTContext());
   }
 
-  if (isa<InOutTypeRepr>(repr)
+  if (ownershipRepr && ownershipRepr->getSpecifier() == ParamSpecifier::InOut
       && !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
     // Anything within an inout isn't a parameter anymore.
     options.setContext(TypeResolverContext::InoutFunctionInput);
@@ -4566,27 +4573,33 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
   }
 
+  PackExpansionType *result{};
+  GenericSignature genericSig;
+  Type shapeType;
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    genericSig = resolution.getGenericSignature();
+    shapeType = genericSig->getReducedShape(rootParameterPacks[0]);
+    result = PackExpansionType::get(patternType, shapeType);
+  } else {
+    result = PackExpansionType::get(patternType, rootParameterPacks[0]);
+  }
+
   // We might not allow variadic expansions here at all.
   if (!options.isPackExpansionSupported(getDeclContext())) {
-    diagnose(repr->getLoc(), diag::expansion_not_allowed, patternType);
+    diagnose(repr->getLoc(), diag::expansion_not_allowed, result);
     return ErrorType::get(ctx);
   }
 
   if (resolution.getStage() == TypeResolutionStage::Interface) {
-    auto genericSig = resolution.getGenericSignature();
-    auto shapeType = genericSig->getReducedShape(rootParameterPacks[0]);
-    auto result = PackExpansionType::get(patternType, shapeType);
-
     for (auto type : rootParameterPacks) {
       if (!genericSig->haveSameShape(type, shapeType)) {
         ctx.Diags.diagnose(repr->getLoc(), diag::expansion_not_same_shape,
                            result, shapeType, type);
       }
     }
-    return result;
   }
 
-  return PackExpansionType::get(patternType, rootParameterPacks[0]);
+  return result;
 }
 
 NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
@@ -4601,15 +4614,30 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     return ErrorType::get(ctx);
 
   if (!packReference->isParameterPack()) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack,
-                       packReference);
+    auto diag =
+        ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
+    bool addEachFixitApplied = false;
+    if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
+      if (auto *packIdentBinding = packIdent->getBoundDecl()) {
+        if (packIdentBinding->getLoc().isValid()) {
+          diag.fixItInsert(packIdentBinding->getLoc(), "each ");
+          addEachFixitApplied = true;
+        }
+      }
+    }
+    if (const auto eachLoc = repr->getEachLoc();
+        !addEachFixitApplied && eachLoc.isValid()) {
+      const auto eachLocEnd =
+          Lexer::getLocForEndOfToken(ctx.SourceMgr, eachLoc);
+      diag.fixItRemoveChars(eachLoc, eachLocEnd);
+    }
     return packReference;
   }
 
   if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
     ctx.Diags.diagnose(repr->getLoc(),
                        diag::pack_reference_outside_expansion,
-                       packReference);
+                       packReference, /*inExpression*/false);
     return ErrorType::get(ctx);
   }
 
@@ -4654,6 +4682,11 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (eltName.empty())
       continue;
 
+    if (ty->is<PackExpansionType>()) {
+      diagnose(repr->getElementNameLoc(i), diag::tuple_pack_element_label);
+      hadError = true;
+    }
+
     if (seenEltNames.count(eltName) == 1) {
       foundDupLabel = true;
     }
@@ -4669,15 +4702,15 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
-  if (options.contains(TypeResolutionFlags::SILType) ||
-      ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+  if (options.contains(TypeResolutionFlags::SILType)) {
     if (repr->isParenType())
       return ParenType::get(ctx, elements[0].getType());
   } else {
     // Single-element labeled tuples are not permitted outside of declarations
     // or SIL, either.
-    if (elements.size() == 1 && elements[0].hasName()
-        && !(options & TypeResolutionFlags::SILType)) {
+    if (elements.size() == 1 && elements[0].hasName() &&
+        !elements[0].getType()->is<PackExpansionType>() &&
+        !(options & TypeResolutionFlags::SILType)) {
       diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
         .fixItRemoveChars(repr->getElementNameLoc(0),
                           repr->getElementType(0)->getStartLoc());
@@ -4685,7 +4718,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       elements[0] = TupleTypeElt(elements[0].getType());
     }
 
-    if (elements.size() == 1 && !elements[0].hasName())
+    if (elements.size() == 1 && !elements[0].hasName() &&
+        !elements[0].getType()->is<PackExpansionType>())
       return ParenType::get(ctx, elements[0].getType());
   }
 
@@ -5035,6 +5069,10 @@ public:
   ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     reprStack.push_back(T);
 
@@ -5099,7 +5137,7 @@ public:
     case TypeReprKind::Attributed:
     case TypeReprKind::Error:
     case TypeReprKind::Function:
-    case TypeReprKind::InOut:
+    case TypeReprKind::Ownership:
     case TypeReprKind::Composition:
     case TypeReprKind::OpaqueReturn:
     case TypeReprKind::NamedOpaqueReturn:
@@ -5113,8 +5151,6 @@ public:
     case TypeReprKind::Fixed:
     case TypeReprKind::Array:
     case TypeReprKind::SILBox:
-    case TypeReprKind::Shared:
-    case TypeReprKind::Owned:
     case TypeReprKind::Isolated:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeConst:

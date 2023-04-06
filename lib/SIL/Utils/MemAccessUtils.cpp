@@ -19,7 +19,6 @@
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -416,10 +415,6 @@ bool swift::mayAccessPointer(SILInstruction *instruction) {
   return isUnidentified;
 }
 
-bool swift_mayAccessPointer(BridgedInstruction inst) {
-  return mayAccessPointer(castToInst(inst));
-}
-
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
   return isa<LoadWeakInst>(instruction) 
       || isa<LoadUnownedInst>(instruction) 
@@ -427,20 +422,13 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
       || isa<StrongCopyUnmanagedValueInst>(instruction);
 }
 
-bool swift_mayLoadWeakOrUnowned(BridgedInstruction inst) {
-  return mayLoadWeakOrUnowned(castToInst(inst));
-}
-
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
 bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
   return FullApplySite::isa(instruction) 
       || isa<EndApplyInst>(instruction)
-      || isa<AbortApplyInst>(instruction);
-}
-
-bool swift_maySynchronizeNotConsideringSideEffects(BridgedInstruction inst) {
-  return maySynchronizeNotConsideringSideEffects(castToInst(inst));
+      || isa<AbortApplyInst>(instruction)
+      || isa<HopToExecutorInst>(instruction);
 }
 
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
@@ -449,10 +437,6 @@ bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruct
              || maySynchronizeNotConsideringSideEffects(instruction);
   assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
   return retval;
-}
-
-bool swift_mayBeDeinitBarrierNotConsideringSideEffects(BridgedInstruction inst) {
-  return mayBeDeinitBarrierNotConsideringSideEffects(castToInst(inst));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2538,6 +2522,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
+    case BuiltinValueKind::InitializeNonDefaultDistributedActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::StartAsyncLet:
@@ -2653,6 +2638,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
+  case SILInstructionKind::PackElementSetInst:
     visitor(&I->getAllOperands()[StoreInst::Dest]);
     return;
 
@@ -2670,7 +2656,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst: {
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::PackElementGetInst: {
     // Assuming all the above have only a single address operand.
     assert(I->getNumOperands() - I->getNumTypeDependentOperands() == 1);
     Operand *singleOperand = &I->getAllOperands()[0];

@@ -86,7 +86,7 @@ public func createSmallStruct(x: Float) -> SmallStruct {
 // CHECK-NEXT:   return _impl::$s7Methods11LargeStructV6doubleyyF(_getOpaquePointer());
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK LargeStruct LargeStruct::scale(swift::Int x, swift::Int y) {
-// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s7Methods11LargeStructV5scaleyACSi_SitF(result, x, y, _getOpaquePointer());
 // CHECK-NEXT:   });
 // CHECK-NEXT:   }
@@ -95,7 +95,7 @@ public func createSmallStruct(x: Float) -> SmallStruct {
 // CHECK-NEXT:   return _impl::$s7Methods11SmallStructV4dumpyyF(_impl::swift_interop_passDirect_Methods_float_0_4(_getOpaquePointer()));
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK SmallStruct SmallStruct::scale(float y) {
-// CHECK-NEXT:   return _impl::_impl_SmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_SmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::swift_interop_returnDirect_Methods_float_0_4(result, _impl::$s7Methods11SmallStructV5scaleyACSfF(y, _getOpaquePointer()));
 // CHECK-NEXT:   });
 // CHECK-NEXT:   }

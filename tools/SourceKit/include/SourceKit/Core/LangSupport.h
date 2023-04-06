@@ -586,11 +586,14 @@ struct CursorInfoData {
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
   StringRef InternalDiagnostic;
-  llvm::ArrayRef<CursorSymbolInfo> Symbols;
+  llvm::SmallVector<CursorSymbolInfo, 1> Symbols;
   /// All available actions on the code under cursor.
-  llvm::ArrayRef<RefactoringInfo> AvailableActions;
+  llvm::SmallVector<RefactoringInfo, 8> AvailableActions;
   /// Whether the ASTContext was reused for this cursor info.
   bool DidReuseAST = false;
+  /// An allocator that can be used to allocate data that is referenced by this
+  /// \c CursorInfoData.
+  llvm::BumpPtrAllocator Allocator;
 
   void print(llvm::raw_ostream &OS, std::string Indentation) const {
     OS << Indentation << "CursorInfoData" << '\n';
@@ -637,6 +640,10 @@ enum class SemanticRefactoringKind {
 
 struct SemanticRefactoringInfo {
   SemanticRefactoringKind Kind;
+  // The name of the input buffer to start the refactoring in. This must either
+  // be empty (in which case the primary file for the AST is used), or exactly
+  // match the buffer identifier stored in the source manager.
+  StringRef InputBufferName;
   unsigned Line;
   unsigned Column;
   unsigned Length;
@@ -646,6 +653,20 @@ struct SemanticRefactoringInfo {
 struct RelatedIdentsInfo {
   /// (Offset,Length) pairs.
   ArrayRef<std::pair<unsigned, unsigned>> Ranges;
+};
+
+/// Represent one branch of an if config.
+/// Either `#if`, `#else` or `#elseif`.
+struct IfConfigInfo {
+  unsigned Offset;
+  bool IsActive;
+
+  IfConfigInfo(unsigned Offset, bool IsActive)
+      : Offset(Offset), IsActive(IsActive) {}
+};
+
+struct ActiveRegionsInfo {
+  ArrayRef<IfConfigInfo> Configs;
 };
 
 /// Filled out by LangSupport::findInterfaceDocument().
@@ -961,14 +982,15 @@ public:
                                        EditorConsumer &Consumer) = 0;
 
   virtual void getCursorInfo(
-      StringRef Filename, unsigned Offset, unsigned Length, bool Actionables,
-      bool SymbolGraph, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool Actionables, bool SymbolGraph,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void
-  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
+  getDiagnostics(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
                  Optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
@@ -982,21 +1004,29 @@ public:
                   Receiver) = 0;
 
   virtual void getRangeInfo(
-      StringRef Filename, unsigned Offset, unsigned Length,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
   virtual void getCursorInfoFromUSR(
-      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(
-      StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+          Receiver) = 0;
+
+  virtual void findActiveRegionsInFile(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ActiveRegionsInfo> &)>
           Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
@@ -1025,16 +1055,17 @@ public:
                         SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
-  virtual void semanticRefactoring(StringRef Filename,
+  virtual void semanticRefactoring(StringRef PrimaryFilePath,
                                    SemanticRefactoringInfo Info,
                                    ArrayRef<const char *> Args,
                                    SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
   virtual void collectExpressionTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
-      bool CanonicalType, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
+      bool FullyQualified, bool CanonicalType,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) = 0;
 
@@ -1042,8 +1073,9 @@ public:
   /// the source file. If `Offset` or `Length` are empty, variable types for
   /// the entire document are collected.
   virtual void collectVariableTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, Optional<unsigned> Offset,
+      Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;

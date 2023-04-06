@@ -481,6 +481,34 @@ swift_auth_code(T value, unsigned extra) {
 #endif
 }
 
+/// Does this platform support backtrace-on-crash?
+#ifdef __APPLE__
+#  include <TargetConditionals.h>
+#  if TARGET_OS_OSX
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
+#    define SWIFT_BACKTRACE_SECTION "__DATA,swift5_backtrace"
+#  else
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#  endif
+#elif defined(_WIN32)
+#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#  define SWIFT_BACKTRACE_SECTION ".sw5bckt"
+#elif defined(__linux__)
+#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#  define SWIFT_BACKTRACE_SECTION "swift5_backtrace"
+#else
+#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#endif
+
+/// What is the system page size?
+#if defined(__APPLE__) && defined(__arm64__)
+  // Apple Silicon systems use a 16KB page size
+  #define SWIFT_PAGE_SIZE 16384
+#else
+  // Everything else uses 4KB pages
+  #define SWIFT_PAGE_SIZE 4096
+#endif
+
 #endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H

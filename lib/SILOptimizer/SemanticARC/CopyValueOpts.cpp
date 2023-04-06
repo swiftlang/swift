@@ -76,7 +76,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
 
   // Find all borrow introducers for our copy operand. If we are unable to find
-  // all of the reproducers (due to pattern matching failure), conservatively
+  // all of the introducers (due to pattern matching failure), conservatively
   // return false. We can not optimize.
   //
   // NOTE: We can get multiple introducers if our copy_value's operand
@@ -213,6 +213,17 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
 
       OwnershipLiveRange phiArgLR(value);
       if (bool(phiArgLR.hasUnknownConsumingUse())) {
+        return false;
+      }
+
+      // Replacing owned phi operands with a local borrow introducer can
+      // introduce reborrows. Since lifetime adjustment is not implemented for
+      // this case, disable here.
+      // Returning false here will make sure so this isn't populated in
+      // joinedOwnedIntroducerToConsumedOperands which is used by
+      // semanticarc::tryConvertOwnedPhisToGuaranteedPhis for transforming owned
+      // phi to guaranteed.
+      if (haveAnyLocalScopes) {
         return false;
       }
 
@@ -481,6 +492,12 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
             return !visitedInsts.count(endScopeUse->getUser());
           }))
         return false;
+  }
+  // Check whether the uses considered immediately above are all effectively
+  // instantaneous uses. Pointer escapes propagate values ways that may not be
+  // discoverable.
+  if (hasPointerEscape(operand)) {
+    return false;
   }
 
   // Ok, we now know that we can eliminate this value.
@@ -765,7 +782,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+  LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

@@ -380,9 +380,10 @@ Type ASTBuilder::createFunctionType(
 
     auto label = Ctx.getIdentifier(param.getLabel());
     auto flags = param.getFlags();
-    auto ownership = flags.getValueOwnership();
+    auto ownership =
+      ParamDecl::getParameterSpecifierForValueOwnership(flags.getValueOwnership());
     auto parameterFlags = ParameterTypeFlags()
-                              .withValueOwnership(ownership)
+                              .withOwnershipSpecifier(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure())
                               .withNoDerivative(flags.isNoDerivative());
@@ -673,8 +674,7 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     case RequirementKind::SameType:
       if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
-        if (baseDecl->getAssociatedType(DMT->getName()))
-          cmap[DMT->getName()] = req.getSecondType();
+        cmap[DMT->getName()] = req.getSecondType();
     }
   }
   llvm::SmallVector<Type, 4> args;

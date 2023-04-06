@@ -85,7 +85,8 @@ private:
   llvm::SmallDenseMap<SILBasicBlock *, CopyValueInst *, 4> persistentCopies;
 
 public:
-  CanonicalizeBorrowScope(InstructionDeleter &deleter) : deleter(deleter) {}
+  CanonicalizeBorrowScope(SILFunction *function, InstructionDeleter &deleter)
+    : liveness(function), deleter(deleter) {}
 
   BorrowedValue getBorrowedValue() const { return borrowedValue; }
 

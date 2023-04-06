@@ -282,10 +282,20 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 /// This query is careful not to trigger accessor macro expansion, which
 /// creates a cycle. It conservatively assumes that all accessor macros
 /// produce computed properties, which is... incorrect.
+///
+/// The query also avoids triggering a `StorageImplInfoRequest` for patterns
+/// involved in a ProtocolDecl, because we know they can never contain storage.
+/// For background, vars of noncopyable type have their OpaqueReadOwnership
+/// determined by the type of the var decl, but that type hasn't always been
+/// determined when this query is made.
 static bool mayHaveStorage(Pattern *pattern) {
-  // Check whether there are any accessor macros.
+  // Check whether there are any accessor macros, or it's a protocol member.
   bool hasAccessorMacros = false;
+  bool inProtocolDecl = false;
   pattern->forEachVariable([&](VarDecl *VD) {
+    if (isa<ProtocolDecl>(VD->getDeclContext()))
+      inProtocolDecl = true;
+
     VD->forEachAttachedMacro(MacroRole::Accessor,
       [&](CustomAttr *customAttr, MacroDecl *macro) {
         hasAccessorMacros = true;
@@ -293,6 +303,10 @@ static bool mayHaveStorage(Pattern *pattern) {
   });
 
   if (hasAccessorMacros)
+    return false;
+
+  // protocol members can never contain storage; avoid triggering request.
+  if (inProtocolDecl)
     return false;
 
   return pattern->hasStorage();
@@ -596,12 +610,49 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
+/*
+ // An accessor that uses borrowed ownership cannot have effects, as the
+   // coroutine accessor doesn't support `async` or `throws`
+   if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+     if (accessor->hasThrows() || accessor->hasAsync())
+       if (accessor->)
+       if (accessor->getResultInterfaceType()->isPureMoveOnly())
+         accessor->diagnose(diag::moveonly_effectful_getter);
+   }
+ */
+
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
-  return (storage->getAttrs().hasAttribute<BorrowedAttr>()
-          ? OpaqueReadOwnership::Borrowed
-          : OpaqueReadOwnership::Owned);
+  enum class DiagKind {
+    BorrowedAttr,
+    NoncopyableType
+  };
+
+  auto usesBorrowed = [&](DiagKind kind) -> OpaqueReadOwnership {
+    // Check for effects on the getter.
+    if (auto *getter = storage->getEffectfulGetAccessor()) {
+      switch (kind) {
+      case DiagKind::NoncopyableType:
+        getter->diagnose(diag::moveonly_effectful_getter,
+                         getter->getDescriptiveKind());
+        break;
+      case DiagKind::BorrowedAttr:
+        getter->diagnose(diag::borrowed_with_effect,
+                         getter->getDescriptiveKind());
+        break;
+      }
+    }
+    return OpaqueReadOwnership::Borrowed;
+  };
+
+  if (storage->getAttrs().hasAttribute<BorrowedAttr>())
+    return usesBorrowed(DiagKind::BorrowedAttr);
+
+  if (storage->getValueInterfaceType()->isPureMoveOnly())
+    return usesBorrowed(DiagKind::NoncopyableType);
+
+  return OpaqueReadOwnership::Owned;
 }
 
 /// Insert the specified decl into the DeclContext's member list.  If the hint
@@ -1369,6 +1420,10 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -1432,7 +1487,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
   Named->setType(Tmp1VD->getType());
-  auto *Let = BindingPattern::createImplicit(Ctx, /*let*/ true, Named);
+  auto *Let =
+      BindingPattern::createImplicit(Ctx, VarDecl::Introducer::Let, Named);
   Let->setType(Named->getType());
   auto *Some = OptionalSomePattern::createImplicit(Ctx, Let);
   Some->setType(OptionalType::get(Let->getType()));
@@ -2713,7 +2769,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
 
   // Type-check the initialization.
   using namespace constraints;
-  auto target = SolutionApplicationTarget::forPropertyWrapperInitializer(
+  auto target = SyntacticElementTarget::forPropertyWrapperInitializer(
       wrappedVar, initContext, initializer);
   auto result = TypeChecker::typeCheckExpression(target);
   if (!result)
@@ -3358,9 +3414,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
-      param->isInOut()
-      ? StorageIsMutable
-      : StorageIsNotMutable);
+      param->isImmutableInFunctionBody()
+        ? StorageIsNotMutable
+        : StorageIsMutable);
   }
 
   if (auto *var = dyn_cast<VarDecl>(storage)) {
@@ -3523,6 +3579,11 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
 
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)

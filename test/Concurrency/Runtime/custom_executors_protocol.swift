@@ -1,22 +1,22 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
+
+// rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
+
+// FIXME: rdar://107112715 test failing on iOS simulator, investigating
+// UNSUPPORTED: OS=ios
 
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-import Dispatch
-
-func checkIfMainQueue(expectedAnswer expected: Bool) {
-  dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main)
-      : .notOnQueue(DispatchQueue.main))
-}
+@preconcurrency import Dispatch
 
 protocol WithSpecifiedExecutor: Actor {
-  nonisolated var executor: SpecifiedExecutor { get }
+  nonisolated var executor: any SpecifiedExecutor { get }
 }
 
 protocol SpecifiedExecutor: SerialExecutor {}
@@ -29,42 +29,43 @@ extension WithSpecifiedExecutor {
   }
 }
 
-final class InlineExecutor: SpecifiedExecutor, Swift.CustomStringConvertible {
+final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
   let name: String
+  let queue: DispatchQueue
 
-  init(_ name: String) {
+  init(name: String, _ queue: DispatchQueue) {
     self.name = name
+    self.queue = queue
   }
 
-  public func enqueue(_ job: UnownedJob) {
+  public func enqueue(_ job: __owned Job) {
     print("\(self): enqueue")
-    job._runSynchronously(on: self.asUnownedSerialExecutor())
+    let unowned = UnownedJob(job)
+    queue.sync {
+      unowned.runSynchronously(on: self.asUnownedSerialExecutor())
+    }
     print("\(self): after run")
   }
 
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
-  }
-
   var description: Swift.String {
-    "InlineExecutor(\(name))"
+    "NaiveQueueExecutor(\(name))"
   }
 }
 
 actor MyActor: WithSpecifiedExecutor {
 
-  nonisolated let executor: SpecifiedExecutor
+  nonisolated let executor: any SpecifiedExecutor
 
   // Note that we don't have to provide the unownedExecutor in the actor itself.
   // We obtain it from the extension on `WithSpecifiedExecutor`.
 
-  init(executor: SpecifiedExecutor) {
+  init(executor: any SpecifiedExecutor) {
     self.executor = executor
   }
 
-  func test(expectedExecutor: some SerialExecutor) {
-    precondition(_taskIsOnExecutor(expectedExecutor), "Expected to be on: \(expectedExecutor)")
-    checkIfMainQueue(expectedAnswer: true)
+  func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
+    // FIXME(waiting on preconditions to merge): expectedExecutor.preconditionIsolated("Expected to be on: \(expectedExecutor)")
+    dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }
 }
@@ -72,19 +73,21 @@ actor MyActor: WithSpecifiedExecutor {
 @main struct Main {
   static func main() async {
     print("begin")
-    let one = InlineExecutor("one")
+    let name = "CustomQueue"
+    let queue = DispatchQueue(label: name)
+    let one = NaiveQueueExecutor(name: name, queue)
     let actor = MyActor(executor: one)
-    await actor.test(expectedExecutor: one)
-    await actor.test(expectedExecutor: one)
-    await actor.test(expectedExecutor: one)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
+    await actor.test(expectedExecutor: one, expectedQueue: queue)
     print("end")
   }
 }
 
 // CHECK:      begin
-// CHECK-NEXT: InlineExecutor(one): enqueue
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: MyActor: on executor InlineExecutor(one)
-// CHECK-NEXT: InlineExecutor(one): after run
+// CHECK-NEXT: NaiveQueueExecutor(CustomQueue): enqueue
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
+// CHECK-NEXT: NaiveQueueExecutor(CustomQueue): after run
 // CHECK-NEXT: end

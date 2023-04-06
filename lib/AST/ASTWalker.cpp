@@ -94,37 +94,37 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
   };
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Expr *visit(Expr *E) {
     SetParentRAII SetParent(Walker, E);
     return inherited::visit(E);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Stmt *visit(Stmt *S) {
     SetParentRAII SetParent(Walker, S);
     return inherited::visit(S);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Pattern *visit(Pattern *P) {
     SetParentRAII SetParent(Walker, P);
     return inherited::visit(P);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(Decl *D) {
     SetParentRAII SetParent(Walker, D);
     return inherited::visit(D);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(TypeRepr *T) {
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
@@ -133,7 +133,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitGenericParamListIfNeeded(GenericContext *GC) {
     // Must check this first in case extensions have not been bound yet
     if (Walker.shouldWalkIntoGenericParams()) {
@@ -146,7 +146,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitTrailingRequirements(GenericContext *GC) {
     if (const auto Where = GC->getTrailingWhereClause()) {
       for (auto &Req: Where->getRequirements())
@@ -422,6 +422,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
     }
 
+    if (auto def = MD->definition) {
+      // Don't walk into unchecked definitions.
+      if (auto expansion = dyn_cast<MacroExpansionExpr>(def)) {
+        if (!expansion->getType().isNull()) {
+          if (auto newDef = doIt(def))
+            MD->definition = newDef;
+          else
+            return true;
+        }
+      }
+    }
+
     // Visit trailing requirements
     if (WalkGenerics && visitTrailingRequirements(MD))
        return true;
@@ -430,14 +442,37 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
-    if (MED->getArgs() && doIt(MED->getArgs()))
-      return true;
-    if (Walker.shouldWalkMacroExpansions()) {
-      for (auto *decl : MED->getRewritten())
-        if (doIt(decl))
-          return true;
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", MED);
+#endif
+    bool shouldWalkArguments, shouldWalkExpansion;
+    std::tie(shouldWalkArguments, shouldWalkExpansion) =
+        Walker.shouldWalkMacroArgumentsAndExpansion();
+    if (shouldWalkArguments && MED->getArgs()) {
+      if (auto *argList = doIt(MED->getArgs()))
+        MED->setArgs(argList);
+      else
+        return true;
     }
-    return false;
+    // Visit auxiliary decls, which may be decls from macro expansions.
+    bool alreadyFailed = false;
+    if (shouldWalkExpansion) {
+      MED->visitAuxiliaryDecls([&](Decl *decl) {
+        if (alreadyFailed) return;
+        alreadyFailed = inherited::visit(decl);
+      });
+      MED->forEachExpandedExprOrStmt([&](ASTNode expandedNode) {
+        if (alreadyFailed) return;
+        if (auto *expr = expandedNode.dyn_cast<Expr *>()) {
+          if (!doIt(expr))
+            alreadyFailed = true;
+        } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
+          if (!doIt(stmt))
+            alreadyFailed = true;
+        }
+      });
+    }
+    return alreadyFailed;
   }
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
@@ -874,6 +909,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
+  Expr *visitMaterializePackExpr(MaterializePackExpr *E) {
+    if (Expr *fromExpr = doIt(E->getFromExpr())) {
+      E->setFromExpr(fromExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
@@ -1297,12 +1340,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-    ArgumentList *args = nullptr;
-    if (E->getArgs()) {
-      args = doIt(E->getArgs());
-      if (!args) return nullptr;
+    bool shouldWalkArguments, shouldWalkExpansion;
+    std::tie(shouldWalkArguments, shouldWalkExpansion) =
+        Walker.shouldWalkMacroArgumentsAndExpansion();
+
+    if (auto *substituteDecl = E->getSubstituteDecl()) {
+      if (doIt(substituteDecl))
+        return nullptr;
+      // Visiting the substitute macro expansion decl will visit the same
+      // argument list. Skip visiting it again.
+      shouldWalkArguments = false;
     }
-    if (Walker.shouldWalkMacroExpansions()) {
+
+    if (shouldWalkArguments && E->getArgs()) {
+      ArgumentList *args = doIt(E->getArgs());
+      if (!args) return nullptr;
+      E->setArgs(args);
+    }
+
+    if (shouldWalkExpansion) {
       Expr *rewritten = nullptr;
       if (E->getRewritten()) {
         rewritten = doIt(E->getRewritten());
@@ -1310,7 +1366,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       E->setRewritten(rewritten);
     }
-    E->setArgs(args);
     return E;
   }
 
@@ -1338,7 +1393,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   template <typename T>
   using PostWalkResult = ASTWalker::PostWalkResult<T>;
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool traverse(PreWalkAction Pre, llvm::function_ref<bool(void)> VisitChildren,
                 llvm::function_ref<PostWalkAction(void)> WalkPost) {
     switch (Pre.Action) {
@@ -1361,7 +1416,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   template <typename T>
-  LLVM_NODISCARD
+  [[nodiscard]]
   T *traverse(PreWalkResult<T *> Pre,
               llvm::function_ref<T *(T *)> VisitChildren,
               llvm::function_ref<PostWalkResult<T *>(T *)> WalkPost) {
@@ -1390,7 +1445,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     llvm_unreachable("Unhandled case in switch!");
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool visitParameterList(ParameterList *PL) {
     return traverse(
         Walker.walkToParameterListPre(PL),
@@ -1408,7 +1463,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Expr *doIt(Expr *E) {
     return traverse<Expr>(
         Walker.walkToExprPre(E),
@@ -1416,7 +1471,7 @@ public:
         [&](Expr *E) { return Walker.walkToExprPost(E); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Stmt *doIt(Stmt *S) {
     return traverse<Stmt>(
         Walker.walkToStmtPre(S),
@@ -1425,7 +1480,8 @@ public:
   }
   
   bool shouldSkip(Decl *D) {
-    if (!Walker.shouldWalkMacroExpansions() && D->isInGeneratedBuffer())
+    if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
+        D->isInGeneratedBuffer())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -1447,7 +1503,7 @@ public:
   }
 
   /// Returns true on failure.
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(Decl *D) {
     if (shouldSkip(D))
       return false;
@@ -1458,7 +1514,7 @@ public:
         [&]() { return Walker.walkToDeclPost(D); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   Pattern *doIt(Pattern *P) {
     return traverse<Pattern>(
         Walker.walkToPatternPre(P),
@@ -1466,7 +1522,7 @@ public:
         [&](Pattern *P) { return Walker.walkToPatternPost(P); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
@@ -1507,7 +1563,7 @@ public:
   }
 
   /// Returns true on failure.
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(TypeRepr *T) {
     return traverse(
         Walker.walkToTypeReprPre(T),
@@ -1515,7 +1571,7 @@ public:
         [&]() { return Walker.walkToTypeReprPost(T); });
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(RequirementRepr &Req) {
     switch (Req.getKind()) {
     case RequirementReprKind::SameType:
@@ -1534,7 +1590,7 @@ public:
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool doIt(GenericParamList *GPL) {
     // Visit generic params
     for (auto &P : GPL->getParams()) {
@@ -1551,7 +1607,7 @@ public:
     return false;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ArgumentList *visit(ArgumentList *ArgList) {
     for (auto Idx : indices(*ArgList)) {
       auto *E = doIt(ArgList->getExpr(Idx));
@@ -1561,7 +1617,7 @@ public:
     return ArgList;
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ArgumentList *doIt(ArgumentList *ArgList) {
     return traverse<ArgumentList>(
         Walker.walkToArgumentListPre(ArgList),
@@ -1594,6 +1650,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   if (Expr *E = doIt(TS->getSubExpr())) {
     TS->setSubExpr(E);
     return TS;
+  }
+  return nullptr;
+}
+
+Stmt *Traversal::visitForgetStmt(ForgetStmt *FS) {
+  if (Expr *E = doIt(FS->getSubExpr())) {
+    FS->setSubExpr(E);
+    return FS;
   }
   return nullptr;
 }
@@ -1939,8 +2003,8 @@ Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
 Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   // If the pattern has been type-checked, walk the match expression, which
   // includes the explicit subexpression.
-  if (P->getMatchExpr()) {
-    if (Expr *newMatch = doIt(P->getMatchExpr())) {
+  if (auto *match = P->getCachedMatchExpr()) {
+    if (Expr *newMatch = doIt(match)) {
       P->setMatchExpr(newMatch);
       return P;
     }
@@ -2069,15 +2133,7 @@ bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
   return doIt(T->getBase());
 }
 
-bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
-bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
-  return doIt(T->getBase());
-}
-
-bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
+bool Traversal::visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
   return doIt(T->getBase());
 }
 

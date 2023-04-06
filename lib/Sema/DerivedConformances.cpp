@@ -334,8 +334,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // Actor.unownedExecutor
-    if (name.isSimpleName(ctx.Id_unownedExecutor))
+    if (name.isSimpleName(ctx.Id_unownedExecutor)) {
       return getRequirement(KnownProtocolKind::Actor);
+    }
 
     // DistributedActor.id
     if (name.isSimpleName(ctx.Id_id))
@@ -344,6 +345,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // DistributedActor.actorSystem
     if (name.isSimpleName(ctx.Id_actorSystem))
       return getRequirement(KnownProtocolKind::DistributedActor);
+
+    // DistributedActor.localUnownedExecutor
+    if (name.isSimpleName(ctx.Id_localUnownedExecutor)) {
+      return getRequirement(KnownProtocolKind::DistributedActor);
+    }
 
     return nullptr;
   }
@@ -519,7 +525,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
   getterDecl->copyFormalAccessFrom(property);
 
-
   return getterDecl;
 }
 
@@ -670,6 +675,36 @@ GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(), true);
   return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, falseExpr);
 }
+/// Returns a generated guard statement that checks whether the given expr is true.
+/// If it is false, the else block for the guard returns `nil`.
+/// \p C The AST context.
+/// \p testExpr The expression that should be tested.
+/// \p baseType The wrapped type of the to-be-returned Optional<Wrapped>.
+GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
+                                        Expr *testExpr,
+                                        Type optionalWrappedType) {
+  auto nilExpr = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
+  nilExpr->setType(optionalWrappedType->wrapInOptionalType());
+
+  SmallVector<StmtConditionElement, 1> conditions;
+  SmallVector<ASTNode, 1> statements;
+
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  statements.push_back(returnStmt);
+
+  // Next, generate the condition being checked.
+//  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
+//      DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
+//      DeclNameLoc());
+//  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
+//      /*implicit*/ true);
+  conditions.emplace_back(testExpr);
+
+  // Build and return the complete guard statement.
+  // guard lhs == rhs else { return lhs < rhs }
+  auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
+  return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
+}
 /// Returns a generated guard statement that checks whether the given lhs and
 /// rhs expressions are equal. If not equal, the else block for the guard
 /// returns lhs < rhs.
@@ -737,7 +772,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     // generate: case .<Case>:
     auto pat = new (C)
         EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(), elt, nullptr);
+                           DeclNameLoc(), DeclNameRef(), elt, nullptr,
+                           /*DC*/ funcDecl);
     pat->setImplicit();
     pat->setType(enumType);
 
@@ -854,8 +890,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
 
       auto namedPattern = new (C) NamedPattern(payloadVar);
       namedPattern->setImplicit();
-      auto letPattern =
-          BindingPattern::createImplicit(C, /*isLet*/ true, namedPattern);
+      auto letPattern = BindingPattern::createImplicit(
+          C, VarDecl::Introducer::Let, namedPattern);
       elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
                                                 SourceLoc(), letPattern));
     }
@@ -874,8 +910,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
 
   auto namedPattern = new (C) NamedPattern(payloadVar);
   namedPattern->setImplicit();
-  auto letPattern =
-      new (C) BindingPattern(SourceLoc(), /*isLet*/ true, namedPattern);
+  auto letPattern = new (C)
+      BindingPattern(SourceLoc(), VarDecl::Introducer::Let, namedPattern);
   return ParenPattern::createImplicit(C, letPattern);
 }
 

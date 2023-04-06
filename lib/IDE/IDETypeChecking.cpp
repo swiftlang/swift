@@ -344,16 +344,30 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             return type;
           },
           LookUpConformanceInModule(M));
-        if (SubstReq.hasError())
+
+        SmallVector<Requirement, 2> subReqs;
+        switch (SubstReq.checkRequirement(subReqs)) {
+        case CheckRequirementResult::Success:
+          break;
+
+        case CheckRequirementResult::ConditionalConformance:
+          // FIXME: Need to handle conditional requirements here!
+          break;
+
+        case CheckRequirementResult::PackRequirement:
+          // FIXME
+          assert(false && "Refactor this");
           return true;
 
-        // FIXME: Need to handle conditional requirements here!
-        ArrayRef<Requirement> conditionalRequirements;
-        if (!SubstReq.isSatisfied(conditionalRequirements)) {
+        case CheckRequirementResult::SubstitutionFailure:
+          return true;
+
+        case CheckRequirementResult::RequirementFailure:
           if (!SubstReq.canBeSatisfied())
             return true;
 
           MergeInfo.addRequirement(Req);
+          break;
         }
       }
       return false;

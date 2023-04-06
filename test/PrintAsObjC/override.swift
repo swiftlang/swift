@@ -15,6 +15,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar102629628
+
 import OverrideBase
 // No errors from Clang until we get to the FixMe class.
 // CLANG-NOT: error

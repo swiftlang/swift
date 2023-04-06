@@ -1726,8 +1726,8 @@
       key.column: 1,
       key.filepath: main.swift,
       key.severity: source.diagnostic.severity.error,
-      key.id: "destructor_decl_outside_class",
-      key.description: "deinitializers may only be declared within a class or actor",
+      key.id: "destructor_decl_outside_class_or_noncopyable",
+      key.description: "deinitializers may only be declared within a class, actor, or noncopyable type",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     }
   ]

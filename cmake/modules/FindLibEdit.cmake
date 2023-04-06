@@ -61,9 +61,9 @@ else()
                                       LibEdit_VERSION_STRING)
 endif()
 
-if(LibEdit_FOUND AND NOT TARGET libedit)
-  add_library(libedit UNKNOWN IMPORTED)
-  set_target_properties(libedit PROPERTIES
+if(LibEdit_FOUND AND NOT TARGET LibEdit::LibEdit)
+  add_library(LibEdit::LibEdit UNKNOWN IMPORTED)
+  set_target_properties(LibEdit::LibEdit PROPERTIES
     IMPORTED_LOCATION ${LibEdit_LIBRARIES}
     INTERFACE_INCLUDE_DIRECTORIES ${LibEdit_INCLUDE_DIRS})
 endif()

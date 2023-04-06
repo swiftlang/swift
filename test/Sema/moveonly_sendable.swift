@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -strict-concurrency=complete -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
 
 // REQUIRES: concurrency
 

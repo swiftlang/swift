@@ -955,3 +955,13 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // allocation methods because they may have been overridden.
   return theClass->getObjectModel() == ReferenceCounting::ObjC;
 }
+
+bool Lowering::shouldSkipLowering(Decl *D) {
+  if (D->getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+      UnavailableDeclOptimization::Complete)
+    return false;
+
+  // Unavailable declarations should be skipped if
+  // -unavailable-decl-optimization=complete is specified.
+  return D->getSemanticUnavailableAttr() != None;
+}

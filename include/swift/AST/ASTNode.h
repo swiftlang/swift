@@ -107,6 +107,19 @@ namespace llvm {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
   };
+
+  // A ASTNode is "pointer like".
+  template <>
+  struct PointerLikeTypeTraits<ASTNode> {
+  public:
+    static inline void *getAsVoidPointer(ASTNode N) {
+      return (void *)N.getOpaqueValue();
+    }
+    static inline ASTNode getFromVoidPointer(void *P) {
+      return ASTNode::getFromOpaqueValue(P);
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+  };
 }
 
 #endif // LLVM_SWIFT_AST_AST_NODE_H

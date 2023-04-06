@@ -2229,7 +2229,7 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(@_noImplicitCo
 
 func moveOperatorTest(_ k: __owned Klass) {
     @_noImplicitCopy let k2 = k // expected-error {{'k2' consumed more than once}}
-    @_noImplicitCopy let k3 = _move k2 // expected-note {{consuming use here}}
-    let _ = _move k2 // expected-note {{consuming use here}}
+    @_noImplicitCopy let k3 = consume k2 // expected-note {{consuming use here}}
+    let _ = consume k2 // expected-note {{consuming use here}}
     let _ = k3
 }

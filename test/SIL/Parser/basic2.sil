@@ -64,20 +64,20 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK:  debug_value [moved] %0 : $Builtin.NativeObject
+// CHECK:  debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
 // CHECK:  debug_value [poison] %0 : $Builtin.NativeObject
-// CHECK:  debug_value [poison] [moved] %0 : $Builtin.NativeObject
-// CHECK:  debug_value [poison] [moved] %0 : $Builtin.NativeObject
-// CHECK:  alloc_stack [moved] $Builtin.NativeObject
+// CHECK:  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
+// CHECK:  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
+// CHECK:  alloc_stack [moveable_value_debuginfo] $Builtin.NativeObject
 // CHECK: } // end sil function 'test_debug_value_alloc_stack_moved'
 sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  debug_value [moved] %0 : $Builtin.NativeObject
+  debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
   debug_value [poison] %0 : $Builtin.NativeObject
-  debug_value [moved] [poison] %0 : $Builtin.NativeObject
-  debug_value [poison] [moved] %0 : $Builtin.NativeObject
+  debug_value [moveable_value_debuginfo] [poison] %0 : $Builtin.NativeObject
+  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
 
-  %1 = alloc_stack [moved] $Builtin.NativeObject
+  %1 = alloc_stack [moveable_value_debuginfo] $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
 
   destroy_value %0 : $Builtin.NativeObject
@@ -127,6 +127,17 @@ bb0(%0 : @owned $Builtin.NativeObject):
   dealloc_stack %3 : $*Builtin.NativeObject
   dealloc_stack %2 : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_allocbox_moveable_value_debuginfo_flag : $@convention(thin) () -> () {
+// CHECK: alloc_box [moveable_value_debuginfo] ${ var Builtin.NativeObject }
+// CHECK: } // end sil function 'test_allocbox_moveable_value_debuginfo_flag'
+sil [ossa] @test_allocbox_moveable_value_debuginfo_flag : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box [moveable_value_debuginfo] ${ var Builtin.NativeObject }
+  dealloc_box %0 : ${ var Builtin.NativeObject }
   %9999 = tuple()
   return %9999 : $()
 }

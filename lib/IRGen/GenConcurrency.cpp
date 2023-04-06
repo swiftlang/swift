@@ -43,7 +43,8 @@ public:
   ExecutorTypeInfo(llvm::StructType *storageType,
                    Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
-                                  align, IsPOD, IsFixedSize) {}
+                                  align, IsTriviallyDestroyable,
+                                  IsCopyable, IsFixedSize) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -60,7 +61,7 @@ public:
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -158,7 +159,7 @@ void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
 void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                                llvm::Value *executor,
                                                CanType executorType,
-                                       ProtocolConformanceRef executorConf,
+                                               ProtocolConformanceRef executorConf,
                                                Explosion &out) {
   // The implementation word of an "ordinary" serial executor is
   // just the witness table pointer with no flags set.
@@ -167,6 +168,31 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
   llvm::Value *impl =
     emitWitnessTableRef(IGF, executorType, executorConf);
   impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  out.add(identity);
+  out.add(impl);
+}
+
+void irgen::emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
+                                               llvm::Value *executor,
+                                               CanType executorType,
+                                               ProtocolConformanceRef executorConf,
+                                               Explosion &out) {
+  llvm::Value *identity =
+    IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+
+  // The implementation word of an "complex equality" serial executor is
+  // the witness table pointer with the ExecutorKind::ComplexEquality flag set.
+  llvm::Value *impl =
+    emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  // NOTE: Refer to ExecutorRef::ExecutorKind for the flag values.
+  llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
+  auto complexEqualityExecutorKindFlag =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      0b01));
+  impl = IGF.Builder.CreateOr(impl, complexEqualityExecutorKindFlag);
 
   out.add(identity);
   out.add(impl);

@@ -45,8 +45,11 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/BLAKE3.h"
+#include "llvm/Support/HashingOutputBackend.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 #include <memory>
 
@@ -380,6 +383,10 @@ public:
   /// imported.
   bool shouldImportSwiftStringProcessing() const;
 
+  /// Whether the Swift Backtracing support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftBacktracing() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
@@ -453,6 +460,13 @@ class CompilerInstance {
   /// instance has completed its setup, this will be null.
   std::unique_ptr<UnifiedStatsReporter> Stats;
 
+  /// Virtual OutputBackend.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend = nullptr;
+
+  /// The verification output backend.
+  using HashBackendTy = llvm::vfs::HashingOutputBackend<llvm::BLAKE3>;
+  llvm::IntrusiveRefCntPtr<HashBackendTy> HashBackend;
+
   mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoaderBase *DefaultSerializedLoader = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
@@ -502,6 +516,16 @@ public:
   void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
     SourceMgr.setFileSystem(FS);
   }
+
+  llvm::vfs::OutputBackend &getOutputBackend() const {
+    return *OutputBackend;
+  }
+  void
+  setOutputBackend(llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
+    OutputBackend = std::move(Backend);
+  }
+  using HashingBackendPtrTy = llvm::IntrusiveRefCntPtr<HashBackendTy>;
+  HashingBackendPtrTy getHashingBackend() { return HashBackend; }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -575,6 +599,14 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
 
+  /// Verify that if an implicit import of the `Backtracing` module if
+  /// expected, it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitBacktracingImport();
+
+  /// Whether the Swift Backtracing support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftBacktracing() const;
+
   /// Whether the CxxShim library can be imported
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
@@ -617,6 +649,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
+  void setupOutputBackend();
 
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();

@@ -252,15 +252,32 @@ extension CheckedContinuation {
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with a checked continuation for the current task.
+/// Invokes the passed in closure with a checked continuation for the current task.
+///
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, which will them resume suspended task.
+///
+/// You must invoke the continuation's `resume` method exactly once.
+///
+/// Missing to invoke it (eventually) will cause the calling task to remain suspended
+/// indefinitely which will result in the task "hanging" as well as being leaked with
+/// no possibility to destroy it.
+///
+/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// to it, without having resumed it will trigger a warning. Resuming a continuation twice
+/// is also diagnosed and will cause a crash.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes a `CheckedContinuation` parameter.
-///     You must resume the continuation exactly once.
+/// - Returns: The value continuation is resumed with.
+///
+/// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
+/// - SeeAlso: `withUnsafeContinuation(function:_:)`
+/// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable
@@ -273,18 +290,34 @@ public func withCheckedContinuation<T>(
   }
 }
 
-/// Suspends the current task,
-/// then calls the given closure with a checked throwing continuation for the current task.
+/// Invokes the passed in closure with a checked continuation for the current task.
+///
+/// The body of the closure executes synchronously on the calling task, and once it returns
+/// the calling task is suspended. It is possible to immediately resume the task, or escape the
+/// continuation in order to complete it afterwards, which will them resume suspended task.
+///
+/// If `resume(throwing:)` is called on the continuation, this function throws that error.
+///
+/// You must invoke the continuation's `resume` method exactly once.
+///
+/// Missing to invoke it (eventually) will cause the calling task to remain suspended
+/// indefinitely which will result in the task "hanging" as well as being leaked with
+/// no possibility to destroy it.
+///
+/// The checked continuation offers detection of mis-use, and dropping the last reference
+/// to it, without having resumed it will trigger a warning. Resuming a continuation twice
+/// is also diagnosed and will cause a crash.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes a `CheckedContinuation` parameter.
-///     You must resume the continuation exactly once.
+/// - Returns: The value continuation is resumed with.
 ///
-/// If `resume(throwing:)` is called on the continuation,
-/// this function throws that error.
+/// - SeeAlso: `withCheckedContinuation(function:_:)`
+/// - SeeAlso: `withUnsafeContinuation(function:_:)`
+/// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable

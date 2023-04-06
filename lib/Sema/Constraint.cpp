@@ -526,6 +526,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     case OverloadChoiceKind::TupleIndex:
       Out << "tuple index " << overload.getTupleIndex();
       break;
+    case OverloadChoiceKind::MaterializePack:
+      Out << "materialize pack";
+      break;
     case OverloadChoiceKind::KeyPathApplication:
       Out << "key path application";
       break;
@@ -653,6 +656,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[protocol-metatype-to-object]";
   case ConversionRestrictionKind::ArrayToPointer:
     return "[array-to-pointer]";
+  case ConversionRestrictionKind::ArrayToCPointer:
+    return "[array-to-c-pointer]";
   case ConversionRestrictionKind::StringToPointer:
     return "[string-to-pointer]";
   case ConversionRestrictionKind::InoutToPointer:

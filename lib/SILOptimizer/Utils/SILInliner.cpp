@@ -336,8 +336,8 @@ protected:
     // For performance inlining return the original location.
     if (IKind == InlineKind::PerformanceInline)
       return InLoc;
-    // Inlined location wraps the call site that is being inlined, regardless
-    // of the input location.
+    // Inlined location wraps the call site that is being inlined, regardless of
+    // the input location.
     return Loc;
   }
 
@@ -877,6 +877,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::TestSpecificationInst:

@@ -78,6 +78,7 @@ LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins", true)
 LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
 LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
+LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
@@ -93,33 +94,45 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 LANGUAGE_FEATURE(BuiltinIntLiteralAccessors, 368, "Builtin.IntLiteral accessors", true)
-LANGUAGE_FEATURE(
-    FreestandingExpressionMacros, 0, "@freestanding(expression) macros",
-    langOpts.hasFeature(Feature::Macros))
+LANGUAGE_FEATURE(Macros, 0, "Macros", hasSwiftSwiftParser)
+SUPPRESSIBLE_LANGUAGE_FEATURE(
+    FreestandingExpressionMacros, 382, "Expression macros",
+        hasSwiftSwiftParser)
+LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
+LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
+LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 6)
+UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(VariadicGenerics, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
-EXPERIMENTAL_FEATURE(MoveOnly, true)
+EXPERIMENTAL_FEATURE(FreestandingMacros, true)
+EXPERIMENTAL_FEATURE(CodeItemMacros, true)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
 // tests in non-asserts builds too.
 EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
+EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
+EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
+EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
+
 EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
+EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Whether to enable experimental layout string value witnesses
 EXPERIMENTAL_FEATURE(LayoutStringValueWitnesses, true)
+EXPERIMENTAL_FEATURE(LayoutStringValueWitnessesInstantiation, true)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
@@ -158,9 +171,6 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
-/// Enable the experimental macros feature.
-EXPERIMENTAL_FEATURE(Macros, true)
-
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
@@ -173,6 +183,15 @@ EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
 /// Swift types and C++ methods as symbolic functions with blank
 /// signatures.
 EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
+
+/// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
+EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
+
+/// Enable reference bindings.
+EXPERIMENTAL_FEATURE(ReferenceBindings, false)
+
+/// Enable the explicit 'import Builtin' and allow Builtin usage.
+EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -14,13 +14,11 @@ class A {
   }
 }
 
-// TEST_A: Begin completions
 // TEST_A-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#A#]{{; name=.+$}}
 // TEST_A-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#double: Double#})[#A#]{{; name=.+$}}
 // TEST_A-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_A-DAG: Keyword[self]/CurrNominal:          .self[#A.Type#]; name=self
 // TEST_A-DAG: Keyword/CurrNominal:                .Type[#A.Type#]; name=Type
-// TEST_A: End completions
 
 class B : A {
   var x = 0
@@ -28,13 +26,11 @@ class B : A {
   // A's complete object initializers are inherited.
 }
 
-// TEST_B: Begin completions
 // TEST_B-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#B#]{{; name=.+$}}
 // TEST_B-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#double: Double#})[#B#]{{; name=.+$}}
 // TEST_B-DAG: Decl[Constructor]/Super/Flair[ArgLabels]:            ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_B-DAG: Keyword[self]/CurrNominal:          .self[#B.Type#]; name=self
 // TEST_B-DAG: Keyword/CurrNominal: .Type[#B.Type#]; name=Type
-// TEST_B: End completions
 
 class C : B {
   init(int i: Int) {
@@ -46,12 +42,10 @@ class C : B {
   // No initializers are inherited.
 }
 
-// TEST_C: Begin completions
 // TEST_C-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#C#]{{; name=.+$}}
 // TEST_C-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_C-DAG: Keyword[self]/CurrNominal:          .self[#C.Type#]; name=self
 // TEST_C-DAG: Keyword/CurrNominal:                .Type[#C.Type#]; name=Type
-// TEST_C: End completions
 
 class D : C {
   var y = 0
@@ -64,13 +58,11 @@ class D : C {
   }
 }
 
-// TEST_D: Begin completions
 // TEST_D-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#d: D#})[#D#]{{; name=.+$}}
 // TEST_D-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#D#]{{; name=.+$}}
 // TEST_D-DAG: Decl[Constructor]/Super/Flair[ArgLabels]:            ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_D-DAG: Keyword[self]/CurrNominal:          .self[#D.Type#]; name=self
 // TEST_D-DAG: Keyword/CurrNominal:                .Type[#D.Type#]; name=Type
-// TEST_D: End completions
 
 // TEST_D_DOT: Decl[Constructor]/CurrNominal:       init({#d: D#})[#D#]; name=init(d:)
 // TEST_D_DOT-DAG: Decl[Constructor]/CurrNominal:  init({#int: Int#})[#D#]; name=init(int:)
@@ -107,9 +99,7 @@ class R74233797Derived : R74233797Base {
 }
 func testR74233797() {
     R74233797Derived(#^METATYPE_CONVERSION^#)
-// METATYPE_CONVERSION: Begin completions
 // METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#sub: Bool#}[')'][#R74233797Derived#];
 // METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#R74233797Derived#];
 // METATYPE_CONVERSION-DAG: Decl[Constructor]/Super/Flair[ArgLabels]: ['(']{#(test): Bool#}[')'][#R74233797Base#];
-// METATYPE_CONVERSION: End completions
 }

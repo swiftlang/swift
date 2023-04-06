@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -107,15 +107,21 @@ extension SomeActor {
 // -----------------------------------------------------------------------
 
 @globalActor
-private struct PrivateGA { // expected-note 2 {{type declared here}}
+private struct PrivateGA { // expected-note 3 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
 }
 
 @globalActor
-internal struct InternalGA { // expected-note 1 {{type declared here}}
+internal struct InternalGA { // expected-note 2 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
+}
+
+@globalActor
+package struct PackageGA { // expected-note 1 {{type declared here}}
+  package actor Actor {}
+  package static let shared = Actor()
 }
 
 @globalActor
@@ -126,12 +132,20 @@ public struct PublicGA {
 
 @PrivateGA private struct PrivateStructPrivateGA {}
 @InternalGA private struct PrivateStructInternalGA {}
+@PackageGA private struct PrivateStructPackageGA {}
 @PublicGA private struct PrivateStructPublicGA {}
 
 @PrivateGA internal struct InternalStructPrivateGA {} // expected-error {{internal struct 'InternalStructPrivateGA' cannot have private global actor 'PrivateGA'}}
 @InternalGA internal struct InternalStructInternalGA {}
+@PackageGA internal struct InternalStructPackageGA {}
 @PublicGA internal struct InternalStructPublicGA {}
+
+@PrivateGA package class PackageClassPrivateGA {} // expected-error {{package class 'PackageClassPrivateGA' cannot have private global actor 'PrivateGA'}}
+@InternalGA package class PackageClassInternalGA {} // expected-error {{package class 'PackageClassInternalGA' cannot have internal global actor 'InternalGA'}}
+@PackageGA package struct PackageClassPackageGA {}
+@PublicGA package class PackageClassPublicGA {}
 
 @PrivateGA open class OpenClassPrivateGA {} // expected-error {{open class 'OpenClassPrivateGA' cannot have private global actor 'PrivateGA'}}
 @InternalGA open class OpenClassInternalGA {} // expected-error {{open class 'OpenClassInternalGA' cannot have internal global actor 'InternalGA'}}
+@PackageGA open class OpenClassPackageGA {} // expected-error {{open class 'OpenClassPackageGA' cannot have package global actor 'PackageGA'}}
 @PublicGA open class OpenClassPublicGA {}
