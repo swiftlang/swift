@@ -9,6 +9,7 @@
 
 // Execution testing
 // RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature FreestandingMacros -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 @freestanding(codeItem)

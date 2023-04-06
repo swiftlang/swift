@@ -9,6 +9,7 @@
 
 // Execution testing
 // RUN: %target-build-swift -g -swift-version 5 -enable-experimental-feature FreestandingMacros -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) %s %S/Inputs/top_level_freestanding_other.swift -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // Test unqualified lookup from within a macro expansion
