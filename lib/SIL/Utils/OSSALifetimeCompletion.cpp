@@ -129,7 +129,7 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
       changed = true;
     }
     for (auto *successor : block->getSuccessorBlocks()) {
-      deadEndBlocks.push(successor);
+      deadEndBlocks.pushIfNotVisited(successor);
     }
   }
   return changed;
