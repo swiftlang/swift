@@ -3835,6 +3835,8 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
+    /// Whether to exclude members of macro expansions.
+    ExcludeMacroExpansions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type

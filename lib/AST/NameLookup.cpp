@@ -1713,13 +1713,24 @@ void NominalTypeDecl::prepareLookupTable() {
 }
 
 static TinyPtrVector<ValueDecl *>
-maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
-                             DeclName name,
-                             bool includeAttrImplements) {
-  if (includeAttrImplements)
+maybeFilterOutUnwantedDecls(TinyPtrVector<ValueDecl *> decls,
+                            DeclName name,
+                            bool includeAttrImplements,
+                            bool excludeMacroExpansions) {
+  if (includeAttrImplements && !excludeMacroExpansions)
     return decls;
   TinyPtrVector<ValueDecl*> result;
   for (auto V : decls) {
+    // If we're supposed to exclude anything that comes from a macro expansion,
+    // check whether the source location of the declaration is in a macro
+    // expansion, and skip this declaration if it does.
+    if (excludeMacroExpansions) {
+      auto sourceFile =
+          V->getModuleContext()->getSourceFileContainingLocation(V->getLoc());
+      if (sourceFile && sourceFile->Kind == SourceFileKind::MacroExpansion)
+        continue;
+    }
+
     // Filter-out any decl that doesn't have the name we're looking for
     // (asserting as a consistency-check that such entries all have
     // @_implements attrs for the name!)
@@ -1755,12 +1766,16 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                                           decl->hasLazyMembers());
   const bool includeAttrImplements =
       flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
+  const bool excludeMacroExpansions =
+      flags.contains(NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions);
 
   LLVM_DEBUG(llvm::dbgs() << decl->getNameStr() << ".lookupDirect("
                           << name << ")"
                           << ", hasLazyMembers()=" << decl->hasLazyMembers()
                           << ", useNamedLazyMemberLoading="
                           << useNamedLazyMemberLoading
+                          << ", excludeMacroExpansions="
+                          << excludeMacroExpansions
                           << "\n");
 
   decl->prepareLookupTable();
@@ -1797,8 +1812,9 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       if (!allFound.empty()) {
         auto known = Table.find(name);
         if (known != Table.end()) {
-          auto swiftLookupResult = maybeFilterOutAttrImplements(
-              known->second, name, includeAttrImplements);
+          auto swiftLookupResult = maybeFilterOutUnwantedDecls(
+              known->second, name, includeAttrImplements,
+              excludeMacroExpansions);
           for (auto foundSwiftDecl : swiftLookupResult) {
             allFound.push_back(foundSwiftDecl);
           }
@@ -1828,7 +1844,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   DeclName macroExpansionKey = adjustLazyMacroExpansionNameKey(ctx, name);
-  if (!Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
+  if (!excludeMacroExpansions &&
+      !Table.isLazilyCompleteForMacroExpansion(macroExpansionKey)) {
     populateLookupTableEntryFromMacroExpansions(
         ctx, Table, macroExpansionKey, decl);
     for (auto ext : decl->getExtensions()) {
@@ -1845,8 +1862,9 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   // We found something; return it.
-  return maybeFilterOutAttrImplements(known->second, name,
-                                      includeAttrImplements);
+  return maybeFilterOutUnwantedDecls(known->second, name,
+                                     includeAttrImplements,
+                                     excludeMacroExpansions);
 }
 
 bool NominalTypeDecl::createObjCMethodLookup() {
@@ -2201,6 +2219,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
     if (options & NL_IncludeAttributeImplements)
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
+    if (options & NL_ExcludeMacroExpansions)
+      flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
     for (auto decl : current->lookupDirect(member.getFullName(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
