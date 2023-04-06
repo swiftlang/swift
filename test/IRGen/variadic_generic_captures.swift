@@ -9,7 +9,7 @@ public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
   return { _ = (repeat each T).self }
 }
 
-// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc { i8*, %swift.refcounted* } @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlF"(%swift.opaque** noalias nocapture %0, i64 %1, %swift.type** %T) #0 {
+// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc { i8*, %swift.refcounted* } @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlF"(%swift.opaque** noalias nocapture %0, i{{32|64}} %1, %swift.type** %T) #0 {
 // CHECK: [[CONTEXT0:%.*]] = call noalias %swift.refcounted* @swift_allocObject(
 // CHECK: [[CONTEXT:%.*]] = bitcast %swift.refcounted* [[CONTEXT0]] to <{{.*}}>*
 
@@ -45,7 +45,7 @@ public func has_metadata_pack_noescape<each T>(t: repeat each T) {
   takesNoEscape { _ = (repeat each T).self }
 }
 
-// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlF"(%swift.opaque** noalias nocapture %0, i64 %1, %swift.type** %T) #0 {
+// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlF"(%swift.opaque** noalias nocapture %0, i{{32|64}} %1, %swift.type** %T) #0 {
 // CHECK: [[CONTEXT0:%.*]] = alloca i8, [[INT]]
 // CHECK: [[CONTEXT1:%.*]] = bitcast i8* [[CONTEXT0]] to %swift.opaque*
 // CHECK: [[CONTEXT:%.*]] = bitcast %swift.opaque* [[CONTEXT1]] to <{{.*}}>*
