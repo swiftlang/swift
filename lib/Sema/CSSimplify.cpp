@@ -2081,6 +2081,18 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
 
 namespace {
 
+static bool isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl()
+        .getLocator()
+        ->isLastElement<LocatorPathElt::PackExpansionType>();
+
+  return false;
+}
+
 class TupleMatcher {
   TupleType *tuple1;
   TupleType *tuple2;
@@ -2103,7 +2115,7 @@ public:
     // case too eventually.
     if (tuple1->containsPackExpansionType() ||
         tuple2->containsPackExpansionType()) {
-      TuplePackMatcher matcher(tuple1, tuple2);
+      TuplePackMatcher matcher(tuple1, tuple2, isPackExpansionType);
       if (matcher.match())
         return true;
 
@@ -2294,7 +2306,8 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   PackMatcher matcher(pack1->getElementTypes(), pack2->getElementTypes(),
-                      getASTContext());
+                      getASTContext(), isPackExpansionType);
+
   if (matcher.match())
     return getTypeMatchFailure(locator);
 
@@ -3347,7 +3360,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // case too eventually.
   if (AnyFunctionType::containsPackExpansionType(func1Params) ||
       AnyFunctionType::containsPackExpansionType(func2Params)) {
-    ParamPackMatcher matcher(func1Params, func2Params, getASTContext());
+    ParamPackMatcher matcher(func1Params, func2Params, getASTContext(),
+                             isPackExpansionType);
     if (matcher.match())
       return getTypeMatchFailure(locator);
 
@@ -13121,7 +13135,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
 
   // Match the opened generic parameters to the specialized arguments.
   auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
-  PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext());
+  PackMatcher matcher(openedGenericParams, specializedArgs, getASTContext(),
+                      isPackExpansionType);
   if (matcher.match())
     return SolutionKind::Error;
 
