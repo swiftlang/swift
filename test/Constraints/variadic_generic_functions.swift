@@ -21,7 +21,7 @@ func min<each T: Comparable>(_ values: repeat each T) -> (repeat each T)? {
 }
 
 func invalidPacks() {
-  func monovariadic1() -> (each String) {} // expected-error {{'each' cannot be applied to non-pack type 'String'}}
+  func monovariadic1() -> (each String) {} // expected-error {{'each' cannot be applied to non-pack type 'String'}}{{28-32=}}
   func monovariadic2<T>() -> (repeat T) {} // expected-error {{pack expansion 'T' must contain at least one pack reference}}
   func monovariadic3<T, U>() -> (T, repeat U) {} // expected-error {{pack expansion 'U' must contain at least one pack reference}}
 }

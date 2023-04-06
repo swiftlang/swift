@@ -331,3 +331,6 @@ func testFancyTuple_concrete() {
 func testFancyTuple_pack<each T>(values: repeat each T) {
   FancyTuple<Int, String, repeat each T, Bool>(x: (1, "hi", repeat each values, false)).makeTuple()
 }
+
+// rdar://107664237
+func f<each T>() -> (repeat Array<each T>) {}

@@ -1,5 +1,9 @@
 // REQUIRES: swift_swift_parser, executable_test
 
+// For _Concurrency.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking
@@ -14,6 +18,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
 
 // RUN: %target-build-swift -swift-version 5 -Xfrontend -disable-availability-checking -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library %s -o %t/main -module-name MacroUser -g
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s -check-prefix=CHECK-EXEC
 
 // Emit module while skipping function bodies
