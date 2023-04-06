@@ -174,6 +174,10 @@ class swift::SourceLookupCache {
 
   using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
   AuxiliaryDeclMap TopLevelAuxiliaryDecls;
+
+  /// Top-level macros that produce arbitrary names.
+  SmallVector<MissingDecl *, 4> TopLevelArbitraryMacros;
+
   SmallVector<Decl *, 4> MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
 
@@ -352,26 +356,46 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto attrConst : decl->getAttrs().getAttributes<CustomAttr>()) {
       auto *attr = const_cast<CustomAttr *>(attrConst);
       UnresolvedMacroReference macroRef(attr);
+      bool introducesArbitraryNames = false;
       namelookup::forEachPotentialResolvedMacro(
           decl->getDeclContext()->getModuleScopeContext(),
           macroRef.getMacroName(), MacroRole::Peer,
           [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            // First check for arbitrary names.
+            if (roleAttr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+              introducesArbitraryNames = true;
+            }
+
             macro->getIntroducedNames(MacroRole::Peer,
                                       dyn_cast<ValueDecl>(decl),
                                       introducedNames[attr]);
           });
+
+      // Record this macro where appropriate.
+      if (introducesArbitraryNames)
+        TopLevelArbitraryMacros.push_back(MissingDecl::forUnexpandedMacro(attr, decl));
     }
 
     if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
       UnresolvedMacroReference macroRef(med);
+      bool introducesArbitraryNames = false;
       namelookup::forEachPotentialResolvedMacro(
           decl->getDeclContext()->getModuleScopeContext(),
           macroRef.getMacroName(), MacroRole::Declaration,
           [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            // First check for arbitrary names.
+            if (roleAttr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+              introducesArbitraryNames = true;
+            }
+
             macro->getIntroducedNames(MacroRole::Declaration,
                                       /*attachedTo*/ nullptr,
                                       introducedNames[med]);
           });
+
+      // Record this macro where appropriate.
+      if (introducesArbitraryNames)
+        TopLevelArbitraryMacros.push_back(MissingDecl::forUnexpandedMacro(med, decl));
     }
 
     // Add macro-introduced names to the top-level auxiliary decl cache as
@@ -440,15 +464,30 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
     ? UniqueMacroNamePlaceholder
     : Name;
   auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
-  if (auxDecls == TopLevelAuxiliaryDecls.end())
+
+  // Check macro expansions that could produce this name.
+  SmallVector<MissingDecl *, 4> unexpandedDecls;
+  if (auxDecls != TopLevelAuxiliaryDecls.end()) {
+    unexpandedDecls.insert(
+      unexpandedDecls.end(), auxDecls->second.begin(), auxDecls->second.end());
+  }
+
+  // Check macro expansions that can produce arbitrary names.
+  unexpandedDecls.insert(
+      unexpandedDecls.end(),
+      TopLevelArbitraryMacros.begin(), TopLevelArbitraryMacros.end());
+
+  if (unexpandedDecls.empty())
     return;
 
-  for (auto *unexpandedDecl : auxDecls->second) {
-    // Add expanded peers and freestanding declarations to the result.
+  // Add matching expanded peers and freestanding declarations to the results.
+  SmallPtrSet<ValueDecl *, 4> macroExpandedDecls;
+  for (auto *unexpandedDecl : unexpandedDecls) {
     unexpandedDecl->forEachMacroExpandedDecl(
         [&](ValueDecl *decl) {
           if (decl->getName().matchesRef(Name)) {
-            Result.push_back(decl);
+            if (macroExpandedDecls.insert(decl).second)
+              Result.push_back(decl);
           }
         });
   }
