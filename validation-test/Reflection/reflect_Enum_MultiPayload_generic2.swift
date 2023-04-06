@@ -28,9 +28,6 @@ reflect(enum: SimplePayload1<ClassTypeA, Void>.a(ClassTypeA()))
 // CHECK-NEXT:   (tuple))
 
 // MemoryLayout<SimplePayload1<ClassTypeA, Void>> gives 9,8,16
-// SimplePayload1 is a BoundGenericTypeRef
-// It's getting laid out as a tagged MPE, not as an SPE
-// (an SPE would use the XIs of the ptr) XXXXXX OR WOULD IT???  Hmmmmm....
 
 // CHECK: Type info:
 // X64-NEXT: (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=254 bitwise_takable=1
@@ -62,8 +59,9 @@ reflect(enum: SimplePayload1<ClassTypeA, Void>.b(()))
 // X64-NEXT:     (reference kind=strong refcounting=native))
 // X64-NEXT:   (case name=b index=1 offset=0
 // X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
-// X64-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic214SimplePayload1OyAA10ClassTypeACytG
-// X64-NEXT: Demangled name: reflect_Enum_MultiPayload_generic2.SimplePayload1<reflect_Enum_MultiPayload_generic2.ClassTypeA, ()>
+
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic214SimplePayload1OyAA10ClassTypeACytG
+// CHECK-NEXT: Demangled name: reflect_Enum_MultiPayload_generic2.SimplePayload1<reflect_Enum_MultiPayload_generic2.ClassTypeA, ()>
 
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=b index=1

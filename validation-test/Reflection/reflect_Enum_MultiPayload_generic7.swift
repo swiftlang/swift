@@ -148,6 +148,7 @@ reflect(enum: B<Int>.c(()))
 reflect(enum: B<Void>.a(8))
 
 // CHECK: Reflecting an enum.
+
 // CHECK: Type info:
 // X64-NEXT: (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=253 bitwise_takable=1
 // X64-NEXT:   (case name=a index=0 offset=0

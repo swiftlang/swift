@@ -33,7 +33,7 @@ reflect(enum: SimplePayload1<ClassTypeA>.b(ClassTypeA()))
 
 // CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2147483645 bitwise_takable=1
-// X32-NEXT: FAIL XXX TODO XXX
+// X32-NEXT: (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
 // CHECK-NEXT:   (case name=b index=0 offset=0
 // CHECK-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-NEXT:   (case name=a index=1)
