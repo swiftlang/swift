@@ -160,6 +160,8 @@ enum class NameLookupFlags {
   IncludeOuterResults = 1 << 1,
   // Whether to include results that are marked @inlinable or @usableFromInline.
   IncludeUsableFromInline = 1 << 2,
+  /// This lookup should exclude any names introduced by macro expansions.
+  ExcludeMacroExpansions = 1 << 3,
 };
 
 /// A set of options that control name lookup.
