@@ -1467,6 +1467,9 @@ public:
   llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
+  llvm::DenseMap<PackExpansionType *, TypeVariableType *>
+      OpenedPackExpansionTypes;
+
   /// The pack expansion environment that can open pack elements for
   /// a given locator.
   llvm::DenseMap<ConstraintLocator *, std::pair<UUID, Type>>
@@ -2219,6 +2222,9 @@ private:
   llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
       OpenedExistentialTypes;
 
+  llvm::SmallMapVector<PackExpansionType *, TypeVariableType *, 4>
+      OpenedPackExpansionTypes;
+
   llvm::SmallMapVector<ConstraintLocator *, std::pair<UUID, Type>, 4>
       PackExpansionEnvironments;
 
@@ -2701,6 +2707,9 @@ public:
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
+
+    /// The length of \c OpenedPackExpansionsTypes.
+    unsigned numOpenedPackExpansionTypes;
 
     /// The length of \c PackExpansionEnvironments.
     unsigned numPackExpansionEnvironments;
@@ -3965,6 +3974,12 @@ private:
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
                       ConstraintLocatorBuilder locator);
+
+  /// "Open" a pack expansion type by replacing it with a type variable,
+  /// opening its pattern and shape types and connecting them to the
+  /// aforementioned variable via special constraints.
+  Type openPackExpansionType(PackExpansionType *expansion,
+                             OpenedTypeMap &replacements);
 
 public:
   /// Recurse over the given type and open any opaque archetype types.
