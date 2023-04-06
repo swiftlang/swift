@@ -5719,10 +5719,9 @@ public:
       auto substConformances = [&](CanType dependentType,
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
-        // FIXME: substitute back to the pack context to get the
-        // corresponding conformance pack, then project out the
-        // appropriate lane.
-        llvm_unreachable("unimplemented");
+        // FIXME: This violates the spirit of this verifier check.
+        return protocol->getParentModule()
+            ->lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,
