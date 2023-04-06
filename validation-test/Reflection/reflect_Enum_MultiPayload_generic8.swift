@@ -50,9 +50,7 @@ reflect(enum: A<Void>.a(S<Void>(t: ())) as A<Void>?)
 // X64-NEXT:         (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
 // X64-NEXT:   (case name=none index=1))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic81AOyytGSg
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic81AOyytGSg
 // CHECK-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic8.A<()>>
 
 // CHECK: Enum value:
@@ -97,7 +95,7 @@ reflect(enum: B<Int>.a(S<Void>(t: ())) as B<Int>?)
 // CHECK-NEXT:   (bound_generic_enum reflect_Enum_MultiPayload_generic8.B
 // CHECK-NEXT:     (struct Swift.Int)))
 
-// X64: Type info:
+// CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=10 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 // X64-NEXT:   (case name=some index=0 offset=0
 // X64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
@@ -115,9 +113,7 @@ reflect(enum: B<Int>.a(S<Void>(t: ())) as B<Int>?)
 // X64-NEXT:         (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
 // X64-NEXT:   (case name=none index=1))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic81BOySiGSg
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic81BOySiGSg
 // CHECK-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic8.B<Swift.Int>>
 
 // CHECK: Enum value:
