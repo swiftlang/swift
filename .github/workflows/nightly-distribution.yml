@@ -10,7 +10,7 @@ jobs:
         include:
           - branch: "swiftwasm"
             channel: "DEVELOPMENT"
-            targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
+            targets: "amazonlinux2_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
           - branch: "swiftwasm-release/5.3"
             channel: "5.3"
             targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
@@ -28,7 +28,7 @@ jobs:
             targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
           - branch: "swiftwasm-release/5.8"
             channel: "5.8"
-            targets: "amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
+            targets: "amazonlinux2_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 ubuntu22.04_x86_64 macos_x86_64 macos_arm64"
     steps:
       - uses: actions/checkout@v1
       - name: Setup keychain

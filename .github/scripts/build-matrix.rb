@@ -2,18 +2,19 @@ require "json"
 require "optparse"
 
 BASE_MATRIX_ENTRIES = [
-  {
-    "build_os": "ubuntu-18.04",
-    "agent_query": "ubuntu-18.04",
-    "target": "ubuntu18.04_x86_64",
-    "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-18.04",
-    "run_stdlib_test": true,
-    "run_full_test": false,
-    "run_e2e_test": true,
-    "build_hello_wasm": true,
-    "clean_build_dir": false,
-    "free_disk_space": true
-  },
+# DEPRECATED: GitHub Actions won't support Ubuntu 18.0.4 faimily anymore
+#  {
+#    "build_os": "ubuntu-18.04",
+#    "agent_query": "ubuntu-18.04",
+#    "target": "ubuntu18.04_x86_64",
+#    "container": "ghcr.io/swiftwasm/swift-ci:main-ubuntu-18.04",
+#    "run_stdlib_test": true,
+#    "run_full_test": false,
+#    "run_e2e_test": true,
+#    "build_hello_wasm": true,
+#    "clean_build_dir": false,
+#    "free_disk_space": true
+#  },
   {
     "build_os": "ubuntu-20.04",
     "agent_query": "ubuntu-20.04",
