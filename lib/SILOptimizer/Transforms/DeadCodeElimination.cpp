@@ -680,7 +680,8 @@ bool DCE::removeDead() {
         }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
         LLVM_DEBUG(Inst->dump());
-        LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "with jump to: BB" << postDom->getDebugID() << "\n");
 
         replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();
