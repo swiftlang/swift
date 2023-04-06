@@ -674,6 +674,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
+      case SILInstructionKind::MarkMustCheckInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));

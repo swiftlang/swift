@@ -40,7 +40,7 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 
 SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
-  SILType selfType = getLoweredLoadableType(selfDecl->getType());
+  SILType selfType = getLoweredType(selfDecl->getType());
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
   // If we have a move only type, then mark it with mark_must_check so we can't
