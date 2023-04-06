@@ -556,6 +556,9 @@ namespace swift {
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
+    /// All block list configuration files to be honored in this compilation.
+    std::vector<std::string> BlocklistConfigFilePath;
+
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }

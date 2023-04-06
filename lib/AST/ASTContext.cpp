@@ -713,9 +713,14 @@ ASTContext::ASTContext(
   registerNameLookupRequestFunctions(evaluator);
 
   createModuleToExecutablePluginMap();
+  
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
     OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+  // Insert all block list config paths.
+  for (auto path: langOpts.BlocklistConfigFilePath) {
+    blockListConfig.addConfigureFilePath(path);
+  }
 }
 
 ASTContext::~ASTContext() {
