@@ -8,6 +8,23 @@
 :: See https://swift.org/LICENSE.txt for license information
 :: See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+:: The build relies on build.ps1, which should not be called in a vs dev cmd
+if defined VSCMD_ARG_HOST_ARCH (
+  echo This script should not be called in a vs developer command prompt
+  echo Reeinvoking script in the default environment
+  set TEMP=%~dp0\..\..\tmp
+  echo set PYTHON_HOME=%PYTHON_HOME% > %TEMP%\call-build.cmd
+  echo set CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% >> %TEMP%\call-build.cmd
+  echo set SKIP_TESTS=%SKIP_TESTS% >> %TEMP%\call-build.cmd
+  echo set SKIP_PACKAGING=%SKIP_PACKAGING% >> %TEMP%\call-build.cmd
+  echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT% >> %TEMP%\call-build.cmd
+  echo set REPO_SCHEME=%REPO_SCHEME% >> %TEMP%\call-build.cmd
+  echo "%~f0" >> %TEMP%\call-build.cmd
+  start /i /b /wait cmd /env=default /c %TEMP%\call-build.cmd
+  del %TEMP%\call-build.cmd
+  exit /b
+)
+
 setlocal enableextensions enabledelayedexpansion
 path %PATH%;%PYTHON_HOME%
 
