@@ -758,6 +758,10 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
+  // The NamedReturnValueOptimization shouldn't be done before serialization.
+  // For details see the comment for `namedReturnValueOptimization`.
+  P.addNamedReturnValueOptimization();
+
   P.addDeadObjectElimination();
   P.addObjectOutliner();
   P.addDeadStoreElimination();

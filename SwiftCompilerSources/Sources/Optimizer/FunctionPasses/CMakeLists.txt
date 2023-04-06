@@ -14,6 +14,7 @@ swift_compiler_sources(Optimizer
   InitializeStaticGlobals.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift
+  NamedReturnValueOptimization.swift
   ReleaseDevirtualizer.swift
   SimplificationPasses.swift
   StackPromotion.swift
