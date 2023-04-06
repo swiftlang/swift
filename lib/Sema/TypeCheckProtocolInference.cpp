@@ -923,6 +923,10 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto gp : genericSig.getInnermostGenericParams()) {
+      // Packs cannot witness associated type requirements.
+      if (gp->isParameterPack())
+        continue;
+
       if (gp->getName() == assocType->getName())
         return AbstractTypeWitness(assocType, gp);
     }

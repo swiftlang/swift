@@ -1118,6 +1118,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         replacedInReq = syntheticEnv->mapTypeIntoContext(replacedInReq);
       }
 
+      if (auto packType = replacedInReq->getAs<PackType>()) {
+        if (auto unwrapped = packType->unwrapSingletonPackExpansion())
+          replacedInReq = unwrapped->getPatternType();
+      }
+
       cs->addConstraint(ConstraintKind::Bind, replacement.second, replacedInReq,
                         reqLocator);
     }

@@ -108,8 +108,12 @@ RequirementEnvironment::RequirementEnvironment(
       // invalid code.
       if (genericParam->getDepth() != 1)
         return Type();
-      auto substGenericParam = GenericTypeParamType::get(
+      Type substGenericParam = GenericTypeParamType::get(
           genericParam->isParameterPack(), depth, genericParam->getIndex(), ctx);
+      if (genericParam->isParameterPack()) {
+        substGenericParam = PackType::getSingletonPackExpansion(
+            substGenericParam);
+      }
       return substGenericParam;
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](

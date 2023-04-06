@@ -40,7 +40,9 @@ struct PackTypeParameterCollector: TypeWalker {
       if (auto parentType = boundGenericType->getParent())
         parentType.walk(*this);
 
-      Type(boundGenericType->getExpandedGenericArgsPack()).walk(*this);
+      for (auto type : boundGenericType->getExpandedGenericArgs())
+        type.walk(*this);
+
       return Action::SkipChildren;
     }
 
@@ -49,7 +51,9 @@ struct PackTypeParameterCollector: TypeWalker {
         if (auto parentType = typeAliasType->getParent())
           parentType.walk(*this);
 
-        Type(typeAliasType->getExpandedGenericArgsPack()).walk(*this);
+        for (auto type : typeAliasType->getExpandedGenericArgs())
+          type.walk(*this);
+
         return Action::SkipChildren;
       }
     }
@@ -244,7 +248,7 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
-PackType *BoundGenericType::getExpandedGenericArgsPack() {
+SmallVector<Type, 2> BoundGenericType::getExpandedGenericArgs() {
   // It would be nicer to use genericSig.getInnermostGenericParams() here,
   // but that triggers a request cycle if we're in the middle of computing
   // the generic signature already.
@@ -253,26 +257,26 @@ PackType *BoundGenericType::getExpandedGenericArgsPack() {
     params.push_back(paramDecl->getDeclaredInterfaceType());
   }
 
-  return PackType::get(getASTContext(),
+  return PackType::getExpandedGenericArgs(
                        TypeArrayView<GenericTypeParamType>(params),
                        getGenericArgs());
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
-PackType *TypeAliasType::getExpandedGenericArgsPack() {
+SmallVector<Type, 2> TypeAliasType::getExpandedGenericArgs() {
   if (!getDecl()->isGeneric())
-    return nullptr;
+    return SmallVector<Type, 2>();
 
   auto genericSig = getGenericSignature();
-  return PackType::get(getASTContext(),
+  return PackType::getExpandedGenericArgs(
                        genericSig.getInnermostGenericParams(),
                        getDirectGenericArgs());
 }
 
-/// <T...> Pack{T, Pack{Int, String}} => Pack{T..., Int, String}
-PackType *PackType::get(const ASTContext &C,
-                        TypeArrayView<GenericTypeParamType> params,
-                        ArrayRef<Type> args) {
+/// <T...> Pack{T, Pack{Int, String}} => {T..., Int, String}
+SmallVector<Type, 2>
+PackType::getExpandedGenericArgs(TypeArrayView<GenericTypeParamType> params,
+                                 ArrayRef<Type> args) {
   SmallVector<Type, 2> wrappedArgs;
 
   assert(params.size() == args.size());
@@ -288,7 +292,7 @@ PackType *PackType::get(const ASTContext &C,
     wrappedArgs.push_back(arg);
   }
 
-  return get(C, wrappedArgs);
+  return wrappedArgs;
 }
 
 PackType *PackType::getSingletonPackExpansion(Type param) {
@@ -347,7 +351,7 @@ static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
                                                 Collection loweredEltTypes) {
   // Build an array of formal element types, but be lazy about it:
   // use the original array unless we see an element type that doesn't
-  // work as a legal format type.
+  // work as a legal formal type.
   Optional<SmallVector<CanType, 4>> formalEltTypes;
   for (auto i : indices(loweredEltTypes)) {
     auto loweredEltType = loweredEltTypes[i];
