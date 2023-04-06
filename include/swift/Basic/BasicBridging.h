@@ -15,6 +15,7 @@
 
 // Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
 // when including VirtualFileSystem.h
+#include <cassert>
 #include "llvm/CAS/CASReference.h"
 
 #include "swift/Basic/BridgedSwiftObject.h"
