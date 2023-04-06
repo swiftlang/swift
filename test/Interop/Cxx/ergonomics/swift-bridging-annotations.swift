@@ -29,16 +29,16 @@ module CxxModule {
 #pragma clang module import SwiftBridging
 #endif
 
-class SELF_CONTAINED SelfContained {
+class SWIFT_SELF_CONTAINED SelfContained {
 public:
     int *pointer;
 
     SelfContained();
 
-    const int *returnsIndependent() const RETURNS_INDEPENDENT_VALUE;
+    const int *returnsIndependent() const SWIFT_RETURNS_INDEPENDENT_VALUE;
 };
 
-class SHARED_REFERENCE(retainSharedObject, releaseSharedObject)
+class SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject)
 SharedObject {
 public:
     static SharedObject *create();
@@ -47,13 +47,13 @@ public:
 void retainSharedObject(SharedObject *);
 void releaseSharedObject(SharedObject *);
 
-class IMMORTAL_REFERENCE LoggerSingleton {
+class SWIFT_IMMORTAL_REFERENCE LoggerSingleton {
 public:
     LoggerSingleton(const LoggerSingleton &) = delete;
     static LoggerSingleton *getInstance();
 };
 
-class UNSAFE_REFERENCE UnsafeNonCopyable {
+class SWIFT_UNSAFE_REFERENCE UnsafeNonCopyable {
 public:
     UnsafeNonCopyable(UnsafeNonCopyable &) = delete;
 };
@@ -61,7 +61,7 @@ public:
 UnsafeNonCopyable *returnsPointerToUnsafeReference();
 void takesPointerToUnsafeNonCopyable(UnsafeNonCopyable *);
 
-class CONFORMS_TO_PROTOCOL(SwiftMod.Proto) ConformsTo {
+class SWIFT_CONFORMS_TO_PROTOCOL(SwiftMod.Proto) ConformsTo {
 public:
 };
 
