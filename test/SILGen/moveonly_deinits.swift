@@ -66,7 +66,8 @@ var value: Bool { false }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[MARK]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[DD]]
 // SILGEN:   destroy_value [[LHS]]
 // SILGEN:   destroy_value [[RHS]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
@@ -74,7 +75,8 @@ var value: Bool { false }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   end_lifetime [[MARKED]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
+// SILGEN:   end_lifetime [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
 
 ////////////////////////
@@ -330,7 +332,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   switch_enum [[MARK]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   switch_enum [[DD]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
 //
 // SILGEN: [[BB_LHS]]([[ARG:%.*]] :
 // SILGEN-NEXT: destroy_value [[ARG]]
@@ -348,7 +351,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   switch_enum [[MARK]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   switch_enum [[DD]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
 //
 // SILGEN: [[BB_LHS]]([[ARG:%.*]] :
 // SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
