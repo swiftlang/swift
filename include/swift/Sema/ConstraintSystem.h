@@ -335,6 +335,9 @@ enum TypeVariableOptions {
 
   /// Whether the type variable can be bound to a pack type or not.
   TVO_CanBindToPack = 0x20,
+
+  /// Whether the type variable can be bound only to a pack expansion type.
+  TVO_PackExpansion = 0x40,
 };
 
 /// The implementation object for a type variable used within the
@@ -406,6 +409,9 @@ public:
 
   /// Whether this type variable can bind to a PackType.
   bool canBindToPack() const { return getRawOptions() & TVO_CanBindToPack; }
+
+  /// Whether this type variable can bind only to PackExpansionType.
+  bool isPackExpansion() const { return getRawOptions() & TVO_PackExpansion; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -650,6 +656,7 @@ private:
     ENTRY(TVO_CanBindToHole, "hole");
     ENTRY(TVO_PrefersSubtypeBinding, "");
     ENTRY(TVO_CanBindToPack, "pack");
+    ENTRY(TVO_PackExpansion, "pack expansion");
     }
   #undef ENTRY
   }
