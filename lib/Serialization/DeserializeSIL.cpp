@@ -2200,6 +2200,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::DropDeinitInst: {
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createDropDeinit(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst: {
     using Kind = MarkUnresolvedReferenceBindingInst::Kind;
     auto ty = MF->getType(TyID);

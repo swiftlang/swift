@@ -8268,6 +8268,15 @@ public:
   void removeIsLexical() { lexical = false; }
 };
 
+class DropDeinitInst
+    : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+
+  DropDeinitInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+};
+
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
 /// and should not be pattern matched. During the diagnostic passes, the "move
 /// function" checker for addresses always converts this to a copy_addr [init]
