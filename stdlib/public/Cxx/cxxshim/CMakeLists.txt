@@ -15,7 +15,7 @@ foreach(sdk ${SWIFT_SDKS})
     endif()
 
     set(outputs)
-    foreach(source libcxxshim.modulemap libcxxshim.h)
+    foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h)
       add_custom_command(OUTPUT ${module_dir}/${source}
                          DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
                          COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
@@ -41,11 +41,11 @@ foreach(sdk ${SWIFT_SDKS})
     list(APPEND libcxxshim_modulemap_target_list cxxshim-${sdk}-${arch})
 
 
-    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT compiler)
     if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+      swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT compiler)
     endif()
