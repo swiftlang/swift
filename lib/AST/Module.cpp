@@ -444,10 +444,12 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
     return;
 
   for (auto *unexpandedDecl : auxDecls->second) {
-    // Add expanded peers to the result.
+    // Add expanded peers and freestanding declarations to the result.
     unexpandedDecl->forEachMacroExpandedDecl(
         [&](ValueDecl *decl) {
-          Result.push_back(decl);
+          if (decl->getName().matchesRef(Name)) {
+            Result.push_back(decl);
+          }
         });
   }
 }
