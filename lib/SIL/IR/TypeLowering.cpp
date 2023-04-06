@@ -2745,7 +2745,7 @@ bool TypeConverter::visitAggregateLeaves(
     Optional<unsigned> maybeIndex;
     if (index != UINT_MAX)
       maybeIndex = {index};
-    return {ty, origTy, field, index};
+    return {ty, origTy, field, maybeIndex};
   };
   auto isAggregate = [](CanType ty) {
     return isa<SILPackType>(ty) ||
@@ -2761,6 +2761,7 @@ bool TypeConverter::visitAggregateLeaves(
     ValueDecl *field;
     Optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
+    assert(!field || !index && "both field and index!?");
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto packTy = dyn_cast<SILPackType>(ty)) {
         for (auto packIndex : indices(packTy->getElementTypes())) {

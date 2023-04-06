@@ -26,6 +26,10 @@ enum E {
 @_silgen_name("use_generic")
 func use_generic<T>(_ t: T) {}
 
+struct NonlexicalBox<X> {
+  @_eagerMove var x: X
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Declarations                                                               }}
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,6 +150,8 @@ extension C {
   __consuming
   func eagermove_method_attr() {}
 }
+
+func f<T>() -> (NonlexicalBox<T>) {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Test                                                                       }}

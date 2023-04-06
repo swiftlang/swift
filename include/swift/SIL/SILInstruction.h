@@ -8265,6 +8265,7 @@ public:
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
 
   bool isLexical() const { return lexical; };
+  void removeIsLexical() { lexical = false; }
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
