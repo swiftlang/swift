@@ -3886,7 +3886,16 @@ public:
       opaqueDecl->setGenericSignature(genericSig);
     else
       opaqueDecl->setGenericSignature(GenericSignature());
-    if (underlyingTypeSubsID) {
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
+    if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+      // Do not try to read the underlying type information if the function
+      // is not inlinable in clients. This reflects the swiftinterface behavior
+      // in where clients are only aware of the underlying type when the body
+      // of the function is public.
+
+    } else if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.
