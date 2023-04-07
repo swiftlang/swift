@@ -319,11 +319,6 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
     // Return () if no return value was given.
     if (!returnValue)
       returnValue = emitEmptyTuple(CleanupLocation(TopLevel));
-    //{
-    //  RegularLocation loc(returnLoc);
-    //  loc.pointToEnd();
-    //  returnValue = emitEmptyTuple(loc);
-    //}
 
     B.createReturn(returnLoc, returnValue);
   }
