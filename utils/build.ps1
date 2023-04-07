@@ -31,6 +31,11 @@ An array of architectures for which the Swift SDK should be built.
 The product version to be used when building the installer.
 Supports semantic version strings.
 
+.PARAMETER SkipInstall
+If set, does not create S:\Program Files and S:\Library mimicking an
+installed redistributable, SDK and toolchain.
+("install" is used in the sense of the installer, not the CMake install step)
+
 .PARAMETER SkipPackaging
 If set, skips building the msi's and installer
 
@@ -58,6 +63,7 @@ param(
   [string] $BuildType = "Release",
   [string[]] $SDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
+  [switch] $SkipInstall = $false,
   [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
@@ -86,7 +92,7 @@ if (-not (Test-Path $python))
   }
 }
 
-# Work around limitations of cmd passing in arrays to PowerShell
+# Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($SDKs.Length -eq 1) { $SDKs = $SDKs[0].Split(",") }
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
@@ -210,7 +216,7 @@ function Invoke-Program()
       $OutputLine += " > `"$OutFile`""
     }
 
-    Write-Output -Encoding UTF8 $OutputLine
+    Write-Output $OutputLine
   }
   else
   {
@@ -270,7 +276,7 @@ function Invoke-VsDevShell($Arch)
   }
   else
   {
-    # This dll path is valid for VS2019 and VS2022, but the was dll is under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments "-no_logo -host_arch=$($HostArch.VSName) -arch=$($Arch.VSName)"
   }
@@ -851,7 +857,7 @@ function Copy-Directory($Src, $Dst)
   Copy-Item -Force -Recurse $Src $Dst
 }
 
-function Consolidate-RedistInstall($Arch)
+function Install-Redist($Arch)
 {
   if ($ToBatch) { return }
 
@@ -884,7 +890,7 @@ function Consolidate-RedistInstall($Arch)
 # Copies files installed by CMake from the arch-specific platform root,
 # where they follow the layout expected by the installer,
 # to the final platform root, following the installer layout.
-function Consolidate-PlatformInstall($Arch)
+function Install-Platform($Arch)
 {
   if ($ToBatch) { return }
 
@@ -1214,7 +1220,7 @@ function Build-SourceKitLSP($Arch)
     }
 }
 
-function Consolidate-HostToolchainInstall()
+function Install-HostToolchain()
 {
   if ($ToBatch) { return }
 
@@ -1269,11 +1275,6 @@ function Build-Installer()
 Build-BuildTools $HostArch
 Build-Compilers $HostArch
 
-if (-not $ToBatch)
-{
-  Remove-Item -Force -Recurse $PlatformInstallRoot -ErrorAction Ignore
-}
-
 foreach ($Arch in $SDKArchs)
 {
   Build-ZLib $Arch
@@ -1288,8 +1289,19 @@ foreach ($Arch in $SDKArchs)
   Build-Foundation $Arch
   Build-XCTest $Arch
 
-  Consolidate-RedistInstall $Arch
-  Consolidate-PlatformInstall $Arch
+  if (-not $SkipInstall)
+  {
+    Install-Redist $Arch
+  }
+}
+
+if (-not $SkipInstall -and -not $ToBatch)
+{
+  Remove-Item -Force -Recurse $PlatformInstallRoot -ErrorAction Ignore
+  foreach ($Arch in $SDKArchs)
+  {
+    Install-Platform $Arch
+  }
 }
 
 Build-SQLite $HostArch
@@ -1308,12 +1320,15 @@ Build-IndexStoreDB $HostArch
 Build-Syntax $HostArch
 Build-SourceKitLSP $HostArch
 
+if (-not $SkipInstall)
+{
+  Install-HostToolchain
+}
+
 if (-not $SkipPackaging)
 {
   Build-Installer
 }
-
-Consolidate-HostToolchainInstall
 
 if ($Test -contains "swift") { Build-Compilers $HostArch -Test }
 if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }

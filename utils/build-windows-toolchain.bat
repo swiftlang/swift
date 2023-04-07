@@ -77,6 +77,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -BuildType %CMAKE_BUILD_TYPE% ^
+  -SkipInstall ^
   %SkipPackagingArg% ^
   %TestArg% ^
   -Stage "%BuildRoot%\package"
