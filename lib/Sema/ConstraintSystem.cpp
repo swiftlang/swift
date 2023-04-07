@@ -3791,9 +3791,25 @@ struct TypeSimplifier {
     }
 
     if (auto expansion = dyn_cast<PackExpansionType>(type.getPointer())) {
+      // First, let's check whether pattern type has all of the type variables
+      // that represent packs resolved, otherwise we don't have enough information
+      // to flatten this pack expansion type.
+      //
+      // Note that we don't actually need to do deep transformation here
+      // because pack variables can only appear in structural positions.
+      if (expansion->getPatternType().findIf([&](Type type) {
+            if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (typeVar->getImpl().canBindToPack())
+                return GetFixedTypeFn(typeVar)->is<TypeVariableType>();
+            }
+            return false;
+          })) {
+        return expansion;
+      }
+
       // Transform the count type, ignoring any active pack expansions.
       auto countType = expansion->getCountType().transform(
-                                        TypeSimplifier(CS, GetFixedTypeFn));
+          TypeSimplifier(CS, GetFixedTypeFn));
 
       if (auto countPack = countType->getAs<PackType>()) {
         SmallVector<Type, 4> elts;
