@@ -517,10 +517,9 @@ WARNING(compiler_plugin_not_loaded,none,
 ERROR(dont_enable_interop_and_compat,none,
       "do not pass both -enable-experimental-cxx-interop and "
       "-cxx-interoperability-mode. Remove -enable-experimental-cxx-interop.", ())
-      
-ERROR(invalid_interop_compat_mode,none,
-      "invalid option passed to -cxx-interoperability-mode. Please select either "
-      "'off' or 'swift-5.9'.", ())
+
+NOTE(valid_cxx_interop_modes,none,
+      "valid arguments to '-cxx-interoperability-mode=' are %0", (StringRef))
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "

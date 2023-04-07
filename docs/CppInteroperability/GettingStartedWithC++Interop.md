@@ -32,7 +32,7 @@ module CxxTest {
 Add the C++ module to the include path and enable C++ interop:
 - Navigate to your project directory
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
-- Under `Custom Flags` -> `Other Swift Flags` add `-cxx-interoperability-mode=swift-5.9`
+- Under `Custom Flags` -> `Other Swift Flags` add `-cxx-interoperability-mode=default`
 - Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/CxxTest`). 
 
 - This should now allow your to import your C++ Module into any `.swift` file.
@@ -81,7 +81,7 @@ After creating your Swift package project, follow the steps [Creating a Module t
 - Swift code will be in `Sources/CxxInterop` called `main.swift`
 - C++ source code follows the example shown in [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code)
 - Under targets, add the name of your C++ module and the directory containing the Swift code as a target.
-- In the target defining your Swift target, add a`dependencies` to the C++ Module, the `path`, `source`, and `swiftSettings` with `unsafeFlags` with the source to the C++ Module, and enable `-cxx-interoperability-mode=swift-5.9`
+- In the target defining your Swift target, add a`dependencies` to the C++ Module, the `path`, `source`, and `swiftSettings` with `unsafeFlags` with the source to the C++ Module, and enable `-cxx-interoperability-mode=default`
 
 ```
 //In Package Manifest
@@ -111,7 +111,7 @@ let package = Package(
             sources: [ "main.swift" ],
             swiftSettings: [.unsafeFlags([
                 "-I", "Sources/CxxTest",
-                "-cxx-interoperability-mode=swift-5.9",
+                "-cxx-interoperability-mode=default",
             ])]
         ),
     ]
@@ -144,7 +144,7 @@ After creating your project follow the steps [Creating a Module to contain your 
 - Create a `CMakeLists.txt` file and configure for your project
 - In`add_library` invoke `cxx-support` with the path to the C++ implementation file
 - Add the `target_include_directories` with `cxx-support` and path to the C++ Module `${CMAKE_SOURCE_DIR}/Sources/CxxTest`
-- Add the `add_executable` to the specific files/directory you would like to generate source, with`SHELL:-cxx-interoperability-mode=swift-5.9`.
+- Add the `add_executable` to the specific files/directory you would like to generate source, with`SHELL:-cxx-interoperability-mode=default`.
 - In the example below we will be following the file structure used in [Creating a Swift Package](#Creating-a-Swift-Package)
 
 ```
@@ -167,7 +167,7 @@ target_include_directories(cxx-support PUBLIC
 
 add_executable(CxxInterop ./Sources/CxxInterop/main.swift)
 target_compile_options(CxxInterop PRIVATE
-  "SHELL:-cxx-interoperability-mode=swift-5.9"
+  "SHELL:-cxx-interoperability-mode=default"
 target_link_libraries(CxxInterop PRIVATE cxx-support)
 
 ```
