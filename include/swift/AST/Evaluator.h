@@ -208,6 +208,18 @@ class Evaluator {
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<ActiveRequest> activeRequests;
 
+  /// How many `ResolveMacroRequest` requests are active.
+  ///
+  /// This allows us to quickly determine whether there is any
+  /// `ResolveMacroRequest` active in the active request stack.
+  /// It saves us from a linear scan through `activeRequests` when
+  /// we need to determine this information.
+  ///
+  /// Why on earth would we need to determine this information?
+  /// Please see the extended comment that goes with the constructor
+  /// of `UnqualifiedLookupRequest`.
+  unsigned numActiveResolveMacroRequests = 0;
+
   /// A cache that stores the results of requests.
   evaluator::RequestCache cache;
 
@@ -324,6 +336,16 @@ public:
     return activeRequests.count(ActiveRequest(request));
   }
 
+  /// Determine whether there is any active "resolve macro" request
+  /// on the request stack.
+  ///
+  /// Why on earth would we need to determine this information?
+  /// Please see the extended comment that goes with the constructor
+  /// of `UnqualifiedLookupRequest`.
+  bool hasActiveResolveMacroRequest() const {
+    return numActiveResolveMacroRequests > 0;
+  }
+
 private:
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
@@ -336,6 +358,10 @@ private:
   /// already diagnosed the cycle. Otherwise, returns \c false and adds this
   /// request to the \c activeRequests stack.
   bool checkDependency(const ActiveRequest &request);
+
+  /// Note that we have finished this request, popping it from the
+  /// \c activeRequests stack.
+  void finishedRequest(const ActiveRequest &request);
 
   /// Produce the result of the request without caching.
   template<typename Request>
@@ -366,8 +392,7 @@ private:
 
     // Make sure we remove this from the set of active requests once we're
     // done.
-    assert(activeRequests.back() == activeReq);
-    activeRequests.pop_back();
+    finishedRequest(activeReq);
 
     return std::move(result);
   }
