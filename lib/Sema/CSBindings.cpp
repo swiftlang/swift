@@ -2302,8 +2302,17 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto result =
       cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
 
-  if (result.isFailure())
+  if (result.isFailure()) {
+    if (cs.isDebugMode()) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "(failed to establish binding " << TypeVar->getString(PO)
+          << " := " << type->getString(PO) << ")\n";
+    }
     return false;
+  }
 
   auto reportHole = [&]() {
     if (cs.isForCodeCompletion()) {
