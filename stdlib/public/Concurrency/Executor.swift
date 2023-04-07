@@ -17,16 +17,16 @@ import Swift
 public protocol Executor: AnyObject, Sendable {
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.9, *)
-  func enqueue(_ job: __owned Job)
+  func enqueue(_ job: __owned ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
@@ -39,10 +39,10 @@ public protocol SerialExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
-  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned Job)' instead")
+  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 
@@ -53,7 +53,7 @@ public protocol SerialExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   @available(SwiftStdlib 5.9, *)
-  func enqueue(_ job: __owned Job)
+  func enqueue(_ job: __owned ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// Convert this executor value to the optimized form of borrowed
@@ -87,10 +87,10 @@ public protocol SerialExecutor: Executor {
 @available(SwiftStdlib 5.9, *)
 extension Executor {
   public func enqueue(_ job: UnownedJob) {
-    self.enqueue(Job(job))
+    self.enqueue(ExecutorJob(job))
   }
 
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     self.enqueue(UnownedJob(job))
   }
 }
@@ -219,10 +219,10 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 
 /// Primarily a debug utility.
 ///
-/// If the passed in Job is a Task, returns the complete 64bit TaskId,
+/// If the passed in ExecutorJob is a Task, returns the complete 64bit TaskId,
 /// otherwise returns only the job's 32bit Id.
 ///
-/// - Returns: the Id stored in this Job or Task, for purposes of debug printing
+/// - Returns: the Id stored in this ExecutorJob or Task, for purposes of debug printing
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
@@ -250,7 +250,7 @@ internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(SwiftStdlib 5.9, *) {
-    executor.enqueue(Job(context: unownedJob._context))
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
   } else {
     executor.enqueue(unownedJob)
   }
