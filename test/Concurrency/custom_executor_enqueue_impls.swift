@@ -25,7 +25,7 @@ final class OldExecutor: SerialExecutor {
 /// That's why we do log the deprecation warning, people should use the move-only version.
 final class BothExecutor: SerialExecutor {
   func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'BothExecutor' to 'Executor' by implementing 'func enqueue(Job)' instead}}
-  func enqueue(_ job: __owned Job) {}
+  func enqueue(_ job: __owned ExecutorJob) {}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
@@ -45,7 +45,7 @@ final class NoneExecutor: SerialExecutor { // expected-error{{type 'NoneExecutor
 
 /// Just implementing the new signature causes no warnings, good.
 final class NewExecutor: SerialExecutor {
-  func enqueue(_ job: __owned Job) {} // no warnings
+  func enqueue(_ job: __owned ExecutorJob) {} // no warnings
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
