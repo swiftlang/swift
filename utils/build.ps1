@@ -266,11 +266,13 @@ function Invoke-VsDevShell($Arch)
 {
   if ($ToBatch)
   {
-    Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" -no_logo -host_arch=amd64 -arch=$($Arch.VSName)"
+    Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" -no_logo -host_arch=$($HostArch.VSName) -arch=$($Arch.VSName)"
   }
   else
   {
-    & "$VSInstallRoot\Common7\Tools\Launch-VsDevShell.ps1" -VsInstallationPath $VSInstallRoot -HostArch amd64 -Arch $Arch.VSName | Out-Null
+    # This dll path is valid for VS2019 and VS2022, but the was dll is under a vsdevcmd subfolder in VS2017 
+    Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+    Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments "-no_logo -host_arch=$($HostArch.VSName) -arch=$($Arch.VSName)"
   }
 }
 
