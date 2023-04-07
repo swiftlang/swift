@@ -282,6 +282,10 @@ _ = StructWithUnqualifiedLookup().foo()
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
   struct Foo {
+    static let singleton = Foo()
+
+    static let s2 = Foo.singleton
+
     #bitwidthNumberedStructs("MyIntOne")
   }
 
@@ -341,9 +345,10 @@ func testFreestandingMacroExpansion() {
 testFreestandingMacroExpansion()
 
 // Explicit structs to force macros to be parsed as decl.
+var globalBool = true
 struct ContainerOfNumberedStructs {
   #bitwidthNumberedStructs("MyIntOne")
-  #bitwidthNumberedStructs("MyIntTwo")
+  #bitwidthNumberedStructs("MyIntTwo", blah: globalBool)
 }
 
 // Avoid re-type-checking declaration macro arguments.

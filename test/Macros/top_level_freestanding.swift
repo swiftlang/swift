@@ -54,3 +54,13 @@ struct HasInnerClosure {
   #freestandingWithClosure(0) { x in x }
   #freestandingWithClosure(1) { x in x }
 }
+
+// Arbitrary names at global scope
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+#bitwidthNumberedStructs("MyIntGlobal")
+
+func testArbitraryAtGlobal() {
+  _ = MyIntGlobal16()
+}
