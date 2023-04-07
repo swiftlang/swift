@@ -904,7 +904,8 @@ emitKeyPathComponent(IRGenModule &IGM,
                     reqt.getProtocol());
                 externalSubArgs.push_back(IGM.emitWitnessTableRefString(
                     substType, conformance,
-                    genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                    genericEnv ? genericEnv->getGenericSignature() :
+                                 componentCanSig,
                     /*shouldSetLowBit*/ true));
               }
             });

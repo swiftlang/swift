@@ -383,6 +383,12 @@ public:
   /// using TypeInfo entries.
   unsigned ForceStructTypeLayouts : 1;
 
+  /// Enable generation and use of layout string based value witnesses
+  unsigned EnableLayoutStringValueWitnesses : 1;
+
+  /// Enable runtime instantiation of value witness strings for generic types
+  unsigned EnableLayoutStringValueWitnessesInstantiation : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -496,6 +502,8 @@ public:
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
+        EnableLayoutStringValueWitnesses(false),
+        EnableLayoutStringValueWitnessesInstantiation(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
