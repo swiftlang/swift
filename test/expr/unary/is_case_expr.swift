@@ -48,7 +48,13 @@ enum Destination {
 
 let destination = Destination.inbox
 
-print(destination is case .inbox && destination is case .messageThread) // false
-print(destination is case .inbox || destination is case .messageThread) // true
-print(destination is case .inbox == destination is case .messageThread) // false
-print(destination is case .inbox != destination is case .messageThread) // true
+_ = destination is case .inbox && destination is case .messageThread // false
+_ = destination is case .inbox || destination is case .messageThread // true
+_ = destination is case .inbox == destination is case .messageThread // false
+_ = destination is case .inbox != destination is case .messageThread // true
+
+_ = 42 is case 1 ... 100 // true
+_ = 42 is case 1 ..< 10 // false
+_ = 15 is case 10 | 5 // true
+_ = 1 is case 0 ..< 10 | 5 // true
+_ = 1 is case 0 ..< 10 & 5 // false

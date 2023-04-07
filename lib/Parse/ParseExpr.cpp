@@ -242,12 +242,12 @@ parse_operator:
       
       // Inside `is case <pattern>` exprs, we don't parse binary operators.
       // Since all expressions are also patterns, parsing operators here
-      // could cause the `is case` pattern to greedily consume everything
+      // would cause the `is case` pattern to greedily consume everything
       // to its right in an operator chain.
       //
       // Instead, we parse `is case` expressions as if they have infinitely
-      // high operator precedence, and fix up the operator sequent in PreCheckExpr
-      // if necessary.
+      // high operator precedence on the RHS, and fix up the operator sequence later
+      // in TypeCheckExpr to account for operators with a higher actual precedence.
       if (inIsCaseExpr) {
         goto done;
       }

@@ -386,7 +386,6 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   }
   
   if (auto *isCaseExpr = dyn_cast<IsCaseExpr>(Op)) {
-    assert(RHS == isCaseExpr);
     isCaseExpr->setSubExpr(LHS);
     return isCaseExpr;
   }
@@ -516,8 +515,36 @@ static Expr *foldSequence(DeclContext *DC,
     // repeat.
     if (associativity == Associativity::Right &&
         op1.precedence != op2.precedence) {
-      RHS = foldSequence(DC, RHS, S,
-                         PrecedenceBound(op1.precedence, /*strict*/ true));
+      auto foldedSequence = foldSequence(DC, RHS, S, PrecedenceBound(op1.precedence, /*strict*/ true));
+      
+      // IsCaseExprs are parsed as if they have infinitely high precedence
+      // on the RHS, since otherwise they would greedily consume the rest
+      // of the operator chain (since all exprs all also patterns).
+      //
+      // If the `is case` expr is followed by operators with a higher precedence,
+      // then we need to move those operators into the `is case` expr.
+      if (auto binaryExpr = dyn_cast<BinaryExpr>(foldedSequence)) {
+        if (auto isCaseExpr = dyn_cast<IsCaseExpr>(binaryExpr->getLHS())) {
+          if (auto exprPattern = dyn_cast<ExprPattern>(isCaseExpr->getPattern())) {
+            // We currently have a BinaryExpr with:
+            //  - LHS: a is case b
+            //  - Fn: some higher precedence operator (like ..<)
+            //  - RHS: c
+            //
+            // To match the expected precedence of `is case`, we transform this to
+            // a single `IsCaseExpr` like `a is case (b ..< c)`.
+            auto transformedExpr = BinaryExpr::create(DC->getASTContext(),
+                                                      exprPattern->getSubExpr(),
+                                                      binaryExpr->getFn(),
+                                                      binaryExpr->getRHS(),
+                                                      /* implicit */ false);
+            
+            exprPattern->setSubExpr(transformedExpr);
+          }
+        }
+      }
+      
+      RHS = foldedSequence;
       continue;
     }
 
