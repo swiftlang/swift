@@ -3441,10 +3441,19 @@ namespace {
              });
     }
 
+    static bool hasComputedPropertyAttr(const clang::Decl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_computed_property";
+               return false;
+             });
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
 
-      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties) {
+      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
+          hasComputedPropertyAttr(decl)) {
         CXXMethodBridging bridgingInfo(decl);
         if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
           auto name = bridgingInfo.getClangName().drop_front(3);
