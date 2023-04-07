@@ -35,6 +35,7 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
 
 namespace swift {
 
@@ -2381,9 +2382,11 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   assert(pullbackTrampolineBB->getNumArguments() == 1);
   auto loc = origBB->getParent()->getLocation();
   SmallVector<SILValue, 8> trampolineArguments;
+
   // Propagate adjoint values/buffers of active values/buffers to
   // predecessor blocks.
   auto &predBBActiveValues = activeValues[origPredBB];
+  llvm::SmallSet<std::pair<SILValue, SILValue>, 32> propagatedAdjoints;
   for (auto activeValue : predBBActiveValues) {
     LLVM_DEBUG(getADDebugStream()
                << "Propagating adjoint of active value " << activeValue
@@ -2425,12 +2428,14 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
       // Propagate adjoint buffers using `copy_addr`.
       auto adjBuf = getAdjointBuffer(origBB, activeValue);
       auto predAdjBuf = getAdjointBuffer(origPredBB, activeValue);
-      builder.createCopyAddr(loc, adjBuf, predAdjBuf, IsNotTake,
-                             IsNotInitialization);
+      if (propagatedAdjoints.insert({adjBuf, predAdjBuf}).second)
+        builder.createCopyAddr(loc, adjBuf, predAdjBuf, IsNotTake,
+                               IsNotInitialization);
       break;
     }
     }
   }
+
   // Propagate pullback struct argument.
   TangentBuilder pullbackTrampolineBBBuilder(
       pullbackTrampolineBB, getContext());
