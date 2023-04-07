@@ -1652,19 +1652,20 @@ public:
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   ParserResult<Expr> parseExpr(Diag<> ID) {
-    return parseExprImpl(ID, /*isExprBasic=*/false);
+    return parseExprImpl(ID, /*isExprBasic=*/false, /* inIsCaseExpr */ false);
   }
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
-    return parseExprImpl(ID, /*isExprBasic=*/true);
+    return parseExprImpl(ID, /*isExprBasic=*/true, /* inIsCaseExpr */ false);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic, bool inIsCaseExpr);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprIsCase();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isForConditionalDirective = false);
+                                       bool isForConditionalDirective = false,
+                                       bool inIsCaseExpr = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,

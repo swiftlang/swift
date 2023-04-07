@@ -40,3 +40,15 @@ guard value is case .baaz else { fatalError() }
 
 // This one gets an unexpected `error: circular reference`, and also hits an assertion
 //for i in [Foo.bar(1), .bar(2), .baaz] where i is case .baaz { }
+
+enum Destination {
+  case inbox
+  case messageThread(id: Int)
+}
+
+let destination = Destination.inbox
+
+print(destination is case .inbox && destination is case .messageThread) // false
+print(destination is case .inbox || destination is case .messageThread) // true
+print(destination is case .inbox == destination is case .messageThread) // false
+print(destination is case .inbox != destination is case .messageThread) // true

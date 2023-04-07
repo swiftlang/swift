@@ -39,7 +39,8 @@ using namespace swift;
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
-                                         bool isExprBasic) {
+                                         bool isExprBasic,
+                                         bool inIsCaseExpr) {
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
   // let pattern type checking determine its final form.
@@ -57,7 +58,8 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   }
 
   return parseExprSequence(Message, isExprBasic,
-                                /*forConditionalDirective*/false);
+                                /*forConditionalDirective*/false,
+                                /* inIsCaseExpr */ inIsCaseExpr);
 }
 
 /// parseExprIs
@@ -186,7 +188,8 @@ ParserResult<Expr> Parser::parseExprArrow() {
 /// apply to everything to its right.
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
-                                             bool isForConditionalDirective) {
+                                             bool isForConditionalDirective,
+                                             bool inIsCaseExpr) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   ParserStatus SequenceStatus;
@@ -236,6 +239,18 @@ parse_operator:
            (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
             peekToken().isAny(tok::kw_inout))))
         goto done;
+      
+      // Inside `is case <pattern>` exprs, we don't parse binary operators.
+      // Since all expressions are also patterns, parsing operators here
+      // could cause the `is case` pattern to greedily consume everything
+      // to its right in an operator chain.
+      //
+      // Instead, we parse `is case` expressions as if they have infinitely
+      // high operator precedence, and fix up the operator sequent in PreCheckExpr
+      // if necessary.
+      if (inIsCaseExpr) {
+        goto done;
+      }
       
       // Parse the operator.
       Expr *Operator = parseExprOperator();

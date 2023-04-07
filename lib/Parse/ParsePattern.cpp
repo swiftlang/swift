@@ -1322,7 +1322,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic, bool inIsCa
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
   ParserResult<Expr> subExpr =
-    parseExprImpl(diag::expected_pattern, isExprBasic);
+    parseExprImpl(diag::expected_pattern, isExprBasic, inIsCaseExpr);
   ParserStatus status = subExpr;
   if (subExpr.isNull())
     return status;

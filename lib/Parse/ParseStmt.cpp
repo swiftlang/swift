@@ -1050,7 +1050,7 @@ static void parseWhereGuard(Parser &P, GuardedPattern &result,
       }
       llvm_unreachable("bad context");
     }();
-    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
+    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic, /* inIsCaseExpr */ false);
     status |= guardResult;
 
     // Use the parsed guard expression if possible.
