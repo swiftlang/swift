@@ -2591,7 +2591,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   auto &ti = IGM.getTypeInfo(lowered);
   auto *typeLayoutEntry =
       ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+      IGM.getOptions().EnableLayoutStringValueWitnesses) {
 
     auto genericSig =
         lowered.getNominalOrBoundGenericNominal()->getGenericSignature();
@@ -2599,7 +2600,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   }
 
   if (auto sd = dyn_cast<StructDecl>(type)) {
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
       hasLayoutString |= requiresForeignTypeMetadata(type) ||
         needsSingletonMetadataInitialization(IGM, type) ||
         (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
@@ -2896,7 +2898,8 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
     bool isVWTMutable, MetadataDependencyCollector *collector) {
   auto &IGM = IGF.IGM;
   assert(IGM.Context.LangOpts.hasFeature(
-      Feature::LayoutStringValueWitnessesInstantiation));
+      Feature::LayoutStringValueWitnessesInstantiation) &&
+      IGM.getOptions().EnableLayoutStringValueWitnesses);
 
   auto *target = T.getStructOrBoundGenericStruct();
 
@@ -3008,7 +3011,9 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
 
     if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
         IGM.Context.LangOpts.hasFeature(
-            Feature::LayoutStringValueWitnessesInstantiation)) {
+            Feature::LayoutStringValueWitnessesInstantiation) &&
+        IGM.getOptions().EnableLayoutStringValueWitnesses &&
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
       emitInitializeFieldOffsetVectorWithLayoutString(IGF, loweredTy, metadata,
                                                       isVWTMutable, collector);
     } else {
@@ -3123,7 +3128,8 @@ namespace {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(
           IGM, Target->getDeclaredType()->getCanonicalType());
@@ -3206,7 +3212,8 @@ namespace {
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
 
         if (IGM.Context.LangOpts.hasFeature(
-                Feature::LayoutStringValueWitnesses)) {
+                Feature::LayoutStringValueWitnesses) &&
+            IGM.getOptions().EnableLayoutStringValueWitnesses) {
           if (auto *layoutString = getLayoutString()) {
             auto layoutStringCast = IGF.Builder.CreateBitCast(layoutString,
                                                               IGM.Int8PtrTy);
@@ -3782,7 +3789,8 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(
           IGM, Target->getDeclaredType()->getCanonicalType());
@@ -4986,11 +4994,13 @@ namespace {
     }
 
     bool hasLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses)) {
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
         return false;
       }
 
-      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation)) {
+      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
         return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
       }
 
@@ -5029,7 +5039,8 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(
           IGM, Target->getDeclaredType()->getCanonicalType());
@@ -5180,12 +5191,14 @@ namespace {
 
     bool hasLayoutString() {
       if (!IGM.Context.LangOpts.hasFeature(
-              Feature::LayoutStringValueWitnesses)) {
+              Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses) {
         return false;
       }
       return !!getLayoutString() ||
              (IGM.Context.LangOpts.hasFeature(
                  Feature::LayoutStringValueWitnessesInstantiation) &&
+              IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
                     (HasDependentVWT || HasDependentMetadata) &&
                       !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
     }
@@ -5445,7 +5458,8 @@ namespace {
     }
 
     llvm::Constant *emitLayoutString() {
-      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses))
+      if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
+          !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
       auto lowered = getLoweredTypeInPrimaryContext(
           IGM, Target->getDeclaredType()->getCanonicalType());

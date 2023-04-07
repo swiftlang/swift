@@ -535,5 +535,9 @@ WARNING(enable_interop_flag_deprecated,none,
         "the -enable-experimental-cxx-interop flag is deprecated. Please pass "
         "'-cxx-interoperability-mode=' instead.", ())
 
+ERROR(layout_string_instantiation_without_layout_strings,none,
+      "-enable-layout-string-value-witnesses-instantiation can not be enabled "
+      "without -enable-layout-string-value-witnesses.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

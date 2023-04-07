@@ -1021,6 +1021,18 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
   HelpText<"Force type layout based lowering for structs">;
 
+def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
+  HelpText<"Enable layout string based value witnesses">;
+
+def disable_layout_string_value_witnesses : Flag<["-"], "disable-layout-string-value-witnesses">,
+  HelpText<"Disable layout string based value witnesses">;
+
+def enable_layout_string_value_witnesses_instantiation : Flag<["-"], "enable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Enable runtime instantiation of layout string value witnesses for generic types">;
+
+def disable_layout_string_value_witnesses_instantiation : Flag<["-"], "disable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Disable runtime instantiation of layout string value witnesses for generic types">;
+
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
 
