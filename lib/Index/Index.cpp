@@ -1504,8 +1504,8 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!startEntity(D, Info, /*IsRef=*/false))
     return false;
 
-  if (!reportRelatedRef(NTD, Loc, /*isImplicit=*/false,
-                        (SymbolRoleSet)SymbolRole::RelationExtendedBy, D))
+  TypeLoc TL(D->getExtendedTypeRepr(), D->getExtendedType());
+  if (!reportRelatedTypeRef(TL, (SymbolRoleSet)SymbolRole::RelationExtendedBy, D))
       return false;
   if (!reportInheritedTypeRefs(D->getInherited(), D))
       return false;
