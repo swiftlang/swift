@@ -102,3 +102,44 @@ bb3:
   return %r : $()
 }
 
+// Ensure no assert fires while inserting dead end blocks to the worklist
+sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  debug_value %0 : $C, let, name "newElements", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb9, bb10
+
+bb3:
+  br bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8:
+  %77 = apply undef(%0) : $@convention(method) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %79 = tuple ()
+  return %79 : $()
+
+bb9:
+  br bb8
+
+bb10:
+  br bb8
+}
+
