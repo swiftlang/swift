@@ -2080,6 +2080,11 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case CopyDestroyStrategy::ForwardToPayload:
     return cases[0]->refCountString(IGM, B, genericSig);
   case CopyDestroyStrategy::Normal: {
+    // TODO: this is only relevant until we properly support enums.
+    if (!IGM.getSILModule().isTypeMetadataAccessible(ty.getASTType())) {
+      return false;
+    }
+
     auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
     B.addFixedEnumRefCount(accessor);
     B.addSkip(fixedSize(IGM)->getValue());

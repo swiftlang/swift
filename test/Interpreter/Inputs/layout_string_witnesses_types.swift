@@ -308,7 +308,6 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
-
 public struct ComplexNesting<A, B, C, D> {
     let pre: Filler = Filler()
     let a: NestedA<A>
@@ -362,6 +361,21 @@ public struct ComplexNesting<A, B, C, D> {
         self.b = NestedB(y: b)
         self.c = NestedC(y: c)
         self.d = NestedD(y: d)
+    }
+}
+
+internal enum InternalEnum {
+    case a(Int, AnyObject)
+    case b(Int)
+    case c(String)
+}
+
+public struct InternalEnumWrapper {
+    internal let x: InternalEnum
+    internal let y: Int = 32
+
+    public init(x: AnyObject) {
+        self.x = .a(23, x)
     }
 }
 
