@@ -30,15 +30,15 @@ import Test
 // CHECK: note: record 'A' is not automatically available: does not have a copy constructor or destructor. Does this type have reference semantics?
 // CHECK: struct A {
 // CHECK: ^
-// CHECK: SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>)
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: A) { }
 // CHECK: note: record 'B' is not automatically available: does not have a copy constructor or destructor. Does this type have reference semantics?
 // CHECK: struct {{.*}}B {
 // CHECK: ^
-// CHECK: SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>)
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: B) { }
 // CHECK: note: record 'Nested' is not automatically available: does not have a copy constructor or destructor. Does this type have reference semantics?
 // CHECK: struct Nested {
 // CHECK: ^
-// CHECK: SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>)
+// CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: Namespace.Nested) { }

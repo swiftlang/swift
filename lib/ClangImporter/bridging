@@ -17,18 +17,98 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
 #define SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
 
-#define SELF_CONTAINED __attribute__((swift_attr("import_owned")))
-#define SAFE_TO_IMPORT __attribute__((swift_attr("import_unsafe")))
+/// Specifies that a C++ `class` or `struct` owns and controls the lifetime of all
+/// of the objects it references. Such type should not reference any objects whose
+/// lifetime is controlled externally. This annotation allows Swift to import methods
+/// that return a `class` or `struct` type that is annotated with this macro.
+#define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
+
+/// Specifies that a C++ method returns a value that is presumed to contain
+/// objects whose lifetime is not dependent on `this` or other parameters passed
+/// to the method.
+#define SWIFT_RETURNS_INDEPENDENT_VALUE __attribute__((swift_attr("import_unsafe")))
 
 #define _CXX_INTEROP_STRINGIFY(_x) #_x
-#define SWIFT_REFERENCE_TYPE(_retain, _release)                                \
-  __attribute__((swift_attr("import_reference")))                              \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:_retain))))          \
+
+/// Specifies that a C++ `class` or `struct` is reference-counted using
+/// the given `retain` and `release` functions. This annotation lets Swift import
+/// such a type as reference counted type in Swift, taking advantage of Swift's
+/// automatic reference counting.
+///
+/// This example shows how to use this macro to let Swift know that
+/// a non-copyable reference counted C++ class can be imported as a reference counted type in Swift:
+///  ```c++
+///    class SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject)
+///    SharedObject : NonCopyable, IntrusiveReferenceCounted<SharedObject> {
+///    public:
+///      static SharedObject* create();
+///      void doSomething();
+///    };
+///
+///    void retainSharedObject(SharedObject *);
+///    void releaseSharedObject(SharedObject *);
+///  ```
+///
+///  Then, the Swift programmer would be able to use it in the following manner:
+///
+///  ```swift
+///    let object = SharedObject.create()
+///    object.doSomething()
+///    // The Swift compiler will release object here.
+///  ```
+#define SWIFT_SHARED_REFERENCE(_retain, _release)                                \
+  __attribute__((swift_attr("import_reference")))                          \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:_retain))))      \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:_release))))
 
+/// Specifies that a C++ `class` or `struct` is a reference type whose lifetime
+/// is presumed to be immortal, i.e. the reference to such object is presumed to
+/// always be valid. This annotation lets Swift import such a type as a reference
+/// type in Swift.
+////
+/// This example shows how to use this macro to let Swift know that
+/// a non-copyable singleton C++ class can be imported as a reference type in Swift:
+///  ```c++
+///    class SWIFT_IMMORTAL_REFERENCE
+///    LoggerSingleton : NonCopyable {
+///    public:
+///      static LoggerSingleton &getInstance();
+///      void log(int x);
+///    };
+///  ```
+///
+///  Then, the Swift programmer would be able to use it in the following manner:
+///
+///  ```swift
+///    let logger = LoggerSingleton.getInstance()
+///    logger.log(123)
+///  ```
+#define SWIFT_IMMORTAL_REFERENCE                                                \
+  __attribute__((swift_attr("import_reference")))                         \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
+
+/// Specifies that a C++ `class` or `struct` is a reference type whose lifetime
+/// is not managed automatically. The programmer must validate that any reference
+/// to such object is valid themselves. This annotation lets Swift import such a type as a reference type in Swift.
+#define SWIFT_UNSAFE_REFERENCE                                                  \
+  __attribute__((swift_attr("import_reference")))                         \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
+
+/// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
-#define CONFORMS_TO(_name) \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(conforms_to:_name))))
+/// Specifies that a specific C++ `class` or `struct` conforms to a
+/// a specific Swift protocol.
+///
+/// This example shows how to use this macro to conform a class template to a Swift protocol:
+///  ```
+///    template<class T>
+///    class SWIFT_CONFORMS_TO_PROTOCOL(SwiftModule.ProtocolName)
+///    CustomClass {};
+///  ```
+#define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName) \
+  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(conforms_to:_moduleName_protocolName))))
 
 #endif // SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
