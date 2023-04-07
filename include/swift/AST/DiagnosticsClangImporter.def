@@ -165,7 +165,7 @@ NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
 NOTE(reference_passed_by_value, none, "function uses foreign reference type "
                                       "'%0' as a value in %1 types which breaks "
-                                      "'import_reference' contract (outlined in "
+                                      "'swift_shared_reference' contract (outlined in "
                                       "C++ Interop User Manual).",
      (StringRef, StringRef))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
@@ -186,11 +186,11 @@ NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a re
 NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
                                     "interior pointer. ",
      (StringRef))
-NOTE(mark_self_contained, none, "Mark type '%0' as 'SELF_CONTAINED' in C++ to "
+NOTE(mark_self_contained, none, "Mark type '%0' as 'SWIFT_SELF_CONTAINED' in C++ to "
                                  "make methods that use it available in Swift. ",
      (StringRef))
-NOTE(mark_safe_to_import, none, "Mark method '%0' as 'SAFE_TO_IMPORT' in C++ to "
-                                "make it available in Swift. ",
+NOTE(mark_safe_to_import, none, "annotate method '%0' with 'SWIFT_RETURNS_INDEPENDENT_VALUE' in C++ to "
+                                "make it available in Swift",
      (StringRef))
 
 NOTE(at_to_subscript, none, "Do you want to replace it with a call "
