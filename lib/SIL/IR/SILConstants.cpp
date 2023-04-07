@@ -1174,6 +1174,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   if (accessPath.empty())
     return newElement;
 
+  // Callers are required to ensure unknowns are not passed. However,
+  // the recurisve call can pass an unknown as an aggregate.
+  if (aggregate.getKind() == SymbolicValue::Unknown)
+    return aggregate;
+
   // If we have an uninit memory, then scalarize it into an aggregate to
   // continue.  This happens when memory objects are initialized piecewise.
   if (aggregate.getKind() == SymbolicValue::UninitMemory) {

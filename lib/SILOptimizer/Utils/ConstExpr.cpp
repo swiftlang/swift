@@ -2162,13 +2162,8 @@ ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
   return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
 }
 
-std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
-    SILBasicBlock::iterator instI) {
-  SILInstruction *inst = &(*instI);
-
-  // Set all constant state that could be mutated by the instruction
-  // to an unknown symbolic value.
+void ConstExprStepEvaluator::setMutableAddressesToUnknown(
+    SILInstruction *inst) {
   for (auto &operand : inst->getAllOperands()) {
     auto constValOpt = lookupConstValue(operand.get());
     if (!constValOpt) {
@@ -2225,6 +2220,15 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
       memoryObject->setValue(unknownValue);
     }
   }
+}
+
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+  SILInstruction *inst = &(*instI);
+
+  if (inst->mayWriteToMemory())
+    setMutableAddressesToUnknown(inst);
 
   // Map the results of this instruction to unknown values.
   for (auto result : inst->getResults()) {
