@@ -3891,6 +3891,7 @@ public:
 
     auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
     if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        !MF.FileContext->getParentModule()->isMainModule() &&
         AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
       // Do not try to read the underlying type information if the function
       // is not inlinable in clients. This reflects the swiftinterface behavior
