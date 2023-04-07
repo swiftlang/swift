@@ -238,7 +238,7 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   auto clangModuleDependencies =
       cache.getClangScannerTool().getModuleDependencies(
           moduleName, commandLineArgs, workingDir,
-          cache.getAlreadySeenClangModules(), lookupModuleOutput, {});
+          cache.getAlreadySeenClangModules(), lookupModuleOutput);
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
@@ -298,7 +298,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
   auto clangModuleDependencies =
       cache.getClangScannerTool().getTranslationUnitDependencies(
           commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-          lookupModuleOutput, {});
+          lookupModuleOutput);
   if (!clangModuleDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(), llvm::errs());
