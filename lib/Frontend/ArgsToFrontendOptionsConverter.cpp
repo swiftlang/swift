@@ -346,6 +346,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
   Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
+  for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
+    Opts.BlocklistConfigFilePaths.push_back(A);
+  }
   return false;
 }
 
