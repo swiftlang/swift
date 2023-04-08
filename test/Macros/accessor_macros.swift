@@ -43,7 +43,7 @@ struct MyStruct {
 
   @myPropertyWrapper
   var name: String
-  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV4nameSSvp17myPropertyWrapperfMa_.swift
+  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV4name17myPropertyWrapperfMa_.swift
   // CHECK-DUMP: get {
   // CHECK-DUMP:   _name.wrappedValue
   // CHECK-DUMP: }
@@ -53,7 +53,7 @@ struct MyStruct {
 
   @myPropertyWrapper
   var birthDate: Date?
-  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV9birthDateAA0F0VSgvp17myPropertyWrapperfMa_.swift 
+  // CHECK-DUMP: @__swiftmacro_15accessor_macros8MyStructV9birthDate17myPropertyWrapperfMa_.swift
   // CHECK-DUMP: get {
   // CHECK-DUMP:   _birthDate.wrappedValue
   // CHECK-DUMP: }
