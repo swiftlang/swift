@@ -1697,6 +1697,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())
     (void)llvm::sys::fs::create_directories(moduleCachePath);
+
+  // Inherit all block list configuration files
+  frontendOpts.BlocklistConfigFilePaths = langOpts.BlocklistConfigFilePaths;
+  for (auto &blocklist: langOpts.BlocklistConfigFilePaths) {
+    GenericArgs.push_back("-blocklist-file");
+    GenericArgs.push_back(blocklist);
+  }
 }
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
