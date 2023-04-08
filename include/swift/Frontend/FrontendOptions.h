@@ -510,6 +510,8 @@ public:
   /// textual imports
   bool EmitClangHeaderWithNonModularIncludes = false;
 
+  /// All block list configuration files to be honored in this compilation.
+  std::vector<std::string> BlocklistConfigFilePaths;
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
