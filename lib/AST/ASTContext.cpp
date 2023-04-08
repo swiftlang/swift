@@ -695,7 +695,7 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
   // Insert all block list config paths.
-  for (auto path: langOpts.BlocklistConfigFilePath) {
+  for (auto path: langOpts.BlocklistConfigFilePaths) {
     blockListConfig.addConfigureFilePath(path);
   }
 }
