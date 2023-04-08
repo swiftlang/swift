@@ -396,13 +396,13 @@ Entities
 
   macro-discriminator-list ::= macro-discriminator-list? file-discriminator? macro-expansion-operator INDEX
 
-  macro-expansion-operator ::= identifier 'fMa' // attached accessor macro
-  macro-expansion-operator ::= identifier 'fMA' // attached member-attribute macro
+  macro-expansion-operator ::= decl-name identifier 'fMa' // attached accessor macro
+  macro-expansion-operator ::= decl-name identifier 'fMA' // attached member-attribute macro
   macro-expansion-operator ::= identifier 'fMf' // freestanding macro
-  macro-expansion-operator ::= identifier 'fMm' // attached member macro
-  macro-expansion-operator ::= identifier 'fMp' // attached peer macro
-  macro-expansion-operator ::= identifier 'fMc' // attached conformance macro
-  macro-expansion-operator ::= identifier 'fMu' // uniquely-named entity
+  macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
+  macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
+  macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
 

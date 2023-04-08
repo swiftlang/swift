@@ -4061,47 +4061,74 @@ static bool isMacroExpansionNodeKind(Node::Kind kind) {
 
 NodePointer Demangler::demangleMacroExpansion() {
   Node::Kind kind;
+  bool isAttached;
+  bool isFreestanding;
   switch (nextChar()) {
   case 'a':
     kind = Node::Kind::AccessorAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
     break;
 
   case 'A':
     kind = Node::Kind::MemberAttributeAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
     break;
 
   case 'f':
     kind = Node::Kind::FreestandingMacroExpansion;
+    isAttached = false;
+    isFreestanding = true;
     break;
 
   case 'm':
     kind = Node::Kind::MemberAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
     break;
 
   case 'p':
     kind = Node::Kind::PeerAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
     break;
 
   case 'c':
     kind = Node::Kind::ConformanceAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
     break;
 
   case 'u':
     kind = Node::Kind::MacroExpansionUniqueName;
+    isAttached = false;
+    isFreestanding = false;
     break;
 
   default:
     return nullptr;
   }
 
-  NodePointer name = popNode(Node::Kind::Identifier);
-  NodePointer privateDiscriminator = popNode(Node::Kind::PrivateDeclName);
+  NodePointer macroName = popNode(Node::Kind::Identifier);
+  NodePointer privateDiscriminator = nullptr;
+  if (isFreestanding)
+    privateDiscriminator = popNode(Node::Kind::PrivateDeclName);
+  NodePointer attachedName = nullptr;
+  if (isAttached)
+    attachedName = popNode(isDeclName);
+
   NodePointer context = popNode(isMacroExpansionNodeKind);
   if (!context)
     context = popContext();
   NodePointer discriminator = demangleIndexAsNode();
-  auto result = createWithChildren(
-      kind, context, name, discriminator);
+  NodePointer result;
+  if (isAttached) {
+    result = createWithChildren(
+        kind, context, attachedName, macroName, discriminator);
+  } else {
+    result = createWithChildren(kind, context, macroName, discriminator);
+  }
   if (privateDiscriminator)
     result->addChild(privateDiscriminator, *this);
   return result;
