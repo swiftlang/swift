@@ -25,8 +25,8 @@ namespace swift {
 
 enum class BlockListAction: uint8_t {
   Undefined = 0,
-  ShouldUseBinaryModule,
-  ShouldUseTextualModule,
+#define BLOCKLIST_ACTION(NAME) NAME,
+#include "BlockListAction.def"
 };
 
 enum class BlockListKeyKind: uint8_t {
