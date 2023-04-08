@@ -115,10 +115,8 @@ void swift::BlockListStore::Implementation::addConfigureFilePath(StringRef path)
     for (auto &pair: *dyn_cast<yaml::MappingNode>(N)) {
       std::string key = getScalaString(pair.getKey());
       auto action = llvm::StringSwitch<BlockListAction>(key)
-#define CASE(X) .Case(#X, BlockListAction::X)
-        CASE(ShouldUseBinaryModule)
-        CASE(ShouldUseTextualModule)
-#undef CASE
+#define BLOCKLIST_ACTION(X) .Case(#X, BlockListAction::X)
+#include "swift/Basic/BlockListAction.def"
         .Default(BlockListAction::Undefined);
       if (action == BlockListAction::Undefined)
         continue;
