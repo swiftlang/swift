@@ -8617,6 +8617,7 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
 }
 
 bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
+  const auto fromType = getFromType();
   const auto toType = getToType();
   auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
   // FIXME(https://github.com/apple/swift/issues/54529): This literal diagnostics needs to be revisited by a proposal to unify casting semantics for literals.
@@ -8628,7 +8629,8 @@ bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
     // be statically coerced to the cast type.
     if (protocol && TypeChecker::conformsToProtocol(toType, protocol,
                                                     dc->getParentModule())) {
-      emitDiagnostic(diag::literal_conditional_downcast_to_coercion, toType);
+      emitDiagnostic(diag::literal_conditional_downcast_to_coercion, fromType,
+                     toType);
       return true;
     }
   }

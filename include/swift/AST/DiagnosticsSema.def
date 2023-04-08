@@ -1189,9 +1189,9 @@ WARNING(conditional_downcast_coercion,none,
       (Type, Type))
 
 WARNING(literal_conditional_downcast_to_coercion,none,
-        "conditional downcast from literal to %0 always fails; "
+        "cast from literal of inferred type %0 to unrelated type %1 always fails; "
         "consider using 'as' coercion",
-        (Type))
+        (Type, Type))
 
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
