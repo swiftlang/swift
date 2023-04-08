@@ -221,6 +221,7 @@ public:
     return guaranteed.stored;
   }
 
+  /// Whether it's possible and appropriate to end the lifetime.
   bool canEndLexicalLifetime() {
     if (auto *owned = storage.dyn_cast<Owned>()) {
       return owned->canEndLexicalLifetime();
