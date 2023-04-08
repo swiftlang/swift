@@ -316,6 +316,39 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
+enum class CodeCompletionMacroRole : uint8_t {
+  Expression = 1 << 0,
+  Declaration = 1 << 1,
+  CodeItem = 1 << 2,
+  AttachedVar = 1 << 3,
+  AttachedContext = 1 << 4,
+  AttachedDecl = 1 << 5,
+};
+using CodeCompletionMacroRoles = OptionSet<CodeCompletionMacroRole>;
+
+enum class CodeCompletionFilterFlag : uint16_t {
+  Expr = 1 << 0,
+  Type = 1 << 1,
+  PrecedenceGroup = 1 << 2,
+  Module = 1 << 3,
+  ExpressionMacro = 1 << 4,
+  DeclarationMacro = 1 << 5,
+  CodeItemMacro = 1 << 6,
+  AttachedVarMacro = 1 << 7,
+  AttachedContextMacro = 1 << 8,
+  AttachedDeclMacro = 1 << 9,
+};
+using CodeCompletionFilter = OptionSet<CodeCompletionFilterFlag>;
+
+CodeCompletionMacroRoles getCompletionMacroRoles(const Decl *D);
+
+CodeCompletionMacroRoles
+getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds);
+
+CodeCompletionMacroRoles getCompletionMacroRoles(CodeCompletionFilter filter);
+
+CodeCompletionFilter getCompletionFilter(CodeCompletionMacroRoles roles);
+
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
 class ContextFreeCodeCompletionResult {
@@ -333,6 +366,8 @@ class ContextFreeCodeCompletionResult {
 
   CodeCompletionOperatorKind KnownOperatorKind : 6;
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
+
+  CodeCompletionMacroRoles MacroRoles;
 
   bool IsSystem : 1;
   bool IsAsync : 1;
@@ -359,17 +394,18 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef NameForDiagnostics;
 
 public:
-  /// Memberwise initializer. \p AssociatedKInd is opaque and will be
+  /// Memberwise initializer. \p AssociatedKind is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
   /// completion item is an operator, it will be determined based on the
-  /// compleiton string.
+  /// completion string.
   ///
-  /// \note The caller must ensure that the \p CompleitonString and all the
+  /// \note The caller must ensure that the \p CompletionString and all the
   /// \c Ref types outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem, bool IsAsync,
+      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionMacroRoles MacroRoles, bool IsSystem, bool IsAsync,
       bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
@@ -380,8 +416,9 @@ public:
       NullTerminatedStringRef DiagnosticMessage,
       NullTerminatedStringRef FilterName,
       NullTerminatedStringRef NameForDiagnostics)
-      : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
-        IsAsync(IsAsync), HasAsyncAlternative(HasAsyncAlternative),
+      : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
+        MacroRoles(MacroRoles), IsSystem(IsSystem), IsAsync(IsAsync),
+        HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
@@ -487,6 +524,8 @@ public:
     assert(isOperator());
     return KnownOperatorKind;
   }
+
+  CodeCompletionMacroRoles getMacroRoles() const { return MacroRoles; }
 
   bool isSystem() const { return IsSystem; };
 
