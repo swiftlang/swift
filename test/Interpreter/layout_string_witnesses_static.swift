@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-type-layout -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
 
-// NOTE: This additional step is necessary to turn private external symbols into local symbols, so we can observe potential issues with linkage
-// RUN: %target-build-swift-dylib(%t/layout_string_witnesses_types.dylib) %t/layout_string_witnesses_types.o
+// NOTE: We have to build this as dylib to turn private external symbols into local symbols, so we can observe potential issues with linkage
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
 // RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static %t/layout_string_witnesses_types.dylib %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static %t/%target-library-name(layout_string_witnesses_types) %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
