@@ -138,8 +138,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
-    llvm::outs() << "Demangling for " << name << '\n';
-    llvm::outs() << getNodeTreeAsString(pointer);
+    os << "Demangling for " << name << '\n';
+    os << getNodeTreeAsString(pointer);
   }
   if (RemangleMode) {
     std::string remangled;
@@ -175,8 +175,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
     }
-    if (hadLeadingUnderscore) llvm::outs() << '_';
-    llvm::outs() << remangled;
+    if (hadLeadingUnderscore) os << '_';
+    os << remangled;
     return;
   } else if (RemangleRtMode) {
     std::string remangled = name.str();
@@ -190,7 +190,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       }
       remangled = mangling.result();
     }
-    llvm::outs() << remangled;
+    os << remangled;
     return;
   }
   if (!TreeOnly) {
@@ -207,7 +207,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
       std::string remangled = mangling.result();
-      llvm::outs() << remangled;
+      os << remangled;
       return;
     }
     if (StripSpecialization) {
@@ -220,12 +220,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         exit(1);
       }
       std::string remangled = mangling.result();
-      llvm::outs() << remangled;
+      os << remangled;
       return;
     }
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
-      llvm::outs() << name << " ---> ";
+      os << name << " ---> ";
 
     if (Classify) {
       std::string Classifications;
@@ -245,9 +245,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         Classifications += 'C';
       }
       if (!Classifications.empty())
-        llvm::outs() << '{' << Classifications << "} ";
+        os << '{' << Classifications << "} ";
     }
-    llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
+    os << (string.empty() ? name : llvm::StringRef(string));
   }
   DCtx.clear();
 }
