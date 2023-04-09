@@ -21,5 +21,6 @@
 
 BLOCKLIST_ACTION(ShouldUseBinaryModule)
 BLOCKLIST_ACTION(ShouldUseTextualModule)
+BLOCKLIST_ACTION(DowngradeInterfaceVerificationFailure)
 
 #undef BLOCKLIST_ACTION
