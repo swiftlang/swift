@@ -37,10 +37,19 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
       return false;
 
     switch (R->getAssociatedDeclKind()) {
+    case CodeCompletionDeclKind::EnumElement:
+    case CodeCompletionDeclKind::Constructor:
+    case CodeCompletionDeclKind::Destructor:
+    case CodeCompletionDeclKind::Subscript:
+    case CodeCompletionDeclKind::StaticMethod:
+    case CodeCompletionDeclKind::InstanceMethod:
     case CodeCompletionDeclKind::PrefixOperatorFunction:
     case CodeCompletionDeclKind::PostfixOperatorFunction:
     case CodeCompletionDeclKind::InfixOperatorFunction:
     case CodeCompletionDeclKind::FreeFunction:
+    case CodeCompletionDeclKind::StaticVar:
+    case CodeCompletionDeclKind::InstanceVar:
+    case CodeCompletionDeclKind::LocalVar:
     case CodeCompletionDeclKind::GlobalVar:
       return filter.contains(CodeCompletionFilterFlag::Expr);
 
@@ -60,20 +69,9 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
 
     case CodeCompletionDeclKind::Macro:
       return (bool)(R->getMacroRoles() & expectedMacroRoles);
-
-    case CodeCompletionDeclKind::EnumElement:
-    case CodeCompletionDeclKind::Constructor:
-    case CodeCompletionDeclKind::Destructor:
-    case CodeCompletionDeclKind::Subscript:
-    case CodeCompletionDeclKind::StaticMethod:
-    case CodeCompletionDeclKind::InstanceMethod:
-    case CodeCompletionDeclKind::StaticVar:
-    case CodeCompletionDeclKind::InstanceVar:
-    case CodeCompletionDeclKind::LocalVar:
-      break;
     }
 
-    return false;
+    llvm_unreachable("Unhandled associated decl kind");
   };
 
   USRBasedTypeContext USRTypeContext(TypeContext, source.USRTypeArena);
