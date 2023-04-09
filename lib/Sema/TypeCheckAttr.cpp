@@ -1896,7 +1896,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 
   // Skip the remaining diagnostics in swiftinterfaces.
-  auto *SF = D->getDeclContext()->getParentSourceFile();
+  auto *DC = D->getDeclContext();
+  auto *SF = DC->getParentSourceFile();
   if (SF && SF->Kind == SourceFileKind::Interface)
     return;
 
@@ -1926,7 +1927,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       return;
     }
 
-    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (VD->isProtocolRequirement() && !PD->isObjC()) {
           diagnoseAndRemoveAttr(attr,
@@ -1958,13 +1959,17 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       EnclosingAnnotatedRange.emplace(
           AvailabilityInference::availableRange(enclosingAttr, Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
-        // Members of extensions of nominal types with available ranges were
-        // not diagnosed previously, so only emit a warning in that case.
-        bool inExtension = isa<ExtensionDecl>(
-            D->getDeclContext()->getTopmostDeclarationDeclContext());
-        auto limit = (enclosingDecl != parent && inExtension)
-                         ? DiagnosticBehavior::Warning
-                         : DiagnosticBehavior::Unspecified;
+        auto limit = DiagnosticBehavior::Unspecified;
+        if (D->isImplicit()) {
+          // Incorrect availability for an implicit declaration is likely a
+          // compiler bug so make the diagnostic a warning.
+          limit = DiagnosticBehavior::Warning;
+        } else if (enclosingDecl != parent) {
+          // Members of extensions of nominal types with available ranges were
+          // not diagnosed previously, so only emit a warning in that case.
+          if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
+            limit = DiagnosticBehavior::Warning;
+        }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : attr->getLocation(),
                  diag::availability_decl_more_than_enclosing,
