@@ -180,6 +180,14 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   return false;
 }
 
+static bool shouldDowngradeInterfaceVerificationError(const FrontendOptions &opts,
+                                                      ASTContext &ctx) {
+  return opts.DowngradeInterfaceVerificationError ||
+    ctx.blockListConfig.hasBlockListAction(opts.ModuleName,
+                                           BlockListKeyKind::ModuleName,
+                        BlockListAction::DowngradeInterfaceVerificationFailure);
+}
+
 std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     StringRef InterfacePath, StringRef OutputPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -207,7 +215,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
                           << " to " << OutputPath << "\n");
 
   LLVM_DEBUG(llvm::dbgs() << "Performing sema\n");
-  if (isTypeChecking && FEOpts.DowngradeInterfaceVerificationError) {
+  if (isTypeChecking &&
+      shouldDowngradeInterfaceVerificationError(FEOpts, Instance.getASTContext())) {
     ErrorDowngradeConsumerRAII R(Instance.getDiags());
     Instance.performSema();
     return std::error_code();
