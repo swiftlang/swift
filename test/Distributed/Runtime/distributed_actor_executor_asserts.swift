@@ -46,12 +46,15 @@ extension Worker {
 
 actor EnqueueTest {
   let unownedExecutor: UnownedSerialExecutor
+  var field: Int = 0
 
   init(unownedExecutor: UnownedSerialExecutor) {
     self.unownedExecutor = unownedExecutor
   }
 
   func test() {
+    // do something, so the test call does not get optimized away (if it was just an empty method)
+    self.field += 1
   }
 }
 
