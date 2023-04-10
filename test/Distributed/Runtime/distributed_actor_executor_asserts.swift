@@ -22,13 +22,15 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
+@available(SwiftStdlib 5.9, *)
 distributed actor MainWorker: Worker {
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }
 }
 
+@available(SwiftStdlib 5.9, *)
 distributed actor NormalWorker: Worker {
   // empty on purpose, default executor
 }
@@ -39,6 +41,20 @@ protocol Worker: DistributedActor {
 extension Worker {
   distributed func preconditionSameExecutor(as other: some Worker) {
     other.preconditionIsolated("Expected for [\(self)] share executor with [\(other)]")
+  }
+}
+
+actor EnqueueTest {
+  let unownedExecutor: UnownedSerialExecutor
+  var field: Int = 0
+
+  init(unownedExecutor: UnownedSerialExecutor) {
+    self.unownedExecutor = unownedExecutor
+  }
+
+  func test() {
+    // do something, so the test call does not get optimized away (if it was just an empty method)
+    self.field += 1
   }
 }
 
@@ -54,24 +70,24 @@ extension Worker {
 
       let normalRemoteWorker = try! NormalWorker.resolve(id: normalLocalWorker.id, using: system)
       precondition(__isRemoteActor(normalRemoteWorker), "must be remote")
+      precondition(normalLocalWorker.id == normalRemoteWorker.id, "IDs must be equal")
 
-      if #available(SwiftStdlib 5.9, *) {
-        precondition(normalLocalWorker.id == normalRemoteWorker.id, "IDs must be equal")
+      tests.test("exactly the same actor") {
+        try! await normalLocalWorker.preconditionSameExecutor(as: normalLocalWorker)
+      }
 
-        tests.test("exactly the same actor") {
-          try! await normalLocalWorker.preconditionSameExecutor(as: normalLocalWorker)
-        }
+      tests.test("different normal local worker, not same executor") {
+        expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'UnownedSerialExecutor(executor: (Opaque Value))' executor. Expected for [main.NormalWorker] share executor with main.NormalWorker")
+        let other = NormalWorker(actorSystem: system)
+        try! await normalLocalWorker.preconditionSameExecutor(as: other)
+      }
 
-        tests.test("different normal local worker, not same executor") {
-          expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'UnownedSerialExecutor(executor: (Opaque Value))' executor. Expected for [main.NormalWorker] share executor with main.NormalWorker")
-          let other = NormalWorker(actorSystem: system)
-          try! await normalLocalWorker.preconditionSameExecutor(as: other)
-        }
-
-        tests.test("remote actor reference should have nil executor") {
-          precondition(normalRemoteWorker.localUnownedExecutor == nil,
-              "Expected nil executor but was: \(String(describing: normalRemoteWorker.localUnownedExecutor!))")
-        }
+      tests.test("remote actor reference should have crash-on-enqueue executor") {
+        expectCrashLater(withMessage: "Attempted to enqueue Job (Job(id: 1)) on executor of remote distributed actor reference!")
+        // we do the bad idea of taking an executor from a remote worker
+        // and then force another actor to run on it; this will cause an enqueue on the "crash on enqueue" executor.
+        let wrongUse = EnqueueTest(unownedExecutor: normalRemoteWorker.unownedExecutor)
+        await wrongUse.test()
       }
     }
 

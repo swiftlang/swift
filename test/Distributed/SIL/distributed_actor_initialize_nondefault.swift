@@ -15,7 +15,7 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 @available(SwiftStdlib 5.9, *)
 distributed actor MyDistActor {
-    nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+    nonisolated var unownedExecutor: UnownedSerialExecutor {
         return MainActor.sharedUnownedExecutor
     }
 

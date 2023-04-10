@@ -23,7 +23,7 @@ typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
 @available(SwiftStdlib 5.7, *)
 distributed actor FiveSevenActor_NothingExecutor {
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }
@@ -41,8 +41,7 @@ distributed actor FiveSevenActor_NothingExecutor {
 
 @available(SwiftStdlib 5.9, *)
 distributed actor FiveNineActor_NothingExecutor {
-//  @available(SwiftStdlib 5.9, *) // because of `localUnownedExecutor`
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }
@@ -61,7 +60,7 @@ distributed actor FiveNineActor_NothingExecutor {
 @available(SwiftStdlib 5.7, *)
 distributed actor FiveSevenActor_FiveNineExecutor {
   @available(SwiftStdlib 5.9, *)
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? {
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("get unowned executor")
     return MainActor.sharedUnownedExecutor
   }

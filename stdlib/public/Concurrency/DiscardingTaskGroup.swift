@@ -407,7 +407,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// out of the `withThrowingDiscardingTaskGroup` method when it returns.
 ///
 /// ```
-/// try await withThrowingDiscardingTaskGroup() { group in
+/// try await withThrowingDiscardingTaskGroup { group in
 ///   group.addTask { try boom(1) }
 ///   group.addTask { try boom(2, after: .seconds(5)) }
 ///   group.addTask { try boom(3, after: .seconds(5)) }
@@ -490,7 +490,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 /// A throwing discarding task group becomes cancelled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
+/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup { ... }` closure,
 /// - when the ``Task`` running this task group is cancelled.
 ///
 /// But also, and uniquely in *discarding* task groups:
@@ -598,7 +598,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withThrowingDiscardingTaskGroup(of:returning:body:)` call,
+  /// At the start of the body of a `withThrowingDiscardingTaskGroup(returning:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body

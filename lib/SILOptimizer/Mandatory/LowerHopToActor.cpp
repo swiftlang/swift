@@ -197,43 +197,11 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     unmarkedExecutor =
       B.createBuiltin(loc, builtinName, resultType, subs, {actor});
 
-    // Otherwise, go through Actor.unownedExecutor.
-  } else if (actorType->isDistributedActor()) {
-    auto actorKind = KnownProtocolKind::DistributedActor;
-    auto actorProtocol = ctx.getProtocol(actorKind);
-    auto req = ctx.getGetUnwrapLocalDistributedActorUnownedExecutor();
-    assert(req && "Distributed library broken");
-    SILDeclRef fn(req, SILDeclRef::Kind::Func);
-
-    auto actorConf = module->lookupConformance(actorType, actorProtocol);
-    assert(actorConf &&
-           "hop_to_executor with distributed actor that doesn't conform to DistributedActor");
-
-    auto subs = SubstitutionMap::get(req->getGenericSignature(),
-                                     {actorType}, {actorConf});
-
-    // Find the unwrap function
-    FuncDecl *funcDecl = ctx.getGetUnwrapLocalDistributedActorUnownedExecutor();
-    assert(funcDecl);
-    auto funcDeclRef = SILDeclRef(funcDecl, SILDeclRef::Kind::Func);
-
-    SILFunction *unwrapExecutorFun =
-        functionBuilder.getOrCreateFunction(
-            loc, funcDeclRef, ForDefinition_t::NotForDefinition);
-    assert(unwrapExecutorFun && "no sil function!");
-    auto funcRef =
-        B.createFunctionRef(loc, unwrapExecutorFun);
-    auto witnessCall = B.createApply(loc, funcRef, subs, {actor});
-
-    // The protocol requirement returns an Optional<UnownedSerialExecutor>;
-    // extract the Builtin.Executor from it.
-    auto executorDecl = ctx.getUnownedSerialExecutorDecl();
-    auto executorProps = executorDecl->getStoredProperties();
-    assert(executorProps.size() == 1);
-    unmarkedExecutor =
-      B.createStructExtract(loc, witnessCall, executorProps[0]);
+    // Otherwise, go through (Distributed)Actor.unownedExecutor.
   } else {
-    auto actorKind = KnownProtocolKind::Actor;
+    auto actorKind = actorType->isDistributedActor() ?
+                     KnownProtocolKind::DistributedActor :
+                     KnownProtocolKind::Actor;
     auto actorProtocol = ctx.getProtocol(actorKind);
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");

@@ -2039,7 +2039,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
               cast<ClassDecl>(prop->getDeclContext())->isActor() &&
               !prop->isStatic() &&
               prop->getName() == ctx.Id_unownedExecutor &&
-              prop->getName() == ctx.Id_localUnownedExecutor &&
               prop->getInterfaceType()->getAnyNominal() == ctx.getUnownedSerialExecutorDecl());
     };
 
