@@ -39,13 +39,17 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
+@_moveOnly struct MOS {}
 
 sil [ossa] @getKlass : $@convention(thin) () -> @owned Klass
+sil [ossa] @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+sil [ossa] @getMOS : $@convention(thin) () -> @owned MOS
 
 sil @unknown : $@convention(thin) () -> ()
 
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @guaranteed_user_with_result : $@convention(thin) (@guaranteed Klass) -> @out Klass
+sil [ossa] @inguaranteed_user_without_result_NTS : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 
 sil [ossa] @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -767,8 +771,7 @@ bb0(%0 : $*Builtin.NativeObject):
 //
 // CHECK-LABEL: sil [ossa] @takeWithLoadRelease : $@convention(thin) (@in Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK:   [[V:%.*]] = load [copy] %0 : $*Builtin.NativeObject
-// CHECK:   destroy_addr %0 : $*Builtin.NativeObject
+// CHECK:   [[V:%.*]] = load [take] %0 : $*Builtin.NativeObject
 // CHECK:   apply %{{.*}}([[V]]) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK:   destroy_value [[V]] : $Builtin.NativeObject
 // CHECK-LABEL: } // end sil function 'takeWithLoadRelease'
@@ -1516,9 +1519,7 @@ bb2:
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Klass
 // CHECK:         store [[INSTANCE_1]] to [init] [[ADDR]]
 // CHECK:         apply [[USER]]([[ADDR]])
-// CHECK:         [[INSTANCE_2:%[^,]+]] = load [copy] [[ADDR]]
-// Extra copy:                            ^^^^^^^^^^^
-// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [take] [[ADDR]]
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         return [[INSTANCE_2]]
 // CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_load_take'
@@ -1545,9 +1546,7 @@ sil [ossa] @take_from_original_copy_addr__final_use_load_take : $() -> @owned Kl
 // CHECK:         [[SRC:%[^,]+]] = alloc_stack $Klass                         
 // CHECK:         store [[INSTANCE_1]] to [init] [[SRC]]
 // CHECK:         apply [[USER]]([[SRC]])
-// CHECK:         copy_addr [[SRC]] to [init] [[OUT]]
-// Extra copy:    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// CHECK:         destroy_addr [[SRC]]
+// CHECK:         copy_addr [take] [[SRC]] to [init] [[OUT]]
 // CHECK:         dealloc_stack [[SRC]]
 // CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_copy_addr_take'
 sil [ossa] @take_from_original_copy_addr__final_use_copy_addr_take : $() -> @out Klass {
@@ -1563,6 +1562,68 @@ entry(%out : $*Klass):
   copy_addr [take] %tmp to [init] %out : $*Klass
   dealloc_stack %tmp : $*Klass
   dealloc_stack %src : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_field_load_copy : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getNonTrivialStruct
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result_NTS
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $NonTrivialStruct
+// CHECK:         store [[INSTANCE]] to [init] [[SRC]]
+// CHECK:         apply [[USER]]([[SRC]])
+// CHECK:         [[FIELD_ADDR:%[^,]+]] = struct_element_addr [[SRC]]
+// CHECK:         [[FIELD:%[^,]+]] = load [copy] [[FIELD_ADDR]]
+// CHECK:         destroy_addr [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK:         return [[FIELD]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_field_load_copy'
+sil [ossa] @take_from_original_copy_addr__final_use_field_load_copy : $() -> @owned Klass {
+  %get = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %user = function_ref @inguaranteed_user_without_result_NTS : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+  %instance_1 = apply %get() : $@convention(thin) () -> @owned NonTrivialStruct
+  %src = alloc_stack $NonTrivialStruct
+  store %instance_1 to [init] %src : $*NonTrivialStruct
+  apply %user(%src) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+  %tmp = alloc_stack $NonTrivialStruct
+  copy_addr [take] %src to [init] %tmp : $*NonTrivialStruct
+  %field_addr = struct_element_addr %tmp : $*NonTrivialStruct, #NonTrivialStruct.val
+  %field = load [copy] %field_addr : $*Klass
+  destroy_addr %tmp : $*NonTrivialStruct
+  dealloc_stack %tmp : $*NonTrivialStruct
+  dealloc_stack %src : $*NonTrivialStruct
+  return %field : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_field_copy_addr_take : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[OUT:%[^,]+]] :
+// CHECK:         [[GET:%[^,]+]] = function_ref @getNonTrivialStruct
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result_NTS
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $NonTrivialStruct
+// CHECK:         store [[INSTANCE]] to [init] [[SRC]]
+// CHECK:         apply [[USER]]([[SRC]])
+// CHECK:         [[FIELD_ADDR:%[^,]+]] = struct_element_addr [[SRC]]
+// CHECK:         copy_addr [[FIELD_ADDR]] to [init] [[OUT]]
+// CHECK:         destroy_addr [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_field_copy_addr_take'
+sil [ossa] @take_from_original_copy_addr__final_use_field_copy_addr_take : $() -> @out Klass {
+entry(%out : $*Klass):
+  %getNonTrivialStruct = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %user = function_ref @inguaranteed_user_without_result_NTS : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+  %instance_1 = apply %getNonTrivialStruct() : $@convention(thin) () -> @owned NonTrivialStruct
+  %src = alloc_stack $NonTrivialStruct
+  store %instance_1 to [init] %src : $*NonTrivialStruct
+  apply %user(%src) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+  %tmp = alloc_stack $NonTrivialStruct
+  copy_addr [take] %src to [init] %tmp : $*NonTrivialStruct
+  %field_addr = struct_element_addr %tmp : $*NonTrivialStruct, #NonTrivialStruct.val
+  copy_addr %field_addr to [init] %out : $*Klass
+  destroy_addr %tmp : $*NonTrivialStruct
+  dealloc_stack %tmp : $*NonTrivialStruct
+  dealloc_stack %src : $*NonTrivialStruct
   %retval = tuple ()
   return %retval : $()
 }
@@ -1702,4 +1763,32 @@ entry(%instance : $*NonTrivialStruct):
   dealloc_stack %addr : $*Klass
   %retval = tuple ()
   return %retval : $()
+}
+
+// Verify that no copy of an instance of the move-only type MOS is introduced.
+// CHECK-LABEL: sil hidden [ossa] @dont_copy_move_only_struct : {{.*}} {
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $MOS
+// CHECK:         [[GET:%[^,]+]] = function_ref @getMOS
+// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET]]()
+// CHECK:         store [[INSTANCE_1]] to [init] [[SRC]]
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [take] [[SRC]]
+// CHECK:         store [[INSTANCE_2]] to [init] [[SRC]]
+// CHECK:         [[INSTANCE_3:%[^,]+]] = load [take] [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK:         return [[INSTANCE_3]]
+// CHECK-LABEL: } // end sil function 'dont_copy_move_only_struct'
+sil hidden [ossa] @dont_copy_move_only_struct : $@convention(thin) () -> @owned MOS {
+bb0:
+  %src = alloc_stack $MOS
+  %getMOS = function_ref @getMOS : $@convention(thin) () -> @owned MOS
+  %instance_1 = apply %getMOS() : $@convention(thin) () -> @owned MOS
+  store %instance_1 to [init] %src : $*MOS
+  %tmp = alloc_stack $MOS
+  copy_addr [take] %src to [init] %tmp : $*MOS
+  %instance_2 = load [take] %tmp : $*MOS
+  store %instance_2 to [init] %src : $*MOS
+  %instance_3 = load [take] %src : $*MOS
+  dealloc_stack %tmp : $*MOS
+  dealloc_stack %src : $*MOS
+  return %instance_3 : $MOS
 }
