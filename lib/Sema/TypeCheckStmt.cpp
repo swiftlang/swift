@@ -2649,9 +2649,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     if (Type builderType = getResultBuilderType(func)) {
       if (auto optBody =
               TypeChecker::applyResultBuilderBodyTransform(
-                func, builderType,
-                /*ClosuresInResultBuilderDontParticipateInInference=*/
-                false)) {
+                func, builderType)) {
         if (!*optBody)
           return errorBody();
 
