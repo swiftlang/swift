@@ -39,6 +39,9 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
+
+sil [ossa] @getKlass : $@convention(thin) () -> @owned Klass
+
 sil @unknown : $@convention(thin) () -> ()
 
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
@@ -1504,6 +1507,122 @@ bb2:
   destroy_addr %1 : $*Two
   dealloc_stack %1 : $*Two
   unwind
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_load_take : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result
+// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Klass
+// CHECK:         store [[INSTANCE_1]] to [init] [[ADDR]]
+// CHECK:         apply [[USER]]([[ADDR]])
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [copy] [[ADDR]]
+// Extra copy:                            ^^^^^^^^^^^
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         return [[INSTANCE_2]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_load_take'
+sil [ossa] @take_from_original_copy_addr__final_use_load_take : $() -> @owned Klass {
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %user = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %instance_1 = apply %getKlass() : $@convention(thin) () -> @owned Klass
+  %src = alloc_stack $Klass
+  store %instance_1 to [init] %src : $*Klass
+  apply %user(%src) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %tmp = alloc_stack $Klass
+  copy_addr [take] %src to [init] %tmp : $*Klass
+  %instance_2 = load [take] %tmp : $*Klass
+  dealloc_stack %tmp : $*Klass
+  dealloc_stack %src : $*Klass
+  return %instance_2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_copy_addr_take : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[OUT:%[^,]+]] :
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result
+// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $Klass                         
+// CHECK:         store [[INSTANCE_1]] to [init] [[SRC]]
+// CHECK:         apply [[USER]]([[SRC]])
+// CHECK:         copy_addr [[SRC]] to [init] [[OUT]]
+// Extra copy:    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// CHECK:         destroy_addr [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_copy_addr_take'
+sil [ossa] @take_from_original_copy_addr__final_use_copy_addr_take : $() -> @out Klass {
+entry(%out : $*Klass):
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %user = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %instance_1 = apply %getKlass() : $@convention(thin) () -> @owned Klass
+  %src = alloc_stack $Klass
+  store %instance_1 to [init] %src : $*Klass
+  apply %user(%src) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %tmp = alloc_stack $Klass
+  copy_addr [take] %src to [init] %tmp : $*Klass
+  copy_addr [take] %tmp to [init] %out : $*Klass
+  dealloc_stack %tmp : $*Klass
+  dealloc_stack %src : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_load_copy : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result
+// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $Klass
+// CHECK:         store [[INSTANCE_1]] to [init] [[SRC]]
+// CHECK:         apply [[USER]]([[SRC]])
+// CHECK:         [[INSTANCE_2:%[^,]+]] = load [copy] [[SRC]]
+// CHECK:         destroy_addr [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK:         return [[INSTANCE_2]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_load_copy'
+sil [ossa] @take_from_original_copy_addr__final_use_load_copy : $() -> @owned Klass {
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %user = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %instance_1 = apply %getKlass() : $@convention(thin) () -> @owned Klass
+  %src = alloc_stack $Klass
+  store %instance_1 to [init] %src : $*Klass
+  apply %user(%src) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %tmp = alloc_stack $Klass
+  copy_addr [take] %src to [init] %tmp : $*Klass
+  %instance_2 = load [copy] %tmp : $*Klass
+  destroy_addr %tmp : $*Klass
+  dealloc_stack %tmp : $*Klass
+  dealloc_stack %src : $*Klass
+  return %instance_2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @take_from_original_copy_addr__final_use_copy_addr_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[OUT:%[^,]+]] : $*Klass):
+// CHECK:         [[GET:%[^,]+]] = function_ref @getKlass
+// CHECK:         [[USER:%[^,]+]] = function_ref @inguaranteed_user_without_result
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[SRC:%[^,]+]] = alloc_stack $Klass
+// CHECK:         store [[INSTANCE]] to [init] [[SRC]]
+// CHECK:         apply [[USER]]([[SRC]])
+// CHECK:         copy_addr [[SRC]] to [init] [[OUT]]
+// CHECK:         destroy_addr [[SRC]]
+// CHECK:         dealloc_stack [[SRC]]
+// CHECK-LABEL: } // end sil function 'take_from_original_copy_addr__final_use_copy_addr_copy'
+sil [ossa] @take_from_original_copy_addr__final_use_copy_addr_copy : $() -> @out Klass {
+entry(%out : $*Klass):
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> @owned Klass
+  %user = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %instance_1 = apply %getKlass() : $@convention(thin) () -> @owned Klass
+  %src = alloc_stack $Klass
+  store %instance_1 to [init] %src : $*Klass
+  apply %user(%src) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %tmp = alloc_stack $Klass
+  copy_addr [take] %src to [init] %tmp : $*Klass
+  copy_addr %tmp to [init] %out : $*Klass
+  destroy_addr %tmp : $*Klass
+  dealloc_stack %tmp : $*Klass
+  dealloc_stack %src : $*Klass
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // This does not get optimized correctly because of the conservative treatment of load_borrow/end_borrow in MemBehavior
