@@ -2002,9 +2002,9 @@ ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
-      "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' could not be "
-      "converted: %1.",
+      "could not generate C++ types from the generic Swift types provided; "
+      "the following Swift type(s) provided to '%0' could not be "
+      "converted: %1",
       (StringRef, StringRef))
 
 // Type aliases

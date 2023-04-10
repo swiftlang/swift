@@ -522,18 +522,18 @@ WARNING(compiler_plugin_not_loaded,none,
         "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
         
 ERROR(dont_enable_interop_and_compat,none,
-      "do not pass both -enable-experimental-cxx-interop and "
-      "-cxx-interoperability-mode. Remove -enable-experimental-cxx-interop.", ())
+      "do not pass both '-enable-experimental-cxx-interop' and "
+      "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
 
 NOTE(valid_cxx_interop_modes,none,
       "valid arguments to '-cxx-interoperability-mode=' are %0", (StringRef))
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "
-     "change how APIs are imported.", ())
+     "change how APIs are imported", ())
 WARNING(enable_interop_flag_deprecated,none,
-        "the -enable-experimental-cxx-interop flag is deprecated. Please pass "
-        "'-cxx-interoperability-mode=' instead.", ())
+        "the '-enable-experimental-cxx-interop' flag is deprecated; please pass "
+        "'-cxx-interoperability-mode=' instead", ())
 
 ERROR(layout_string_instantiation_without_layout_strings,none,
       "-enable-layout-string-value-witnesses-instantiation can not be enabled "
