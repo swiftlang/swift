@@ -42,8 +42,6 @@ class SwiftLookupTable;
 class ValueDecl;
 class VisibleDeclConsumer;
 
-void dumpSwiftLookupTable(SwiftLookupTable *table);
-
 /// Represents the different namespaces for types in C.
 ///
 /// A simplified version of clang::Sema::LookupKind.
