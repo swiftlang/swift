@@ -69,6 +69,7 @@
 /include/swift/PrintAsClang                        @zoecarver @hyp @egorzhdan
 # TODO: /include/swift/SIL/
 # TODO: /include/swift/SILOptimizer/
+/include/swift/SIL/SILDebug*                       @adrian-prantl
 /include/swift/SILOptimizer/Utils/Distributed*     @ktoso
 /include/swift/Sema/                               @hborla @slavapestov @xedin
 /include/swift/Sema/CS*                            @hborla @xedin
@@ -89,6 +90,7 @@
 /lib/ASTGen/                                        @zoecarver @CodaFi
 /lib/Basic/Windows                                  @compnerd
 /lib/ClangImporter                                  @zoecarver @hyp @egorzhdan
+/lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm
 /lib/Driver                                         @artemcm
 /lib/Frontend/*ModuleInterface*                     @artemcm @tshortli
@@ -97,10 +99,13 @@
 /lib/IDETool/                                       @ahoppen @bnbarham @rintaro
 /lib/Index/                                         @bnbarham
 /lib/Refactoring/                                   @ahoppen @bnbarham
+/lib/IRGen/*Debug*                                  @adrian-prantl
 /lib/IRGen/*Distributed*                            @ktoso
 /lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 /lib/PrintAsClang                                   @zoecarver @hyp @egorzhdan
 # TODO: /lib/SIL/
+/lib/SIL/IR/SILDebug*                               @adrian-prantl
+/lib/SIL/IR/SILLocation*                            @adrian-prantl
 # TODO: /lib/SILGen/
 /lib/SILGen/*Distributed*                           @ktoso
 # TODO: /lib/SILOptimizer/
@@ -132,6 +137,7 @@
 # test
 /test/ASTGen/                                       @zoecarver @CodaFi
 /test/Constraints/                                  @hborla @xedin
+/test/DebugInfo/                                    @adrian-prantl
 /test/Distributed/                                  @ktoso
 /test/Driver/                                       @artemcm
 /test/Generics/                                     @hborla @slavapestov
@@ -159,6 +165,7 @@
 # tools
 # TODO: /tools
 /tools/SourceKit                                    @ahoppen @bnbarham @rintaro
+/tools/lldb-moduleimport-test/                      @adrian-prantl
 /tools/swift-ide-test                               @ahoppen @bnbarham @rintaro
 /tools/swift-refactor                               @ahoppen @bnbarham
 
