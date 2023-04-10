@@ -1266,7 +1266,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   auto module = nominal->getParentModule();
   Type nominalTy = nominal->getDeclaredInterfaceType();
 
-  // enqueue(_: UnownedJob)
+  // enqueue(_:)
   auto enqueueDeclName = DeclName(C, DeclBaseName(C.Id_enqueue), { Identifier() });
 
   FuncDecl *unownedEnqueueRequirement = nullptr;
@@ -1283,8 +1283,16 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (funcDecl->getParameters()->size() != 1)
       continue;
     if (auto param = funcDecl->getParameters()->front()) {
-      if (C.getJobDecl() &&
-          param->getType()->isEqual(C.getJobDecl()->getDeclaredInterfaceType())) {
+      StructDecl* jobDecl;
+      if (auto decl = C.getExecutorJobDecl()) {
+        jobDecl = decl;
+      } else if (auto decl = C.getJobDecl()) {
+        // old standard library, before we introduced the `typealias Job = ExecutorJob`
+        jobDecl = decl;
+      }
+
+      if (jobDecl &&
+          param->getType()->isEqual(jobDecl->getDeclaredInterfaceType())) {
         assert(moveOnlyEnqueueRequirement == nullptr);
         moveOnlyEnqueueRequirement = funcDecl;
       } else if (param->getType()->isEqual(C.getUnownedJobDecl()->getDeclaredInterfaceType())) {
