@@ -6256,6 +6256,10 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
+      // FIXME: Profile counters for loop bodies may be emitted before the
+      // instructions for the loop variable, but in a deeper scope.
+      if (isa<IncrementProfilerCounterInst>(SI))
+        continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;
       // FIXME: These still leave holes in the scopes. We should make them
