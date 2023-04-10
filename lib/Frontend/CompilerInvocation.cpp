@@ -2671,6 +2671,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
+
+  Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
+                                                       OPT_disable_layout_string_value_witnesses,
+                                                       Opts.EnableLayoutStringValueWitnesses);
+
+  Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
+                                      OPT_disable_layout_string_value_witnesses_instantiation,
+                                      Opts.EnableLayoutStringValueWitnessesInstantiation);
+
+  if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
+      !Opts.EnableLayoutStringValueWitnesses) {
+    Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
+    return true;
+  }
+
   return false;
 }
 
