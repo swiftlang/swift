@@ -538,7 +538,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // If the source of the copyInst is taken, we must insert a compensating
   // destroy_addr. This must be done at the right spot: after the last use
   // tempObj, but before any (potential) re-initialization of the source.
-  bool needToInsertDestroy = copyInst->isTakeOfSrc();
+  bool needFinalDeinit = copyInst->isTakeOfSrc();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -557,7 +557,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
     // Also, destroys are allowed to be in a different block.
     if (isa<DestroyAddrInst>(user)) {
-      if (!isOSSA && needToInsertDestroy) {
+      if (!isOSSA && needFinalDeinit) {
         // In non-OSSA mode, for the purpose of inserting the destroy of
         // copySrc, we have to be conservative and assume that the lifetime of
         // tempObj goes beyond it's last use - until the final destroy_addr.
@@ -588,7 +588,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // Example:
   //   copy_addr [take] %copySrc to [init] %tempObj   // copyInst
   //   copy_addr [take] %tempObj to [init] %copySrc   // lastLoadInst
-  if (needToInsertDestroy && lastLoadInst != copyInst &&
+  if (needFinalDeinit && lastLoadInst != copyInst &&
       !isa<DestroyAddrInst>(lastLoadInst) &&
       aa->mayWriteToMemory(lastLoadInst, copySrc))
     return;
@@ -601,7 +601,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
-  if (needToInsertDestroy) {
+  if (needFinalDeinit) {
     // Compensate the [take] of the original copyInst.
     SILBuilderWithScope::insertAfter(lastLoadInst, [&] (SILBuilder &builder) {
       builder.createDestroyAddr(builder.getInsertionPoint()->getLoc(), copySrc);
