@@ -535,9 +535,10 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
 
-  // If the source of the copyInst is taken, we must insert a compensating
-  // destroy_addr. This must be done at the right spot: after the last use
-  // tempObj, but before any (potential) re-initialization of the source.
+  // If the source of the copyInst is taken, it must be deinitialized (via
+  // destroy_addr, load [take], copy_addr [take]).  This must be done at the
+  // right spot: after the last use tempObj, but before any (potential)
+  // re-initialization of the source.
   bool needFinalDeinit = copyInst->isTakeOfSrc();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
@@ -601,7 +602,29 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
-  if (needFinalDeinit) {
+  // If copyInst's source must be deinitialized, whether that must be done via
+  // a newly created destroy_addr.
+  //
+  // If lastLoadInst is a load or a copy_addr, then the deinitialization can be
+  // done in that instruction.
+  //
+  // This is necessary for correctness: otherwise, copies of move-only values
+  // would be introduced.
+  bool needToInsertDestroy = [&]() {
+    if (!needFinalDeinit)
+      return false;
+    if (lastLoadInst == copyInst)
+      return true;
+    if (auto *cai = dyn_cast<CopyAddrInst>(lastLoadInst)) {
+      return cai->getSrc() != tempObj || !cai->isTakeOfSrc();
+    }
+    if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
+      return li->getOperand() != tempObj ||
+             li->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
+    }
+    return true;
+  }();
+  if (needToInsertDestroy) {
     // Compensate the [take] of the original copyInst.
     SILBuilderWithScope::insertAfter(lastLoadInst, [&] (SILBuilder &builder) {
       builder.createDestroyAddr(builder.getInsertionPoint()->getLoc(), copySrc);
@@ -630,16 +653,19 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       auto *cai = cast<CopyAddrInst>(user);
       if (cai != copyInst) {
         assert(cai->getSrc() == tempObj);
-        if (cai->isTakeOfSrc())
+        if (cai->isTakeOfSrc() && (!needFinalDeinit || lastLoadInst != cai)) {
           cai->setIsTakeOfSrc(IsNotTake);
+        }
       }
       use->set(copySrc);
       break;
     }
     case SILInstructionKind::LoadInst: {
       auto *li = cast<LoadInst>(user);
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
+          (!needFinalDeinit || li != lastLoadInst)) {
         li->setOwnershipQualifier(LoadOwnershipQualifier::Copy);
+      }
       use->set(copySrc);
       break;
     }
