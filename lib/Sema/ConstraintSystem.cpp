@@ -3784,7 +3784,9 @@ struct TypeSimplifier {
         // Flatten single-element tuples containing type variables that cannot
         // bind to packs.
         auto typeVar = elementType->getAs<TypeVariableType>();
-        if (!element.hasName() && typeVar && !typeVar->getImpl().canBindToPack()) {
+        if (!element.hasName() && typeVar &&
+            !typeVar->getImpl().canBindToPack() &&
+            !typeVar->getImpl().isPackExpansion()) {
           return typeVar;
         }
       }

@@ -117,6 +117,16 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
+static bool isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl().isPackExpansion();
+
+  return false;
+}
+
 bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
                                                 const ValueDecl *decl) {
   assert(decl->getDeclContext()->isTypeContext() &&
@@ -534,8 +544,7 @@ static bool matchCallArgumentsImpl(
     }
 
     // Handle variadic parameters.
-    if (param.isVariadic() ||
-        param.getPlainType()->is<PackExpansionType>()) {
+    if (param.isVariadic() || isPackExpansionType(param.getPlainType())) {
       // Claim the next argument with the name of this parameter.
       auto claimed =
           claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch);
@@ -795,8 +804,7 @@ static bool matchCallArgumentsImpl(
       const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.isVariadic() ||
-          param.getPlainType()->is<PackExpansionType>())
+      if (param.isVariadic() || isPackExpansionType(param.getPlainType()))
         continue;
 
       // Parameters with defaults can be unfulfilled.
@@ -886,7 +894,7 @@ static bool matchCallArgumentsImpl(
 
         // Does nothing for variadic tail.
         if ((params[paramIdx].isVariadic() ||
-             params[paramIdx].getPlainType()->is<PackExpansionType>()) &&
+             isPackExpansionType(params[paramIdx].getPlainType())) &&
             paramBindIdx > 0) {
           assert(args[fromArgIdx].getLabel().empty());
           continue;
@@ -1763,7 +1771,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // is declared as `init(_: repeat each T)`. Although declaration
       // based information reports parameter at index 0 as variadic generic
       // the call site specializes it to `Int`.
-      if (auto *paramPackExpansion = paramTy->getAs<PackExpansionType>()) {
+      if (isPackExpansionType(paramTy)) {
         SmallVector<Type, 2> argTypes;
         for (auto argIdx : parameterBindings[paramIdx]) {
           auto argType = argsWithLabels[argIdx].getPlainType();
@@ -1773,9 +1781,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         auto *argPack = PackType::get(cs.getASTContext(), argTypes);
         auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
 
-        cs.addConstraint(
-          subKind, argPackExpansion, paramPackExpansion,
-          loc, /*isFavored=*/false);
+        cs.addConstraint(subKind, argPackExpansion, paramTy, loc);
         continue;
       }
     }
@@ -2077,16 +2083,6 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
 }
 
 namespace {
-
-static bool isPackExpansionType(Type type) {
-  if (type->is<PackExpansionType>())
-    return true;
-
-  if (auto *typeVar = type->getAs<TypeVariableType>())
-    return typeVar->getImpl().isPackExpansion();
-
-  return false;
-}
 
 class TupleMatcher {
   TupleType *tuple1;
@@ -2418,8 +2414,9 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
   for (unsigned i = 0, e = pack->getNumElements(); i < e; ++i) {
     auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
 
-    auto instantiatedPattern = pattern.transformRec([&](Type t) -> Optional<Type> {
-      if (t->is<PackExpansionType>())
+    auto instantiatedPattern = pattern.transformRec([&](Type t)
+                                                        -> Optional<Type> {
+      if (isPackExpansionType(t))
         return t;
 
       if (auto *typeVar = t->getAs<TypeVariableType>()) {
@@ -2655,8 +2652,7 @@ static bool isSingleTupleParam(ASTContext &ctx,
     return false;
 
   const auto &param = params.front();
-  if ((param.isVariadic() ||
-       param.getPlainType()->is<PackExpansionType>()) ||
+  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
       param.isInOut() || param.hasLabel() || param.isIsolated())
     return false;
 
@@ -11038,7 +11034,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
     // Cannot propagate pack expansion type from context,
     // it has to be handled by type matching logic.
-    if (contextualTy->is<PackExpansionType>())
+    if (isPackExpansionType(contextualTy))
       return false;
 
     // If contextual type has an error, let's wait for inference,
