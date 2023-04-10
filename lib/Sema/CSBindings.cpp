@@ -1784,7 +1784,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PO.PrintTypesForDebugging = true;
 
   if (auto typeVar = getTypeVariable()) {
-    typeVar->print(out, PO);
+    typeVar->getImpl().print(out);
     out << " ";
   }
 
