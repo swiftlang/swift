@@ -750,3 +750,28 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
     diagnose(astContext, user, diag::sil_moveonlychecker_consuming_use_here);
   }
 }
+
+void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
+    MarkMustCheckInst *markedValue, StringRef pathString,
+    NominalTypeDecl *deinitedNominal, SILInstruction *consumingUser) {
+  auto &astContext = fn->getASTContext();
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+
+  registerDiagnosticEmitted(markedValue);
+
+  if (pathString.empty()) {
+    diagnose(
+        astContext, markedValue,
+        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self,
+        varName);
+  } else {
+    diagnose(
+        astContext, markedValue,
+        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field,
+        varName, varName, pathString.drop_front(),
+        deinitedNominal->getBaseName());
+  }
+  diagnose(astContext, consumingUser,
+           diag::sil_moveonlychecker_consuming_use_here);
+}

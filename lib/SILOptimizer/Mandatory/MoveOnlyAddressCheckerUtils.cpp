@@ -271,6 +271,7 @@
 #include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyTypeUtils.h"
 #include "MoveOnlyUtils.h"
 
 #include <utility>
@@ -521,13 +522,68 @@ namespace {
 struct UseState {
   MarkMustCheckInst *address;
 
+  /// A map from destroy_addr to the part of the type that it destroys.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> destroys;
+
+  /// A map from a liveness requiring use to the part of the type that it
+  /// requires liveness for.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> livenessUses;
+
+  /// A map from a load [copy] or load [take] that we determined must be
+  /// converted to a load_borrow to the part of the type tree that it needs to
+  /// borrow.
+  ///
+  /// NOTE: This does not include actual load_borrow which are treated
+  /// just as liveness uses.
+  ///
+  /// NOTE: load_borrow that we actually copy, we canonicalize early to a load
+  /// [copy] + begin_borrow so that we do not need to convert load_borrow to a
+  /// normal load when rewriting.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> borrows;
+
+  /// A copy_addr, load [copy], or load [take] that we determine is semantically
+  /// truly a take mapped to the part of the type tree that it needs to use.
+  ///
+  /// DISCUSSION: A copy_addr [init] or load [copy] are considered actually
+  /// takes if they are not destroyed with a destroy_addr/destroy_value. We
+  /// consider them to be takes since after the transform they must be a take.
+  ///
+  /// Importantly, these we know are never copied and are only consumed once.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> takeInsts;
+
+  /// A map from a copy_addr, load [copy], or load [take] that we determine
+  /// semantically are true copies to the part of the type tree they must copy.
+  ///
+  /// DISCUSSION: One of these instructions being a true copy means that their
+  /// result or destination is used in a way that some sort of extra copy is
+  /// needed. Example:
+  ///
+  /// %0 = load [take] %addr
+  /// %1 = copy_value %0
+  /// consume(%0)
+  /// consume(%1)
+  ///
+  /// Notice how the load [take] above semantically requires a copy since it was
+  /// consumed twice even though SILGen emitted it as a load [take].
+  ///
+  /// We represent these separately from \p takeInsts since:
+  ///
+  /// 1.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> copyInsts;
+
+  /// A map from an instruction that initializes memory to the description of
+  /// the part of the type tree that it initializes.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> initInsts;
+
+  /// memInstMustReinitialize insts. Contains both insts like copy_addr/store
+  /// [assign] that are reinits that we will convert to inits and true reinits.
   llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4> reinitInsts;
+
+  /// A "inout terminator use" is an implicit liveness use of the entire value
+  /// placed on a terminator. We use this both so we add liveness for the
+  /// terminator user and so that we can use the set to quickly identify later
+  /// while emitting diagnostics that a liveness use is a terminator user and
+  /// emit a specific diagnostic message.
   SmallSetVector<SILInstruction *, 2> inoutTermUsers;
 
   /// We add debug_values to liveness late after we diagnose, but before we
@@ -1252,6 +1308,57 @@ struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                  MARK: DestructureThroughDeinit Checking
+//===----------------------------------------------------------------------===//
+
+static void
+checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
+                                 TypeTreeLeafTypeRange usedBits,
+                                 DiagnosticEmitter &diagnosticEmitter) {
+  LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
+
+  SILFunction *fn = rootAddress->getFunction();
+  SILModule &mod = fn->getModule();
+
+  // We walk down from our ancestor to our projection, emitting an error if any
+  // of our types have a deinit.
+  TypeOffsetSizePair pair(usedBits);
+  auto targetType = use->get()->getType();
+  auto iterType = rootAddress->getType();
+  TypeOffsetSizePair iterPair(iterType, fn);
+
+  while (iterType != targetType) {
+    // If we have a nominal type as our parent type, see if it has a
+    // deinit. We know that it must be non-copyable since copyable types
+    // cannot contain non-copyable types and that our parent root type must be
+    // an enum, tuple, or struct.
+    if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+      if (mod.lookUpMoveOnlyDeinitFunction(nom)) {
+        // If we find one, emit an error since we are going to have to extract
+        // through the deinit. Emit a nice error saying what it is. Since we
+        // are emitting an error, we do a bit more work and construct the
+        // actual projection string.
+        SmallString<128> pathString;
+        auto rootType = rootAddress->getType();
+        if (iterType != rootType) {
+          llvm::raw_svector_ostream os(pathString);
+          pair.constructPathString(iterType, {rootType, fn}, rootType, fn, os);
+        }
+
+        diagnosticEmitter.emitCannotDestructureDeinitNominalError(
+            rootAddress, pathString, nom, use->getUser());
+        break;
+      }
+    }
+
+    // Otherwise, walk one level towards our child type. We unconditionally
+    // unwrap since we should never fail here due to earlier checking.
+    std::tie(iterPair, iterType) =
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                   MARK: GatherLexicalLifetimeUseVisitor
 //===----------------------------------------------------------------------===//
 
@@ -1446,6 +1553,13 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     if (!leafRange)
       return false;
 
+    // TODO: Add borrow checking here like below.
+
+    // TODO: Add destructure deinit checking here once address only checking is
+    // completely brought up.
+
+    // TODO: Add check here that we don't error on trivial/copyable types.
+
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
       useState.takeInsts.insert({user, *leafRange});
@@ -1477,151 +1591,160 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       return true;
     }
 
-    if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy ||
-        li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+    // We must have a load [take] or load [copy] here since we are in OSSA.
+    OSSACanonicalizer::LivenessState livenessState(moveChecker.canonicalizer,
+                                                   li);
 
-      OSSACanonicalizer::LivenessState livenessState(moveChecker.canonicalizer,
-                                                     li);
+    // Before we do anything, run the borrow to destructure transform in case
+    // we have a switch_enum user.
+    unsigned numDiagnostics =
+        moveChecker.diagnosticEmitter.getDiagnosticCount();
+    BorrowToDestructureTransform borrowToDestructure(
+        moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
+        moveChecker.poa);
+    if (!borrowToDestructure.transform()) {
+      assert(moveChecker.diagnosticEmitter
+                 .didEmitCheckerDoesntUnderstandDiagnostic());
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed to perform borrow to destructure transform!\n");
+      emittedEarlyDiagnostic = true;
+      return false;
+    }
 
-      // Before we do anything, run the borrow to destructure transform in case
-      // we have a switch_enum user.
-      unsigned numDiagnostics =
-          moveChecker.diagnosticEmitter.getDiagnosticCount();
-      BorrowToDestructureTransform borrowToDestructure(
-          moveChecker.allocator, markedValue, li, moveChecker.diagnosticEmitter,
-          moveChecker.poa);
-      if (!borrowToDestructure.transform()) {
-        assert(moveChecker.diagnosticEmitter
-                   .didEmitCheckerDoesntUnderstandDiagnostic());
+    // If we emitted an error diagnostic, do not transform further and instead
+    // mark that we emitted an early diagnostic and return true.
+    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
+      emittedEarlyDiagnostic = true;
+      return true;
+    }
+
+    // Now, validate that what we will transform into a take isn't a take that
+    // would invalidate a field that has a deinit.
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed to compute leaf range for: " << *op->get());
+      return false;
+    }
+
+    checkForDestructureThroughDeinit(markedValue, op, *leafRange,
+                                     diagnosticEmitter);
+
+    // If we emitted an error diagnostic, do not transform further and instead
+    // mark that we emitted an early diagnostic and return true.
+    if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Emitting destructure through deinit error!\n");
+      emittedEarlyDiagnostic = true;
+      return true;
+    }
+
+    // Canonicalize the lifetime of the load [take], load [copy].
+    LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
+    moveChecker.changed |= moveChecker.canonicalizer.canonicalize();
+
+    // If we are asked to perform no_consume_or_assign checking or
+    // assignable_but_not_consumable checking, if we found any consumes of our
+    // load, then we need to emit an error.
+    auto checkKind = markedValue->getCheckKind();
+    if (checkKind != MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+      if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "Failed to perform borrow to destructure transform!\n");
-        emittedEarlyDiagnostic = true;
-        return false;
-      }
-
-      // If we emitted an error diagnostic, do not transform further and instead
-      // mark that we emitted an early diagnostic and return true.
-      if (numDiagnostics !=
-          moveChecker.diagnosticEmitter.getDiagnosticCount()) {
-        LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
+                   << "Found mark must check [nocopy] error: " << *user);
+        auto *fArg = dyn_cast<SILFunctionArgument>(
+            stripAccessMarkers(markedValue->getOperand()));
+        if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+          moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
+              markedValue, fArg);
+        } else {
+          moveChecker.diagnosticEmitter
+              .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+        }
         emittedEarlyDiagnostic = true;
         return true;
       }
 
-      // Canonicalize the lifetime of the load [take], load [copy].
-      LLVM_DEBUG(llvm::dbgs() << "Running copy propagation!\n");
-      moveChecker.changed |= moveChecker.canonicalizer.canonicalize();
-
-      // If we are asked to perform no_consume_or_assign checking or
-      // assignable_but_not_consumable checking, if we found any consumes of our
-      // load, then we need to emit an error.
-      auto checkKind = markedValue->getCheckKind();
-      if (checkKind != MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
-        if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Found mark must check [nocopy] error: " << *user);
-          auto *fArg = dyn_cast<SILFunctionArgument>(
-              stripAccessMarkers(markedValue->getOperand()));
-          if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
-            moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
-                markedValue, fArg);
-          } else {
-            moveChecker.diagnosticEmitter
-                .emitAddressEscapingClosureCaptureLoadedAndConsumed(
-                    markedValue);
-          }
-          emittedEarlyDiagnostic = true;
-          return true;
-        }
-
-        // If set, this will tell the checker that we can change this load into
-        // a load_borrow.
-        auto leafRange =
-            TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-        if (!leafRange)
-          return false;
-
-        LLVM_DEBUG(llvm::dbgs() << "Found potential borrow: " << *user);
-
-        if (checkForExclusivityHazards(li)) {
-          LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-          emittedEarlyDiagnostic = true;
-          return true;
-        }
-
-        useState.borrows.insert({user, *leafRange});
-
-        // If we had a load [copy], borrow then we know that all of its destroys
-        // must have been destroy_value. So we can just gather up those
-        // destroy_value and use then to create liveness to ensure that our
-        // value is alive over the entire borrow scope we are going to create.
-        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
-                                   "since they will become end_borrows.\n");
-        for (auto *consumeUse : li->getConsumingUses()) {
-          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-          useState.livenessUses.insert({dvi, *leafRange});
-        }
-
-        return true;
-      }
-
-      // First check if we had any consuming uses that actually needed a
-      // copy. This will always be an error and we allow the user to recompile
-      // and eliminate the error. This just allows us to rely on invariants
-      // later.
-      if (moveChecker.canonicalizer.foundConsumingUseRequiringCopy()) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Found that load at object level requires copies!\n");
-        // If we failed to understand how to perform the check or did not find
-        // any targets... continue. In the former case we want to fail with a
-        // checker did not understand diagnostic later and in the former, we
-        // succeeded.
-        // Otherwise, emit the diagnostic.
-        moveChecker.diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
-        emittedEarlyDiagnostic = true;
-        LLVM_DEBUG(llvm::dbgs() << "Emitted early object level diagnostic.\n");
-        return true;
-      }
-
-      // Then if we had any final consuming uses, mark that this liveness use is
-      // a take/copy and if not, mark this as a borrow.
+      // If set, this will tell the checker that we can change this load into
+      // a load_borrow.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
       if (!leafRange)
         return false;
 
-      if (!moveChecker.canonicalizer.foundFinalConsumingUses()) {
-        LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
-        if (checkForExclusivityHazards(li)) {
-          LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-          emittedEarlyDiagnostic = true;
-          return true;
-        }
+      LLVM_DEBUG(llvm::dbgs() << "Found potential borrow: " << *user);
 
-        useState.borrows.insert({user, *leafRange});
-        // If we had a load [copy], borrow then we know that all of its destroys
-        // must have been destroy_value. So we can just gather up those
-        // destroy_value and use then to create liveness to ensure that our
-        // value is alive over the entire borrow scope we are going to create.
-        LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
-                                   "since they will become end_borrows.\n");
-        for (auto *consumeUse : li->getConsumingUses()) {
-          auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
-          useState.livenessUses.insert({dvi, *leafRange});
-        }
-      } else {
-        // If we had a load [copy], store this into the copy list. These are the
-        // things that we must merge into destroy_addr or reinits after we are
-        // done checking. The load [take] are already complete and good to go.
-        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-          LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
-          useState.takeInsts.insert({user, *leafRange});
-        } else {
-          LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
-          useState.copyInsts.insert({user, *leafRange});
-        }
+      if (checkForExclusivityHazards(li)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
+        emittedEarlyDiagnostic = true;
+        return true;
       }
+
+      useState.borrows.insert({user, *leafRange});
+
+      // If we had a load [copy], borrow then we know that all of its destroys
+      // must have been destroy_value. So we can just gather up those
+      // destroy_value and use then to create liveness to ensure that our
+      // value is alive over the entire borrow scope we are going to create.
+      LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                 "since they will become end_borrows.\n");
+      for (auto *consumeUse : li->getConsumingUses()) {
+        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+        useState.livenessUses.insert({dvi, *leafRange});
+      }
+
       return true;
     }
+
+    // First check if we had any consuming uses that actually needed a
+    // copy. This will always be an error and we allow the user to recompile
+    // and eliminate the error. This just allows us to rely on invariants
+    // later.
+    if (moveChecker.canonicalizer.foundConsumingUseRequiringCopy()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found that load at object level requires copies!\n");
+      // If we failed to understand how to perform the check or did not find
+      // any targets... continue. In the former case we want to fail with a
+      // checker did not understand diagnostic later and in the former, we
+      // succeeded.
+      // Otherwise, emit the diagnostic.
+      moveChecker.diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
+      emittedEarlyDiagnostic = true;
+      LLVM_DEBUG(llvm::dbgs() << "Emitted early object level diagnostic.\n");
+      return true;
+    }
+
+    if (!moveChecker.canonicalizer.foundFinalConsumingUses()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
+      if (checkForExclusivityHazards(li)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
+        emittedEarlyDiagnostic = true;
+        return true;
+      }
+
+      useState.borrows.insert({user, *leafRange});
+      // If we had a load [copy], borrow then we know that all of its destroys
+      // must have been destroy_value. So we can just gather up those
+      // destroy_value and use then to create liveness to ensure that our
+      // value is alive over the entire borrow scope we are going to create.
+      LLVM_DEBUG(llvm::dbgs() << "Adding destroys from load as liveness uses "
+                                 "since they will become end_borrows.\n");
+      for (auto *consumeUse : li->getConsumingUses()) {
+        auto *dvi = cast<DestroyValueInst>(consumeUse->getUser());
+        useState.livenessUses.insert({dvi, *leafRange});
+      }
+    } else {
+      // If we had a load [copy], store this into the copy list. These are the
+      // things that we must merge into destroy_addr or reinits after we are
+      // done checking. The load [take] are already complete and good to go.
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
+        useState.takeInsts.insert({user, *leafRange});
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Found copy inst: " << *user);
+        useState.copyInsts.insert({user, *leafRange});
+      }
+    }
+    return true;
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
@@ -2311,8 +2434,9 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     return false;
   }
 
-  // Before we do anything, convert any load_borrow + copy_value into load
-  // [copy] + begin_borrow for further processing.
+  // Before we do anything, canonicalize load_borrow + copy_value into load
+  // [copy] + begin_borrow for further processing. This just eliminates a case
+  // that the checker doesn't need to know about.
   {
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
     if (!visitAccessPathBaseUses(copiedLoadBorrowEliminator, accessPathWithBase,
@@ -2349,6 +2473,10 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // emitted a copy from the base address + a destroy_addr of the use. By
   // bailing here, we can make that assumption since we would have errored
   // earlier otherwise.
+  if (diagCount != diagnosticEmitter.getDiagnosticCount())
+    return true;
+
+  // Then check if we emitted an error. If we did not, return true.
   if (diagCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
