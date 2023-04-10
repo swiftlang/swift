@@ -76,8 +76,9 @@ call :CloneRepositories || (exit /b)
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
+  -LibraryRoot %BuildRoot%\Library ^
   -BuildType %CMAKE_BUILD_TYPE% ^
-  -SkipInstall ^
+  -SkipRedistInstall ^
   %SkipPackagingArg% ^
   %TestArg% ^
   -Stage "%BuildRoot%\package"
