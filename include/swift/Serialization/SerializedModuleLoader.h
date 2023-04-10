@@ -360,10 +360,11 @@ public:
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual StringRef
-  getFilenameForPrivateDecl(const ValueDecl *decl) const override;
+  getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
@@ -456,7 +457,7 @@ public:
 
   virtual void loadDependenciesForTestable(SourceLoc diagLoc) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
 
   virtual StringRef getFilename() const override;
 

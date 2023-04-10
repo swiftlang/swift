@@ -862,6 +862,7 @@ static Optional<RequirementKind> getActualRequirementKind(uint64_t rawKind) {
     return RequirementKind::KIND;
 
   switch (rawKind) {
+  CASE(SameShape)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
@@ -2670,6 +2671,7 @@ getActualMacroRole(uint8_t context) {
   CASE(Member)
   CASE(Peer)
   CASE(Conformance)
+  CASE(CodeItem)
 #undef CASE
   }
   return None;
@@ -3886,7 +3888,17 @@ public:
       opaqueDecl->setGenericSignature(genericSig);
     else
       opaqueDecl->setGenericSignature(GenericSignature());
-    if (underlyingTypeSubsID) {
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
+    if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        !MF.FileContext->getParentModule()->isMainModule() &&
+        AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+      // Do not try to read the underlying type information if the function
+      // is not inlinable in clients. This reflects the swiftinterface behavior
+      // in where clients are only aware of the underlying type when the body
+      // of the function is public.
+
+    } else if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.

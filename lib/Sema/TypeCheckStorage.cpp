@@ -1485,8 +1485,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
   Tmp1VD->setImplicit();
 
-  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
-  Named->setType(Tmp1VD->getType());
+  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD, Tmp1VD->getType());
   auto *Let =
       BindingPattern::createImplicit(Ctx, VarDecl::Introducer::Let, Named);
   Let->setType(Named->getType());
@@ -1551,7 +1550,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   InitValue = new (Ctx) LazyInitializerExpr(InitValue);
   InitValue->setType(initType);
 
-  Pattern *Tmp2PBDPattern = NamedPattern::createImplicit(Ctx, Tmp2VD);
+  Pattern *Tmp2PBDPattern =
+      NamedPattern::createImplicit(Ctx, Tmp2VD, Tmp2VD->getType());
   Tmp2PBDPattern =
     TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
@@ -1794,7 +1794,8 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
                                    SourceLoc(), Ctx.getIdentifier("tmp"), Set);
       OldValue->setImplicit();
       OldValue->setInterfaceType(VD->getValueInterfaceType());
-      auto *tmpPattern = NamedPattern::createImplicit(Ctx, OldValue);
+      auto *tmpPattern =
+          NamedPattern::createImplicit(Ctx, OldValue, OldValue->getType());
       auto *tmpPBD = PatternBindingDecl::createImplicit(
           Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
       SetterBody.push_back(tmpPBD);
@@ -2619,8 +2620,8 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
-  Pattern *PBDPattern = NamedPattern::createImplicit(Context, Storage);
-  PBDPattern->setType(StorageTy);
+  Pattern *PBDPattern =
+      NamedPattern::createImplicit(Context, Storage, StorageTy);
   PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
   InitExpr->setType(Storage->getType());
@@ -3032,8 +3033,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
 
   auto createPBD = [&](VarDecl *singleVar) -> PatternBindingDecl * {
-    Pattern *pattern = NamedPattern::createImplicit(ctx, singleVar);
-    pattern->setType(singleVar->getType());
+    Pattern *pattern =
+        NamedPattern::createImplicit(ctx, singleVar, singleVar->getType());
     pattern = TypedPattern::createImplicit(ctx, pattern, singleVar->getType());
     PatternBindingDecl *pbd = PatternBindingDecl::createImplicit(
         ctx, var->getCorrectStaticSpelling(), pattern, /*init*/nullptr,

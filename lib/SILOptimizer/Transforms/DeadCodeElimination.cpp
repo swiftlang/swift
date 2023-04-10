@@ -280,6 +280,8 @@ void DCE::markLive() {
         if (phi && (phi->isLexical() || hasPointerEscape(phi))) {
           markInstructionLive(&I);
         }
+        // The instruction is live only if it's operand value is also live
+        addReverseDependency(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
@@ -680,7 +682,8 @@ bool DCE::removeDead() {
         }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
         LLVM_DEBUG(Inst->dump());
-        LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "with jump to: BB" << postDom->getDebugID() << "\n");
 
         replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();

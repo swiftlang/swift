@@ -107,7 +107,13 @@ public:
   /// to the current orig parameter.
   unsigned getSubstIndex() const {
     assert(!isFinished());
-    return origParamIndex;
+    return substParamIndex;
+  }
+
+  IntRange<unsigned> getSubstIndexRange() const {
+    assert(!isFinished());
+    return IntRange<unsigned>(substParamIndex,
+                              substParamIndex + numSubstParamsForOrigParam);
   }
 
   /// Return the parameter flags for the current orig parameter.
@@ -157,8 +163,9 @@ class TupleElementGenerator {
   /// during construction.
   AbstractionPattern origTupleType;
 
-  /// The substitute tuple type.  Set once during construction.
-  CanTupleType substTupleType;
+  /// The substituted type.  A tuple type unless this is a vanishing
+  /// tuple.  Set once during construction.
+  CanType substType;
 
   /// The number of orig elements to traverse.  Set once during
   /// construction.
@@ -176,6 +183,10 @@ class TupleElementGenerator {
   /// orig element.
   unsigned numSubstEltsForOrigElt;
 
+  /// Whether the orig tuple type is a vanishing tuple, i.e. substitution
+  /// turns it into a singleton element.
+  bool origTupleVanishes;
+
   /// Whether the orig tuple type is opaque, i.e. does not permit us to
   /// call getNumTupleElements() and similar accessors.  Set once during
   /// construction.
@@ -188,6 +199,9 @@ class TupleElementGenerator {
   /// If it is a pack expansion, this is the expansion type, not the
   /// pattern type.
   AbstractionPattern origEltType = AbstractionPattern::getInvalid();
+
+  /// A scratch element that is used for vanishing tuple types.
+  mutable TupleTypeElt scratchSubstElt;
 
   /// Load the informaton for the current orig element into the
   /// fields above for it.
@@ -202,7 +216,7 @@ class TupleElementGenerator {
 
 public:
   TupleElementGenerator(AbstractionPattern origTupleType,
-                        CanTupleType substTupleType);
+                        CanType substType);
 
   /// Is the traversal finished?  If so, none of the getters below
   /// are allowed to be called.
@@ -228,14 +242,22 @@ public:
   /// to the current orig element.
   unsigned getSubstIndex() const {
     assert(!isFinished());
-    return origEltIndex;
+    return substEltIndex;
+  }
+
+  IntRange<unsigned> getSubstIndexRange() const {
+    assert(!isFinished());
+    return IntRange<unsigned>(substEltIndex,
+                              substEltIndex + numSubstEltsForOrigElt);
   }
 
   /// Return a tuple element for the current orig element.
   TupleTypeElt getOrigElement() const {
     assert(!isFinished());
+    // If the orig tuple is opaque, it can't have vanished, so this
+    // cast of substType is okay.
     return (origTupleTypeIsOpaque
-              ? substTupleType->getElement(substEltIndex)
+              ? cast<TupleType>(substType)->getElement(substEltIndex)
               : cast<TupleType>(origTupleType.getType())
                   ->getElement(origEltIndex));
   }
@@ -257,15 +279,24 @@ public:
   /// pack expansion, this will have exactly one element.
   CanTupleEltTypeArrayRef getSubstTypes() const {
     assert(!isFinished());
-    return substTupleType.getElementTypes().slice(substEltIndex,
-                                                  numSubstEltsForOrigElt);
+    if (!origTupleVanishes) {
+      return cast<TupleType>(substType)
+               .getElementTypes().slice(substEltIndex,
+                                        numSubstEltsForOrigElt);
+    } else if (numSubstEltsForOrigElt == 0) {
+      return CanTupleEltTypeArrayRef();
+    } else {
+      scratchSubstElt = TupleTypeElt(substType);
+      return CanTupleEltTypeArrayRef(scratchSubstElt);
+    }
   }
 
   /// Call this to finalize the traversal and assert that it was done
   /// properly.
   void finish() {
     assert(isFinished() && "didn't finish the traversal");
-    assert(substEltIndex == substTupleType->getNumElements() &&
+    assert(substEltIndex == (origTupleVanishes ? 1 :
+               cast<TupleType>(substType)->getNumElements()) &&
            "didn't exhaust subst elements; possible missing subs on "
            "orig tuple type");
   }

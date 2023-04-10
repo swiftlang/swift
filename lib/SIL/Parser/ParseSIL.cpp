@@ -2774,7 +2774,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
   SILType Ty;
-  SILLocation InstLoc = RegularLocation(OpcodeLoc);
+  SILLocation InstLoc = RegularLocation(OpcodeLoc, /*implicit*/ false);
   this->parsedComma = false;
 
   auto parseFormalTypeAndValue = [&](CanType &formalType,
@@ -3712,7 +3712,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             .Case("consumable_and_assignable",
                   CheckKind::ConsumableAndAssignable)
             .Case("no_consume_or_assign", CheckKind::NoConsumeOrAssign)
-            .Case("assignable_but_not_consumable", CheckKind::AssignableButNotConsumable)
+            .Case("assignable_but_not_consumable",
+                  CheckKind::AssignableButNotConsumable)
+            .Case("initable_but_not_consumable",
+                  CheckKind::InitableButNotConsumable)
             .Default(CheckKind::Invalid);
 
     if (CKind == CheckKind::Invalid) {

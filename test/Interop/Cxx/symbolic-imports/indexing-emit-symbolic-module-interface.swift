@@ -123,11 +123,11 @@ import CxxModule
 // CHECK-EMPTY:
 // CHECK-NEXT:  struct TemplateRecord {
 // CHECK-EMPTY:
-// CHECK-NEXT:    mutating func methodFunc()
+// CHECK-NEXT:    mutating func methodFunc(_ x: Any)
 // CHECK-EMPTY:
 // CHECK-NEXT:    struct InnerRecord {
 // CHECK-EMPTY:
-// CHECK-NEXT:      mutating func innerMethod()
+// CHECK-NEXT:      mutating func innerMethod(_ y: Any)
 // CHECK-NEXT:    }
 // CHECK-EMPTY:
 // CHECK-NEXT:    struct InnerTemplate {

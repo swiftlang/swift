@@ -834,11 +834,6 @@ EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
 
-static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
-    "enable-experimental-string-processing",
-    llvm::cl::desc("Enable experimental string processing"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     "enable-bare-slash-regex",
     llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
@@ -4374,9 +4369,6 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
-  }
-  if (options::EnableExperimentalStringProcessing) {
-    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);

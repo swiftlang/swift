@@ -14,6 +14,7 @@
 #define FrontendSourceFileDepGraphFactory_h
 
 #include "swift/AST/AbstractSourceFileDepGraphFactory.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 namespace swift {
 namespace fine_grained_dependencies {
 
@@ -27,7 +28,9 @@ class FrontendSourceFileDepGraphFactory
   const DependencyTracker &depTracker;
 
 public:
-  FrontendSourceFileDepGraphFactory(const SourceFile *SF, StringRef outputPath,
+  FrontendSourceFileDepGraphFactory(const SourceFile *SF,
+                                    llvm::vfs::OutputBackend &backend,
+                                    StringRef outputPath,
                                     const DependencyTracker &depTracker,
                                     bool alsoEmitDotFile);
 
@@ -42,7 +45,8 @@ class ModuleDepGraphFactory : public AbstractSourceFileDepGraphFactory {
   const ModuleDecl *Mod;
 
 public:
-  ModuleDepGraphFactory(const ModuleDecl *Mod, bool emitDot);
+  ModuleDepGraphFactory(llvm::vfs::OutputBackend &backend,
+                        const ModuleDecl *Mod, bool emitDot);
 
   ~ModuleDepGraphFactory() override = default;
 

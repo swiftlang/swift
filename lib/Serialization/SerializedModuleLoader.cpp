@@ -1501,12 +1501,13 @@ bool SerializedASTFile::isSystemModule() const {
 }
 
 void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
+                                    OptionSet<ModuleLookupFlags> Flags,
                                     SmallVectorImpl<ValueDecl*> &results) const{
   File.lookupValue(name, results);
 }
 
 StringRef
-SerializedASTFile::getFilenameForPrivateDecl(const ValueDecl *decl) const {
+SerializedASTFile::getFilenameForPrivateDecl(const Decl *decl) const {
   return File.FilenamesForPrivateValues.lookup(decl);
 }
 
@@ -1688,8 +1689,8 @@ const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
 }
 
 Identifier
-SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
-  Identifier discriminator = File.getDiscriminatorForPrivateValue(D);
+SerializedASTFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
+  Identifier discriminator = File.getDiscriminatorForPrivateDecl(D);
   assert(!discriminator.empty() && "no discriminator found for value");
   return discriminator;
 }

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
@@ -83,6 +83,48 @@ StdStringOverlayTestSuite.test("std::u16string operators") {
   // Make sure the operators work together with ExpressibleByStringLiteral conformance.
   s1 += "literal"
   expectTrue(s1 == "something123literal")
+}
+
+StdStringOverlayTestSuite.test("std::string as Hashable") {
+  let s0 = std.string()
+  let h0 = s0.hashValue
+
+  let s1 = std.string("something")
+  let h1 = s1.hashValue
+
+  let s2 = std.string("something123")
+  let h2 = s2.hashValue
+
+  let s3 = std.string("something")
+  let h3 = s3.hashValue
+
+  expectEqual(h1, h3)
+  expectNotEqual(h0, h1)
+  expectNotEqual(h0, h2)
+  expectNotEqual(h0, h3)
+  expectNotEqual(h1, h2)
+  expectNotEqual(h2, h3)
+}
+
+StdStringOverlayTestSuite.test("std::u16string as Hashable") {
+  let s0 = std.u16string()
+  let h0 = s0.hashValue
+
+  let s1 = std.u16string("something")
+  let h1 = s1.hashValue
+
+  let s2 = std.u16string("something123")
+  let h2 = s2.hashValue
+
+  let s3 = std.u16string("something")
+  let h3 = s3.hashValue
+
+  expectEqual(h1, h3)
+  expectNotEqual(h0, h1)
+  expectNotEqual(h0, h2)
+  expectNotEqual(h0, h3)
+  expectNotEqual(h1, h2)
+  expectNotEqual(h2, h3)
 }
 
 StdStringOverlayTestSuite.test("std::u16string <=> Swift.String") {

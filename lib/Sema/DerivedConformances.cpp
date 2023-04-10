@@ -335,7 +335,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // Actor.unownedExecutor
     if (name.isSimpleName(ctx.Id_unownedExecutor)) {
-      return getRequirement(KnownProtocolKind::Actor);
+      if (nominal->isDistributedActor()) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      } else {
+        return getRequirement(KnownProtocolKind::Actor);
+      }
     }
 
     // DistributedActor.id
@@ -345,11 +349,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // DistributedActor.actorSystem
     if (name.isSimpleName(ctx.Id_actorSystem))
       return getRequirement(KnownProtocolKind::DistributedActor);
-
-    // DistributedActor.localUnownedExecutor
-    if (name.isSimpleName(ctx.Id_localUnownedExecutor)) {
-      return getRequirement(KnownProtocolKind::DistributedActor);
-    }
 
     return nullptr;
   }
@@ -554,8 +553,8 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
 
-  Pattern *propPat = NamedPattern::createImplicit(Context, propDecl);
-  propPat->setType(propertyContextType);
+  Pattern *propPat =
+      NamedPattern::createImplicit(Context, propDecl, propertyContextType);
 
   propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
   propPat->setType(propertyContextType);
@@ -693,11 +692,6 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
-//  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-//      DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
-//      DeclNameLoc());
-//  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
-//      /*implicit*/ true);
   conditions.emplace_back(testExpr);
 
   // Build and return the complete guard statement.
@@ -759,8 +753,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
   indexVar->setImplicit();
 
   // generate: var indexVar
-  Pattern *indexPat = NamedPattern::createImplicit(C, indexVar);
-  indexPat->setType(intType);
+  Pattern *indexPat = NamedPattern::createImplicit(C, indexVar, intType);
   indexPat = TypedPattern::createImplicit(C, indexPat, intType);
   indexPat->setType(intType);
   auto *indexBind = PatternBindingDecl::createImplicit(

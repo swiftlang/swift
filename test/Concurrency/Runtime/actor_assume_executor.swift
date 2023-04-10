@@ -16,7 +16,7 @@ import StdlibUnittest
 
 func checkAssumeMainActor(echo: MainActorEcho) /* synchronous! */ {
   // Echo.get("any") // error: main actor isolated, cannot perform async call here
-  assumeOnMainActorExecutor {
+  MainActor.assumeIsolated {
     let input = "example"
     let got = echo.get(input)
     precondition(got == "example", "Expected echo to match \(input)")
@@ -40,7 +40,7 @@ actor MainFriend {
 
 func checkAssumeSomeone(someone: Someone) /* synchronous */ {
   // someone.something // can't access, would need a hop but we can't
-  assumeOnActorExecutor(someone) { someone in
+  someone.assumeIsolated { someone in
     let something = someone.something
     let expected = "isolated something"
     precondition(something == expected, "expected '\(expected)', got: \(something)")
@@ -103,19 +103,19 @@ final class MainActorEcho {
     if #available(SwiftStdlib 5.9, *) {
       // === MainActor --------------------------------------------------------
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from 'main() async'") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from 'main() async'") {
         await checkAssumeMainActor(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from MainActor method") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from MainActor method") {
         await mainActorCallCheck(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: assume the main executor, from actor on MainActor executor") {
+      tests.test("MainActor.assumeIsolated: assume the main executor, from actor on MainActor executor") {
         await MainFriend().callCheck(echo: echo)
       }
 
-      tests.test("assumeOnMainActorExecutor: wrongly assume the main executor, from actor on other executor") {
+      tests.test("MainActor.assumeIsolated: wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor(echo: echo)
       }

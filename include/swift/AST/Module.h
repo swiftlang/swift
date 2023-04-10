@@ -410,6 +410,11 @@ public:
   /// the given location isn't in this module.
   bool isInGeneratedBuffer(SourceLoc loc);
 
+  // Retrieve the buffer ID and source location of the outermost location that
+  // caused the generation of the buffer containing \p loc. \p loc and its
+  // buffer if it isn't in a generated buffer or has no original location.
+  std::pair<unsigned, SourceLoc> getOriginalLocation(SourceLoc loc) const;
+
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
   ///
@@ -728,7 +733,18 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   void lookupValue(DeclName Name, NLKind LookupKind,
+                   OptionSet<ModuleLookupFlags> Flags,
                    SmallVectorImpl<ValueDecl*> &Result) const;
+
+  /// Look up a (possibly overloaded) value set at top-level scope
+  /// (but with the specified access path, which may come from an import decl)
+  /// within the current module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  void lookupValue(DeclName Name, NLKind LookupKind,
+                   SmallVectorImpl<ValueDecl*> &Result) const {
+    lookupValue(Name, LookupKind, {}, Result);
+  }
 
   /// Look up a local type declaration by its mangled name.
   ///

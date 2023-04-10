@@ -160,6 +160,8 @@ enum class NameLookupFlags {
   IncludeOuterResults = 1 << 1,
   // Whether to include results that are marked @inlinable or @usableFromInline.
   IncludeUsableFromInline = 1 << 2,
+  /// This lookup should exclude any names introduced by macro expansions.
+  ExcludeMacroExpansions = 1 << 3,
 };
 
 /// A set of options that control name lookup.
@@ -1059,6 +1061,11 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 /// or None if this is allowed.
 Optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
+
+/// Returns a diagnostic indicating why the declaration cannot be annotated
+/// with an @available() attribute indicating it is unavailable or None if this
+/// is allowed.
+Optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
 /// Same as \c checkDeclarationAvailability but doesn't give a reason for
 /// unavailability.

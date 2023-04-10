@@ -75,12 +75,8 @@ static void addSearchPathInvocationArguments(
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx,
     Optional<StringRef> sourceFileName = None) {
-  std::vector<std::string> commandLineArgs;
-
-  // Form the basic command line.
-  commandLineArgs.push_back("clang");
-  importer::getNormalInvocationArguments(commandLineArgs, ctx);
-  importer::addCommonInvocationArguments(commandLineArgs, ctx);
+  std::vector<std::string> commandLineArgs =
+      ClangImporter::getClangArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
@@ -113,6 +109,10 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
     assert(syntaxOnlyPos != commandLineArgs.end());
     *syntaxOnlyPos = "-c";
   }
+
+  // The Clang modules produced by ClangImporter are always embedded in an
+  // ObjectFilePCHContainer and contain -gmodules debug info.
+  commandLineArgs.push_back("-gmodules");
 
   return commandLineArgs;
 }
@@ -238,7 +238,7 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
   auto clangModuleDependencies =
       cache.getClangScannerTool().getModuleDependencies(
           moduleName, commandLineArgs, workingDir,
-          cache.getAlreadySeenClangModules(), lookupModuleOutput, {});
+          cache.getAlreadySeenClangModules(), lookupModuleOutput);
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
@@ -298,7 +298,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
   auto clangModuleDependencies =
       cache.getClangScannerTool().getTranslationUnitDependencies(
           commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-          lookupModuleOutput, {});
+          lookupModuleOutput);
   if (!clangModuleDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(), llvm::errs());

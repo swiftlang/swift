@@ -3249,7 +3249,26 @@ namespace {
       } else {
         if (importFuncWithoutSignature) {
           importedType = ImportedType{Impl.SwiftContext.getVoidType(), false};
-          bodyParams = ParameterList::createEmpty(Impl.SwiftContext);
+          if (decl->param_empty())
+            bodyParams = ParameterList::createEmpty(Impl.SwiftContext);
+          else {
+            llvm::SmallVector<ParamDecl *, 4> params;
+            for (const auto &param : decl->parameters()) {
+
+              Identifier bodyName =
+                  Impl.importFullName(param, Impl.CurrentVersion)
+                      .getDeclName()
+                      .getBaseIdentifier();
+              auto paramInfo = Impl.createDeclWithClangNode<ParamDecl>(
+                  param, AccessLevel::Private, SourceLoc(), SourceLoc(),
+                  Identifier(), Impl.importSourceLoc(param->getLocation()),
+                  bodyName, Impl.ImportedHeaderUnit);
+              paramInfo->setSpecifier(ParamSpecifier::Default);
+              paramInfo->setInterfaceType(Impl.SwiftContext.TheAnyType);
+              params.push_back(paramInfo);
+            }
+            bodyParams = ParameterList::create(Impl.SwiftContext, params);
+          }
         } else {
           // Import the function type. If we have parameters, make sure their
           // names get into the resulting function type.
@@ -3422,10 +3441,19 @@ namespace {
              });
     }
 
+    static bool hasComputedPropertyAttr(const clang::Decl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_computed_property";
+               return false;
+             });
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
 
-      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties) {
+      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
+          hasComputedPropertyAttr(decl)) {
         CXXMethodBridging bridgingInfo(decl);
         if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
           auto name = bridgingInfo.getClangName().drop_front(3);

@@ -615,9 +615,11 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
   DeclNameRef nameRef(ctx.getIdentifier(name));
-  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               nameRef, SourceLoc(),
-                                               defaultUnqualifiedLookupOptions);
+  auto lookup = TypeChecker::lookupUnqualified(
+      dc->getModuleScopeContext(),
+      nameRef, SourceLoc(),
+      defaultUnqualifiedLookupOptions | NameLookupFlags::ExcludeMacroExpansions
+  );
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();

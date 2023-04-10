@@ -90,6 +90,10 @@ public:
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
     SuppressWarnings = 1 << 4,
+
+    /// Whether to disable the Swift Parser ASTGen
+    /// e.g. in dependency scanning, where an AST is not needed.
+    DisableSwiftParserASTGen = 1 << 5,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -442,6 +446,7 @@ public:
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ImportPath::Access accessPath,
@@ -490,7 +495,7 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;

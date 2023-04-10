@@ -1393,6 +1393,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Documentation: {
+    auto *attr = cast<DocumentationAttr>(this);
+
+    Printer.printAttrName("@_documentation");
+    Printer << "(";
+
+    bool needs_comma = !attr->Metadata.empty() && attr->Visibility;
+
+    if (attr->Visibility) {
+      Printer << "visibility: ";
+      Printer << getAccessLevelSpelling(*attr->Visibility);
+    }
+
+    if (needs_comma) {
+      Printer << ", ";
+    }
+
+    if (!attr->Metadata.empty()) {
+      Printer << "metadata: ";
+      Printer << attr->Metadata;
+    }
+
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 

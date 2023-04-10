@@ -86,27 +86,27 @@ tests.test("readArraySwitchLetTest") {
     }
 }
 
-tests.test("simpleArrayVarTest") {
-    var x: [Enum] = Array(repeating: .foo, count: 10_000)
-    expectTrue(x._buffer.isUniquelyReferenced())
+tests.test("simpleVarTest") {
+    var x = Klass()
+    expectTrue(_isUnique_native(&x))
 
     var y = x
-    expectTrue(x._buffer.isUniquelyReferenced())
-    let _ = y
-    expectTrue(x._buffer.isUniquelyReferenced())
-    y = []
-    expectTrue(x._buffer.isUniquelyReferenced())
+    expectFalse(_isUnique_native(&x))
+    let _ = consume y
+    expectTrue(_isUnique_native(&x))
+    y = Klass()
+    expectTrue(_isUnique_native(&x))
 }
 
-tests.test("simpleArrayInoutVarTest") {
-    func inOutTest(_ x: inout [Enum]) {
+tests.test("simpleInoutVarTest") {
+    func inOutTest(_ x: inout Klass) {
         var y = x
-        expectTrue(x._buffer.isUniquelyReferenced())
-        let _ = y
-        expectTrue(x._buffer.isUniquelyReferenced())
-        y = []
-        expectTrue(x._buffer.isUniquelyReferenced())
+        expectFalse(_isUnique_native(&x))
+        let _ = consume y
+        expectTrue(_isUnique_native(&x))
+        y = Klass()
+        expectTrue(_isUnique_native(&x))
     }
-    var outerX: [Enum] = Array(repeating: .foo, count: 10_000)
+    var outerX = Klass()
     inOutTest(&outerX)
 }

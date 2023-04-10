@@ -160,7 +160,6 @@ public:
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
-  IGNORED_ATTR(MacroRole)
   IGNORED_ATTR(LexicalLifetimes)
 #undef IGNORED_ATTR
 
@@ -342,6 +341,8 @@ public:
   void visitSendableAttr(SendableAttr *attr);
 
   void visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr);
+
+  void visitMacroRoleAttr(MacroRoleAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1858,31 +1859,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
+  // FIXME: This seems like it could be diagnosed during parsing instead.
   while (attr->IsSPI) {
     if (attr->hasPlatform() && attr->Introduced.has_value())
       break;
     diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
     break;
-  }
-
-  if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->isProtocolRequirement()) {
-        if (attr->isActivePlatform(Ctx) ||
-            attr->isLanguageVersionSpecific() ||
-            attr->isPackageDescriptionVersionSpecific()) {
-          auto versionAvailability = attr->getVersionAvailability(Ctx);
-          if (attr->isUnconditionallyUnavailable() ||
-              versionAvailability == AvailableVersionComparison::Obsoleted ||
-              versionAvailability == AvailableVersionComparison::Unavailable) {
-              if (!PD->isObjC()) {
-                diagnoseAndRemoveAttr(attr, diag::unavailable_method_non_objc_protocol);
-                return;
-              }
-            }
-          }
-        }
-    }
   }
 
   if (attr->isNoAsync()) {
@@ -1911,18 +1893,19 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       D->getASTContext().Diags.diagnose(
           D->getLoc(), diag::invalid_decl_attribute, attr);
     }
-
   }
 
   // Skip the remaining diagnostics in swiftinterfaces.
-  auto *SF = D->getDeclContext()->getParentSourceFile();
+  auto *DC = D->getDeclContext();
+  auto *SF = DC->getParentSourceFile();
   if (SF && SF->Kind == SourceFileKind::Interface)
     return;
 
-  if (!attr->hasPlatform() || !attr->isActivePlatform(Ctx) ||
-      !attr->Introduced.has_value()) {
+  // The remaining diagnostics are only for attributes that are active for the
+  // current target triple.
+  if (!attr->isActivePlatform(Ctx) && !attr->isLanguageVersionSpecific() &&
+      !attr->isPackageDescriptionVersionSpecific())
     return;
-  }
 
   // Make sure there isn't a more specific attribute we should be using instead.
   // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
@@ -1935,6 +1918,30 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 
   SourceLoc attrLoc = attr->getLocation();
+  auto versionAvailability = attr->getVersionAvailability(Ctx);
+  if (versionAvailability == AvailableVersionComparison::Obsoleted ||
+      versionAvailability == AvailableVersionComparison::Unavailable) {
+    if (auto cannotBeUnavailable =
+            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
+      diagnose(attrLoc, cannotBeUnavailable.value());
+      return;
+    }
+
+    if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->isProtocolRequirement() && !PD->isObjC()) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::unavailable_method_non_objc_protocol);
+          return;
+        }
+      }
+    }
+  }
+
+  // The remaining diagnostics are only for attributes with introduced versions
+  // for specific platforms.
+  if (!attr->hasPlatform() || !attr->Introduced.has_value())
+    return;
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
@@ -1952,13 +1959,17 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       EnclosingAnnotatedRange.emplace(
           AvailabilityInference::availableRange(enclosingAttr, Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
-        // Members of extensions of nominal types with available ranges were
-        // not diagnosed previously, so only emit a warning in that case.
-        bool inExtension = isa<ExtensionDecl>(
-            D->getDeclContext()->getTopmostDeclarationDeclContext());
-        auto limit = (enclosingDecl != parent && inExtension)
-                         ? DiagnosticBehavior::Warning
-                         : DiagnosticBehavior::Unspecified;
+        auto limit = DiagnosticBehavior::Unspecified;
+        if (D->isImplicit()) {
+          // Incorrect availability for an implicit declaration is likely a
+          // compiler bug so make the diagnostic a warning.
+          limit = DiagnosticBehavior::Warning;
+        } else if (enclosingDecl != parent) {
+          // Members of extensions of nominal types with available ranges were
+          // not diagnosed previously, so only emit a warning in that case.
+          if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
+            limit = DiagnosticBehavior::Warning;
+        }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : attr->getLocation(),
                  diag::availability_decl_more_than_enclosing,
@@ -2333,6 +2344,16 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
              applicationMainKind);
     attr->setInvalid();
   }
+
+  diagnose(attr->getLocation(),
+           diag::attr_ApplicationMain_deprecated,
+           applicationMainKind)
+    .warnUntilSwiftVersion(6);
+
+  diagnose(attr->getLocation(),
+           diag::attr_ApplicationMain_deprecated_use_attr_main)
+    .fixItReplace(attr->getRange(), "@main");
+
 
   if (attr->isInvalid())
     return;
@@ -4459,6 +4480,10 @@ Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
+  // A destructor is always called if declared.
+  if (auto *DD = dyn_cast<DestructorDecl>(D))
+    return diag::availability_deinit_no_potential;
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return None;
@@ -4488,6 +4513,45 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
         return diag::availability_enum_element_no_potential;
       }
     }
+  }
+
+  return None;
+}
+
+Optional<Diag<>>
+TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
+  auto parentIsUnavailable = [](const Decl *D) -> bool {
+    if (auto *parent =
+            AvailabilityInference::parentDeclForInferredAvailability(D)) {
+      return parent->getSemanticUnavailableAttr() != None;
+    }
+    return false;
+  };
+
+  // A destructor is always called if declared.
+  if (auto *DD = dyn_cast<DestructorDecl>(D)) {
+    if (parentIsUnavailable(D))
+      return None;
+
+    return diag::availability_deinit_no_unavailable;
+  }
+
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (!VD->hasStorageOrWrapsStorage())
+      return None;
+
+    if (parentIsUnavailable(D))
+      return None;
+
+    // Do not permit unavailable script-mode global variables; their initializer
+    // expression is not lazily evaluated, so this would not be safe.
+    if (VD->isTopLevelGlobal())
+      return diag::availability_global_script_no_unavailable;
+
+    // Globals and statics are lazily initialized, so they are safe for
+    // unavailability.
+    if (!VD->isStatic() && !D->getDeclContext()->isModuleScopeContext())
+      return diag::availability_stored_property_no_unavailable;
   }
 
   return None;
@@ -6956,6 +7020,59 @@ void AttributeChecker::visitRuntimeMetadataAttr(RuntimeMetadataAttr *attr) {
     }
 
     attr->setInvalid();
+  }
+}
+
+void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
+  switch (attr->getMacroSyntax()) {
+  case MacroSyntax::Freestanding: {
+    switch (attr->getMacroRole()) {
+    case MacroRole::Expression:
+      if (!attr->getNames().empty())
+        diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
+                              getMacroRoleString(attr->getMacroRole()));
+      break;
+    case MacroRole::Declaration:
+      // TODO: Check names
+      break;
+    case MacroRole::CodeItem:
+      if (!attr->getNames().empty())
+        diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
+                              getMacroRoleString(attr->getMacroRole()));
+      break;
+    default:
+      diagnoseAndRemoveAttr(attr, diag::invalid_macro_role_for_macro_syntax,
+                            /*freestanding*/0);
+      break;
+    }
+    break;
+  }
+  case MacroSyntax::Attached: {
+    switch (attr->getMacroRole()) {
+    case MacroRole::Accessor:
+      // TODO: Check property observer names?
+      break;
+    case MacroRole::MemberAttribute:
+      if (!attr->getNames().empty())
+        diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
+                              getMacroRoleString(attr->getMacroRole()));
+      break;
+    case MacroRole::Member:
+      break;
+    case MacroRole::Peer:
+      break;
+    case MacroRole::Conformance:
+      if (!attr->getNames().empty())
+        diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
+                              getMacroRoleString(attr->getMacroRole()));
+      break;
+    default:
+      diagnoseAndRemoveAttr(attr, diag::invalid_macro_role_for_macro_syntax,
+                            /*attached*/1);
+      break;
+    }
+    break;
+  }
   }
 }
 

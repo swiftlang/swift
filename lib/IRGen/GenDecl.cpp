@@ -2167,13 +2167,19 @@ void IRGenerator::emitEntryPointInfo() {
 }
 
 static IRLinkage
-getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             ForDefinition_t isDefinition, bool isWeakImported,
-             bool isKnownLocal = false) {
+getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
+             SILLinkage linkage, ForDefinition_t isDefinition,
+             bool isWeakImported, bool isKnownLocal = false) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
             llvm::GlobalValue::DLL_STORAGE##StorageClass}
+
+  // This is a synthetic symbol that is referenced for `#dsohandle` and is never
+  // a definition but needs to be handled as a definition as it will be provided
+  // by the linker. This is a MSVC extension that is honoured by lld as well.
+  if (info.IsMSVCEnvironment && name == "__ImageBase")
+    return RESULT(External, Default, Default);
 
   // Use protected visibility for public symbols we define on ELF.  ld.so
   // doesn't support relative relocations at load time, which interferes with
@@ -2208,7 +2214,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
-      return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
+      return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
                           isWeakImported, isKnownLocal);
 
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
@@ -2262,8 +2268,9 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
       isKnownLocal = IGM.getSwiftModule() == MD || MD->isStaticLibrary();
 
   auto IRL =
-      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, weakImported, isKnownLocal);
+      getIRLinkage(global->hasName() ? global->getName() : StringRef(),
+                   linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
+                   weakImported, isKnownLocal);
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2297,8 +2304,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                            isDefinition, weakImported, isKnownLocal);
+  result.IRL = getIRLinkage(result.Name, linkInfo,
+                            entity.getLinkage(isDefinition), isDefinition,
+                            weakImported, isKnownLocal);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2308,8 +2316,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
                        bool isWeakImported) {
   LinkInfo result;
   result.Name += name;
-  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported,
-                            linkInfo.Internalize);
+  result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
+                            isWeakImported, linkInfo.Internalize);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -5489,6 +5497,9 @@ Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   for (Decl *member : members) {
+    if (Lowering::shouldSkipLowering(member))
+      continue;
+
     member->visitAuxiliaryDecls([&](Decl *decl) {
       emitNestedTypeDecls({decl, nullptr});
     });

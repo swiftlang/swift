@@ -15,8 +15,8 @@
 ///
 /// Interior liveness handles the following cases naturally:
 ///
-/// When completing the lifetime if the initial value, %v1, transitively
-/// include all dominated reborrows. %phi1 in this example:
+/// When completing the lifetime of the initial value, %v1, transitively
+/// include all uses of dominated reborrows as, such as %phi1 in this example:
 ///
 ///     %v1 = ...
 ///     cond_br bb1, bb2
@@ -31,8 +31,8 @@
 ///     end_borrow %phi1
 ///     %k1 = destroy_value %v1 // must be below end_borrow %phi1
 ///
-/// When completing the lifetime for a (%phi2) transitively include all inner
-/// adjacent reborrows (%phi1):
+/// When completing the lifetime for a phi (%phi2) transitively include all
+/// uses of inner adjacent reborrows, such as %phi1 in this example:
 ///
 ///   bb1:
 ///     %v1 = ...
@@ -129,7 +129,7 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
       changed = true;
     }
     for (auto *successor : block->getSuccessorBlocks()) {
-      deadEndBlocks.push(successor);
+      deadEndBlocks.pushIfNotVisited(successor);
     }
   }
   return changed;

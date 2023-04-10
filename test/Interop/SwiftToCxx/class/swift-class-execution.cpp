@@ -1,22 +1,50 @@
-// RUN: %empty-directory(%t)
+// (1) Onone, no evolution
 
-// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
+// RUN: %empty-directory(%t-onone)
 
-// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-class-execution.o
-// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t/swift-class-execution -Xlinker %t/swift-class-execution.o -module-name Class -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t-onone/class.h -Onone
 
-// RUN: %target-codesign %t/swift-class-execution
-// RUN: %target-run %t/swift-class-execution | %FileCheck %s
+// RUN: %target-interop-build-clangxx -c %s -I %t-onone -o %t-onone/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-onone/swift-class-execution -Xlinker %t-onone/swift-class-execution.o -module-name Class -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Onone
 
-// RUN: %empty-directory(%t-evo)
+// RUN: %target-codesign %t-onone/swift-class-execution
+// RUN: %target-run %t-onone/swift-class-execution | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 
-// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo/class.h
+// (2) O, no evolution
 
-// RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-class-execution.o
-// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-evo/swift-class-execution-evo -Xlinker %t-evo/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
+// RUN: %empty-directory(%t-ofast)
 
-// RUN: %target-codesign %t-evo/swift-class-execution-evo
-// RUN: %target-run %t-evo/swift-class-execution-evo | %FileCheck %s
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t-ofast/class.h -O
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-ofast -o %t-ofast/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-ofast/swift-class-execution -Xlinker %t-ofast/swift-class-execution.o -module-name Class -Xfrontend -entry-point-function-name -Xfrontend swiftMain -O
+
+// RUN: %target-codesign %t-ofast/swift-class-execution
+// RUN: %target-run %t-ofast/swift-class-execution | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+
+// (3) Onone, evolution
+
+// RUN: %empty-directory(%t-evo-onone)
+
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo-onone/class.h -Onone
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-evo-onone -o %t-evo-onone/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-evo-onone/swift-class-execution-evo -Xlinker %t-evo-onone/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Onone
+
+// RUN: %target-codesign %t-evo-onone/swift-class-execution-evo
+// RUN: %target-run %t-evo-onone/swift-class-execution-evo | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+
+// (4) O, evolution
+
+// RUN: %empty-directory(%t-evo-ofast)
+
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo-ofast/class.h -O
+
+// RUN: %target-interop-build-clangxx -c %s -I %t-evo-ofast -o %t-evo-ofast/swift-class-execution.o
+// RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-evo-ofast/swift-class-execution-evo -Xlinker %t-evo-ofast/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain -O
+
+// RUN: %target-codesign %t-evo-ofast/swift-class-execution-evo
+// RUN: %target-run %t-evo-ofast/swift-class-execution-evo | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 
 // REQUIRES: executable_test
 
@@ -70,8 +98,10 @@ int main() {
     takeClassWithIntField(x);
   }
 // CHECK-NEXT: init ClassWithIntField
-// CHECK-NEXT: init ClassWithIntField
-// CHECK-NEXT: destroy ClassWithIntField
+// CHECK-ONONE-NEXT: init ClassWithIntField
+// CHECK-ONONE-NEXT: destroy ClassWithIntField
+// CHECK-OPT-NEXT: destroy ClassWithIntField
+// CHECK-OPT-NEXT: init ClassWithIntField
 // CHECK-NEXT: ClassWithIntField: -11;
 // CHECK-NEXT: destroy ClassWithIntField
 

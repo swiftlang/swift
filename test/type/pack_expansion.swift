@@ -69,7 +69,7 @@ func packRef<each T>(_: repeat each T) where each T: P {}
 
 func packMemberRef<each T>(_: repeat each T.T) where each T: P {}
 
-// expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}
+// expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}{{31-35=}}
 func invalidPackRefEachInt(_: each Int) {}
 
 // expected-error@+1 {{pack expansion 'Int' must contain at least one pack reference}}

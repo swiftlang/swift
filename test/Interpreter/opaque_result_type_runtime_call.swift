@@ -6,6 +6,9 @@
 // RUN: %target-run %t/main %t/%target-library-name(opaque_result_type_runtime_call_other) | %FileCheck %s
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import opaque_result_type_runtime_call_other
 
 extension String: P {}

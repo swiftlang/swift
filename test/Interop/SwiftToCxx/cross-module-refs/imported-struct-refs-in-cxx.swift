@@ -6,7 +6,7 @@
 // RUN: %FileCheck %s < %t/uses-structs.h
 // RUN: %check-interop-cxx-header-in-clang(-I %t %t/uses-structs.h)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -cxx-interoperability-mode=swift-5.9 -emit-clang-header-path %t/uses-structs-default.h -clang-header-expose-module Structs=structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -cxx-interoperability-mode=default -emit-clang-header-path %t/uses-structs-default.h -clang-header-expose-module Structs=structs.h
 // RUN: %check-interop-cxx-header-in-clang(-I %t %t/uses-structs-default.h)
 
 import Structs

@@ -574,6 +574,8 @@ DeclContext *Decl::getInnermostDeclContext() const {
     return const_cast<ExtensionDecl*>(ext);
   if (auto topLevel = dyn_cast<TopLevelCodeDecl>(this))
     return const_cast<TopLevelCodeDecl*>(topLevel);
+  if (auto macro = dyn_cast<MacroDecl>(this))
+    return const_cast<MacroDecl*>(macro);
 
   return getDeclContext();
 }
@@ -1098,6 +1100,8 @@ AvailabilityContext Decl::getAvailabilityForLinkage() const {
     return *containingContext;
   }
 
+  // FIXME: Adopt AvailabilityInference::parentDeclForInferredAvailability()
+  // here instead of duplicating the logic.
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
 
@@ -2693,13 +2697,15 @@ void AbstractStorageDecl::visitOpaqueAccessors(
   });
 }
 
-static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
-  return D->getFormalAccess() <= AccessLevel::FilePrivate;
+static bool hasPrivateOrFilePrivateFormalAccess(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+  return isa<MacroExpansionDecl>(D);
 }
 
 /// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
 /// marked private or fileprivate or is a local context.
-static bool isInPrivateOrLocalContext(const ValueDecl *D) {
+static bool isInPrivateOrLocalContext(const Decl *D) {
   const DeclContext *DC = D->getDeclContext();
   if (!DC->isTypeContext()) {
     assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
@@ -2716,7 +2722,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
-bool ValueDecl::isOutermostPrivateOrFilePrivateScope() const {
+bool Decl::isOutermostPrivateOrFilePrivateScope() const {
   return hasPrivateOrFilePrivateFormalAccess(this) &&
          !isInPrivateOrLocalContext(this);
 }
@@ -9642,29 +9648,6 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   return nullptr;
 }
 
-const VarDecl *ClassDecl::getLocalUnownedExecutorProperty() const {
-  auto &C = getASTContext();
-
-  if (!isDistributedActor())
-    return nullptr;
-
-  llvm::SmallVector<ValueDecl *, 2> results;
-  this->lookupQualified(getSelfNominalTypeDecl(),
-                        DeclNameRef(C.Id_localUnownedExecutor),
-                        NL_ProtocolMembers,
-                        results);
-
-  for (auto candidate: results) {
-    if (isa<ProtocolDecl>(candidate->getDeclContext()))
-      continue;
-
-    if (VarDecl *var = dyn_cast<VarDecl>(candidate))
-      return var;
-  }
-
-  return nullptr;
-}
-
 bool ClassDecl::isRootDefaultActor() const {
   return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }
@@ -9889,6 +9872,14 @@ Decl *TypeOrExtensionDecl::getAsDecl() const {
 DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
   return getAsDecl()->getInnermostDeclContext();
 }
+
+IterableDeclContext *TypeOrExtensionDecl::getAsIterableDeclContext() const {
+  if (auto nominal = Decl.dyn_cast<NominalTypeDecl *>())
+    return nominal;
+
+  return Decl.get<ExtensionDecl *>();
+}
+
 NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
   return getAsDeclContext()->getSelfNominalTypeDecl();
 }
@@ -10055,6 +10046,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Conformance:
     return "conformance";
+
+  case MacroRole::CodeItem:
+    return "codeItem";
   }
 }
 
@@ -10096,7 +10090,8 @@ StringRef swift::getMacroIntroducedDeclNameString(
 static MacroRoles freestandingMacroRoles =
   (MacroRoles() |
    MacroRole::Expression |
-   MacroRole::Declaration);
+   MacroRole::Declaration |
+   MacroRole::CodeItem);
 static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Accessor |
                                         MacroRole::MemberAttribute |
@@ -10302,6 +10297,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Declaration:
   case MacroRole::Member:
   case MacroRole::Peer:
+  case MacroRole::CodeItem:
     names.push_back(MacroDecl::getUniqueNamePlaceholder(getASTContext()));
     break;
 

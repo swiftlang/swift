@@ -182,7 +182,7 @@ namespace swift {
     version::Version PackageDescriptionVersion;
 
     /// Enable experimental string processing
-    bool EnableExperimentalStringProcessing = false;
+    bool EnableExperimentalStringProcessing = true;
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
@@ -555,6 +555,9 @@ namespace swift {
 
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
+
+    /// All block list configuration files to be honored in this compilation.
+    std::vector<std::string> BlocklistConfigFilePaths;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;

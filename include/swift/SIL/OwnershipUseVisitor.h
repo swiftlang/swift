@@ -388,8 +388,9 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
   case OperandOwnership::BitwiseEscape:
-  case OperandOwnership::EndBorrow:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
+  case OperandOwnership::EndBorrow:
+    return handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding);
 
   case OperandOwnership::Reborrow:
     if (!asImpl().handleOuterReborrow(use))

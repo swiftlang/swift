@@ -30,6 +30,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -260,12 +261,22 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
+    case MacroRole::CodeItem:
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
-    case MacroRole::Peer:
     case MacroRole::Conformance:
       parentLoc = expansion.getStartLoc();
       break;
+    case MacroRole::Peer: {
+      ASTContext &ctx = SF->getASTContext();
+      SourceManager &sourceMgr = ctx.SourceMgr;
+      auto generatedSourceInfo =
+          *sourceMgr.getGeneratedSourceInfo(*SF->getBufferID());
+
+      ASTNode node = ASTNode::getFromOpaqueValue(generatedSourceInfo.astNode);
+      parentLoc = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
+      break;
+    }
     case MacroRole::Member: {
       // For synthesized member macros, take the end loc of the
       // enclosing declaration (before the closing brace), because

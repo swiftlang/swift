@@ -78,6 +78,10 @@ class GenericContext;
 class DeclName;
 class StmtConditionElement;
 
+namespace Lowering {
+class SILGenFunction;
+}
+
 namespace ast_scope {
 class ASTScopeImpl;
 class GenericTypeOrExtensionScope;
@@ -129,6 +133,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
   friend class ASTSourceFileScope;
+  friend class Lowering::SILGenFunction;
 
 #pragma mark - tree state
 protected:
@@ -272,6 +277,10 @@ public:
 
   static std::pair<CaseStmt *, CaseStmt *>
   lookupFallthroughSourceAndDest(SourceFile *sourceFile, SourceLoc loc);
+
+  /// Scopes that cannot bind variables may set this to true to create more
+  /// compact scope tree in the debug info.
+  virtual bool ignoreInDebugInfo() const { return false; }
 
 #pragma mark - - lookup- starting point
 private:
@@ -777,6 +786,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   NullablePtr<const void> addressForPrinting() const override { return params; }
+  bool ignoreInDebugInfo() const override { return true; }
 };
 
 /// Body of functions, methods, constructors, destructors and accessors.
@@ -799,6 +809,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
+  bool ignoreInDebugInfo() const override { return true; }
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
@@ -825,6 +836,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
+  bool ignoreInDebugInfo() const override { return true; }
 };
 
 /// Consider:
@@ -858,7 +870,7 @@ public:
   NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
     return attr;
   }
-
+ bool ignoreInDebugInfo() const override { return true; }
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 };
@@ -972,6 +984,7 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
+  bool ignoreInDebugInfo() const override { return true; }
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1049,6 +1062,7 @@ public:
   }
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
+  bool ignoreInDebugInfo() const override { return true; }
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;

@@ -1156,6 +1156,10 @@ public:
 
   bool isAvailableAsSPI() const;
 
+  /// Determine whether this Decl has either Private or FilePrivate access,
+  /// and its DeclContext does not.
+  bool isOutermostPrivateOrFilePrivateScope() const;
+
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
   ///
@@ -2570,10 +2574,6 @@ public:
   /// \sa hasOpenAccess
   AccessLevel getFormalAccess() const;
 
-  /// Determine whether this Decl has either Private or FilePrivate access,
-  /// and its DeclContext does not.
-  bool isOutermostPrivateOrFilePrivateScope() const;
-
   /// Returns the outermost DeclContext from which this declaration can be
   /// accessed, or null if the declaration is public.
   ///
@@ -3835,6 +3835,8 @@ public:
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
     IncludeAttrImplements = 1 << 0,
+    /// Whether to exclude members of macro expansions.
+    ExcludeMacroExpansions = 1 << 1,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -4533,7 +4535,6 @@ public:
 
   /// Fetch this class's unownedExecutor property, if it has one.
   const VarDecl *getUnownedExecutorProperty() const;
-  const VarDecl *getLocalUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;

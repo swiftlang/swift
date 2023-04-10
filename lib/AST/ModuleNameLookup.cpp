@@ -57,6 +57,10 @@ public:
                       NLOptions options);
 };
 
+// Exclude names introduced by macro expansions.
+enum class LocalLookupFlags {
+  ExcludeMacroExpansions,
+};
 
 /// Encapsulates the work done for a recursive qualified lookup into a module
 /// by full name.
@@ -81,12 +85,13 @@ private:
   }
 
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
+                     OptionSet<ModuleLookupFlags> flags,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
     // If this import is specific to some named decl ("import Swift.Int")
     // then filter out any lookups that don't match.
     if (!path.matches(name))
       return;
-    module->lookupValue(name, lookupKind, localDecls);
+    module->lookupValue(name, lookupKind, flags, localDecls);
   }
 };
 
@@ -112,6 +117,7 @@ private:
   }
 
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
+                     OptionSet<ModuleLookupFlags> flags,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
     VectorDeclConsumer consumer(localDecls);
     module->lookupVisibleDecls(path, consumer, lookupKind);
@@ -167,9 +173,14 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     currentCount = decls.size();
   };
 
+  OptionSet<ModuleLookupFlags> currentModuleLookupFlags = {};
+  if (options & NL_ExcludeMacroExpansions)
+    currentModuleLookupFlags |= ModuleLookupFlags::ExcludeMacroExpansions;
+
   // Do the lookup into the current module.
   auto *module = moduleOrFile->getParentModule();
-  getDerived()->doLocalLookup(module, accessPath, decls);
+  getDerived()->doLocalLookup(
+      module, accessPath, currentModuleLookupFlags, decls);
   updateNewDecls(moduleScopeContext);
 
   bool canReturnEarly = (initialCount != decls.size() &&
@@ -198,7 +209,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         return;
 
       getDerived()->doLocalLookup(import.importedModule, import.accessPath,
-                                  decls);
+                                  { }, decls);
       updateNewDecls(moduleScopeContext);
     };
 

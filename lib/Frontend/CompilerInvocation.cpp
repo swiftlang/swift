@@ -438,9 +438,24 @@ enum class CxxCompatMode {
 static CxxCompatMode validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return CxxCompatMode::off;
+  if (mode == "default")
+    return CxxCompatMode::enabled;
+  // FIXME: Drop swift-5.9.
   if (mode == "swift-5.9")
     return CxxCompatMode::enabled;
   return CxxCompatMode::invalid;
+}
+
+static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
+                                         DiagnosticEngine &diags) {
+  // General invalid argument error
+  diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                 verArg->getAsString(Args), verArg->getValue());
+
+  // Note valid C++ interoperability modes.
+  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default")};
+  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
+  diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -542,8 +557,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // forward slash regex `/.../`.
     if (!Opts.EnableExperimentalStringProcessing)
       Opts.EnableBareSlashRegexLiterals = false;
-  } else {
-    Opts.EnableExperimentalStringProcessing = true;
   }
 
   Opts.DisableAvailabilityChecking |=
@@ -942,10 +955,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
     Opts.EnableCXXInterop |= (interopCompatMode == CxxCompatMode::enabled);
 
-    if (interopCompatMode == CxxCompatMode::invalid) {
-      Diags.diagnose(SourceLoc(), diag::invalid_interop_compat_mode);
-      Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
-    }
+    if (interopCompatMode == CxxCompatMode::invalid)
+      diagnoseCxxInteropCompatMode(A, Args, Diags);
   }
   
   if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
@@ -1166,6 +1177,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
+  for (auto &block: FrontendOpts.BlocklistConfigFilePaths)
+    Opts.BlocklistConfigFilePaths.push_back(block);
   if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
     Opts.ActiveConcurrencyModel =
         llvm::StringSwitch<ConcurrencyModel>(A->getValue())
@@ -2366,6 +2379,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
+  Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files);
 
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
@@ -2660,6 +2674,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
+
+  Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
+                                                       OPT_disable_layout_string_value_witnesses,
+                                                       Opts.EnableLayoutStringValueWitnesses);
+
+  Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
+                                      OPT_disable_layout_string_value_witnesses_instantiation,
+                                      Opts.EnableLayoutStringValueWitnessesInstantiation);
+
+  if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
+      !Opts.EnableLayoutStringValueWitnesses) {
+    Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
+    return true;
+  }
+
   return false;
 }
 

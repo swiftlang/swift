@@ -6,6 +6,11 @@ import Builtin
 
 class C {}
 
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
 // CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
 // CHECK-LABEL: OSSA lifetime completion: %0 = argument of bb0 : $C
 // CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
@@ -45,3 +50,96 @@ bb3:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @borrowTest : $@convention(method) (@owned C) -> () {
+// CHECK: bb1:
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: br bb3
+// CHECK-LABEL: } // end sil function 'borrowTest'
+sil [ossa] @borrowTest : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %borrow = begin_borrow %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow : $C
+  br bb3
+
+bb2:
+  end_borrow %borrow : $C
+  br bb3
+
+bb3:
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @enumTest : $@convention(method) (@guaranteed FakeOptional<C>) -> () {
+// CHECK: bb2
+// CHECK: destroy_value
+// CHECK: br bb3
+// CHECK-LABEL: } // end sil function 'enumTest'
+sil [ossa] @enumTest : $@convention(method) (@guaranteed FakeOptional<C>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<C>):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %copy = copy_value %0 : $FakeOptional<C>
+  %borrow = begin_borrow %copy : $FakeOptional<C>
+  switch_enum %borrow : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%some : @guaranteed $C):
+  end_borrow %borrow : $FakeOptional<C>
+  destroy_value %copy : $FakeOptional<C>
+  br bb3
+
+bb2:
+  end_borrow %borrow : $FakeOptional<C>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Ensure no assert fires while inserting dead end blocks to the worklist
+sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  debug_value %0 : $C, let, name "newElements", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb9, bb10
+
+bb3:
+  br bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8:
+  %77 = apply undef(%0) : $@convention(method) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %79 = tuple ()
+  return %79 : $()
+
+bb9:
+  br bb8
+
+bb10:
+  br bb8
+}
+

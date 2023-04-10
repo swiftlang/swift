@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -43,8 +44,10 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
 #include <set>
 #include <string>
 #include <sstream>
@@ -933,6 +936,25 @@ static void writeJSON(llvm::raw_ostream &out,
   }
 }
 
+static bool writePrescanJSONToOutput(DiagnosticEngine &diags,
+                                     llvm::vfs::OutputBackend &backend,
+                                     StringRef path,
+                                     const swiftscan_import_set_t importSet) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_pwrite_stream &os) {
+    writePrescanJSON(os, importSet);
+    return false;
+  });
+}
+
+static bool writeJSONToOutput(DiagnosticEngine &diags,
+                              llvm::vfs::OutputBackend &backend, StringRef path,
+                              const swiftscan_dependency_graph_t dependencies) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_pwrite_stream &os) {
+    writeJSON(os, dependencies);
+    return false;
+  });
+}
+
 static swiftscan_dependency_graph_t
 generateFullDependencyGraph(CompilerInstance &instance,
                             ModuleDependenciesCache &cache,
@@ -1369,7 +1391,7 @@ static void serializeDependencyCache(CompilerInstance &instance,
   ASTContext &Context = instance.getASTContext();
   auto savePath = opts.SerializedDependencyScannerCachePath;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Context.Diags, savePath, service);
+      Context.Diags, instance.getOutputBackend(), savePath, service);
   if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
   }
@@ -1393,15 +1415,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
-  if (out.has_error() || EC) {
-    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
-                           EC.message());
-    out.clear_error();
-    return true;
-  }
-
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   SwiftDependencyScanningService service;
@@ -1427,8 +1440,10 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
     return true;
   auto dependencies = std::move(*dependenciesOrErr);
 
-  // Write out the JSON description.
-  writeJSON(out, dependencies);
+  if (writeJSONToOutput(Context.Diags, instance.getOutputBackend(), path,
+                        dependencies))
+    return true;
+
   // This process succeeds regardless of whether any errors occurred.
   // FIXME: We shouldn't need this, but it's masking bugs in our scanning
   // logic where we don't create a fresh context when scanning Swift interfaces
@@ -1441,20 +1456,12 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   SwiftDependencyScanningService singleUseService;
   ModuleDependenciesCache cache(singleUseService,
                                 instance.getMainModule()->getNameStr().str(),
                                 instance.getInvocation().getModuleScanningHash());
-  if (out.has_error() || EC) {
-    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
-                           EC.message());
-    out.clear_error();
-    return true;
-  }
 
   // Execute import prescan, and write JSON output to the output stream
   auto importSetOrErr = performModulePrescan(instance);
@@ -1463,7 +1470,10 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   auto importSet = std::move(*importSetOrErr);
 
   // Serialize and output main module dependencies only and exit.
-  writePrescanJSON(out, importSet);
+  if (writePrescanJSONToOutput(Context.Diags, instance.getOutputBackend(), path,
+                               importSet))
+    return true;
+
   // This process succeeds regardless of whether any errors occurred.
   // FIXME: We shouldn't need this, but it's masking bugs in our scanning
   // logic where we don't create a fresh context when scanning Swift interfaces
@@ -1499,12 +1509,13 @@ bool swift::dependencies::batchScanDependencies(
   auto iresults = batchScanResults.cbegin();
   for (; ientries != batchInput->end() and iresults != batchScanResults.end();
        ++ientries, ++iresults) {
-    std::error_code EC;
-    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::OF_None);
     if ((*iresults).getError())
       return true;
 
-    writeJSON(out, **iresults);
+    if (writeJSONToOutput(instance.getASTContext().Diags,
+                          instance.getOutputBackend(), (*ientries).outputPath,
+                          **iresults))
+      return true;
   }
   return false;
 }
@@ -1534,12 +1545,13 @@ bool swift::dependencies::batchPrescanDependencies(
   for (;
        ientries != batchInput->end() and iresults != batchPrescanResults.end();
        ++ientries, ++iresults) {
-    std::error_code EC;
-    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::OF_None);
     if ((*iresults).getError())
       return true;
 
-    writePrescanJSON(out, **iresults);
+    if (writePrescanJSONToOutput(instance.getASTContext().Diags,
+                                 instance.getOutputBackend(),
+                                 (*ientries).outputPath, **iresults))
+      return true;
   }
   return false;
 }

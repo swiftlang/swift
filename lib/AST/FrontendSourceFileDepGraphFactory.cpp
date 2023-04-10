@@ -43,6 +43,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
@@ -232,18 +233,19 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
 
 bool fine_grained_dependencies::withReferenceDependencies(
     llvm::PointerUnion<const ModuleDecl *, const SourceFile *> MSF,
-    const DependencyTracker &depTracker, StringRef outputPath,
-    bool alsoEmitDotFile,
+    const DependencyTracker &depTracker, llvm::vfs::OutputBackend &backend,
+    StringRef outputPath, bool alsoEmitDotFile,
     llvm::function_ref<bool(SourceFileDepGraph &&)> cont) {
   if (auto *MD = MSF.dyn_cast<const ModuleDecl *>()) {
     SourceFileDepGraph g =
-        ModuleDepGraphFactory(MD, alsoEmitDotFile).construct();
+        ModuleDepGraphFactory(backend, MD, alsoEmitDotFile).construct();
     return cont(std::move(g));
   } else {
     auto *SF = MSF.get<const SourceFile *>();
-    SourceFileDepGraph g = FrontendSourceFileDepGraphFactory(
-                               SF, outputPath, depTracker, alsoEmitDotFile)
-                               .construct();
+    SourceFileDepGraph g =
+        FrontendSourceFileDepGraphFactory(SF, backend, outputPath, depTracker,
+                                          alsoEmitDotFile)
+            .construct();
     return cont(std::move(g));
   }
 }
@@ -253,11 +255,12 @@ bool fine_grained_dependencies::withReferenceDependencies(
 //==============================================================================
 
 FrontendSourceFileDepGraphFactory::FrontendSourceFileDepGraphFactory(
-    const SourceFile *SF, StringRef outputPath,
-    const DependencyTracker &depTracker, const bool alsoEmitDotFile)
+    const SourceFile *SF, llvm::vfs::OutputBackend &backend,
+    StringRef outputPath, const DependencyTracker &depTracker,
+    const bool alsoEmitDotFile)
     : AbstractSourceFileDepGraphFactory(
           SF->getASTContext().hadError(), outputPath, SF->getInterfaceHash(),
-          alsoEmitDotFile, SF->getASTContext().Diags),
+          alsoEmitDotFile, SF->getASTContext().Diags, backend),
       SF(SF), depTracker(depTracker) {}
 
 //==============================================================================
@@ -577,11 +580,12 @@ void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
 // MARK: ModuleDepGraphFactory
 //==============================================================================
 
-ModuleDepGraphFactory::ModuleDepGraphFactory(const ModuleDecl *Mod,
+ModuleDepGraphFactory::ModuleDepGraphFactory(llvm::vfs::OutputBackend &backend,
+                                             const ModuleDecl *Mod,
                                              bool emitDot)
     : AbstractSourceFileDepGraphFactory(
           Mod->getASTContext().hadError(), Mod->getNameStr(),
-          Mod->getFingerprint(), emitDot, Mod->getASTContext().Diags),
+          Mod->getFingerprint(), emitDot, Mod->getASTContext().Diags, backend),
       Mod(Mod) {}
 
 void ModuleDepGraphFactory::addAllDefinedDecls() {

@@ -182,6 +182,27 @@ bool IsDefaultActorRequest::evaluate(
   if (!classDecl->isActor())
     return false;
 
+  // Distributed actors were not able to have custom executors until Swift 5.9,
+  // so in order to avoid wrongly treating a resilient distributed actor from another
+  // module as not-default we need to handle this case explicitly.
+  if (classDecl->isDistributedActor()) {
+    ASTContext &ctx = classDecl->getASTContext();
+    auto customExecutorAvailability =
+        ctx.getConcurrencyDistributedActorWithCustomExecutorAvailability();
+
+    auto actorAvailability = TypeChecker::overApproximateAvailabilityAtLocation(
+        classDecl->getStartLoc(),
+        classDecl);
+
+    if (!actorAvailability.isContainedIn(customExecutorAvailability)) {
+      // Any 'distributed actor' declared with availability lower than the
+      // introduction of custom executors for distributed actors, must be treated as default actor,
+      // even if it were to declared the unowned executor property, as older compilers
+      // do not have the the logic to handle that case.
+      return true;
+    }
+  }
+
   // If the class is resilient from the perspective of the module
   // module, it's not a default actor.
   if (classDecl->isForeign() || classDecl->isResilient(M, expansion))
@@ -198,16 +219,6 @@ bool IsDefaultActorRequest::evaluate(
     foundExecutorPropertyImpl = true;
     isDefaultActor = isDefaultActor ||
         executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
-  }
-
-  // Maybe it was a distributed actor, let's double-check it's localUnownedExecutor property.
-  // If we synthesized that one with appropriate semantics we may still be a default actor.
-  if (!isDefaultActor && classDecl->isDistributedActor()) {
-    if (auto localExecutorProperty = classDecl->getLocalUnownedExecutorProperty()) {
-      foundExecutorPropertyImpl = true;
-      isDefaultActor = isDefaultActor ||
-          localExecutorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
-    }
   }
 
   // Only if we found one of the executor properties, do we return the status of default or not,

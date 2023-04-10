@@ -55,3 +55,11 @@ public struct Predicate<each Input> {
     )
   }
 }
+
+extension Sequence {
+  public func filter(_ predicate: Predicate<Element>) throws -> [Element] {
+    try self.filter {
+      try predicate.evaluate($0)
+    }
+  }
+}

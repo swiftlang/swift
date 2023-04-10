@@ -365,9 +365,11 @@ public:
   explicit NamedPattern(VarDecl *Var)
       : Pattern(PatternKind::Named), Var(Var) { }
 
-  static NamedPattern *createImplicit(ASTContext &Ctx, VarDecl *Var) {
+  static NamedPattern *createImplicit(ASTContext &Ctx, VarDecl *Var,
+                                      Type ty = Type()) {
     auto *NP = new (Ctx) NamedPattern(Var);
     NP->setImplicit();
+    NP->setType(ty);
     return NP;
   }
 

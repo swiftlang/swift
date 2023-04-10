@@ -698,9 +698,11 @@ function(_compile_swift_files
 
       if(SWIFT_ENABLE_MODULE_INTERFACES)
         set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
-        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}")
+        set(maccatalyst_private_interface_file "${maccatalyst_module_base}.private.swiftinterface")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}" "${maccatalyst_private_interface_file}")
       else()
         set(maccatalyst_interface_file)
+        set(maccatalyst_private_interface_file)
       endif()
 
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
@@ -824,10 +826,20 @@ function(_compile_swift_files
     list(APPEND maccatalyst_swift_flags
       "-I" "${lib_dir}/${maccatalyst_library_subdir}")
     set(maccatalyst_swift_module_flags ${swift_module_flags})
+
+    # Remove original interface file
     list(FIND maccatalyst_swift_module_flags "${interface_file}" interface_file_index)
     if(NOT interface_file_index EQUAL -1)
       list(INSERT maccatalyst_swift_module_flags ${interface_file_index} "${maccatalyst_interface_file}")
       math(EXPR old_interface_file_index "${interface_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
+
+    # Remove original private interface
+    list(FIND maccatalyst_swift_module_flags "${private_interface_file}" private_interface_file_index)
+    if(NOT private_interface_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${private_interface_file_index} "${maccatalyst_private_interface_file}")
+      math(EXPR old_interface_file_index "${private_interface_file_index} + 1")
       list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
     endif()
 

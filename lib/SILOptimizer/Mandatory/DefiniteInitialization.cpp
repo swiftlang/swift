@@ -2312,7 +2312,6 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;
@@ -2326,6 +2325,23 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
       AI->setOwnershipQualifier((InitKind == IsInitialization
                                 ? AssignOwnershipQualifier::Init
                                 : AssignOwnershipQualifier::Reassign));
+    }
+
+    // Look and see if we are assigning a moveonly type into a mark_must_check
+    // [assignable_but_not_consumable]. If we are, then we need to transition
+    // its flag to initable_but_not_assignable.
+    //
+    // NOTE: We should only ever have to do this for a single level since SILGen
+    // always initializes values completely and we enforce that invariant.
+    if (InitKind == IsInitialization) {
+      if (auto *mmci =
+              dyn_cast<MarkMustCheckInst>(stripAccessMarkers(AI->getDest()))) {
+        if (mmci->getCheckKind() ==
+                MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
+          mmci->setCheckKind(
+              MarkMustCheckInst::CheckKind::InitableButNotConsumable);
+        }
+      }
     }
 
     return;
