@@ -221,16 +221,6 @@ bool IsDefaultActorRequest::evaluate(
         executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
   }
 
-  // Maybe it was a distributed actor, let's double-check it's localUnownedExecutor property.
-  // If we synthesized that one with appropriate semantics we may still be a default actor.
-  if (!isDefaultActor && classDecl->isDistributedActor()) {
-    if (auto localExecutorProperty = classDecl->getLocalUnownedExecutorProperty()) {
-      foundExecutorPropertyImpl = true;
-      isDefaultActor = isDefaultActor ||
-          localExecutorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
-    }
-  }
-
   // Only if we found one of the executor properties, do we return the status of default or not,
   // based on the findings of the semantics attribute of that located property.
   if (foundExecutorPropertyImpl) {
