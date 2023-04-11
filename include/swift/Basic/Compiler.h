@@ -184,15 +184,6 @@
 #define SWIFT_VFORMAT(fmt)
 #endif
 
-// Tells Swift's ClangImporter to import a C++ type as a foreign reference type.
-#if __has_attribute(swift_attr)
-#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_reference"))) \
-  __attribute__((swift_attr("retain:immortal")))                               \
-  __attribute__((swift_attr("release:immortal")))
-#else
-#define SWIFT_IMPORT_REFERENCE
-#endif
-
 #if __has_attribute(enum_extensibility)
 #define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
 #else
