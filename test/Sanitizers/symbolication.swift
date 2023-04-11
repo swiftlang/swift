@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
 // REQUIRES: VENDOR=apple
+// REQUIRES: rdar107669811
 
 // We copy the binary but not the corresponding .dSYM for remote runs (e.g.,
 // on-device testing), and hence online symbolication fails.
