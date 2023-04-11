@@ -351,22 +351,22 @@ function Build-CMakeProject
     Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
   }
   if ($UseBuiltCompilers.Contains("ASM")) {
-    TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER S:/b/1/bin/clang-cl.exe
+    TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
     Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
     TryAdd-KeyValue $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
   }
   if ($UseBuiltCompilers.Contains("C")) {
-    TryAdd-KeyValue $Defines CMAKE_C_COMPILER S:/b/1/bin/clang-cl.exe
+    TryAdd-KeyValue $Defines CMAKE_C_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
     TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
     Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
   }
   if ($UseBuiltCompilers.Contains("CXX")) {
-    TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER S:/b/1/bin/clang-cl.exe
+    TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
     TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
     Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
   }
   if ($UseBuiltCompilers.Contains("Swift")) {
-    TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER S:/b/1/bin/swiftc.exe
+    TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe".Replace("\", "/")
     TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
 
     $RuntimeBuildDir = Get-ProjectBuildDir $Arch 1
@@ -946,29 +946,24 @@ function Install-Platform($Arch)
 
 function Build-SQLite($Arch)
 {
-  $ArchName = $Arch.ShortName
-  $Dest = "$SourceCache\sqlite-3.36.0"
+  $SrcPath = "$SourceCache\sqlite-3.36.0"
 
   # Download the sources
-  if (-not $ToBatch)
+  if (-not (Test-Path $SrcPath))
   {
-    New-Item -ErrorAction Ignore -Type Directory `
-      -Path "S:\var\cache"
-    if (-not (Test-Path -Path "S:\var\cache\sqlite-amalgamation-3360000.zip"))
-    {
-      curl.exe -sL https://sqlite.org/2021/sqlite-amalgamation-3360000.zip -o S:\var\cache\sqlite-amalgamation-3360000.zip
-    }
+    $ZipPath = "$env:TEMP\sqlite-amalgamation-3360000.zip"
+    if (-not $ToBatch) { Remove-item $ZipPath -ErrorAction Ignore | Out-Null }
+    Invoke-Program curl.exe -- -sL https://sqlite.org/2021/sqlite-amalgamation-3360000.zip -o $ZipPath
 
-    if (-not (Test-Path -Path $Dest))
-    {
-      New-Item -ErrorAction Ignore -Type Directory -Path $Dest
-      & "$env:ProgramFiles\Git\usr\bin\unzip.exe" -j -o S:\var\cache\sqlite-amalgamation-3360000.zip -d $Dest
-      Copy-Item $SourceCache\swift-build\cmake\SQLite\CMakeLists.txt $Dest\
-    }
+    if (-not $ToBatch) { New-Item -Type Directory -Path $SrcPath -ErrorAction Ignore | Out-Null }
+    Invoke-Program "$env:ProgramFiles\Git\usr\bin\unzip.exe" -- -j -o $ZipPath -d $SrcPath
+    if (-not $ToBatch) { Copy-Item $SourceCache\swift-build\cmake\SQLite\CMakeLists.txt $SrcPath\ }
+
+    if (-not $ToBatch) { Remove-item $ZipPath | Out-Null }
   }
 
   Build-CMakeProject `
-    -Src $SourceCache\sqlite-3.36.0 `
+    -Src $SrcPath `
     -Bin "$($Arch.BinaryRoot)\sqlite-3.36.0" `
     -InstallTo $LibraryRoot\sqlite-3.36.0\usr `
     -Arch $Arch `
