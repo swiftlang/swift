@@ -2015,6 +2015,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       DC = DC->getParent();
     }
   }
+  
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 

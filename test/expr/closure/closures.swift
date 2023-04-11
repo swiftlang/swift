@@ -891,3 +891,34 @@ func test60781() -> Int {
 func test60781_MultiArg() -> Int {
   f60781({ 1 }, { 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
 }
+
+@resultBuilder
+struct VoidBuilder {
+  static func buildBlock() -> Void { }
+  static func buildPartialBlock<T>(first: T) -> Void { }
+  static func buildPartialBlock<T>(accumulated: Void, next: T) -> Void { }
+}
+
+final class EscapingWrapper {
+  static func wrapper(_ closure: @escaping () -> Void) {
+    closure()
+  }
+}
+
+final class TestGithubIssue64757 {
+  var instanceProperty: String = "instance property"
+  
+  @VoidBuilder
+  var void: Void {
+    EscapingWrapper.wrapper { [weak self] in
+      print(instanceProperty) // expected-error {{reference to property 'instanceProperty' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      
+      if let self {
+        print(instanceProperty)
+      }
+      
+      guard let self else { return }
+      print(instanceProperty)
+    }
+  }
+}
