@@ -252,6 +252,8 @@ _swift_backtrace_thread_get_state(__swift_thread_t target_act,
   return thread_get_state(target_act, flavor, old_state, old_stateCnt);
 }
 
+extern __swift_kern_return_t task_read_for_pid(__swift_task_t task, int pid, __swift_task_t *ptask);
+
 /* DANGER!  These are SPI.  They may change (or vanish) at short notice, may
    not work how you expect, and are generally dangerous to use. */
 struct dyld_process_cache_info {
@@ -269,6 +271,11 @@ extern void  _dyld_process_info_retain(dyld_process_info info);
 extern void  _dyld_process_info_get_cache(dyld_process_info info, dyld_process_cache_info* cacheInfo);
 extern void _dyld_process_info_for_each_image(dyld_process_info info, void (^callback)(__swift_uint64_t machHeaderAddress, const __swift_uuid_t uuid, const char* path));
 extern void _dyld_process_info_for_each_segment(dyld_process_info info, __swift_uint64_t machHeaderAddress, void (^callback)(__swift_uint64_t segmentAddress, __swift_uint64_t segmentSize, const char* segmentName));
+
+#define CS_OPS_STATUS 0
+#define CS_PLATFORM_BINARY 0x04000000
+#define CS_PLATFORM_PATH   0x08000000
+extern int csops(int, unsigned int, void *, __swift_size_t);
 
 /* DANGER!  CoreSymbolication is a private framework.  This is all SPI. */
 typedef __swift_int32_t cpu_type_t;
