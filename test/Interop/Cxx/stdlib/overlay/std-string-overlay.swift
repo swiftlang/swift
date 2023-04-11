@@ -236,4 +236,11 @@ StdStringOverlayTestSuite.test("std::u16string as Swift.CustomStringConvertible"
   expectEqual(cxx3.description, "a�c")
 }
 
+StdStringOverlayTestSuite.test("std::string from C string") {
+  let str = "abc".withCString { ptr in
+    std.string(ptr)
+  }
+  expectEqual(str, std.string("abc"))
+}
+
 runAllTests()
