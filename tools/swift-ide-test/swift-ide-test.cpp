@@ -4169,7 +4169,9 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool ForceNoOutputs) {
+static int doTestCreateCompilerInvocation(StringRef DriverPath,
+                                          ArrayRef<const char *> Args,
+                                          bool ForceNoOutputs) {
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -4177,14 +4179,16 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool Forc
 
   CompilerInvocation CI;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    llvm::outs() << "Frontend Arguments BEGIN\n";
-    for (const char *arg : FrontendArgs) {
-      llvm::outs() << arg << "\n";
-    }
-    llvm::outs() << "Frontend Arguments END\n";
-    return CI.parseArgs(FrontendArgs, Diags);
-  }, ForceNoOutputs);
+      DriverPath, Args, Diags,
+      [&](ArrayRef<const char *> FrontendArgs) {
+        llvm::outs() << "Frontend Arguments BEGIN\n";
+        for (const char *arg : FrontendArgs) {
+          llvm::outs() << arg << "\n";
+        }
+        llvm::outs() << "Frontend Arguments END\n";
+        return CI.parseArgs(FrontendArgs, Diags);
+      },
+      ForceNoOutputs);
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -4213,10 +4217,27 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+// Derive 'swiftc' path from 'swift-ide-test' path.
+std::string getDriverPath(StringRef MainExecutablePath) {
+  SmallString<256> driverPath(MainExecutablePath);
+  llvm::sys::path::remove_filename(driverPath); // remove 'swift-ide-test'.
+  llvm::sys::path::remove_filename(driverPath); // remove 'bin'.
+  if (llvm::sys::path::filename(driverPath) == "local") {
+    llvm::sys::path::remove_filename(driverPath); // remove 'local'.
+  }
+  llvm::sys::path::append(driverPath, "bin", "swiftc");
+  return std::string(driverPath);
+}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
   initializeSwiftModules();
+
+  std::string mainExecutablePath = llvm::sys::fs::getMainExecutable(
+      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable));
+
+  std::string driverPath = getDriverPath(mainExecutablePath);
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -4229,7 +4250,7 @@ int main(int argc, char *argv[]) {
         ForceNoOutputs = true;
         Args = Args.drop_front();
       }
-      return doTestCreateCompilerInvocation(Args, ForceNoOutputs);
+      return doTestCreateCompilerInvocation(driverPath, Args, ForceNoOutputs);
     }
   }
 
@@ -4258,10 +4279,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::Action == ActionType::GenerateModuleAPIDescription) {
-    return doGenerateModuleAPIDescription(
-        llvm::sys::fs::getMainExecutable(
-            argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)),
-        options::InputFilenames);
+    return doGenerateModuleAPIDescription(driverPath, mainExecutablePath,
+                                          options::InputFilenames);
   }
 
   if (options::Action == ActionType::DumpCompletionCache) {
@@ -4328,9 +4347,7 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
-  InitInvok.setMainExecutablePath(
-      llvm::sys::fs::getMainExecutable(argv[0],
-          reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);

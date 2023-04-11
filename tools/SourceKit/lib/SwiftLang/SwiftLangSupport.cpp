@@ -297,7 +297,8 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
                                  SKCtx.getGlobalConfiguration());
 
   CompileManager = std::make_shared<compile::SessionManager>(
-      RuntimeResourcePath, DiagnosticDocumentationPath, Plugins);
+      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath,
+      Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
