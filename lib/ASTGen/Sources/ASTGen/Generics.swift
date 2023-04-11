@@ -23,9 +23,20 @@ extension ASTGenVisitor {
     let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
     let eachLoc = node.each.map { self.base.advanced(by: $0.position.utf8Offset).raw }
 
+    var genericParameterIndex: Int?
+    for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
+      if sibling == node {
+        genericParameterIndex = index
+        break
+      }
+    }
+    guard let genericParameterIndex = genericParameterIndex else {
+      preconditionFailure("Node not part of the parent?")
+    }
+
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, eachLoc, node.indexInParent / 2,
+        self.ctx, self.declContext, name, nameLoc, eachLoc, genericParameterIndex,
         eachLoc != nil))
   }
 }
