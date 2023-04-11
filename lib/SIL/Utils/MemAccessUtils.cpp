@@ -1864,6 +1864,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
   }
 
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkMustCheckInst: {
     // Mark must check goes on the project_box, so it isn't a ref.
     assert(!dfs.isRef());

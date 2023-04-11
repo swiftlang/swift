@@ -1996,6 +1996,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitDropDeinitInst(DropDeinitInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitMarkMustCheckInst(MarkMustCheckInst *I) {
     using CheckKind = MarkMustCheckInst::CheckKind;
     switch (I->getCheckKind()) {

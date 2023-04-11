@@ -354,6 +354,10 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDropDeinitInst(DropDeinitInst *ddi) {
+  return ddi->getType().isAddress() ? OwnershipKind::None : OwnershipKind::Owned;
+}
+
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *PA) {
   // partial_apply instructions are modeled as creating an owned value during

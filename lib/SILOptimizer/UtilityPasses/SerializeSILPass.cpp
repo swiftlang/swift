@@ -204,6 +204,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:

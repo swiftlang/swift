@@ -211,6 +211,14 @@ private:
         return;
     }
 
+    // Desugar type before collecting type variables, otherwise
+    // we can bring in scope unrelated type variables passed
+    // into the closure (via parameter/result) from contextual type.
+    // For example `Typealias<$T, $U>.Context` which desugars into
+    // `_Context<$U>` would bring in `$T` that could be inferrable
+    // only after the body of the closure is solved.
+    type = type->getDesugaredType();
+
     // Don't walk into the opaque archetypes because they are not
     // transparent in this context - `some P` could reference a
     // type variables as substitutions which are visible only to

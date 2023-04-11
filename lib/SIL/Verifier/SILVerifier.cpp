@@ -667,6 +667,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
+      case SILInstructionKind::MarkMustCheckInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -5913,6 +5914,14 @@ public:
             "Operand value should be an object");
     require(mvi->getType() == mvi->getOperand()->getType(),
             "Result and operand must have the same type, today.");
+  }
+
+  void checkDropDeinitInst(DropDeinitInst *ddi) {
+    require(ddi->getType() == ddi->getOperand()->getType(),
+            "Result and operand must have the same type.");
+    require(ddi->getType().isMoveOnlyNominalType(),
+            "drop_deinit only allowed for move-only types");
+    require(F.hasOwnership(), "drop_deinit only allowed in OSSA");
   }
 
   void checkMarkMustCheckInst(MarkMustCheckInst *i) {
