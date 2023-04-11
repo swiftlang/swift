@@ -713,7 +713,8 @@ public:
                       Optional<SILLocation> CurDebugLocOverride,
                       bool ForMetaInstruction);
 
-  const SILDebugScope *getScopeOrNull(SILLocation Loc);
+  const SILDebugScope *getScopeOrNull(SILLocation Loc,
+                                      bool ForMetaInstruction = false);
 
 private:
   const SILDebugScope *getOrCreateScope(SourceLoc SLoc);
