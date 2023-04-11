@@ -5622,13 +5622,7 @@ importName(const clang::NamedDecl *D,
 
 Type ClangImporter::importFunctionReturnType(
     const clang::FunctionDecl *clangDecl, DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
-  bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
-  if (auto imported =
-          Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
-              .getType())
+  if (auto imported = Impl.importFunctionReturnType(clangDecl, dc).getType())
     return imported;
   return dc->getASTContext().getNeverType();
 }
