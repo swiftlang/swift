@@ -351,22 +351,22 @@ function Build-CMakeProject
     Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
   }
   if ($UseBuiltCompilers.Contains("ASM")) {
-    TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
+    TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
     Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
     TryAdd-KeyValue $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
   }
   if ($UseBuiltCompilers.Contains("C")) {
-    TryAdd-KeyValue $Defines CMAKE_C_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
+    TryAdd-KeyValue $Defines CMAKE_C_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
     TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
     Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
   }
   if ($UseBuiltCompilers.Contains("CXX")) {
-    TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER "$BinaryCache\1\bin\clang-cl.exe".Replace("\", "/")
+    TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
     TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
     Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
   }
   if ($UseBuiltCompilers.Contains("Swift")) {
-    TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe".Replace("\", "/")
+    TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe"
     TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
 
     $RuntimeBuildDir = Get-ProjectBuildDir $Arch 1
@@ -407,7 +407,11 @@ function Build-CMakeProject
     $cmakeGenerateArgs += @("-C", $CacheScript)
   }
   foreach ($Define in ($Defines.GetEnumerator() | Sort-Object Name)) {
-    $cmakeGenerateArgs += @("-D", "$($Define.Key)=$($Define.Value)")
+    # Avoid backslashes in defines since they are going into CMakeCache.txt,
+    # where they are interpreted as escapes. Assume all backslashes
+    # are path separators and can be turned into forward slashes.
+    $ValueWithForwardSlashes = $Define.Value.Replace("\", "/")
+    $cmakeGenerateArgs += @("-D", "$($Define.Key)=$ValueWithForwardSlashes")
   }
 
   Isolate-EnvVars {
