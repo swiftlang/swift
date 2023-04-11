@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-// TODO(swift): rename the file to Job.swift eventually, we don't use PartialTask terminology anymore
+// TODO(swift): rename the file to ExecutorJob.swift eventually, we don't use PartialTask terminology anymore
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_job_run")
@@ -65,7 +65,7 @@ public struct UnownedJob: Sendable {
   /// Deprecated API to run a job on a specific executor.
   @_alwaysEmitIntoClient
   @inlinable
-  @available(*, deprecated, renamed: "Job.runSynchronously(on:)")
+  @available(*, deprecated, renamed: "ExecutorJob.runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(self, executor)
   }
@@ -105,6 +105,11 @@ extension UnownedJob: CustomStringConvertible {
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(*, deprecated, renamed: "ExecutorJob")
+public typealias Job = ExecutorJob
+
 /// A unit of scheduleable work.
 ///
 /// Unless you're implementing a scheduler,
@@ -112,7 +117,7 @@ extension UnownedJob: CustomStringConvertible {
 @available(SwiftStdlib 5.9, *)
 @frozen
 @_moveOnly
-public struct Job: Sendable {
+public struct ExecutorJob: Sendable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -145,7 +150,7 @@ public struct Job: Sendable {
 }
 
 @available(SwiftStdlib 5.9, *)
-extension Job {
+extension ExecutorJob {
 
   /// Run this job on the passed in executor.
   ///
@@ -158,7 +163,7 @@ extension Job {
   ///
   /// This operation consumes the job, preventing it accidental use after it has ben run.
   ///
-  /// Converting a `Job` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
@@ -182,7 +187,7 @@ extension Job {
 /// However, the semantics of how priority is treated are left up to each
 /// platform and `Executor` implementation.
 ///
-/// A Job's priority is roughly equivalent to a `TaskPriority`,
+/// A ExecutorJob's priority is roughly equivalent to a `TaskPriority`,
 /// however, since not all jobs are tasks, represented as separate type.
 ///
 /// Conversions between the two priorities are available as initializers on the respective types.
