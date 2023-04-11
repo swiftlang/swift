@@ -235,6 +235,9 @@ public:
   ///       options have been parsed.
   void setDefaultPrebuiltCacheIfNecessary();
 
+  /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
+  void setDefaultBlocklistsIfNecessary();
+
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
   static void computeRuntimeResourcePathFromExecutablePath(

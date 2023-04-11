@@ -159,6 +159,31 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
 }
 
+void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
+  if (!LangOpts.BlocklistConfigFilePaths.empty())
+    return;
+  if (SearchPathOpts.RuntimeResourcePath.empty())
+    return;
+  // XcodeDefault.xctoolchain/usr/lib/swift
+  SmallString<64> blocklistDir{SearchPathOpts.RuntimeResourcePath};
+  // XcodeDefault.xctoolchain/usr/lib
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr/local/lib/swift/blocklists
+  llvm::sys::path::append(blocklistDir, "local", "lib", "swift", "blocklists");
+  std::error_code EC;
+  if (llvm::sys::fs::is_directory(blocklistDir)) {
+    for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
+         F != FE; F.increment(EC)) {
+      StringRef ext = llvm::sys::path::extension(F->path());
+      if (ext == "yml" || ext == "yaml") {
+        LangOpts.BlocklistConfigFilePaths.push_back(F->path());
+      }
+    }
+  }
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
@@ -2870,6 +2895,7 @@ bool CompilerInvocation::parseArgs(
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
   setDefaultPrebuiltCacheIfNecessary();
+  setDefaultBlocklistsIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
