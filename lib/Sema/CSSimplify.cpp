@@ -6577,6 +6577,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
 
+        // Pack expansion variables cannot be merged because
+        // they involve other type variables.
+        if (rep1->getImpl().isPackExpansion() ||
+            rep2->getImpl().isPackExpansion())
+          return formUnsolvedResult();
+
         // If exactly one of the type variables can bind to an lvalue, we
         // can't merge these two type variables.
         if (kind == ConstraintKind::Equal &&
@@ -6633,6 +6639,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       } if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
         auto rep2 = getRepresentative(typeVar2);
+
+        // Pack expansion variables cannot be merged because
+        // they involve other type variables.
+        if (rep1->getImpl().isPackExpansion() ||
+            rep2->getImpl().isPackExpansion())
+          return formUnsolvedResult();
 
         if (!rep1->getImpl().canBindToInOut() ||
             !rep2->getImpl().canBindToLValue()) {
