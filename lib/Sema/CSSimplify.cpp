@@ -4287,6 +4287,15 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
+  if (typeVar->getImpl().isPackExpansion()) {
+    if (!flags.contains(TMF_BindingTypeVariable))
+      return formUnsolvedResult();
+
+    return resolvePackExpansion(typeVar, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   // If we're attempting to bind a PackType or PackArchetypeType to a type
   // variable that doesn't support it, we have a pack reference outside of a
   // pack expansion expression.
@@ -4303,11 +4312,6 @@ ConstraintSystem::matchTypesBindTypeVar(
     // Don't allow the invalid pack reference to propagate to other
     // bindings.
     type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
-  }
-
-  // FIXME: Add a fix for this.
-  if (typeVar->getImpl().isPackExpansion() && !type->is<PackExpansionType>()) {
-    return getTypeMatchFailure(locator);
   }
 
   // Binding to a pack expansion type is always an error in Swift 6 mode.
@@ -11227,6 +11231,29 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Generate constraints from the body of this closure.
   return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+}
+
+bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
+                                            ConstraintLocatorBuilder locator) {
+  // TODO: Pack expansion type variable can carry opened type.
+  auto expansion =
+      llvm::find_if(OpenedPackExpansionTypes, [&](const auto &expansion) {
+        return expansion.second->isEqual(typeVar);
+      });
+
+  assert(expansion != OpenedPackExpansionTypes.end());
+
+  assignFixedType(typeVar, expansion->first, getConstraintLocator(locator));
+
+  if (isDebugMode()) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    llvm::errs().indent(solverState->getCurrentIndent())
+        << "(pack expansion variable " << typeVar->getString(PO)
+        << " is bound to '" << expansion->first->getString(PO) << "')\n";
+  }
+
+  return true;
 }
 
 ConstraintSystem::SolutionKind
