@@ -283,11 +283,18 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
   case OperandOwnership::EndBorrow:
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
 
-  case OperandOwnership::Reborrow:
+  case OperandOwnership::Reborrow: {
     if (!asImpl().handleInnerReborrow(borrowEnd))
       return false;
 
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
+  }
+  case OperandOwnership::DestroyingConsume: {
+    // partial_apply [on_stack] can introduce borrowing operand and can have destroy_value consumes.
+    auto *pai = dyn_cast<PartialApplyInst>(borrowEnd->get());
+    assert(pai && pai->isOnStack());
+    return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
+  }
 
   default:
     llvm_unreachable("expected borrow scope end");

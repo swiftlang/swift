@@ -102,6 +102,31 @@ bb3:
   return %r : $()
 }
 
+sil @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+
+sil [ossa] @argTest : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  debug_value %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb4
+
+bb2:
+  br bb3
+
+bb3:
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+
+bb4:
+  unreachable
+}
+
 // Ensure no assert fires while inserting dead end blocks to the worklist
 sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -141,5 +166,31 @@ bb9:
 
 bb10:
   br bb8
+}
+
+sil @foo : $@convention(thin) (@guaranteed C) -> ()
+
+// Ensure no assert fires while handling lifetime end of partial_apply
+sil [ossa] @testPartialApplyStack : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %8 = copy_value %0 : $C
+  %9 = begin_borrow %8 : $C
+  %80 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
+  %81 = partial_apply [callee_guaranteed] [on_stack] %80(%9) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %81 : $@noescape @callee_guaranteed () -> ()
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %9 : $C
+  destroy_value %8 : $C
+  %180 = tuple ()
+  return %180 : $()
 }
 
