@@ -14,14 +14,15 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_GLOBAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-sourcetext -code-completion-token=CONDITION_GLOBAL_2 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
 
-// POUND_DIRECTIVE: Begin completions, 7 items
 // POUND_DIRECTIVE-DAG: Keyword[#sourceLocation]/None:      sourceLocation(file: {#String#}, line: {#Int#}); name=sourceLocation(file:line:); sourcetext=sourceLocation(file: <#T##String#>, line: <#T##Int#>)
-// POUND_DIRECTIVE-DAG: Keyword[#warning]/None:             warning("{#(message)#}"); name=warning(""); sourcetext=warning(\"<#T##message#>\")
-// POUND_DIRECTIVE-DAG: Keyword[#error]/None:               error("{#(message)#}"); name=error(""); sourcetext=error(\"<#T##message#>\")
 // POUND_DIRECTIVE-DAG: Keyword[#if]/None:                  if {#(condition)#}; name=if ; sourcetext=if <#T##condition#>
 // POUND_DIRECTIVE-DAG: Keyword[#elseif]/None:              elseif {#(condition)#}; name=elseif ; sourcetext=elseif <#T##condition#>
 // POUND_DIRECTIVE-DAG: Keyword[#else]/None:                else; name=else; sourcetext=else
 // POUND_DIRECTIVE-DAG: Keyword[#endif]/None:               endif; name=endif; sourcetext=endif
+// TODO: These currently do not match between when macros are enabled and when
+// they aren't. Update to macros when
+// POUND_DIRECTIVE-DAG: name=warning
+// POUND_DIRECTIVE-DAG: name=error
 
 class C {
 ##^POUND_NOMINAL_TOP^#
