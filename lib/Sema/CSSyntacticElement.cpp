@@ -217,7 +217,7 @@ private:
     // For example `Typealias<$T, $U>.Context` which desugars into
     // `_Context<$U>` would bring in `$T` that could be inferrable
     // only after the body of the closure is solved.
-    type = type->getDesugaredType();
+    type = type->getCanonicalType();
 
     // Don't walk into the opaque archetypes because they are not
     // transparent in this context - `some P` could reference a
