@@ -25,6 +25,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -1784,6 +1785,8 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
 }
 
 void StackAllocationPromoter::run() {
+  auto *function = asi->getFunction();
+
   // Reduce the number of load/stores in the function to minimum.
   // After this phase we are left with up to one load and store
   // per block and the last store is recorded.
@@ -1791,6 +1794,33 @@ void StackAllocationPromoter::run() {
 
   // Replace AllocStacks with Phi-nodes.
   promoteAllocationToPhi();
+
+  // Make sure that all of the allocations were promoted into registers.
+  assert(isWriteOnlyAllocation(asi) && "Non-write uses left behind");
+
+  SmallVector<SILValue> valuesToComplete;
+
+  // Enum types may have incomplete lifetimes in address form, when promoted to
+  // value form after mem2reg, they will end up with incomplete ossa lifetimes.
+  // Use the lifetime completion utility to complete such lifetimes.
+  // First, collect the stored values to complete.
+  if (asi->getType().isOrHasEnum()) {
+    for (auto it : initializationPoints) {
+      auto *si = it.second;
+      auto src = si->getOperand(0);
+      valuesToComplete.push_back(src);
+    }
+  }
+
+  // ... and erase the allocation.
+  deleter.forceDeleteWithUsers(asi);
+
+  // Now, complete lifetimes!
+  OSSALifetimeCompletion completion(function, domInfo);
+
+  for (auto it : valuesToComplete) {
+    completion.completeOSSALifetime(it);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2091,12 +2121,31 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
     deleter.forceDeleteWithUsers(alloc);
     return true;
   } else {
-    // For enums we require that all uses are in the same block.
-    // Otherwise there could be a switch_enum of an optional where the none-case
-    // does not have a destroy of the enum value.
-    // After transforming such an alloc_stack, the value would leak in the none-
-    // case block.
-    if (f.hasOwnership() && alloc->getType().isOrHasEnum())
+    auto enableOptimizationForEnum = [](AllocStackInst *asi) {
+      if (asi->isLexical()) {
+        return false;
+      }
+      for (auto *use : asi->getUses()) {
+        auto *user = use->getUser();
+        if (!isa<StoreInst>(user) && !isa<StoreBorrowInst>(user)) {
+          continue;
+        }
+        auto stored = user->getOperand(CopyLikeInstruction::Src);
+        if (stored->isLexical()) {
+          return false;
+        }
+      }
+      return true;
+    };
+    // For stack locs of enum type that are lexical or with lexical stored
+    // values, we require that all uses are in the same block. This is because
+    // we can have incomplete lifetime of enum typed addresses, and on
+    // converting to value form this causes verification error. For all other
+    // stack locs of enum type, we use the lifetime completion utility to fix
+    // the lifetime. But when we have a lexical value, the utility can complete
+    // lifetimes on dead end blocks only.
+    if (f.hasOwnership() && alloc->getType().isOrHasEnum() &&
+        !enableOptimizationForEnum(alloc))
       return false;
   }
 
@@ -2108,11 +2157,6 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
   StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx, deleter,
                           instructionsToDelete)
       .run();
-
-  // Make sure that all of the allocations were promoted into registers.
-  assert(isWriteOnlyAllocation(alloc) && "Non-write uses left behind");
-  // ... and erase the allocation.
-  deleter.forceDeleteWithUsers(alloc);
   return true;
 }
 
