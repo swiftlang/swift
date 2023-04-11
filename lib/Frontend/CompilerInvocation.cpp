@@ -1452,6 +1452,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
 
+  // Forward the FrontendOptions to clang importer option so it can be
+  // accessed when creating clang module compilation invocation.
+  if (FrontendOpts.EnableCAS)
+    Opts.CASPath = FrontendOpts.CASPath;
+
   return false;
 }
 
