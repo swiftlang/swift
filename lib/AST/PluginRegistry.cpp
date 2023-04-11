@@ -67,7 +67,7 @@ PluginRegistry::loadLibraryPlugin(StringRef path) {
   }
 #endif
 
-  storage = std::unique_ptr<LoadedLibraryPlugin>(new LoadedLibraryPlugin(lib));
+  storage = std::make_unique<LoadedLibraryPlugin>(lib);
   return storage.get();
 }
 
@@ -111,8 +111,8 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
                                    "not executable");
   }
 
-  auto plugin = std::unique_ptr<LoadedExecutablePlugin>(
-      new LoadedExecutablePlugin(path, stat.getLastModificationTime()));
+  auto plugin = std::make_unique<LoadedExecutablePlugin>(
+      path, stat.getLastModificationTime());
 
   plugin->setDumpMessaging(dumpMessaging);
 
@@ -153,9 +153,9 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
     return llvm::errorCodeToError(childInfo.getError());
   }
 
-  Process = std::unique_ptr<PluginProcess>(
-      new PluginProcess(childInfo->Pid, childInfo->ReadFileDescriptor,
-                        childInfo->WriteFileDescriptor));
+  Process = std::make_unique<PluginProcess>(childInfo->Pid,
+                                            childInfo->ReadFileDescriptor,
+                                            childInfo->WriteFileDescriptor);
 
   // Call "on reconnect" callbacks.
   for (auto *callback : onReconnect) {
