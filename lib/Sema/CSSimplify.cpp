@@ -9177,12 +9177,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();
-
       // Accessing `.element` on an abstract tuple materializes a pack.
       if (nameStr == "element" && baseTuple->getNumElements() == 1 &&
-          baseTuple->getElementType(0)->is<PackExpansionType>()) {
-        result.ViableCandidates.push_back(
+          isPackExpansionType(baseTuple->getElementType(0))) {
+        auto elementType = baseTuple->getElementType(0);
+
+        if (elementType->is<PackExpansionType>()) {
+          result.ViableCandidates.push_back(
             OverloadChoice(baseTy, OverloadChoiceKind::MaterializePack));
+        } else {
+          assert(elementType->is<TypeVariableType>());
+          result.OverallResult = MemberLookupResult::Unsolved;
+        }
         return result;
       }
 
