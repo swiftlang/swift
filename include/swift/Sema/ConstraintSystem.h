@@ -3881,6 +3881,16 @@ public:
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Given the fact that contextual type is now available for the type
+  /// variable representing a pack expansion type, let's resolve the expansion.
+  ///
+  /// \param typeVar The type variable representing pack expansion type.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if pack expansion has been resolved, `false` otherwise.
+  bool resolvePackExpansion(TypeVariableType *typeVar,
+                            ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
