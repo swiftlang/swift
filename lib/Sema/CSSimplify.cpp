@@ -6895,6 +6895,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return true;
           }
 
+          // Delay matching if one of the elements is unresolved pack
+          // expansion represented by a type variable.
+          if (auto *typeVar = element.getType()->getAs<TypeVariableType>()) {
+            if (typeVar->getImpl().isPackExpansion())
+              return true;
+          }
+
           afterPack = element.getType()->is<PackExpansionType>();
         }
 
@@ -13108,11 +13115,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     return formUnsolved();
 
   // We can't compute a reduced shape if the input type still
-  // contains type variables that might bind to pack archetypes.
+  // contains type variables that might bind to pack archetypes
+  // or pack expansions.
   SmallPtrSet<TypeVariableType *, 2> typeVars;
   type1->getTypeVariables(typeVars);
   for (auto *typeVar : typeVars) {
-    if (typeVar->getImpl().canBindToPack())
+    if (typeVar->getImpl().canBindToPack() ||
+        typeVar->getImpl().isPackExpansion())
       return formUnsolved();
   }
 
