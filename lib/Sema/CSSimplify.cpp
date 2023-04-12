@@ -127,6 +127,18 @@ static bool isPackExpansionType(Type type) {
   return false;
 }
 
+static bool containsPackExpansionType(ArrayRef<AnyFunctionType::Param> params) {
+  return llvm::any_of(params, [&](const auto &param) {
+    return isPackExpansionType(param.getPlainType());
+  });
+}
+
+static bool containsPackExpansionType(TupleType *tuple) {
+  return llvm::any_of(tuple->getElements(), [&](const auto &elt) {
+    return isPackExpansionType(elt.getType());
+  });
+}
+
 bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
                                                 const ValueDecl *decl) {
   assert(decl->getDeclContext()->isTypeContext() &&
@@ -2107,8 +2119,8 @@ public:
   bool match(MatchKind kind, ConstraintLocatorBuilder locator) {
     // FIXME: TuplePackMatcher should completely replace the non-variadic
     // case too eventually.
-    if (tuple1->containsPackExpansionType() ||
-        tuple2->containsPackExpansionType()) {
+    if (containsPackExpansionType(tuple1) ||
+        containsPackExpansionType(tuple2)) {
       TuplePackMatcher matcher(tuple1, tuple2, isPackExpansionType);
       if (matcher.match())
         return true;
@@ -3352,8 +3364,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   // FIXME: ParamPackMatcher should completely replace the non-variadic
   // case too eventually.
-  if (AnyFunctionType::containsPackExpansionType(func1Params) ||
-      AnyFunctionType::containsPackExpansionType(func2Params)) {
+  if (containsPackExpansionType(func1Params) ||
+      containsPackExpansionType(func2Params)) {
     ParamPackMatcher matcher(func1Params, func2Params, getASTContext(),
                              isPackExpansionType);
     if (matcher.match())
@@ -14184,8 +14196,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // the fix constraint solved without trying to figure out which tuple
     // elements were part of the pack.
     {
-      if (lhs->containsPackExpansionType() ||
-          rhs->containsPackExpansionType()) {
+      if (containsPackExpansionType(lhs) ||
+          containsPackExpansionType(rhs)) {
         if (recordFix(fix))
           return SolutionKind::Error;
         return SolutionKind::Solved;
