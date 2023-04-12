@@ -32,7 +32,7 @@ struct TestView<Data, Content: View> : View {
    typealias Context = Content._Context where Content: ContentProtocol
 
    init<R, C>(_ data: Data,
-              @ViewBuilder shelfContent: @escaping (Context) -> C)
+              @ViewBuilder shelfContent: @escaping ([Context]) -> C)
        where Data.Element == any Model<R>,
              Content == ContinuousContent<LazyMapCollection<Data, AnyModel<R>>, C> {
    }
@@ -44,7 +44,7 @@ struct TestView<Data, Content: View> : View {
 func test(values: [any Model<[Int]>]) -> some View {
   TestView(values) { context in
     VStack {
-      if context.offset == 0 {
+      if context.first?.offset == 0 {
       }
     }
   }
