@@ -693,40 +693,10 @@ bool BorrowingOperand::visitExtendedScopeEndingUses(
     function_ref<bool(Operand *)> visitor) const {
 
   if (hasBorrowIntroducingUser()) {
-    return visitBorrowIntroducingUserResults(
-        [visitor](BorrowedValue borrowedValue) {
-          return borrowedValue.visitExtendedScopeEndingUses(visitor);
-        });
+    auto borrowedValue = getBorrowIntroducingUserResult();
+    return borrowedValue.visitExtendedScopeEndingUses(visitor);
   }
   return visitScopeEndingUses(visitor);
-}
-
-bool BorrowingOperand::visitBorrowIntroducingUserResults(
-    function_ref<bool(BorrowedValue)> visitor) const {
-  switch (kind) {
-  case BorrowingOperandKind::Invalid:
-    llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::Apply:
-  case BorrowingOperandKind::TryApply:
-  case BorrowingOperandKind::BeginApply:
-  case BorrowingOperandKind::Yield:
-  case BorrowingOperandKind::PartialApplyStack:
-  case BorrowingOperandKind::BeginAsyncLet:
-    llvm_unreachable("Never has borrow introducer results!");
-  case BorrowingOperandKind::BeginBorrow: {
-    auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
-    assert(value);
-    return visitor(value);
-  }
-  case BorrowingOperandKind::Branch: {
-    auto *bi = cast<BranchInst>(op->getUser());
-    auto value = BorrowedValue(
-        bi->getDestBB()->getArgument(op->getOperandNumber()));
-    assert(value && "guaranteed-to-unowned conversion not allowed on branches");
-    return visitor(value);
-  }
-  }
-  llvm_unreachable("Covered switch isn't covered?!");
 }
 
 BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
@@ -900,11 +870,9 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      BorrowingOperand(scopeEndingUse).visitBorrowIntroducingUserResults(
-        [&](BorrowedValue borrowedValue) {
-          reborrows.insert(borrowedValue.value);
-          return true;
-        });
+      auto borrowedValue =
+          BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
+      reborrows.insert(borrowedValue.value);
       return true;
     }
     return visitor(scopeEndingUse);
@@ -929,11 +897,9 @@ bool BorrowedValue::visitTransitiveLifetimeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      BorrowingOperand(scopeEndingUse)
-          .visitBorrowIntroducingUserResults([&](BorrowedValue borrowedValue) {
-            reborrows.insert(borrowedValue.value);
-            return true;
-          });
+      auto borrowedValue =
+          BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
+      reborrows.insert(borrowedValue.value);
       // visitor on the reborrow
       return visitor(scopeEndingUse);
     }
@@ -984,16 +950,14 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
         break;
       }
 
-      borrowingOperand.visitBorrowIntroducingUserResults([&](auto bv) {
-        for (auto *use : bv->getUses()) {
-          if (auto intPtrOperand = InteriorPointerOperand(use)) {
-            func(intPtrOperand);
-            continue;
-          }
-          worklist.push_back(use);
+      auto bv = borrowingOperand.getBorrowIntroducingUserResult();
+      for (auto *use : bv->getUses()) {
+        if (auto intPtrOperand = InteriorPointerOperand(use)) {
+          func(intPtrOperand);
+          continue;
         }
-        return true;
-      });
+        worklist.push_back(use);
+      }
       continue;
     }
 
