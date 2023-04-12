@@ -401,7 +401,8 @@ protected:
   void appendType(Type type, GenericSignature sig,
                   const ValueDecl *forDecl = nullptr);
   
-  void appendDeclName(const ValueDecl *decl);
+  void appendDeclName(
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,
