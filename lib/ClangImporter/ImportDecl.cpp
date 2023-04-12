@@ -2681,8 +2681,24 @@ namespace {
       if (!result)
         return nullptr;
 
-      if (auto classDecl = dyn_cast<ClassDecl>(result))
+      if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);
+
+        auto ctx = Impl.SwiftContext.getSwift58Availability();
+        if (!ctx.isAlwaysAvailable()) {
+          assert(ctx.getOSVersion().hasLowerEndpoint());
+          auto AvAttr = new (Impl.SwiftContext) AvailableAttr(
+              SourceLoc(), SourceRange(),
+              targetPlatform(Impl.SwiftContext.LangOpts), "", "",
+              /*RenameDecl=*/nullptr, ctx.getOSVersion().getLowerEndpoint(),
+              /*IntroducedRange=*/SourceRange(), {},
+              /*DeprecatedRange=*/SourceRange(), {},
+              /*ObsoletedRange=*/SourceRange(),
+              PlatformAgnosticAvailabilityKind::None, /*Implicit=*/false,
+              false);
+          classDecl->getAttrs().add(AvAttr);
+        }
+      }
 
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
