@@ -691,11 +691,6 @@ public:
   /// \param DiagText name for the string literal in the diagnostic.
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
-  
-  /// Returns true when body elements are eligible as single-expression implicit returns.
-  ///
-  /// \param Body elements to search for implicit single-expression returns.
-  bool shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body); 
 
   /// Returns true to indicate that experimental concurrency syntax should be
   /// parsed if the parser is generating only a syntax tree or if the user has

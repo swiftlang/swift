@@ -8032,8 +8032,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   AFD->setHasSingleExpressionBody(false);
   AFD->setBodyParsed(BS, fp);
 
-  if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
-    auto Element = BS->getLastElement();
+  if (auto Element = BS->getSingleActiveElement()) {
     if (auto *stmt = Element.dyn_cast<Stmt *>()) {
       if (isa<FuncDecl>(AFD)) {
         if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {

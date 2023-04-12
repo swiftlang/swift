@@ -212,6 +212,11 @@ public:
 
   ASTNode findAsyncNode();
 
+  /// If this brace contains a single ASTNode, or a \c #if that has a single active
+  /// element, returns it. This will always be the last element of the brace.
+  /// Otherwise returns \c nullptr.
+  ASTNode getSingleActiveElement() const;
+
   /// If this brace is wrapping a single expression, returns it. Otherwise
   /// returns \c nullptr.
   Expr *getSingleExpressionElement() const;
