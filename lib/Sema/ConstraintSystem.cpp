@@ -3779,11 +3779,25 @@ struct TypeSimplifier {
     if (auto tuple = dyn_cast<TupleType>(type.getPointer())) {
       if (tuple->getNumElements() == 1) {
         auto element = tuple->getElement(0);
-        auto elementType = element.getType().transform(*this);
+        auto elementType = element.getType();
+        auto resolvedType = elementType.transform(*this);
+
+        // If this is a single-element tuple with pack expansion
+        // variable inside, let's unwrap it if pack is flattened.
+        if (!element.hasName()) {
+          if (auto *typeVar = elementType->getAs<TypeVariableType>()) {
+            if (typeVar->getImpl().isPackExpansion() &&
+                !resolvedType->isEqual(typeVar) &&
+                !resolvedType->is<PackExpansionType>() &&
+                !resolvedType->is<PackType>()) {
+              return resolvedType;
+            }
+          }
+        }
 
         // Flatten single-element tuples containing type variables that cannot
         // bind to packs.
-        auto typeVar = elementType->getAs<TypeVariableType>();
+        auto typeVar = resolvedType->getAs<TypeVariableType>();
         if (!element.hasName() && typeVar &&
             !typeVar->getImpl().canBindToPack() &&
             !typeVar->getImpl().isPackExpansion()) {
