@@ -83,7 +83,7 @@ actor EnqueueTest {
       }
 
       tests.test("remote actor reference should have crash-on-enqueue executor") {
-        expectCrashLater(withMessage: "Attempted to enqueue Job (Job(id: 1)) on executor of remote distributed actor reference!")
+        expectCrashLater(withMessage: "Attempted to enqueue ExecutorJob (ExecutorJob(id: 1)) on executor of remote distributed actor reference!")
         // we do the bad idea of taking an executor from a remote worker
         // and then force another actor to run on it; this will cause an enqueue on the "crash on enqueue" executor.
         let wrongUse = EnqueueTest(unownedExecutor: normalRemoteWorker.unownedExecutor)
