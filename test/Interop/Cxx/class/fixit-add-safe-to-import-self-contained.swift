@@ -33,7 +33,7 @@ public func test(x: X) {
   // CHECK: ^
   // CHECK: SWIFT_RETURNS_INDEPENDENT_VALUE
   
-  // CHECK: note: Mark type 'Ptr' as 'SWIFT_SELF_CONTAINED' in C++ to make methods that use it available in Swift.
+  // CHECK: note: annotate type 'Ptr' with 'SWIFT_SELF_CONTAINED' in C++ to make methods that return it available in Swift
   // CHECK: struct Ptr {
   // CHECK: ^
   // CHECK: SWIFT_SELF_CONTAINED
