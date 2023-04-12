@@ -2075,6 +2075,15 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
 }
 
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
+    const clang::FunctionDecl *clangDecl, DeclContext *dc) {
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool allowNSUIntegerAsInt =
+      shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
+  return importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+}
+
+ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
 
