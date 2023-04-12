@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
@@ -49,7 +50,6 @@ struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
 class LabeledStmt;
-class LoadedExecutablePlugin;
 class MacroDefinition;
 class PrecedenceGroupDecl;
 class PropertyWrapperInitializerInfo;
@@ -3998,39 +3998,20 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Load a plugin module with the given name.
-///
-///
+/// Represent a loaded plugin either an in-process library or an executable.
 class LoadedCompilerPlugin {
-  enum class PluginKind : uint8_t {
-    None,
-    InProcess,
-    Executable,
-  };
-  PluginKind kind;
-  void *ptr;
-
-  LoadedCompilerPlugin(PluginKind kind, void *ptr) : kind(kind), ptr(ptr) {
-    assert(ptr != nullptr || kind == PluginKind::None);
-  }
+  llvm::PointerUnion<LoadedLibraryPlugin *, LoadedExecutablePlugin *> ptr;
 
 public:
-  LoadedCompilerPlugin(std::nullptr_t) : kind(PluginKind::None), ptr(nullptr) {}
+  LoadedCompilerPlugin(std::nullptr_t) : ptr(nullptr) {}
+  LoadedCompilerPlugin(LoadedLibraryPlugin *ptr) : ptr(ptr){};
+  LoadedCompilerPlugin(LoadedExecutablePlugin *ptr) : ptr(ptr){};
 
-  static LoadedCompilerPlugin inProcess(void *ptr) {
-    return {PluginKind::InProcess, ptr};
-  }
-  static LoadedCompilerPlugin executable(LoadedExecutablePlugin *ptr) {
-    return {PluginKind::Executable, ptr};
-  }
-
-  void *getAsInProcessPlugin() const {
-    return kind == PluginKind::InProcess ? ptr : nullptr;
+  LoadedLibraryPlugin *getAsLibraryPlugin() const {
+    return ptr.dyn_cast<LoadedLibraryPlugin *>();
   }
   LoadedExecutablePlugin *getAsExecutablePlugin() const {
-    return kind == PluginKind::Executable
-               ? static_cast<LoadedExecutablePlugin *>(ptr)
-               : nullptr;
+    return ptr.dyn_cast<LoadedExecutablePlugin *>();
   }
 };
 

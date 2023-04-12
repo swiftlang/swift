@@ -82,6 +82,7 @@ namespace swift {
   class ExtensionDecl;
   struct ExternalSourceLocs;
   class LoadedExecutablePlugin;
+  class LoadedLibraryPlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -1496,7 +1497,7 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  void *loadLibraryPlugin(StringRef path);
+  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
   /// module by '-load-plugin-executable'.
