@@ -217,9 +217,15 @@ public:
   /// Otherwise returns \c nullptr.
   ASTNode getSingleActiveElement() const;
 
-  /// If this brace is wrapping a single expression, returns it. Otherwise
-  /// returns \c nullptr.
-  Expr *getSingleExpressionElement() const;
+  /// If this brace is wrapping a single active expression, returns it. This
+  /// includes both a single expression element, or a single expression in an
+  /// active \c #if. Otherwise returns \c nullptr.
+  Expr *getSingleActiveExpression() const;
+
+  /// If this brace is wrapping a single active statement, returns it. This
+  /// includes both a single statement element, or a single statement in an
+  /// active \c #if. Otherwise returns \c nullptr.
+  Stmt *getSingleActiveStatement() const;
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
