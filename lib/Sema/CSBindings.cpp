@@ -148,6 +148,11 @@ bool BindingSet::isDelayed() const {
 }
 
 bool BindingSet::involvesTypeVariables() const {
+  // This type variable always depends on a pack expansion variable
+  // which should be inferred first if possible.
+  if (TypeVar->getImpl().canBindToPack())
+    return true;
+
   // This is effectively O(1) right now since bindings are re-computed
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
