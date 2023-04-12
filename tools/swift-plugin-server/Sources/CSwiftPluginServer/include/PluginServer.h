@@ -13,8 +13,6 @@
 #ifndef SWIFT_PLUGINSERVER_PLUGINSERVER_H
 #define SWIFT_PLUGINSERVER_PLUGINSERVER_H
 
-#include <sys/types.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,11 +29,11 @@ const void *PluginServer_createConnection(const char **errorMessage);
 void PluginServer_destroyConnection(const void *connHandle);
 
 /// Read bytes from the IPC communication handle.
-ssize_t PluginServer_read(const void *connHandle, void *data, size_t nbyte);
+long PluginServer_read(const void *connHandle, void *data, unsigned long nbyte);
 
 /// Write bytes to the IPC communication handle.
-ssize_t PluginServer_write(const void *connHandle, const void *data,
-                           size_t nbyte);
+long PluginServer_write(const void *connHandle, const void *data,
+                        unsigned long nbyte);
 
 //===----------------------------------------------------------------------===//
 // Dynamic link
