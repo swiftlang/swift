@@ -859,6 +859,21 @@ func nestedType() -> Int {
   }
 }
 
+func testEmptyBranch() -> Int {
+  // TODO: Ideally we wouldn't emit both diagnostics, the latter is the better
+  // one, but the former is currently emitted by the parser. Ideally the former
+  // one should become semantic, and we'd just avoid it for
+  // SingleValueStmtExprs.
+  let x = switch Bool.random() {
+    case true:
+    // expected-error@-1 {{'case' label in a 'switch' must have at least one executable statement}}
+    // expected-error@-2:14 {{expected expression in branch of 'switch' expression}}
+    case false:
+    0
+  }
+  return x
+}
+
 // MARK: Jumping
 
 func break1() -> Int {
