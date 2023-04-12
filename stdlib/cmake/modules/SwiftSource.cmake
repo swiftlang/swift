@@ -49,7 +49,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
       ${ARGN})
@@ -64,6 +64,7 @@ function(handle_swift_sources
   translate_flag(${SWIFTSOURCES_STATIC} "STATIC"
                  STATIC_arg)
   translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
+  translate_flag(${SWIFTSOURCES_IS_FRAGILE} "IS_FRAGILE" IS_FRAGILE_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -152,6 +153,7 @@ function(handle_swift_sources
         ${EMBED_BITCODE_arg}
         ${STATIC_arg}
         ${BOOTSTRAPPING_arg}
+        ${IS_FRAGILE_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
         MACCATALYST_BUILD_FLAVOR "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
@@ -376,7 +378,7 @@ function(_compile_swift_files
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -487,7 +489,7 @@ function(_compile_swift_files
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
-  if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
     list(APPEND swift_flags "-library-level" "api")
     list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
