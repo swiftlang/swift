@@ -1,6 +1,7 @@
 # CHANGELOG
 
-_**Note:** This is in reverse chronological order, so newer entries are added to the top._
+> **Note**\
+> This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 5.9
 
@@ -91,6 +92,8 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   ```
 
 ## Swift 5.8
+
+### 2023-03-30 (Xcode 14.3)
 
 * [SE-0376][]:
 
