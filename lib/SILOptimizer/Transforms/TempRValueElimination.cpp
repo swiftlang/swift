@@ -616,17 +616,23 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     if (lastLoadInst == copyInst)
       return true;
     if (auto *cai = dyn_cast<CopyAddrInst>(lastLoadInst)) {
-      auto retval = cai->getSrc() != tempObj || !cai->isTakeOfSrc();
-      assert(!tempObj->getType().isMoveOnly() ||
-             !retval && "introducing copy of move-only value!?");
-      return retval;
+      if (cai->getSrc() == tempObj && cai->isTakeOfSrc()) {
+        // This copy_addr [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
     }
     if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
-      auto retval = li->getOperand() != tempObj ||
-                    li->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
-      assert(!tempObj->getType().isMoveOnly() ||
-             !retval && "introducing copy of move-only value!?");
-      return retval;
+      if (li->getOperand() == tempObj &&
+          li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        // This load [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
     }
     return true;
   }();
