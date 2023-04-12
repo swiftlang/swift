@@ -67,7 +67,7 @@ struct Bad {}
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ImageLiteralType'
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_FileReferenceLiteralType'
 
-// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
 // CHECK-DIAGS: precedencegroup MyPrecedence {}
 // CHECK-DIAGS: @attached(member) macro myMacro()
