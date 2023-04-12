@@ -20,8 +20,7 @@ import _Concurrency
 // CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, [[INT]], [[INT]], %swift.context*)* @test_simple.1 to i8*), i8* [[RESUME]], [[INT]] %1, [[INT]] %2, %swift.context* {{%[0-9]+}})
 // CHECK: [[RET_CONTINUATION:%.*]] = bitcast void (%swift.context*)* {{.*}} to i8*
 // CHECK:  call i1 (i8*, i1, ...) @llvm.coro.end.async(i8* {{.*}}, i1 false, void (i8*, %swift.context*)* @[[TAIL_CALL_FUNC:.*]], i8* [[RET_CONTINUATION]]
-// CHECK-WIN: ret void
-// CHECK-SYSV: unreachable
+// CHECK: unreachable
 
 sil @test_simple : $@async (@guaranteed Optional<Builtin.Executor>) -> () {
 bb0(%0 : $Optional<Builtin.Executor>):

@@ -10,9 +10,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// Windows does not do swiftailcc
-// XFAIL: OS=windows-msvc
-
 import _Concurrency
 
 
