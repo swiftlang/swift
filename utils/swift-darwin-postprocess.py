@@ -92,7 +92,7 @@ def unrpathize(filename):
 def codesign(filename):
     # "-" is the signing identity for ad-hoc signing.
     command = ['/usr/bin/codesign', '--force', '--sign', '-',
-               '--options=runtime', '--entitlements', get_task_allow_plist,
+               '--entitlements', get_task_allow_plist,
                filename]
     subprocess.check_call(command)
 
