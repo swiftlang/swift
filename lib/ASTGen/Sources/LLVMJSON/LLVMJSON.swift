@@ -14,7 +14,7 @@ import CBasicBridging
 
 extension String {
   init(_ data: BridgedData) {
-    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.size)
+    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: Int(data.size))
     self = buffer.withMemoryRebound(to: UInt8.self) { buffer in
       String(decoding: buffer, as: UTF8.self)
     }
@@ -35,13 +35,13 @@ public struct LLVMJSON {
     JSON_value_serialize(valuePtr, &data)
     assert(data.baseAddress != nil)
     defer { BridgedData_free(data) }
-    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.size)
+    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: Int(data.size))
     return try body(buffer)
   }
 
   /// Decode a JSON data to a Swift value.
   public static func decode<T: Decodable>(_ type: T.Type, from json: UnsafeBufferPointer<Int8>) throws -> T {
-    let data = BridgedData(baseAddress: json.baseAddress, size: json.count)
+    let data = BridgedData(baseAddress: json.baseAddress, size: UInt(json.count))
     let valuePtr = JSON_deserializedValue(data)
     defer { JSON_value_delete(valuePtr) }
 
@@ -209,7 +209,7 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
   var allKeys: [Key] {
     var keys: [Key] = []
     let size = JSON_object_getSize(objectPtr)
-    keys.reserveCapacity(size)
+    keys.reserveCapacity(Int(size))
     for i in 0 ..< size {
       let keyData = JSON_object_getKey(objectPtr, i)
       if let key = Key(stringValue: String(keyData)) {
