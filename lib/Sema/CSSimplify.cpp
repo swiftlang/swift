@@ -6514,6 +6514,17 @@ bool ConstraintSystem::repairFailures(
   return !conversionsOrFixes.empty();
 }
 
+static bool isTupleWithUnresolvedPackExpansion(Type type) {
+  if (auto *tuple = type->getAs<TupleType>()) {
+    return llvm::any_of(tuple->getElements(), [&](const TupleTypeElt &elt) {
+      if (auto typeVar = elt.getType()->getAs<TypeVariableType>())
+        return typeVar->getImpl().isPackExpansion();
+      return false;
+    });
+  }
+  return false;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -6780,6 +6791,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       desugar2->isTypeVariableOrMember()) {
     return formUnsolvedResult();
   }
+
+  // If either side is a tuple that has unresolved pack expansions,
+  // delay matching until more is inferred about type structure.
+  if (isTupleWithUnresolvedPackExpansion(desugar1) ||
+      isTupleWithUnresolvedPackExpansion(desugar2))
+    return formUnsolvedResult();
 
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
 
