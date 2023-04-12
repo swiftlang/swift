@@ -299,6 +299,31 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
+static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
+  while (true) {
+    // Single element brace.
+    if (elts.size() == 1)
+      return true;
+
+    // See if we have a #if as the first element of a 2 element brace, if so we
+    // can recuse into its active clause. If so, the second element will be the
+    // active element.
+    if (elts.size() == 2) {
+      if (auto *D = elts.front().dyn_cast<Decl *>()) {
+        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+          elts = ICD->getActiveClauseElements();
+          continue;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+ASTNode BraceStmt::getSingleActiveElement() const {
+  return hasSingleActiveElement(getElements()) ? getLastElement() : nullptr;
+}
+
 Expr *BraceStmt::getSingleExpressionElement() const {
   if (getElements().size() != 1)
     return nullptr;
