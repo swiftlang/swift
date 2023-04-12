@@ -324,11 +324,12 @@ ASTNode BraceStmt::getSingleActiveElement() const {
   return hasSingleActiveElement(getElements()) ? getLastElement() : nullptr;
 }
 
-Expr *BraceStmt::getSingleExpressionElement() const {
-  if (getElements().size() != 1)
-    return nullptr;
+Expr *BraceStmt::getSingleActiveExpression() const {
+  return getSingleActiveElement().dyn_cast<Expr *>();
+}
 
-  return getElements()[0].dyn_cast<Expr *>();
+Stmt *BraceStmt::getSingleActiveStatement() const {
+  return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(Evaluator &eval) const {
