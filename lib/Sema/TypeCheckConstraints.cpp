@@ -1578,6 +1578,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
     }
   }
 
+  if (!PackExpansionEnvironments.empty()) {
+    out.indent(indent) << "Pack Expansion Environments:\n";
+    for (const auto &env : PackExpansionEnvironments) {
+      out.indent(indent + 2);
+      env.first->dump(&getASTContext().SourceMgr, out);
+      out << " = (" << env.second.first << ", "
+          << env.second.second->getString(PO) << ")" << '\n';
+    }
+  }
+
   if (!DefaultedConstraints.empty()) {
     out.indent(indent) << "Defaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {

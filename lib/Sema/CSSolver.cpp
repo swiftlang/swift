@@ -213,6 +213,10 @@ Solution ConstraintSystem::finalize() {
     solution.ImplicitCallAsFunctionRoots.insert(implicitRoot);
   }
 
+  for (const auto &env : PackExpansionEnvironments) {
+    solution.PackExpansionEnvironments.insert(env);
+  }
+
   return solution;
 }
 
