@@ -473,7 +473,7 @@ struct BorrowingOperand {
 
   /// If this operand's user has a single borrowed value result return a
   /// valid BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult();
+  BorrowedValue getBorrowIntroducingUserResult() const;
 
   /// Compute the implicit uses that this borrowing operand "injects" into the
   /// set of its operands uses.

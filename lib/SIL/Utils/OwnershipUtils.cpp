@@ -729,7 +729,7 @@ bool BorrowingOperand::visitBorrowIntroducingUserResults(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
+BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
   case BorrowingOperandKind::Apply:
