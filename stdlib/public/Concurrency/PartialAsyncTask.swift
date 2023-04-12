@@ -45,7 +45,7 @@ public struct UnownedJob: Sendable {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Create an `UnownedJob` whose lifetime must be managed carefully until it is run exactly once.
   @available(SwiftStdlib 5.9, *)
-  public init(_ job: __owned Job) {
+  public init(_ job: __owned ExecutorJob) {
     self.context = job.context
   }
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
