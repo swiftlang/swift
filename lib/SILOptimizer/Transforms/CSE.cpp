@@ -515,6 +515,24 @@ public:
         X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()),
         llvm::hash_combine_range(ConformsTo.begin(), ConformsTo.end()));
   }
+
+  hash_code visitScalarPackIndexInst(ScalarPackIndexInst *X) {
+    return llvm::hash_combine(
+        X->getKind(), X->getIndexedPackType(), X->getComponentIndex());
+  }
+
+  hash_code visitDynamicPackIndexInst(DynamicPackIndexInst *X) {
+    return llvm::hash_combine(
+        X->getKind(), X->getIndexedPackType(), &X->getOperandRef());
+  }
+
+  hash_code visitTuplePackElementAddrInst(TuplePackElementAddrInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()),
+        X->getElementType());
+  }
 };
 } // end anonymous namespace
 
@@ -1225,6 +1243,9 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
+  case SILInstructionKind::ScalarPackIndexInst:
+  case SILInstructionKind::DynamicPackIndexInst:
+  case SILInstructionKind::TuplePackElementAddrInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \
