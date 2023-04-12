@@ -407,3 +407,16 @@ func test_no_unused_result_warning(arr: inout [Any]) {
     ((repeat arr.append(each value))) // no warning
   }
 }
+
+func test_partually_flattened_expansions() {
+  struct S<each T> {
+    init() {}
+
+    func fn<each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {
+      return (repeat (each t, each u))
+    }
+  }
+
+  _ = S().fn(t: 1, "hi", u: false, 1.0) // Ok
+  _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
+}

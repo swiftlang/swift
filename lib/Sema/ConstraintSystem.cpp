@@ -835,7 +835,11 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
     result = DC->mapTypeIntoContext(result);
   }
 
-  return result;
+  return result.transform([&](Type type) {
+    if (auto *expansion = dyn_cast<PackExpansionType>(type.getPointer()))
+      return openPackExpansionType(expansion, replacements);
+    return type;
+  });
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -967,6 +971,24 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
 
   return type.transform([&](Type type) -> Type {
       assert(!type->is<GenericFunctionType>());
+
+      // Preserve single element tuples if their element is
+      // pack expansion, otherwise it wouldn't be expanded.
+      if (auto *tuple = type->getAs<TupleType>()) {
+        if (tuple->getNumElements() == 1) {
+          const auto &elt = tuple->getElement(0);
+          if (!elt.hasName() && elt.getType()->is<PackExpansionType>()) {
+            return TupleType::get(
+                {openPackExpansionType(
+                    elt.getType()->castTo<PackExpansionType>(), replacements)},
+                tuple->getASTContext());
+          }
+        }
+      }
+
+      if (auto *expansion = type->getAs<PackExpansionType>()) {
+        return openPackExpansionType(expansion, replacements);
+      }
 
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
