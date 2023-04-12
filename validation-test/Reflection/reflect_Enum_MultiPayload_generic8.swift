@@ -9,7 +9,6 @@
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
-import Darwin
 
 struct S<T> { var t: T }
 
