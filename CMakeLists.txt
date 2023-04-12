@@ -1265,6 +1265,7 @@ else()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
+    add_subdirectory(stdlib/public/Cxx)
   endif()
 
   if (BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
