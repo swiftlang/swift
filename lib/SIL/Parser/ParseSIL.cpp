@@ -48,6 +48,11 @@ static llvm::cl::opt<bool>
 ParseSerializedSIL("parse-serialized-sil",
                    llvm::cl::desc("Parse the output of a serialized module"));
 
+static llvm::cl::opt<bool>
+    DisableInputVerify("sil-disable-input-verify",
+                       llvm::cl::desc("Disable verification of input SIL"),
+                       llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
@@ -7037,7 +7042,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     return true;
 
   // If SIL parsing succeeded, verify the generated SIL.
-  if (!P.Diags.hadAnyError())
+  if (!P.Diags.hadAnyError() && !DisableInputVerify)
     FunctionState.F->verify();
 
   return false;
