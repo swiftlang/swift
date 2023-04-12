@@ -7207,6 +7207,21 @@ TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
     return;
   }
 
+  // Pack expansion type variable can only ever have one binding
+  // which is handled by \c resolvePackExpansion.
+  //
+  // There is no need to iterate over other bindings here because
+  // there is no use for contextual types (unlike closures that can
+  // propagate contextual information into the body).
+  if (TypeVar->getImpl().isPackExpansion()) {
+    for (const auto &entry : bindings.Defaults) {
+      auto *constraint = entry.second;
+      Bindings.push_back(getDefaultBinding(constraint));
+    }
+
+    return;
+  }
+
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
