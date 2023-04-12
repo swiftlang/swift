@@ -269,7 +269,8 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
     // Perform round-trip and/or validation checking.
     if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
          Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
-        SF.exportedSourceFile) {
+        SF.exportedSourceFile &&
+        !SourceMgr.hasIDEInspectionTargetBuffer()) {
       if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
           swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
         SourceLoc loc;
@@ -305,8 +306,7 @@ Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
                                  bool suppressDiagnostics) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  if (!SourceMgr.hasIDEInspectionTargetBuffer() &&
-      SF.Kind != SourceFileKind::SIL) {
+  if (SF.Kind != SourceFileKind::SIL) {
     StringRef contents =
         SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
 
