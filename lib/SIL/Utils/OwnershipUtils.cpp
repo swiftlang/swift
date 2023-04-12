@@ -740,12 +740,17 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   case BorrowingOperandKind::BeginAsyncLet:
     return BorrowedValue();
 
-  case BorrowingOperandKind::BeginBorrow:
-    return BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
-
+  case BorrowingOperandKind::BeginBorrow: {
+    auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
+    assert(value);
+    return value;
+  }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
-    return BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
+    auto value =
+        BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
+    assert(value && "guaranteed-to-unowned conversion not allowed on branches");
+    return value;
   }
   }
   llvm_unreachable("covered switch");
