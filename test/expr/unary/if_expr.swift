@@ -646,6 +646,12 @@ func nestedType() -> Int {
   }
 }
 
+func testEmptyBranch() -> Int {
+  let x = if .random() {} else { 0 }
+  // expected-error@-1:24 {{expected expression in branch of 'if' expression}}
+  return x
+}
+
 // MARK: Jumping
 
 func break1() -> Int {
