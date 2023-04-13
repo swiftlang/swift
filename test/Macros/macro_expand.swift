@@ -253,6 +253,9 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
+// Freestanding macros are not in inlined scopes.
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift":9:14 {{.*}} -> Int }
+
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
 #bitwidthNumberedStructs("MyIntGlobal")
