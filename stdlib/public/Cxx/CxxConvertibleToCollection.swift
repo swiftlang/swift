@@ -55,6 +55,7 @@ extension RangeReplaceableCollection {
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
+  @inlinable
   public init<C: CxxConvertibleToCollection>(_ elements: C)
     where C.RawIterator.Pointee == Element {
 
@@ -72,6 +73,7 @@ extension SetAlgebra {
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
+  @inlinable
   public init<C: CxxConvertibleToCollection>(_ elements: C)
     where C.RawIterator.Pointee == Element {
 
