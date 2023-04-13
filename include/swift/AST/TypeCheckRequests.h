@@ -300,8 +300,8 @@ public:
 
 /// Determine whether an existential type conforming to this protocol
 /// requires the \c any syntax.
-class ExistentialRequiresAnyRequest :
-    public SimpleRequest<ExistentialRequiresAnyRequest,
+class HasSelfOrAssociatedTypeRequirementsRequest :
+    public SimpleRequest<HasSelfOrAssociatedTypeRequirementsRequest,
                          bool(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:

@@ -5194,8 +5194,7 @@ public:
       OS << ")";
 
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(T->getBoundDecl())) {
-      if (Ctx.LangOpts.hasFeature(Feature::ExistentialAny) ||
-          proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(T->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -5213,8 +5212,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!Ctx.LangOpts.hasFeature(Feature::ExistentialAny) &&
-              !protoDecl->existentialRequiresAny())
+          if (!protoDecl->existentialRequiresAny())
             continue;
 
           Ctx.Diags.diagnose(T->getNameLoc(),
