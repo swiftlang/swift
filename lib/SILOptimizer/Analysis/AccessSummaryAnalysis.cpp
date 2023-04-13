@@ -215,6 +215,10 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
+  case SILInstructionKind::MoveValueInst:
+    return llvm::all_of(cast<MoveValueInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:

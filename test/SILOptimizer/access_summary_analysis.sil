@@ -485,6 +485,22 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
   return %9999 : $()
 }
 
+// Look through moves.
+// CHECK-LABEL: @partialApplyFollowedByConvertFunctionWithMove
+// CHECK-NEXT: ([modify], [], [read])
+sil private [ossa] @partialApplyFollowedByConvertFunctionWithMove : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
+  %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %4 = partial_apply %3(%0, %1, %2) : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %5 = convert_function %4 : $@callee_owned (Int) -> () to $@callee_owned (Int) -> @error Error
+  %6 = move_value %5 : $@callee_owned (Int) -> @error Error
+  %7 = function_ref @takesGuaranteedNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
+  destroy_value %6 : $@callee_owned (Int) -> @error Error
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 sil @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 sil @subject : $@convention(thin) (Builtin.Int64) -> ()
 
