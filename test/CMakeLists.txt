@@ -411,6 +411,12 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+
+        # Enable on-crash backtracing if supported
+        if("${SDK}" STREQUAL "OSX" AND NOT SWIFT_ASAN_BUILD)
+          list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
+        endif()
+
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
