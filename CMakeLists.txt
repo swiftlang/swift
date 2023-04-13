@@ -243,6 +243,10 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
     TRUE)
 
+option(SWIFT_BUILD_STDLIB_CXX_MODULE
+  "If not building stdlib, controls whether to build the Cxx module"
+  TRUE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -1265,6 +1269,9 @@ else()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
+  endif()
+
+  if(SWIFT_BUILD_STDLIB_CXX_MODULE)
     add_subdirectory(stdlib/public/Cxx)
   endif()
 
