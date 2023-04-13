@@ -765,6 +765,12 @@ ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var
       (StringRef))
 ERROR(sil_moveonlychecker_let_capture_consumed, none,
       "'%0' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it", (StringRef))
+ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self, none,
+      "Cannot partially consume '%0' since it has a user defined deinit",
+      (StringRef))
+ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field, none,
+      "Cannot partially consume '%0' since it contains field '%1.%2' whose type %3 has a user defined deinit",
+      (StringRef, StringRef, StringRef, DeclBaseName))
 
 NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
      "move only field consumed here", ())
@@ -784,6 +790,8 @@ NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
      "non-consuming use here", ())
 NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
      "consuming in loop use here", ())
+NOTE(sil_moveonlychecker_deinit_here, none,
+     "deinit declared here", ())
 
 ERROR(sil_moveonlychecker_not_understand_consumable_and_assignable, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
