@@ -332,6 +332,22 @@ ImportObjCHeader("import-objc-header",
                  llvm::cl::desc("header to implicitly import"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::list<std::string>
+PluginPath("plugin-path",
+               llvm::cl::desc("plugin-path"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+LoadPluginLibrary("load-plugin-library",
+               llvm::cl::desc("load plugin library"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+LoadPluginExecutable("load-plugin-executable",
+               llvm::cl::desc("load plugin executable"),
+               llvm::cl::cat(Category));
+
+
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
@@ -4471,6 +4487,32 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "invalid module alias arguments\n";
       return 1;
     }
+  }
+
+  for (auto path : options::PluginPath) {
+    InitInvok.getSearchPathOptions().PluginSearchPaths.push_back(path);
+  }
+  if (!options::LoadPluginLibrary.empty()) {
+    std::vector<std::string> paths;
+    for (auto path: options::LoadPluginLibrary) {
+      paths.push_back(path);
+    }
+    InitInvok.getSearchPathOptions().setCompilerPluginLibraryPaths(paths);
+  }
+  if (!options::LoadPluginExecutable.empty()) {
+    std::vector<PluginExecutablePathAndModuleNames> pairs;
+    for (auto arg: options::LoadPluginExecutable) {
+      StringRef path;
+      StringRef modulesStr;
+      std::tie(path, modulesStr) = StringRef(arg).rsplit('#');
+      std::vector<std::string> moduleNames;
+      for (auto name : llvm::split(modulesStr, ',')) {
+        moduleNames.emplace_back(name);
+      }
+      pairs.push_back({std::string(path), std::move(moduleNames)});
+    }
+
+    InitInvok.getSearchPathOptions().setCompilerPluginExecutablePaths(std::move(pairs));
   }
 
   // Process the clang arguments last and allow them to override previously
