@@ -6260,6 +6260,8 @@ public:
       // instructions for the loop variable, but in a deeper scope.
       if (isa<IncrementProfilerCounterInst>(SI))
         continue;
+      if (!SI.getLoc().hasValidLineNumber())
+        continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;
       // FIXME: These still leave holes in the scopes. We should make them
