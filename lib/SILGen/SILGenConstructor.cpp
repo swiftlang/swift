@@ -631,7 +631,22 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!isDelegating) {
     auto *typeDC = ctor->getDeclContext();
     auto *nominal = typeDC->getSelfNominalTypeDecl();
-    emitMemberInitializers(ctor, selfDecl, nominal);
+
+    // If we have an empty move only struct, then we will not initialize it with
+    // any member initializers, breaking SIL. So in that case, just construct a
+    // SIL struct value and initialize the memory with that.
+    //
+    // DISCUSSION: This only happens with noncopyable types since the memory
+    // lifetime checker doesn't seem to process trivial locations. But empty
+    // move only structs are non-trivial, so we need to handle this here.
+    if (isa<StructDecl>(nominal) && nominal->isMoveOnly() &&
+        nominal->getStoredProperties().empty()) {
+      auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
+      B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
+                                StoreOwnershipQualifier::Init);
+    } else {
+      emitMemberInitializers(ctor, selfDecl, nominal);
+    }
   }
 
   emitProfilerIncrement(ctor->getTypecheckedBody());
