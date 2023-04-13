@@ -1018,7 +1018,8 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
     return known->second;
 
   auto *expansionVar = createTypeVariable(
-      getConstraintLocator({}, ConstraintLocator::PackExpansionType),
+      getConstraintLocator(
+          {}, LocatorPathElt::PackExpansionType(openedPackExpansion)),
       TVO_PackExpansion);
 
   // This constraint is important to make sure that pack expansion always
@@ -1026,7 +1027,8 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   // that appear in pattern and shape types.
   addUnsolvedConstraint(Constraint::create(
       *this, ConstraintKind::Defaultable, expansionVar, openedPackExpansion,
-      getConstraintLocator({}, ConstraintLocator::PackExpansionType)));
+      getConstraintLocator(
+          {}, LocatorPathElt::PackExpansionType(openedPackExpansion))));
 
   OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
   return expansionVar;

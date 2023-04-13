@@ -504,7 +504,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
 
   case ConstraintLocator::PackExpansionType:
-    out << "pack expansion type";
+    auto expansionElt = elt.castTo<LocatorPathElt::PackExpansionType>();
+    out << "pack expansion type ("
+        << expansionElt.getOpenedType()->getString(PO) << ")";
     break;
   }
   }
