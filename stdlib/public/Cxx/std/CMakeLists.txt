@@ -144,4 +144,4 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     TARGET_SDKS ALL_APPLE_PLATFORMS LINUX
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED
-    DEPENDS libstdcxx-modulemap)
+    DEPENDS libstdcxx-modulemap libcxxshim_modulemap)
