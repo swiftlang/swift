@@ -90,6 +90,7 @@ constexpr const char DynamicReplacementSomeSection[] =
 constexpr const char AccessibleFunctionsSection[] =
     MachOAccessibleFunctionsSection;
 constexpr const char TextSegment[] = MachOTextSegment;
+constexpr const char SwiftROSegment[] = MachOSwiftROSegment;
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -106,6 +107,7 @@ void addImageCallback(const mach_header *mh) {
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
 #endif
 
+  // Look for a section.
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
@@ -147,7 +149,65 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 }
 
 // Callback for objc_addLoadImageFunc that just takes a mach_header.
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          int SECTION_KIND,
+          void CONSUME_BLOCK(const void *baseAddress, const void *start,
+                             uintptr_t size)>
+void addImageCallbackEitherOr(const mach_header *mh) {
+#if __POINTER_WIDTH__ == 64
+  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
+#endif
 
+  // Look for a section.
+  unsigned long size;
+  const uint8_t *section =
+  getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                 SEGMENT_NAME, SECTION_NAME,
+                 &size);
+
+  if (!section) {
+    // Alternatively, look for another section.
+    section =
+    getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                   SEGMENT_NAME2, SECTION_NAME2,
+                   &size);
+    if (!section)
+      return;
+  }
+
+  CONSUME_BLOCK(mh, section, size);
+}
+
+// Callback for objc_addLoadImageFunc2 that takes a mach_header and dyld info.
+#if OBJC_ADDLOADIMAGEFUNC2_DEFINED
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          int SECTION_KIND,
+          void CONSUME_BLOCK(const void *baseAddress, const void *start,
+                             uintptr_t size)>
+void addImageCallbackEitherOr(const mach_header *mh,
+                              struct _dyld_section_location_info_s *dyldInfo) {
+  // This kind of lookup doesn't use the segment/section names anyway.
+  addImageCallback<SEGMENT_NAME, SECTION_NAME,
+                   SECTION_KIND, CONSUME_BLOCK>(mh, dyldInfo);
+}
+#endif
+
+// Callback for _dyld_register_func_for_add_image that takes a mach_header and a
+// slide.
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          int SECTION_KIND,
+          void CONSUME_BLOCK(const void *baseAddress, const void *start,
+                             uintptr_t size)>
+void addImageCallbackEitherOr(const mach_header *mh, intptr_t vmaddr_slide) {
+  addImageCallbackEitherOr<SEGMENT_NAME, SECTION_NAME,
+                           SEGMENT_NAME2, SECTION_NAME2,
+                           SECTION_KIND, CONSUME_BLOCK>(mh);
+}
+
+// Callback for objc_addLoadImageFunc that just takes a mach_header.
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
           int SECTION_KIND, int SECTION_KIND2,
@@ -265,9 +325,10 @@ void swift::initializeProtocolConformanceLookup() {
 }
 void swift::initializeTypeMetadataRecordLookup() {
   REGISTER_FUNC(
-      addImageCallback<TextSegment, TypeMetadataRecordSection,
-                       _dyld_section_location_text_swift5_types,
-                       addImageTypeMetadataRecordBlockCallbackUnsafe>);
+      addImageCallbackEitherOr<SwiftROSegment, TypeMetadataRecordSection,
+                               TextSegment, TypeMetadataRecordSection,
+                               _dyld_section_location_text_swift5_types,
+                               addImageTypeMetadataRecordBlockCallbackUnsafe>);
 }
 
 void swift::initializeDynamicReplacementLookup() {

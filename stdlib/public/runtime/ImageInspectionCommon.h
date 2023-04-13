@@ -42,6 +42,7 @@
 #define MachOAccessibleFunctionsSection "__swift5_acfuncs"
 
 #define MachOTextSegment "__TEXT"
+#define MachOSwiftROSegment "__SWIFT_RO"
 
 #else
 
