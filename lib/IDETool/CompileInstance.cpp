@@ -261,10 +261,14 @@ bool CompileInstance::setupCI(
                DiagnosticDocumentationPath.c_str()});
   args.append(origArgs.begin(), origArgs.end());
 
+  SmallString<256> driverPath(SwiftExecutablePath);
+  llvm::sys::path::remove_filename(driverPath);
+  llvm::sys::path::append(driverPath, "swiftc");
+
   CompilerInvocation invocation;
   bool invocationCreationFailed =
       driver::getSingleFrontendInvocationFromDriverArguments(
-          args, Diags,
+          driverPath, args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
             return invocation.parseArgs(FrontendArgs, Diags);
           },
