@@ -12,6 +12,7 @@ import sys
 utils = os.path.dirname(os.path.realpath(__file__))
 get_task_allow_plist = os.path.join(utils, 'get-task-allow.plist')
 
+
 def main(arguments):
     parser = argparse.ArgumentParser(
         description='Postprocess binaries to prepare for \
