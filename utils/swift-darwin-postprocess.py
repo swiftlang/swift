@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 utils = os.path.dirname(os.path.realpath(__file__))
+get_task_allow_plist = os.path.join(utils, 'get-task-allow.plist')
 
 
 def main(arguments):
@@ -91,7 +92,9 @@ def unrpathize(filename):
 
 def codesign(filename):
     # "-" is the signing identity for ad-hoc signing.
-    command = ["/usr/bin/codesign", "--force", "--sign", "-", filename]
+    command = ['/usr/bin/codesign', '--force', '--sign', '-',
+               '--entitlements', get_task_allow_plist,
+               filename]
     subprocess.check_call(command)
 
 
