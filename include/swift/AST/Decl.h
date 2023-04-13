@@ -4889,8 +4889,14 @@ public:
   bool requiresSelfConformanceWitnessTable() const;
 
   /// Determine whether an existential type must be explicitly prefixed
-  /// with \c any. \c any is required if any of the members contain
-  /// an associated type, or if \c Self appears in non-covariant position.
+  /// with \c any. \c any is required if one of the following conditions is met
+  /// for this protocol or an inherited protocol:
+  /// - The protocol has an associated type requirement.
+  /// - `Self` appears in non-covariant position in the type signature of a
+  ///   value requirement.
+  ///
+  /// @Note This method does not take the state of language features into
+  /// account.
   bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
