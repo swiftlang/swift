@@ -72,13 +72,14 @@ void PluginServer_destroyConnection(const void *connHandle) {
   delete conn;
 }
 
-ssize_t PluginServer_read(const void *connHandle, void *data, size_t nbyte) {
+long PluginServer_read(const void *connHandle, void *data,
+                       unsigned long nbyte) {
   const auto *conn = static_cast<const ConnectionHandle *>(connHandle);
   return ::read(conn->inputFD, data, nbyte);
 }
 
-ssize_t PluginServer_write(const void *connHandle, const void *data,
-                           size_t nbyte) {
+long PluginServer_write(const void *connHandle, const void *data,
+                        unsigned long nbyte) {
   const auto *conn = static_cast<const ConnectionHandle *>(connHandle);
   return ::write(conn->outputFD, data, nbyte);
 }
