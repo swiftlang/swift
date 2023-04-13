@@ -89,3 +89,17 @@ Tests.test("deinit not called in init when assigned") {
   }
   expectEqual(0, FD2.count)
 }
+
+Tests.test("empty struct") {
+  @_moveOnly
+  struct EmptyStruct {
+    func doSomething() {}
+    var value: Bool { false }
+  }
+
+  let e = EmptyStruct()
+  e.doSomething()
+  if e.value {
+    let _ = consume e
+  }
+}
