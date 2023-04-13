@@ -33,7 +33,7 @@ extension std.string {
       return
     }
 
-    let len = strlen(str)
+    let len = UTF8._nullCodeUnitOffset(in: str)
     for i in 0..<len {
       let char = UInt8(str[i])
       self.push_back(value_type(bitPattern: char))
