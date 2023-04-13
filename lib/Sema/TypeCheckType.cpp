@@ -4816,8 +4816,7 @@ public:
 
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (Ctx.LangOpts.hasFeature(Feature::ExistentialAny) ||
-          proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -4834,8 +4833,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!Ctx.LangOpts.hasFeature(Feature::ExistentialAny) &&
-              !protoDecl->existentialRequiresAny())
+          if (!protoDecl->existentialRequiresAny())
             continue;
 
           Ctx.Diags.diagnose(comp->getNameLoc(),
