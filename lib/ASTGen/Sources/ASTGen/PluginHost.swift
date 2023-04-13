@@ -352,7 +352,7 @@ extension PluginMessage.Syntax {
         fileID: fileID,
         fileName: fileName,
         offset: loc.offset,
-        line: loc.line!,
-        column: loc.column!))
+        line: loc.line,
+        column: loc.column))
   }
 }
