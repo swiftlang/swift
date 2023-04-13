@@ -11313,24 +11313,16 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
                                             ConstraintLocatorBuilder locator) {
-  // TODO: Pack expansion type variable can carry opened type.
-  auto expansion =
-      llvm::find_if(OpenedPackExpansionTypes, [&](const auto &expansion) {
-        return expansion.second->isEqual(typeVar);
-      });
-
-  assert(expansion != OpenedPackExpansionTypes.end());
-
-  assignFixedType(typeVar, expansion->first, getConstraintLocator(locator));
-
-  if (isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    llvm::errs().indent(solverState->getCurrentIndent())
-        << "(pack expansion variable " << typeVar->getString(PO)
-        << " is bound to '" << expansion->first->getString(PO) << "')\n";
+  Type openedExpansionType;
+  if (auto last = locator.last()) {
+    auto expansionElt = last->castTo<LocatorPathElt::PackExpansionType>();
+    openedExpansionType = expansionElt.getOpenedType();
   }
 
+  if (!openedExpansionType)
+    return false;
+
+  assignFixedType(typeVar, openedExpansionType, getConstraintLocator(locator));
   return true;
 }
 
