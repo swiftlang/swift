@@ -44,11 +44,11 @@ namespace {
   };
 }
 
-BridgedDiagnostic SwiftDiagnostic_create(
-    void *diagnosticEngine, BridgedDiagnosticSeverity severity,
-    const void *sourceLocPtr,
-    const uint8_t *textPtr, long textLen
-) {
+BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
+                                         BridgedDiagnosticSeverity severity,
+                                         const void *sourceLocPtr,
+                                         const unsigned char *textPtr,
+                                         long textLen) {
   StringRef origText{
     reinterpret_cast<const char *>(textPtr), size_t(textLen)};
   llvm::MallocAllocator mallocAlloc;
@@ -91,10 +91,11 @@ void SwiftDiagnostic_highlight(
 }
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
-void SwiftDiagnostic_fixItReplace(
-    BridgedDiagnostic diagPtr,
-    const void *replaceStartLocPtr, const void *replaceEndLocPtr,
-    const uint8_t *newTextPtr, long newTextLen) {
+void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diagPtr,
+                                  const void *replaceStartLocPtr,
+                                  const void *replaceEndLocPtr,
+                                  const unsigned char *newTextPtr,
+                                  long newTextLen) {
 
   SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(replaceEndLocPtr);
@@ -115,9 +116,9 @@ void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
   delete impl;
 }
 
-BridgedIdentifier SwiftASTContext_getIdentifier(void *ctx,
-                                                const uint8_t *_Nullable str,
-                                                long len) {
+BridgedIdentifier
+SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
+                              long len) {
   return const_cast<void *>(
       static_cast<ASTContext *>(ctx)
           ->getIdentifier(
@@ -213,7 +214,8 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
   return E;
 }
 
-void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
+void *SwiftStringLiteralExpr_create(void *ctx,
+                                    const unsigned char *_Nullable string,
                                     long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
@@ -222,7 +224,8 @@ void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
       StringLiteralExpr(stringRef, getSourceLocFromPointer(TokenLoc));
 }
 
-void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
+void *SwiftIntegerLiteralExpr_create(void *ctx,
+                                     const unsigned char *_Nullable string,
                                      long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
@@ -687,6 +690,6 @@ bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto size = message.size();
   auto outPtr = malloc(size);
   memcpy(outPtr, message.data(), size);
-  *out = BridgedData{(const char *)outPtr, size};
+  *out = BridgedData{(const char *)outPtr, (unsigned long)size};
   return false;
 }
