@@ -39,7 +39,7 @@ extension ASTGenVisitor {
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.members.members
+    node.memberBlock.members
       .map { self.visit($0).rawValue }
       .withBridgedArrayRef { ref in
         NominalTypeDecl_setMembers(out.nominalDecl, ref)
@@ -60,7 +60,7 @@ extension ASTGenVisitor {
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.members.members
+    node.memberBlock.members
       .map { self.visit($0).rawValue }
       .withBridgedArrayRef { ref in
         NominalTypeDecl_setMembers(out.nominalDecl, ref)
