@@ -345,7 +345,8 @@ bb0:
 // CHECK-LABEL: } // end sil function 'no_real_uses'
 
 // CHECK-LABEL: sil [ossa] @keep_release :
-// CHECK: destroy_value %0
+// CHECK: [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK: destroy_value [[LIFETIME_OWNED]]
 // CHECK-LABEL: } // end sil function 'keep_release'
 sil [ossa] @keep_release : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -390,7 +391,8 @@ bb0(%0 : $*Int64):
 // trade-offs.
 // CHECK-LABEL: sil [ossa] @large_struct_test :
 // CHECK: bb0([[ARG0:%.*]] : @owned $LargeCodesizeStruct):
-// CHECK:   destroy_value [[ARG0]]
+// CHECK:   [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ARG0]]
+// CHECK:   destroy_value [[LIFETIME_OWNED]]
 // CHECK: } // end sil function 'large_struct_test'
 sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
 bb0(%0 : @owned $LargeCodesizeStruct):
@@ -404,7 +406,8 @@ bb0(%0 : @owned $LargeCodesizeStruct):
 
 // CHECK-LABEL: sil [ossa] @small_struct_test :
 // CHECK: bb0([[ARG0:%.*]] : @owned $SmallCodesizeStruct):
-// CHECK:   ([[ELEM1:%[0-9]+]], [[ELEM2:%[0-9]+]]) = destructure_struct [[ARG0]]
+// CHECK:   [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ARG0]]
+// CHECK:   ([[ELEM1:%[0-9]+]], [[ELEM2:%[0-9]+]]) = destructure_struct [[LIFETIME_OWNED]]
 // CHECK:   destroy_value [[ELEM1]]
 // CHECK:   destroy_value [[ELEM2]]
 // CHECK: } // end sil function 'small_struct_test'
@@ -421,9 +424,10 @@ bb0(%0 : @owned $SmallCodesizeStruct):
 // CHECK-LABEL: sil [ossa] @small_struct_multi_test :
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $SmallCodesizeStruct):
 // CHECK-NOT:     alloc_stack
+// CHECK:       [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK:       bb1:
-// CHECK:         [[COPY:%.*]] = copy_value %0
-// CHECK-NEXT:    destructure_struct %0
+// CHECK:         [[COPY:%.*]] = copy_value [[LIFETIME_OWNED]]
+// CHECK-NEXT:    destructure_struct [[LIFETIME_OWNED]]
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    begin_borrow [[COPY]]
@@ -431,7 +435,7 @@ bb0(%0 : @owned $SmallCodesizeStruct):
 // CHECK-NEXT:    end_borrow
 // CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK:       bb2:
-// CHECK-NEXT:    destructure_struct %0
+// CHECK-NEXT:    destructure_struct [[LIFETIME_OWNED]]
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'small_struct_multi_test'
@@ -514,8 +518,6 @@ case one(C)
 }
 
 sil [ossa] @getC : $@convention(thin) () -> @owned C
-sil [ossa] @getD : $@convention(thin) () -> @owned D
-sil [ossa] @getE : $@convention(thin) () -> @owned E
 
 sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
@@ -527,18 +529,16 @@ sil [ossa] @callee_void_to_void : $@convention(thin) () -> ()
 // An owned instance of C is passed in, stored to the stack, used
 // non-consumingly once, and destroyed.
 //
-// CHECK-LABEL: sil [ossa] @basic_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @basic_1 : $@convention(thin) (@owned C) -> () {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[LIFETIME_OWNED]])
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_1'
-sil [ossa] @basic_1 : $() -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @basic_1 : $(@owned C) -> () {
+entry(%instance : @owned $C):
     %scope = alloc_stack [lexical] $C
     store %instance to [init] %scope : $*C
     %thing = load [take] %scope : $*C
@@ -577,17 +577,15 @@ entry(%instance_guaranteed : @guaranteed $C):
 // An owned instance of C is passed in, stored to the stack, and used
 // consumingly.
 //
-// CHECK-LABEL: sil [ossa] @basic_4 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @basic_4 : $@convention(thin) (@owned C) -> () {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_owned
 // CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[LIFETIME_OWNED]])
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_4'
-sil [ossa] @basic_4 : $() -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @basic_4 : $(@owned C) -> () {
+entry(%instance : @owned $C):
     %scope = alloc_stack [lexical] $C
     store %instance to [init] %scope : $*C
     %thing = load [take] %scope : $*C
@@ -597,10 +595,8 @@ sil [ossa] @basic_4 : $() -> () {
     return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @basic_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @basic_5 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
@@ -608,10 +604,8 @@ sil [ossa] @basic_4 : $() -> () {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_5'
-sil [ossa] @basic_5 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @basic_5 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   store %instance_2 to [assign] %addr : $*C
@@ -621,10 +615,8 @@ sil [ossa] @basic_5 : $@convention(thin) () -> () {
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @basic_6 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @basic_6 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
@@ -636,10 +628,8 @@ sil [ossa] @basic_5 : $@convention(thin) () -> () {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_6' 
-sil [ossa] @basic_6 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @basic_6 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   br work
 work:
@@ -653,10 +643,8 @@ exit:
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @basic_7 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @basic_7 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -668,10 +656,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_7'
-sil [ossa] @basic_7 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @basic_7 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   br work
@@ -689,17 +675,15 @@ exit:
 
 // after_N {{ uses of the loaded value after dealloc_stack
 
-// CHECK-LABEL: sil [ossa] @after_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_1 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]
 // CHECK:         return [[LIFETIME_OWNED]]
 // CHECK-LABEL: } // end sil function 'after_1'
-sil [ossa] @after_1 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_1 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -709,10 +693,8 @@ sil [ossa] @after_1 : $@convention(thin) () -> @owned C {
   return %instance_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_2 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] 
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
@@ -720,10 +702,8 @@ sil [ossa] @after_1 : $@convention(thin) () -> @owned C {
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
 // CHECK:         return [[LIFETIME_OWNED_1]] 
 // CHECK-LABEL: } // end sil function 'after_2' 
-sil [ossa] @after_2 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   %instance_1_loaded = load [take] %addr : $*C
@@ -736,9 +716,8 @@ sil [ossa] @after_2 : $@convention(thin) () -> @owned C {
   return %instance_1_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_3 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_3 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
@@ -746,9 +725,8 @@ sil [ossa] @after_2 : $@convention(thin) () -> @owned C {
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[LIFETIME_OWNED]] 
 // CHECK-LABEL: } // end sil function 'after_3'
-sil [ossa] @after_3 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_3 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -760,9 +738,8 @@ exit:
   return %instance_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_4 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_4 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         br bb1
 // CHECK:       bb1:
@@ -770,9 +747,8 @@ exit:
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[LIFETIME_OWNED]] 
 // CHECK-LABEL: } // end sil function 'after_4'
-sil [ossa] @after_4 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_4 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -784,9 +760,8 @@ exit:
   return %instance_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_5 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
@@ -795,9 +770,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'after_5'
-sil [ossa] @after_5 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_5 : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -810,11 +784,8 @@ exit:
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @after_6 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_3:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_6 : $@convention(thin) (@owned C, @owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C, [[INSTANCE_3:%[^,]+]] : @owned $C):
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
@@ -825,11 +796,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED_3]]
 // CHECK:         return [[LIFETIME_OWNED_1]]
 // CHECK-LABEL: } // end sil function 'after_6'
-sil [ossa] @after_6 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_3 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_6 : $@convention(thin) (@owned C, @owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C, %instance_3 : @owned $C):
   %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
@@ -846,17 +814,15 @@ sil [ossa] @after_6 : $@convention(thin) () -> @owned C {
   return %instance_1_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_7 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_7 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[LIFETIME_OWNED]] 
 // CHECK-LABEL: } // end sil function 'after_7'
-sil [ossa] @after_7 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_7 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -866,9 +832,8 @@ sil [ossa] @after_7 : $@convention(thin) () -> @owned C {
   return %instance_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_8 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_8 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]] 
 // CHECK:         destroy_value [[LIFETIME_OWNED]] 
@@ -876,9 +841,8 @@ sil [ossa] @after_7 : $@convention(thin) () -> @owned C {
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[COPY]] 
 // CHECK-LABEL: } // end sil function 'after_8'
-sil [ossa] @after_8 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_8 : $@convention(thin) (@owned C) -> @owned C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [copy] %addr : $*C
@@ -889,10 +853,8 @@ sil [ossa] @after_8 : $@convention(thin) () -> @owned C {
   return %instance_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_9 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_9 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
@@ -900,10 +862,8 @@ sil [ossa] @after_8 : $@convention(thin) () -> @owned C {
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
 // CHECK:         return [[LIFETIME_OWNED_1]] 
 // CHECK-LABEL: } // end sil function 'after_9'
-sil [ossa] @after_9 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_9 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   %instance_1_loaded = load [take] %addr : $*C
@@ -916,10 +876,8 @@ exit:
   return %instance_1_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_10 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_10 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
@@ -931,10 +889,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
 // CHECK:         return [[COPY]] 
 // CHECK-LABEL: } // end sil function 'after_10'
-sil [ossa] @after_10 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_10 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   br work
 work:
@@ -949,10 +905,8 @@ exit:
   return %instance_1_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @after_11 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @after_11 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -964,10 +918,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
 // CHECK:         return [[COPY]]
 // CHECK-LABEL: } // end sil function 'after_11'
-sil [ossa] @after_11 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @after_11 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   br work
@@ -987,10 +939,8 @@ exit:
 // deferred_N {{ // scope closure isn't done immediately because it can't be
 
 // Check that an initial store [assign] becomes a scope end.
-// CHECK-LABEL: sil [ossa] @deferred_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_1 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] : $C
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1000,10 +950,8 @@ exit:
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]] : $C
 // CHECK-LABEL: } // end sil function 'deferred_1' 
-sil [ossa] @deferred_1 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_1 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_2 to [init] %addr : $*C
   br work
@@ -1018,10 +966,8 @@ exit:
 
 // Ensure that a store [assign] following an initial load [copy] gets a deferred
 // scope end.
-// CHECK-LABEL: sil [ossa] @deferred_2 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1033,10 +979,8 @@ exit:
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
 // CHECK-LABEL: } // end sil function 'deferred_2'
-sil [ossa] @deferred_2 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_2 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_2 to [init] %addr : $*C
   br work
@@ -1052,10 +996,8 @@ exit:
 }
 
 // Ensure that an initial deferred destroy_addr becomes a scope end.
-// CHECK-LABEL: sil [ossa] @deferred_3 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_3 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1065,10 +1007,8 @@ exit:
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
 // CHECK-LABEL: } // end sil function 'deferred_3'
-sil [ossa] @deferred_3 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_3 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_2 to [init] %addr : $*C
   br work
@@ -1084,10 +1024,8 @@ exit:
 
 // Ensure that a destroy_addr following an initial load [copy] gets a deferred
 // scope end.
-// CHECK-LABEL: sil [ossa] @deferred_4 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_4 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1099,10 +1037,8 @@ exit:
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
 // CHECK-LABEL: } // end sil function 'deferred_4'
-sil [ossa] @deferred_4 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_4 : $@convention(thin) (@owned C,@owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_2 to [init] %addr : $*C
   br work
@@ -1119,10 +1055,8 @@ exit:
 }
 
 // Ensure that an initial load [take] gets a deferred scope end.
-// CHECK-LABEL: sil [ossa] @deferred_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_5 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1132,10 +1066,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
 // CHECK:         return [[LIFETIME_OWNED_1]]
 // CHECK-LABEL: } // end sil function 'deferred_5'
-sil [ossa] @deferred_5 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_5 : $@convention(thin) (@owned C, @owned C) -> @owned C {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   br work
@@ -1152,9 +1084,8 @@ exit:
 
 // Ensure that a load [take] following an initial load [copy] gets a deferred
 // scope end.
-// CHECK-LABEL: sil [ossa] @deferred_6 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_6 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1164,9 +1095,8 @@ exit:
 // CHECK:         destroy_value [[COPY]]
 // CHECK:         return [[LIFETIME_OWNED]]
 // CHECK-LABEL: } // end sil function 'deferred_6'
-sil [ossa] @deferred_6 : $@convention(thin) () -> @owned C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_6 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_1 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr : $*C
   br work
@@ -1180,10 +1110,8 @@ exit:
   return %instance_1_loaded : $C
 }
 
-// CHECK-LABEL: sil [ossa] @deferred_7 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @deferred_7 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
@@ -1191,16 +1119,15 @@ exit:
 // CHECK:         destroy_value [[COPY_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
-// CHECK:         destroy_value [[LIFETIME_OWNED_2]]
+// CHECK:         [[LIFETIME_OWNED_3:%[^,]+]] = move_value [lexical] [[LIFETIME_OWNED_2]]
+// CHECK:         destroy_value [[LIFETIME_OWNED_3]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'deferred_7'
-sil [ossa] @deferred_7 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
-  %instance_2 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @deferred_7 : $@convention(thin) (@owned C,@owned C) -> () {
+entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_2 to [init] %addr : $*C
   br work
@@ -1222,15 +1149,13 @@ exit:
 
 // term_N {{ the last use of the stored value is a terminator
 
-// CHECK-LABEL: sil [ossa] @term_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[RETVAL:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'term_1'
-sil [ossa] @term_1 : $@convention(thin) () -> @owned C {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %instance to [init] %addr : $*C
     %result = load [take] %addr : $*C
@@ -1238,17 +1163,15 @@ sil [ossa] @term_1 : $@convention(thin) () -> @owned C {
     return %result : $C
 }
 
-// CHECK-LABEL: sil [ossa] @term_2 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @term_2 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[^,]+]]([[LIFETIME_OWNED_1]] : $C)
 // CHECK:       [[EXIT]]([[OUTSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         return [[OUTSTANCE]]
 // CHECK-LABEL: } // end sil function 'term_2'
-sil [ossa] @term_2 : $@convention(thin) () -> @owned C {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @term_2 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %instance to [init] %addr : $*C
     %result = load [take] %addr : $*C
@@ -1258,17 +1181,15 @@ exit(%outstance : @owned $C):
     return %outstance : $C
 }
 
-// CHECK-LABEL: sil [ossa] @term_3 : {{.*}} {
-// CHECK:         [[GET_E:%[^,]+]] = function_ref @getE
-// CHECK:         [[EITHER:%[^,]+]] = apply [[GET_E]]
+// CHECK-LABEL: sil [ossa] @term_3 : $@convention(thin) (@owned E) -> @owned C {
+// CHECK:       {{bb[^,]+}}([[EITHER:%[^,]+]] : @owned $E):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[EITHER]] : $E
 // CHECK:         switch_enum [[LIFETIME_OWNED]] : $E, case #E.one!enumelt: [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         return [[INSTANCE]] : $C
 // CHECK-LABEL: } // end sil function 'term_3'
-sil [ossa] @term_3 : $@convention(thin) () -> @owned C {
-    %getE = function_ref @getE : $@convention(thin) () -> @owned E
-    %either = apply %getE() : $@convention(thin) () -> @owned E
+sil [ossa] @term_3 : $@convention(thin) (@owned E) -> @owned C {
+entry(%either : @owned $E):
     %addr = alloc_stack [lexical] $E
     store %either to [init] %addr : $*E
     %either2 = load [take] %addr : $*E
@@ -1278,11 +1199,8 @@ one(%instance : @owned $C):
     return %instance : $C
 }
 
-// CHECK-LABEL: sil [ossa] @term_4 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[SUPER_IN:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[GET_D:%[^,]+]] = function_ref @getD
-// CHECK:         [[SUB_IN:%[^,]+]] = apply [[GET_D]]
+// CHECK-LABEL: sil [ossa] @term_4 : $@convention(thin) (@owned C, @owned D) -> @owned D {
+// CHECK:       {{bb[^,]+}}([[SUPER_IN:%[^,]+]] : @owned $C, [[SUB_IN:%[^,]+]] : @owned $D):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[SUPER_IN]]
 // CHECK:         checked_cast_br [[LIFETIME_OWNED]] : $C to D, [[SUPER_IS_SUB:bb[^,]+]], [[SUPER_IS_SUPER:bb[0-9]+]]
 // CHECK:       [[SUPER_IS_SUB]]([[SUPER_AS_SUB:%[^,]+]] : @owned $D):
@@ -1294,11 +1212,8 @@ one(%instance : @owned $C):
 // CHECK:       [[EXIT]]([[SUB_OUT:%[^,]+]] : @owned $D):
 // CHECK:         return [[SUB_OUT]]
 // CHECK-LABEL: } // end sil function 'term_4'
-sil [ossa] @term_4 : $@convention(thin) () -> @owned D {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %super_in = apply %getC() : $@convention(thin) () -> @owned C
-    %getD = function_ref @getD : $@convention(thin) () -> @owned D
-    %sub_in = apply %getD() : $@convention(thin) () -> @owned D
+sil [ossa] @term_4 : $@convention(thin) (@owned C, @owned D) -> @owned D {
+bb0(%super_in : @owned $C, %sub_in : @owned $D):
     %addr = alloc_stack [lexical] $C
     store %super_in to [init] %addr : $*C
     %super_load = load [take] %addr : $*C
@@ -1314,9 +1229,8 @@ exit(%sub_out : @owned $D):
     return %sub_out : $D
 }
 
-// CHECK-LABEL: sil hidden [ossa] @term_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error any Error {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE_ERROR_OWNED:%[^,]+]] = function_ref @callee_error_owned
 // CHECK:         try_apply [[CALLEE_ERROR_OWNED]]([[LIFETIME_OWNED]]) : $@convention(thin) (@owned C) -> @error any Error, normal [[REGULAR_BLOCK:bb[^,]+]], error [[THROW_BLOCK:bb[0-9]+]]
@@ -1329,9 +1243,8 @@ exit(%sub_out : @owned $D):
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'term_5' 
-sil hidden [ossa] @term_5 : $@convention(thin) () -> @error Error {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %instance to [init] %addr : $*C
     %instance_load = load [take] %addr : $*C
@@ -1348,9 +1261,8 @@ exit:
     return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @term_6 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @term_6 : $@yield_once @convention(method) (@owned C) -> @yields C {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         yield [[LIFETIME_OWNED]] : $C, resume [[RESUME_BLOCK:bb[^,]+]], unwind [[UNWIND_BLOCK:bb[0-9]+]]
 // CHECK:       [[RESUME_BLOCK]]:
@@ -1361,9 +1273,8 @@ exit:
 // CHECK:         destroy_value [[LIFETIME_OWNED]] 
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function 'term_6'
-sil [ossa] @term_6 : $@yield_once @convention(thin) () -> @yields C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @term_6 : $@yield_once @convention(method) (@owned C) -> @yields C {
+entry(%instance : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %instance to [init] %addr : $*C
     %instance_load = load [take] %addr : $*C
@@ -1379,9 +1290,8 @@ unwind_block:
     unwind
 }
 
-// CHECK-LABEL: sil [ossa] @term_7 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @term_7 : $@convention(thin) (@owned C) -> @error C {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -1391,9 +1301,8 @@ unwind_block:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] 
 // CHECK-LABEL: } // end sil function 'term_7'
-sil [ossa] @term_7 : $@convention(thin) () -> @error C {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @term_7 : $@convention(thin) (@owned C) -> @error C {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_load = load [take] %addr : $*C
@@ -1412,10 +1321,8 @@ bb2:
 
 // unreachable_N {{ ending of scopes in blocks that terminate in unreachable
 
-// CHECK-LABEL: sil [ossa] @unreachable_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[DIE]]:
@@ -1423,10 +1330,8 @@ bb2:
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_1'
-sil [ossa] @unreachable_1 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %one = apply %getC() : $@convention(thin) () -> @owned C
-  %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %one to [init] %addr : $*C
   br work
@@ -1437,45 +1342,39 @@ work:
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @unreachable_2 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_2'
-sil [ossa] @unreachable_2 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @unreachable_3 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_3'
-sil [ossa] @unreachable_3 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @unreachable_4 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE]] : $C
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[LIFETIME_OWNED_1]] : $C
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_4'
-sil [ossa] @unreachable_4 : $@convention(thin) () -> () {
-entry:
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
@@ -1485,17 +1384,15 @@ entry:
 
 
 // End lifetime before unreachable inst.
-// CHECK-LABEL: sil [ossa] @unreachable_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_5'
-sil [ossa] @unreachable_5 : $@convention(thin) () -> () {
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance_1 = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance_1 to [init] %addr :$*C
   br exit
@@ -1665,10 +1562,8 @@ die:
 
 // diamond_N {{ the usages of the alloc_stack occur over a diamond of blocks
 
-// CHECK-LABEL: sil [ossa] @diamond_1 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_2:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_1 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[INSTANCE_2]]
@@ -1684,10 +1579,8 @@ die:
 // CHECK:         [[RESULT:%[^,]+]] = tuple ()
 // CHECK:         return [[RESULT]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_1'
-sil [ossa] @diamond_1 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
-    %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_1 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
     %addr = alloc_stack [lexical] $C
     cond_br undef, left, right
 left:
@@ -1710,10 +1603,8 @@ exit:
 
 // Store and load the value to the alloc stack only on one branch.
 //
-// CHECK-LABEL: sil [ossa] @diamond_2 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE_0:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[INSTANCE_1:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_2 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE_0:%[^,]+]] : @owned $C, [[INSTANCE_1:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[INSTANCE_0]]
@@ -1730,10 +1621,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'diamond_2'
-sil [ossa] @diamond_2 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
-    %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_2 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
     %addr = alloc_stack [lexical] $C
     cond_br undef, left, right
 left:
@@ -1758,10 +1647,8 @@ exit:
 // Ensure that the lifetime is extended to the final destroy_addr even when
 // there are no uses after the middle blocks.
 //
-// CHECK-LABEL: sil [ossa] @diamond_3 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[ONE:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[TWO:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_3 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
@@ -1776,10 +1663,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_3'
-sil [ossa] @diamond_3 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
-    %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_3 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
     %addr = alloc_stack [lexical] $C
     cond_br undef, left, right
 left:
@@ -1800,10 +1685,8 @@ exit:
 // Ensure that the value stored to the alloc_stack is kept alive until the
 // destroy_addr in a subsequent block even when there are no uses.
 //
-// CHECK-LABEL: sil [ossa] @diamond_4 : $@convention(thin) () -> () {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[ONE:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[TWO:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_4 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
@@ -1818,10 +1701,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_4' 
-sil [ossa] @diamond_4 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
-    %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_4 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
     %addr = alloc_stack [lexical] $C
     cond_br undef, left, right
 left:
@@ -1839,10 +1720,8 @@ exit:
     return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @diamond_5 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[ONE:%[^,]+]] = apply [[GET_C]]
-// CHECK:         [[TWO:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_5 : $@convention(thin) (@owned C, @owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ONE:%[^,]+]] : @owned $C, [[TWO:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
@@ -1857,10 +1736,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_5' 
-sil [ossa] @diamond_5 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
-    %two = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_5 : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%one : @owned $C, %two : @owned $C):
     %addr = alloc_stack [lexical] $C
     cond_br undef, left, right
 left:
@@ -1880,9 +1757,8 @@ exit:
 
 // Verify that a dead-end which succeeds the introduction of a borrow_scope ends
 // the borrow scope before the unreachable.
-// CHECK-LABEL: sil [ossa] @diamond_6 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[ORIGINAL:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_6 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[ORIGINAL:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ORIGINAL]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -1894,9 +1770,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_6' 
-sil [ossa] @diamond_6 : $@convention(thin) () -> () {
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %original = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_6 : $@convention(thin) (@owned C) -> () {
+entry(%original : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %original to [init] %addr : $*C
     cond_br undef, left, right
@@ -1911,9 +1786,8 @@ exit:
     return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @diamond_7 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_7 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
@@ -1927,10 +1801,8 @@ exit:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'diamond_7' 
-sil [ossa] @diamond_7 : $@convention(thin) () -> () {
-entry:
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_7 : $@convention(thin) (@owned C) -> () {
+entry(%one : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %one  to [init] %addr : $*C
     %value2 = load [copy] %addr : $*C
@@ -1947,9 +1819,8 @@ right:
     return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @diamond_8 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_8 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
@@ -1963,10 +1834,8 @@ right:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'diamond_8'
-sil [ossa] @diamond_8 : $@convention(thin) () -> () {
-entry:
-    %getC = function_ref @getC : $@convention(thin) () -> @owned C
-    %one = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_8 : $@convention(thin) (@owned C) -> () {
+entry(%one : @owned $C):
     %addr = alloc_stack [lexical] $C
     store %one  to [init] %addr : $*C
     %value2 = load [copy] %addr : $*C
@@ -1983,9 +1852,8 @@ right:
     return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @diamond_9 : {{.*}} {
-// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
-// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]
+// CHECK-LABEL: sil [ossa] @diamond_9 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[BB1:bb[0-9]+]], [[BB4:bb[0-9]+]]
 // CHECK:       [[BB1]]:
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
@@ -2000,10 +1868,8 @@ right:
 // CHECK:       [[BB5]]:
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'diamond_9'
-sil [ossa] @diamond_9 : $@convention(thin) () -> () {
-bb0:
-  %getC = function_ref @getC : $@convention(thin) () -> @owned C
-  %instance = apply %getC() : $@convention(thin) () -> @owned C
+sil [ossa] @diamond_9 : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   cond_br undef, bb1, bb4
 bb1:
