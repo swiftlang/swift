@@ -49,7 +49,6 @@ enum E<each T> {
 }
 
 func withWhereClause<each T>(_ x: repeat each T) where repeat each T: P {}
-// expected-error@-1 {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
 
 struct Outer<each T> {
   struct Bad<each U> {
@@ -65,9 +64,9 @@ struct Outer<each T> {
   }
 }
 
-func packRef<each T>(_: repeat each T) where each T: P {}
+func packRef<each T>(_: repeat each T) where repeat each T: P {}
 
-func packMemberRef<each T>(_: repeat each T.T) where each T: P {}
+func packMemberRef<each T>(_: repeat each T.T) where repeat each T: P {}
 
 // expected-error@+1 {{'each' cannot be applied to non-pack type 'Int'}}{{31-35=}}
 func invalidPackRefEachInt(_: each Int) {}
@@ -89,6 +88,12 @@ func packRefOutsideExpansion<each T>(_: (each T)) {}
 
 // expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
 func packRefOutsideExpansion<each T>(_: each T.Type) {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansionRequirement1<each T>(_: repeat each T) where each T: P {}
+
+// expected-error@+1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+func packRefOutsideExpansionRequirement2<each T>(_: repeat each T) where G<each T>: P {}
 
 // coverage to ensure a 'repeat each' type is considered Copyable
 func golden<Z>(_ z: Z) {}

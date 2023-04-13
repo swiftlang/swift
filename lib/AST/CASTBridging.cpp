@@ -562,12 +562,12 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
     case BridgedRequirementReprKindTypeConstraint:
       requirements.push_back(RequirementRepr::getTypeConstraint(
           (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
+          (TypeRepr *)req.SecondType, /*isExpansionPattern*/false));
       break;
     case BridgedRequirementReprKindSameType:
       requirements.push_back(RequirementRepr::getSameType(
           (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
+          (TypeRepr *)req.SecondType, /*isExpansionPattern*/false));
       break;
     case BridgedRequirementReprKindLayoutConstraint:
       llvm_unreachable("cannot handle layout constraints!");
