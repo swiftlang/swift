@@ -3995,14 +3995,14 @@ public:
                                        StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC, existentialRequiresAny;
+    bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
     uint8_t rawAccessLevel;
     unsigned numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
-                                            existentialRequiresAny,
+                                            hasSelfOrAssocTypeRequirements,
                                             rawAccessLevel, numInheritedTypes,
                                             rawInheritedAndDependencyIDs);
 
@@ -4030,8 +4030,8 @@ public:
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
-    ctx.evaluator.cacheOutput(ExistentialRequiresAnyRequest{proto},
-                              std::move(existentialRequiresAny));
+    ctx.evaluator.cacheOutput(HasSelfOrAssociatedTypeRequirementsRequest{proto},
+                              std::move(hasSelfOrAssocTypeRequirements));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       proto->setAccess(*accessLevel);

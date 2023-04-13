@@ -6018,9 +6018,18 @@ bool ProtocolDecl::existentialConformsToSelf() const {
     ExistentialConformsToSelfRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
-bool ProtocolDecl::existentialRequiresAny() const {
+bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
   return evaluateOrDefault(getASTContext().evaluator,
-    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
+                           HasSelfOrAssociatedTypeRequirementsRequest{
+                               const_cast<ProtocolDecl *>(this)},
+                           true);
+}
+
+bool ProtocolDecl::existentialRequiresAny() const {
+  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
+  return hasSelfOrAssociatedTypeRequirements();
 }
 
 ArrayRef<AssociatedTypeDecl *>
