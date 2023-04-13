@@ -881,6 +881,22 @@ namespace {
       return true;
     }
 
+    bool visitScalarPackIndexInst(const ScalarPackIndexInst *RHS) {
+      auto *X = cast<ScalarPackIndexInst>(LHS);
+      return (X->getIndexedPackType() == RHS->getIndexedPackType() &&
+              X->getComponentIndex() == RHS->getComponentIndex());
+    }
+
+    bool visitDynamicPackIndexInst(const DynamicPackIndexInst *RHS) {
+      auto *X = cast<DynamicPackIndexInst>(LHS);
+      return X->getIndexedPackType() == RHS->getIndexedPackType();
+    }
+
+    bool visitTuplePackElementAddrInst(const TuplePackElementAddrInst *RHS) {
+      auto *X = cast<TuplePackElementAddrInst>(LHS);
+      return X->getElementType() == RHS->getElementType();
+    }
+
   private:
     const SILInstruction *LHS;
   };

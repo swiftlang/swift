@@ -553,11 +553,12 @@ protected:
     /// Whether the existential of this protocol conforms to itself.
     ExistentialConformsToSelf : 1,
 
-    /// Whether the \c ExistentialRequiresAny bit is valid.
-    ExistentialRequiresAnyValid : 1,
+    /// Whether the \c HasSelfOrAssociatedTypeRequirements bit is valid.
+    HasSelfOrAssociatedTypeRequirementsValid : 1,
 
-    /// Whether the existential of this protocol must be spelled with \c any.
-    ExistentialRequiresAny : 1,
+    /// Whether this protocol has \c Self or associated type requirements.
+    /// See \c hasSelfOrAssociatedTypeRequirements() for clarification.
+    HasSelfOrAssociatedTypeRequirements : 1,
 
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
@@ -4756,19 +4757,19 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialConformsToSelf = result;
   }
 
-  /// Returns the cached result of \c existentialRequiresAny or \c None if it
-  /// hasn't yet been computed.
-  Optional<bool> getCachedExistentialRequiresAny() {
-    if (Bits.ProtocolDecl.ExistentialRequiresAnyValid)
-      return Bits.ProtocolDecl.ExistentialRequiresAny;
+  /// Returns the cached result of \c hasSelfOrAssociatedTypeRequirements or
+  /// \c None if it hasn't yet been computed.
+  Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
+    if (Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid)
+      return Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements;
 
     return None;
   }
 
-  /// Caches the result of \c existentialRequiresAny
-  void setCachedExistentialRequiresAny(bool requiresAny) {
-    Bits.ProtocolDecl.ExistentialRequiresAnyValid = true;
-    Bits.ProtocolDecl.ExistentialRequiresAny = requiresAny;
+  /// Caches the result of \c hasSelfOrAssociatedTypeRequirements
+  void setCachedHasSelfOrAssociatedTypeRequirements(bool value) {
+    Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid = true;
+    Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements = value;
   }
 
   bool hasLazyRequirementSignature() const {
@@ -4785,11 +4786,9 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
-  friend class RequirementSignatureRequestRQM;
-  friend class RequirementSignatureRequestGSB;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
-  friend class ExistentialRequiresAnyRequest;
+  friend class HasSelfOrAssociatedTypeRequirementsRequest;
   friend class InheritedProtocolsRequest;
   friend class PrimaryAssociatedTypesRequest;
   friend class ProtocolRequirementsRequest;
@@ -4888,15 +4887,20 @@ public:
   /// Does this protocol require a self-conformance witness table?
   bool requiresSelfConformanceWitnessTable() const;
 
-  /// Determine whether an existential type must be explicitly prefixed
-  /// with \c any. \c any is required if one of the following conditions is met
-  /// for this protocol or an inherited protocol:
+  /// Determine whether this protocol has `Self` or associated type
+  /// requirements.
+  ///
+  /// This is true if one of the following conditions is met for this protocol
+  /// or an inherited protocol:
   /// - The protocol has an associated type requirement.
   /// - `Self` appears in non-covariant position in the type signature of a
   ///   value requirement.
+  bool hasSelfOrAssociatedTypeRequirements() const;
+
+  /// Determine whether an existential type constrained by this protocol must
+  /// be written using `any` syntax.
   ///
-  /// @Note This method does not take the state of language features into
-  /// account.
+  /// \Note This method takes language feature state into account.
   bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
