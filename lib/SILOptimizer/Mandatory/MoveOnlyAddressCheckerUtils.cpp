@@ -1333,7 +1333,7 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
     if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
-      if (mod.lookUpMoveOnlyDeinitFunction(nom)) {
+      if (nom->getValueTypeDestructor()) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
