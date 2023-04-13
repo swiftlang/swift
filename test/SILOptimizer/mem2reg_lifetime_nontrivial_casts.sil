@@ -7,8 +7,9 @@ import Swift
 // Since it is forwarding, the ownership of the src forwards, but we cannot destroy the dst because it is trivial
 
 // CHECK-LABEL: sil [ossa] @casttotrivial :
-// CHECK:         [[CAST:%.*]]  = unchecked_bitwise_cast %0 : $AnyObject to $UInt8
-// CHECK-NEXT:    destroy_value %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK:         [[CAST:%.*]]  = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $UInt8
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[CAST]]
 // CHECK-LABEL: } // end sil function 'casttotrivial'
 sil [ossa] @casttotrivial : $@convention(thin) (@owned AnyObject) -> @owned UInt8 {
@@ -28,9 +29,10 @@ bb0(%0 : @owned $AnyObject):
 // To avoid all this spl handling, just use bitwise cast
 
 // CHECK-LABEL: sil [ossa] @casttonontrivial :
-// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast %0 : $AnyObject to $String
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $String
 // CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
-// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-LABEL: } // end sil function 'casttonontrivial'
 sil [ossa] @casttonontrivial : $@convention(thin) (@owned AnyObject) -> @owned String {
@@ -48,9 +50,10 @@ bb0(%0 : @owned $AnyObject):
 struct Pair { var lhs: AnyObject; var rhs: AnyObject }
 
 // CHECK-LABEL: sil [ossa] @shorteningcast :
-// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Pair to $AnyObject
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $Pair to $AnyObject
 // CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
-// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-LABEL: } // end sil function 'shorteningcast'
 sil [ossa] @shorteningcast : $@convention(thin) (@owned Pair) -> @owned AnyObject {
@@ -67,7 +70,8 @@ bb0(%0 : @owned $Pair):
 
 // CHECK-LABEL: sil [ossa] @deadcast :
 // CHECK-LABEL: bb0
-// CHECK-NEXT:    destroy_value %0
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-LABEL: } // end sil function 'deadcast'
 sil [ossa] @deadcast : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):

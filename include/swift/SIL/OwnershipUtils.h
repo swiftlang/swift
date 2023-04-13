@@ -475,6 +475,9 @@ struct BorrowingOperand {
   /// valid BorrowedValue instance.
   BorrowedValue getBorrowIntroducingUserResult();
 
+  /// Return the borrowing operand's value.
+  SILValue getScopeIntroducingUserResult();
+
   /// Compute the implicit uses that this borrowing operand "injects" into the
   /// set of its operands uses.
   ///
