@@ -779,3 +779,27 @@ func checkMarkMustCheckOnCaptured(x: __owned FD) {
     func clodger<T>(_: () -> T) {}
     clodger({ consumeVal(x) })
 }
+
+//////////////////
+// Empty Struct //
+//////////////////
+
+@_moveOnly
+struct EmptyStruct {
+  // Make sure we explicitly initialize empty struct as appropriate despite the
+  // fact we do not have any fields.
+  //
+  // CHECK-LABEL: sil hidden [ossa] @$s8moveonly11EmptyStructVACycfC : $@convention(method) (@thin EmptyStruct.Type) -> @owned EmptyStruct {
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var EmptyStruct }, var, name "self"
+  // CHECK: [[MARKED_UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]]
+  // CHECK: [[PROJECT:%.*]] = project_box [[MARKED_UNINIT]]
+  // CHECK: [[STRUCT:%.*]] = struct $EmptyStruct ()
+  // CHECK: store [[STRUCT]] to [init] [[PROJECT]]
+  // CHECK: [[MV_CHECK:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+  // CHECK: [[LOADED_VALUE:%.*]] = load [copy] [[MV_CHECK]]
+  // CHECK: destroy_value [[MARKED_UNINIT]]
+  // CHECK: return [[LOADED_VALUE]]
+  // CHECK: } // end sil function '$s8moveonly11EmptyStructVACycfC'
+  init() {
+  }
+}

@@ -2482,3 +2482,312 @@ func yieldTest() {
     }
   }
 }
+
+///////////////////////
+// Empty Struct Test //
+///////////////////////
+
+@_moveOnly
+struct EmptyStruct {
+  var bool: Bool { false }
+  func doSomething() {}
+  mutating func doSomething2() {}
+  consuming func doSomething3() {}
+}
+
+func borrow(_ x: borrowing EmptyStruct) {}
+func consume(_ x: consuming EmptyStruct) {}
+
+func testEmptyStruct() {
+  func testArg1(_ x: consuming EmptyStruct) {
+    borrow(x)
+  }
+
+  func testArg2(_ x: consuming EmptyStruct) {
+    consume(x)
+  }
+
+  func testArg2a(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    consume(x) // expected-note {{consuming use here}}
+    consume(x) // expected-note {{consuming use here}}
+  }
+
+  func testArg2b(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' used after consume}}
+    borrow(x)
+    consume(x) // expected-note {{consuming use here}}
+    borrow(x) // expected-note {{non-consuming use here}}
+  }
+
+  func testArg3(_ x: consuming EmptyStruct) {
+    let _ = x
+  }
+
+  func testArg3a(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    let _ = x // expected-note {{consuming use here}}
+    let _ = x // expected-note {{consuming use here}}
+  }
+
+  func testArg4(_ x: consuming EmptyStruct) {
+    _ = x
+  }
+
+  func testArg4a(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    _ = x // expected-note {{consuming use here}}
+    _ = x // expected-note {{consuming use here}}
+  }
+
+  func testArg4b(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    // expected-error @-2 {{'x' consumed more than once}}
+    _ = x // expected-note {{consuming use here}}
+    _ = x // expected-note {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    let _ = x // expected-note {{consuming use here}}
+  }
+
+  func testArg5(_ x: consuming EmptyStruct) {
+    let y = x
+    _ = y
+  }
+
+  func testArg6(_ x: consuming EmptyStruct) {
+    x.doSomething()
+  }
+
+  func testArg7(_ x: consuming EmptyStruct) {
+    x.doSomething3()
+  }
+
+  func testArg7a(_ x: consuming EmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    x.doSomething3() // expected-note {{consuming use here}}
+    x.doSomething3() // expected-note {{consuming use here}}
+  }
+}
+
+////////////////////////////////////
+// Struct Containing Empty Struct //
+////////////////////////////////////
+
+// Make sure that we handle a struct that recursively holds an empty struct
+// correctly.
+@_moveOnly
+struct StructContainingEmptyStruct {
+  var x: EmptyStruct
+}
+
+func borrow(_ x: consuming StructContainingEmptyStruct) {}
+func consume(_ x: consuming StructContainingEmptyStruct) {}
+
+func testStructContainingEmptyStruct() {
+  func testArg1(_ x: consuming StructContainingEmptyStruct) {
+    borrow(x)
+  }
+
+  func testArg2(_ x: consuming StructContainingEmptyStruct) {
+    consume(x)
+  }
+
+  func testArg3(_ x: consuming StructContainingEmptyStruct) {
+    let _ = x
+  }
+
+  func testArg4(_ x: consuming StructContainingEmptyStruct) {
+    _ = x
+  }
+
+  func testArg5(_ x: consuming StructContainingEmptyStruct) {
+    let y = x
+    _ = y
+  }
+
+  func testArg6(_ x: consuming StructContainingEmptyStruct) {
+    x.x.doSomething()
+  }
+
+  func testArg7(_ x: consuming StructContainingEmptyStruct) {
+    x.x.doSomething3()
+  }
+
+  func testArg7a(_ x: consuming StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+  }
+}
+
+////////////////////////////////////
+// Struct Containing Empty Struct //
+////////////////////////////////////
+
+// Make sure that we handle a struct that recursively holds an empty struct
+// correctly.
+@_moveOnly
+struct StructContainingTwoEmptyStruct {
+  var x: EmptyStruct
+  var y: EmptyStruct
+}
+
+func borrow(_ x: consuming StructContainingTwoEmptyStruct) {}
+func consume(_ x: consuming StructContainingTwoEmptyStruct) {}
+
+func testStructContainingTwoEmptyStruct() {
+  func testArg1(_ x: consuming StructContainingTwoEmptyStruct) {
+    borrow(x)
+  }
+
+  func testArg2(_ x: consuming StructContainingTwoEmptyStruct) {
+    consume(x)
+  }
+
+  func testArg3(_ x: consuming StructContainingTwoEmptyStruct) {
+    let _ = x
+  }
+
+  func testArg4(_ x: consuming StructContainingTwoEmptyStruct) {
+    _ = x
+  }
+
+  func testArg5(_ x: consuming StructContainingTwoEmptyStruct) {
+    let y = x
+    _ = y
+  }
+
+  func testArg6(_ x: consuming StructContainingTwoEmptyStruct) {
+    x.x.doSomething()
+  }
+
+  func testArg7(_ x: consuming StructContainingTwoEmptyStruct) {
+    x.x.doSomething3()
+  }
+
+  func testArg8(_ x: consuming StructContainingTwoEmptyStruct) {
+    x.y.doSomething3()
+  }
+
+  func testArg9(_ x: consuming StructContainingTwoEmptyStruct) {
+    x.x.doSomething3()
+    x.y.doSomething3()
+  }
+
+  func testArg10(_ x: consuming StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+    x.y.doSomething3()
+    x.x.doSomething3() // expected-note {{consuming use here}}
+  }
+}
+
+//////////////////////////////////
+// Enum Containing Empty Struct //
+//////////////////////////////////
+
+@_moveOnly
+enum MyEnum2 {
+case first(EmptyStruct)
+case second(String)
+}
+
+@_moveOnly
+enum MyEnum {
+case first(EmptyStruct)
+case second(String)
+case third(MyEnum2)
+}
+
+func borrow(_ x: borrowing MyEnum) {}
+
+func testMyEnum() {
+  func test1(_ x: consuming MyEnum) {
+    if case let .first(y) = x {
+      _ = y
+    }
+  }
+
+  func test1a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    if case let .first(y) = x { // expected-note {{consuming use here}}
+      _ = consume x // expected-note {{consuming use here}}
+      _ = y
+    }
+  }
+
+  func test1b(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    if case let .first(y) = x { // expected-note {{consuming use here}}
+      _ = y
+    }
+    _ = consume x // expected-note {{consuming use here}}
+  }
+
+  func test2(_ x: consuming MyEnum) {
+    if case let .third(.first(y)) = x {
+      _ = y
+    }
+  }
+
+  func test2a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    if case let .third(.first(y)) = x { // expected-note {{consuming use here}}
+      _ = consume x // expected-note {{consuming use here}}
+      _ = y
+    }
+  }
+
+  func test2b(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    if case let .third(.first(y)) = x { // expected-note {{consuming use here}}
+      _ = y
+    }
+    _ = consume x // expected-note {{consuming use here}}
+  }
+
+  func test2c(_ x: consuming MyEnum) { // expected-error {{'x' used after consume}}
+    if case let .third(.first(y)) = x { // expected-note {{consuming use here}}
+      _ = y
+    }
+    borrow(x) // expected-note {{non-consuming use here}}
+  }
+
+  func test3(_ x: consuming MyEnum) {
+    switch x {
+    case let .first(y):
+      _ = y
+      break
+    default:
+      break
+    }
+  }
+
+  func test3a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    switch x { // expected-note {{consuming use here}}
+    case let .first(y):
+      _ = y
+      break
+    default:
+      break
+    }
+    _ = consume x // expected-note {{consuming use here}}
+  }
+
+  func test4(_ x: consuming MyEnum) {
+    switch x {
+    case let .third(.first(y)):
+      _ = y
+      break
+    default:
+      break
+    }
+  }
+
+  func test4a(_ x: consuming MyEnum) { // expected-error {{'x' consumed more than once}}
+    switch x { // expected-note {{consuming use here}}
+    case let .third(.first(y)):
+      _ = y
+      break
+    default:
+      break
+    }
+    _ = consume x // expected-note {{consuming use here}}
+  }
+}
