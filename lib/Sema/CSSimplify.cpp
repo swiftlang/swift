@@ -6533,6 +6533,9 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
+  auto origType1 = type1;
+  auto origType2 = type2;
+
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal);
@@ -6796,11 +6799,32 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
-  // If either side is a tuple that has unresolved pack expansions,
-  // delay matching until more is inferred about type structure.
-  if (isTupleWithUnresolvedPackExpansion(desugar1) ||
-      isTupleWithUnresolvedPackExpansion(desugar2))
-    return formUnsolvedResult();
+  // If the original type on one side consisted of a tuple type with
+  // unresolved pack expansion(s), let's make sure that both sides are
+  // tuples to enable proper pack matching for situations like:
+  //
+  // `Int <conversion> (_: $T3)`
+  // where `$T3` is pack expansion of pattern type `$T2`
+  //
+  // `Int` should be wrapped in a one-element tuple to make sure
+  // that tuple matcher can form a pack expansion type that would
+  // match `$T3` and propagate `Pack{Int}` to `$T2`.
+  //
+  // This is also important for situations like: `$T2 conv (Int, $T_exp)`
+  // becuase expansion could be defaulted to an empty pack which means
+  // that under substitution that element would disappear and the type
+  // would be just `(Int)`.
+  if (isTupleWithUnresolvedPackExpansion(origType1) ||
+      isTupleWithUnresolvedPackExpansion(origType2)) {
+    if (desugar1->is<TupleType>() != desugar2->is<TupleType>()) {
+      return matchTypes(
+          desugar1->is<TupleType>() ? type1
+                                    : TupleType::get({type1}, getASTContext()),
+          desugar2->is<TupleType>() ? type2
+                                    : TupleType::get({type2}, getASTContext()),
+          kind, flags, locator);
+    }
+  }
 
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
 
