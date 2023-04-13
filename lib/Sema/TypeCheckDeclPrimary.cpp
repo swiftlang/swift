@@ -1921,7 +1921,8 @@ public:
     (void)ID->getDecls();
 
     auto target = ID->getModule();
-    if (!getASTContext().LangOpts.PackageName.empty() &&
+    if (target && // module would be nil if loading fails
+        !getASTContext().LangOpts.PackageName.empty() &&
         getASTContext().LangOpts.PackageName == target->getPackageName().str() &&
         !target->isNonSwiftModule() && // target is a Swift module
         target->isNonUserModule()) { // target module is in distributed SDK
