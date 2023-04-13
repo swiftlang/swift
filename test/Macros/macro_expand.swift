@@ -67,7 +67,7 @@ struct Bad {}
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ImageLiteralType'
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_FileReferenceLiteralType'
 
-// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
 // CHECK-DIAGS: precedencegroup MyPrecedence {}
 // CHECK-DIAGS: @attached(member) macro myMacro()
@@ -274,6 +274,10 @@ _ = StructWithUnqualifiedLookup().foo()
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
   struct Foo {
+    static let singleton = Foo()
+
+    static let s2 = Foo.singleton
+
     #bitwidthNumberedStructs("MyIntOne")
   }
 
@@ -333,9 +337,10 @@ func testFreestandingMacroExpansion() {
 testFreestandingMacroExpansion()
 
 // Explicit structs to force macros to be parsed as decl.
+var globalBool = true
 struct ContainerOfNumberedStructs {
   #bitwidthNumberedStructs("MyIntOne")
-  #bitwidthNumberedStructs("MyIntTwo")
+  #bitwidthNumberedStructs("MyIntTwo", blah: globalBool)
 }
 
 // Avoid re-type-checking declaration macro arguments.

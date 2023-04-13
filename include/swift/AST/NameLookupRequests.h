@@ -430,7 +430,7 @@ class UnqualifiedLookupRequest
                            RequestFlags::Uncached |
                                RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  UnqualifiedLookupRequest(UnqualifiedLookupDescriptor);
 
 private:
   friend SimpleRequest;
@@ -456,7 +456,10 @@ class LookupInModuleRequest
                                 NLOptions),
           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  LookupInModuleRequest(
+      const DeclContext *, DeclName, NLKind,
+      namelookup::ResolutionKind, const DeclContext *,
+      NLOptions);
 
 private:
   friend SimpleRequest;
@@ -504,7 +507,9 @@ class ModuleQualifiedLookupRequest
                            RequestFlags::Uncached |
                               RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  ModuleQualifiedLookupRequest(const DeclContext *,
+                               ModuleDecl *, DeclNameRef,
+                               NLOptions);
 
 private:
   friend SimpleRequest;
@@ -528,7 +533,9 @@ class QualifiedLookupRequest
                                                  DeclNameRef, NLOptions),
                            RequestFlags::Uncached> {
 public:
-  using SimpleRequest::SimpleRequest;
+  QualifiedLookupRequest(const DeclContext *,
+                         SmallVector<NominalTypeDecl *, 4>,
+                         DeclNameRef, NLOptions);
 
 private:
   friend SimpleRequest;
@@ -579,7 +586,7 @@ class DirectLookupRequest
                            TinyPtrVector<ValueDecl *>(DirectLookupDescriptor),
                            RequestFlags::Uncached|RequestFlags::DependencySink> {
 public:
-  using SimpleRequest::SimpleRequest;
+  DirectLookupRequest(DirectLookupDescriptor);
 
 private:
   friend SimpleRequest;

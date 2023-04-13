@@ -17,6 +17,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/TypeCheckRequests.h" // for ResolveMacroRequest
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
@@ -61,12 +62,23 @@ Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
 
 bool Evaluator::checkDependency(const ActiveRequest &request) {
   // Record this as an active request.
-  if (activeRequests.insert(request))
+  if (activeRequests.insert(request)) {
+    if (request.getAs<ResolveMacroRequest>())
+      ++numActiveResolveMacroRequests;
     return false;
+  }
 
   // Diagnose cycle.
   diagnoseCycle(request);
   return true;
+}
+
+void Evaluator::finishedRequest(const ActiveRequest &request) {
+  if (request.getAs<ResolveMacroRequest>())
+    --numActiveResolveMacroRequests;
+
+  assert(activeRequests.back() == request);
+  activeRequests.pop_back();
 }
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
