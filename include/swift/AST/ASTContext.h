@@ -160,7 +160,7 @@ namespace ide {
 /// While the names of Foundation types aren't likely to change in
 /// Objective-C, their mapping into Swift can. Therefore, when
 /// referring to names of Foundation entities in Swift, use this enum
-/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+/// and \c swift::getSwiftName or \c ASTContext::getSwiftId.
 enum class KnownFoundationEntity {
 #define FOUNDATION_ENTITY(Name) Name,
 #include "swift/AST/KnownFoundationEntities.def"
@@ -169,6 +169,10 @@ enum class KnownFoundationEntity {
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Retrieve the Swift name for the given Foundation entity, where
+/// "NS" prefix stripping will apply under omit-needless-words.
+StringRef getSwiftName(KnownFoundationEntity kind);
 
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
@@ -1344,14 +1348,10 @@ public:
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
-  /// Retrieve the Swift name for the given Foundation entity, where
-  /// "NS" prefix stripping will apply under omit-needless-words.
-  StringRef getSwiftName(KnownFoundationEntity kind);
-
   /// Retrieve the Swift identifier for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
   Identifier getSwiftId(KnownFoundationEntity kind) {
-    return getIdentifier(getSwiftName(kind));
+    return getIdentifier(swift::getSwiftName(kind));
   }
 
   /// Populate \p names with visible top level module names.

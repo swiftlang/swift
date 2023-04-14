@@ -3046,7 +3046,7 @@ Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
     .Default(None);
 }
 
-StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
+StringRef swift::getSwiftName(KnownFoundationEntity kind) {
   StringRef objcName;
   switch (kind) {
 #define FOUNDATION_ENTITY(Name) case KnownFoundationEntity::Name:  \
