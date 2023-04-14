@@ -23,7 +23,7 @@ final class NaiveQueueExecutor: SerialExecutor, CustomStringConvertible {
     self.queue = queue
   }
 
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     let unowned = UnownedJob(job)
     queue.sync {
       unowned.runSynchronously(on: self.asUnownedSerialExecutor())
