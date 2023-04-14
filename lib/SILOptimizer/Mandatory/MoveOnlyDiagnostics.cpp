@@ -774,4 +774,6 @@ void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
   }
   diagnose(astContext, consumingUser,
            diag::sil_moveonlychecker_consuming_use_here);
+  astContext.Diags.diagnose(deinitedNominal->getValueTypeDestructor(),
+                            diag::sil_moveonlychecker_deinit_here);
 }
