@@ -188,8 +188,6 @@ static CanType getSingletonPackExpansionParameter(CanPackType packType,
       return expansion.getPatternType();
     }
   }
-
-  return CanType();
 }
 
 bool FulfillmentMap::searchTypeMetadataPack(IRGenModule &IGM,

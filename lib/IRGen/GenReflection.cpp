@@ -490,8 +490,10 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
+            auto origSig = genericEnv->getGenericSignature();
             conformance = conformance.subst(origType,
-                genericEnv->getForwardingSubstitutionMap());
+              QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(origSig.getPointer()));
           }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
           IGF.Builder.CreateRet(ret);
