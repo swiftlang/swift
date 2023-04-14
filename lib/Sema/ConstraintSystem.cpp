@@ -837,7 +837,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
 
   return result.transform([&](Type type) {
     if (auto *expansion = dyn_cast<PackExpansionType>(type.getPointer()))
-      return openPackExpansionType(expansion, replacements);
+      return openPackExpansionType(expansion, replacements, locator);
     return type;
   });
 }
@@ -963,7 +963,8 @@ Type ConstraintSystem::replaceInferableTypesWithTypeVars(
   return type;
 }
 
-Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
+Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
+                                ConstraintLocatorBuilder locator) {
   assert(!type->hasUnboundGenericType());
 
   if (!type->hasTypeParameter())
@@ -980,14 +981,15 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
           if (!elt.hasName() && elt.getType()->is<PackExpansionType>()) {
             return TupleType::get(
                 {openPackExpansionType(
-                    elt.getType()->castTo<PackExpansionType>(), replacements)},
+                    elt.getType()->castTo<PackExpansionType>(), replacements,
+                    locator)},
                 tuple->getASTContext());
           }
         }
       }
 
       if (auto *expansion = type->getAs<PackExpansionType>()) {
-        return openPackExpansionType(expansion, replacements);
+        return openPackExpansionType(expansion, replacements, locator);
       }
 
       // Replace a generic type parameter with its corresponding type variable.
@@ -1007,9 +1009,11 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
 }
 
 Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
-                                             OpenedTypeMap &replacements) {
-  auto patternType = openType(expansion->getPatternType(), replacements);
-  auto shapeType = openType(expansion->getCountType(), replacements);
+                                             OpenedTypeMap &replacements,
+                                             ConstraintLocatorBuilder locator) {
+  auto patternType =
+      openType(expansion->getPatternType(), replacements, locator);
+  auto shapeType = openType(expansion->getCountType(), replacements, locator);
 
   auto openedPackExpansion = PackExpansionType::get(patternType, shapeType);
 
@@ -1017,18 +1021,17 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   if (known != OpenedPackExpansionTypes.end())
     return known->second;
 
-  auto *expansionVar = createTypeVariable(
-      getConstraintLocator(
-          {}, LocatorPathElt::PackExpansionType(openedPackExpansion)),
-      TVO_PackExpansion);
+  auto *expansionLoc = getConstraintLocator(locator.withPathElement(
+      LocatorPathElt::PackExpansionType(openedPackExpansion)));
+
+  auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion);
 
   // This constraint is important to make sure that pack expansion always
   // has a binding and connect pack expansion var to any type variables
   // that appear in pattern and shape types.
-  addUnsolvedConstraint(Constraint::create(
-      *this, ConstraintKind::Defaultable, expansionVar, openedPackExpansion,
-      getConstraintLocator(
-          {}, LocatorPathElt::PackExpansionType(openedPackExpansion))));
+  addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::Defaultable,
+                                           expansionVar, openedPackExpansion,
+                                           expansionLoc));
 
   OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
   return expansionVar;
@@ -1066,7 +1069,7 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
 
   recordOpenedTypes(opaqueLocatorKey, replacements);
 
-  return openType(opaque->getInterfaceType(), replacements);
+  return openType(opaque->getInterfaceType(), replacements, locator);
 }
 
 Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
@@ -1113,12 +1116,14 @@ FunctionType *ConstraintSystem::openFunctionType(
 
     openGenericParameters(outerDC, signature, replacements, locator);
 
-    openGenericRequirements(
-        outerDC, signature, /*skipProtocolSelfConstraint=*/false, locator,
-        [&](Type type) -> Type { return openType(type, replacements); });
+    openGenericRequirements(outerDC, signature,
+                            /*skipProtocolSelfConstraint=*/false, locator,
+                            [&](Type type) -> Type {
+                              return openType(type, replacements, locator);
+                            });
 
     funcType = genericFn->substGenericArgs(
-        [&](Type type) { return openType(type, replacements); });
+        [&](Type type) { return openType(type, replacements, locator); });
   }
 
   return funcType->castTo<FunctionType>();
@@ -1558,8 +1563,8 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue,
-    OpenedTypeMap &replacements) {
+    unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
+    ConstraintLocatorBuilder locator) {
   return swift::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue,
       GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
@@ -1567,7 +1572,7 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         if (replacements.empty())
           return type;
 
-        return openType(type, replacements);
+        return openType(type, replacements, locator);
       });
 }
 
@@ -1642,7 +1647,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
       openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
-          origOpenedType, func, useDC, numApplies, false, replacements));
+          origOpenedType, func, useDC, numApplies, false, replacements,
+          locator));
     }
 
     // The reference implicitly binds 'self'.
@@ -1668,8 +1674,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       unsigned numApplies = getNumApplications(
           funcDecl, false, functionRefKind);
       openedType = cast<FunctionType>(adjustFunctionTypeForConcurrency(
-          origOpenedType->castTo<FunctionType>(), funcDecl, useDC,
-          numApplies, false, replacements));
+          origOpenedType->castTo<FunctionType>(), funcDecl, useDC, numApplies,
+          false, replacements, locator));
     }
 
     if (isForCodeCompletion() && openedType->hasError()) {
@@ -1834,7 +1840,7 @@ void ConstraintSystem::openGeneric(
   // Add the requirements as constraints.
   openGenericRequirements(
       outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
-      [&](Type type) { return openType(type, replacements); });
+      [&](Type type) { return openType(type, replacements, locator); });
 }
 
 void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
@@ -2431,9 +2437,8 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
     if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
-      openedType = genericFn->substGenericArgs([&](Type type) {
-        return openType(type, replacements);
-      });
+      openedType = genericFn->substGenericArgs(
+          [&](Type type) { return openType(type, replacements, locator); });
     }
   } else {
     // For a property, build a type (Self) -> PropType.
@@ -2477,8 +2482,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // If the storage is generic, open the self and ref types.
     if (genericSig) {
-      selfTy = openType(selfTy, replacements);
-      refType = openType(refType, replacements);
+      selfTy = openType(selfTy, replacements, locator);
+      refType = openType(refType, replacements, locator);
     }
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
@@ -2506,7 +2511,7 @@ ConstraintSystem::getTypeOfMemberReference(
               getConcreteReplacementForProtocolSelfType(value)) {
         // Concrete type replacing `Self` could be generic, so we need
         // to make sure that it's opened before use.
-        baseOpenedTy = openType(concreteSelf, replacements);
+        baseOpenedTy = openType(concreteSelf, replacements, locator);
         baseObjTy = baseOpenedTy;
       }
     }
@@ -2544,7 +2549,7 @@ ConstraintSystem::getTypeOfMemberReference(
     openGenericRequirements(
         outerDC, genericSig,
         /*skipProtocolSelfConstraint=*/true, locator,
-        [&](Type type) { return openType(type, replacements); });
+        [&](Type type) { return openType(type, replacements, locator); });
   }
 
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -2569,11 +2574,11 @@ ConstraintSystem::getTypeOfMemberReference(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<AnyFunctionType>(), value, useDC, numApplies,
-        isMainDispatchQueueMember(locator), replacements);
+        isMainDispatchQueueMember(locator), replacements, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
-        /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements);
+        /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
     // Adjust the function's result type, since that's the Var's actual type.
     auto origFnType = origOpenedType->castTo<AnyFunctionType>();
@@ -2700,9 +2705,9 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       type = adjustFunctionTypeForConcurrency(
-          FunctionType::get(indices, elementTy, info),
-          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
-          emptyReplacements);
+          FunctionType::get(indices, elementTy, info), subscript, useDC,
+          /*numApplies=*/1, /*isMainDispatchQueue=*/false, emptyReplacements,
+          locator);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC)) {
@@ -2748,10 +2753,9 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           decl, hasAppliedSelf, overload.getFunctionRefKind());
 
       type = adjustFunctionTypeForConcurrency(
-          type->castTo<FunctionType>(),
-          decl, useDC, numApplies, /*isMainDispatchQueue=*/false,
-          emptyReplacements)
-        ->getResult();
+                 type->castTo<FunctionType>(), decl, useDC, numApplies,
+                 /*isMainDispatchQueue=*/false, emptyReplacements, locator)
+                 ->getResult();
     }
   }
 

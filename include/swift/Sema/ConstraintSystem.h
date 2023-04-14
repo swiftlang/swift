@@ -3978,7 +3978,8 @@ public:
   ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, OpenedTypeMap &replacements);
+  Type openType(Type type, OpenedTypeMap &replacements,
+                ConstraintLocatorBuilder locator);
 
 private:
   /// "Open" an opaque archetype type, similar to \c openType.
@@ -3989,7 +3990,8 @@ private:
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
-                             OpenedTypeMap &replacements);
+                             OpenedTypeMap &replacements,
+                             ConstraintLocatorBuilder locator);
 
 public:
   /// Recurse over the given type and open any opaque archetype types.
@@ -4061,9 +4063,9 @@ public:
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.
   AnyFunctionType *adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue,
-    OpenedTypeMap &replacements);
+      AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+      unsigned numApplies, bool isMainDispatchQueue,
+      OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
