@@ -3271,6 +3271,10 @@ static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
 
+static bool usesFeatureMoveOnlyTuples(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNoImplicitCopy(Decl *decl) {
   return decl->isNoImplicitCopy();
 }
