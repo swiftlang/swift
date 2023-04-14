@@ -11,6 +11,6 @@ let x = BOOM
 
 // Use variadic generics
 func debugPrint<each T>(_ items: repeat each T)
-  where each T: CustomDebugStringConvertible
+  where repeat each T: CustomDebugStringConvertible
 {
 }

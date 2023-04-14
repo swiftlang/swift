@@ -264,7 +264,8 @@ func patternInstantiationConcreteInvalid() {
   let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
 }
 
-func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repeat each U) where (repeat (each T, each U)): Any, each T: Hashable {
+func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repeat each U)
+    where (repeat (each T, each U)): Any, repeat each T: Hashable {
   let _: (repeat Array<each T>) = patternInstantiationTupleTest1()
   let _: (repeat Array<each T>, Array<String>) = patternInstantiationTupleTest1()
   let _: (Array<String>, repeat Array<each T>) = patternInstantiationTupleTest1()
@@ -286,7 +287,7 @@ func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repea
   let _: (Dictionary<Int, String>, repeat Dictionary<each T, each U>, Dictionary<Double, Character>) -> () = patternInstantiationFunctionTest2()
 }
 
-func patternInstantiationGenericInvalid<each T>(t: repeat each T) where each T: Hashable {
+func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 

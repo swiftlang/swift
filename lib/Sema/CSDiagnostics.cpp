@@ -6043,7 +6043,7 @@ bool InvalidPackElement::diagnoseAsError() {
 
 bool InvalidPackReference::diagnoseAsError() {
   emitDiagnostic(diag::pack_reference_outside_expansion,
-                 packType, /*inExpression*/true);
+                 packType);
   return true;
 }
 

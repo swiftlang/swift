@@ -1842,16 +1842,23 @@ void PrintAST::printRequirement(const Requirement &req) {
     Printer << ")) : Any";
     return;
   case RequirementKind::Layout:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     break;
   case RequirementKind::SameType:
+    if (req.getFirstType()->hasParameterPack() ||
+        req.getSecondType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " == ";
     break;

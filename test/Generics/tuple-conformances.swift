@@ -11,7 +11,7 @@ protocol P {
   func f()
 }
 
-extension Builtin.TheTupleType: P where each Elements: P {
+extension Builtin.TheTupleType: P where repeat each Elements: P {
   typealias A = (repeat each Elements.A)
   typealias B = Float
   func f() {}
