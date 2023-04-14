@@ -11,6 +11,8 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
+// REQUIRES: rdar108045677
+
 import Builtin
 import Swift
 import PrintShims
