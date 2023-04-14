@@ -36,6 +36,7 @@ import Public
 
 public struct InternalStruct: PublicProtocol {}
 
+@available(SwiftStdlib 5.1, *)
 public extension PublicProtocol {
   func opaque() -> some PublicProtocol {
     return InternalStruct()
@@ -46,6 +47,7 @@ public extension PublicProtocol {
 import Public
 @_implementationOnly import ProjectInternal
 
+@available(SwiftStdlib 5.1, *)
 public func foo(bar: some PublicProtocol) -> some PublicProtocol {
   return bar.opaque()
 }
