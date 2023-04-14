@@ -127,7 +127,7 @@ add_dependencies(sdk-overlay libstdcxx-modulemap)
 #
 # C++ Standard Library Overlay.
 #
-add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB
+add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     std.swift
     String.swift
 
