@@ -17,6 +17,11 @@
 // RUN:   -package-name MyPackage -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name MyPackage -I %t \
+// RUN:   -enable-deserialization-safety \
+// RUN:   -enable-experimental-feature AccessLevelOnImport
+
 /// A client outside of the package raises errors.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name NotMyPackage -I %t \
