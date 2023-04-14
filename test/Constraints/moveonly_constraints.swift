@@ -226,7 +226,7 @@ func checkStdlibTypes(_ mo: __shared MO) {
   let _: [MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
       []
   let _: [String: MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-      ["hello" : MO()]
+      ["hello" : MO()]  // expected-error{{tuples with noncopyable elements are not supported}}
 
   // i think this one's only caught b/c of the 'Any' change
   _ = [MO()] // expected-error {{move-only type 'MO' cannot be used with generics yet}}
