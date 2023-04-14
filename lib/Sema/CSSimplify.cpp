@@ -11031,7 +11031,7 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     auto substitutions = cs.getOpenedTypes(calleeLocator);
     if (!substitutions.empty()) {
       OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
-      builderType = cs.openType(builderType, replacements);
+      builderType = cs.openType(builderType, replacements, locator);
     }
     assert(!builderType->hasTypeParameter());
   }

@@ -658,7 +658,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       cs.openGenericRequirement(DC->getParent(), index, requirement,
                                 /*skipSelfProtocolConstraint=*/false, locator,
                                 [&](Type type) -> Type {
-                                  return cs.openType(type, genericParameters);
+                                  return cs.openType(type, genericParameters,
+                                                     locator);
                                 });
     };
 
