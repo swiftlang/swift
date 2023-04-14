@@ -1940,6 +1940,19 @@ void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
   CompletionContext->LookedupNominalTypeNames.push_back(qualifiedName);
 }
 
+Type CompletionLookup::normalizeTypeForDuplicationCheck(Type Ty) {
+  return Ty.transform([](Type T) {
+    if (auto opaque = T->getAs<OpaqueTypeArchetypeType>()) {
+      /// Opaque type has a _invisible_ substitution map. Since IDE can't
+      /// differentiate them, replace it with empty substitution map.
+      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                          opaque->getInterfaceType(),
+                                          /*Substitutions=*/{});
+    }
+    return T;
+  });
+}
+
 void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                                  DynamicLookupInfo dynamicLookupInfo) {
   assert(Reason !=
