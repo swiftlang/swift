@@ -1282,7 +1282,7 @@ else()
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
   # so ensure we build that when building tools.
-  if(SWIFT_INCLUDE_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS OR SWIFT_BUILD_STDLIB_CXX_MODULE)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 
