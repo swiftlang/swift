@@ -31,6 +31,7 @@ namespace ide {
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompileInstance {
+  const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
   const std::string &DiagnosticDocumentationPath;
   const std::shared_ptr<swift::PluginRegistry> Plugins;
@@ -67,10 +68,12 @@ class CompileInstance {
                    std::shared_ptr<std::atomic<bool>> CancellationFlag);
 
 public:
-  CompileInstance(const std::string &RuntimeResourcePath,
+  CompileInstance(const std::string &SwiftExecutablePath,
+                  const std::string &RuntimeResourcePath,
                   const std::string &DiagnosticDocumentationPath,
                   std::shared_ptr<swift::PluginRegistry> Plugins = nullptr)
-      : RuntimeResourcePath(RuntimeResourcePath),
+      : SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         Plugins(Plugins), CachedCIInvalidated(false), CachedReuseCount(0) {}
 
