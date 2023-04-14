@@ -588,6 +588,10 @@ public:
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    if (Ctx.getOpts().PublicSymbolsOnly &&
+        getDeclLinkage(NTD) != FormalLinkage::PublicUnique)
+      return;
+
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
     if (!NTD->getObjCImplementationDecl()) {
