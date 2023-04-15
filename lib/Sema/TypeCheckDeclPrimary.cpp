@@ -473,6 +473,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   for (auto gp : *genericParams) {
+    // Diagnose generic types with a parameter packs if VariadicGenerics
+    // is not enabled.
+    auto *decl = ownerCtx->getAsDecl();
+    auto &ctx = decl->getASTContext();
+    if (gp->isParameterPack() && isa<GenericTypeDecl>(decl) &&
+        !ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+      decl->diagnose(diag::experimental_type_with_parameter_pack);
+    }
+
     TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
