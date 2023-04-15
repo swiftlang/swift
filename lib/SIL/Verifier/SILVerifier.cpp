@@ -69,9 +69,15 @@ static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
 static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
                                              llvm::cl::init(false));
 
-static llvm::cl::opt<bool> VerifyDIHoles(
-                              "verify-di-holes",
-                              llvm::cl::init(true));
+// This verification is affects primarily debug info and end users don't derive
+// a benefit from seeing its results.
+static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
+#ifndef NDEBUG
+                                                                true
+#else
+                                                                false
+#endif
+                                                                ));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
