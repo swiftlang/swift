@@ -1755,8 +1755,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        paramInfo.isVariadicGenericParameter(paramIdx)) {
+    if (paramInfo.isVariadicGenericParameter(paramIdx)) {
       // If generic parameter comes from a variadic type declaration it's
       // possible that it got specialized early and is no longer represented
       // by a pack expansion type. For example, consider expression -

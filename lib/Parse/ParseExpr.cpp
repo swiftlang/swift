@@ -531,8 +531,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
   // 'repeat' as an expression prefix is a pack expansion expression.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-      Tok.is(tok::kw_repeat)) {
+  if (Tok.is(tok::kw_repeat)) {
     SourceLoc repeatLoc = consumeToken();
     auto patternExpr = parseExpr(Message);
     if (patternExpr.isNull())
@@ -3024,17 +3023,10 @@ ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
                     rightLoc);
 
   // A tuple with a single, unlabeled element is just parentheses.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-    if (elts.size() == 1 && !isa<PackExpansionExpr>(elts[0].E) &&
-        elts[0].LabelLoc.isInvalid()) {
-      return makeParserResult(
-          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
-    }
-  } else {
-    if (elts.size() == 1 && elts[0].Label.empty()) {
-      return makeParserResult(
-          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
-    }
+  if (elts.size() == 1 && !isa<PackExpansionExpr>(elts[0].E) &&
+      elts[0].Label.empty()) {
+    return makeParserResult(
+        status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
   }
 
   SmallVector<Expr *, 8> exprs;

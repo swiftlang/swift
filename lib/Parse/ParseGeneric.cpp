@@ -60,8 +60,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse the 'each' keyword for a type parameter pack 'each T'.
     SourceLoc EachLoc;
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        Tok.isContextualKeyword("each")) {
+    if (Tok.isContextualKeyword("each")) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
       EachLoc = consumeToken();
@@ -78,8 +77,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse and diagnose the unsupported ellipsis for a type parameter pack
     // 'T...'.
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        startsWithEllipsis(Tok)) {
+    if (startsWithEllipsis(Tok)) {
       const auto EllipsisLoc = consumeStartingEllipsis();
       // TODO: token length hardcoded because calculation for ellipsis
       // incorrectly includes '>' if one follows (as can occur in this parse).
