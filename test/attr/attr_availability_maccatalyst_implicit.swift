@@ -16,8 +16,8 @@ extension NSBaseClass {
   // expected-warning@+3 {{_modify accessor cannot be more available than enclosing scope}}
   // expected-note@+2 {{_modify accessor implicitly declared here with availability of Mac Catalyst 13.1 or newer}}
   // expected-note@+1 {{enclosing scope requires availability of Mac Catalyst 15.0 or newer}}
-  var property: Int {
-    get { 1 }
+  var property: NSBaseClass {
+    get { self }
     set {}
   }
 }
