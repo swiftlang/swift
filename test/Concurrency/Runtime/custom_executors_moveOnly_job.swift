@@ -10,7 +10,7 @@
 // REQUIRES: concurrency_runtime
 
 final class InlineExecutor: SerialExecutor, CustomStringConvertible {
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 
