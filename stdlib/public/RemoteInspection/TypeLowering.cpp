@@ -2602,7 +2602,7 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
   return TI;
 }
 
-const TypeInfo *TypeConverter::getClassInstanceTypeInfo(
+const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     const TypeRef *TR, unsigned start,
     remote::TypeInfoProvider *ExternalTypeInfo) {
   auto FD = getBuilder().getFieldTypeInfo(TR);
