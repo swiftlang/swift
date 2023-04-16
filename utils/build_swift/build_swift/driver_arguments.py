@@ -718,6 +718,10 @@ def create_argument_parser():
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree ' +
                 'match the ones that would be generated from current main')
+    option('--swiftsyntax-enable-test-fuzzing',
+           toggle_true('swiftsyntax_enable_test_fuzzing'),
+           help='set to modify test cases in SwiftParserTest to check for ' +
+                'round-trip failures and assertion failures')
     option('--swiftsyntax-enable-rawsyntax-validation',
            toggle_true('swiftsyntax_enable_rawsyntax_validation'),
            help='set to validate that RawSyntax layout nodes contain children of ' +
