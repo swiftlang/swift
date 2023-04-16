@@ -2981,7 +2981,16 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   // If there is more than 1 element, we will emit a warning or an error
   // elsewhere, so don't handle that case here.
-  return nominalTypes.empty() ? nullptr : nominalTypes[0];
+  if (nominalTypes.empty())
+    return nullptr;
+
+  // Diagnose experimental tuple extensions.
+  if (isa<BuiltinTupleDecl>(nominalTypes[0]) &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    ext->diagnose(diag::experimental_tuple_extension);
+  }
+
+  return nominalTypes[0];
 }
 
 /// Whether there are only associated types in the set of declarations.

@@ -114,6 +114,7 @@ EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(FreestandingMacros, true)
 EXPERIMENTAL_FEATURE(CodeItemMacros, true)
+EXPERIMENTAL_FEATURE(TupleConformances, false)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
