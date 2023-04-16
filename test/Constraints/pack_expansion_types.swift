@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift
 
 func returnTuple1<each T>() -> (repeat each T) { fatalError() }
 // expected-note@-1 3 {{in call to function 'returnTuple1()'}}
