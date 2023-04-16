@@ -1,5 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 func takesVariadicFunction<each T>(function: (repeat each T) -> Int) {}
 func takesVariadicOwnedFunction<each T>(function: (repeat __owned each T) -> Int) {}

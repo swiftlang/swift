@@ -5375,6 +5375,10 @@ ERROR(tuple_pack_element_label,none,
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
+
+ERROR(experimental_type_with_parameter_pack,none,
+      "generic types with parameter packs are experimental",
+      ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument list", (Type))
