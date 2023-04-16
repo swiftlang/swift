@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances -parse-stdlib
 
 // REQUIRES: asserts
 
