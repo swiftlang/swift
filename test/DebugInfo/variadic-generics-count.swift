@@ -1,9 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -g -o - \
-// RUN:    -enable-experimental-feature VariadicGenerics \
 // RUN:    -parse-as-library -module-name a | %FileCheck %s
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
 
 public func f1<each T>(ts: repeat each T) {
   // CHECK: define {{.*}} @"$s1a2f12tsyxxQp_tRvzlF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT1_1:.*]], %swift.type** {{.*}})
