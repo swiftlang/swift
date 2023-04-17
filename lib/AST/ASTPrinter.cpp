@@ -3208,6 +3208,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureTupleConformances(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {

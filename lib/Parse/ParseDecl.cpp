@@ -6459,8 +6459,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   }
 
   // Reject variadic associated types with a specific error.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-      Tok.isContextualKeyword("each")) {
+  if (Tok.isContextualKeyword("each")) {
     const auto EachLoc = consumeToken();
     diagnose(EachLoc, diag::associatedtype_cannot_be_variadic)
         .fixItRemoveChars(EachLoc, Tok.getLoc());
@@ -6484,8 +6483,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   }
 
   // Reject (early syntax) variadic associated types with a specific error.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-      startsWithEllipsis(Tok)) {
+  if (startsWithEllipsis(Tok)) {
     const auto EllipsisLoc = consumeStartingEllipsis();
     const auto EllipsisEnd = Lexer::getLocForEndOfToken(SourceMgr, EllipsisLoc);
     diagnose(EllipsisLoc, diag::associatedtype_cannot_be_variadic)

@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift
 
 func debugPrint<each T>(_ items: repeat each T)
   where repeat each T: CustomDebugStringConvertible

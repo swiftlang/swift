@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-feature VariadicGenerics -enable-sil-verify-all=true %s | %target-sil-opt -enable-experimental-feature VariadicGenerics -enable-sil-verify-all=true | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all=true %s | %target-sil-opt -enable-sil-verify-all=true | %FileCheck %s
 
 import Builtin
 import Swift
