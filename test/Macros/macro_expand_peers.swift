@@ -6,12 +6,12 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DTEST_DIAGNOSTICS
 
 // Check with the imported macro library vs. the local declaration of the macro.
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -DTEST_DIAGNOSTICS
 
 
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library %s -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
@@ -147,4 +147,12 @@ struct S2 {
   func g(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
+
+  #if TEST_DIAGNOSTICS
+  // expected-error@+1{{cannot find 'nonexistent' in scope}}
+  @addCompletionHandlerArbitrarily(nonexistent)
+  func h(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+  #endif
 }
