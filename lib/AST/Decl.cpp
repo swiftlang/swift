@@ -372,10 +372,12 @@ OrigDeclAttributes Decl::getOriginalAttrs() const {
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
-  auto mutableThis = const_cast<Decl *>(this);
-  (void)evaluateOrDefault(getASTContext().evaluator,
-                          ExpandMemberAttributeMacros{mutableThis},
-                          { });
+  if (!getASTContext().evaluator.hasActiveResolveMacroRequest()) {
+    auto mutableThis = const_cast<Decl *>(this);
+    (void)evaluateOrDefault(getASTContext().evaluator,
+                            ExpandMemberAttributeMacros{mutableThis},
+                            { });
+  }
 
   return getAttrs();
 }
