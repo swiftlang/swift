@@ -290,7 +290,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
     assert(directResults.size() ==
            F.getConventions().getNumExpandedDirectSILResults(
                getTypeExpansionContext()));
-    returnValue = buildReturnValue(*this, topLevel, directResults);
+    returnValue = buildReturnValue(*this, cleanupLoc, directResults);
   }
 
   return {returnValue, *returnLoc};

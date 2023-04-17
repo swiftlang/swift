@@ -1053,11 +1053,13 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
                                                  bool hasDynamicLifetime,
-                                                 bool isLexical) {
+                                                 bool isLexical,
+                                                 bool generateDebugInfo) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
-  if (auto *VD = loc.getAsASTNode<VarDecl>())
-    DbgVar = SILDebugVariable(VD->isLet(), 0);
+  if (generateDebugInfo)
+    if (auto *VD = loc.getAsASTNode<VarDecl>())
+      DbgVar = SILDebugVariable(VD->isLet(), 0);
   // Recognize "catch let errorvar" bindings.
   if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
@@ -1068,7 +1070,12 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
         loc = SILLocation(VD);
       }
   auto *alloc =
-      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical);
+      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical, false
+#ifndef NDEBUG
+                         ,
+                         !generateDebugInfo
+#endif
+      );
   enterDeallocStackCleanup(alloc);
   return alloc;
 }
@@ -2663,9 +2670,11 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
-  // CaptureListExprs evaluate their bound variables.
+  // CaptureListExprs evaluate their bound variables, but they don't introduce
+  // new ones that should be described in the debug info.
+  bool generateDebugInfo = false;
   for (auto capture : E->getCaptureList())
-    SGF.visit(capture.PBD);
+    SGF.visitPatternBindingDecl(capture.PBD, generateDebugInfo);
 
   // Then they evaluate to their body.
   return visit(E->getClosureBody(), C);
@@ -6163,11 +6172,6 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
 RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
                                               SGFContext C) {
   if (auto *rewritten = E->getRewritten()) {
-    Mangle::ASTMangler mangler;
-    auto name =
-        SGF.getASTContext().getIdentifier(mangler.mangleMacroExpansion(E));
-    MacroScope scope(SGF, CleanupLocation(rewritten), E, name.str(),
-                     E->getMacroRef().getDecl());
     return visit(rewritten, C);
   }
   else if (auto *MED = E->getSubstituteDecl()) {

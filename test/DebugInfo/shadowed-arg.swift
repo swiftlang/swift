@@ -13,8 +13,8 @@ public func f(i: Int) {
 
 // CHECK: ![[S1:[0-9]+]] = distinct !DISubprogram(name: "f",
 // CHECK: !DILocalVariable(name: "i", arg: 1, scope: ![[S1]],
-// CHECK: !DILocalVariable(name: "i", scope: ![[S2:[0-9]+]],
-// CHECK: ![[S2]] = distinct !DILexicalBlock(scope: ![[S1]],
+// CHECK: !DILocalVariable(name: "i", scope: ![[S3:[0-9]+]],
+// CHECK: ![[S3]] = distinct !DILexicalBlock(scope: ![[S1]],
 // SIL: sil_scope [[S1:[0-9]+]] { {{.*}} parent @$s4main1f1iySi_tF
 // SIL: sil_scope [[S2:[0-9]+]] { {{.*}} parent [[S1]] }
 // SIL: debug_value %0 : $Int, let, name "i", argno 1,{{.*}}, scope [[S1]]

@@ -58,8 +58,8 @@ struct Crash {
 // CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:27:3
 // CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:23:3
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:47:5
-// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:44:1
-// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash at {{.*}}/Crash.swift
+// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/<compiler-generated>
+// CHECK-NEXT: 7 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash at {{.*}}/Crash.swift
 
 // CHECK: Registers:
 
@@ -154,7 +154,7 @@ struct Crash {
 // OPTIMIZED-NEXT: 3 [inlined]          0x{{[0-9a-f]+}} level2() in CrashOpt at {{.*}}/Crash.swift:27:3
 // OPTIMIZED-NEXT: 4 [inlined]          0x{{[0-9a-f]+}} level1() in CrashOpt at {{.*}}/Crash.swift:23:3
 // OPTIMIZED-NEXT: 5 [inlined]          0x{{[0-9a-f]+}} static Crash.main() in CrashOpt at {{.*}}/Crash.swift:47:5
-// OPTIMIZED-NEXT: 6 [inlined] [system] 0x{{[0-9a-f]+}} static Crash.$main() in CrashOpt at {{.*}}/Crash.swift:44:1
+// OPTIMIZED-NEXT: 6 [inlined] [system] 0x{{[0-9a-f]+}} static Crash.$main() in CrashOpt at {{.*}}/<compiler-generated>
 // OPTIMIZED-NEXT: 7 [system]           0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOpt at {{.*}}/Crash.swift
 
 // OPTIMIZED: Registers:

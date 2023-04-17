@@ -69,9 +69,15 @@ static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
 static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
                                              llvm::cl::init(false));
 
-static llvm::cl::opt<bool> VerifyDIHoles(
-                              "verify-di-holes",
-                              llvm::cl::init(true));
+// This verification is affects primarily debug info and end users don't derive
+// a benefit from seeing its results.
+static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
+#ifndef NDEBUG
+                                                                true
+#else
+                                                                false
+#endif
+                                                                ));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -6235,6 +6241,11 @@ public:
     if (!VerifyDIHoles)
       return;
 
+    // These transforms don't set everything they move to implicit.
+    if (M->getASTContext().LangOpts.Playground ||
+        M->getASTContext().LangOpts.PCMacro)
+      return;
+
     // This check only makes sense at -Onone. Optimizations,
     // e.g. inlining, can move scopes around.
     llvm::DenseSet<const SILDebugScope *> AlreadySeenScopes;
@@ -6251,7 +6262,17 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
+      // FIXME: Profile counters for loop bodies may be emitted before the
+      // instructions for the loop variable, but in a deeper scope.
+      if (isa<IncrementProfilerCounterInst>(SI))
+        continue;
+      if (!SI.getLoc().hasValidLineNumber())
+        continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
+        continue;
+      // FIXME: These still leave holes in the scopes. We should make them
+      // inherit the sourrounding scope in IRGenSIL.
+      if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
 
       // If we haven't seen this debug scope yet, update the

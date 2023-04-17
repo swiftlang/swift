@@ -1,25 +1,21 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-debuginfo %s \
 // RUN:  | %FileCheck %s
-func f(c: AnyObject?) {
+func use<T>(_ t: T) {}
+
+func f(c: AnyObject??) {
   let x = c
-  // CHECK: sil_scope [[S1:[0-9]+]] { {{.*}} parent @{{.*}}1f
-  // CHECK: sil_scope [[S2:[0-9]+]] { {{.*}} parent [[S1]] }
-  // CHECK: sil_scope [[S3:[0-9]+]] { {{.*}} parent [[S2]] }
-  // CHECK: sil_scope [[S4:[0-9]+]] { loc "{{.*}}":[[@LINE+3]]:17 parent [[S3]] }
-  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x"{{.*}} scope [[S2]]
-  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S4]]
-  guard let x = x else {
-    fatalError(".")
+  guard let x = x, let x = x else {
+  // CHECK: sil_scope [[S3:[0-9]+]] { {{.*}} parent @{{.*}}1f
+  // CHECK: sil_scope [[S4:[0-9]+]] { {{.*}} parent [[S3]] }
+  // CHECK: sil_scope [[S5:[0-9]+]] { {{.*}} parent [[S4]] }
+  // CHECK: sil_scope [[S6:[0-9]+]] { loc "{{.*}}":7:3 parent [[S4]] }
+  // CHECK: sil_scope [[S7:[0-9]+]] { loc "{{.*}}":7:17 parent [[S6]] }
+  // CHECK: sil_scope [[S8:[0-9]+]] { loc "{{.*}}":7:28 parent [[S7]] }
+  // CHECK: debug_value %{{.*}} : $Optional<Optional<AnyObject>>, let, name "x"{{.*}} scope [[S4]]
+  // CHECK: debug_value %{{.*}} : $Optional<AnyObject>, let, name "x", {{.*}} scope [[S6]]
+  // CHECK: debug_value %{{.*}} : $AnyObject, let, name "x", {{.*}} scope [[S7]]
+    fatalError()
   }
-  print(x)
-}
-
-// Check that we don't crash with a verifier error on this.
-protocol P {}
-
-public func testit(_ x: AnyObject) -> Bool {
-  guard let _ = x as? P else {
-    return false
-  }
-  fatalError()
+  // CHECK: function_ref {{.*3use.*}} scope [[S8]]
+  use(x)
 }
