@@ -245,7 +245,8 @@ public:
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo) = 0;
+                               ModuleVersionInfo *versionInfo,
+                               bool isTestableImport = false) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -328,7 +329,8 @@ public:
   virtual Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName,
       ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) = 0;
+      InterfaceSubContextDelegate &delegate,
+      bool isTestableImport = false) = 0;
 };
 
 } // namespace swift

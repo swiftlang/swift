@@ -127,6 +127,8 @@ void ModuleDependencyInfo::addModuleImport(
     auto realPath = importDecl->getRealModulePath(scratch);
     addModuleImport(realPath, &alreadyAddedModules);
 
+    // Additionally, keep track of which dependencies of a Source
+    // module are `@Testable`.
     if (getKind() == swift::ModuleDependencyKind::SwiftSource &&
         importDecl->isTestable())
       addTestableImport(realPath);
@@ -140,9 +142,8 @@ void ModuleDependencyInfo::addModuleImport(
   case swift::ModuleDependencyKind::SwiftInterface: {
     // If the storage is for an interface file, the only source file we
     // should see is that interface file.
-    auto swiftInterfaceStorage =
-        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-    assert(fileName == swiftInterfaceStorage->swiftInterfaceFile);
+    assert(fileName ==
+           cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())->swiftInterfaceFile);
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {

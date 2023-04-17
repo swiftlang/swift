@@ -330,6 +330,8 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
   for (auto dependsOn : knownDependencies->getModuleImports()) {
     // Figure out what kind of module we need.
     bool onlyClangModule = !isSwift || moduleID.first == dependsOn;
+    bool isTestable = knownDependencies->isTestableImport(dependsOn);
+
     if (onlyClangModule) {
       if (auto found =
               ctx.getClangModuleDependencies(dependsOn, cache, ASTDelegate))
@@ -338,6 +340,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
       if (auto found =
               ctx.getModuleDependencies(dependsOn, cache, ASTDelegate,
                                         /* optionalDependencyLookup */ false,
+                                        isTestable,
                                         moduleID))
         result.insert({dependsOn, found.value()->getKind()});
     }
@@ -350,6 +353,7 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
     if (auto found =
             ctx.getModuleDependencies(optionallyDependsOn, cache, ASTDelegate,
                                       /* optionalDependencyLookup */ true,
+                                      /* isTestableDependency */ false,
                                       moduleID))
       result.insert({optionallyDependsOn, found.value()->getKind()});
   }

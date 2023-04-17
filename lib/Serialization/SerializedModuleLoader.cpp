@@ -474,7 +474,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework, bool IsTestableDependencyLookup) {
   if (LoadMode == ModuleLoadingMode::OnlyInterface ||
       Ctx.IgnoreAdjacentModules)
     return std::make_error_code(std::errc::not_supported);
@@ -577,7 +577,8 @@ bool SerializedModuleLoaderBase::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
+    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool &isFramework, bool &isSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -622,7 +623,8 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface, IsFramework);
+          moduleSourceInfoBuffer, skipBuildingInterface,
+          IsFramework, isTestableDependencyLookup);
       if (!result) {
         return SearchResult::Found;
       } else if (result == std::errc::not_supported) {
@@ -1229,7 +1231,8 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
-    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
+    ImportPath::Module path, ModuleVersionInfo *versionInfo,
+    bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -1245,7 +1248,8 @@ bool SerializedModuleLoaderBase::canImportModule(
       mID, /*moduleInterfacePath=*/nullptr, &moduleInterfaceSourcePath,
       &moduleInputBuffer,
       /*moduleDocBuffer=*/nullptr, /*moduleSourceInfoBuffer=*/nullptr,
-      /*skipBuildingInterface=*/true, isFramework, isSystemModule);
+      /*skipBuildingInterface=*/true, isTestableDependencyLookup,
+      isFramework, isSystemModule);
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
@@ -1278,7 +1282,8 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
+    ImportPath::Module path, ModuleVersionInfo *versionInfo,
+    bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -1318,7 +1323,9 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInterfaceSourcePath,
                   &moduleInputBuffer, &moduleDocInputBuffer,
                   &moduleSourceInfoInputBuffer,
-                  /*skipBuildingInterface=*/false, isFramework,
+                  /*skipBuildingInterface=*/false,
+                  /*isTestableDependencyLookup=*/false,
+                  isFramework,
                   isSystemModule)) {
     return nullptr;
   }
@@ -1443,7 +1450,8 @@ std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework,
+    bool isTestableDependencyLookup) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.

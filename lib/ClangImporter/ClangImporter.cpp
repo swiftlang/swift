@@ -1855,7 +1855,8 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    ModuleVersionInfo *versionInfo) {
+                                    ModuleVersionInfo *versionInfo,
+                                    bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
