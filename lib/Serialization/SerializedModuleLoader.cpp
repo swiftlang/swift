@@ -392,47 +392,35 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
   return std::error_code();
 }
 
-llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
-    Twine modulePath, bool isFramework) {
-  // Open the module file
-  auto &fs = *Ctx.SourceMgr.getFileSystem();
-  auto moduleBuf = fs.getBufferForFile(modulePath);
+llvm::ErrorOr<llvm::StringSet<>>
+SerializedModuleLoaderBase::getModuleImportsOfModule(
+    Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
+    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
+    StringRef packageName, llvm::vfs::FileSystem *fileSystem,
+    PathObfuscator &recoverer) {
+  auto moduleBuf = fileSystem->getBufferForFile(modulePath);
   if (!moduleBuf)
     return moduleBuf.getError();
 
+  llvm::StringSet<> importedModuleNames;
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
-      Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
+      isRequiredOSSAModules, SDKName, recoverer, loadedModuleFile);
 
-  const std::string moduleDocPath;
-  const std::string sourceInfoPath;
-  // Map the set of dependencies over to the "module dependencies".
-  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(modulePath.str(),
-                                                               moduleDocPath,
-                                                               sourceInfoPath,
-                                                               isFramework);
-  llvm::StringSet<> addedModuleNames;
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
     // FIXME: Record header dependency?
     if (dependency.isHeader())
       continue;
 
-    // Some transitive dependencies of binary modules are not required to be
-    // imported during normal builds.
-    // TODO: This is worth revisiting for debugger purposes where
-    //       loading the module is optional, and implementation-only imports
-    //       from modules with testing enabled where the dependency is
-    //       optional.
-    ModuleLoadingBehavior transitiveBehavior =
-      loadedModuleFile->getTransitiveLoadingBehavior(dependency,
-                                         /*debuggerMode*/false,
-                                         /*isPartialModule*/false,
-                                         /*package*/Ctx.LangOpts.PackageName,
-                                         loadedModuleFile->isTestable());
-    if (transitiveBehavior != ModuleLoadingBehavior::Required)
+    ModuleLoadingBehavior dependencyTransitiveBehavior =
+        loadedModuleFile->getTransitiveLoadingBehavior(
+            dependency,
+            /*debuggerMode*/ false,
+            /*isPartialModule*/ false, packageName,
+            loadedModuleFile->isTestable());
+    if (dependencyTransitiveBehavior != transitiveBehavior)
       continue;
 
     // Find the top-level module name.
@@ -442,8 +430,39 @@ llvm::ErrorOr<ModuleDependencyInfo> SerializedModuleLoaderBase::scanModuleFile(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    dependencies.addModuleImport(moduleName, &addedModuleNames);
+    importedModuleNames.insert(moduleName);
   }
+
+  return importedModuleNames;
+}
+
+llvm::ErrorOr<ModuleDependencyInfo>
+SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
+  const std::string moduleDocPath;
+  const std::string sourceInfoPath;
+  // Map the set of dependencies over to the "module dependencies".
+  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
+      modulePath.str(), moduleDocPath, sourceInfoPath, isFramework);
+  // Some transitive dependencies of binary modules are not required to be
+  // imported during normal builds.
+  // TODO: This is worth revisiting for debugger purposes where
+  //       loading the module is optional, and implementation-only imports
+  //       from modules with testing enabled where the dependency is
+  //       optional.
+  ModuleLoadingBehavior transitiveLoadingBehavior =
+      ModuleLoadingBehavior::Required;
+  auto importedModuleNames = getModuleImportsOfModule(
+      modulePath, transitiveLoadingBehavior, isFramework,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
+      Ctx.SourceMgr.getFileSystem().get(),
+      Ctx.SearchPathOpts.DeserializedPathRecoverer);
+  if (!importedModuleNames)
+    return importedModuleNames.getError();
+
+  llvm::StringSet<> addedModuleNames;
+  for (const auto &importedModuleName : *importedModuleNames)
+    dependencies.addModuleImport(importedModuleName.getKey(),
+                                 &addedModuleNames);
 
   return std::move(dependencies);
 }
