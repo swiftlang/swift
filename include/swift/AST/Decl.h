@@ -1422,6 +1422,10 @@ public:
     return getAttrs().hasAttribute<ExportedAttr>();
   }
 
+  bool isTestable() const {
+    return getAttrs().hasAttribute<TestableAttr>();
+  }
+
   ModuleDecl *getModule() const { return Mod; }
   void setModule(ModuleDecl *M) { Mod = M; }
 

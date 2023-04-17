@@ -211,10 +211,14 @@ public:
   /// Details common to Swift textual (interface or source) modules
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
+  /// Collection of module imports that were detected to be `@Testable`
+  llvm::StringSet<> testableImports;
+
   SwiftSourceModuleDependenciesStorage(
     ArrayRef<StringRef> extraPCMArgs
   ) : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource),
-      textualModuleDetails(extraPCMArgs) {}
+      textualModuleDetails(extraPCMArgs),
+      testableImports(llvm::StringSet<>()) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
     return new SwiftSourceModuleDependenciesStorage(*this);
@@ -222,6 +226,10 @@ public:
 
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftSource;
+  }
+
+  void addTestableImport(ImportPath::Module module) {
+    testableImports.insert(module.front().Item.str());
   }
 };
 
@@ -459,6 +467,13 @@ public:
   void setIsResolved(bool isResolved) {
     storage->resolved = isResolved;
   }
+
+  /// For a Source dependency, register a `Testable` import
+  void addTestableImport(ImportPath::Module module);
+
+  /// Whether or not a queried module name is a `@Testable` import dependency
+  /// of this module. Can only return `true` for Swift source modules.
+  bool isTestableImport(StringRef moduleName) const;
 
   /// Whether the dependencies are for a Swift module: either Textual, Source, Binary, or Placeholder.
   bool isSwiftModule() const;
