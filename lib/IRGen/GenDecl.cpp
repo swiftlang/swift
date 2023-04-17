@@ -5493,6 +5493,11 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     member->visitAuxiliaryDecls([&](Decl *decl) {
+      // FIXME: Conformance macros can generate extension decls. These
+      // are visited as top-level decls; skip them here.
+      if (isa<ExtensionDecl>(decl))
+        return;
+
       emitNestedTypeDecls({decl, nullptr});
     });
     switch (member->getKind()) {
