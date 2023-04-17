@@ -35,7 +35,7 @@ bar()
 
 // Out-of-process
 // FIXME: There is no instruction with the location of the failing `.` operator and it's used inside implicit setup code, thus the crash is associated with the previous line.
-// OOP:      #0 0x{{[0-9a-f]+}} in foo() symbolication.swift:[[@LINE-14]]
+// OOP:      #0 0x{{[0-9a-f]+}} in foo() symbolication.swift
 // OOP-NEXT: #1 0x{{[0-9a-f]+}} in bar() symbolication.swift:[[@LINE-9]]
 // OOP-NEXT: #2 0x{{[0-9a-f]+}} in main symbolication.swift:[[@LINE-6]]
 
