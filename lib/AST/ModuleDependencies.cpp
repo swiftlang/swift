@@ -85,6 +85,18 @@ ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
   return dyn_cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
 }
 
+void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
+  assert(getAsSwiftSourceModule() && "Expected source module for addTestableImport.");
+  dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())->addTestableImport(module);
+}
+
+bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
+  if (auto swiftSourceDepStorage = getAsSwiftSourceModule())
+    return swiftSourceDepStorage->testableImports.contains(moduleName);
+  else
+    return false;
+}
+
 void ModuleDependencyInfo::addModuleDependency(ModuleDependencyID dependencyID) {
   storage->resolvedModuleDependencies.push_back(dependencyID);
 }
@@ -114,6 +126,10 @@ void ModuleDependencyInfo::addModuleImport(
     ImportPath::Builder scratch;
     auto realPath = importDecl->getRealModulePath(scratch);
     addModuleImport(realPath, &alreadyAddedModules);
+
+    if (getKind() == swift::ModuleDependencyKind::SwiftSource &&
+        importDecl->isTestable())
+      addTestableImport(realPath);
   }
 
   auto fileName = sf.getFilename();
