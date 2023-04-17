@@ -455,6 +455,7 @@ class CompilerInstance {
   /// the file buffer provided by CAS needs to outlive the SourceMgr.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+  Optional<llvm::cas::ObjectRef> CompileJobBaseKey;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -543,6 +544,9 @@ public:
   }
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
+  }
+  Optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
+    return CompileJobBaseKey;
   }
 
   ASTContext &getASTContext() { return *Context; }
@@ -646,7 +650,8 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation, std::string &Error);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error,
+             ArrayRef<const char *> Args = {});
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -667,7 +672,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
-  bool setupCASIfNeeded();
+  bool setupCASIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
 
   /// \return false if successful, true on error.

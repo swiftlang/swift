@@ -26,6 +26,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -398,7 +399,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
-bool CompilerInstance::setupCASIfNeeded() {
+bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
   if (!Opts.EnableCAS)
     return false;
@@ -429,6 +430,13 @@ bool CompilerInstance::setupCASIfNeeded() {
     }
   }
 
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  if (!BaseKey) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         toString(BaseKey.takeError()));
+    return true;
+  }
+  CompileJobBaseKey = *BaseKey;
   return false;
 }
 
@@ -452,10 +460,10 @@ void CompilerInstance::setupOutputBackend() {
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
-                             std::string &Error) {
+                             std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
 
-  if (setupCASIfNeeded()) {
+  if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";
     return true;
   }

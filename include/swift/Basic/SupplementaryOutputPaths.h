@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 #define SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/IR/Function.h"
 
@@ -199,6 +200,48 @@ struct SupplementaryOutputPaths {
       fn(BitstreamOptRecordPath);
     if (!ModuleSemanticInfoOutputPath.empty())
       fn(ModuleSemanticInfoOutputPath);
+  }
+
+  void forEachSetOutputAndType(
+      llvm::function_ref<void(const std::string &, file_types::ID)> fn) const {
+    if (!ClangHeaderOutputPath.empty())
+      fn(ClangHeaderOutputPath, file_types::ID::TY_ClangHeader);
+    if (!ModuleOutputPath.empty())
+      fn(ModuleOutputPath, file_types::ID::TY_SwiftModuleFile);
+    if (!ModuleSourceInfoOutputPath.empty())
+      fn(ModuleSourceInfoOutputPath, file_types::ID::TY_SwiftSourceInfoFile);
+    if (!ModuleDocOutputPath.empty())
+      fn(ModuleDocOutputPath, file_types::ID::TY_SwiftModuleDocFile);
+    if (!DependenciesFilePath.empty())
+      fn(DependenciesFilePath, file_types::ID::TY_Dependencies);
+    if (!ReferenceDependenciesFilePath.empty())
+      fn(ReferenceDependenciesFilePath, file_types::ID::TY_SwiftDeps);
+    if (!SerializedDiagnosticsPath.empty())
+      fn(SerializedDiagnosticsPath, file_types::ID::TY_SerializedDiagnostics);
+    if (!FixItsOutputPath.empty())
+      fn(FixItsOutputPath, file_types::ID::TY_SwiftFixIt);
+    if (!LoadedModuleTracePath.empty())
+      fn(LoadedModuleTracePath, file_types::ID::TY_ModuleTrace);
+    if (!TBDPath.empty())
+      fn(TBDPath, file_types::ID::TY_TBD);
+    if (!ModuleInterfaceOutputPath.empty())
+      fn(ModuleInterfaceOutputPath,
+         file_types::ID::TY_SwiftModuleInterfaceFile);
+    if (!PrivateModuleInterfaceOutputPath.empty())
+      fn(PrivateModuleInterfaceOutputPath,
+         file_types::ID::TY_PrivateSwiftModuleInterfaceFile);
+    if (!ModuleSummaryOutputPath.empty())
+      fn(ModuleSummaryOutputPath, file_types::ID::TY_SwiftModuleSummaryFile);
+    if (!ABIDescriptorOutputPath.empty())
+      fn(ABIDescriptorOutputPath, file_types::ID::TY_SwiftABIDescriptor);
+    if (!ConstValuesOutputPath.empty())
+      fn(ConstValuesOutputPath, file_types::ID::TY_ConstValues);
+    if (!YAMLOptRecordPath.empty())
+      fn(YAMLOptRecordPath, file_types::ID::TY_YAMLOptRecord);
+    if (!BitstreamOptRecordPath.empty())
+      fn(BitstreamOptRecordPath, file_types::ID::TY_BitstreamOptRecord);
+    if (!ModuleSemanticInfoOutputPath.empty())
+      fn(ModuleSemanticInfoOutputPath, file_types::ID::TY_ModuleSemanticInfo);
   }
 
   bool empty() const {
