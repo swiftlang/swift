@@ -89,6 +89,12 @@ void ModuleDependencyInfo::addModuleDependency(ModuleDependencyID dependencyID) 
   storage->resolvedModuleDependencies.push_back(dependencyID);
 }
 
+void ModuleDependencyInfo::addOptionalModuleImport(
+    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
+    storage->optionalModuleImports.push_back(module.str());
+}
+
 void ModuleDependencyInfo::addModuleImport(
     StringRef module, llvm::StringSet<> *alreadyAddedModules) {
   if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)

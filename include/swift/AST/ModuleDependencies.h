@@ -109,6 +109,11 @@ public:
   /// The set of modules on which this module depends.
   std::vector<std::string> moduleImports;
 
+  /// The set of modules which constitute optional module
+  /// dependencies for this module, such as `@_implementationOnly`
+  /// or `internal` imports.
+  std::vector<std::string> optionalModuleImports;
+
   /// The set of modules on which this module depends, resolved
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
   std::vector<ModuleDependencyID> resolvedModuleDependencies;
@@ -425,6 +430,11 @@ public:
     return storage->moduleImports;
   }
 
+  /// Retrieve the module-level optional imports.
+  ArrayRef<std::string> getOptionalModuleImports() const {
+    return storage->optionalModuleImports;
+  }
+
   /// Retreive the module-level dependencies.
   const ArrayRef<ModuleDependencyID> getModuleDependencies() const {
     assert(storage->resolved);
@@ -487,6 +497,11 @@ public:
   /// Retrieve the dependencies for a placeholder dependency module stub.
   const SwiftPlaceholderModuleDependencyStorage *
     getAsPlaceholderDependencyModule() const;
+
+  /// Add a dependency on the given module, if it was not already in the set.
+  void addOptionalModuleImport(StringRef module,
+                               llvm::StringSet<> *alreadyAddedModules = nullptr);
+
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleImport(StringRef module,
