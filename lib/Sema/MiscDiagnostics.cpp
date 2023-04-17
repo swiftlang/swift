@@ -333,10 +333,16 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
-      // Diagnose tuple expressions with duplicate element label.
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        // Diagnose tuple expressions with duplicate element label.
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
+                                
+        // Diagnose attempts to form a tuple with any noncopyable elements.
+        if (E->getType()->isPureMoveOnly()
+            && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+          Ctx.Diags.diagnose(E->getLoc(), diag::tuple_move_only_not_supported);
+        }
       }
 
       // Specially diagnose some checked casts that are illegal.
