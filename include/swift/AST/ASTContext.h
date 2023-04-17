@@ -1021,6 +1021,7 @@ public:
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
       bool optionalDependencyLookup = false,
+      bool isTestableImport = false,
       llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.

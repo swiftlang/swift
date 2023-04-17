@@ -2010,6 +2010,7 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate,
     bool optionalDependencyLookup,
+    bool isTestableImport,
     llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
   // Check whether we've cached this result.
@@ -2031,7 +2032,8 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
 
   for (auto &loader : getImpl().ModuleLoaders) {
     if (auto dependencies =
-        loader->getModuleDependencies(moduleName, cache, delegate))
+        loader->getModuleDependencies(moduleName, cache, delegate,
+                                      isTestableImport))
       return dependencies;
   }
 
