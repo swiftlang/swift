@@ -20,6 +20,8 @@
 
 namespace swift {
 class ModuleFile;
+class PathObfuscator;
+enum class ModuleLoadingBehavior;
 namespace file_types {
   enum ID : uint8_t;
 }
@@ -145,6 +147,16 @@ protected:
 
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath, bool isFramework);
+
+  static llvm::ErrorOr<llvm::StringSet<>>
+  getModuleImportsOfModule(Twine modulePath,
+                           ModuleLoadingBehavior transitiveBehavior,
+                           bool isFramework,
+                           bool isRequiredOSSAModules,
+                           StringRef SDKName,
+                           StringRef packageName,
+                           llvm::vfs::FileSystem *fileSystem,
+                           PathObfuscator &recoverer);
 
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
