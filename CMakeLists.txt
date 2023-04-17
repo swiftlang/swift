@@ -1269,10 +1269,10 @@ else()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
-  endif()
 
-  if(SWIFT_BUILD_STDLIB_CXX_MODULE)
-    add_subdirectory(stdlib/public/Cxx)
+    if(SWIFT_BUILD_STDLIB_CXX_MODULE)
+      add_subdirectory(stdlib/public/Cxx)
+    endif()
   endif()
 
   if (BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
