@@ -186,25 +186,51 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
       Result->addModuleImport(import.module.getModulePath(), &alreadyAddedModules);
     }
 
-    // Check the adjacent binary module, if one is found,
-    // for additional "optional" dependencies.
+    // For a `@testable` direct dependency, read in the dependencies
+    // from an adjacent binary module, for completeness.
     if (isTestableImport) {
-      auto adjacentBinaryCandidate = std::find_if(
+      auto adjacentBinaryModule = std::find_if(
           compiledCandidates.begin(), compiledCandidates.end(),
           [moduleInterfacePath](const std::string &candidate) {
             return llvm::sys::path::parent_path(candidate) ==
                    llvm::sys::path::parent_path(moduleInterfacePath.str());
           });
-      if (adjacentBinaryCandidate != compiledCandidates.end()) {
-        auto adjacentBinaryCandidateModules = getModuleImportsOfModule(
-            *adjacentBinaryCandidate, ModuleLoadingBehavior::Optional,
-            isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      if (adjacentBinaryModule != compiledCandidates.end()) {
+        // Required modules.
+        auto adjacentBinaryModuleRequiredImports = getModuleImportsOfModule(
+            *adjacentBinaryModule, ModuleLoadingBehavior::Required, isFramework,
+            isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
             Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
             Ctx.SearchPathOpts.DeserializedPathRecoverer);
-        if (!adjacentBinaryCandidateModules)
-          return adjacentBinaryCandidateModules.getError();
-        for (const auto &t : *adjacentBinaryCandidateModules)
-          Result->addOptionalModuleImport(t.getKey(), &alreadyAddedModules);
+        if (!adjacentBinaryModuleRequiredImports)
+          return adjacentBinaryModuleRequiredImports.getError();
+
+#ifndef NDEBUG
+        //  Verify that the set of required modules read out from the binary
+        //  module is a super-set of module imports identified in the
+        //  textual interface.
+        for (const auto &requiredImport : Result->getModuleImports()) {
+          assert(adjacentBinaryModuleRequiredImports->contains(requiredImport) &&
+                 "Expected adjacent binary module's import set to contain all "
+                 "textual interface imports.");
+        }
+#endif
+
+        for (const auto &requiredImport : *adjacentBinaryModuleRequiredImports)
+          Result->addModuleImport(requiredImport.getKey(),
+                                  &alreadyAddedModules);
+
+        // Optional modules. Will be looked-up on a best-effort basis
+        auto adjacentBinaryModuleOptionalImports = getModuleImportsOfModule(
+            *adjacentBinaryModule, ModuleLoadingBehavior::Optional, isFramework,
+            isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+            Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
+            Ctx.SearchPathOpts.DeserializedPathRecoverer);
+        if (!adjacentBinaryModuleOptionalImports)
+          return adjacentBinaryModuleOptionalImports.getError();
+        for (const auto &optionalImport : *adjacentBinaryModuleOptionalImports)
+          Result->addOptionalModuleImport(optionalImport.getKey(),
+                                          &alreadyAddedModules);
       }
     }
 

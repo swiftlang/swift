@@ -420,7 +420,7 @@ SerializedModuleLoaderBase::getModuleImportsOfModule(
             /*debuggerMode*/ false,
             /*isPartialModule*/ false, packageName,
             loadedModuleFile->isTestable());
-    if (dependencyTransitiveBehavior != transitiveBehavior)
+    if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 
     // Find the top-level module name.
