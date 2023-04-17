@@ -667,6 +667,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
+      case SILInstructionKind::MarkMustCheckInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -5719,10 +5720,9 @@ public:
       auto substConformances = [&](CanType dependentType,
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
-        // FIXME: substitute back to the pack context to get the
-        // corresponding conformance pack, then project out the
-        // appropriate lane.
-        llvm_unreachable("unimplemented");
+        // FIXME: This violates the spirit of this verifier check.
+        return protocol->getParentModule()
+            ->lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,
@@ -5914,6 +5914,14 @@ public:
             "Operand value should be an object");
     require(mvi->getType() == mvi->getOperand()->getType(),
             "Result and operand must have the same type, today.");
+  }
+
+  void checkDropDeinitInst(DropDeinitInst *ddi) {
+    require(ddi->getType() == ddi->getOperand()->getType(),
+            "Result and operand must have the same type.");
+    require(ddi->getType().isMoveOnlyNominalType(),
+            "drop_deinit only allowed for move-only types");
+    require(F.hasOwnership(), "drop_deinit only allowed in OSSA");
   }
 
   void checkMarkMustCheckInst(MarkMustCheckInst *i) {
@@ -6256,6 +6264,12 @@ public:
     SILInstruction *LastSeenScopeInst = nullptr;
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
+        continue;
+      // FIXME: Profile counters for loop bodies may be emitted before the
+      // instructions for the loop variable, but in a deeper scope.
+      if (isa<IncrementProfilerCounterInst>(SI))
+        continue;
+      if (!SI.getLoc().hasValidLineNumber())
         continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;

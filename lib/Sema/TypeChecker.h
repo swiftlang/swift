@@ -160,6 +160,8 @@ enum class NameLookupFlags {
   IncludeOuterResults = 1 << 1,
   // Whether to include results that are marked @inlinable or @usableFromInline.
   IncludeUsableFromInline = 1 << 2,
+  /// This lookup should exclude any names introduced by macro expansions.
+  ExcludeMacroExpansions = 1 << 3,
 };
 
 /// A set of options that control name lookup.
@@ -459,7 +461,7 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// value if an error occurred while type checking the transformed body.
 Optional<BraceStmt *> applyResultBuilderBodyTransform(
     FuncDecl *func, Type builderType,
-    bool ClosuresInResultBuilderDontParticipateInInference = true);
+    bool ClosuresInResultBuilderDontParticipateInInference = false);
 
 /// Find the return statements within the body of the given function.
 std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);

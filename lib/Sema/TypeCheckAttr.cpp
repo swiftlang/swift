@@ -1896,7 +1896,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 
   // Skip the remaining diagnostics in swiftinterfaces.
-  auto *SF = D->getDeclContext()->getParentSourceFile();
+  auto *DC = D->getDeclContext();
+  auto *SF = DC->getParentSourceFile();
   if (SF && SF->Kind == SourceFileKind::Interface)
     return;
 
@@ -1905,6 +1906,16 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (!attr->isActivePlatform(Ctx) && !attr->isLanguageVersionSpecific() &&
       !attr->isPackageDescriptionVersionSpecific())
     return;
+
+  // Make sure there isn't a more specific attribute we should be using instead.
+  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
+  // an iOS attribute while building for macCatalyst.
+  if (attr->Platform == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
+    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+      return;
+    }
+  }
 
   SourceLoc attrLoc = attr->getLocation();
   auto versionAvailability = attr->getVersionAvailability(Ctx);
@@ -1916,7 +1927,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       return;
     }
 
-    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (VD->isProtocolRequirement() && !PD->isObjC()) {
           diagnoseAndRemoveAttr(attr,
@@ -1931,16 +1942,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // for specific platforms.
   if (!attr->hasPlatform() || !attr->Introduced.has_value())
     return;
-
-  // Make sure there isn't a more specific attribute we should be using instead.
-  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
-  // an iOS attribute while building for macCatalyst.
-  if (attr->Platform == PlatformKind::iOS &&
-      isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
-      return;
-    }
-  }
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
@@ -1958,13 +1959,17 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       EnclosingAnnotatedRange.emplace(
           AvailabilityInference::availableRange(enclosingAttr, Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
-        // Members of extensions of nominal types with available ranges were
-        // not diagnosed previously, so only emit a warning in that case.
-        bool inExtension = isa<ExtensionDecl>(
-            D->getDeclContext()->getTopmostDeclarationDeclContext());
-        auto limit = (enclosingDecl != parent && inExtension)
-                         ? DiagnosticBehavior::Warning
-                         : DiagnosticBehavior::Unspecified;
+        auto limit = DiagnosticBehavior::Unspecified;
+        if (D->isImplicit()) {
+          // Incorrect availability for an implicit declaration is likely a
+          // compiler bug so make the diagnostic a warning.
+          limit = DiagnosticBehavior::Warning;
+        } else if (enclosingDecl != parent) {
+          // Members of extensions of nominal types with available ranges were
+          // not diagnosed previously, so only emit a warning in that case.
+          if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
+            limit = DiagnosticBehavior::Warning;
+        }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : attr->getLocation(),
                  diag::availability_decl_more_than_enclosing,
@@ -2339,6 +2344,16 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
              applicationMainKind);
     attr->setInvalid();
   }
+
+  diagnose(attr->getLocation(),
+           diag::attr_ApplicationMain_deprecated,
+           applicationMainKind)
+    .warnUntilSwiftVersion(6);
+
+  diagnose(attr->getLocation(),
+           diag::attr_ApplicationMain_deprecated_use_attr_main)
+    .fixItReplace(attr->getRange(), "@main");
+
 
   if (attr->isInvalid())
     return;
@@ -2957,22 +2972,27 @@ void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
 
 void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
   if (auto *varDecl = dyn_cast<VarDecl>(D)) {
-    if (!varDecl->hasStorage()) {
-      diagnose(attr->getLocation(), diag::exclusivity_on_computed_property);
-      attr->setInvalid();
-      return;
+    auto *DC = D->getDeclContext();
+    auto *parentSF = DC->getParentSourceFile();
+
+    if (parentSF && parentSF->Kind != SourceFileKind::Interface) {
+      if (!varDecl->hasStorage()) {
+        diagnose(attr->getLocation(), diag::exclusivity_on_computed_property);
+        attr->setInvalid();
+        return;
+      }
     }
-  
-    if (isa<ClassDecl>(varDecl->getDeclContext()))
+
+    if (isa<ClassDecl>(DC))
       return;
-    
-    if (varDecl->getDeclContext()->isTypeContext() && !varDecl->isInstanceMember())
+
+    if (DC->isTypeContext() && !varDecl->isInstanceMember())
       return;
-    
-    if (varDecl->getDeclContext()->isModuleScopeContext())
+
+    if (DC->isModuleScopeContext())
       return;
   }
-  diagnose(attr->getLocation(), diag::exclusivity_on_wrong_decl);
+  diagnoseAndRemoveAttr(attr, diag::exclusivity_on_wrong_decl);
   attr->setInvalid();
 }
 

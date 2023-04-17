@@ -44,13 +44,15 @@ PluginRegistry::PluginRegistry() {
   dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
 }
 
-llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
+llvm::Expected<LoadedLibraryPlugin *>
+PluginRegistry::loadLibraryPlugin(StringRef path) {
   std::lock_guard<std::mutex> lock(mtx);
-  auto found = LoadedPluginLibraries.find(path);
-  if (found != LoadedPluginLibraries.end()) {
+  auto &storage = LoadedPluginLibraries[path];
+  if (storage) {
     // Already loaded.
-    return found->second;
+    return storage.get();
   }
+
   void *lib = nullptr;
 #if defined(_WIN32)
   lib = LoadLibraryA(path.str().c_str());
@@ -64,8 +66,19 @@ llvm::Expected<void *> PluginRegistry::loadLibraryPlugin(StringRef path) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(), dlerror());
   }
 #endif
-  LoadedPluginLibraries.insert({path, lib});
-  return lib;
+
+  storage = std::make_unique<LoadedLibraryPlugin>(lib);
+  return storage.get();
+}
+
+void *LoadedLibraryPlugin::getAddressOfSymbol(const char *symbolName) {
+  auto &cached = resolvedSymbols[symbolName];
+  if (cached)
+    return cached;
+#if !defined(_WIN32)
+  cached = dlsym(handle, symbolName);
+#endif
+  return cached;
 }
 
 llvm::Expected<LoadedExecutablePlugin *>
@@ -98,8 +111,8 @@ PluginRegistry::loadExecutablePlugin(StringRef path) {
                                    "not executable");
   }
 
-  auto plugin = std::unique_ptr<LoadedExecutablePlugin>(
-      new LoadedExecutablePlugin(path, stat.getLastModificationTime()));
+  auto plugin = std::make_unique<LoadedExecutablePlugin>(
+      path, stat.getLastModificationTime());
 
   plugin->setDumpMessaging(dumpMessaging);
 
@@ -140,9 +153,9 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
     return llvm::errorCodeToError(childInfo.getError());
   }
 
-  Process = std::unique_ptr<PluginProcess>(
-      new PluginProcess(childInfo->Pid, childInfo->ReadFileDescriptor,
-                        childInfo->WriteFileDescriptor));
+  Process = std::make_unique<PluginProcess>(childInfo->Pid,
+                                            childInfo->ReadFileDescriptor,
+                                            childInfo->WriteFileDescriptor);
 
   // Call "on reconnect" callbacks.
   for (auto *callback : onReconnect) {

@@ -67,7 +67,7 @@ struct Bad {}
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_ImageLiteralType'
 // CHECK-DIAGS: error: macro expansion cannot introduce default literal type '_FileReferenceLiteralType'
 
-// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3BadV7InvalidfMp_.swift
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
 // CHECK-DIAGS: import Swift
 // CHECK-DIAGS: precedencegroup MyPrecedence {}
 // CHECK-DIAGS: @attached(member) macro myMacro()
@@ -102,11 +102,19 @@ func testFileID(a: Int, b: Int) {
   // CHECK-SIL: sil_scope [[EXPANSION_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]:22 parent [[SRC_SCOPE]]
   // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "{{.*}}":[[@LINE-3]]:22 parent @$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_ {{.*}} inlined_at [[EXPANSION_SCOPE]] }
   // CHECK-SIL: string_literal utf8 "MacroUser/macro_expand.swift", loc "@__swiftmacro_9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_.swift":1:1, scope [[MACRO_SCOPE]]
-  // CHECK-IR: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
+  // CHECK-IR-DAG: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser10testFileID1a1bySi_SitF06customdE0fMf_"
 
   // CHECK: Builtin result is MacroUser/macro_expand.swift
   // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
   print("Builtin result is \(#fileID)")
+  print(
+    /// CHECK-IR-DAG: ![[L1:[0-9]+]] = !DILocation(line: [[@LINE+1]], column: 5
+    #addBlocker(
+      /// CHECK-IR-DAG: ![[L2:[0-9]+]] = !DILocation({{.*}}inlinedAt: ![[L1]])
+      /// CHECK-IR-DAG: ![[L3:[0-9]+]] = !DILocation({{.*}}inlinedAt: ![[L2]])
+      #stringify(a - b)
+      )
+    )
 }
 
 testFileID(a: 1, b: 2)
@@ -245,6 +253,9 @@ func testNestedDeclInExpr() {
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
+// Freestanding macros are not in inlined scopes.
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift":9:14 {{.*}} -> Int }
+
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
 #bitwidthNumberedStructs("MyIntGlobal")
@@ -274,6 +285,10 @@ _ = StructWithUnqualifiedLookup().foo()
 func testFreestandingMacroExpansion() {
   // Explicit structs to force macros to be parsed as decl.
   struct Foo {
+    static let singleton = Foo()
+
+    static let s2 = Foo.singleton
+
     #bitwidthNumberedStructs("MyIntOne")
   }
 
@@ -333,9 +348,10 @@ func testFreestandingMacroExpansion() {
 testFreestandingMacroExpansion()
 
 // Explicit structs to force macros to be parsed as decl.
+var globalBool = true
 struct ContainerOfNumberedStructs {
   #bitwidthNumberedStructs("MyIntOne")
-  #bitwidthNumberedStructs("MyIntTwo")
+  #bitwidthNumberedStructs("MyIntTwo", blah: globalBool)
 }
 
 // Avoid re-type-checking declaration macro arguments.

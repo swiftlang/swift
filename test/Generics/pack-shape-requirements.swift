@@ -12,9 +12,9 @@ func inferSameShape<each T, each U>(ts t: repeat each T, us u: repeat each U) wh
 }
 
 // CHECK-LABEL: desugarSameShape(ts:us:)
-// CHECK-NEXT: Generic signature: <each T, each U where T : P, (repeat (each T, each U)) : Any, U : P>
-func desugarSameShape<each T, each U>(ts t: repeat each T, us u: repeat each U) where each T: P, each U: P, (repeat (each T.A, each U.A)): Any {
-}
+// CHECK-NEXT: Generic signature: <each T, each U where repeat T : P, (repeat (each T, each U)) : Any, repeat U : P>
+func desugarSameShape<each T, each U>(ts t: repeat each T, us u: repeat each U)
+  where repeat each T: P, repeat each U: P, (repeat (each T.A, each U.A)): Any {}
 
 // CHECK-LABEL: multipleSameShape1(ts:us:vs:)
 // CHECK-NEXT: Generic signature: <each T, each U, each V where (repeat (each T, each U)) : Any, (repeat (each U, each V)) : Any>
@@ -49,14 +49,14 @@ func multipleSameShape6<each T, each U, each V>(ts t: repeat each T, us u: repea
 struct Ts<each T> {
   struct Us<each U> {
     // CHECK-LABEL: Ts.Us.packEquality()
-    // CHECK-NEXT: Generic signature: <each T, each U where T == U>
-    func packEquality() where each T == each U, (repeat (each T, each U)): Any {
+    // CHECK-NEXT: Generic signature: <each T, each U where repeat T == U>
+    func packEquality() where repeat each T == each U, (repeat (each T, each U)): Any {
     }
 
     struct Vs<each V> {
       // CHECK-LABEL: Ts.Us.Vs.packEquality()
-      // CHECK-NEXT: Generic signature: <each T, each U, each V where T == U, (repeat (each T, each V)) : Any>
-      func packEquality() where each T == each U, (repeat (each U, each V)): Any {
+      // CHECK-NEXT: Generic signature: <each T, each U, each V where repeat T == U, (repeat (each T, each V)) : Any>
+      func packEquality() where repeat each T == each U, (repeat (each U, each V)): Any {
       }
     }
   }

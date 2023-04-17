@@ -1065,5 +1065,26 @@ keyPath.test("ReferenceWritableKeyPath statically typed as WritableKeyPath") {
   expectEqual(outer[keyPath: upcastKeyPath], 46)
 }
 
+struct Dog {
+  var name: String
+  var age: Int
+}
+
+if #available(SwiftStdlib 5.9, *) {
+  keyPath.test("_createOffsetBasedKeyPath") {
+    let dogAgeKp = _createOffsetBasedKeyPath(
+      root: Dog.self,
+      value: Int.self,
+      offset: 16
+    ) as? KeyPath<Dog, Int>
+
+    expectNotNil(dogAgeKp)
+
+    let sparky = Dog(name: "Sparky", age: 7)
+
+    expectEqual(sparky[keyPath: dogAgeKp!], 7)
+  }
+}
+
 runAllTests()
 

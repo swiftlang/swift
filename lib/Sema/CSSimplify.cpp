@@ -1912,11 +1912,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       }
 
       auto argLabel = argument.getLabel();
-      if (paramInfo.hasExternalPropertyWrapper(argIdx) || argLabel.hasDollarPrefix()) {
-        auto *param = getParameterAt(callee, argIdx);
+      if (paramInfo.hasExternalPropertyWrapper(paramIdx) ||
+          argLabel.hasDollarPrefix()) {
+        auto *param = getParameterAt(callee, paramIdx);
         assert(param);
-        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
-                                               argLabel, subKind, loc).isFailure()) {
+        if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
+                                               const_cast<ParamDecl *>(param),
+                                               argLabel, subKind, loc)
+                .isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
         continue;

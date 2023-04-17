@@ -217,6 +217,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     newOptions |= UnqualifiedLookupFlags::IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::ExcludeMacroExpansions))
+    newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
 
   return newOptions;
 }

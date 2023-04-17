@@ -27,6 +27,8 @@
 // RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_St9__va_listEmSB_z \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_PKS5_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEPKS5_OS8_ \
 // RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
 // RUN:             -e '_ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA[0-9]\+_cEEEvv' \
@@ -284,6 +286,8 @@
 // RUN:             -e _ZSteqIcSt11char_traitsIcESaIcEEbRKNSt7__cxx1112basic_stringIT_T0_T1_EEPKS5_ \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEPKS5_RKS8_ \
 // RUN:             -e _ZN9__gnu_cxx32__throw_concurrence_unlock_errorEv \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_PKS5_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEPKS5_OS8_ \
 // RUN:             -e _ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE11_M_disjunctEPKc \
 // RUN:             -e _ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE11_M_is_localEv \
 // RUN:             -e _ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12find_last_ofEPKcm \

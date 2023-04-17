@@ -8265,6 +8265,16 @@ public:
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
 
   bool isLexical() const { return lexical; };
+  void removeIsLexical() { lexical = false; }
+};
+
+class DropDeinitInst
+    : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+
+  DropDeinitInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics

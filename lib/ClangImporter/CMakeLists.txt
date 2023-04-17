@@ -50,13 +50,16 @@ set(SWIFTINC_DIR
 
 add_custom_command(
     OUTPUT "${SWIFTINC_DIR}/bridging"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/bridging"
     COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/bridging" "${SWIFTINC_DIR}")
 
 add_custom_target("copy_cxxInterop_support_header"
     DEPENDS "${SWIFTINC_DIR}/bridging"
     COMMENT "Copying C++ interop support header to ${SWIFTINC_DIR}")
 
-swift_install_in_component(FILES "${CMAKE_CURRENT_SOURCE_DIR}/bridging"
+swift_install_in_component(FILES
+                           "${CMAKE_CURRENT_SOURCE_DIR}/bridging"
+                           "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
                            DESTINATION "include/swift"
                            COMPONENT compiler)
 

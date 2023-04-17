@@ -1678,6 +1678,7 @@ function(add_swift_target_library name)
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
+        IS_SWIFT_ONLY
         NOSWIFTRT
         OBJECT_LIBRARY
         SHARED
@@ -1814,7 +1815,7 @@ function(add_swift_target_library name)
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
-     NOT SWIFT_PREBUILT_CLANG)
+     NOT SWIFT_PREBUILT_CLANG AND NOT SWIFTLIB_IS_SWIFT_ONLY)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 

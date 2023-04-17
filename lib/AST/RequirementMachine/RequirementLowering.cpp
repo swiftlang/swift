@@ -173,7 +173,7 @@ using namespace rewriting;
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
 /// left hand side is always a type parameter.
-static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
+static void desugarSameTypeRequirement(Requirement req, SourceLoc loc,
                                        SmallVectorImpl<Requirement> &result,
                                        SmallVectorImpl<RequirementError> &errors) {
   class Matcher : public TypeMatcher<Matcher> {
@@ -183,7 +183,6 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
 
   public:
     bool recordedErrors = false;
-    bool recordedRequirements = false;
 
     explicit Matcher(SourceLoc loc,
                      SmallVectorImpl<Requirement> &result,
@@ -206,21 +205,18 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             sugaredFirstType, secondType);
-        recordedRequirements = true;
         return true;
       }
 
       if (firstType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             sugaredFirstType, secondType);
-        recordedRequirements = true;
         return true;
       }
 
       if (secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             secondType, sugaredFirstType);
-        recordedRequirements = true;
         return true;
       }
 
@@ -231,149 +227,157 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
     }
   } matcher(loc, result, errors);
 
-  (void) matcher.match(lhs, rhs);
+  (void) matcher.match(req.getFirstType(), req.getSecondType());
 
   // If neither side is directly a type parameter, the type parameter
   // must be in structural position where the enclosing type is redundant.
-  if (!lhs->isTypeParameter() && !rhs->isTypeParameter() &&
+  if (!req.getFirstType()->isTypeParameter() &&
+      !req.getSecondType()->isTypeParameter() &&
       !matcher.recordedErrors) {
     // FIXME: Add a tailored error message when requirements were
     // recorded, e.g. Array<Int> == Array<T>. The outer type is
     // redundant, but the inner requirement T == Int is not.
-    errors.push_back(RequirementError::forRedundantRequirement(
-        {RequirementKind::SameType, lhs, rhs}, loc));
+    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
   }
 }
 
-static void desugarSuperclassRequirement(Type subjectType,
-                                         Type constraintType,
+static void desugarSuperclassRequirement(Requirement req,
                                          SourceLoc loc,
                                          SmallVectorImpl<Requirement> &result,
                                          SmallVectorImpl<RequirementError> &errors) {
-  if (!subjectType->isTypeParameter()) {
-    Requirement requirement(RequirementKind::Superclass,
-                            subjectType, constraintType);
-    if (constraintType->isExactSuperclassOf(subjectType)) {
-      errors.push_back(
-          RequirementError::forRedundantRequirement(requirement, loc));
-    } else {
-      errors.push_back(
-          RequirementError::forInvalidRequirementSubject(requirement, loc));
-    }
-
+  if (req.getFirstType()->isTypeParameter()) {
+    result.push_back(req);
     return;
   }
 
-  result.emplace_back(RequirementKind::Superclass, subjectType, constraintType);
+  SmallVector<Requirement, 2> subReqs;
+
+  switch (req.checkRequirement(subReqs)) {
+  case CheckRequirementResult::Success:
+  case CheckRequirementResult::PackRequirement:
+    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
+    break;
+
+  case CheckRequirementResult::RequirementFailure:
+    errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
+    break;
+
+  case CheckRequirementResult::SubstitutionFailure:
+    break;
+
+  case CheckRequirementResult::ConditionalConformance:
+    llvm_unreachable("Unexpected CheckRequirementResult");
+  }
+
+  for (auto subReq : subReqs)
+    desugarRequirement(subReq, loc, result, errors);
 }
 
-static void desugarLayoutRequirement(Type subjectType,
-                                     LayoutConstraint layout,
+static void desugarLayoutRequirement(Requirement req,
                                      SourceLoc loc,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
-  if (!subjectType->isTypeParameter()) {
-    Requirement requirement(RequirementKind::Layout,
-                            subjectType, layout);
-    if (layout->isClass() && subjectType->isAnyClassReferenceType()) {
-      errors.push_back(
-          RequirementError::forRedundantRequirement(requirement, loc));
-    } else {
-      errors.push_back(
-          RequirementError::forInvalidRequirementSubject(requirement, loc));
-    }
-
+  if (req.getFirstType()->isTypeParameter()) {
+    result.push_back(req);
     return;
   }
 
-  result.emplace_back(RequirementKind::Layout, subjectType, layout);
+  SmallVector<Requirement, 2> subReqs;
+
+  switch (req.checkRequirement(subReqs)) {
+  case CheckRequirementResult::Success:
+  case CheckRequirementResult::PackRequirement:
+    errors.push_back(RequirementError::forRedundantRequirement(req, loc));
+    break;
+
+  case CheckRequirementResult::RequirementFailure:
+    errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
+    break;
+
+  case CheckRequirementResult::SubstitutionFailure:
+    break;
+
+  case CheckRequirementResult::ConditionalConformance:
+    llvm_unreachable("Unexpected CheckRequirementResult");
+  }
+
+  for (auto subReq : subReqs)
+    desugarRequirement(subReq, loc, result, errors);
 }
 
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
-static void desugarConformanceRequirement(Type subjectType, Type constraintType,
+static void desugarConformanceRequirement(Requirement req,
                                           SourceLoc loc,
                                           SmallVectorImpl<Requirement> &result,
                                           SmallVectorImpl<RequirementError> &errors) {
+  SmallVector<Requirement, 2> subReqs;
+
+  auto constraintType = req.getSecondType();
+
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
-    if (!subjectType->isTypeParameter()) {
-      // Check if the subject type actually conforms.
-      auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
-      auto *module = protoDecl->getParentModule();
-      auto conformance = module->lookupConformance(
-          subjectType, protoDecl, /*allowMissing=*/true);
-      if (conformance.isInvalid()) {
-        errors.push_back(RequirementError::forInvalidRequirementSubject(
-            {RequirementKind::Conformance, subjectType, constraintType}, loc));
-        return;
-      }
-
-      errors.push_back(RequirementError::forRedundantRequirement(
-          {RequirementKind::Conformance, subjectType, constraintType}, loc));
-
-      if (conformance.isConcrete()) {
-        // Introduce conditional requirements if the conformance is concrete.
-        for (auto req : conformance.getConcrete()->getConditionalRequirements()) {
-          desugarRequirement(req, loc, result, errors);
-        }
-      }
-
+    if (req.getFirstType()->isTypeParameter()) {
+      result.push_back(req);
       return;
     }
 
-    result.emplace_back(RequirementKind::Conformance, subjectType,
-                        constraintType);
-    return;
+    // Check if the subject type actually conforms.
+    switch (req.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::PackRequirement:
+    case CheckRequirementResult::ConditionalConformance:
+      errors.push_back(RequirementError::forRedundantRequirement(req, loc));
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
+      errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
+      break;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      break;
+    }
+  } else if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
+    subReqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
+                         paramType->getBaseType());
+    paramType->getRequirements(req.getFirstType(), subReqs);
+  } else if (auto *compositionType = constraintType->castTo<ProtocolCompositionType>()) {
+    if (compositionType->hasExplicitAnyObject()) {
+      subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
+                           LayoutConstraint::getLayoutConstraint(
+                             LayoutConstraintKind::Class));
+    }
+
+    for (auto memberType : compositionType->getMembers()) {
+      subReqs.emplace_back(
+          memberType->isConstraintType()
+            ? RequirementKind::Conformance
+            : RequirementKind::Superclass,
+          req.getFirstType(), memberType);
+    }
   }
 
-  if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
-    desugarConformanceRequirement(subjectType, paramType->getBaseType(),
-                                  loc, result, errors);
-
-    SmallVector<Requirement, 2> reqs;
-    paramType->getRequirements(subjectType, reqs);
-
-    for (const auto &req : reqs)
-      desugarRequirement(req, loc, result, errors);
-
-    return;
-  }
-
-  auto *compositionType = constraintType->castTo<ProtocolCompositionType>();
-  if (compositionType->hasExplicitAnyObject()) {
-    desugarLayoutRequirement(subjectType,
-                             LayoutConstraint::getLayoutConstraint(
-                                 LayoutConstraintKind::Class),
-                             loc, result, errors);
-  }
-
-  for (auto memberType : compositionType->getMembers()) {
-    if (memberType->isConstraintType())
-      desugarConformanceRequirement(subjectType, memberType,
-                                    loc, result, errors);
-    else
-      desugarSuperclassRequirement(subjectType, memberType,
-                                   loc, result, errors);
-  }
+  for (auto subReq : subReqs)
+    desugarRequirement(subReq, loc, result, errors);
 }
 
 /// Desugar same-shape requirements by equating the shapes of the
 /// root pack types, and diagnose shape requirements on non-pack
 /// types.
-static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
+static void desugarSameShapeRequirement(Requirement req, SourceLoc loc,
                                         SmallVectorImpl<Requirement> &result,
                                         SmallVectorImpl<RequirementError> &errors) {
   // For now, only allow shape requirements directly between pack types.
-  if (!lhs->isParameterPack() || !rhs->isParameterPack()) {
+  if (!req.getFirstType()->isParameterPack() ||
+      !req.getSecondType()->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(
-        {RequirementKind::SameShape, lhs, rhs}, loc));
+        req, loc));
   }
 
   result.emplace_back(RequirementKind::SameShape,
-                      lhs->getRootGenericParam(),
-                      rhs->getRootGenericParam());
+                      req.getFirstType()->getRootGenericParam(),
+                      req.getSecondType()->getRootGenericParam());
 }
 
 /// Convert a requirement where the subject type might not be a type parameter,
@@ -384,32 +388,25 @@ void
 swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
-  auto firstType = req.getFirstType();
-
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    desugarSameShapeRequirement(firstType, req.getSecondType(),
-                                loc, result, errors);
+    desugarSameShapeRequirement(req, loc, result, errors);
     break;
 
   case RequirementKind::Conformance:
-    desugarConformanceRequirement(firstType, req.getSecondType(),
-                                  loc, result, errors);
+    desugarConformanceRequirement(req, loc, result, errors);
     break;
 
   case RequirementKind::Superclass:
-    desugarSuperclassRequirement(firstType, req.getSecondType(),
-                                 loc, result, errors);
+    desugarSuperclassRequirement(req, loc, result, errors);
     break;
 
   case RequirementKind::Layout:
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
-                             loc, result, errors);
+    desugarLayoutRequirement(req, loc, result, errors);
     break;
 
   case RequirementKind::SameType:
-    desugarSameTypeRequirement(firstType, req.getSecondType(),
-                               loc, result, errors);
+    desugarSameTypeRequirement(req, loc, result, errors);
     break;
   }
 }
@@ -453,11 +450,11 @@ static void realizeTypeRequirement(DeclContext *dc,
   }
 
   if (constraintType->isConstraintType()) {
-    // Handle conformance requirements.
-    desugarConformanceRequirement(subjectType, constraintType, loc, reqs, errors);
+    Requirement req(RequirementKind::Conformance, subjectType, constraintType);
+    desugarRequirement(req, loc, reqs, errors);
   } else if (constraintType->getClassOrBoundGenericClass()) {
-    // Handle superclass requirements.
-    desugarSuperclassRequirement(subjectType, constraintType, loc, reqs, errors);
+    Requirement req(RequirementKind::Superclass, subjectType, constraintType);
+    desugarRequirement(req, loc, reqs, errors);
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -641,7 +638,6 @@ void swift::rewriting::realizeRequirement(
     bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
-  auto firstType = req.getFirstType();
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
   auto *moduleForInference = dc->getParentModule();
 
@@ -651,7 +647,9 @@ void swift::rewriting::realizeRequirement(
 
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
+    auto firstType = req.getFirstType();
     auto secondType = req.getSecondType();
+
     if (shouldInferRequirements) {
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
@@ -668,14 +666,14 @@ void swift::rewriting::realizeRequirement(
 
   case RequirementKind::Layout: {
     if (shouldInferRequirements) {
+      auto firstType = req.getFirstType();
       auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
                                : SourceLoc());
       inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
-                             loc, reqs, errors);
+    desugarRequirement(req, loc, reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -684,20 +682,20 @@ void swift::rewriting::realizeRequirement(
   }
 
   case RequirementKind::SameType: {
-    auto secondType = req.getSecondType();
     if (shouldInferRequirements) {
+      auto firstType = req.getFirstType();
       auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
                                : SourceLoc());
       inferRequirements(firstType, firstLoc, moduleForInference, dc, result);
 
+      auto secondType = req.getSecondType();
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
       inferRequirements(secondType, secondLoc, moduleForInference, dc, result);
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarSameTypeRequirement(req.getFirstType(), secondType, loc,
-                               reqs, errors);
+    desugarRequirement(req, loc, reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -928,8 +926,9 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
-    desugarSameTypeRequirement(getStructuralType(first),
-                               getStructuralType(second),
+    desugarRequirement(Requirement(RequirementKind::SameType,
+                                   getStructuralType(first),
+                                   getStructuralType(second)),
                                SourceLoc(), result, errors);
   };
 

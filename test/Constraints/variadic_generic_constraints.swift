@@ -47,9 +47,11 @@ takesAnyObject(C(), S(), C())  // expected-error {{type of expression is ambiguo
 
 // Same-type requirements
 
-func takesParallelSequences<each T, each U>(t: repeat each T, u: repeat each U) where each T: Sequence, each U: Sequence, each T.Element == each U.Element {}
-// expected-note@-1 {{where 'T.Element' = 'String', 'U.Element' = 'Int'}}
-
+// expected-note@+1 {{where 'T.Element' = 'String', 'U.Element' = 'Int'}}
+func takesParallelSequences<each T, each U>(t: repeat each T, u: repeat each U)
+    where repeat each T: Sequence,
+          repeat each U: Sequence,
+          repeat (each T).Element == (each U).Element {}
 takesParallelSequences()  // ok
 takesParallelSequences(t: Array<Int>(), u: Set<Int>())  // ok
 takesParallelSequences(t: Array<String>(), Set<Int>(), u: Set<String>(), Array<Int>())  // ok

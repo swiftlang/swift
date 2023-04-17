@@ -559,14 +559,14 @@ extension Unicode {
   }
 }
 
-@available(SwiftStdlib 5.8, *)
+@available(SwiftStdlib 5.9, *)
 extension Unicode._CharacterRecognizer: Equatable {
   public static func ==(left: Self, right: Self) -> Bool {
     left._previous == right._previous && left._state == right._state
   }
 }
 
-@available(SwiftStdlib 5.8, *)
+@available(SwiftStdlib 5.9, *)
 extension Unicode._CharacterRecognizer: CustomStringConvertible {
   public var description: String {
     return "\(_state)U+\(String(_previous.value, radix: 16, uppercase: true))"

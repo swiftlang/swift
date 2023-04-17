@@ -490,6 +490,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
                                                    NominalTypeDecl *nom,
                                                    CleanupLocation cleanupLoc,
                                                    SILBasicBlock *finishBB) {
+  selfValue = B.createDropDeinit(cleanupLoc, selfValue);
   if (selfValue->getType().isAddress()) {
     if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
       for (VarDecl *vd : nom->getStoredProperties()) {

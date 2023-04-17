@@ -26,11 +26,11 @@ func lookupGlobalFreestandingExpansion() {
 }
 
 @freestanding(declaration)
-macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+macro anonymousTypes(public: Bool = false, _: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
 
-#anonymousTypes { "hello" }
+#anonymousTypes(public: true) { "hello" }
 
-// CHECK-SIL: sil hidden @$s9MacroUser03$s9A71User33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_4namefMu_C5helloSSyF
+// CHECK-SIL: sil @$s9MacroUser03$s9A71User33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_4namefMu_C5helloSSyF
 
 @main
 struct Main {
@@ -53,4 +53,14 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 struct HasInnerClosure {
   #freestandingWithClosure(0) { x in x }
   #freestandingWithClosure(1) { x in x }
+}
+
+// Arbitrary names at global scope
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+#bitwidthNumberedStructs("MyIntGlobal")
+
+func testArbitraryAtGlobal() {
+  _ = MyIntGlobal16()
 }

@@ -300,6 +300,11 @@ public:
   SILInstruction *
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
   
+  SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
+  SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
+  SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
+  SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
+
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
 #define PASS(ID, TAG, DESCRIPTION)

@@ -31,6 +31,7 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -792,13 +793,29 @@ bool SubstitutionMap::isIdentity() const {
   if (empty())
     return true;
 
+  for (auto conf : getConformances()) {
+    if (conf.isAbstract())
+      continue;
+
+    if (conf.isPack()) {
+      auto patternConfs = conf.getPack()->getPatternConformances();
+      if (patternConfs.size() == 1 && patternConfs[0].isAbstract())
+        continue;
+    }
+
+    return false;
+  }
+
   GenericSignature sig = getGenericSignature();
   bool hasNonIdentityReplacement = false;
   auto replacements = getReplacementTypesBuffer();
 
   sig->forEachParam([&](GenericTypeParamType *paramTy, bool isCanonical) {
     if (isCanonical) {
-      if (!paramTy->isEqual(replacements[0]))
+      Type wrappedParamTy = paramTy;
+      if (paramTy->isParameterPack())
+        wrappedParamTy = PackType::getSingletonPackExpansion(paramTy);
+      if (!wrappedParamTy->isEqual(replacements[0]))
         hasNonIdentityReplacement = true;
     }
 

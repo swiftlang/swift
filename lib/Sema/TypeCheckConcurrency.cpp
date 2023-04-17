@@ -221,16 +221,6 @@ bool IsDefaultActorRequest::evaluate(
         executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
   }
 
-  // Maybe it was a distributed actor, let's double-check it's localUnownedExecutor property.
-  // If we synthesized that one with appropriate semantics we may still be a default actor.
-  if (!isDefaultActor && classDecl->isDistributedActor()) {
-    if (auto localExecutorProperty = classDecl->getLocalUnownedExecutorProperty()) {
-      foundExecutorPropertyImpl = true;
-      isDefaultActor = isDefaultActor ||
-          localExecutorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
-    }
-  }
-
   // Only if we found one of the executor properties, do we return the status of default or not,
   // based on the findings of the semantics attribute of that located property.
   if (foundExecutorPropertyImpl) {
@@ -1276,7 +1266,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   auto module = nominal->getParentModule();
   Type nominalTy = nominal->getDeclaredInterfaceType();
 
-  // enqueue(_: UnownedJob)
+  // enqueue(_:)
   auto enqueueDeclName = DeclName(C, DeclBaseName(C.Id_enqueue), { Identifier() });
 
   FuncDecl *unownedEnqueueRequirement = nullptr;
@@ -1293,8 +1283,16 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (funcDecl->getParameters()->size() != 1)
       continue;
     if (auto param = funcDecl->getParameters()->front()) {
-      if (C.getJobDecl() &&
-          param->getType()->isEqual(C.getJobDecl()->getDeclaredInterfaceType())) {
+      StructDecl* jobDecl;
+      if (auto decl = C.getExecutorJobDecl()) {
+        jobDecl = decl;
+      } else if (auto decl = C.getJobDecl()) {
+        // old standard library, before we introduced the `typealias Job = ExecutorJob`
+        jobDecl = decl;
+      }
+
+      if (jobDecl &&
+          param->getType()->isEqual(jobDecl->getDeclaredInterfaceType())) {
         assert(moveOnlyEnqueueRequirement == nullptr);
         moveOnlyEnqueueRequirement = funcDecl;
       } else if (param->getType()->isEqual(C.getUnownedJobDecl()->getDeclaredInterfaceType())) {

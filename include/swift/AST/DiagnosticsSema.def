@@ -1189,9 +1189,9 @@ WARNING(conditional_downcast_coercion,none,
       (Type, Type))
 
 WARNING(literal_conditional_downcast_to_coercion,none,
-        "conditional downcast from literal to %0 always fails; "
+        "cast from literal of inferred type %0 to unrelated type %1 always fails; "
         "consider using 'as' coercion",
-        (Type))
+        (Type, Type))
 
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
@@ -2002,9 +2002,9 @@ ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
-      "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' could not be "
-      "converted: %1.",
+      "could not generate C++ types from the generic Swift types provided; "
+      "the following Swift type(s) provided to '%0' could not be "
+      "converted: %1",
       (StringRef, StringRef))
 
 // Type aliases
@@ -3601,6 +3601,11 @@ ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
+ERROR(attr_ApplicationMain_deprecated,none,
+      "%" SELECT_APPLICATION_MAIN "0 is deprecated",
+      (unsigned))
+NOTE(attr_ApplicationMain_deprecated_use_attr_main,none,
+     "use @main instead", ())
 
 NOTE(attr_ApplicationMain_parse_as_library,none,
      "pass '-parse-as-library' to compiler invocation if this is intentional",
@@ -5382,9 +5387,8 @@ ERROR(invalid_expansion_argument,none,
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
-      "pack reference %0 can only appear in pack expansion "
-      "%select{or generic requirement|}1",
-      (Type, /*inExpression*/ bool))
+      "pack reference %0 can only appear in pack expansion ",
+      (Type))
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))

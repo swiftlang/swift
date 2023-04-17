@@ -1006,8 +1006,9 @@ static Optional<std::string> getOverriddenSwiftProtocolObjCName(
   return None;
 }
 
-void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  DeclBaseName name = decl->getBaseName();
+void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
+  if (name.empty())
+    name = decl->getBaseName();
   assert(!name.isSpecial() && "Cannot print special names");
 
   auto *synthesizedTypeAttr =
@@ -4022,21 +4023,34 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     const Decl *decl, CustomAttr *attr, MacroRole role) {
   beginMangling();
 
+  // Append the context and name of the declaration.
+  // We don't mangle the declaration itself because doing so requires semantic
+  // information (e.g., its interface type), which introduces cyclic
+  // dependencies.
   const Decl *attachedTo = decl;
+  DeclBaseName attachedToName;
   if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (role != MacroRole::MemberAttribute) {
-      appendAnyDecl(valueDecl);
-    } else {
-      // Appending the member would result in a cycle since `VarDecl` appends
-      // its type, which would then loop back around to getting the attributes
-      // again. We'll instead add a discriminator for each member.
-      appendContextOf(valueDecl);
+    appendContextOf(valueDecl);
+
+    // Mangle the name, replacing special names with their user-facing names.
+    attachedToName = valueDecl->getName().getBaseName();
+    if (attachedToName.isSpecial()) {
+      attachedToName =
+          decl->getASTContext().getIdentifier(attachedToName.userFacingName());
+    }
+    appendDeclName(valueDecl, attachedToName);
+
+    // For member attribute macros, the attribute is attached to the enclosing
+    // declaration.
+    if (role == MacroRole::MemberAttribute) {
       attachedTo = decl->getDeclContext()->getAsDecl();
     }
   } else {
     appendContext(decl->getDeclContext(), "");
+    appendIdentifier("_");
   }
 
+  // Determine the name of the macro.
   DeclBaseName macroName;
   if (auto *macroDecl = attachedTo->getResolvedMacro(attr)) {
     macroName = macroDecl->getName().getBaseName();
@@ -4044,6 +4058,8 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     macroName = decl->getASTContext().getIdentifier("__unknown_macro__");
   }
 
+  // FIXME: attached macro discriminators should take attachedToName into
+  // account.
   appendMacroExpansionOperator(
       macroName.userFacingName(), role,
       decl->getAttachedMacroDiscriminator(macroName, role, attr));

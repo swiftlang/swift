@@ -1805,6 +1805,11 @@ def nostartfiles:
          HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Do not link in the Swift language startup routines">;
 
+def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  MetaVarName<"<path>">,
+  HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 def load_plugin_library:

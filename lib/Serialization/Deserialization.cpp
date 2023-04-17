@@ -3888,7 +3888,17 @@ public:
       opaqueDecl->setGenericSignature(genericSig);
     else
       opaqueDecl->setGenericSignature(GenericSignature());
-    if (underlyingTypeSubsID) {
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
+    if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        !MF.FileContext->getParentModule()->isMainModule() &&
+        AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+      // Do not try to read the underlying type information if the function
+      // is not inlinable in clients. This reflects the swiftinterface behavior
+      // in where clients are only aware of the underlying type when the body
+      // of the function is public.
+
+    } else if (underlyingTypeSubsID) {
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.
@@ -3985,14 +3995,14 @@ public:
                                        StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC, existentialRequiresAny;
+    bool isImplicit, isClassBounded, isObjC, hasSelfOrAssocTypeRequirements;
     uint8_t rawAccessLevel;
     unsigned numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
-                                            existentialRequiresAny,
+                                            hasSelfOrAssocTypeRequirements,
                                             rawAccessLevel, numInheritedTypes,
                                             rawInheritedAndDependencyIDs);
 
@@ -4020,8 +4030,8 @@ public:
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
-    ctx.evaluator.cacheOutput(ExistentialRequiresAnyRequest{proto},
-                              std::move(existentialRequiresAny));
+    ctx.evaluator.cacheOutput(HasSelfOrAssociatedTypeRequirementsRequest{proto},
+                              std::move(hasSelfOrAssocTypeRequirements));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       proto->setAccess(*accessLevel);

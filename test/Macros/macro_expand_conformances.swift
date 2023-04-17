@@ -29,7 +29,7 @@ struct S {}
 @Hashable
 struct S2 {}
 
-// CHECK-DUMP: @__swiftmacro_25macro_expand_conformances1SV9EquatablefMc_.swift
+// CHECK-DUMP: @__swiftmacro_25macro_expand_conformances1S9EquatablefMc_.swift
 // CHECK-DUMP: extension S : Equatable  {}
 
 // CHECK: true
@@ -55,7 +55,7 @@ struct Wrapped: P {
 @DelegatedConformance
 struct Generic<Element> {}
 
-// CHECK-DUMP: @__swiftmacro_25macro_expand_conformances7GenericV20DelegatedConformancefMc_.swift
+// CHECK-DUMP: @__swiftmacro_25macro_expand_conformances7Generic20DelegatedConformancefMc_.swift
 // CHECK-DUMP: extension Generic : P where Element: P {}
 
 func requiresP(_ value: (some P).Type) {

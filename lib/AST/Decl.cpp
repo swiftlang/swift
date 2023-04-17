@@ -6018,9 +6018,18 @@ bool ProtocolDecl::existentialConformsToSelf() const {
     ExistentialConformsToSelfRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
-bool ProtocolDecl::existentialRequiresAny() const {
+bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
   return evaluateOrDefault(getASTContext().evaluator,
-    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
+                           HasSelfOrAssociatedTypeRequirementsRequest{
+                               const_cast<ProtocolDecl *>(this)},
+                           true);
+}
+
+bool ProtocolDecl::existentialRequiresAny() const {
+  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
+  return hasSelfOrAssociatedTypeRequirements();
 }
 
 ArrayRef<AssociatedTypeDecl *>
@@ -9634,29 +9643,6 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        NL_ProtocolMembers,
-                        results);
-
-  for (auto candidate: results) {
-    if (isa<ProtocolDecl>(candidate->getDeclContext()))
-      continue;
-
-    if (VarDecl *var = dyn_cast<VarDecl>(candidate))
-      return var;
-  }
-
-  return nullptr;
-}
-
-const VarDecl *ClassDecl::getLocalUnownedExecutorProperty() const {
-  auto &C = getASTContext();
-
-  if (!isDistributedActor())
-    return nullptr;
-
-  llvm::SmallVector<ValueDecl *, 2> results;
-  this->lookupQualified(getSelfNominalTypeDecl(),
-                        DeclNameRef(C.Id_localUnownedExecutor),
                         NL_ProtocolMembers,
                         results);
 

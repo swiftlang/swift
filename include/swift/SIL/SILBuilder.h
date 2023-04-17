@@ -1355,6 +1355,14 @@ public:
                                                   operand, isLexical));
   }
 
+  DropDeinitInst *createDropDeinit(SILLocation loc, SILValue operand) {
+    assert(getFunction().hasOwnership());
+    assert(!operand->getType().isTrivial(getFunction()) &&
+           "Should not be passing trivial values to this api.");
+    return insert(new (getModule()) DropDeinitInst(getSILDebugLocation(loc),
+                                                   operand));
+  }
+
   MarkUnresolvedMoveAddrInst *createMarkUnresolvedMoveAddr(SILLocation loc,
                                                            SILValue srcAddr,
                                                            SILValue takeAddr) {

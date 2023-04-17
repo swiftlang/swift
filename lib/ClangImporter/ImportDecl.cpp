@@ -2681,8 +2681,24 @@ namespace {
       if (!result)
         return nullptr;
 
-      if (auto classDecl = dyn_cast<ClassDecl>(result))
+      if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);
+
+        auto ctx = Impl.SwiftContext.getSwift58Availability();
+        if (!ctx.isAlwaysAvailable()) {
+          assert(ctx.getOSVersion().hasLowerEndpoint());
+          auto AvAttr = new (Impl.SwiftContext) AvailableAttr(
+              SourceLoc(), SourceRange(),
+              targetPlatform(Impl.SwiftContext.LangOpts), "", "",
+              /*RenameDecl=*/nullptr, ctx.getOSVersion().getLowerEndpoint(),
+              /*IntroducedRange=*/SourceRange(), {},
+              /*DeprecatedRange=*/SourceRange(), {},
+              /*ObsoletedRange=*/SourceRange(),
+              PlatformAgnosticAvailabilityKind::None, /*Implicit=*/false,
+              false);
+          classDecl->getAttrs().add(AvAttr);
+        }
+      }
 
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
@@ -3048,13 +3064,16 @@ namespace {
 
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType())) {
-        Impl.addImportDiagnostic(
-            decl, Diagnostic(diag::reference_passed_by_value,
-                             Impl.SwiftContext.AllocateCopy(
-                                 recordType->getDecl()->getNameAsString()),
-                             "the return"),
-            decl->getLocation());
-        return recordHasReferenceSemantics(recordType->getDecl());
+        if (recordHasReferenceSemantics(recordType->getDecl())) {
+          Impl.addImportDiagnostic(
+              decl,
+              Diagnostic(diag::reference_passed_by_value,
+                         Impl.SwiftContext.AllocateCopy(
+                             recordType->getDecl()->getNameAsString()),
+                         "the return"),
+              decl->getLocation());
+          return true;
+        }
       }
 
       return false;
@@ -3391,6 +3410,14 @@ namespace {
         func->setAccess(AccessLevel::Public);
       }
 
+      if (!isa<clang::CXXConstructorDecl>(decl) && !importedType) {
+        if (!Impl.importFunctionReturnType(decl, result->getDeclContext())) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::unsupported_return_type, decl),
+              decl->getSourceRange().getBegin());
+          return nullptr;
+        }
+      }
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
@@ -3441,10 +3468,24 @@ namespace {
              });
     }
 
+    static bool hasComputedPropertyAttr(const clang::Decl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_computed_property";
+               return false;
+             });
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
+      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
+        Impl.markUnavailable(
+            cast<ValueDecl>(method),
+            "virtual functions are not yet available in Swift");
+      }
 
-      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties) {
+      if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
+          hasComputedPropertyAttr(decl)) {
         CXXMethodBridging bridgingInfo(decl);
         if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
           auto name = bridgingInfo.getClangName().drop_front(3);

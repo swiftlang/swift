@@ -3,7 +3,7 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
   set(SWIFT_CXX_LIBRARY_KIND SHARED)
 endif()
 
-add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB
+add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift

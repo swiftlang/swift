@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -81,6 +82,7 @@ namespace swift {
   class ExtensionDecl;
   struct ExternalSourceLocs;
   class LoadedExecutablePlugin;
+  class LoadedLibraryPlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -365,6 +367,8 @@ public:
   /// The Swift module currently being compiled.
   ModuleDecl *MainModule = nullptr;
 
+  /// The block list where we can find special actions based on module name;
+  BlockListStore blockListConfig;
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -1493,7 +1497,7 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  void *loadLibraryPlugin(StringRef path);
+  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
   /// module by '-load-plugin-executable'.

@@ -713,9 +713,14 @@ ASTContext::ASTContext(
   registerNameLookupRequestFunctions(evaluator);
 
   createModuleToExecutablePluginMap();
+  
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
     OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+  // Insert all block list config paths.
+  for (auto path: langOpts.BlocklistConfigFilePaths) {
+    blockListConfig.addConfigureFilePath(path);
+  }
 }
 
 ASTContext::~ASTContext() {
@@ -6407,7 +6412,7 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   return plugin.get();
 }
 
-void *ASTContext::loadLibraryPlugin(StringRef path) {
+LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
   // Remember the path (even if it fails to load.)
   getImpl().LoadedPluginLibraryPaths.insert(path);
 

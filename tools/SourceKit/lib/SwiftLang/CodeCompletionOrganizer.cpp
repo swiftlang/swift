@@ -1167,9 +1167,9 @@ Completion *CompletionBuilder::finish() {
         new (sink.allocator) ContextFreeCodeCompletionResult(
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
-            contextFreeBase.isSystem(), contextFreeBase.isAsync(),
-            contextFreeBase.hasAsyncAlternative(), newCompletionString,
-            contextFreeBase.getModuleName(),
+            contextFreeBase.getMacroRoles(), contextFreeBase.isSystem(),
+            contextFreeBase.isAsync(), contextFreeBase.hasAsyncAlternative(),
+            newCompletionString, contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
             contextFreeBase.getResultType(),

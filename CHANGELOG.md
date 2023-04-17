@@ -1,8 +1,34 @@
 # CHANGELOG
 
-_**Note:** This is in reverse chronological order, so newer entries are added to the top._
+> **Note**\
+> This is in reverse chronological order, so newer entries are added to the top.
 
 ## Swift 5.9
+
+* [#64927][]:
+
+  Swift 5.9 introduces warnings that catch conversions from an inout
+  argument in the caller to an `UnsafeRawPointer` in the callee
+  whenever the original type contains an object reference.
+
+  ```swift
+  func inspectString(string: inout String) {
+    readBytes(&string)
+    // warning: forming an 'UnsafeRawPointer' to an inout variable of type String
+    // exposes the internal representation rather than the string contents.
+  }
+  ```
+
+  ```swift
+  func inspectData(data: inout Data) {
+    readBytes(&data)
+    // warning: forming an 'UnsafeRawPointer' to a variable of type 'T';
+    // this is likely incorrect because 'T' may contain an object reference.
+  }
+  ```
+
+  Please see the "Workarounds for common cases" section link in github
+  issue #64927.
 
 * Marking stored properties as unavailable with `@available` has been banned,
   closing an unintentional soundness hole that had allowed arbitrary
@@ -66,6 +92,8 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   ```
 
 ## Swift 5.8
+
+### 2023-03-30 (Xcode 14.3)
 
 * [SE-0376][]:
 
@@ -9705,6 +9733,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0376]: <https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md>
 [SE-0377]: <https://github.com/apple/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md>
 
+[#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
 [#43036]: <https://github.com/apple/swift/issues/43036>

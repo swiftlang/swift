@@ -1130,6 +1130,8 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addSimpleTypedParameter("Int");
     Builder.addRightParen();
   });
+
+#ifndef SWIFT_SWIFT_PARSER
   addWithName("warning", CodeCompletionKeywordKind::pound_warning,
               [&] (CodeCompletionResultBuilder &Builder) {
     Builder.addLeftParen();
@@ -1146,6 +1148,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addTextChunk("\"");
     Builder.addRightParen();
   });
+#endif
 
   addWithName("if ", CodeCompletionKeywordKind::pound_if,
               [&] (CodeCompletionResultBuilder &Builder) {
@@ -1352,11 +1355,10 @@ void swift::ide::deliverCompletionResults(
         std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
-        RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
+        RequestedModules.push_back({std::move(K), TheModule, Request.Filter});
 
         auto TheModuleName = TheModule->getName();
-        if (Request.IncludeModuleQualifier &&
+        if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
             (!Lookup.isHiddenModuleName(TheModuleName) ||
              explictlyImportedModules.contains(TheModule)) &&
             seenModuleNames.insert(TheModuleName).second)
@@ -1371,11 +1373,11 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
+      Lookup.getToplevelCompletions(Request.Filter);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();
-      if (Request.IncludeModuleQualifier &&
+      if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
           seenModuleNames.insert(curModule->getName()).second)
         Lookup.addModuleName(curModule);
 
@@ -1790,15 +1792,35 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       default:
         break;
       }
-    }
-    if (!ExpectedCustomAttributeKinds) {
+
+      switch (*AttTargetDK) {
+      case DeclKind::Var:
+      case DeclKind::Subscript:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+        break;
+      case DeclKind::Struct:
+      case DeclKind::Class:
+      case DeclKind::Protocol:
+      case DeclKind::Enum:
+      case DeclKind::Extension:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+        break;
+      default:
+        break;
+      }
+      if (*AttTargetDK != DeclKind::Param) {
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      }
+    } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
       ExpectedCustomAttributeKinds |= CustomAttributeKind::PropertyWrapper;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
     }
-    ExpectedCustomAttributeKinds |= CustomAttributeKind::Macro;
 
     Lookup.setExpectedTypes(/*Types=*/{},
                             /*isImplicitSingleExpressionReturn=*/false,
@@ -1814,8 +1836,11 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
           P.Context.SourceMgr.getIDEInspectionTargetLoc());
 
     // Macro name at attribute position after '@'.
-    Lookup.getToplevelCompletions(
-        /*OnlyTypes=*/false, /*OnlyMacros=*/true);
+    CodeCompletionMacroRoles macroRoles =
+        getCompletionMacroRoles(ExpectedCustomAttributeKinds);
+    if (macroRoles) {
+      Lookup.getMacroCompletions(macroRoles);
+    }
     break;
   }
   case CompletionKind::AttributeDeclParen: {
@@ -1968,6 +1993,15 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   case CompletionKind::AfterPoundDirective: {
     addPoundDirectives(CompletionContext.getResultSink());
+
+    CodeCompletionMacroRoles roles;
+    if (!CurDeclContext || !CurDeclContext->isTypeContext()) {
+      roles |= CodeCompletionMacroRole::Expression;
+      roles |= CodeCompletionMacroRole::CodeItem;
+    }
+    roles |= CodeCompletionMacroRole::Declaration;
+    Lookup.getMacroCompletions(roles);
+
     // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
     // position.
     break;

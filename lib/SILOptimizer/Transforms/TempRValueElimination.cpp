@@ -535,10 +535,11 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
 
-  // If the source of the copyInst is taken, we must insert a compensating
-  // destroy_addr. This must be done at the right spot: after the last use
-  // tempObj, but before any (potential) re-initialization of the source.
-  bool needToInsertDestroy = copyInst->isTakeOfSrc();
+  // If the source of the copyInst is taken, it must be deinitialized (via
+  // destroy_addr, load [take], copy_addr [take]).  This must be done at the
+  // right spot: after the last use tempObj, but before any (potential)
+  // re-initialization of the source.
+  bool needFinalDeinit = copyInst->isTakeOfSrc();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -557,7 +558,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
     // Also, destroys are allowed to be in a different block.
     if (isa<DestroyAddrInst>(user)) {
-      if (!isOSSA && needToInsertDestroy) {
+      if (!isOSSA && needFinalDeinit) {
         // In non-OSSA mode, for the purpose of inserting the destroy of
         // copySrc, we have to be conservative and assume that the lifetime of
         // tempObj goes beyond it's last use - until the final destroy_addr.
@@ -588,7 +589,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // Example:
   //   copy_addr [take] %copySrc to [init] %tempObj   // copyInst
   //   copy_addr [take] %tempObj to [init] %copySrc   // lastLoadInst
-  if (needToInsertDestroy && lastLoadInst != copyInst &&
+  if (needFinalDeinit && lastLoadInst != copyInst &&
       !isa<DestroyAddrInst>(lastLoadInst) &&
       aa->mayWriteToMemory(lastLoadInst, copySrc))
     return;
@@ -601,6 +602,40 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
+  // If copyInst's source must be deinitialized, whether that must be done via
+  // a newly created destroy_addr.
+  //
+  // If lastLoadInst is a load or a copy_addr, then the deinitialization can be
+  // done in that instruction.
+  //
+  // This is necessary for correctness: otherwise, copies of move-only values
+  // would be introduced.
+  bool needToInsertDestroy = [&]() {
+    if (!needFinalDeinit)
+      return false;
+    if (lastLoadInst == copyInst)
+      return true;
+    if (auto *cai = dyn_cast<CopyAddrInst>(lastLoadInst)) {
+      if (cai->getSrc() == tempObj && cai->isTakeOfSrc()) {
+        // This copy_addr [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
+    }
+    if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
+      if (li->getOperand() == tempObj &&
+          li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        // This load [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
+    }
+    return true;
+  }();
   if (needToInsertDestroy) {
     // Compensate the [take] of the original copyInst.
     SILBuilderWithScope::insertAfter(lastLoadInst, [&] (SILBuilder &builder) {
@@ -630,16 +665,19 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       auto *cai = cast<CopyAddrInst>(user);
       if (cai != copyInst) {
         assert(cai->getSrc() == tempObj);
-        if (cai->isTakeOfSrc())
+        if (cai->isTakeOfSrc() && (!needFinalDeinit || lastLoadInst != cai)) {
           cai->setIsTakeOfSrc(IsNotTake);
+        }
       }
       use->set(copySrc);
       break;
     }
     case SILInstructionKind::LoadInst: {
       auto *li = cast<LoadInst>(user);
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
+          (!needFinalDeinit || li != lastLoadInst)) {
         li->setOwnershipQualifier(LoadOwnershipQualifier::Copy);
+      }
       use->set(copySrc);
       break;
     }
