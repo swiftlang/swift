@@ -52,8 +52,8 @@ BASE_MATRIX_ENTRIES = [
     "free_disk_space": true
   },
   {
-    "build_os": "macos-11",
-    "agent_query": "macos-11",
+    "build_os": "macos-12",
+    "agent_query": "macos-12",
     "target": "macos_x86_64",
     "run_stdlib_test": false,
     "run_full_test": false,
