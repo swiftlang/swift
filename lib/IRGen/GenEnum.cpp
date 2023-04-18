@@ -279,62 +279,6 @@ EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
   }
 }
 
-void EnumImplStrategy::callOutlinedCopy(IRGenFunction &IGF,
-                                        Address dest, Address src, SILType T,
-                                        IsInitialization_t isInit,
-                                        IsTake_t isTake) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedCopy(dest, src, T, *TI, isInit, isTake);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedCopy(dest, src, T, *TI, isInit, isTake);
-    return;
-  }
-
-  if (isInit == IsInitialization && isTake == IsTake) {
-    return emitInitializeWithTakeCall(IGF, T, dest, src);
-  } else if (isInit == IsInitialization && isTake == IsNotTake) {
-    return emitInitializeWithCopyCall(IGF, T, dest, src);
-  } else if (isInit == IsNotInitialization && isTake == IsTake) {
-    return emitAssignWithTakeCall(IGF, T, dest, src);
-  } else if (isInit == IsNotInitialization && isTake == IsNotTake) {
-    return emitAssignWithCopyCall(IGF, T, dest, src);
-  }
-  llvm_unreachable("unknown case");
-}
-
-void EnumImplStrategy::callOutlinedDestroy(IRGenFunction &IGF,
-                                           Address addr, SILType T) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedDestroy(addr, T, *TI);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedDestroy(addr, T, *TI);
-    return;
-  }
-
-  emitDestroyCall(IGF, T, addr);
-  return;
-}
-
 namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
@@ -2854,24 +2798,7 @@ namespace {
         }
         }
       } else {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-          OutliningMetadataCollector collector(IGF);
-          if (T.hasArchetype()) {
-            collectMetadataForOutlining(collector, T);
-          }
-          collector.emitCallToOutlinedDestroy(addr, T, *TI);
-          return;
-        }
-
-        if (!T.hasArchetype()) {
-          // Call the outlined copy function (the implementation will call vwt
-          // in this case).
-          OutliningMetadataCollector collector(IGF);
-          collector.emitCallToOutlinedDestroy(addr, T, *TI);
-          return;
-        }
-
-        emitDestroyCall(IGF, T, addr);
+        callOutlinedDestroy(IGF, addr, T);
         return;
       }
     }
