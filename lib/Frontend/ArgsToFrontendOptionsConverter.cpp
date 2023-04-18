@@ -355,6 +355,13 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CASPath =
       Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
   Opts.CASFSRootID = Args.getLastArgValue(OPT_cas_fs);
+  if (Opts.EnableCAS && Opts.CASFSRootID.empty() &&
+      FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
+    if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
+        Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+        return true;
+    }
+  }
 
   return false;
 }

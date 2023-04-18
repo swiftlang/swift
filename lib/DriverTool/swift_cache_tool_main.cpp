@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Version.h"
+#include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -28,6 +29,7 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include <memory>
 
 using namespace swift;
@@ -39,7 +41,15 @@ namespace {
 enum class SwiftCacheToolAction {
   Invalid,
   PrintBaseKey,
-  PrintOutputKeys
+  PrintOutputKeys,
+  ValidateOutputs
+};
+
+struct OutputEntry {
+  std::string InputPath;
+  std::string OutputPath;
+  std::string OutputKind;
+  std::string CacheKey;
 };
 
 enum ID {
@@ -77,6 +87,7 @@ private:
   PrintingDiagnosticConsumer PDC;
   std::string MainExecutablePath;
   std::string CASPath;
+  std::vector<std::string> Inputs;
   std::vector<std::string> FrontendArgs;
   SwiftCacheToolAction ActionKind = SwiftCacheToolAction::Invalid;
 
@@ -115,17 +126,19 @@ public:
     CASPath =
         ParsedArgs.getLastArgValue(OPT_cas_path, getDefaultOnDiskCASPath());
 
+    Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
     FrontendArgs = ParsedArgs.getAllArgValues(OPT__DASH_DASH);
     if (auto *A = ParsedArgs.getLastArg(OPT_cache_tool_action))
       ActionKind =
           llvm::StringSwitch<SwiftCacheToolAction>(A->getValue())
               .Case("print-base-key", SwiftCacheToolAction::PrintBaseKey)
               .Case("print-output-keys", SwiftCacheToolAction::PrintOutputKeys)
+              .Case("validate-outputs", SwiftCacheToolAction::ValidateOutputs)
               .Default(SwiftCacheToolAction::Invalid);
 
     if (ActionKind == SwiftCacheToolAction::Invalid) {
       llvm::errs() << "Invalid option specified for -cache-tool-action: "
-                   << "use print-base-key|print-output-keys\n";
+                   << "use print-base-key|print-output-keys|validate-outputs\n";
       return 1;
     }
 
@@ -138,6 +151,8 @@ public:
       return printBaseKey();
     case SwiftCacheToolAction::PrintOutputKeys:
       return printOutputKeys();
+    case SwiftCacheToolAction::ValidateOutputs:
+      return validateOutputs();
     case SwiftCacheToolAction::Invalid:
       return 0; // No action. Probably just print help. Return.
     }
@@ -217,6 +232,7 @@ private:
   }
 
   int printOutputKeys();
+  int validateOutputs();
 };
 
 } // end anonymous namespace
@@ -230,12 +246,6 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   if (!BaseKey)
     return 1;
 
-  struct OutputEntry {
-    std::string InputPath;
-    std::string OutputPath;
-    std::string OutputKind;
-    std::string CacheKey;
-  };
   std::vector<OutputEntry> OutputKeys;
   bool hasError = false;
   auto addOutputKey = [&](StringRef InputPath, file_types::ID OutputKind,
@@ -289,6 +299,55 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   });
 
   return 0;
+}
+
+int SwiftCacheToolInvocation::validateOutputs() {
+  auto DB = llvm::cas::createOnDiskUnifiedCASDatabases(CASPath);
+  if (!DB)
+    report_fatal_error(DB.takeError());
+
+  PrintingDiagnosticConsumer PDC;
+  Instance.getDiags().addConsumer(PDC);
+
+  auto validateCacheKeysFromFile = [&](const std::string &Path) {
+    auto JSONContent = llvm::MemoryBuffer::getFile(Path);
+    if (!JSONContent) {
+      llvm::errs() << "failed to read " << Path << ": "
+                   << JSONContent.getError().message() << "\n";
+      return true;
+    }
+    auto JSONValue = llvm::json::parse((*JSONContent)->getBuffer());
+    if (!JSONValue) {
+      llvm::errs() << "failed to parse " << Path << ": "
+                   << toString(JSONValue.takeError()) << "\n";
+      return true;
+    }
+
+    auto Keys = JSONValue->getAsArray();
+    if (!Keys) {
+      llvm::errs() << "invalid keys format in " << Path << "\n";
+      return true;
+    }
+
+    for (const auto& Entry : *Keys) {
+      if (auto *Obj = Entry.getAsObject()) {
+        if (auto Key = Obj->getString("CacheKey")) {
+          if (auto Buffer = loadCachedCompileResultFromCacheKey(
+                  *DB->first, *DB->second, Instance.getDiags(), *Key))
+            continue;
+          llvm::errs() << "failed to find output for cache key " << *Key
+                       << "\n";
+          return true;
+        }
+      }
+      llvm::errs() << "can't read cache key from " << Path << "\n";
+      return true;
+    }
+
+    return false;
+  };
+
+  return llvm::any_of(Inputs, validateCacheKeysFromFile);
 }
 
 int swift_cache_tool_main(ArrayRef<const char *> Args, const char *Argv0,

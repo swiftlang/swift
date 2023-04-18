@@ -26,6 +26,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
@@ -447,6 +448,15 @@ void CompilerInstance::setupOutputBackend() {
 
   OutputBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Mirror the output into CAS.
+  if (supportCaching()) {
+    auto CASOutputBackend = createSwiftCachingOutputBackend(
+        *CAS, *ResultCache, *CompileJobBaseKey,
+        Invocation.getFrontendOptions().InputsAndOutputs);
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
+  }
 
   // Setup verification backend.
   // Create a mirroring outputbackend to produce hash for output files.
@@ -1041,6 +1051,14 @@ bool CompilerInstance::canImportCxxShim() const {
   auto modulePath = builder.get();
   return getASTContext().canImportModule(modulePath) &&
          !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+}
+
+bool CompilerInstance::supportCaching() const {
+  if (!Invocation.getFrontendOptions().EnableCAS)
+    return false;
+
+  return FrontendOptions::supportCompilationCaching(
+      Invocation.getFrontendOptions().RequestedAction);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {

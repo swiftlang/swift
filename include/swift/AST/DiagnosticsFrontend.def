@@ -485,6 +485,10 @@ ERROR(error_output_missing,none,
 REMARK(matching_output_produced,none,
       "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
 
+// Caching related diagnostics
+ERROR(error_caching_no_cas_fs, none,
+    "caching is enabled without -cas-fs option, input is not immutable", ())
+
 // CAS related diagnostics
 ERROR(error_create_cas, none, "failed to create CAS '%0' (%1)", (StringRef, StringRef))
 ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
