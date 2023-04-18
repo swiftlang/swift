@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
@@ -482,7 +483,7 @@ void IDEInspectionInstance::performNewOperation(
           InstanceSetupError));
       return;
     }
-    CI->getASTContext().setPluginRegistry(Plugins.get());
+    CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 

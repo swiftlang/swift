@@ -671,6 +671,7 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
+  bool setUpPluginLoader();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();

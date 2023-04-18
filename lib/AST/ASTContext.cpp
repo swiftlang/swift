@@ -41,7 +41,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PluginRegistry.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -67,7 +67,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Config/config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
@@ -526,17 +525,8 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
-  /// Plugin registry. Lazily populated by get/setPluginRegistry().
-  /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
-  PluginRegistry *Plugins = nullptr;
-
-  /// `Plugins` storage if this ASTContext owns it.
-  std::unique_ptr<PluginRegistry> OwnedPluginRegistry = nullptr;
-
-  /// Map a module name to an executable plugin path that provides the module.
-  llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
-
-  llvm::StringSet<> LoadedPluginLibraryPaths;
+  /// Plugin loader.
+  std::unique_ptr<swift::PluginLoader> Plugins;
 
   /// The permanent arena.
   Arena Permanent;
@@ -712,8 +702,6 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
 
-  createModuleToExecutablePluginMap();
-  
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
     OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
@@ -6281,34 +6269,33 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
-void ASTContext::setPluginRegistry(PluginRegistry *newValue) {
-  assert(getImpl().Plugins == nullptr &&
-         "Too late to set a new plugin registry");
-  getImpl().Plugins = newValue;
+void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {
+  getImpl().Plugins = std::move(loader);
 }
 
-PluginRegistry *ASTContext::getPluginRegistry() const {
-  PluginRegistry *&registry = getImpl().Plugins;
+PluginLoader &ASTContext::getPluginLoader() { return *getImpl().Plugins; }
 
-  // Create a new one if it hasn't been set.
-  if (!registry) {
-    registry = new PluginRegistry();
-    getImpl().OwnedPluginRegistry.reset(registry);
-  }
-
-  assert(registry != nullptr);
-  return registry;
+Optional<std::string>
+ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupLibraryPluginByModuleName(moduleName);
 }
 
-void ASTContext::createModuleToExecutablePluginMap() {
-  for (auto &arg : SearchPathOpts.getCompilerPluginExecutablePaths()) {
-    // Create a moduleName -> pluginPath mapping.
-    assert(!arg.ExecutablePath.empty() && "empty plugin path");
-    auto pathStr = AllocateCopy(arg.ExecutablePath);
-    for (auto moduleName : arg.ModuleNames) {
-      getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
-    }
-  }
+Optional<StringRef>
+ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupExecutablePluginByModuleName(moduleName);
+}
+
+Optional<std::pair<std::string, std::string>>
+ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupExternalLibraryPluginByModuleName(moduleName);
+}
+
+LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
+  return getImpl().Plugins->loadLibraryPlugin(path);
+}
+
+LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
+  return getImpl().Plugins->loadExecutablePlugin(path);
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
@@ -6344,105 +6331,6 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
-}
-
-Optional<std::string>
-ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
-  auto fs = SourceMgr.getFileSystem();
-
-  // Look for 'lib${module name}(.dylib|.so)'.
-  SmallString<64> expectedBasename;
-  expectedBasename.append("lib");
-  expectedBasename.append(moduleName.str());
-  expectedBasename.append(LTDL_SHLIB_EXT);
-
-  // Try '-plugin-path'.
-  for (const auto &searchPath : SearchPathOpts.PluginSearchPaths) {
-    SmallString<128> fullPath(searchPath);
-    llvm::sys::path::append(fullPath, expectedBasename);
-    if (fs->exists(fullPath)) {
-      return std::string(fullPath);
-    }
-  }
-
-  // Try '-load-plugin-library'.
-  for (const auto &libPath : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    if (llvm::sys::path::filename(libPath) == expectedBasename) {
-      return libPath;
-    }
-  }
-
-  return None;
-}
-
-Optional<StringRef>
-ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
-  auto &execPluginPaths = getImpl().ExecutablePluginPaths;
-  auto found = execPluginPaths.find(moduleName);
-  if (found == execPluginPaths.end())
-    return None;
-  return found->second;
-}
-
-Optional<std::pair<std::string, std::string>>
-ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
-  auto fs = this->SourceMgr.getFileSystem();
-  for (auto &pair : SearchPathOpts.ExternalPluginSearchPaths) {
-    SmallString<128> fullPath(pair.SearchPath);
-    llvm::sys::path::append(fullPath, "lib" + moduleName.str() + LTDL_SHLIB_EXT);
-
-    if (fs->exists(fullPath)) {
-      return {{std::string(fullPath), pair.ServerPath}};
-    }
-  }
-  return None;
-}
-
-LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
-  SmallString<128> resolvedPath;
-  auto fs = this->SourceMgr.getFileSystem();
-  if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   err.message());
-    return nullptr;
-  }
-
-  // Load the plugin.
-  auto plugin = getPluginRegistry()->loadExecutablePlugin(resolvedPath);
-  if (!plugin) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   llvm::toString(plugin.takeError()));
-    return nullptr;
-  }
-
-  return plugin.get();
-}
-
-LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
-  // Remember the path (even if it fails to load.)
-  getImpl().LoadedPluginLibraryPaths.insert(path);
-
-  SmallString<128> resolvedPath;
-  auto fs = this->SourceMgr.getFileSystem();
-  if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   err.message());
-    return nullptr;
-  }
-
-  // Load the plugin.
-  auto plugin = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
-  if (!plugin) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   llvm::toString(plugin.takeError()));
-    return nullptr;
-  }
-
-  return plugin.get();
-}
-
-const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
-  return getImpl().LoadedPluginLibraryPaths;
 }
 
 bool ASTContext::supportsMoveOnlyTypes() const {
