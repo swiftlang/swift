@@ -397,6 +397,11 @@ DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"),
     llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+EnableDeserializationSafety("enable-deserialization-safety",
+    llvm::cl::desc("Avoid reading potentially unsafe decls from swiftmodules"),
+    llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     "code-complete-inits-in-postfix-expr",
     llvm::cl::desc(
@@ -4464,6 +4469,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().EnableDeserializationSafety =
+    options::EnableDeserializationSafety;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=

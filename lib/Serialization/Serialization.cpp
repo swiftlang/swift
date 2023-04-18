@@ -5004,14 +5004,14 @@ public:
   void visitPackType(const PackType *packTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[PackTypeLayout::Code];
-    PackTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
 
-    abbrCode = S.DeclTypeAbbrCodes[PackTypeEltLayout::Code];
-    for (auto elt : packTy->getElementTypes()) {
-      PackTypeEltLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          S.addTypeRef(elt));
+    SmallVector<TypeID, 8> variableData;
+    for (auto elementType : packTy->getElementTypes()) {
+      variableData.push_back(S.addTypeRef(elementType));
     }
+
+    PackTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                               variableData);
   }
 
   void visitSILPackType(const SILPackType *packTy) {
@@ -5549,6 +5549,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<ElementArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
   registerDeclTypeAbbr<PackArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
@@ -5568,7 +5569,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
   registerDeclTypeAbbr<PackExpansionTypeLayout>();
   registerDeclTypeAbbr<PackTypeLayout>();
-  registerDeclTypeAbbr<PackTypeEltLayout>();
+  registerDeclTypeAbbr<SILPackTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
