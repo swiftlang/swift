@@ -2157,7 +2157,6 @@ public func closureCaptureClassUseAfterConsume2(_ x2: inout Klass) {
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
         // expected-note @-1 {{consuming use here}}
         borrowVal(x2) // expected-note {{captured here}}
-        // expected-error @-1 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         consumeVal(x2) // expected-note {{captured here}}
         consumeVal(x2)  // expected-note {{captured here}}
     }
