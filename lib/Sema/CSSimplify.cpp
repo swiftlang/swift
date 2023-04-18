@@ -9002,67 +9002,78 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
   return SolutionKind::Solved;
 }
 
-static Type lookThroughSingletonPackExpansion(Type ty) {
-  if (auto pack = ty->getAs<PackType>()) {
-    if (pack->getNumElements() == 1) {
-      if (auto expansion = pack->getElementType(0)->getAs<PackExpansionType>()) {
-        auto countType = expansion->getCountType();
-        if (countType->isEqual(expansion->getPatternType()))
-          return countType;
-      }
-    }
-  }
-  return ty;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
   auto elementType = simplifyType(first, flags);
-  auto packType = simplifyType(second, flags);
+  auto patternType = simplifyType(second, flags);
 
-  if (elementType->hasTypeVariable() || packType->hasTypeVariable()) {
+  auto formUnsolved = [&]() {
     if (!flags.contains(TMF_GenerateConstraints))
       return SolutionKind::Unsolved;
 
-    auto *loc = getConstraintLocator(locator);
     addUnsolvedConstraint(
-        Constraint::create(*this, ConstraintKind::PackElementOf,
-                           first, second, loc));
+        Constraint::create(*this, ConstraintKind::PackElementOf, first, second,
+                           getConstraintLocator(locator)));
 
     return SolutionKind::Solved;
-  }
+  };
 
-  // FIXME: I'm not sure this is actually necessary; I may only be seeing
-  // this because of something I've screwed up in element generic
-  // environments.
-  elementType = lookThroughSingletonPackExpansion(elementType);
-
-  // This constraint only exists to vend bindings.
-  auto *packEnv = DC->getGenericEnvironmentOfContext();
-
-  // Map element archetypes to the pack context to check for equality.
-  if (elementType->hasElementArchetype()) {
-    auto mappedPack = packEnv->mapElementTypeIntoPackContext(elementType);
-    return (packType->isEqual(mappedPack) ?
-            SolutionKind::Solved : SolutionKind::Error);
-  }
-
-  // Pack expansions can have concrete pattern types. In this case, the pack
-  // type and element type will be equal.
-  if (packType->isEqual(elementType)) {
-    return SolutionKind::Solved;
-  }
+  // If neither side is fully resolved yet, there is nothing we can do.
+  if (elementType->hasTypeVariable() && patternType->hasTypeVariable())
+    return formUnsolved();
 
   if (shouldAttemptFixes()) {
-    auto *loc = getConstraintLocator(locator);
-    if (elementType->isPlaceholder() ||
-        !recordFix(AllowInvalidPackElement::create(*this, packType, loc)))
+    if (elementType->isPlaceholder() || patternType->isPlaceholder())
       return SolutionKind::Solved;
   }
 
-  return SolutionKind::Error;
+  // Let's try to resolve element type based on the pattern type.
+  if (!patternType->hasTypeVariable()) {
+    auto *loc = getConstraintLocator(locator);
+    auto shapeClass = patternType->getReducedShape();
+    patternType = patternType->mapTypeOutOfContext();
+    auto *elementEnv = getPackElementEnvironment(loc, shapeClass);
+
+    // Without an opened element environment, we cannot derive the
+    // element binding.
+    if (!elementEnv) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      // `each` was applied to a concrete type.
+      if (!shapeClass->is<PackArchetypeType>()) {
+        if (recordFix(AllowInvalidPackElement::create(*this, patternType, loc)))
+          return SolutionKind::Error;
+      }
+
+      // Only other posibility is that there is a shape mismatch between
+      // elements of the pack expansion pattern which is detected separately.
+
+      recordAnyTypeVarAsPotentialHole(elementType);
+      return SolutionKind::Solved;
+    }
+
+    auto expectedElementTy =
+        elementEnv->mapPackTypeIntoElementContext(patternType);
+    assert(!expectedElementTy->is<PackType>());
+
+    addConstraint(ConstraintKind::Equal, elementType, expectedElementTy,
+                  locator);
+    return SolutionKind::Solved;
+  }
+
+  // Otherwise we are inferred or checking pattern type.
+
+  auto *packEnv = DC->getGenericEnvironmentOfContext();
+
+  // Map element archetypes to the pack context to check for equality.
+  if (elementType->hasElementArchetype())
+    elementType = packEnv->mapElementTypeIntoPackContext(elementType);
+
+  addConstraint(ConstraintKind::Equal, elementType, patternType, locator);
+  return SolutionKind::Solved;
 }
 
 static bool isForKeyPathSubscript(ConstraintSystem &cs,
