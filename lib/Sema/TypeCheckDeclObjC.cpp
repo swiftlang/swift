@@ -2882,6 +2882,15 @@ class ObjCImplementationChecker {
   /// Candidates with their explicit ObjC names, if any.
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
 
+  /// Key that can be used to uniquely identify a particular Objective-C
+  /// method.
+  using ObjCMethodKey = std::pair<ObjCSelector, char>;
+
+  /// Mapping from Objective-C methods to the set of requirements within this
+  /// protocol that have the same selector and instance/class designation.
+  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
+    objcMethodRequirements;
+
 public:
   ObjCImplementationChecker(ExtensionDecl *ext)
       : diags(ext->getASTContext().Diags)
@@ -2903,6 +2912,10 @@ public:
   }
 
 private:
+  auto getObjCMethodKey(AbstractFunctionDecl *func) const -> ObjCMethodKey {
+    return ObjCMethodKey(func->getObjCSelector(), func->isInstanceMember());
+  }
+
   void addRequirements(IterableDeclContext *idc) {
     assert(idc->getDecl()->hasClangNode());
     for (Decl *_member : idc->getMembers()) {
@@ -2918,6 +2931,10 @@ private:
 
       auto inserted = unmatchedRequirements.insert(member);
       assert(inserted && "objc interface member added twice?");
+
+      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+        objcMethodRequirements[getObjCMethodKey(func)].push_back(func);
+      }
     }
   }
 
@@ -3011,6 +3028,19 @@ private:
     }
   };
 
+  /// Determine whether the set of matched requirements are ambiguous for the
+  /// given candidate.
+  bool areRequirementsAmbiguous(const BestMatchList &reqs, ValueDecl *cand) {
+    if (reqs.matches.size() != 2)
+      return reqs.matches.size() > 2;
+
+    bool firstIsAsyncAlternative =
+      matchesAsyncAlternative(reqs.matches[0], cand);
+    bool secondIsAsyncAlternative =
+      matchesAsyncAlternative(reqs.matches[1], cand);
+    return firstIsAsyncAlternative == secondIsAsyncAlternative;
+  }
+
   void matchRequirementsAtThreshold(MatchOutcome threshold) {
     SmallString<32> scratch;
 
@@ -3070,11 +3100,14 @@ private:
       // removing them.
       requirementsToRemove.set_union(matchedRequirements.matches);
 
-      if (matchedRequirements.matches.size() == 1) {
+      if (!areRequirementsAmbiguous(matchedRequirements, cand)) {
         // Note that this is BestMatchList::insert(), so it'll only keep the
         // matches with the best outcomes.
-        matchesByRequirement[matchedRequirements.matches.front()]
-          .insert(cand, matchedRequirements.currentOutcome);
+        for (auto req : matchedRequirements.matches) {
+          matchesByRequirement[req]
+            .insert(cand, matchedRequirements.currentOutcome);
+        }
+
         continue;
       }
 
@@ -3156,6 +3189,35 @@ private:
       unmatchedCandidates.erase(cand);
   }
 
+  /// Whether the candidate matches the async alternative of the given
+  /// requirement.
+  bool matchesAsyncAlternative(ValueDecl *req, ValueDecl *cand) const {
+    auto reqFunc = dyn_cast<AbstractFunctionDecl>(req);
+    if (!reqFunc)
+      return false;
+
+    auto candFunc = dyn_cast<AbstractFunctionDecl>(cand);
+    if (!candFunc)
+      return false;
+
+    if (reqFunc->hasAsync() == candFunc->hasAsync())
+      return false;
+
+    auto otherReqFuncs =
+      objcMethodRequirements.find(getObjCMethodKey(reqFunc));
+    if (otherReqFuncs == objcMethodRequirements.end())
+      return false;
+
+    for (auto otherReqFunc : otherReqFuncs->second) {
+      if (otherReqFunc->getName() == cand->getName() &&
+          otherReqFunc->hasAsync() == candFunc->hasAsync() &&
+          req->getObjCRuntimeName() == cand->getObjCRuntimeName())
+        return true;
+    }
+
+    return false;
+  }
+
   MatchOutcome matches(ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) const {
     bool hasObjCNameMatch =
@@ -3173,7 +3235,10 @@ private:
           && req->getObjCRuntimeName() != explicitObjCName)
       return MatchOutcome::WrongExplicitObjCName;
 
-    if (!hasSwiftNameMatch)
+    // If the ObjC selectors matched but the Swift names do not, and these are
+    // functions with mismatched 'async', check whether the "other" requirement
+    // (the completion-handler or async version)'s Swift name matches.
+    if (!hasSwiftNameMatch && !matchesAsyncAlternative(req, cand))
       return MatchOutcome::WrongSwiftName;
 
     if (!hasObjCNameMatch)
