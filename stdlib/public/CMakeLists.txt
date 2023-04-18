@@ -65,7 +65,9 @@ endif()
 
 add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
-add_subdirectory(Cxx)
+if(SWIFT_BUILD_STDLIB_CXX_MODULE)
+  add_subdirectory(Cxx)
+endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection

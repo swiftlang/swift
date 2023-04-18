@@ -244,7 +244,7 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     TRUE)
 
 option(SWIFT_BUILD_STDLIB_CXX_MODULE
-  "If not building stdlib, controls whether to build the Cxx module"
+  "Build the Cxx module and the CxxStdlib overlay module"
   TRUE)
 
 # In many cases, the CMake build system needs to determine whether to include

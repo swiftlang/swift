@@ -6,6 +6,8 @@ set(SWIFT_HOST_VARIANT_ARCH i686 CACHE STRING "")
 # library.
 set(SWIFT_INCLUDE_TOOLS NO CACHE BOOL "")
 
+set(SWIFT_BUILD_STDLIB_CXX_MODULE YES CACHE BOOL "")
+
 # NOTE(compnerd) cannot build tests since the tests require the toolchain
 set(SWIFT_INCLUDE_TESTS NO CACHE BOOL "")
 
