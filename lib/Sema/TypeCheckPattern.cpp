@@ -954,7 +954,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 /// "repair" the pattern if needed. This ensures that the pattern engine
 /// receives well-formed input, avoiding the need to implement an additional
 /// compatibility hack there, as doing that is lot more tricky due to the
-/// different cases that need to handled.
+/// different cases that need to be handled.
 ///
 /// We also emit diagnostics and potentially a fix-it to help the user.
 ///
@@ -1011,12 +1011,16 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
         addDeclNote = true;
       }
     }
-  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
+  } else if (auto *tupleType = enumPayloadType
+                                   // Account for implicit optional promotion.
+                                   ->lookThroughAllOptionalTypes()
+                                   ->getAs<TupleType>()) {
     if (tupleType->getNumElements() >= 2) {
       if (auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat)) {
         DE.diagnose(enumElementInnerPat->getLoc(),
                     diag::converting_several_associated_values_into_tuple,
                     enumCase->getNameStr(),
+                    enumPayloadType->isOptional(),
                     tupleType->getNumElements())
           .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
           .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
@@ -1237,6 +1241,21 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       return P;
     }
 
+    // Allow optional promotion only when pattern matching is allowed to
+    // fail (in statement conditions, 'switch' case items, but not pattern
+    // binding declarations).
+    const bool allowOptionalPromotion = !pattern.getPatternBindingDecl();
+
+    const auto origTy = type;
+    if (allowOptionalPromotion) {
+      // Peel away any optionality. If the coercion succeeds, we will promote
+      // the resulting pattern to the original type by wrapping it in
+      // 'OptionalSome' patterns.
+      type = type->lookThroughAllOptionalTypes();
+    }
+
+    tupleTy = type->getAs<TupleType>();
+
     if (!tupleTy) {
       diags.diagnose(TP->getStartLoc(),
                      diag::tuple_pattern_in_non_tuple_context, type);
@@ -1278,6 +1297,21 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     }
 
     P->setType(type);
+
+    if (allowOptionalPromotion) {
+      // If the original coercion type is optional, promote the resulting
+      // pattern to a matching optionality.
+      if (auto wrappedTy = origTy->getOptionalObjectType()) {
+        do {
+          auto *OSP =
+              OptionalSomePattern::createImplicit(Context, P, P->getEndLoc());
+          OSP->setType(OptionalType::get(P->getType()));
+          P = OSP;
+          wrappedTy = wrappedTy->getOptionalObjectType();
+        } while (wrappedTy);
+      }
+    }
+
     return P;
   }
 

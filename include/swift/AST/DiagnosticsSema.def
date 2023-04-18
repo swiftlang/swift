@@ -4635,8 +4635,9 @@ WARNING(found_one_pattern_for_several_associated_values,Deprecation,
 WARNING(converting_tuple_into_several_associated_values,none,
         "enum case '%0' has %1 associated values", (StringRef, unsigned))
 WARNING(converting_several_associated_values_into_tuple,none,
-        "enum case '%0' has one associated value that is a tuple of %1 "
-        "elements",(StringRef, unsigned))
+        "enum case '%0' has one associated value that is a %select{|optional }1"
+        "tuple of %2 elements",
+        (StringRef, bool, unsigned))
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))
