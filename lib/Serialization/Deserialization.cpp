@@ -6876,31 +6876,18 @@ Expected<Type> DESERIALIZE_TYPE(PACK_EXPANSION_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  // The pack record itself is empty. Read all trailing elements.
-  SmallVector<Type, 8> elements;
-  while (true) {
-    llvm::BitstreamEntry entry =
-        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
+  ArrayRef<uint64_t> elementTypeIDs;
+  decls_block::PackTypeLayout::readRecord(scratch, elementTypeIDs);
 
-    scratch.clear();
-    unsigned recordID = MF.fatalIfUnexpected(
-        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != decls_block::PACK_TYPE_ELT)
-      break;
-
-    TypeID typeID;
-    decls_block::PackTypeEltLayout::readRecord(scratch, typeID);
-
-    auto elementTy = MF.getTypeChecked(typeID);
-    if (!elementTy)
-      return elementTy.takeError();
-
-    elements.push_back(elementTy.get());
+  SmallVector<Type, 8> elementTypes;
+  for (auto elementTypeID : elementTypeIDs) {
+    auto elementType = MF.getTypeChecked(elementTypeID);
+    if (!elementType)
+      return elementType.takeError();
+    elementTypes.push_back(elementType.get());
   }
 
-  return PackType::get(MF.getContext(), elements);
+  return PackType::get(MF.getContext(), elementTypes);
 }
 
 Expected<Type> DESERIALIZE_TYPE(SIL_PACK_TYPE)(

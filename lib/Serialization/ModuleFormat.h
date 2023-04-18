@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 758; // drop_deinit instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 759; // change PackType
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1327,13 +1327,9 @@ namespace decls_block {
   );
 
   TYPE_LAYOUT(PackTypeLayout,
-    PACK_TYPE
+    PACK_TYPE,
+    BCArray<TypeIDField>  // component types
   );
-
-  using PackTypeEltLayout = BCRecordLayout<
-    PACK_TYPE_ELT,
-    TypeIDField         // type
-  >;
 
   TYPE_LAYOUT(SILPackTypeLayout,
     SIL_PACK_TYPE,

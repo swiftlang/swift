@@ -1680,6 +1680,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(PEGI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         packTypeRef,
@@ -1721,6 +1722,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(TPEAI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         tupleTypeRef,
@@ -3057,6 +3059,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
   registerSILAbbr<SILInstHasSymbolLayout>();
+  registerSILAbbr<SILPackElementGetLayout>();
+  registerSILAbbr<SILPackElementSetLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

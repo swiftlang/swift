@@ -523,7 +523,8 @@ public:
 
   hash_code visitDynamicPackIndexInst(DynamicPackIndexInst *X) {
     return llvm::hash_combine(
-        X->getKind(), X->getIndexedPackType(), &X->getOperandRef());
+        X->getKind(), X->getIndexedPackType(),
+        tryLookThroughOwnershipInsts(&X->getOperandRef()));
   }
 
   hash_code visitTuplePackElementAddrInst(TuplePackElementAddrInst *X) {
@@ -585,7 +586,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   };
   bool isEqual =
       LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
-#ifdef NDEBUG
+#ifndef NDEBUG
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
     LHSI->dump();
