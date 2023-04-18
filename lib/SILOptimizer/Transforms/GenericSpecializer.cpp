@@ -208,9 +208,6 @@ class MandatoryGenericSpecializer : public SILModuleTransform {
 void MandatoryGenericSpecializer::run() {
   SILModule *module = getModule();
 
-  if (!module->getOptions().EnablePerformanceAnnotations)
-    return;
-
   ClassHierarchyAnalysis *cha = getAnalysis<ClassHierarchyAnalysis>();
   
   llvm::SmallVector<SILFunction *, 8> workList;

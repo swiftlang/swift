@@ -486,13 +486,6 @@ private:
         if (function.wasDeserializedCanonical())
           continue;
 
-        if (!module->getOptions().EnablePerformanceAnnotations) {
-          module->getASTContext().Diags.diagnose(
-            function.getLocation().getSourceLoc(),
-            diag::performance_annotations_not_enabled);
-          return;
-        }
-
         diagnoser.visitFunction(&function, function.getPerfConstraints());
       }
     }
