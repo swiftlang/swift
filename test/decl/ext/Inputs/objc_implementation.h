@@ -1,3 +1,5 @@
+@import Foundation;
+
 @interface ObjCBaseClass
 
 
@@ -81,6 +83,12 @@
 
 - (void)ambiguousMethod4WithCInt:(int)param  __attribute__((swift_name("ambiguousMethod4(with:)")));
 
+@end
+
+@interface ObjCClass (Effects)
+- (void)doSomethingAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
+- (void)doSomethingElseAsynchronousWithCompletionHandler:(void (^ _Nullable)(id _Nonnull result))completionHandler;
+- (void)doSomethingFunAndAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
 @end
 
 @interface ObjCSubclass : ObjCClass
