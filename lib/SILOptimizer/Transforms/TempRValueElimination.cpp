@@ -22,6 +22,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -742,13 +743,12 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     if (user == si)
       continue;
 
-    // For enums we require that all uses are in the same block.
-    // Otherwise it could be a switch_enum of an optional where the none-case
-    // does not have a destroy of the enum value.
-    // After transforming such an alloc_stack the value would leak in the none-
-    // case block.
-    if (isOrHasEnum && user->getParent() != si->getParent() &&
-        !isa<DeallocStackInst>(user)) {
+    // For lexical stored values that are enums, we require that all uses are in
+    // the same block. This is because we can have incomplete address lifetimes
+    // on none/trivial paths. and OSSALifetimeCompletion currently can complete
+    // lexical values only in the presence of dead end blocks.
+    if (isOrHasEnum && si->getSrc()->isLexical() &&
+        user->getParent() != si->getParent() && !isa<DeallocStackInst>(user)) {
       return std::next(si->getIterator());
     }
 
@@ -864,6 +864,7 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
   si->eraseFromParent();
   tempObj->eraseFromParent();
   invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
   return nextIter;
 }
 
@@ -873,12 +874,19 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
 /// The main entry point of the pass.
 void TempRValueOptPass::run() {
-  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
-                          << getFunction()->getName() << "\n");
+  auto *function = getFunction();
+
+  auto *da = PM->getAnalysis<DominanceAnalysis>();
+
+  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func " << function->getName()
+                          << "\n");
+
+  SmallVector<SILValue> valuesToComplete;
 
   // Find all copy_addr instructions.
   llvm::SmallSetVector<CopyAddrInst *, 8> deadCopies;
-  for (auto &block : *getFunction()) {
+
+  for (auto &block : *function) {
     // Increment the instruction iterator only after calling
     // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
     // deleted, but copyInst itself won't be deleted until later.
@@ -899,7 +907,21 @@ void TempRValueOptPass::run() {
       }
 
       if (auto *si = dyn_cast<StoreInst>(&*ii)) {
+        auto stored = si->getSrc();
+        bool isOrHasEnum = stored->getType().isOrHasEnum();
+        auto nextIter = std::next(si->getIterator());
+
         ii = tryOptimizeStoreIntoTemp(si);
+
+        // If the optimization was successful, and the stack loc was an enum
+        // type, collect the stored value for lifetime completion.
+        // This is needed because we can have incomplete address lifetimes on
+        // none/trivial paths for an enum type. Once we convert to value form,
+        // this will cause incomplete value lifetimes which can raise ownership
+        // verification errors, because we rely on linear lifetimes in OSSA.
+        if (ii == nextIter && isOrHasEnum) {
+          valuesToComplete.push_back(stored);
+        }
         continue;
       }
 
@@ -916,7 +938,7 @@ void TempRValueOptPass::run() {
     }
   );
 
-  DeadEndBlocks deBlocks(getFunction());
+  DeadEndBlocks deBlocks(function);
   for (auto *deadCopy : deadCopies) {
     auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
     deadCopy->eraseFromParent();
@@ -928,6 +950,12 @@ void TempRValueOptPass::run() {
   }
   if (!deadCopies.empty()) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+
+  // Call the utlity to complete ossa lifetime.
+  OSSALifetimeCompletion completion(function, da->get(function));
+  for (auto it : valuesToComplete) {
+    completion.completeOSSALifetime(it);
   }
 }
 

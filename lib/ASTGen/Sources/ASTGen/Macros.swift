@@ -546,7 +546,7 @@ func expandFreestandingMacroInProcess(
   guard let parentExpansion = macroSyntax.asProtocol(
     FreestandingMacroExpansionSyntax.self
   ) else {
-    print("not on a macro expansion node: \(macroSyntax.recursiveDescription)")
+    print("not on a macro expansion node: \(macroSyntax.debugDescription)")
     return nil
   }
 
@@ -671,7 +671,7 @@ private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     currentSyntax = parentSyntax
   }
 
-  print("unable to find node: \(token.recursiveDescription)")
+  print("unable to find node: \(token.debugDescription)")
   return nil
 }
 

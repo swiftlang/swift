@@ -103,3 +103,15 @@ sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on test_instructions_1: is-deinit-barrier
+// CHECK:  debug_step
+// CHECK:  false
+// CHECK-LABEL: end running test 1 of 1 on test_instructions_1: is-deinit-barrier
+sil [ossa] @test_instructions_1 : $@convention(thin) () -> () {
+entry:
+  test_specification "is-deinit-barrier @instruction"
+  debug_step
+  %retval = tuple ()
+  return %retval : $()
+}

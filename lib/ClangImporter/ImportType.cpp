@@ -454,7 +454,7 @@ namespace {
           ModuleDecl *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
           Type wrapperTy = Impl.getNamedSwiftType(
                              objCModule,
-                             Impl.SwiftContext.getSwiftName(
+                             swift::getSwiftName(
                                KnownFoundationEntity::NSZone));
           if (wrapperTy)
             return {wrapperTy, ImportHint::OtherPointer};
@@ -1358,7 +1358,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
 
   // FIXME: Avoid string comparison by caching this identifier.
   if (elementClass->getName().str() !=
-        impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
+        swift::getSwiftName(KnownFoundationEntity::NSError))
     return Type();
 
   if (!impl.canImportFoundationModule() ||
@@ -1369,7 +1369,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (resugarNSErrorPointer)
     return impl.getNamedSwiftType(
       foundationModule,
-        impl.SwiftContext.getSwiftName(
+        swift::getSwiftName(
           KnownFoundationEntity::NSErrorPointer));
 
   // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?

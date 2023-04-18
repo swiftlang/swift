@@ -524,9 +524,6 @@ class AbstractionPattern {
       assert(OrigType == signature.getReducedType(origType));
       GenericSig = signature;
     }
-    assert(!subs || !OrigType->hasTypeParameter() ||
-           subs.getGenericSignature()->isEqual(
-             getGenericSignatureForFunctionComponent()));
   }
 
   void initClangType(SubstitutionMap subs, CanGenericSignature signature,
@@ -1089,15 +1086,9 @@ public:
   AbstractionPattern withSubstitutions(SubstitutionMap subs) const {
     AbstractionPattern result = *this;
     if (subs) {
-#ifndef NDEBUG
       // If we have a generic signature, it should match the substitutions.
-      // But there are situations in which it's okay that we don't store
-      // a signature.
-      auto sig = getGenericSignatureForFunctionComponent();
-      assert((sig && sig->isEqual(subs.getGenericSignature())) ||
-             !OrigType ||
-             !OrigType->hasTypeParameter());
-#endif
+      // But in corner cases, "match" can mean that it applies to an inner
+      // local generic context, which is not something we can easily assert.
       result.GenericSubs = subs;
     }
     return result;

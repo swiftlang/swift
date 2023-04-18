@@ -292,10 +292,12 @@ class Session {
   swift::ide::CompileInstance Compiler;
 
 public:
-  Session(const std::string &RuntimeResourcePath,
+  Session(const std::string &SwiftExecutablePath,
+          const std::string &RuntimeResourcePath,
           const std::string &DiagnosticDocumentationPath,
           std::shared_ptr<swift::PluginRegistry> Plugins)
-      : Compiler(RuntimeResourcePath, DiagnosticDocumentationPath, Plugins) {}
+      : Compiler(SwiftExecutablePath, RuntimeResourcePath,
+                 DiagnosticDocumentationPath, Plugins) {}
 
   bool
   performCompile(llvm::ArrayRef<const char *> Args,
@@ -307,6 +309,7 @@ public:
 };
 
 class SessionManager {
+  const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
   const std::string &DiagnosticDocumentationPath;
   const std::shared_ptr<swift::PluginRegistry> Plugins;
@@ -317,10 +320,12 @@ class SessionManager {
   mutable llvm::sys::Mutex mtx;
 
 public:
-  SessionManager(std::string &RuntimeResourcePath,
-                 std::string &DiagnosticDocumentationPath,
-                 std::shared_ptr<swift::PluginRegistry> Plugins)
-      : RuntimeResourcePath(RuntimeResourcePath),
+  SessionManager(const std::string &SwiftExecutablePath,
+                 const std::string &RuntimeResourcePath,
+                 const std::string &DiagnosticDocumentationPath,
+                 const std::shared_ptr<swift::PluginRegistry> Plugins)
+      : SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         Plugins(Plugins) {}
 

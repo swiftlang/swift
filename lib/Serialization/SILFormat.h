@@ -471,6 +471,7 @@ namespace sil_block {
   // The pack_element_get instruction.
   using SILPackElementGetLayout = BCRecordLayout<
     SIL_PACK_ELEMENT_GET,
+    SILInstOpCodeField,
     TypeIDField,            // element type
     SILTypeCategoryField,   // element type category
     TypeIDField,            // pack type

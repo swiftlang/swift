@@ -40,11 +40,20 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
   auto startingSize = Results.size();
   M->getDisplayDecls(Results, Recursive);
 
-  // Force Sendable on all types, which might synthesize some extensions.
+  // Force Sendable on all public types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
   for (auto result : Results) {
-    if (auto NTD = dyn_cast<NominalTypeDecl>(result))
+    if (auto NTD = dyn_cast<NominalTypeDecl>(result)) {
+
+      // Restrict this logic to public and package types. Non-public types
+      // may refer to implementation details and fail at deserialization.
+      auto accessScope = NTD->getFormalAccessScope();
+      if (!M->isMainModule() &&
+          !accessScope.isPublic() && !accessScope.isPackage())
+        continue;
+
       (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+    }
   }
 
   // Remove what we fetched and fetch again, possibly now with additional

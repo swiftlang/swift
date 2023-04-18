@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyTuples %s
 
 // This test validates that we properly emit errors if we partially invalidate
 // through a type with a deinit.
@@ -59,6 +59,16 @@ struct DeinitStruct {
   var fifth: MoveOnlyKlass
 
   deinit {}
+  // expected-note @-1 {{deinit declared here}}
+  // expected-note @-2 {{deinit declared here}}
+  // expected-note @-3 {{deinit declared here}}
+  // expected-note @-4 {{deinit declared here}}
+  // expected-note @-5 {{deinit declared here}}
+  // expected-note @-6 {{deinit declared here}}
+  // expected-note @-7 {{deinit declared here}}
+  // expected-note @-8 {{deinit declared here}}
+  // expected-note @-9 {{deinit declared here}}
+  // expected-note @-10 {{deinit declared here}}
 }
 
 func testConsumeCopyable(_ x: consuming DeinitStruct) {

@@ -173,9 +173,14 @@ bool ide::initCompilerInvocation(
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
+  // Derive 'swiftc' path from 'swift-frontend' path (swiftExecutablePath).
+  SmallString<256> driverPath(swiftExecutablePath);
+  llvm::sys::path::remove_filename(driverPath);
+  llvm::sys::path::append(driverPath, "swiftc");
+
   bool InvocationCreationFailed =
       driver::getSingleFrontendInvocationFromDriverArguments(
-          Args, Diags,
+          driverPath, Args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
             return Invocation.parseArgs(
                 FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,

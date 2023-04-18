@@ -171,7 +171,7 @@ bb10:
 sil @foo : $@convention(thin) (@guaranteed C) -> ()
 
 // Ensure no assert fires while handling lifetime end of partial_apply
-sil [ossa] @testPartialApplyStack : $@convention(thin) (@guaranteed C) -> () {
+sil [ossa] @testPartialApplyStack1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   test_specification "ossa-lifetime-completion @instruction[0]"
   %8 = copy_value %0 : $C
@@ -192,5 +192,23 @@ bb3:
   destroy_value %8 : $C
   %180 = tuple ()
   return %180 : $()
+}
+
+// Ensure no assert fires while handling lifetime end of partial_apply
+sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ossa-lifetime-completion @instruction[1]"
+  %2 = alloc_stack $C
+  %3 = copy_value %0 : $C
+  %4 = begin_borrow %3 : $C
+  %5 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%4) : $@convention(thin) (@guaranteed C) -> ()
+  %7 = mark_dependence %6 : $@noescape @callee_guaranteed () -> () on %2 : $*C
+  destroy_value %7 : $@noescape @callee_guaranteed () -> ()
+  end_borrow %4 : $C
+  destroy_value %3 : $C
+  dealloc_stack %2 : $*C
+  %12 = tuple ()
+  return %12 : $()
 }
 

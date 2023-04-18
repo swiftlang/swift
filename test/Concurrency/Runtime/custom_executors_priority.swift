@@ -10,7 +10,7 @@
 // REQUIRES: concurrency_runtime
 
 final class InlineExecutor: SerialExecutor {
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     print("\(self): enqueue (priority: \(TaskPriority(job.priority)!))")
     job.runSynchronously(on: self.asUnownedSerialExecutor())
   }

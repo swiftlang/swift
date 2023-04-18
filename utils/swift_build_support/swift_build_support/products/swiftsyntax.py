@@ -63,6 +63,12 @@ class SwiftSyntax(product.Product):
         if self.is_release():
             build_cmd.append('--release')
 
+        if self.args.swiftsyntax_enable_rawsyntax_validation:
+            build_cmd.append('--enable-rawsyntax-validation')
+
+        if self.args.swiftsyntax_enable_test_fuzzing:
+            build_cmd.append('--enable-test-fuzzing')
+
         if self.args.verbose_build:
             build_cmd.append('--verbose')
 

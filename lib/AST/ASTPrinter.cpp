@@ -3208,6 +3208,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureTupleConformances(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
@@ -3269,6 +3273,10 @@ static bool usesFeatureMoveOnly(Decl *decl) {
 
 static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
+}
+
+static bool usesFeatureMoveOnlyTuples(Decl *decl) {
+  return false;
 }
 
 static bool usesFeatureNoImplicitCopy(Decl *decl) {

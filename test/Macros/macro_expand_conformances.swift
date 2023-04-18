@@ -29,6 +29,10 @@ struct S {}
 @Hashable
 struct S2 {}
 
+enum E {
+  @Equatable struct Nested {}
+}
+
 // CHECK-DUMP: @__swiftmacro_25macro_expand_conformances1S9EquatablefMc_.swift
 // CHECK-DUMP: extension S : Equatable  {}
 
@@ -37,6 +41,8 @@ requireEquatable(S())
 
 requireEquatable(S2())
 requireHashable(S2())
+
+requireEquatable(E.Nested())
 
 @attached(conformance)
 @attached(member, names: named(requirement))

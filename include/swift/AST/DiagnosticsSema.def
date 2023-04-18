@@ -5372,8 +5372,14 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
+ERROR(tuple_move_only_not_supported,none,
+      "tuples with noncopyable elements are not supported", ())
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
+      ())
+
+ERROR(experimental_type_with_parameter_pack,none,
+      "generic types with parameter packs are experimental",
       ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "

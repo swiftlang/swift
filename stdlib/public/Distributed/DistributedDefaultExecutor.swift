@@ -24,7 +24,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   internal init() {}
 
   @inlinable
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     let jobDescription = job.description
     fatalError("Attempted to enqueue \(ExecutorJob.self) (\(jobDescription)) on executor of remote distributed actor reference!")
   }
