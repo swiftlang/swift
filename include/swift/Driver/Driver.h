@@ -170,7 +170,8 @@ public:
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
     APIExtract,      // swift-api-extract
-    APIDigester      // swift-api-digester
+    APIDigester,     // swift-api-digester
+    CacheTool        // swift-cache-tool
   };
 
   class InputInfoMap;

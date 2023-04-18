@@ -675,6 +675,12 @@ bool ArgsToFrontendOptionsConverter::
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
                                                        supplementaryOutputs,
                                                        mainOutputForIndexUnits);
+  // set output type.
+  const file_types::ID outputType =
+      FrontendOptions::formatForPrincipalOutputFileForAction(
+          Opts.RequestedAction);
+  Opts.InputsAndOutputs.setPrincipalOutputType(outputType);
+
   return false;
 }
 
