@@ -717,6 +717,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
       Opts.Features.insert(*feature);
     }
+
+    // Hack: In order to support using availability macros in SPM packages, we
+    // need to be able to use:
+    //    .enableExperimentalFeature("AvailabilityMacro='...'")
+    // within the package manifest and the feature recognizer can't recognize
+    // this form of feature, so specially handle it here until features can
+    // maybe have extra arguments in the future.
+    auto strRef = StringRef(A->getValue());
+    if (strRef.startswith("AvailabilityMacro=")) {
+      auto availability = strRef.split("=").second;
+
+      Opts.AvailabilityMacros.push_back(availability.str());
+    }
   }
 
   // Map historical flags over to future features.
