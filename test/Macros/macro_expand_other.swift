@@ -8,8 +8,8 @@
 
 // Execution testing
 // RUN: %target-build-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser
-// RUN: %target-run %t/main | %FileCheck %s
 // RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: swift_swift_parser, executable_test
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
