@@ -4668,12 +4668,22 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
+  Optional<unsigned> moveOnlyElementIndex = None;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
-    if (ty->hasError())
+    if (ty->hasError()) {
       hadError = true;
+    }
+    // Tuples with move-only elements aren't yet supported.
+    // Track the presence of a noncopyable field for diagnostic purposes.
+    // We don't need to re-diagnose if a tuple contains another tuple, though,
+    // since we should've diagnosed the inner tuple already.
+    if (ty->isPureMoveOnly() && !moveOnlyElementIndex.has_value()
+        && !isa<TupleTypeRepr>(tyR)) {
+      moveOnlyElementIndex = i;
+    }
 
     auto eltName = repr->getElementName(i);
 
@@ -4721,6 +4731,13 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
       return ParenType::get(ctx, elements[0].getType());
+  }
+  
+  if (moveOnlyElementIndex.has_value()
+      && !options.contains(TypeResolutionFlags::SILType)
+      && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+    diagnose(repr->getElementType(*moveOnlyElementIndex)->getLoc(),
+             diag::tuple_move_only_not_supported);
   }
 
   return TupleType::get(elements, ctx);
