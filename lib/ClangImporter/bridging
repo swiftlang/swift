@@ -111,4 +111,17 @@
 #define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName) \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(conforms_to:_moduleName_protocolName))))
 
+/// Specifies that a specific C++ method should be imported as a computed
+/// property. If this macro is specified on a getter, a getter will be
+/// synthesized. If this macro is specified on a setter, both a getter and
+/// setter will be synthesized.
+///
+/// For example:
+///  ```
+///    int getX() SWIFT_COMPUTED_PROPERTY;
+///  ```
+/// Will be imported as `var x: CInt {...}`.
+#define SWIFT_COMPUTED_PROPERTY \
+  __attribute__((swift_attr("import_computed_property")))
+
 #endif // SWIFT_CLANGIMPORTER_SWIFT_INTEROP_SUPPORT_H
