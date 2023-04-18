@@ -1566,10 +1566,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       }
     }
 
+    Type elementType;
+    Pattern *sub = EEP->getSubPattern();
+
     // If there is a subpattern, push the enum element type down onto it.
     auto argType = elt->getArgumentInterfaceType();
-    if (EEP->hasSubPattern()) {
-      Pattern *sub = EEP->getSubPattern();
+    if (sub) {
       if (!elt->hasAssociatedValues()) {
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_assoc_values_mismatch,
@@ -1579,33 +1581,21 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           .fixItRemove(sub->getSourceRange());
         return nullptr;
       }
-      
-      Type elementType;
+
       if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
-      auto newSubOptions = subOptions;
-      newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
-      newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
 
       ::repairTupleOrAssociatedValuePatternIfApplicable(
         Context, sub, elementType, elt);
-
-      sub = coercePatternToType(
-          pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
-          newSubOptions);
-      if (!sub)
-        return nullptr;
-
-      EEP->setSubPattern(sub);
     } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                                 elt, argType);
+      elementType =
+          enumTy->getTypeOfMember(elt->getModuleContext(), elt, argType);
       SmallVector<TuplePatternElt, 8> elements;
       if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
         for (auto &elt : TTy->getElements()) {
@@ -1622,17 +1612,22 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
                                            subPattern));
       }
-      Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
-                                                elements, SourceLoc());
+      sub = TuplePattern::createSimple(Context, SourceLoc(), elements,
+                                       SourceLoc());
       sub->setImplicit();
+    }
+
+    if (sub) {
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
           newSubOptions);
       if (!sub)
         return nullptr;
+
       EEP->setSubPattern(sub);
     }
 
