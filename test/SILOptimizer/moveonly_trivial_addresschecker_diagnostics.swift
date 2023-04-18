@@ -1237,7 +1237,6 @@ public func closureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivialStruct) 
     let f = { // expected-note {{consuming use here}}
         // expected-error @-1 {{escaping closure captures 'inout' parameter 'x2'}}
         borrowVal(x2) // expected-note {{captured here}}
-        // expected-error @-1 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         consumeVal(x2) // expected-note {{captured here}}
         consumeVal(x2) // expected-note {{captured here}}
     }
@@ -1419,9 +1418,8 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivi
         let g = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
             // expected-note @-1 {{captured indirectly by this call}}
             borrowVal(x2)
-            // expected-error @-1 {{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+            // expected-note @-1 {{captured here}}
             // expected-note @-2 {{captured here}}
-            // expected-note @-3 {{captured here}}
             consumeVal(x2)
             // expected-note @-1 {{captured here}}
             // expected-note @-2 {{captured here}}
