@@ -6407,6 +6407,7 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();
@@ -6429,6 +6430,7 @@ LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();
