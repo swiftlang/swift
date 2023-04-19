@@ -213,7 +213,8 @@ public:
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo) override;
+                               ModuleVersionInfo *versionInfo,
+                               bool isTestableImport = false) override;
 
   /// Import a module with the given module path.
   ///
@@ -427,7 +428,8 @@ public:
 
   Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) override;
+      InterfaceSubContextDelegate &delegate,
+      bool isTestableImport = false) override;
 
   /// Add dependency information for the bridging header.
   ///
