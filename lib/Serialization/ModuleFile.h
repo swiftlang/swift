@@ -989,13 +989,11 @@ public:
 
   /// Returns the protocol conformance for the given ID.
   ProtocolConformanceRef
-  getConformance(serialization::ProtocolConformanceID id,
-                 GenericEnvironment *genericEnv = nullptr);
+  getConformance(serialization::ProtocolConformanceID id);
 
   /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  getConformanceChecked(serialization::ProtocolConformanceID id,
-                        GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
