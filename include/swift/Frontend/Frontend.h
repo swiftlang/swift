@@ -44,6 +44,8 @@
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
@@ -447,6 +449,13 @@ public:
 /// times on a single CompilerInstance is not permitted.
 class CompilerInstance {
   CompilerInvocation Invocation;
+
+  /// CAS Instances.
+  /// This needs to be declared before SourceMgr because when using CASFS,
+  /// the file buffer provided by CAS needs to outlive the SourceMgr.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
@@ -516,9 +525,6 @@ public:
   llvm::vfs::FileSystem &getFileSystem() const {
     return *SourceMgr.getFileSystem();
   }
-  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
-    SourceMgr.setFileSystem(FS);
-  }
 
   llvm::vfs::OutputBackend &getOutputBackend() const {
     return *OutputBackend;
@@ -529,6 +535,15 @@ public:
   }
   using HashingBackendPtrTy = llvm::IntrusiveRefCntPtr<HashBackendTy>;
   HashingBackendPtrTy getHashingBackend() { return HashBackend; }
+
+  llvm::cas::ObjectStore &getObjectStore() const { return *CAS; }
+  llvm::cas::ActionCache &getActionCache() const { return *ResultCache; }
+  std::shared_ptr<llvm::cas::ActionCache> getSharedCacheInstance() const {
+    return ResultCache;
+  }
+  std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
+    return CAS;
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -652,6 +667,7 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
+  bool setupCASIfNeeded();
   void setupOutputBackend();
 
   /// \return false if successful, true on error.

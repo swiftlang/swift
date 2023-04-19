@@ -41,6 +41,9 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -395,6 +398,40 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
+bool CompilerInstance::setupCASIfNeeded() {
+  const auto &Opts = getInvocation().getFrontendOptions();
+  if (!Opts.EnableCAS)
+    return false;
+
+  auto MaybeCache = llvm::cas::createOnDiskUnifiedCASDatabases(Opts.CASPath);
+  if (!MaybeCache) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_create_cas, Opts.CASPath,
+                         toString(MaybeCache.takeError()));
+    return true;
+  }
+  CAS = std::move(MaybeCache->first);
+  ResultCache = std::move(MaybeCache->second);
+
+  // create baseline key.
+  llvm::Optional<llvm::cas::ObjectRef> FSRef;
+  if (!Opts.CASFSRootID.empty()) {
+    auto CASFSID = CAS->parseID(Opts.CASFSRootID);
+    if (!CASFSID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           toString(CASFSID.takeError()));
+      return true;
+    }
+    FSRef = CAS->getReference(*CASFSID);
+    if (!FSRef) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           "-cas-fs value does not exist in CAS");
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void CompilerInstance::setupOutputBackend() {
   // Skip if output backend is not setup, default to OnDiskOutputBackend.
   if (OutputBackend)
@@ -417,6 +454,11 @@ void CompilerInstance::setupOutputBackend() {
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
   Invocation = Invoke;
+
+  if (setupCASIfNeeded()) {
+    Error = "Setting up CAS failed";
+    return true;
+  }
 
   setupDependencyTrackerIfNeeded();
   setupOutputBackend();
@@ -463,6 +505,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  if (Invocation.getFrontendOptions().EnableCAS &&
+      !Invocation.getFrontendOptions().CASFSRootID.empty()) {
+    // Set up CASFS as BaseFS.
+    auto RootID = CAS->parseID(Invocation.getFrontendOptions().CASFSRootID);
+    if (!RootID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(RootID.takeError()));
+      return true;
+    }
+    auto FS = llvm::cas::createCASFileSystem(*CAS, *RootID);
+    if (!FS) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(FS.takeError()));
+      return true;
+    }
+    SourceMgr.setFileSystem(std::move(*FS));
+  }
+
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
           SourceMgr.getFileSystem());
