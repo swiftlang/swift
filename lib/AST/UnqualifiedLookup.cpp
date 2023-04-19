@@ -418,18 +418,17 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
       }
     }
 
-    DeclRefExpr *condDRE = nullptr;
-    if (auto DRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
-      condDRE = DRE;
-    }
-
-    if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
-      if (auto DRE = dyn_cast_or_null<DeclRefExpr>(LE->getSubExpr())) {
-        condDRE = DRE;
+    Expr *exprToCheckForDRE = cond.getInitializer();
+    if (auto LE = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
+      if (auto subexpr = LE->getSubExpr()) {
+        exprToCheckForDRE = subexpr;
       }
     }
 
-    if (!condDRE) {
+    exprToCheckForDRE = exprToCheckForDRE->getSemanticsProvidingExpr();
+
+    DeclRefExpr *condDRE = dyn_cast<DeclRefExpr>(exprToCheckForDRE);
+    if (!condDRE || !condDRE->getDecl()->hasName()) {
       return false;
     }
 
