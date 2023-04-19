@@ -1285,11 +1285,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
   case SIL_PACK_ELEMENT_GET:
-    SILPackElementGetLayout::readRecord(scratch,
+    SILPackElementGetLayout::readRecord(scratch, RawOpCode,
                                         TyID, TyCategory,
                                         TyID2, TyCategory2, ValID2,
                                         ValID3);
-    RawOpCode = (unsigned)SILInstructionKind::PackElementGetInst;
     break;
   case SIL_PACK_ELEMENT_SET:
     SILPackElementSetLayout::readRecord(scratch,
@@ -1332,7 +1331,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::AllocPackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    ResultInst = Builder.createAllocStack(
+    ResultInst = Builder.createAllocPack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
   }
