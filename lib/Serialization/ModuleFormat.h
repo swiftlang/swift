@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 759; // change PackType
+const uint16_t SWIFTMODULE_VERSION_MINOR = 780; // serialize PackConformance
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -139,6 +139,21 @@ public:
 // in the same way.
 using ProtocolConformanceID = DeclID;
 using ProtocolConformanceIDField = DeclIDField;
+
+// The low two bits of the ProtocolConformanceID determine the kind:
+// 00 -- abstract conformance
+// 01 -- concrete conformance
+// 10 -- pack conformance
+struct SerializedProtocolConformanceKind {
+  enum  {
+    Abstract = 0,
+    Concrete = 1,
+    Pack = 2,
+
+    Shift = 2,
+    Mask = 3
+  };
+};
 
 // GenericSignatureID must be the same as DeclID because it is stored in the
 // same way.
@@ -1910,6 +1925,13 @@ namespace decls_block {
     BCArray<BCVBR<6>> // conditional requirements
   >;
 
+  using PackConformanceLayout = BCRecordLayout<
+    PACK_CONFORMANCE,
+    TypeIDField,                         // pattern type
+    DeclIDField,                         // the protocol
+    BCArray<ProtocolConformanceIDField>  // pattern conformances
+  >;
+
   using ProtocolConformanceXrefLayout = BCRecordLayout<
     PROTOCOL_CONFORMANCE_XREF,
     DeclIDField, // the protocol being conformed to
@@ -2344,6 +2366,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,
