@@ -3124,14 +3124,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (hasSafeMembers)
         return true;
 
-      // We can mark the extension unsafe only if it has no  public
+      // We can mark the extension unsafe only if it has no public
       // conformances.
       auto protocols = ext->getLocalProtocols(
                                         ConformanceLookupKind::OnlyExplicit);
-      bool hasSafeConformances = std::any_of(protocols.begin(),
-                                             protocols.end(),
-                                             isDeserializationSafe);
-      if (hasSafeConformances)
+      if (!protocols.empty())
         return true;
 
       // Truly empty extensions are safe, it may happen in swiftinterfaces.
@@ -3140,6 +3137,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       return false;
     }
+
+    if (isa<ProtocolDecl>(decl))
+      return true;
 
     auto value = cast<ValueDecl>(decl);
 
