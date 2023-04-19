@@ -27,6 +27,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -882,6 +883,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
@@ -1682,33 +1684,46 @@ Serializer::addConformanceRef(ProtocolConformance *conformance,
 }
 
 serialization::ProtocolConformanceID
+Serializer::addConformanceRef(PackConformance *conformance,
+                              GenericEnvironment *genericEnv) {
+  return addConformanceRef(ProtocolConformanceRef(conformance), genericEnv);
+}
+
+serialization::ProtocolConformanceID
 Serializer::addConformanceRef(ProtocolConformanceRef ref,
                               GenericEnvironment *genericEnv) {
   if (ref.isInvalid()) {
     return 0;
   }
 
-  // Abstract protocol conformances are very common, so we avoid making
-  // a separate record for them by just emitting a declaration reference
-  // to the protocol and then using the low bit of the ID to distinguish
-  // abstract from concrete conformances.
-
   if (ref.isAbstract()) {
     auto protocolID = addDeclRef(ref.getAbstract());
     assert(protocolID != 0);
-    return protocolID << 1;
+    return ((protocolID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Abstract);
   }
 
-  auto conformance = ref.getConcrete();
+  if (ref.isConcrete()) {
+    auto conformance = ref.getConcrete();
 
-  if (genericEnv && conformance->getType()->hasArchetype()) {
-    ref = ref.mapConformanceOutOfContext();
-    assert(!ref.isInvalid() && !ref.isAbstract());
-    conformance = ref.getConcrete();
+    if (genericEnv && conformance->getType()->hasArchetype()) {
+      ref = ref.mapConformanceOutOfContext();
+      assert(!ref.isInvalid() && !ref.isAbstract());
+      conformance = ref.getConcrete();
+    }
+
+    auto rawID = ConformancesToSerialize.addRef(conformance);
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Concrete);
   }
 
-  auto rawID = ConformancesToSerialize.addRef(conformance);
-  return (rawID << 1) + 1;
+  if (ref.isPack()) {
+    auto rawID = PackConformancesToSerialize.addRef(ref.getPack());
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Pack);
+  }
+
+  llvm_unreachable("Unknown conformance kind");
 }
 
 void
@@ -1794,6 +1809,25 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         requirementData);
     break;
   }
+}
+
+void
+Serializer::writeASTBlockEntity(PackConformance *conformance) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[PackConformanceLayout::Code];
+
+  SmallVector<ProtocolConformanceID, 4> patternConformances;
+  for (auto patternConf : conformance->getPatternConformances()) {
+    patternConformances.push_back(addConformanceRef(patternConf));
+  }
+
+  PackConformanceLayout::emitRecord(
+      Out, ScratchRecord,
+      abbrCode,
+      addTypeRef(conformance->getType()),
+      addDeclRef(conformance->getProtocol()),
+      patternConformances);
 }
 
 SmallVector<ProtocolConformanceID, 4>
@@ -5640,6 +5674,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
+  registerDeclTypeAbbr<PackConformanceLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
   registerDeclTypeAbbr<SILLayoutLayout>();
@@ -5679,6 +5714,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(ConformancesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
   } while (wroteSomething);
 }
@@ -6282,6 +6319,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
+    writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,

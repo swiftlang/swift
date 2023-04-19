@@ -254,6 +254,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Pack conformances referenced by this module.
+  MutableArrayRef<Serialized<PackConformance *>> PackConformances;
+
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
