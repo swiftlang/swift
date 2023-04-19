@@ -18,6 +18,12 @@ CxxCollectionTestSuite.test("SimpleCollectionNoSubscript as Swift.Collection") {
   expectEqual(c[0], 1)
   expectEqual(c[1], 2)
   expectEqual(c[4], 5)
+
+  var array: [Int32] = []
+  c.forEach {
+    array.append($0)
+  }
+  expectEqual([1, 2, 3, 4, 5] as [Int32], array)
 }
 
 CxxCollectionTestSuite.test("SimpleCollectionReadOnly as Swift.Collection") {
