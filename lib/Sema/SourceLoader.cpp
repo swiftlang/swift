@@ -71,7 +71,8 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
 }
 
 bool SourceLoader::canImportModule(ImportPath::Module path,
-                                   ModuleVersionInfo *versionInfo) {
+                                   ModuleVersionInfo *versionInfo,
+                                   bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -155,7 +156,8 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
 Optional<const ModuleDependencyInfo*>
 SourceLoader::getModuleDependencies(StringRef moduleName,
                                     ModuleDependenciesCache &cache,
-                                    InterfaceSubContextDelegate &delegate) {
+                                    InterfaceSubContextDelegate &delegate,
+                                    bool isTestableImport) {
   // FIXME: Implement?
   return None;
 }

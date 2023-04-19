@@ -202,7 +202,7 @@ void ClangImporter::recordModuleDependencies(
 
 Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate) {
+    InterfaceSubContextDelegate &delegate, bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
