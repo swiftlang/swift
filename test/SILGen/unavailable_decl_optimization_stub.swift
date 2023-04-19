@@ -23,3 +23,19 @@ enum SomeError: Error { case generic }
 public func unavailableThrowingFunc() throws {
   throw SomeError.generic
 }
+
+// one-time initialization function for globalVar
+// CHECK-LABEL: sil {{.*}} @$s4Test9globalVar_WZ
+// CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:         alloc_global
+// CHECK:       } // end sil function '$s4Test9globalVar_WZ'
+//
+// globalVar.unsafeMutableAddressor
+// CHECK-LABEL: sil {{.*}} @$s4Test9globalVarAA1SVvau
+// CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:         global_addr @$s4Test9globalVar_Wz
+// CHECK:       } // end sil function '$s4Test9globalVarAA1SVvau'
+@available(*, unavailable)
+public var globalVar = S()
