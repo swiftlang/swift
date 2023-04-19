@@ -1678,20 +1678,17 @@ void Serializer::writeLocalNormalProtocolConformance(
 }
 
 serialization::ProtocolConformanceID
-Serializer::addConformanceRef(ProtocolConformance *conformance,
-                              GenericEnvironment *genericEnv) {
-  return addConformanceRef(ProtocolConformanceRef(conformance), genericEnv);
+Serializer::addConformanceRef(ProtocolConformance *conformance) {
+  return addConformanceRef(ProtocolConformanceRef(conformance));
 }
 
 serialization::ProtocolConformanceID
-Serializer::addConformanceRef(PackConformance *conformance,
-                              GenericEnvironment *genericEnv) {
-  return addConformanceRef(ProtocolConformanceRef(conformance), genericEnv);
+Serializer::addConformanceRef(PackConformance *conformance) {
+  return addConformanceRef(ProtocolConformanceRef(conformance));
 }
 
 serialization::ProtocolConformanceID
-Serializer::addConformanceRef(ProtocolConformanceRef ref,
-                              GenericEnvironment *genericEnv) {
+Serializer::addConformanceRef(ProtocolConformanceRef ref) {
   if (ref.isInvalid()) {
     return 0;
   }
@@ -1705,13 +1702,6 @@ Serializer::addConformanceRef(ProtocolConformanceRef ref,
 
   if (ref.isConcrete()) {
     auto conformance = ref.getConcrete();
-
-    if (genericEnv && conformance->getType()->hasArchetype()) {
-      ref = ref.mapConformanceOutOfContext();
-      assert(!ref.isInvalid() && !ref.isAbstract());
-      conformance = ref.getConcrete();
-    }
-
     auto rawID = ConformancesToSerialize.addRef(conformance);
     return ((rawID << SerializedProtocolConformanceKind::Shift) |
             SerializedProtocolConformanceKind::Concrete);

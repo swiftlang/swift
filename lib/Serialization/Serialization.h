@@ -511,18 +511,10 @@ public:
   /// The protocol conformance will be scheduled for serialization
   /// if necessary.
   ///
-  /// \param genericEnv When provided, the generic environment that describes
-  /// the archetypes within the substitutions. The replacement types within
-  /// the substitution will be mapped out of the generic environment before
-  /// being written.
-  ///
   /// \returns The ID for the given conformance in this module.
-  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
-  ProtocolConformanceID addConformanceRef(PackConformance *conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
-  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
+  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance);
+  ProtocolConformanceID addConformanceRef(PackConformance *conformance);
+  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance);
 
   SmallVector<ProtocolConformanceID, 4>
   addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances);

@@ -825,17 +825,15 @@ ProtocolConformanceDeserializer::read(
 }
 
 ProtocolConformanceRef
-ModuleFile::getConformance(ProtocolConformanceID id,
-                           GenericEnvironment *genericEnv) {
-  auto conformance = getConformanceChecked(id, genericEnv);
+ModuleFile::getConformance(ProtocolConformanceID id) {
+  auto conformance = getConformanceChecked(id);
   if (!conformance)
     fatal(conformance.takeError());
   return conformance.get();
 }
 
 Expected<ProtocolConformanceRef>
-ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID,
-                                  GenericEnvironment *genericEnv) {
+ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
   using namespace decls_block;
 
   if (conformanceID == 0) return ProtocolConformanceRef::forInvalid();
@@ -868,14 +866,7 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID,
       conformanceOrOffset = result.get();
     }
     auto conformance = conformanceOrOffset.get();
-    if (!genericEnv || !conformance->getType()->hasTypeParameter())
-      return ProtocolConformanceRef(conformance);
-
-    // If we have a generic environment, map the conformance into context.
-    auto mappedConformance =
-      genericEnv->mapConformanceRefIntoContext(conformance->getType(),
-                                       ProtocolConformanceRef(conformance));
-    return mappedConformance.second;
+    return ProtocolConformanceRef(conformance);
   }
 
   case SerializedProtocolConformanceKind::Pack: {
