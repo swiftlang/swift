@@ -7,6 +7,8 @@
 
 // Check that TSan ignores the retain count update locks in the runtime.
 
+// REQUIRES: rdar108188149
+
 import Foundation
 
 public class Dummy {
