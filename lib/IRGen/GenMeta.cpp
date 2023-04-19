@@ -4524,13 +4524,6 @@ namespace {
       return !!getLayoutString();
     }
 
-    llvm::Constant *emitNominalTypeDescriptor() {
-      auto descriptor =
-        StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
-                                       hasLayoutString()).emit();
-      return descriptor;
-    }
-
     ConstantReference emitValueWitnessTable(bool relativeReference) {
       return irgen::emitValueWitnessTable(IGM, type, false, relativeReference);
     }
@@ -5386,6 +5379,13 @@ namespace {
                                             StructDecl &decl,
                                             ConstantStructBuilder &B)
         : super(IGM, type, decl, B) {}
+
+    llvm::Constant *emitNominalTypeDescriptor() {
+      auto descriptor =
+        StructContextDescriptorBuilder(IGM, Target, RequireMetadata,
+                                       hasLayoutString()).emit();
+      return descriptor;
+    }
   };
 
 } // end anonymous namespace
