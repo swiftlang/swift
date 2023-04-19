@@ -1598,7 +1598,7 @@ SWIFT_CC(swift)
 static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   AsyncTask * originalTask = _swift_task_clearCurrent();
   ExecutorRef mainExecutor = swift_task_getMainExecutor();
-  if (swift_task_getCurrentExecutor() != swift_task_getMainExecutor())
+  if (!swift_task_isCurrentExecutor(mainExecutor))
     swift_Concurrency_fatalError(0, "Not on the main executor");
   swift_retain(task);
   swift_job_run(task, mainExecutor);
