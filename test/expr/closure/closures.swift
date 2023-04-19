@@ -841,6 +841,11 @@ public class TestImplicitSelfForWeakSelfCapture {
           method()
           self.method()
       }
+      
+      subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
+        method()
+        return index
+      }
     }
     
     doVoidStuffNonEscaping { [weak self] in
@@ -855,6 +860,42 @@ public class TestImplicitSelfForWeakSelfCapture {
           method()
           self.method()
       }
+      
+      subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
+        method()
+        return index
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      
+      func innerFunction1() {
+        doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+        }
+        
+        // This example should probably compile without an error -- seems like a bug in the impl of SE-0269
+        doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.method()
+        }
+        
+        doVoidStuff { [weak self] in
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self?.method()
+        }
+        
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          method()
+          
+          func innerMethod3() {
+            method()
+            self.method()
+          }
+        }
+      }
     }
   }
 }
@@ -862,13 +903,24 @@ public class TestImplicitSelfForWeakSelfCapture {
 class NoImplicitSelfInInnerClass {
   func method() { }
   
-  private init() { // expected-note {{'self' declared here}} expected-note {{'self' declared here}}
+  private init() { // expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}}
     doVoidStuff {
-      class InnerType { // expected-note {{type declared here}}
-          func functionInsideInnerType() {
-            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
-            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
-          }
+      class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
+        init() {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        func functionInsideInnerType() {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        subscript(index: Int) -> Int {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          return index
+        }
       }
     }
     
@@ -876,13 +928,60 @@ class NoImplicitSelfInInnerClass {
       guard let self else { return }
       method()
       
-      class InnerType { // expected-note {{type declared here}}
-          func functionInsideInnerType() {
-            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
-            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
-          }
+      class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
+        func methodOnInnerType() { }
+        
+        init() {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        func functionInsideInnerType() {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        subscript(index: Int) -> Int {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          return index
+        }
       }
     }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      
+      func innerMethod() {
+        method()
+        
+        class InnerType { // expected-note {{type declared here}}
+          func methodOnInnerType() { }
+          
+          init() {
+            methodOnInnerType()
+            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+            
+            doVoidStuff { [weak self] in
+              guard let self else { return }
+              self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+              methodOnInnerType()
+            }
+            
+            doVoidStuff { [weak self] in
+              guard let self else { return }
+              method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+              methodOnInnerType()
+            }
+          }
+        }
+      }
+    }
+    
   }
 }
 
