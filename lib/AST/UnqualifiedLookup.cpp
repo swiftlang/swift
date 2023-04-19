@@ -409,9 +409,7 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
 
       else if (auto OSP = dyn_cast<OptionalSomePattern>(pattern)) {
         if (auto subPattern = OSP->getSubPattern()) {
-          if (subPattern->getBoundName() == Ctx.Id_self) {
-            isSelfRebinding = true;
-          }
+          isSelfRebinding = subPattern->getBoundName() == Ctx.Id_self;
         }
       }
 
@@ -445,12 +443,12 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
 // permitted usage of implicit self. In closures this is most
 // often just `dc` itself, but in functions defined in the
 // closure body this would be some parent context.
-AbstractClosureExpr *closestParentClosure(DeclContext *dc) {
+ClosureExpr *closestParentClosure(DeclContext *dc) {
   if (!dc) {
     return nullptr;
   }
 
-  if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
     return closure;
   }
 
@@ -474,8 +472,7 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   // self _always_ refers to the context's self `ParamDecl`, even if there
   // is another local decl with the name `self` that would be found by
   // `lookupSingleLocalDecl`.
-  auto parentACE = closestParentClosure(factory->DC);
-  auto closureExpr = dyn_cast_or_null<ClosureExpr>(parentACE);
+  auto closureExpr = closestParentClosure(factory->DC);
   if (!closureExpr) {
     return nullptr;
   }
