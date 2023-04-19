@@ -4626,7 +4626,8 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     return packReference;
   }
 
-  if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+  if (!options.contains(TypeResolutionFlags::AllowPackReferences) &&
+      !options.contains(TypeResolutionFlags::SILMode)) {
     ctx.Diags.diagnose(repr->getLoc(),
                        diag::pack_reference_outside_expansion,
                        packReference);

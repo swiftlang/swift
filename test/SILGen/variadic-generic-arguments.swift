@@ -20,9 +20,9 @@ func receive_simple<each T>(_ args: repeat each T) {}
 // CHECK:       bb2:
 // CHECK-NEXT:    [[IDX:%.*]] = builtin "sub_Word"([[LAST_IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
-// CHECK-NEXT:    [[ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    destroy_addr [[ELT_ADDR]] : $*@pack_element([[UUID]]) T
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    destroy_addr [[ELT_ADDR]] : $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    br bb1([[IDX]] : $Builtin.Word)
 // CHECK:       bb3:
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
@@ -108,11 +108,11 @@ func scalar_test1(i: Int, f: Float, s: String) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
-// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T into [[INDEX]] of [[PACK]] : $*Pack{repeat each T}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
@@ -141,11 +141,11 @@ func pack_test0<each T>(args: repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
-// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[PACK]] : $*Pack{repeat each T}
+// CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T into [[INDEX]] of [[PACK]] : $*Pack{repeat each T}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:
@@ -180,12 +180,12 @@ func pack_test1<each T>(args: repeat each T) {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
 // CHECK-NEXT:    [[INDEX:%.*]] = pack_pack_index 1, [[EXPANSION_INDEX]] of $Pack{Int, repeat each T, String}
-// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T
-// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) T into [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T, String}
+// CHECK-NEXT:    [[DST_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    copy_addr [[SRC_ELT_ADDR]] to [init] [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T
+// CHECK-NEXT:    pack_element_set [[DST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T into [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T, String}
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
 // CHECK-NEXT:    br bb1([[NEXT_IDX]] : $Builtin.Word)
 // CHECK:       bb3:

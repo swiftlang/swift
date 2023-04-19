@@ -5,23 +5,23 @@ import Swift
 
 // CHECK-LABEL: sil @test1 :
 // CHECK: [[INDEX:%.*]] = dynamic_pack_index {{%.*}} of $Pack{repeat each T}
-// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000000"
+// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000000"
 sil @test1 : $<each T> () -> () {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %intIndex of $Pack{repeat each T}
-  %0 = open_pack_element %index of <each U> at <Pack{repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000000"
+  %0 = open_pack_element %index of <each U> at <Pack{repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000000"
   %ret = tuple ()
   return %ret : $()
 }
 
 // CHECK-LABEL: sil @test2 :
 // CHECK: [[INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, repeat each T}
-// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000001"
+// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{Int, repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000001"
 sil @test2 : $<each T> () -> () {
 bb0:
   %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
-  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000001"
+  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000001"
   %ret = tuple ()
   return %ret : $()
 }
@@ -29,15 +29,15 @@ bb0:
 // CHECK-LABEL: sil @test3 :
 // CHECK: [[INNER_INDEX:%.*]] = dynamic_pack_index {{%.*}} of $Pack{repeat each T}
 // CHECK: [[INDEX:%.*]] = pack_pack_index 1, [[INNER_INDEX]] of $Pack{Int, repeat each T}
-// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000002"
-// CHECK: metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") U).Type
+// CHECK: {{%.*}} = open_pack_element [[INDEX]] of <each U> at <Pack{Int, repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000002"
+// CHECK: metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") each U).Type
 sil @test3 : $<each T> () -> () {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 0
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
   %index = pack_pack_index 1, %innerIndex of $Pack{Int, repeat each T}
-  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000002"
-  %metatype = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") U).Type
+  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000002"
+  %metatype = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") each U).Type
   %ret = tuple ()
   return %ret : $()
 }
@@ -60,18 +60,18 @@ bb0:
 // CHECK-LABEL: sil @test5 :
 // CHECK: [[PACK:%.*]] = alloc_pack $Pack{Int, repeat each T}
 // CHECK: [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Int, repeat each T}
-// CHECK: [[ADDR:%.*]] = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000003") U
-// CHECK: pack_element_set [[ADDR]] : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U into [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T}
-// CHECK: pack_element_get [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+// CHECK: [[ADDR:%.*]] = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000003") each U
+// CHECK: pack_element_set [[ADDR]] : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") each U into [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T}
+// CHECK: pack_element_get [[INDEX]] of [[PACK]] : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") each U
 sil @test5 : $<each T> (Builtin.Word) -> () {
 bb0(%i : $Builtin.Word):
   %pack1 = alloc_pack $Pack{Int, repeat each T}
   %index = dynamic_pack_index %i of $Pack{Int, repeat each T}
-  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000003"
+  %0 = open_pack_element %index of <each U> at <Pack{Int, repeat each T}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000003"
   %addr = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000003") U
-  pack_element_set %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U into %index of %pack1 : $*Pack{Int, repeat each T}
-  %addr2 = pack_element_get %index of %pack1 : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
-  dealloc_stack %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") U
+  pack_element_set %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") each U into %index of %pack1 : $*Pack{Int, repeat each T}
+  %addr2 = pack_element_get %index of %pack1 : $*Pack{Int, repeat each T} as $*@pack_element("01234567-89AB-CDEF-0123-000000000003") each U
+  dealloc_stack %addr : $*@pack_element("01234567-89AB-CDEF-0123-000000000003") each U
   dealloc_pack %pack1 : $*Pack{Int, repeat each T}
   %ret = tuple ()
   return %ret : $()
@@ -79,12 +79,12 @@ bb0(%i : $Builtin.Word):
 
 // CHECK-LABEL: sil @test6
 // CHECK: [[INDEX:%.*]] = dynamic_pack_index
-// CHECK: tuple_pack_element_addr [[INDEX]] of %0 : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U
+// CHECK: tuple_pack_element_addr [[INDEX]] of %0 : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") each U
 sil @test6 :  $<each T> (@inout (String, repeat each T, Int), Builtin.Word) -> () {
 bb0(%tuple : $*(String, repeat each T, Int), %i : $Builtin.Word):
   %index = dynamic_pack_index %i of $Pack{Float, repeat each T, Float}
-  %0 = open_pack_element %index of <each U> at <Pack{String, repeat each T, Int}>, shape $U, uuid "01234567-89AB-CDEF-0123-000000000004"
-  %elt = tuple_pack_element_addr %index of %tuple : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U
+  %0 = open_pack_element %index of <each U> at <Pack{String, repeat each T, Int}>, shape $each U, uuid "01234567-89AB-CDEF-0123-000000000004"
+  %elt = tuple_pack_element_addr %index of %tuple : $*(String, repeat each T, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") each U
   %ret = tuple ()
   return %ret : $()
 }

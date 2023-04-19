@@ -11,6 +11,11 @@ public func variadicFunction<each T, each U>(t: repeat each T, u: repeat each U)
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $ParameterPacks
+// CHECK-NEXT: public func variadicFunctionWithRequirement<each T>(t: repeat each T) where repeat each T : Swift.Equatable
+public func variadicFunctionWithRequirement<each T: Equatable>(t: repeat each T) {}
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ParameterPacks
 // CHECK-NEXT: public struct VariadicType<each T> {
 public struct VariadicType<each T> {
   // CHECK: public func variadicMethod<each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) where (repeat (each T, each U)) : Any
