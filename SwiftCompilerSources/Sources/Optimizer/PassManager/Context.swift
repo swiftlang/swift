@@ -64,7 +64,7 @@ extension MutatingContext {
   func erase(instructionIncludingDebugUses inst: Instruction) {
     for result in inst.results {
       for use in result.uses {
-        assert(use.instruction is DebugValueInst)
+        assert(use.instruction is DebugValueInst, "instruction to delete may only have debug_value uses")
         erase(instruction: use.instruction)
       }
     }
