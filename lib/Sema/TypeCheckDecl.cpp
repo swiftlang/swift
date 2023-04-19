@@ -1343,9 +1343,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     // Diagnose the duplicate value.
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-    assert(lastExplicitValueElt &&
-           "should not be able to have non-unique raw values when "
-           "relying on autoincrement");
+    
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
@@ -1357,6 +1355,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
         ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
+    
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
