@@ -85,8 +85,26 @@ ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
   return dyn_cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
 }
 
+void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
+  assert(getAsSwiftSourceModule() && "Expected source module for addTestableImport.");
+  dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())->addTestableImport(module);
+}
+
+bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
+  if (auto swiftSourceDepStorage = getAsSwiftSourceModule())
+    return swiftSourceDepStorage->testableImports.contains(moduleName);
+  else
+    return false;
+}
+
 void ModuleDependencyInfo::addModuleDependency(ModuleDependencyID dependencyID) {
   storage->resolvedModuleDependencies.push_back(dependencyID);
+}
+
+void ModuleDependencyInfo::addOptionalModuleImport(
+    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
+    storage->optionalModuleImports.push_back(module.str());
 }
 
 void ModuleDependencyInfo::addModuleImport(
@@ -108,6 +126,12 @@ void ModuleDependencyInfo::addModuleImport(
     ImportPath::Builder scratch;
     auto realPath = importDecl->getRealModulePath(scratch);
     addModuleImport(realPath, &alreadyAddedModules);
+
+    // Additionally, keep track of which dependencies of a Source
+    // module are `@Testable`.
+    if (getKind() == swift::ModuleDependencyKind::SwiftSource &&
+        importDecl->isTestable())
+      addTestableImport(realPath);
   }
 
   auto fileName = sf.getFilename();
@@ -118,9 +142,8 @@ void ModuleDependencyInfo::addModuleImport(
   case swift::ModuleDependencyKind::SwiftInterface: {
     // If the storage is for an interface file, the only source file we
     // should see is that interface file.
-    auto swiftInterfaceStorage =
-        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-    assert(fileName == swiftInterfaceStorage->swiftInterfaceFile);
+    assert(fileName ==
+           cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())->swiftInterfaceFile);
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
