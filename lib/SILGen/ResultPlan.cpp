@@ -430,7 +430,7 @@ class PackExpansionResultPlan : public ResultPlan {
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder,
                           SILValue packAddr,
-                          Optional<MutableArrayRef<InitializationPtr>> inits,
+                          Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -443,7 +443,7 @@ public:
 
     ComponentPlans.reserve(substEltTypes.size());
     for (auto i : indices(substEltTypes)) {
-      Initialization *init = inits ? (*inits)[i].get() : nullptr;
+      Initialization *init = inits ? (*inits)[i] : nullptr;
       CanType substEltType = substEltTypes[i];
 
       if (isa<PackExpansionType>(substEltType)) {
@@ -635,33 +635,49 @@ public:
 class TupleInitializationResultPlan final : public ResultPlan {
   Initialization *tupleInit;
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
-  MutableArrayRef<InitializationPtr> eltInits;
   SmallVector<ResultPlanPtr, 4> eltPlans;
+  bool origTupleVanishes;
 
 public:
   TupleInitializationResultPlan(ResultPlanBuilder &builder,
                                 Initialization *tupleInit,
                                 AbstractionPattern origType,
-                                CanType substType)
-      : tupleInit(tupleInit) {
+                                CanType substType,
+                                bool origTupleVanishes)
+      : tupleInit(tupleInit), origTupleVanishes(origTupleVanishes) {
+
     // Get the sub-initializations.
-    eltInits = tupleInit->splitIntoTupleElements(builder.SGF, builder.loc,
-                                                 substType, eltInitsBuffer);
+    SmallVector<Initialization*, 4> eltInits;
+    if (origTupleVanishes) {
+      eltInits.push_back(tupleInit);
+    } else {
+      MutableArrayRef<InitializationPtr> ownedEltInits
+        = tupleInit->splitIntoTupleElements(builder.SGF, builder.loc,
+                                            substType, eltInitsBuffer);
+
+      // The ownership of these inits is maintained in eltInitsBuffer
+      // (or tupleInit internally), but we need to create a temporary
+      // array of unowned references to the inits, after which we can
+      // throw away the ArrayRef that was returned to us.
+      eltInits.reserve(ownedEltInits.size());
+      for (auto &eltInit : ownedEltInits) {
+        eltInits.push_back(eltInit.get());
+      }
+    }
 
     // Create plans for all the sub-initializations.
     eltPlans.reserve(origType.getNumTupleElements());
-
     origType.forEachTupleElement(substType,
                                  [&](TupleElementGenerator &elt) {
       auto origEltType = elt.getOrigType();
       auto substEltTypes = elt.getSubstTypes();
       if (!elt.isOrigPackExpansion()) {
-        Initialization *eltInit = eltInits[elt.getSubstIndex()].get();
+        Initialization *eltInit = eltInits[elt.getSubstIndex()];
         eltPlans.push_back(builder.build(eltInit, origEltType,
                                          substEltTypes[0]));
       } else {
-        auto componentInits =
-          eltInits.slice(elt.getSubstIndex(), substEltTypes.size());
+        auto componentInits = llvm::makeArrayRef(eltInits)
+               .slice(elt.getSubstIndex(), substEltTypes.size());
         eltPlans.push_back(builder.buildForPackExpansion(componentInits,
                                                          origEltType,
                                                          substEltTypes));
@@ -678,7 +694,12 @@ public:
       assert(eltRV.isInContext());
       (void)eltRV;
     }
-    tupleInit->finishInitialization(SGF);
+
+    // Finish the tuple initialization; but if the tuple vanished,
+    // this is handled in the loop above.
+    if (!origTupleVanishes) {
+      tupleInit->finishInitialization(SGF);
+    }
 
     return RValue::forInContext();
   }
@@ -1179,7 +1200,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::
-    buildForPackExpansion(Optional<MutableArrayRef<InitializationPtr>> inits,
+    buildForPackExpansion(Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());
@@ -1301,10 +1322,16 @@ ResultPlanBuilder::buildScalarIntoPack(SILValue packAddr,
 ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
                                                AbstractionPattern origType,
                                                CanType substType) {
-  // If we have an initialization, and we can split it, do so.
-  if (init && init->canSplitIntoTupleElements()) {
-    return ResultPlanPtr(
-        new TupleInitializationResultPlan(*this, init, origType, substType));
+  // If we have an initialization, and we can split the initialization,
+  // emit directly into the initialization.  If the orig tuple vanishes,
+  // that counts as the initialization being splittable.
+  if (init) {
+    bool vanishes = origType.getVanishingTupleElementPatternType().hasValue();
+    if (vanishes || init->canSplitIntoTupleElements()) {
+      return ResultPlanPtr(
+        new TupleInitializationResultPlan(*this, init, origType, substType,
+                                          vanishes));
+    }
   }
 
   auto substTupleType = dyn_cast<TupleType>(substType);
