@@ -7,6 +7,9 @@
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
+
 import _Concurrency
 
 struct Boom: Error {
