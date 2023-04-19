@@ -29,12 +29,12 @@ func concreteReturnTupleValid() {
   // FIXME: consider propagating 'Int' through the conversion constraint
   // as a binding for the parameter pack expanded in the tuple return type.
   let _: Int = returnTuple1()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(repeat each T)' to specified type 'Int'}}
   let _: (Int, String) = returnTuple1()
 
   let _: Int = returnTuple2()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(Int, repeat each T)' to specified type 'Int'}}
   let _: (Int, String) = returnTuple2()
   let _: (Int, String, Float) = returnTuple2()
@@ -73,15 +73,15 @@ func concreteReturnTupleValid() {
 func concreteReturnTypeInvalid() {
   let _: Int = returnTuple1()
   // expected-error@-1 {{cannot convert value of type '(repeat each T)' to specified type 'Int'}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: () = returnTuple2()
   // expected-error@-1 {{'(Int, repeat each T)' is not convertible to '()', tuples have a different number of elements}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: Int = returnTupleLabel3()
   // expected-error@-1 {{cannot convert value of type '(Int, repeat each T, y: Float)' to specified type 'Int'}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Int, Int, y: Float) = returnTupleLabel4() // error at declaration
   let _: () = returnTupleLabel5()  // error at declaration
@@ -129,14 +129,14 @@ func genericReturnTupleInvalid<each T>(_: repeat each T) {
 
   let _: (x: Int, repeat each T) = returnTuple1()
   // expected-error@-1 {{'(repeat each T)' is not convertible to '(x: Int, repeat each T)', tuples have a different number of elements}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Int, x: repeat each T) = returnTuple2()
   // expected-error@-1 {{cannot use label with pack expansion tuple element}}
 
   let _: (Int, x: String, repeat each T) = returnTuple2()
   // expected-error@-1 {{'(Int, repeat each T)' is not convertible to '(Int, x: String, repeat each T)', tuples have a different number of elements}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: (y: repeat each T) = returnTupleLabel1()
   // expected-error@-1 {{cannot use label with pack expansion tuple element}}
@@ -150,11 +150,11 @@ func genericReturnTupleInvalid<each T>(_: repeat each T) {
 
   let _: (repeat each T, y: Float) = returnTupleLabel3()
   // expected-error@-1 {{'(Int, repeat each T, y: Float)' is not convertible to '(repeat each T, y: Float)', tuples have a different number of elements}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Int, String, repeat each T, x: Float) = returnTupleLabel3()
   // expected-error@-1 {{'(Int, repeat each T, y: Float)' is not convertible to '(Int, String, repeat each T, x: Float)', tuples have a different number of elements}}
-  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each T' could not be inferred}}
 
   let _: (repeat each T, y: Float) = returnTupleLabel4() // error at declaration
 
@@ -197,22 +197,22 @@ func concreteReturnFunctionValid() {
 
 func concreteReturnFunctionInvalid() {
   let _: () -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int, repeat each T) -> ()' to specified type '() -> ()'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (String) -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int) -> ()' to specified type '(String) -> ()'}}
   let _: (String, Int) -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int, Int) -> ()' to specified type '(String, Int) -> ()'}}
 
   let _: () -> () = returnFunction3() // expected-error {{cannot convert value of type '(repeat each T, Float) -> ()' to specified type '() -> ()'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Float, Int) -> () = returnFunction3() // expected-error {{cannot convert value of type '(Float, Float) -> ()' to specified type '(Float, Int) -> ()'}}
   let _: (Float, Double, String) -> () = returnFunction3() // expected-error {{cannot convert value of type '(Float, Double, Float) -> ()' to specified type '(Float, Double, String) -> ()'}}
 
   let _: () -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, repeat each T, Float) -> ()' to specified type '() -> ()'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Int) -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, repeat each T, Float) -> ()' to specified type '(Int) -> ()'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (Float, Int) -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, Float) -> ()' to specified type '(Float, Int) -> ()'}}
 }
@@ -229,7 +229,7 @@ func patternInstantiationConcreteValid() {
   let _: () = patternInstantiationTupleTest1()
   // FIXME
   let _: Array<Int> = patternInstantiationTupleTest1()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(repeat Array<each T>)' to specified type 'Array<Int>'}}
   let _: (Array<Int>, Array<String>) = patternInstantiationTupleTest1()
   let _: (Array<Int>, Array<String>, Array<Float>) = patternInstantiationTupleTest1()
@@ -237,8 +237,8 @@ func patternInstantiationConcreteValid() {
   let _: () = patternInstantiationTupleTest2()
   // FIXME
   let _: Dictionary<Int, String> = patternInstantiationTupleTest2()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  // expected-error@-2 {{generic parameter 'U' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'each U' could not be inferred}}
   // expected-error@-3 {{cannot convert value of type '(repeat Dictionary<each T, each U>)' to specified type 'Dictionary<Int, String>'}}
   let _: (Dictionary<Int, String>, Dictionary<Float, Bool>) = patternInstantiationTupleTest2()
   let _: (Dictionary<Int, String>, Dictionary<Float, Bool>, Dictionary<Double, Character>) = patternInstantiationTupleTest2()
@@ -256,7 +256,7 @@ func patternInstantiationConcreteValid() {
 
 func patternInstantiationConcreteInvalid() {
   let _: Set<Int> = patternInstantiationTupleTest1()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(repeat Array<each T>)' to specified type 'Set<Int>'}}
 
   let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
@@ -287,7 +287,7 @@ func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repea
 
 func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
 }
