@@ -8,6 +8,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
+
 struct Boom: Error {
   let id: String
 
