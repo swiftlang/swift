@@ -1708,6 +1708,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Find the condition that defined the self decl,
       // and check that both its LHS and RHS are 'self'
       for (auto cond : conditionalStmt->getCond()) {
+        if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+          continue;
+        }
+        
         if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
           if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
             continue;
