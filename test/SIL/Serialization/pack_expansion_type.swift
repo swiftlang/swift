@@ -7,27 +7,36 @@
 
 #if LIB
 
-public func callee<each T>(_: repeat each T) {}
+public func calleeWithPack<each T>(_: repeat each T) {}
 
-@_transparent public func caller<each T>(_ t: repeat each T) {
-  callee(repeat [each t])
+public func calleeGeneric<T>(_: T) {}
+
+@_transparent public func transparentCaller<each T>(_ t: repeat each T) {
+  calleeWithPack(repeat [each t])
+  calleeGeneric((repeat [each t]))
 }
 
-public func calleer() {
-  caller(1, "hi", false)
+@_alwaysEmitIntoClient public func serializedCaller<each T>(_ t: repeat each T) {
+  calleeWithPack(repeat [each t])
+  calleeGeneric((repeat [each t]))
 }
 
-public func foo<each T: Equatable>(_: repeat each T) {}
+public func transparentCaller2() {
+  transparentCaller(1, "hi", false)
+}
 
-@_transparent public func bar(x: Int, y: String) {
-  foo(x, y)
+public func calleeWithRequirement<each T: Equatable>(_: repeat each T) {}
+
+@_transparent public func callerWithRequirement(x: Int, y: String) {
+  calleeWithRequirement(x, y)
 }
 
 #elseif APP
 
 import pack_expansion_type
 
-caller(1, "hi", false)
-bar(x: 1, y: "hi")
+transparentCaller(1, "hi", false)
+serializedCaller(1, "hi", false)
+callerWithRequirement(x: 1, y: "hi")
 
 #endif
