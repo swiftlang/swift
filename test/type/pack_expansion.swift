@@ -52,7 +52,7 @@ func withWhereClause<each T>(_ x: repeat each T) where repeat each T: P {}
 
 struct Outer<each T> {
   struct Bad<each U> {
-    typealias Value = (repeat (each T, each U)) // expected-error {{pack expansion 'repeat (each T, each U)' requires that 'T' and 'U' have the same shape}}
+    typealias Value = (repeat (each T, each U)) // expected-error {{pack expansion 'repeat (each T, each U)' requires that 'each T' and 'each U' have the same shape}}
   }
 
   struct Good<each U> where (repeat (each T, each U)): Any {
