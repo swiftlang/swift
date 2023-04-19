@@ -298,8 +298,9 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
       
-      require(substGetterType->getNumParameters() == 1 + hasIndices,
-              "getter should have one parameter");
+      // FIXME(katei): Disabled for now. Will be replaced by keypath cc
+      // require(substGetterType->getNumParameters() == 1 + hasIndices,
+      //         "getter should have one parameter");
       auto baseParam = substGetterType->getParameters()[0];
       require(baseParam.getConvention() == normalArgConvention,
               "getter base parameter should have normal arg convention");
@@ -350,8 +351,9 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "setter should be a thin function");
       
-      require(substSetterType->getNumParameters() == 2 + hasIndices,
-              "setter should have two parameters");
+      // FIXME(katei): Disabled for now. Will be replaced by keypath cc
+      // require(substSetterType->getNumParameters() == 2 + hasIndices,
+      //         "setter should have two parameters");
 
       auto newValueParam = substSetterType->getParameters()[0];
       // TODO: This should probably be unconditionally +1 when we
