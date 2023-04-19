@@ -400,6 +400,10 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
   // Find the condition that defined the self decl,
   // and check that both its LHS and RHS are 'self'
   for (auto cond : conditionalStmt->getCond()) {
+    if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+      continue;
+    }
+    
     if (auto pattern = cond.getPattern()) {
       if (pattern->getBoundName() != Ctx.Id_self) {
         continue;
