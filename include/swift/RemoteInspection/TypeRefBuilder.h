@@ -567,58 +567,58 @@ public:
     return nullptr;
   }
 
+  // Recursively constructs TypeRef for a bound generic, including
+  // the enclosing (parent) generic contexts
   const BoundGenericTypeRef *createBoundGenericTypeReconstructingParent(
       const NodePointer node, const TypeRefDecl &decl, size_t shapeIndex,
       const llvm::ArrayRef<const TypeRef *> &args, size_t argsIndex) {
     if (!node || !node->hasChildren())
       return nullptr;
-    
+    NodePointer parentNode = node->getFirstChild();
+
+    // If this node can't possibly be generic, skip it and
+    // return results for our parent instead
+    auto kind = node->getKind();
+    if (kind != Node::Kind::Class
+	&& kind != Node::Kind::Structure
+	&& kind != Node::Kind::Enum) {
+      return createBoundGenericTypeReconstructingParent(
+	parentNode, decl, --shapeIndex, args, argsIndex);
+    }
+
+    // How many generic args are at this level?
     auto maybeGenericParamsPerLevel = decl.genericParamsPerLevel;
     if (!maybeGenericParamsPerLevel)
       return nullptr;
-
     auto genericParamsPerLevel = *maybeGenericParamsPerLevel;
-
-    auto kind = node->getKind();
-    // Kinds who have a "BoundGeneric..." variant.
-    if (kind != Node::Kind::Class && kind != Node::Kind::Structure &&
-        kind != Node::Kind::Enum)
+    if (shapeIndex >= genericParamsPerLevel.size())
       return nullptr;
+    auto numGenericArgs = genericParamsPerLevel[shapeIndex];
+
+    // Nodes with no generic args can be replaced with their parent
+    if (numGenericArgs == 0) {
+      return createBoundGenericTypeReconstructingParent(
+	parentNode, decl, --shapeIndex, args, argsIndex);
+    }
+
+    // Collect args for the BoundGenericTypeRef::create() call:
+
+    // * Mangling
     auto mangling = Demangle::mangleNode(node);
     if (!mangling.isSuccess())
       return nullptr;
 
-    if (shapeIndex >= genericParamsPerLevel.size())
-      return nullptr;
-
-    auto numGenericArgs = genericParamsPerLevel[shapeIndex];
-
+    // * Generic params for this node
     auto startOffsetFromEnd = argsIndex + numGenericArgs;
     auto endOffsetFromEnd = argsIndex;
     if (startOffsetFromEnd > args.size() || endOffsetFromEnd > args.size())
       return nullptr;
-
     std::vector<const TypeRef *> genericParams(
         args.end() - startOffsetFromEnd, args.end() - endOffsetFromEnd);
 
-    const BoundGenericTypeRef *parent = nullptr;
-    if (node->hasChildren()) {
-      // Skip over nodes that are not of type class, enum or struct
-      auto parentNode = node->getFirstChild();
-      while (parentNode->getKind() != Node::Kind::Class &&
-             parentNode->getKind() != Node::Kind::Structure &&
-             parentNode->getKind() != Node::Kind::Enum) {
-        if (parentNode->hasChildren()) {
-          parentNode = parentNode->getFirstChild();
-        } else {
-          parentNode = nullptr;
-          break;
-        }
-      }
-      if (parentNode)
-        parent = createBoundGenericTypeReconstructingParent(
-            parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
-    }
+    // * Reconstructed parent
+    auto parent = createBoundGenericTypeReconstructingParent(
+      parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
 
     return BoundGenericTypeRef::create(*this, mangling.result(), genericParams,
                                        parent);
@@ -633,7 +633,6 @@ public:
     if (!builtTypeDecl->genericParamsPerLevel)
       return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName, args, nullptr);
 
-  
     auto node = Dem.demangleType(builtTypeDecl->mangledName);
     if (!node || !node->hasChildren() || node->getKind() != Node::Kind::Type)
       return nullptr;
