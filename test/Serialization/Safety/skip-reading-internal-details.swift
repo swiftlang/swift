@@ -86,6 +86,30 @@ public struct PublicStruct {
     }
 }
 
+// resultBuilder scenario
+public protocol V {}
+
+@resultBuilder
+public struct VB {
+    public static func buildExpression<Content>(_ content: Content) -> Content where Content : V { fatalError() }
+    public static func buildBlock() -> V { fatalError() }
+    public static func buildBlock<Content>(_ content: Content) -> Content where Content : V { fatalError() }
+}
+
+public struct EV : V {
+    public init () {}
+}
+
+@available(SwiftStdlib 5.1, *)
+public extension V {
+  @VB
+  func opaqueReferencingPrivate() -> some V {
+    referencedPrivateFunc(v: EV())
+  }
+
+  private func referencedPrivateFunc(v: some V) -> some V { return v }
+}
+
 //--- Client.swift
 
 import Lib
@@ -94,3 +118,8 @@ var x = PublicStruct()
 
 // Trigger a typo correction that reads all members.
 x.notAMember() // expected-error {{value of type 'PublicStruct' has no member 'notAMember'}}
+
+if #available(SwiftStdlib 5.1, *) {
+  let v = EV()
+  let _ = v.opaqueReferencingPrivate()
+}
