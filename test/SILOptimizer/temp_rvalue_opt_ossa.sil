@@ -1364,7 +1364,7 @@ bb7:
 }
 
 // CHECK-LABEL: sil [ossa] @test_optimize_store_of_enum2
-// CHECK:      alloc_stack
+// CHECK-NOT:      alloc_stack
 // CHECK:       } // end sil function 'test_optimize_store_of_enum2'
 sil [ossa] @test_optimize_store_of_enum2 : $@convention(method) <Element> (@owned Optional<Klass>) -> () {
 bb0(%0 : @owned $Optional<Klass>):
