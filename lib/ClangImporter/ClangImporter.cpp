@@ -707,6 +707,15 @@ importer::getNormalInvocationArguments(
   invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
                                llvm::sys::path::get_separator() +
                                "apinotes").str());
+
+  if (!importerOpts.CASPath.empty()) {
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("-fcas-path");
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back(importerOpts.CASPath);
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("-fno-pch-timestamp");
+  }
 }
 
 static void

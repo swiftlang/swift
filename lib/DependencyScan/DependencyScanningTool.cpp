@@ -280,6 +280,10 @@ DependencyScanningTool::initCompilerInstanceForScan(
   if (Instance->setup(Invocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
+  // Setup the caching service after the instance finishes setup.
+  ScanningService->setupCachingDependencyScanningService(*Instance);
+
   (void)Instance->getMainModule();
 
   return Instance;

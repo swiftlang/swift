@@ -818,6 +818,9 @@ namespace swift {
     /// clang CASOptions.
     std::string CASPath;
 
+    /// Cache key for imported bridging header.
+    std::string BridgingHeaderPCHCacheKey;
+
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 

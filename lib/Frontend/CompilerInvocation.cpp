@@ -1461,6 +1461,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
+  Opts.BridgingHeaderPCHCacheKey =
+      Args.getLastArgValue(OPT_bridging_header_pch_key);
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);

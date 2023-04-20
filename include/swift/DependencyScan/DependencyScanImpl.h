@@ -96,6 +96,12 @@ typedef struct {
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
+
+  /// The CASID for CASFileSystemRoot
+  swiftscan_string_ref_t cas_fs_root_id;
+
+  /// ModuleCacheKey
+  swiftscan_string_ref_t module_cache_key;
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.
@@ -111,6 +117,9 @@ typedef struct {
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
+
+  /// ModuleCacheKey
+  swiftscan_string_ref_t module_cache_key;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their
@@ -139,6 +148,12 @@ typedef struct {
 
   /// The swift-specific PCM arguments captured by this dependencies object
   swiftscan_string_set_t *captured_pcm_args;
+
+  /// The CASID for CASFileSystemRoot
+  swiftscan_string_ref_t cas_fs_root_id;
+
+  /// ModuleCacheKey
+  swiftscan_string_ref_t module_cache_key;
 } swiftscan_clang_details_t;
 
 struct swiftscan_module_details_s {

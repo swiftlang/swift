@@ -140,7 +140,9 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
                    FileIDArrayIDField,                  // bridgingModuleDependencies
-                   DependencyIDArrayIDField             // swiftOverlayDependencies
+                   DependencyIDArrayIDField,            // swiftOverlayDependencies
+                   IdentifierIDField,                   // CASFileSystemRootID
+                   IdentifierIDField                    // moduleCacheKey
                    >;
 
 using SwiftSourceModuleDetailsLayout =
@@ -150,7 +152,9 @@ using SwiftSourceModuleDetailsLayout =
                    FileIDArrayIDField,               // sourceFiles
                    FileIDArrayIDField,               // bridgingSourceFiles
                    FileIDArrayIDField,               // bridgingModuleDependencies
-                   DependencyIDArrayIDField          // swiftOverlayDependencies
+                   DependencyIDArrayIDField,         // swiftOverlayDependencies
+                   IdentifierIDField,                // CASFileSystemRootID
+                   FlagIDArrayIDField                // buildCommandLine
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
@@ -158,7 +162,8 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // compiledModulePath
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
-                   IsFrameworkField                  // isFramework
+                   IsFrameworkField,                 // isFramework
+                   IdentifierIDField                 // moduleCacheKey
                    >;
 
 using SwiftPlaceholderModuleDetailsLayout =
@@ -175,7 +180,9 @@ using ClangModuleDetailsLayout =
                    ContextHashIDField,        // contextHash
                    FlagIDArrayIDField,        // commandLine
                    FileIDArrayIDField,        // fileDependencies
-                   FlagIDArrayIDField         // capturedPCMArgs
+                   FlagIDArrayIDField,        // capturedPCMArgs
+                   IdentifierIDField,         // CASFileSystemRootID
+                   IdentifierIDField          // moduleCacheKey
                    >;
 } // namespace graph_block
 

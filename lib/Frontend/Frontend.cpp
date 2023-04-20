@@ -580,6 +580,25 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     SourceMgr.setFileSystem(std::move(*FS));
   }
 
+  // If we have a bridging header cache key, try load it now and overlay it.
+  if (!Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey.empty() &&
+      Invocation.getFrontendOptions().EnableCAS) {
+    auto loadedBridgingBuffer = loadCachedCompileResultFromCacheKey(
+        getObjectStore(), getActionCache(), Diagnostics,
+        Invocation.getClangImporterOptions().BridgingHeaderPCHCacheKey,
+        Invocation.getClangImporterOptions().BridgingHeader);
+    if (loadedBridgingBuffer) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> PCHFS =
+          new llvm::vfs::InMemoryFileSystem();
+      PCHFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
+                     std::move(loadedBridgingBuffer));
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
+          new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
+      OverlayVFS->pushOverlay(PCHFS);
+      SourceMgr.setFileSystem(std::move(OverlayVFS));
+    }
+  }
+
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
           SourceMgr.getFileSystem());
@@ -701,17 +720,24 @@ bool CompilerInstance::setUpModuleLoaders() {
   // If using `-explicit-swift-module-map-file`, create the explicit loader
   // before creating `ClangImporter` because the entries in the map influence
   // the Clang flags. The loader is added to the context below.
-  std::unique_ptr<ExplicitSwiftModuleLoader> ESML = nullptr;
+  std::unique_ptr<SerializedModuleLoaderBase> ESML = nullptr;
   bool ExplicitModuleBuild =
       Invocation.getFrontendOptions().DisableImplicitModules;
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    ESML = ExplicitSwiftModuleLoader::create(
-        *Context, getDependencyTracker(), MLM,
-        Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
-        Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
-        IgnoreSourceInfoFile);
+    if (Invocation.getFrontendOptions().EnableCAS)
+      ESML = ExplicitCASModuleLoader::create(
+          *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
+          MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
+          IgnoreSourceInfoFile);
+    else
+      ESML = ExplicitSwiftModuleLoader::create(
+          *Context, getDependencyTracker(), MLM,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleMap,
+          Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs,
+          IgnoreSourceInfoFile);
   }
 
   // Wire up the Clang importer. If the user has specified an SDK, use it.

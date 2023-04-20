@@ -1829,6 +1829,11 @@ def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-
   Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
   HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
 
+def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Cache Key for bridging header pch">;
+
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 def enable_cas: Flag<["-"], "enable-cas">,
