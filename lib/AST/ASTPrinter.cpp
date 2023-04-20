@@ -3398,6 +3398,10 @@ static bool usesFeatureParameterPacks(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinModule(Decl *decl) {
+  return false;
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
