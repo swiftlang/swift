@@ -1382,9 +1382,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           [&](MacroIntroducedDeclName name) {
             Printer << getMacroIntroducedDeclNameString(name.getKind());
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
-              StringRef nameText = name.getIdentifier().str();
-              bool shouldEscape = escapeKeywordInContext(
-                  nameText, PrintNameContext::Normal) || nameText == "$";
+              SmallString<32> buffer;
+              StringRef nameText = name.getName().getString(buffer);
+              bool shouldEscape = nameText == "$";
               Printer << "(";
               if (shouldEscape)
                 Printer << "`";

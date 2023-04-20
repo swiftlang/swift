@@ -5599,16 +5599,33 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             readRecord(scratch, isImplicit, rawMacroSyntax, rawMacroRole,
                        numNames, introducedDeclNames);
         auto role = *getActualMacroRole(rawMacroRole);
-        if (introducedDeclNames.size() != numNames * 2)
-          return MF.diagnoseFatal();
         SmallVector<MacroIntroducedDeclName, 1> names;
-        for (unsigned i = 0; i < introducedDeclNames.size(); i += 2) {
+        unsigned nameIdx = 0;
+        while (nameIdx < introducedDeclNames.size()) {
           auto kind = getActualMacroIntroducedDeclNameKind(
-              (uint8_t)introducedDeclNames[i]);
-          auto identifier =
-              MF.getIdentifier(IdentifierID(introducedDeclNames[i + 1]));
-          names.push_back(MacroIntroducedDeclName(*kind, identifier));
+              (uint8_t)introducedDeclNames[nameIdx++]);
+          auto baseName =
+              MF.getDeclBaseName(IdentifierID(introducedDeclNames[nameIdx++]));
+
+          unsigned numArgs = introducedDeclNames[nameIdx++];
+          if (numArgs == 0) {
+            names.push_back(MacroIntroducedDeclName(*kind, baseName));
+            continue;
+          }
+
+          SmallVector<Identifier, 2> argLabels;
+          for (unsigned i : range(0, numArgs - 1)) {
+            (void)i;
+            argLabels.push_back(
+                MF.getDeclBaseName(
+                    IdentifierID(introducedDeclNames[nameIdx++]))
+                  .getIdentifier());
+          }
+
+          DeclName name(ctx, baseName, argLabels);
+          names.push_back(MacroIntroducedDeclName(*kind, name));
         }
+
         Attr = MacroRoleAttr::create(
             ctx, SourceLoc(), SourceRange(),
             static_cast<MacroSyntax>(rawMacroSyntax), SourceLoc(), role, names,

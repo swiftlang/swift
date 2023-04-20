@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 780; // serialize PackConformance
+const uint16_t SWIFTMODULE_VERSION_MINOR = 781; // compound introduced names
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2277,7 +2277,11 @@ namespace decls_block {
     BCFixed<1>,                // macro syntax
     MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
-    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
+    BCArray<IdentifierIDField> // introduced names, where each is encoded as
+                               //   - introduced kind
+                               //   - base name
+                               //   - # of argument labels + 1 (or 0 if none)
+                               //   - argument labels
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
