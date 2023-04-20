@@ -110,6 +110,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
   allocateBuffer(Conformances, core->Conformances);
+  allocateBuffer(PackConformances, core->PackConformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);

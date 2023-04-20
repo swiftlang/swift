@@ -3156,15 +3156,15 @@ void ASTMangler::appendGenericSignatureParts(
                                      ArrayRef<CanGenericTypeParamType> params,
                                      unsigned initialParamDepth,
                                      ArrayRef<Requirement> requirements) {
-  // Mangle the requirements.
-  for (const Requirement &reqt : requirements) {
-    appendRequirement(reqt, sig);
-  }
-
   // Mangle which generic parameters are pack parameters.
   for (auto param : params) {
     if (param->isParameterPack())
       appendOpWithGenericParamIndex("Rv", param);
+  }
+
+  // Mangle the requirements.
+  for (const Requirement &reqt : requirements) {
+    appendRequirement(reqt, sig);
   }
 
   if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)
