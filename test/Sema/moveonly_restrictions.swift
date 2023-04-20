@@ -229,9 +229,6 @@ struct StructHolder {
 
 protocol DanceHall: ~Copyable {} // expected-error {{cannot suppress conformances here}}
 
-// FIXME: why does adding this cause warnings about @_moveOnly being deprecated?
-// <unknown>:0: error: unexpected warning produced: '@_moveOnly' attribute is deprecated; use the ~Copyable constraint suppression instead; this is an error in Swift 6
-//<unknown>:0: warning: diagnostic produced elsewhere: '@_moveOnly' attribute is deprecated; use the ~Copyable constraint suppression instead; this is an error in Swift 6
 actor Speedcore: ~Copyable {}
 
 
