@@ -1,13 +1,12 @@
-
-
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -module-name layout_string_witnesses_dynamic %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
+// RUN: %target-swift-frontend -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
+// RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
 
@@ -51,6 +50,85 @@ func testGeneric() {
 }
 
 testGeneric()
+
+func testPrespecializedAnyObject() {
+    let ptr = UnsafeMutablePointer<PrespecializedStruct<AnyObject>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedStruct<AnyObject>(x: SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedStruct<AnyObject>(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedAnyObject()
+
+func testPrespecializedSimpleClass() {
+    let ptr = UnsafeMutablePointer<PrespecializedStruct<SimpleClass>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedStruct<SimpleClass>(x: SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedStruct<SimpleClass>(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testPrespecializedSimpleClass()
+
+
+func testPrespecializedInt() {
+    let ptr = UnsafeMutablePointer<PrespecializedStruct<Int>>.allocate(capacity: 1)
+
+    do {
+        let x = PrespecializedStruct<Int>(x: 23)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = PrespecializedStruct<Int>(x: 32)
+        testAssign(ptr, from: y)
+    }
+
+    ptr.deallocate()
+}
+
+testPrespecializedInt()
 
 func testGenericTuple() {
     let ptr = allocateInternalGenericPtr(of: GenericTupleWrapper<TestClass>.self)
