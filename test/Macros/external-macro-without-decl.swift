@@ -1,3 +1,5 @@
+// REQUIRES: swift_swift_parser
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name Swift -parse-stdlib
 
 // expected-warning@+2{{@expression has been removed in favor of @freestanding(expression)}}

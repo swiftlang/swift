@@ -1189,9 +1189,9 @@ WARNING(conditional_downcast_coercion,none,
       (Type, Type))
 
 WARNING(literal_conditional_downcast_to_coercion,none,
-        "conditional downcast from literal to %0 always fails; "
+        "cast from literal of inferred type %0 to unrelated type %1 always fails; "
         "consider using 'as' coercion",
-        (Type))
+        (Type, Type))
 
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
@@ -2002,9 +2002,9 @@ ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
-      "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' could not be "
-      "converted: %1.",
+      "could not generate C++ types from the generic Swift types provided; "
+      "the following Swift type(s) provided to '%0' could not be "
+      "converted: %1",
       (StringRef, StringRef))
 
 // Type aliases
@@ -3601,6 +3601,11 @@ ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
+ERROR(attr_ApplicationMain_deprecated,none,
+      "%" SELECT_APPLICATION_MAIN "0 is deprecated",
+      (unsigned))
+NOTE(attr_ApplicationMain_deprecated_use_attr_main,none,
+     "use @main instead", ())
 
 NOTE(attr_ApplicationMain_parse_as_library,none,
      "pass '-parse-as-library' to compiler invocation if this is intentional",
@@ -5367,8 +5372,14 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
+ERROR(tuple_move_only_not_supported,none,
+      "tuples with noncopyable elements are not supported", ())
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
+      ())
+
+ERROR(experimental_type_with_parameter_pack,none,
+      "generic types with parameter packs are experimental",
       ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
@@ -5382,9 +5393,8 @@ ERROR(invalid_expansion_argument,none,
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
-      "pack reference %0 can only appear in pack expansion "
-      "%select{or generic requirement|}1",
-      (Type, /*inExpression*/ bool))
+      "pack reference %0 can only appear in pack expansion ",
+      (Type))
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
@@ -6122,13 +6132,28 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
+ERROR(availability_deinit_no_potential, none,
+      "deinitializer cannot be marked potentially unavailable with "
+      "'@available'", ())
+
+ERROR(availability_deinit_no_unavailable, none,
+      "deinitializer cannot be marked unavailable with '@available'", ())
+
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
 
+ERROR(availability_global_script_no_unavailable,
+      none, "global variable cannot be marked unavailable "
+      "with '@available' in script mode", ())
+
 ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "
       "'@available'", ())
+
+ERROR(availability_stored_property_no_unavailable,
+      none, "stored properties cannot be marked unavailable with '@available'",
+      ())
 
 ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
@@ -7005,13 +7030,6 @@ ERROR(macro_unsupported,none,
       "macros are not supported in this compiler", ())
 ERROR(macro_recursive,none,
       "recursive expansion of macro %0", (DeclName))
-WARNING(macro_definition_old_style,none,
-        "external macro definitions are now written using #externalMacro", ())
-WARNING(macro_definition_unknown_builtin,none,
-        "ignoring definition of unknown builtin macro %0", (Identifier))
-ERROR(macro_definition_not_expansion,none,
-      "macro must itself be defined by a macro expansion such as "
-      "'#externalMacro(...)'", ())
 ERROR(macro_definition_unsupported,none,
       "macro definitions other than '#externalMacro(...)' are unsupported", ())
 ERROR(external_macro_arg_not_type_name,none,
@@ -7032,6 +7050,11 @@ ERROR(invalid_macro_introduced_name,none,
 ERROR(global_freestanding_macro_script,none,
       "global freestanding macros not yet supported in script mode",
       ())
+ERROR(invalid_macro_role_for_macro_syntax,none,
+      "invalid macro role for %{a freestanding|an attached}0 macro",
+      (unsigned))
+ERROR(macro_cannot_introduce_names,none,
+      "'%0' macros are not allowed to introduce names", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors

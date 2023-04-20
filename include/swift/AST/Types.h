@@ -71,6 +71,7 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PackExpansionType;
 class PackType;
 enum class ParamSpecifier : uint8_t;
 class PlaceholderTypeRepr;
@@ -2080,7 +2081,7 @@ public:
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const;
 
-  PackType *getExpandedGenericArgsPack();
+  SmallVector<Type, 2> getExpandedGenericArgs();
 
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
@@ -2414,6 +2415,12 @@ public:
 
   unsigned getNumElements() const { return Bits.TupleType.Count; }
 
+  /// Returns the number of non-PackExpansionType elements. This is the
+  /// minimum length of the tuple after substitution; a tuple with
+  /// zero or one scalar elements is unwrapped if it would otherwise be
+  /// a one-element tuple after substitution.
+  unsigned getNumScalarElements() const;
+
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
     return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
@@ -2555,7 +2562,7 @@ public:
     return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
   }
 
-  PackType *getExpandedGenericArgsPack();
+  SmallVector<Type, 2> getExpandedGenericArgs();
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent(), getGenericArgs());
@@ -6813,14 +6820,14 @@ public:
   /// Creates a pack from the types in \p elements.
   static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
 
-  static PackType *get(const ASTContext &C,
-                       TypeArrayView<GenericTypeParamType> params,
-                       ArrayRef<Type> args);
-
   /// Given a type T, which must be a pack parameter, a member type
   /// of a pack parameter, or a pack archetype, construct the type
   /// Pack{repeat each T}.
   static PackType *getSingletonPackExpansion(Type packParameter);
+
+  static SmallVector<Type, 2> getExpandedGenericArgs(
+      TypeArrayView<GenericTypeParamType> params,
+      ArrayRef<Type> args);
 
 public:
   /// Retrieves the number of elements in this pack.
@@ -6837,6 +6844,8 @@ public:
   }
 
   bool containsPackExpansionType() const;
+
+  PackExpansionType *unwrapSingletonPackExpansion() const;
 
   CanTypeWrapper<PackType> getReducedShape();
 
@@ -6876,6 +6885,8 @@ BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
   CanTypeArrayRef getElementTypes() const {
     return CanTypeArrayRef(getPointer()->getElementTypes());
   }
+
+  CanTypeWrapper<PackExpansionType> unwrapSingletonPackExpansion() const;
 END_CAN_TYPE_WRAPPER(PackType, Type)
 
 inline CanPackType CanTupleType::getInducedPackType() const {
@@ -6963,6 +6974,13 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
     return CanType(getPointer()->getCountType());
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
+
+inline CanTypeWrapper<PackExpansionType>
+CanPackType::unwrapSingletonPackExpansion() const {
+  return CanPackExpansionType(
+      getPointer()->unwrapSingletonPackExpansion());
+}
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

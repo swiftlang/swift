@@ -5,20 +5,16 @@
 // RUN: %empty-directory(%t/plugins)
 //
 //== Build the plugin library
-// RUN: %target-build-swift \
+// RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
-// RUN:   -I %swift-host-lib-dir \
-// RUN:   -L %swift-host-lib-dir \
 // RUN:   -emit-library \
 // RUN:   -o %t/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name=MacroDefinition \
 // RUN:   %S/Inputs/syntax_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift \
+// RUN: %host-build-swift \
 // RUN:   -swift-version 5 \
-// RUN:   -I %swift-host-lib-dir \
-// RUN:   -L %swift-host-lib-dir \
 // RUN:   -emit-library \
 // RUN:   -o %t/plugins/%target-library-name(EvilMacros) \
 // RUN:   -module-name=EvilMacros \

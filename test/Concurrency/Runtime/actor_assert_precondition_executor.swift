@@ -15,11 +15,17 @@
 import StdlibUnittest
 
 func checkPreconditionMainActor() /* synchronous! */ {
-  preconditionTaskOnActorExecutor(MainActor.shared)
+  MainActor.shared.preconditionIsolated()
+  MainActor.preconditionIsolated()
+
+  // check for the existence of the assert version of APIs
+  MainActor.shared.assertIsolated()
+  MainActor.assertIsolated()
 }
 
 func checkPreconditionFamousActor() /* synchronous! */ {
-  preconditionTaskOnActorExecutor(FamousActor.shared)
+  FamousActor.shared.preconditionIsolated() // instance version for global actor
+  FamousActor.preconditionIsolated() // static version for global actor
 }
 
 @MainActor
@@ -62,7 +68,7 @@ actor Someone {
     if #available(SwiftStdlib 5.9, *) {
       // === MainActor --------------------------------------------------------
 
-      tests.test("preconditionTaskOnActorExecutor(main): from 'main() async', with await") {
+      tests.test("precondition on actor (main): from 'main() async', with await") {
         await checkPreconditionMainActor()
       }
 
@@ -72,14 +78,14 @@ actor Someone {
         await MainFriend().callCheckMainActor()
       }
 
-      tests.test("preconditionTaskOnActorExecutor(main): wrongly assume the main executor, from actor on other executor") {
+      tests.test("precondition on actor (main): wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor()
       }
 
       // === Global actor -----------------------------------------------------
 
-      tests.test("preconditionTaskOnActorExecutor(main): assume FamousActor, from FamousActor") {
+      tests.test("precondition on actor (main): assume FamousActor, from FamousActor") {
         await FamousActor.shared.callCheckFamousActor()
       }
 

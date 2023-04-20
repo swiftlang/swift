@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -module-name MyModule
+// RUN: %target-typecheck-verify-swift -parse-as-library -module-name MyModule
 
 // REQUIRES: OS=macosx
 
@@ -175,7 +175,10 @@ func testPlatforms() {
 
 struct VarToFunc {
   @available(*, unavailable, renamed: "function()")
-  var variable: Int // expected-note 2 {{explicitly marked unavailable here}}
+  var variable: Int { // expected-note 2 {{explicitly marked unavailable here}}
+    get { 0 }
+    set {}
+  }
 
   @available(*, unavailable, renamed: "function()")
   func oldFunction() -> Int { return 42 } // expected-note 2 {{explicitly marked unavailable here}}

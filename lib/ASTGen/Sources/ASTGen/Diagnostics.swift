@@ -110,7 +110,7 @@ func emitDiagnostic(
         message: fixIt.message.message,
         severity: .note,
         position: diagnostic.position,
-        fixItChanges: fixIt.changes.changes
+        fixItChanges: fixIt.changes
     )
   }
 
@@ -170,10 +170,13 @@ extension SourceManager {
 
       switch change {
       case .replace(let oldNode, let newNode):
-        replaceStartLoc = cxxSourceLocation(for: oldNode)
+        replaceStartLoc = cxxSourceLocation(
+          for: oldNode,
+          at: oldNode.positionAfterSkippingLeadingTrivia
+        )
         replaceEndLoc = cxxSourceLocation(
           for: oldNode,
-          at: oldNode.endPosition
+          at: oldNode.endPositionBeforeTrailingTrivia
         )
         newText = newNode.description
 
@@ -228,7 +231,7 @@ extension SourceManager {
           severity: .note,
           node: diagnostic.node,
           position: diagnostic.position,
-          fixItChanges: fixIt.changes.changes
+          fixItChanges: fixIt.changes
       )
     }
 

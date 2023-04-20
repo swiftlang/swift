@@ -1027,3 +1027,53 @@ bbCont:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @yieldTest : $@yield_once @convention(method) (@guaranteed KlassPair) -> @yields @guaranteed Klass {
+// CHECK: bb0([[INPUT_ARG:%.*]] :
+// CHECK:   [[COPIED_INPUT_ARG:%.*]] = copy_value [[INPUT_ARG]]
+// CHECK:   [[ARG:%.*]] = mark_must_check [no_consume_or_assign] [[COPIED_INPUT_ARG]]
+// CHECK:   [[DESTR_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[DESTR_COPY_BORROW:%.*]] = begin_borrow [[DESTR_COPY]]
+// CHECK:   [[EXT:%.*]] = struct_extract [[DESTR_COPY_BORROW]]
+// CHECK:   yield [[EXT]] : $Klass, resume [[BBLHS:bb[0-9]+]], unwind [[BBRHS:bb[0-9]+]]
+//
+// CHECK: [[BBLHS]]:
+// CHECK-NEXT:   end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:   destroy_value [[DESTR_COPY]]
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   function_ref
+// CHECK-NEXT:   destroy_value [[ARG]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+//
+// CHECK: [[BBRHS]]:
+// CHECK-NEXT:   end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:   destroy_value [[DESTR_COPY]]
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   function_ref
+// CHECK-NEXT:   destroy_value [[ARG]]
+// CHECK-NEXT:   unwind
+// CHECK: } // end sil function 'yieldTest'
+sil [ossa] @yieldTest : $@yield_once @convention(method) (@guaranteed KlassPair) -> @yields @guaranteed Klass {
+bb0(%0 : @guaranteed $KlassPair):
+  %1 = copy_value %0 : $KlassPair
+  %2 = mark_must_check [no_consume_or_assign] %1 : $KlassPair
+  %3 = begin_borrow %2 : $KlassPair
+  %4 = struct_extract %3 : $KlassPair, #KlassPair.lhs
+  yield %4 : $Klass, resume bb1, unwind bb2
+
+bb1:
+  // Dead instruction just to show that we move the end_borrow before this.
+  %f = function_ref @misc_use : $@convention(thin) () -> ()
+  end_borrow %3 : $KlassPair
+  destroy_value %2 : $KlassPair
+  %5 = tuple ()
+  return %5 : $()
+
+bb2:
+  // Dead instruction just to show that we move the end_borrow before this.
+  %f2 = function_ref @misc_use : $@convention(thin) () -> ()
+  end_borrow %3 : $KlassPair
+  destroy_value %2 : $KlassPair
+  unwind
+}

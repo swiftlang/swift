@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CxxStdlibShim
+
 // MARK: Initializing C++ string from a Swift String
 
 extension std.string {
@@ -20,6 +22,20 @@ extension std.string {
   public init(_ string: String) {
     self.init()
     for char in string.utf8 {
+      self.push_back(value_type(bitPattern: char))
+    }
+  }
+
+  public init(_ string: UnsafePointer<CChar>?) {
+    self.init()
+
+    guard let str = string else {
+      return
+    }
+
+    let len = UTF8._nullCodeUnitOffset(in: str)
+    for i in 0..<len {
+      let char = UInt8(str[i])
       self.push_back(value_type(bitPattern: char))
     }
   }
@@ -84,6 +100,24 @@ extension std.u16string: Equatable {
     var copy = lhs
     copy += rhs
     return copy
+  }
+}
+
+// MARK: Hashing C++ strings
+
+extension std.string: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    // Call std::hash<std::string>::operator()
+    let cxxHash = __swift_interopHashOfString().callAsFunction(self)
+    hasher.combine(cxxHash)
+  }
+}
+
+extension std.u16string: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    // Call std::hash<std::u16string>::operator()
+    let cxxHash = __swift_interopHashOfU16String().callAsFunction(self)
+    hasher.combine(cxxHash)
   }
 }
 

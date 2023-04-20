@@ -53,6 +53,9 @@ enum NLOptions : unsigned {
   // Include @usableFromInline and @inlinable
   NL_IncludeUsableFromInline = 1 << 6,
 
+  /// Exclude names introduced by macro expansions in the top-level module.
+  NL_ExcludeMacroExpansions = 1 << 7,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the
@@ -80,6 +83,13 @@ static inline NLOptions operator~(NLOptions value) {
 }
 
 void simple_display(llvm::raw_ostream &out, NLOptions options);
+
+
+/// Flags affecting module-level lookup.
+enum class ModuleLookupFlags : unsigned {
+  /// Exclude names introduced by macro expansions in the top-level module.
+  ExcludeMacroExpansions = 1 << 0,
+};
 
 } // end namespace swift
 

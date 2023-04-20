@@ -129,10 +129,6 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
-static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
-    "enable-experimental-string-processing",
-    llvm::cl::desc("Whether to enable experimental string processing or not"));
-
 static llvm::cl::opt<std::string>
     SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
 
@@ -316,9 +312,6 @@ int main(int argc, char *argv[]) {
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
-  if (options::EnableExperimentalStringProcessing)
-    Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
-
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   Invocation.setModuleName(options::ModuleName);
@@ -421,13 +414,14 @@ int main(int argc, char *argv[]) {
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
 
   if (options::Action == RefactoringKind::None) {
-    llvm::SmallVector<RefactoringKind, 32> Kinds;
     bool CollectRangeStartRefactorings = false;
-    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
-                                 Kinds, {&PrintDiags});
+    auto Refactorings = collectRefactorings(
+        SF, Range, CollectRangeStartRefactorings, {&PrintDiags});
     llvm::outs() << "Action begins\n";
-    for (auto Kind : Kinds) {
-      llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
+    for (auto Info : Refactorings) {
+      if (Info.AvailableKind == RefactorAvailableKind::Available) {
+        llvm::outs() << getDescriptiveRefactoringKindName(Info.Kind) << "\n";
+      }
     }
     llvm::outs() << "Action ends\n";
     return 0;

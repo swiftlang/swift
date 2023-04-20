@@ -377,7 +377,7 @@ public:
   /// class.
   ///
   /// Not cached.
-  const TypeInfo *
+  const RecordTypeInfo *
   getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
                            remote::TypeInfoProvider *ExternalTypeInfo);
 

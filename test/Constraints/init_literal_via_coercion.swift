@@ -7,7 +7,7 @@
 // CHECK: ---Constraint solving at [{{.*}}:12:1 - line:12:13]---
 // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
 // CHECK: Type Variables:
-// CHECK: [[LITERAL_VAR]] [allows bindings to: {{.*}}] as UInt32 {{.*}}
+// CHECK: [[LITERAL_VAR]] as UInt32 {{.*}}
 // CHECK-NOT: disjunction (remembered) \[\[locator@{{.*}} [Coerce@{{.*}}\]\]]:
 _ = UInt32(0)
 
@@ -15,7 +15,7 @@ _ = UInt32(0)
 // CHECK: (coerce_expr implicit type='[[CAST_TYPE:\$T[0-9]+]]' {{.*}}
 // CHECK-NEXT: (nil_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
 // CHECK: Type Variables:
-// CHECK: [[LITERAL_VAR]] [allows bindings to: {{.*}}] as Int? {{.*}}
+// CHECK: [[LITERAL_VAR]] as Int? {{.*}}
 // CHECK: disjunction (remembered) {{.*}}
 // CHECK-NEXT: >  [favored]  [[CAST_TYPE]] bind Int?
 // CHECK-NEXT: >             [[CAST_TYPE]] bind Int

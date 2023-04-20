@@ -1222,6 +1222,10 @@ public:
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
   }
+  void visitDropDeinitInst(DropDeinitInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
   }
@@ -2715,6 +2719,18 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
 
   return fn->getLoweredFunctionType();
 }
+// Async functions that end up with weak_odr or linkonce_odr linkage may not be
+// directly called because we need to preserve the connection between the
+// function's implementation and the function's context size in the async
+// function pointer data structure.
+static bool mayDirectlyCallAsync(SILFunction *fn) {
+  if (fn->getLinkage() == SILLinkage::Shared ||
+      fn->getLinkage() == SILLinkage::PublicNonABI) {
+    return false;
+  }
+
+  return true;
+}
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
@@ -2741,7 +2757,8 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
-    secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+    secondaryValue = mayDirectlyCallAsync(fn) ?
+      IGM.getAddrOfSILFunction(fn, NotForDefinition) : nullptr;
 
   // For ordinary sync functions and special async functions, produce
   // only the direct address of the function.  The runtime does not
@@ -5732,8 +5749,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (!Decl)
     return;
 
-  assert(i->getVarInfo() && "alloc_box without debug info");
-  
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -5752,7 +5767,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM, false);
 
   auto VarInfo = i->getVarInfo();
-  assert(VarInfo && "debug_value without debug info");
+  if (!VarInfo)
+    return;
 
   auto Storage =
       emitShadowCopyIfNeeded(boxWithAddr.getAddress(), i->getDebugScope(),
@@ -6744,10 +6760,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     
     if (!I->getSubstitutions().empty()) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
-        [&](GenericRequirement reqt) -> llvm::Value * {
-          return emitGenericRequirementFromSubstitutions(*this, reqt, subs,
-                                                         MetadataState::Complete);
-        });
+                                          MetadataState::Complete, subs);
     }
     
     for (unsigned i : indices(I->getAllOperands())) {

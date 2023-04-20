@@ -7,9 +7,6 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
-// FIXME: rdar://107112715 test failing on iOS simulator, investigating
-// UNSUPPORTED: OS=ios
-
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
@@ -38,7 +35,7 @@ final class NaiveQueueExecutor: SpecifiedExecutor, CustomStringConvertible {
     self.queue = queue
   }
 
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     print("\(self): enqueue")
     let unowned = UnownedJob(job)
     queue.sync {
@@ -64,7 +61,7 @@ actor MyActor: WithSpecifiedExecutor {
   }
 
   func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
-    // FIXME(waiting on preconditions to merge): preconditionTaskOnExecutor(expectedExecutor, "Expected to be on: \(expectedExecutor)")
+    // FIXME(waiting on preconditions to merge): expectedExecutor.preconditionIsolated("Expected to be on: \(expectedExecutor)")
     dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }

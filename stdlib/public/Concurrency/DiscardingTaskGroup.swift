@@ -171,9 +171,9 @@ public struct DiscardingTaskGroup {
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
-  public mutating func addTask(
+  public mutating func addTask<DiscardedResult>(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: __owned @Sendable @escaping () async -> DiscardedResult
   ) {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
@@ -206,9 +206,9 @@ public struct DiscardingTaskGroup {
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
-  public mutating func addTaskUnlessCancelled(
+  public mutating func addTaskUnlessCancelled<DiscardedResult>(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Void
+    operation: __owned @Sendable @escaping () async -> DiscardedResult
   ) -> Bool {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -237,8 +237,8 @@ public struct DiscardingTaskGroup {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func addTask(
-    operation: __owned @Sendable @escaping () async -> Void
+  public mutating func addTask<DiscardedResult>(
+    operation: __owned @Sendable @escaping () async -> DiscardedResult
   ) {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
@@ -260,8 +260,8 @@ public struct DiscardingTaskGroup {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
 #endif
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    operation: __owned @Sendable @escaping () async -> Void
+  public mutating func addTaskUnlessCancelled<DiscardedResult>(
+    operation: __owned @Sendable @escaping () async -> DiscardedResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -407,7 +407,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// out of the `withThrowingDiscardingTaskGroup` method when it returns.
 ///
 /// ```
-/// try await withThrowingDiscardingTaskGroup() { group in
+/// try await withThrowingDiscardingTaskGroup { group in
 ///   group.addTask { try boom(1) }
 ///   group.addTask { try boom(2, after: .seconds(5)) }
 ///   group.addTask { try boom(3, after: .seconds(5)) }
@@ -490,7 +490,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 /// A throwing discarding task group becomes cancelled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup(...) { }` closure,
+/// - when an error is thrown out of the `withThrowingDiscardingTaskGroup { ... }` closure,
 /// - when the ``Task`` running this task group is cancelled.
 ///
 /// But also, and uniquely in *discarding* task groups:
@@ -547,9 +547,9 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
   @_alwaysEmitIntoClient
-  public mutating func addTask(
+  public mutating func addTask<DiscardedResult>(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Void
+    operation: __owned @Sendable @escaping () async throws -> DiscardedResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let flags = taskCreateFlags(
@@ -569,9 +569,9 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
+  public mutating func addTaskUnlessCancelled<DiscardedResult>(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Void
+    operation: __owned @Sendable @escaping () async throws -> DiscardedResult
   ) -> Bool {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -598,7 +598,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withThrowingDiscardingTaskGroup(of:returning:body:)` call,
+  /// At the start of the body of a `withThrowingDiscardingTaskGroup(returning:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body

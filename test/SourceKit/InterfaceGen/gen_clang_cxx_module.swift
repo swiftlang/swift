@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
-// RUN: %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -cxx-interoperability-mode=swift-5.9 -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
+// RUN: %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -cxx-interoperability-mode=default -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
 
 
 // RUN: not %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -Xcc -DERROR  -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource 2>&1 | %FileCheck --check-prefix=NOLOAD %s

@@ -1732,11 +1732,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
-          if (param->isParameterPack())
-            Printer << "each ";
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
+            if (param->isParameterPack())
+              Printer << "each ";
             Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                           GP);
             Printer.printName(GP->getName(),
@@ -1835,23 +1835,30 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << "(repeat (each ";
+    Printer << "(repeat (";
     printTransformedType(req.getFirstType());
-    Printer << ", each ";
+    Printer << ", ";
     printTransformedType(req.getSecondType());
     Printer << ")) : Any";
     return;
   case RequirementKind::Layout:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     break;
   case RequirementKind::SameType:
+    if (req.getFirstType()->hasParameterPack() ||
+        req.getSecondType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " == ";
     break;
@@ -2838,6 +2845,14 @@ static bool usesFeatureFreestandingMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Declaration);
 }
 
+static bool usesFeatureCodeItemMacros(Decl *decl) {
+  auto macro = dyn_cast<MacroDecl>(decl);
+  if (!macro)
+    return false;
+
+  return macro->getMacroRoles().contains(MacroRole::CodeItem);
+}
+
 static bool usesFeatureAttachedMacros(Decl *decl) {
   auto macro = dyn_cast<MacroDecl>(decl);
   if (!macro)
@@ -3159,6 +3174,24 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
+  ClangNode clangNode = decl->getClangNode();
+  if (!clangNode)
+    return false;
+
+  const clang::Decl *clangDecl = clangNode.getAsDecl();
+  if (!clangDecl)
+    return false;
+
+  if (auto objCInterfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+    return !objCInterfaceDecl->hasDefinition();
+
+  if (auto objCProtocolDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl))
+    return !objCProtocolDecl->hasDefinition();
+
+  return false;
+}
+
 static bool usesFeatureImplicitSome(Decl *decl) {
   return false;
 }
@@ -3175,8 +3208,18 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureLayoutPrespecialization(Decl *decl) {
+static bool usesFeatureTupleConformances(Decl *decl) {
   return false;
+}
+
+static bool usesFeatureLayoutPrespecialization(Decl *decl) {
+  auto &attrs = decl->getAttrs();
+  return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
+    if (auto *specialize = dyn_cast<SpecializeAttr>(attr)) {
+      return !specialize->getTypeErasedParams().empty();
+    }
+    return false;
+  });
 }
 
 static bool usesFeatureLayoutStringValueWitnesses(Decl *decl) {
@@ -3232,11 +3275,22 @@ static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
 
+static bool usesFeatureMoveOnlyTuples(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNoImplicitCopy(Decl *decl) {
   return decl->isNoImplicitCopy();
 }
 
 static bool usesFeatureOldOwnershipOperatorSpellings(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureMoveOnlyEnumDeinits(Decl *decl) {
+  if (auto *ei = dyn_cast<EnumDecl>(decl)) {
+    return usesFeatureMoveOnly(ei) && ei->getValueTypeDestructor();
+  }
   return false;
 }
 
@@ -3289,7 +3343,7 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
 static void
 suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressingFreestandingExpression = true;
   action();
 }
@@ -3297,7 +3351,7 @@ suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressNoAsyncAvailabilityAttr = true;
   action();
 }
@@ -3305,6 +3359,47 @@ suppressingFeatureNoAsyncAvailability(PrintOptions &options,
 static bool usesFeatureReferenceBindings(Decl *decl) {
   auto *vd = dyn_cast<VarDecl>(decl);
   return vd && vd->getIntroducer() == VarDecl::Introducer::InOut;
+}
+
+static bool usesFeatureBuiltinModule(Decl *decl) {
+  return false;
+}
+
+static bool hasParameterPacks(Decl *decl) {
+  if (auto genericContext = decl->getAsGenericContext()) {
+    auto sig = genericContext->getGenericSignature();
+    if (llvm::any_of(
+          sig.getGenericParams(),
+          [&](const GenericTypeParamType *GP) { return GP->isParameterPack(); })) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// A declaration needs the $ParameterPacks feature if it declares a
+/// generic parameter pack, or if its type references a generic nominal
+/// or type alias which declares a generic parameter pack.
+static bool usesFeatureParameterPacks(Decl *decl) {
+  if (hasParameterPacks(decl))
+    return true;
+
+  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (valueDecl->getInterfaceType().findIf(
+        [&](Type t) {
+          if (auto *alias = dyn_cast<TypeAliasType>(t.getPointer()))
+            return hasParameterPacks(alias->getDecl());
+          if (auto *nominal = t->getAnyNominal())
+            return hasParameterPacks(nominal);
+
+          return false;
+        })) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /// Suppress the printing of a particular feature.
@@ -4711,34 +4806,40 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
-  if (decl->definition) {
-    ASTContext &ctx = decl->getASTContext();
-    SmallString<64> scratch;
-    Printer << " = "
-            << extractInlinableText(ctx.SourceMgr, decl->definition, scratch);
-  } else {
-    auto def = decl->getDefinition();
-    switch (def.kind) {
-    case MacroDefinition::Kind::Invalid:
-    case MacroDefinition::Kind::Undefined:
-      // Nothing to do.
-      break;
+  if (Options.PrintMacroDefinitions) {
+    if (decl->definition) {
+      ASTContext &ctx = decl->getASTContext();
+      SmallString<64> scratch;
+      Printer << " = "
+              << extractInlinableText(ctx.SourceMgr, decl->definition, scratch);
+    } else {
+      auto def = decl->getDefinition();
+      switch (def.kind) {
+      case MacroDefinition::Kind::Invalid:
+      case MacroDefinition::Kind::Undefined:
+        // Nothing to do.
+        break;
 
-    case MacroDefinition::Kind::External: {
-      auto external = def.getExternalMacro();
-      Printer << " = #externalMacro(module: \"" << external.moduleName << "\", "
-              << "type: \"" << external.macroTypeName << "\")";
-      break;
-    }
-
-    case MacroDefinition::Kind::Builtin:
-      Printer << " = Builtin.";
-      switch (def.getBuiltinKind()) {
-      case BuiltinMacroKind::ExternalMacro:
-        Printer << "ExternalMacro";
+      case MacroDefinition::Kind::External: {
+        auto external = def.getExternalMacro();
+        Printer << " = #externalMacro(module: \"" << external.moduleName
+                << "\", " << "type: \"" << external.macroTypeName << "\")";
         break;
       }
-      break;
+
+      case MacroDefinition::Kind::Builtin:
+        Printer << " = Builtin.";
+        switch (def.getBuiltinKind()) {
+        case BuiltinMacroKind::ExternalMacro:
+          Printer << "ExternalMacro";
+          break;
+        }
+        break;
+
+      case MacroDefinition::Kind::Expanded:
+        Printer << " = " << def.getExpanded().getExpansionText();
+        break;
+      }
     }
   }
 
@@ -5551,9 +5652,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   Optional<llvm::DenseMap<const clang::Module *, ModuleDecl *>>
       VisibleClangModules;
 
-  void printGenericArgs(PackType *flatArgs) {
+  void printGenericArgs(ArrayRef<Type> flatArgs) {
     Printer << "<";
-    interleave(flatArgs->getElementTypes(),
+    interleave(flatArgs,
                [&](Type arg) { visit(arg); },
                [&] { Printer << ", "; });
     Printer << ">";
@@ -5562,7 +5663,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   void printGenericArgs(ASTContext &ctx,
                         TypeArrayView<GenericTypeParamType> params,
                         ArrayRef<Type> args) {
-    printGenericArgs(PackType::get(ctx, params, args));
+    printGenericArgs(PackType::getExpandedGenericArgs(params, args));
   }
 
   /// Helper function for printing a type that is embedded within a larger type.
@@ -5613,10 +5714,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getInstanceType());
     } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
-      if (param->isParameterPack() && Options.PrintExplicitEach)
+      if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack() && Options.PrintExplicitEach)
+      if (archetype->isParameterPack())
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -5913,7 +6014,7 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgsPack());
+      printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -5952,11 +6053,8 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    PrintOptions innerOptions = Options;
-    innerOptions.PrintExplicitEach = true;
-
     Printer << "repeat ";
-    TypePrinter(Printer, innerOptions).visit(T->getPatternType());
+    visit(T->getPatternType());
   }
 
   void visitTupleType(TupleType *T) {
@@ -6018,7 +6116,7 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgsPack());
+    printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
@@ -6866,8 +6964,7 @@ public:
   }
 
   void printEach() {
-    if (Options.PrintExplicitEach)
-      Printer << "each ";
+    Printer << "each ";
   }
 
   void printArchetypeCommon(ArchetypeType *T) {

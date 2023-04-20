@@ -890,6 +890,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Conformances, scratch);
         break;
+      case index_block::PACK_CONFORMANCE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(PackConformances, scratch);
+        break;
       case index_block::SIL_LAYOUT_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(SILLayouts, scratch);
@@ -1688,7 +1692,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           const Dependency &dependency,
                                           bool debuggerMode,
                                           bool isPartialModule,
-                                          StringRef packageName) const {
+                                          StringRef packageName,
+                                          bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
     // we load all transitive dependencies from partial modules and
@@ -1701,7 +1706,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
-    if (debuggerMode) {
+    if (debuggerMode || forTestable) {
       // In the debugger, try to load the module if possible.
       // Same in the case of a testable import, try to load the dependency
       // but don't fail if it's missing as this could be source breaking.
@@ -1717,7 +1722,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Non-public imports are similar to implementation-only, the module
     // loading behavior differs on loading those dependencies
     // on testable imports.
-    if (isTestable() || !moduleIsResilient) {
+    if (forTestable || !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {
       return ModuleLoadingBehavior::Optional;
@@ -1730,6 +1735,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||
+        forTestable ||
         !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
     } else if (debuggerMode) {

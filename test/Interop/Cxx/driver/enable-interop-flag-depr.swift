@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -cxx-interoperability-mode=swift-5.9 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -cxx-interoperability-mode=default 2>&1 | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module Test {
@@ -14,5 +14,5 @@ module Test {
 
 import Test
 
-// CHECK: error: do not pass both -enable-experimental-cxx-interop and -cxx-interoperability-mode. Remove -enable-experimental-cxx-interop.
-// CHECK: note: Swift will maintain source compatibility for imported APIs based on the selected compatibility mode, so updating the Swift compiler will not change how APIs are imported.
+// CHECK: error: do not pass both '-enable-experimental-cxx-interop' and '-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'
+// CHECK: note: Swift will maintain source compatibility for imported APIs based on the selected compatibility mode, so updating the Swift compiler will not change how APIs are imported

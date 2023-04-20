@@ -243,6 +243,10 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
     TRUE)
 
+option(SWIFT_BUILD_STDLIB_CXX_MODULE
+  "If not building stdlib, controls whether to build the Cxx module"
+  TRUE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -304,12 +308,7 @@ endif()
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
 
-# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
-# can be reused when a new version of Swift comes out (assuming the user hasn't
-# manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION_MAJOR 5)
-set(SWIFT_VERSION_MINOR 9)
-set(SWIFT_VERSION "${SWIFT_VERSION_MAJOR}.${SWIFT_VERSION_MINOR}")
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/SwiftVersion.cmake)
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -1270,6 +1269,10 @@ else()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
+
+    if(SWIFT_BUILD_STDLIB_CXX_MODULE)
+      add_subdirectory(stdlib/public/Cxx)
+    endif()
   endif()
 
   if (BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
@@ -1279,7 +1282,7 @@ else()
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
   # so ensure we build that when building tools.
-  if(SWIFT_INCLUDE_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS OR SWIFT_BUILD_STDLIB_CXX_MODULE)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 

@@ -1260,14 +1260,16 @@ private:
   /// Check the result of
   /// getTypeLowering(AbstractionPattern,Type,TypeExpansionContext).
   void verifyLowering(const TypeLowering &, AbstractionPattern origType,
-                      Type origSubstType, TypeExpansionContext forExpansion);
+                      CanType origSubstType,
+                      TypeExpansionContext forExpansion);
   bool
-  visitAggregateLeaves(Lowering::AbstractionPattern origType, Type substType,
+  visitAggregateLeaves(Lowering::AbstractionPattern origType,
+                       CanType substType,
                        TypeExpansionContext context,
-                       std::function<bool(Type, Lowering::AbstractionPattern,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
                                           ValueDecl *, Optional<unsigned>)>
                            isLeafAggregate,
-                       std::function<bool(Type, Lowering::AbstractionPattern,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
                                           ValueDecl *, Optional<unsigned>)>
                            visit);
 #endif

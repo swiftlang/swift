@@ -46,7 +46,7 @@ struct C<T> { // expected-note 4 {{'T' declared as parameter to type 'C'}}
 
 struct Unavailable {
   @available(*, unavailable)
-  var unavailableProperty: Int
+  var unavailableProperty: Int { 0 }
   // expected-note@-1 {{'unavailableProperty' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)

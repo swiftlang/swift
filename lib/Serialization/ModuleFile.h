@@ -254,6 +254,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Pack conformances referenced by this module.
+  MutableArrayRef<Serialized<PackConformance *>> PackConformances;
+
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
@@ -301,8 +304,8 @@ private:
   llvm::DenseMap<uint32_t,
            std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
-  llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
-  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
+  llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -649,9 +652,23 @@ public:
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool recoverFromIncompatibility);
 
+  /// Load dependencies of this module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  ///
+  /// \returns any error that occurred during loading dependencies.
+  Status
+  loadDependenciesForFileContext(const FileUnit *file, SourceLoc diagLoc,
+                               bool forTestable);
+
   /// How should \p dependency be loaded for a transitive import via \c this?
   ModuleLoadingBehavior
-  getTransitiveLoadingBehavior(const Dependency &dependency) const;
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool forTestable) const;
 
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate
@@ -870,7 +887,7 @@ public:
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
@@ -972,13 +989,11 @@ public:
 
   /// Returns the protocol conformance for the given ID.
   ProtocolConformanceRef
-  getConformance(serialization::ProtocolConformanceID id,
-                 GenericEnvironment *genericEnv = nullptr);
+  getConformance(serialization::ProtocolConformanceID id);
 
   /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  getConformanceChecked(serialization::ProtocolConformanceID id,
-                        GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);

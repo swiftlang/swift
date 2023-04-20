@@ -920,8 +920,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       derived.Nominal->isActor())
     hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
 
-  Pattern *hashValuePat = NamedPattern::createImplicit(C, hashValueDecl);
-  hashValuePat->setType(intType);
+  Pattern *hashValuePat =
+      NamedPattern::createImplicit(C, hashValueDecl, intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);
 

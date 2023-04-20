@@ -508,6 +508,108 @@ swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
   return SourceLoc();
 }
 
+//----------------------------------------------------------------------------//
+// Macro-related adjustments to name lookup requests.
+//----------------------------------------------------------------------------//
+//
+// Macros introduced a significant wrinkle into Swift's name lookup mechanism.
+// Specifically, when resolving names (and, really, anything else) within the
+// arguments to a macro expansion, name lookup must not try to expand any
+// macros, because doing so trivially creates a cyclic dependency amongst the
+// macro expansions that will be detected by the request-evaluator.
+//
+// Our lookup requests don't always have enough information to answer the
+// question "is this part of an argument to a macro?", so we do a much simpler,
+// more efficient, and not-entirely-sound hack based on the request-evaluator.
+// Specifically, if we are in the process of resolving a macro (which is
+// determined by checking for the presence of a `ResolveMacroRequest` in the
+// request-evaluator stack), then we adjust the options used for the name
+// lookup request we are forming to exclude macro expansions. The evaluation
+// of that request will then avoid expanding any macros, and not produce any
+// results that involve entries in already-expanded macros. By adjusting the
+// request itself, we still distinguish between requests that can and cannot
+// look into macro expansions, so it doesn't break caching for those immediate
+// requests.
+//
+// Over time, we should seek to replace this heuristic with a location-based
+// check, where we use ASTScope to determine whether we are inside a macro
+// argument. This existing check might still be useful because it's going to
+// be faster than a location-based query, but the location-based query can be
+// fully correct.
+
+/// Exclude macros in the unqualified lookup descriptor if we need to.
+static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
+    UnqualifiedLookupDescriptor descriptor) {
+  if (descriptor.Options.contains(
+          UnqualifiedLookupFlags::ExcludeMacroExpansions))
+    return descriptor;
+
+  auto &evaluator = descriptor.DC->getASTContext().evaluator;
+  if (!evaluator.hasActiveResolveMacroRequest())
+    return descriptor;
+
+  descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+  return descriptor;
+}
+
+/// Exclude macros in the direct lookup descriptor if we need to.
+static DirectLookupDescriptor excludeMacrosIfNeeded(
+    DirectLookupDescriptor descriptor) {
+  if (descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
+    return descriptor;
+
+  auto &evaluator = descriptor.DC->getASTContext().evaluator;
+  if (!evaluator.hasActiveResolveMacroRequest())
+    return descriptor;
+
+  descriptor.Options |=
+      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+
+  return descriptor;
+}
+
+/// Exclude macros in the name lookup options if we need to.
+static NLOptions
+excludeMacrosIfNeeded(const DeclContext *dc, NLOptions options) {
+  if (options & NL_ExcludeMacroExpansions)
+    return options;
+
+  auto &evaluator = dc->getASTContext().evaluator;
+  if (!evaluator.hasActiveResolveMacroRequest())
+    return options;
+
+  return options | NL_ExcludeMacroExpansions;
+}
+
+UnqualifiedLookupRequest::UnqualifiedLookupRequest(
+    UnqualifiedLookupDescriptor descriptor
+) : SimpleRequest(excludeMacrosIfNeeded(descriptor)) { }
+
+LookupInModuleRequest::LookupInModuleRequest(
+      const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
+      namelookup::ResolutionKind resolutionKind,
+      const DeclContext *moduleScopeContext,
+      NLOptions options
+ ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
+                   moduleScopeContext,
+                   excludeMacrosIfNeeded(moduleOrFile, options)) { }
+
+ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(
+    const DeclContext *dc, ModuleDecl *module, DeclNameRef name,
+    NLOptions options
+ ) : SimpleRequest(dc, module, name, excludeMacrosIfNeeded(dc, options)) { }
+
+QualifiedLookupRequest::QualifiedLookupRequest(
+                       const DeclContext *dc,
+                       SmallVector<NominalTypeDecl *, 4> decls,
+                       DeclNameRef name, NLOptions options
+) : SimpleRequest(dc, std::move(decls), name,
+                  excludeMacrosIfNeeded(dc, options)) { }
+
+DirectLookupRequest::DirectLookupRequest(DirectLookupDescriptor descriptor)
+    : SimpleRequest(excludeMacrosIfNeeded(descriptor)) { }
+
 // Implement the clang importer type zone.
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"

@@ -1,4 +1,7 @@
 // REQUIRES: asserts
+// REQUIRES: swift_swift_parser
+// FIXME: Swift parser is not enabled on Linux CI yet.
+// REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
 
@@ -14,6 +17,11 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
+
+@freestanding(expression) public macro labeledStringify<T>(_ value: T, label: String) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
+
+// CHECK: @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: Swift.String) -> (T, Swift.String) = #labeledStringify(value, label: "default label")
+@freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: String) -> (T, String) = #labeledStringify(value, label: "default label")
 
 // CHECK: #if compiler(>=5.3) && $Macros
 // CHECK-NEXT: #if $FreestandingExpressionMacros

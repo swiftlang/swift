@@ -72,6 +72,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <algorithm>
 #include <memory>
 #include <queue>
@@ -534,6 +536,8 @@ struct ASTContext::Implementation {
   /// Map a module name to an executable plugin path that provides the module.
   llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
 
+  llvm::StringSet<> LoadedPluginLibraryPaths;
+
   /// The permanent arena.
   Arena Permanent;
 
@@ -633,6 +637,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -644,9 +649,10 @@ ASTContext *ASTContext::get(
   impl = reinterpret_cast<void *>(
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
-                              ClangImporterOpts, SymbolGraphOpts, SourceMgr,
-                              Diags, PreModuleImportCallback);
+  return new (mem)
+      ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
+                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags,
+                 std::move(OutputBackend), PreModuleImportCallback);
 }
 
 ASTContext::ASTContext(
@@ -655,17 +661,19 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend,
     std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
-      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
+      TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       PreModuleImportCallback(PreModuleImportCallback),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
-      TheUnresolvedType(new (*this, AllocationArena::Permanent)
+      TheUnresolvedType(new(*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
@@ -705,6 +713,14 @@ ASTContext::ASTContext(
   registerNameLookupRequestFunctions(evaluator);
 
   createModuleToExecutablePluginMap();
+  
+  // Provide a default OnDiskOutputBackend if user didn't supply one.
+  if (!OutputBackend)
+    OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+  // Insert all block list config paths.
+  for (auto path: langOpts.BlocklistConfigFilePaths) {
+    blockListConfig.addConfigureFilePath(path);
+  }
 }
 
 ASTContext::~ASTContext() {
@@ -1150,7 +1166,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   if (!M)
     return nullptr;
   M->lookupValue(getIdentifier(getProtocolName(kind)),
-                 NLKind::UnqualifiedLookup, results);
+                 NLKind::UnqualifiedLookup,
+                 ModuleLookupFlags::ExcludeMacroExpansions,
+                 results);
 
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
@@ -2005,6 +2023,8 @@ static void diagnoseScannerFailure(StringRef moduleName,
 Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate,
+    bool optionalDependencyLookup,
+    bool isTestableImport,
     llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
   // Check whether we've cached this result.
@@ -2026,12 +2046,14 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
 
   for (auto &loader : getImpl().ModuleLoaders) {
     if (auto dependencies =
-        loader->getModuleDependencies(moduleName, cache, delegate))
+        loader->getModuleDependencies(moduleName, cache, delegate,
+                                      isTestableImport))
       return dependencies;
   }
 
-  diagnoseScannerFailure(moduleName, Diags, cache,
-                         dependencyOf);
+  if (!optionalDependencyLookup)
+    diagnoseScannerFailure(moduleName, Diags, cache,
+                           dependencyOf);
   return None;
 }
 
@@ -3028,7 +3050,7 @@ Optional<KnownFoundationEntity> swift::getKnownFoundationEntity(StringRef name){
     .Default(None);
 }
 
-StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
+StringRef swift::getSwiftName(KnownFoundationEntity kind) {
   StringRef objcName;
   switch (kind) {
 #define FOUNDATION_ENTITY(Name) case KnownFoundationEntity::Name:  \
@@ -4576,8 +4598,9 @@ CanSILFunctionType SILFunctionType::get(
     ProtocolConformanceRef witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
-  assert(!ext.isPseudogeneric() || genericSig);
-  
+  assert(!ext.isPseudogeneric() || genericSig ||
+         coroutineKind != SILCoroutineKind::None);
+
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 
@@ -6305,7 +6328,7 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
       if (auto module = clangUnit->getOverlayModule())
         module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     } else {
-      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, { }, results);
     }
   }
 
@@ -6389,12 +6412,16 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();
 }
 
-void *ASTContext::loadLibraryPlugin(StringRef path) {
+LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
+  // Remember the path (even if it fails to load.)
+  getImpl().LoadedPluginLibraryPaths.insert(path);
+
   SmallString<128> resolvedPath;
   auto fs = this->SourceMgr.getFileSystem();
   if (auto err = fs->getRealPath(path, resolvedPath)) {
@@ -6408,9 +6435,14 @@ void *ASTContext::loadLibraryPlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();
+}
+
+const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
+  return getImpl().LoadedPluginLibraryPaths;
 }
 
 bool ASTContext::supportsMoveOnlyTypes() const {

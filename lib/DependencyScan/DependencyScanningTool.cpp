@@ -20,6 +20,7 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 
 #include <sstream>
 
@@ -187,8 +188,9 @@ void DependencyScanningTool::serializeCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(CDC);
+  llvm::vfs::OnDiskOutputBackend Backend;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, path, *ScanningService);
+      Diags, Backend, path, *ScanningService);
 }
 
 bool DependencyScanningTool::loadCache(llvm::StringRef path) {
@@ -252,7 +254,23 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();
-  if (Invocation.parseArgs(CommandArgs, Instance->getDiags(),
+  // Parse/tokenize arguments.
+  std::string CommandString;
+  for (const auto *c : CommandArgs) {
+    CommandString.append(c);
+    CommandString.append(" ");
+  }
+  SmallVector<const char *, 4> Args;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  // Ensure that we use the Windows command line parsing on Windows as we need
+  // to ensure that we properly handle paths.
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
+    llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
+  else
+    llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+
+  if (Invocation.parseArgs(Args, Instance->getDiags(),
                            nullptr, WorkingDirectory, "/tmp/foo")) {
     return std::make_error_code(std::errc::invalid_argument);
   }

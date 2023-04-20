@@ -3,10 +3,11 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 
-// REQUIRES: rdar104762037
-
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: freestanding
+
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
 
 actor Waiter {
   let until: Int

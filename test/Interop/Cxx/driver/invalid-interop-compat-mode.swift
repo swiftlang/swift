@@ -2,6 +2,9 @@
 // RUN: split-file %s %t
 // RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -cxx-interoperability-mode=swift-5.8 2>&1 | %FileCheck %s
 
+// Note: swift-5.9 is still supported, but will be removed.
+// RUN: %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -cxx-interoperability-mode=swift-5.9
+
 //--- Inputs/module.modulemap
 module Test {
     header "test.h"
@@ -14,5 +17,5 @@ module Test {
 
 import Test
 
-// CHECK: error: invalid option passed to -cxx-interoperability-mode. Please select either 'off' or 'swift-5.9'.
-// CHECK: note: Swift will maintain source compatibility for imported APIs based on the selected compatibility mode, so updating the Swift compiler will not change how APIs are imported.
+// CHECK: error: invalid value 'swift-5.8' in '-cxx-interoperability-mode=swift-5.8'
+// CHECK: note: valid arguments to '-cxx-interoperability-mode=' are 'off', 'default'

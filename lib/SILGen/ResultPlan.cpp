@@ -27,6 +27,15 @@ using namespace Lowering;
 //                                Result Plans
 //===----------------------------------------------------------------------===//
 
+void ResultPlan::finishAndAddTo(SILGenFunction &SGF, SILLocation loc,
+                                ArrayRef<ManagedValue> &directResults,
+                                SILValue bridgedForeignError,
+                                RValue &result) {
+  auto rvalue = finish(SGF, loc, directResults, bridgedForeignError);
+  assert(!rvalue.isInContext());
+  result.addElement(std::move(rvalue));
+}
+
 namespace {
 
 /// A result plan for evaluating an indirect result into the address
@@ -343,14 +352,16 @@ public:
 /// using a temporary buffer initialized by a sub-plan.
 class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
+  CanType substType;
   ResultPlanPtr subPlan;
   std::unique_ptr<TemporaryInitialization> temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
-      Initialization *init, ResultPlanPtr &&subPlan,
+      Initialization *init, CanType substType,
+      ResultPlanPtr &&subPlan,
       std::unique_ptr<TemporaryInitialization> &&temporary)
-      : init(init), subPlan(std::move(subPlan)),
+      : init(init), substType(substType), subPlan(std::move(subPlan)),
         temporary(std::move(temporary)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc,
@@ -362,10 +373,15 @@ public:
     (void)subResult;
 
     ManagedValue value = temporary->getManagedAddress();
-    init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
-    init->finishInitialization(SGF);
 
-    return RValue::forInContext();
+    if (init) {
+      init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
+      init->finishInitialization(SGF);
+
+      return RValue::forInContext();
+    }
+
+    return RValue(SGF, loc, substType, value);
   }
 
   void
@@ -414,28 +430,30 @@ class PackExpansionResultPlan : public ResultPlan {
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder,
                           SILValue packAddr,
-                          MutableArrayRef<InitializationPtr> inits,
+                          Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
+    assert(!inits || inits->size() == substEltTypes.size());
+
     auto packTy = packAddr->getType().castTo<SILPackType>();
     auto formalPackType =
       CanPackType::get(packTy->getASTContext(), substEltTypes);
     auto origPatternType = origExpansionType.getPackExpansionPatternType();
 
-    ComponentPlans.reserve(inits.size());
-    for (auto i : indices(inits)) {
-      auto &init = inits[i];
+    ComponentPlans.reserve(substEltTypes.size());
+    for (auto i : indices(substEltTypes)) {
+      Initialization *init = inits ? (*inits)[i] : nullptr;
       CanType substEltType = substEltTypes[i];
 
       if (isa<PackExpansionType>(substEltType)) {
         ComponentPlans.emplace_back(
           builder.buildPackExpansionIntoPack(packAddr, formalPackType, i,
-                                             init.get(), origPatternType));
+                                             init, origPatternType));
       } else {
         ComponentPlans.emplace_back(
           builder.buildScalarIntoPack(packAddr, formalPackType, i,
-                                      init.get(), origPatternType));
+                                      init, origPatternType));
       }
     }
   }
@@ -449,6 +467,16 @@ public:
       assert(componentRV.isInContext()); (void) componentRV;
     }
     return RValue::forInContext();
+  }
+
+  void finishAndAddTo(SILGenFunction &SGF, SILLocation loc,
+                      ArrayRef<ManagedValue> &directResults,
+                      SILValue bridgedForeignError,
+                      RValue &result) override {
+    for (auto &componentPlan : ComponentPlans) {
+      componentPlan->finishAndAddTo(SGF, loc, directResults,
+                                    bridgedForeignError, result);
+    }
   }
 
   void gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
@@ -556,20 +584,27 @@ public:
 /// A result plan which produces a larger RValue from a bunch of
 /// components.
 class TupleRValueResultPlan final : public ResultPlan {
-  CanTupleType substType;
-  SmallVector<ResultPlanPtr, 4> eltPlans;
+  CanType substType;
+  SmallVector<ResultPlanPtr, 4> origEltPlans;
 
 public:
   TupleRValueResultPlan(ResultPlanBuilder &builder, AbstractionPattern origType,
-                        CanTupleType substType)
+                        CanType substType)
       : substType(substType) {
     // Create plans for all the elements.
-    eltPlans.reserve(substType->getNumElements());
-    for (auto i : indices(substType->getElementTypes())) {
-      AbstractionPattern origEltType = origType.getTupleElementType(i);
-      CanType substEltType = substType.getElementType(i);
-      eltPlans.push_back(builder.build(nullptr, origEltType, substEltType));
-    }
+    origEltPlans.reserve(origType.getNumTupleElements());
+    origType.forEachTupleElement(substType,
+                                 [&](TupleElementGenerator &origElt) {
+      AbstractionPattern origEltType = origElt.getOrigType();
+      auto substEltTypes = origElt.getSubstTypes();
+      if (!origElt.isOrigPackExpansion()) {
+        origEltPlans.push_back(
+          builder.build(nullptr, origEltType, substEltTypes[0]));
+      } else {
+        origEltPlans.push_back(
+          builder.buildForPackExpansion(None, origEltType, substEltTypes));
+      }
+    });
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc,
@@ -578,10 +613,9 @@ public:
     RValue tupleRV(substType);
 
     // Finish all the component tuples.
-    for (auto &plan : eltPlans) {
-      RValue eltRV =
-        plan->finish(SGF, loc, directResults, bridgedForeignError);
-      tupleRV.addElement(std::move(eltRV));
+    for (auto &plan : origEltPlans) {
+      plan->finishAndAddTo(SGF, loc, directResults, bridgedForeignError,
+                           tupleRV);
     }
 
     return tupleRV;
@@ -590,8 +624,8 @@ public:
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const override {
-    for (const auto &eltPlan : eltPlans) {
-      eltPlan->gatherIndirectResultAddrs(SGF, loc, outList);
+    for (const auto &plan : origEltPlans) {
+      plan->gatherIndirectResultAddrs(SGF, loc, outList);
     }
   }
 };
@@ -601,33 +635,49 @@ public:
 class TupleInitializationResultPlan final : public ResultPlan {
   Initialization *tupleInit;
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
-  MutableArrayRef<InitializationPtr> eltInits;
   SmallVector<ResultPlanPtr, 4> eltPlans;
+  bool origTupleVanishes;
 
 public:
   TupleInitializationResultPlan(ResultPlanBuilder &builder,
                                 Initialization *tupleInit,
                                 AbstractionPattern origType,
-                                CanTupleType substType)
-      : tupleInit(tupleInit) {
+                                CanType substType,
+                                bool origTupleVanishes)
+      : tupleInit(tupleInit), origTupleVanishes(origTupleVanishes) {
+
     // Get the sub-initializations.
-    eltInits = tupleInit->splitIntoTupleElements(builder.SGF, builder.loc,
-                                                 substType, eltInitsBuffer);
+    SmallVector<Initialization*, 4> eltInits;
+    if (origTupleVanishes) {
+      eltInits.push_back(tupleInit);
+    } else {
+      MutableArrayRef<InitializationPtr> ownedEltInits
+        = tupleInit->splitIntoTupleElements(builder.SGF, builder.loc,
+                                            substType, eltInitsBuffer);
+
+      // The ownership of these inits is maintained in eltInitsBuffer
+      // (or tupleInit internally), but we need to create a temporary
+      // array of unowned references to the inits, after which we can
+      // throw away the ArrayRef that was returned to us.
+      eltInits.reserve(ownedEltInits.size());
+      for (auto &eltInit : ownedEltInits) {
+        eltInits.push_back(eltInit.get());
+      }
+    }
 
     // Create plans for all the sub-initializations.
     eltPlans.reserve(origType.getNumTupleElements());
-
     origType.forEachTupleElement(substType,
                                  [&](TupleElementGenerator &elt) {
       auto origEltType = elt.getOrigType();
       auto substEltTypes = elt.getSubstTypes();
       if (!elt.isOrigPackExpansion()) {
-        Initialization *eltInit = eltInits[elt.getSubstIndex()].get();
+        Initialization *eltInit = eltInits[elt.getSubstIndex()];
         eltPlans.push_back(builder.build(eltInit, origEltType,
                                          substEltTypes[0]));
       } else {
-        auto componentInits =
-          eltInits.slice(elt.getSubstIndex(), substEltTypes.size());
+        auto componentInits = llvm::makeArrayRef(eltInits)
+               .slice(elt.getSubstIndex(), substEltTypes.size());
         eltPlans.push_back(builder.buildForPackExpansion(componentInits,
                                                          origEltType,
                                                          substEltTypes));
@@ -644,7 +694,12 @@ public:
       assert(eltRV.isInContext());
       (void)eltRV;
     }
-    tupleInit->finishInitialization(SGF);
+
+    // Finish the tuple initialization; but if the tuple vanished,
+    // this is handled in the loop above.
+    if (!origTupleVanishes) {
+      tupleInit->finishInitialization(SGF);
+    }
 
     return RValue::forInContext();
   }
@@ -1080,7 +1135,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
                                        CanType substType) {
   // Destructure original tuples.
   if (origType.isTuple()) {
-    return buildForTuple(init, origType, cast<TupleType>(substType));
+    return buildForTuple(init, origType, substType);
   }
 
   assert(!origType.isPackExpansion() &&
@@ -1134,7 +1189,9 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));
-    temporary = SGF.emitTemporary(loc, resultTL);
+    SILLocation tmpLoc(loc);
+    tmpLoc.markAutoGenerated();
+    temporary = SGF.emitTemporary(tmpLoc, resultTL);
   }
 
   return ResultPlanPtr(new ScalarResultPlan(
@@ -1143,10 +1200,10 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::
-    buildForPackExpansion(MutableArrayRef<InitializationPtr> inits,
+    buildForPackExpansion(Optional<ArrayRef<Initialization*>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substTypes) {
-  assert(inits.size() == substTypes.size());
+  assert(!inits || inits->size() == substTypes.size());
 
   // Pack expansions in the original result type always turn into
   // a single @pack_out result.
@@ -1155,7 +1212,7 @@ ResultPlanPtr ResultPlanBuilder::
   auto packTy =
     result.getSILStorageType(SGF.SGM.M, calleeTypeInfo.substFnType,
                              SGF.getTypeExpansionContext());
-  assert(packTy.castTo<SILPackType>()->getNumElements() == inits.size());
+  assert(packTy.castTo<SILPackType>()->getNumElements() == substTypes.size());
 
   // TODO: try to just forward a single pack
 
@@ -1236,7 +1293,6 @@ ResultPlanBuilder::buildScalarIntoPack(SILValue packAddr,
                                        Initialization *init,
                                        AbstractionPattern origType) {
   assert(!origType.isPackExpansion());
-  assert(init);
   auto substType = formalPackType.getElementType(componentIndex);
   assert(!isa<PackExpansionType>(substType));
 
@@ -1245,7 +1301,8 @@ ResultPlanBuilder::buildScalarIntoPack(SILValue packAddr,
                                            ->getElementType(componentIndex);
   SILResultInfo resultInfo(loweredEltType, ResultConvention::Indirect);
 
-  // Use the normal scalar emission path.
+  // Use the normal scalar emission path to gather an indirect result
+  // of that type.
   auto plan = buildForScalar(init, origType, substType, resultInfo);
 
   // Immediately gather the indirect result.
@@ -1264,39 +1321,55 @@ ResultPlanBuilder::buildScalarIntoPack(SILValue packAddr,
 
 ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
                                                AbstractionPattern origType,
-                                               CanTupleType substType) {
-  // If we don't have an initialization for the tuple, just build the
-  // individual components.
-  if (!init) {
-    return ResultPlanPtr(new TupleRValueResultPlan(*this, origType, substType));
+                                               CanType substType) {
+  // If we have an initialization, and we can split the initialization,
+  // emit directly into the initialization.  If the orig tuple vanishes,
+  // that counts as the initialization being splittable.
+  if (init) {
+    bool vanishes = origType.getVanishingTupleElementPatternType().hasValue();
+    if (vanishes || init->canSplitIntoTupleElements()) {
+      return ResultPlanPtr(
+        new TupleInitializationResultPlan(*this, init, origType, substType,
+                                          vanishes));
+    }
   }
 
-  // Okay, we have an initialization for the tuple that we need to emit into.
+  auto substTupleType = dyn_cast<TupleType>(substType);
+  bool substHasPackExpansion =
+    (substTupleType && substTupleType.containsPackExpansionType());
 
-  // If we can just split the initialization, do so.
-  if (init->canSplitIntoTupleElements()) {
-    return ResultPlanPtr(
-        new TupleInitializationResultPlan(*this, init, origType, substType));
-  }
-
-  // Otherwise, we're going to have to call copyOrInitValueInto, which only
-  // takes a single value.
-
-  // If the tuple is address-only, we'll get much better code if we
-  // emit into a single buffer.
+  // Otherwise, if the tuple contains a pack expansion, we'll need to
+  // initialize a single buffer one way or another: either we're giving
+  // this to RValue (which wants a single value for tuples with pack
+  // expansions) or we'll have to call copyOrInitValueInto on init
+  // (which expects a single value).  Create a temporary, build into
+  // that, and then call the initialization.
+  //
+  // We also use this path when we have an init and the type is
+  // address-only, because we'll need to call copyOrInitValueInto and
+  // we'll get better code by building that up indirectly.  But we don't
+  // do that if we're not using lowered addresses because we prefer to
+  // build tuples with scalar operations.
   auto &substTL = SGF.getTypeLowering(substType);
+  assert(substTL.isAddressOnly() || !substHasPackExpansion);
   if (substTL.isAddressOnly() &&
-      (substType.containsPackExpansionType() ||
-        SGF.F.getConventions().useLoweredAddresses())) {
+      (substHasPackExpansion ||
+       (init != nullptr && SGF.F.getConventions().useLoweredAddresses()))) {
     // Create a temporary.
     auto temporary = SGF.emitTemporary(loc, substTL);
 
     // Build a sub-plan to emit into the temporary.
     auto subplan = buildForTuple(temporary.get(), origType, substType);
 
-    // Make a plan to initialize into that.
+    // Make a plan to produce the final result from that.
     return ResultPlanPtr(new InitValueFromTemporaryResultPlan(
-        init, std::move(subplan), std::move(temporary)));
+        init, substType, std::move(subplan), std::move(temporary)));
+  }
+
+  // If we don't have an initialization, just build the individual
+  // components.
+  if (!init) {
+    return ResultPlanPtr(new TupleRValueResultPlan(*this, origType, substType));
   }
 
   // Build a sub-plan that doesn't know about the initialization.

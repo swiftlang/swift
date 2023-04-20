@@ -122,6 +122,15 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
+  /// Use CAS.
+  bool EnableCAS = false;
+
+  /// The CAS Path.
+  std::string CASPath;
+
+  /// CASFS Root.
+  std::string CASFSRootID;
+
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;
@@ -498,6 +507,9 @@ public:
   /// to encode the actual paths into the .swiftmodule file.
   PathObfuscator serializedPathObfuscator;
 
+  /// Whether to run the job twice to check determinism.
+  bool DeterministicCheck = false;
+
   /// Avoid printing actual module content into the ABI descriptor file.
   /// This should only be used as a workaround when emitting ABI descriptor files
   /// crashes the compiler.
@@ -507,6 +519,8 @@ public:
   /// textual imports
   bool EmitClangHeaderWithNonModularIncludes = false;
 
+  /// All block list configuration files to be honored in this compilation.
+  std::vector<std::string> BlocklistConfigFilePaths;
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);

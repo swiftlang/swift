@@ -48,6 +48,11 @@ static llvm::cl::opt<bool>
 ParseSerializedSIL("parse-serialized-sil",
                    llvm::cl::desc("Parse the output of a serialized module"));
 
+static llvm::cl::opt<bool>
+    DisableInputVerify("sil-disable-input-verify",
+                       llvm::cl::desc("Disable verification of input SIL"),
+                       llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
@@ -2774,7 +2779,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
   SILType Ty;
-  SILLocation InstLoc = RegularLocation(OpcodeLoc);
+  SILLocation InstLoc = RegularLocation(OpcodeLoc, /*implicit*/ false);
   this->parsedComma = false;
 
   auto parseFormalTypeAndValue = [&](CanType &formalType,
@@ -3698,6 +3703,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::DropDeinitInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDropDeinit(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::MarkMustCheckInst: {
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {
@@ -3712,7 +3726,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             .Case("consumable_and_assignable",
                   CheckKind::ConsumableAndAssignable)
             .Case("no_consume_or_assign", CheckKind::NoConsumeOrAssign)
-            .Case("assignable_but_not_consumable", CheckKind::AssignableButNotConsumable)
+            .Case("assignable_but_not_consumable",
+                  CheckKind::AssignableButNotConsumable)
+            .Case("initable_but_not_consumable",
+                  CheckKind::InitableButNotConsumable)
             .Default(CheckKind::Invalid);
 
     if (CKind == CheckKind::Invalid) {
@@ -7025,7 +7042,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     return true;
 
   // If SIL parsing succeeded, verify the generated SIL.
-  if (!P.Diags.hadAnyError())
+  if (!P.Diags.hadAnyError() && !DisableInputVerify)
     FunctionState.F->verify();
 
   return false;

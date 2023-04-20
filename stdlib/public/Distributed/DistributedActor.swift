@@ -260,7 +260,7 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// be introduced when not strictly required.  Visible side effects
   /// are therefore strongly discouraged within this property.
   @available(SwiftStdlib 5.9, *)
-  nonisolated var localUnownedExecutor: UnownedSerialExecutor? { get }
+  nonisolated var unownedExecutor: UnownedSerialExecutor{ get }
 
   /// Resolves the passed in `id` against the `system`, returning
   /// either a local or remote actor reference.
@@ -278,19 +278,6 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
 
-  // FIXME: figure out how to remove this so LowerHopToActor can call the extension method directly on the protocol
-  @available(SwiftStdlib 5.9, *)
-  var _unwrapLocalUnownedExecutor: UnownedSerialExecutor { get }
-}
-
-
-@available(SwiftStdlib 5.9, *)
-extension DistributedActor {
-
-  @available(SwiftStdlib 5.9, *)
-  public var _unwrapLocalUnownedExecutor: UnownedSerialExecutor {
-    self.localUnownedExecutor!
-  }
 }
 
 // ==== Hashable conformance ---------------------------------------------------

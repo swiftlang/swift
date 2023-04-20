@@ -514,7 +514,7 @@ bb0:
   %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = global_addr @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $*NonTrivialStruct
   %1 = begin_access [modify] [dynamic] %0 : $*NonTrivialStruct
-  %2 = mark_must_check [assignable_but_not_consumable] %0 : $*NonTrivialStruct
+  %2 = mark_must_check [assignable_but_not_consumable] %1 : $*NonTrivialStruct
   store %10 to [assign] %2 : $*NonTrivialStruct
   end_access %1 : $*NonTrivialStruct
   %8 = tuple ()

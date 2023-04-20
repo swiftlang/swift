@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature VariadicGenerics
 
 // REQUIRES: asserts
 
@@ -52,11 +52,11 @@ protocol P {
   func f(_ self: Self) -> Self
 }
 
-func outerArchetype<each T, U>(t: repeat each T, u: U) where each T: P {
+func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
   let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
 }
 
-func sameElement<each T, U>(t: repeat each T, u: U) where each T: P, each T == U {
+func sameElement<each T, U>(t: repeat each T, u: U) where repeat each T: P, repeat each T == U {
 // expected-error@-1{{same-element requirements are not yet supported}}
 
   // FIXME: Opened element archetypes in diagnostics
@@ -65,7 +65,7 @@ func sameElement<each T, U>(t: repeat each T, u: U) where each T: P, each T == U
 }
 
 func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
-    where each C: Collection, each C.Element == U {
+    where repeat each C: Collection, repeat (each C).Element == U {
     // expected-error@-1{{same-element requirements are not yet supported}}
 
   // FIXME: Opened element archetypes in diagnostics
@@ -73,7 +73,7 @@ func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
   // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
 }
 
-func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntegerLiteral {
+func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
   _ = (repeat Array<each T>())
   _ = (repeat 1 as each T)
 
@@ -83,9 +83,9 @@ func typeReprPacks<each T>(_ t: repeat each T) where each T: ExpressibleByIntege
 }
 
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
-  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 }
 
 func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
@@ -133,7 +133,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
 
   _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'U' and 'T' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each U' and 'each T' have the same shape}}
 }
 
 protocol Generatable {
@@ -153,13 +153,14 @@ func packElementInvalidBinding<each T>(_ arg: repeat each T) {
   let x = 1
   repeat print(each x)
   // expected-error@-1 {{'each' cannot be applied to non-pack type 'Int'}}
+  // TODO: fixit to remove 'each' keyword
 }
 
 func copyIntoTuple<each T>(_ arg: repeat each T) -> (repeat each T) {
   return (repeat each arg)
 }
 func callCopyAndBind<T>(_ arg: repeat each T) {
-  // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}
+  // expected-error@-1 {{'each' cannot be applied to non-pack type 'T'}}{{22-22=each }}
   // expected-error@-2 {{pack expansion 'T' must contain at least one pack reference}}
 
   // Don't propagate errors for invalid declaration reference
@@ -257,24 +258,24 @@ func forwardFunctionPack<each T>(functions: repeat (each T) -> Bool) {
 
 func packOutsideExpansion<each T>(_ t: repeat each T) {
   _ = t
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   forward(t)
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   _ = each t
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   forward(each t)
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   let tuple = (repeat each t)
 
   _ = tuple.element
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   _ = each tuple.element
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 }
 
 func identity<T>(_ t: T) -> T { t }
@@ -331,11 +332,68 @@ func test_pack_expansions_with_closures() {
 // rdar://107151854 - crash on invalid due to specialized pack expansion
 func test_pack_expansion_specialization() {
   struct Data<each T> {
-    init(_: repeat each T) {} // expected-note {{'init(_:)' declared here}}
+    init(_: repeat each T) {} // expected-note 2 {{'init(_:)' declared here}}
+    init(vals: repeat each T) {} // expected-note 2 {{'init(vals:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
   _ = Data<Int>(0) // Ok
   _ = Data<Int, String>(42, "") // Ok
   _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
+  _ = Data<Int, String>((42, ""))
+  // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  _ = Data<Int, String, Float>(vals: (42, "", 0))
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  _ = Data<Int, String, Float>((vals: 42, "", 0))
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+}
+
+// rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
+protocol Q {
+  associatedtype B
+}
+
+do {
+  struct G<each T>: Q {
+    typealias B = (repeat each T)
+  }
+
+  func f<each T>(_: repeat each T) -> some Q {
+    return G<repeat each T>() // Ok
+  }
+}
+
+// Make sure that in-exact matches (that require any sort of conversion or load) on arguments are handled correctly.
+do {
+  var v: Float = 42 // expected-warning {{variable 'v' was never mutated; consider changing to 'let' constant}}
+
+  func testOpt<each T>(x: Int?, _: repeat each T) {}
+  testOpt(x: 42, "", v) // Load + Optional promotion
+
+  func testLoad<each T, each U>(t: repeat each T, u: repeat each U) {}
+  testLoad(t: "", v) // Load + default
+  testLoad(t: "", v, u: v, 0.0) // Two loads
+
+  func testDefaultWithExtra<each T, each U>(t: repeat each T, u: repeat each U, extra: Int?) {}
+  testDefaultWithExtra(t: "", v, extra: 42)
+
+  func defaults1<each T>(x: Int? = nil, _: repeat each T) {}
+  defaults1("", 3.14) // Ok
+
+  func defaults2<each T>(_: repeat each T, x: Int? = nil) {}
+  defaults2("", 3.14) // Ok
+
+  func defaults3<each T, each U>(t: repeat each T, u: repeat each U, extra: Int? = nil) {}
+  defaults3(t: "", 3.14) // Ok
+  defaults3(t: "", 3.14, u: 0, v) // Ok
+  defaults3(t: "", 3.14, u: 0, v, extra: 42) // Ok
+
+  struct Defaulted<each T> {
+    init(t: repeat each T, extra: Int? = nil) {}
+    init<each U>(t: repeat each T, u: repeat each U, other: Int? = nil) {}
+  }
+
+  _ = Defaulted(t: "a", 0, 1.0) // Ok
+  _ = Defaulted(t: "b", 0) // Ok
+  _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
 }

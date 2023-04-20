@@ -401,13 +401,15 @@ public:
     auto *CS = DS->InlinedCallSite;
     if (!CS)
       return nullptr;
-
+ 
     auto CachedInlinedAt = InlinedAtCache.find(CS);
     if (CachedInlinedAt != InlinedAtCache.end())
       return cast<llvm::MDNode>(CachedInlinedAt->second);
 
     auto L = decodeFilenameAndLocation(CS->Loc);
     auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
+    if (auto *Fn = CS->Parent.dyn_cast<SILFunction *>())
+      Scope = getOrCreateScope(Fn->getDebugScope());
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
@@ -416,6 +418,7 @@ public:
     InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
   }
+
 private:
 
 #ifndef NDEBUG
@@ -571,6 +574,12 @@ private:
 
     if (ValueDecl *D = L.getAsASTNode<ValueDecl>())
       return D->getBaseIdentifier().str();
+
+    if (auto *D = L.getAsASTNode<MacroExpansionDecl>())
+      return D->getMacroName().getBaseIdentifier().str();
+
+    if (auto *E = L.getAsASTNode<MacroExpansionExpr>())
+      return E->getMacroName().getBaseIdentifier().str();
 
     return StringRef();
   }
@@ -921,6 +930,9 @@ private:
         Ty->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
@@ -935,6 +947,9 @@ private:
         Reconstructed->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       }
     }
@@ -1778,7 +1793,7 @@ private:
     // Retrieve the private discriminator.
     auto *MSC = Decl->getDeclContext()->getModuleScopeContext();
     auto *FU = cast<FileUnit>(MSC);
-    Identifier PD = FU->getDiscriminatorForPrivateValue(Decl);
+    Identifier PD = FU->getDiscriminatorForPrivateDecl(Decl);
     bool ExportSymbols = true;
     return DBuilder.createNameSpace(Parent, PD.str(), ExportSymbols);
   }
@@ -1986,9 +2001,11 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       SDK = *It;
   }
 
+  bool EnableCXXInterop =
+      IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
   TheCU = DBuilder.createCompileUnit(
-      Lang, MainFile, Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
-      MajorRuntimeVersion, SplitName,
+      Lang, MainFile, Producer, Opts.shouldOptimize(),
+      Opts.getDebugFlags(PD, EnableCXXInterop), MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,

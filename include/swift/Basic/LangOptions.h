@@ -182,7 +182,7 @@ namespace swift {
     version::Version PackageDescriptionVersion;
 
     /// Enable experimental string processing
-    bool EnableExperimentalStringProcessing = false;
+    bool EnableExperimentalStringProcessing = true;
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
@@ -556,8 +556,8 @@ namespace swift {
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
-    /// Allows the explicit 'import Builtin' within Swift modules.
-    bool EnableBuiltinModule = false;
+    /// All block list configuration files to be honored in this compilation.
+    std::vector<std::string> BlocklistConfigFilePaths;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -803,6 +803,9 @@ namespace swift {
     /// The optimization setting.  This doesn't typically matter for
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
+
+    /// clang CASOptions.
+    std::string CASPath;
 
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;

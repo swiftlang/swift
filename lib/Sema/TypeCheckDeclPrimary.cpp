@@ -473,6 +473,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   for (auto gp : *genericParams) {
+    // Diagnose generic types with a parameter packs if VariadicGenerics
+    // is not enabled.
+    auto *decl = ownerCtx->getAsDecl();
+    auto &ctx = decl->getASTContext();
+    if (gp->isParameterPack() && isa<GenericTypeDecl>(decl) &&
+        !ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+      decl->diagnose(diag::experimental_type_with_parameter_pack);
+    }
+
     TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
@@ -1821,9 +1830,13 @@ public:
 
   void visit(Decl *decl) {
     // Visit auxiliary decls first.
-    decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      this->visit(auxiliaryDecl);
-    });
+    // We don't do this for members of classes because it happens as part of
+    // visiting their ABI members.
+    if (!isa<ClassDecl>(decl->getDeclContext())) {
+      decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        this->visit(auxiliaryDecl);
+      });
+    }
 
     if (auto *Stats = getASTContext().Stats)
       ++Stats->getFrontendCounters().NumDeclsTypechecked;
@@ -1917,7 +1930,8 @@ public:
     (void)ID->getDecls();
 
     auto target = ID->getModule();
-    if (!getASTContext().LangOpts.PackageName.empty() &&
+    if (target && // module would be nil if loading fails
+        !getASTContext().LangOpts.PackageName.empty() &&
         getASTContext().LangOpts.PackageName == target->getPackageName().str() &&
         !target->isNonSwiftModule() && // target is a Swift module
         target->isNonUserModule()) { // target module is in distributed SDK
@@ -2009,6 +2023,7 @@ public:
 
     case MacroDefinition::Kind::Invalid:
     case MacroDefinition::Kind::Builtin:
+    case MacroDefinition::Kind::Expanded:
       // Nothing else to check here.
       break;
 
@@ -2036,7 +2051,10 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-    // Expansion already visited as auxiliary decls.
+    // Decls in expansion already visited as auxiliary decls.
+    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+      TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
+    });
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3609,6 +3627,14 @@ public:
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 
+      // Temporarily ban deinit on noncopyable enums, unless the experimental
+      // feature flag is set.
+      if (!DD->getASTContext().LangOpts.hasFeature(
+              Feature::MoveOnlyEnumDeinits) &&
+          nom->isMoveOnly() && isa<EnumDecl>(nom)) {
+        DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
+      }
+
       // If we have a noncopyable type, check if we have an @objc enum with a
       // deinit and emit a specialized error. We will have technically already
       // emitted an error since @objc enum cannot be marked noncopyable, but
@@ -3780,11 +3806,9 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   // If it's not a declaration macro or a code item macro, it must have been
   // parsed as an expression macro, and this decl is just its substitute decl.
   // So there's no thing to be done here.
-  if (!roles.contains(MacroRole::Declaration))
+  if (!roles.contains(MacroRole::Declaration) &&
+      !roles.contains(MacroRole::CodeItem))
     return None;
-
-  // Otherwise, we treat it as a declaration macro.
-  assert(roles.contains(MacroRole::Declaration));
 
   // For now, restrict global freestanding macros in script mode.
   if (dc->isModuleScopeContext() &&

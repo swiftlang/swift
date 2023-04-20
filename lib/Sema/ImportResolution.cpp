@@ -324,6 +324,15 @@ void ImportResolver::bindImport(UnboundImport &&I) {
     return;
   }
 
+  // Load more dependencies for testable imports.
+  if (I.import.options.contains(ImportFlags::Testable)) {
+    SourceLoc diagLoc;
+    if (ID) diagLoc = ID.get()->getStartLoc();
+
+    for (auto file: M->getFiles())
+      file->loadDependenciesForTestable(diagLoc);
+  }
+
   auto topLevelModule = I.getTopLevelModule(M, SF);
 
   I.validateOptions(topLevelModule, SF);
@@ -365,11 +374,13 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
 
   // The Builtin module cannot be explicitly imported unless:
   // 1. We're in a .sil file
-  // 2. '-enable-builtin-module' was passed.
+  // 2. '-enable-builtin-module'/'-enable-experimental-feature BuiltinModule'
+  //    was passed.
   //
   // FIXME: Eventually, it would be nice to separate '-parse-stdlib' from
   // implicitly importing Builtin, but we're not there yet.
-  if (SF.Kind == SourceFileKind::SIL || ctx.LangOpts.EnableBuiltinModule) {
+  if (SF.Kind == SourceFileKind::SIL ||
+      ctx.LangOpts.hasFeature(Feature::BuiltinModule)) {
     if (moduleID.Item == ctx.TheBuiltinModule->getName()) {
       return ctx.TheBuiltinModule;
     }

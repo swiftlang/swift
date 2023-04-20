@@ -198,7 +198,7 @@ namespace irgen {
                                    ProtocolConformanceRef conformance);
 
   using GenericParamFulfillmentCallback =
-    llvm::function_ref<void(CanType genericParamType,
+    llvm::function_ref<void(GenericRequirement req,
                             const MetadataSource &source,
                             const MetadataPath &path)>;
 

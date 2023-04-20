@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -331,6 +332,22 @@ ImportObjCHeader("import-objc-header",
                  llvm::cl::desc("header to implicitly import"),
                  llvm::cl::cat(Category));
 
+static llvm::cl::list<std::string>
+PluginPath("plugin-path",
+               llvm::cl::desc("plugin-path"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+LoadPluginLibrary("load-plugin-library",
+               llvm::cl::desc("load plugin library"),
+               llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+LoadPluginExecutable("load-plugin-executable",
+               llvm::cl::desc("load plugin executable"),
+               llvm::cl::cat(Category));
+
+
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
@@ -378,6 +395,11 @@ AlwaysArgumentLabels("always-argument-labels",
 static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"),
+    llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+EnableDeserializationSafety("enable-deserialization-safety",
+    llvm::cl::desc("Avoid reading potentially unsafe decls from swiftmodules"),
     llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
@@ -833,11 +855,6 @@ EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
 
-static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
-    "enable-experimental-string-processing",
-    llvm::cl::desc("Enable experimental string processing"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     "enable-bare-slash-regex",
     llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
@@ -1188,7 +1205,8 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance IDEInspectionInst;
+        IDEInspectionInstance IDEInspectionInst(
+            std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         IDEInspectionInst.typeContextInfo(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1260,7 +1278,8 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance IDEInspectionInst;
+        IDEInspectionInstance IDEInspectionInst(
+            std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         IDEInspectionInst.conformingMethodList(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1410,7 +1429,7 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
       [&](CompletionLikeOperationParams Params) -> bool {
-        IDEInspectionInstance Inst;
+        IDEInspectionInstance Inst(std::make_shared<PluginRegistry>());
         int ExitCode = 2;
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
@@ -1504,7 +1523,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   auto FileSystem = llvm::vfs::getRealFileSystem();
 
-  IDEInspectionInstance IDEInspectionInst;
+  IDEInspectionInstance IDEInspectionInst(std::make_shared<PluginRegistry>());
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty())
@@ -4155,7 +4174,9 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool ForceNoOutputs) {
+static int doTestCreateCompilerInvocation(StringRef DriverPath,
+                                          ArrayRef<const char *> Args,
+                                          bool ForceNoOutputs) {
   PrintingDiagnosticConsumer PDC;
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -4163,14 +4184,16 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args, bool Forc
 
   CompilerInvocation CI;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    llvm::outs() << "Frontend Arguments BEGIN\n";
-    for (const char *arg : FrontendArgs) {
-      llvm::outs() << arg << "\n";
-    }
-    llvm::outs() << "Frontend Arguments END\n";
-    return CI.parseArgs(FrontendArgs, Diags);
-  }, ForceNoOutputs);
+      DriverPath, Args, Diags,
+      [&](ArrayRef<const char *> FrontendArgs) {
+        llvm::outs() << "Frontend Arguments BEGIN\n";
+        for (const char *arg : FrontendArgs) {
+          llvm::outs() << arg << "\n";
+        }
+        llvm::outs() << "Frontend Arguments END\n";
+        return CI.parseArgs(FrontendArgs, Diags);
+      },
+      ForceNoOutputs);
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -4199,10 +4222,27 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+// Derive 'swiftc' path from 'swift-ide-test' path.
+std::string getDriverPath(StringRef MainExecutablePath) {
+  SmallString<256> driverPath(MainExecutablePath);
+  llvm::sys::path::remove_filename(driverPath); // remove 'swift-ide-test'.
+  llvm::sys::path::remove_filename(driverPath); // remove 'bin'.
+  if (llvm::sys::path::filename(driverPath) == "local") {
+    llvm::sys::path::remove_filename(driverPath); // remove 'local'.
+  }
+  llvm::sys::path::append(driverPath, "bin", "swiftc");
+  return std::string(driverPath);
+}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
   initializeSwiftModules();
+
+  std::string mainExecutablePath = llvm::sys::fs::getMainExecutable(
+      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable));
+
+  std::string driverPath = getDriverPath(mainExecutablePath);
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -4215,7 +4255,7 @@ int main(int argc, char *argv[]) {
         ForceNoOutputs = true;
         Args = Args.drop_front();
       }
-      return doTestCreateCompilerInvocation(Args, ForceNoOutputs);
+      return doTestCreateCompilerInvocation(driverPath, Args, ForceNoOutputs);
     }
   }
 
@@ -4244,10 +4284,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::Action == ActionType::GenerateModuleAPIDescription) {
-    return doGenerateModuleAPIDescription(
-        llvm::sys::fs::getMainExecutable(
-            argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)),
-        options::InputFilenames);
+    return doGenerateModuleAPIDescription(driverPath, mainExecutablePath,
+                                          options::InputFilenames);
   }
 
   if (options::Action == ActionType::DumpCompletionCache) {
@@ -4314,9 +4352,7 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
-  InitInvok.setMainExecutablePath(
-      llvm::sys::fs::getMainExecutable(argv[0],
-          reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
@@ -4371,9 +4407,6 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
-  }
-  if (options::EnableExperimentalStringProcessing) {
-    InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
@@ -4436,6 +4469,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().EnableDeserializationSafety =
+    options::EnableDeserializationSafety;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
@@ -4476,6 +4511,32 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "invalid module alias arguments\n";
       return 1;
     }
+  }
+
+  for (auto path : options::PluginPath) {
+    InitInvok.getSearchPathOptions().PluginSearchPaths.push_back(path);
+  }
+  if (!options::LoadPluginLibrary.empty()) {
+    std::vector<std::string> paths;
+    for (auto path: options::LoadPluginLibrary) {
+      paths.push_back(path);
+    }
+    InitInvok.getSearchPathOptions().setCompilerPluginLibraryPaths(paths);
+  }
+  if (!options::LoadPluginExecutable.empty()) {
+    std::vector<PluginExecutablePathAndModuleNames> pairs;
+    for (auto arg: options::LoadPluginExecutable) {
+      StringRef path;
+      StringRef modulesStr;
+      std::tie(path, modulesStr) = StringRef(arg).rsplit('#');
+      std::vector<std::string> moduleNames;
+      for (auto name : llvm::split(modulesStr, ',')) {
+        moduleNames.emplace_back(name);
+      }
+      pairs.push_back({std::string(path), std::move(moduleNames)});
+    }
+
+    InitInvok.getSearchPathOptions().setCompilerPluginExecutablePaths(std::move(pairs));
   }
 
   // Process the clang arguments last and allow them to override previously

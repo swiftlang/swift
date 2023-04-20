@@ -49,7 +49,26 @@ enum _dyld_section_location_kind {
 
 #endif
 
-#if !OBJC_ADDLOADIMAGEFUNC2_DEFINED
+// Bring our own definition of _dyld_section_location constants in case we're
+// using an older SDK that doesn't have them.
+#define _dyld_section_location_text_swift5_protos 0
+#define _dyld_section_location_text_swift5_proto 1
+#define _dyld_section_location_text_swift5_types 2
+#define _dyld_section_location_text_swift5_replace 3
+#define _dyld_section_location_text_swift5_replace2 4
+#define _dyld_section_location_text_swift5_ac_funcs 5
+
+#if OBJC_ADDLOADIMAGEFUNC2_DEFINED
+// Redefine _dyld_lookup_section_info as weak so we can build against it but
+// still run when it's not present at runtime. Note that we don't have to check
+// for its presence at runtime, as it's guaranteed to be available if we get
+// the callbacks from objc_addLoadImageFunc2.
+LLVM_ATTRIBUTE_WEAK
+struct _dyld_section_info_result
+_dyld_lookup_section_info(const struct mach_header *mh,
+                          _dyld_section_location_info_t locationHandle,
+                          enum _dyld_section_location_kind kind);
+#else
 // If we don't have objc_addLoadImageFunc2, fall back to objc_addLoadImageFunc.
 // Use a #define so we don't have to conditionalize the calling code below.
 #define objc_addLoadImageFunc2 objc_addLoadImageFunc
@@ -79,8 +98,7 @@ using mach_header_platform = mach_header;
 #endif
 
 // Callback for objc_addLoadImageFunc that just takes a mach_header.
-template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-          enum _dyld_section_location_kind SECTION_KIND,
+template <const char *SEGMENT_NAME, const char *SECTION_NAME, int SECTION_KIND,
           void CONSUME_BLOCK(const void *baseAddress, const void *start,
                              uintptr_t size)>
 void addImageCallback(const mach_header *mh) {
@@ -102,8 +120,7 @@ void addImageCallback(const mach_header *mh) {
 
 // Callback for objc_addLoadImageFunc2 that takes a mach_header and dyld info.
 #if OBJC_ADDLOADIMAGEFUNC2_DEFINED
-template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-          enum _dyld_section_location_kind SECTION_KIND,
+template <const char *SEGMENT_NAME, const char *SECTION_NAME, int SECTION_KIND,
           void CONSUME_BLOCK(const void *baseAddress, const void *start,
                              uintptr_t size)>
 void addImageCallback(const mach_header *mh,
@@ -112,7 +129,9 @@ void addImageCallback(const mach_header *mh,
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
 #endif
 
-  auto result = _dyld_lookup_section_info(mh, dyldInfo, SECTION_KIND);
+  auto result = _dyld_lookup_section_info(
+      mh, dyldInfo,
+      static_cast<enum _dyld_section_location_kind>(SECTION_KIND));
   if (result.buffer)
     CONSUME_BLOCK(mh, result.buffer, result.bufferSize);
 }
@@ -120,8 +139,7 @@ void addImageCallback(const mach_header *mh,
 
 // Callback for _dyld_register_func_for_add_image that takes a mach_header and a
 // slide.
-template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-          enum _dyld_section_location_kind SECTION_KIND,
+template <const char *SEGMENT_NAME, const char *SECTION_NAME, int SECTION_KIND,
           void CONSUME_BLOCK(const void *baseAddress, const void *start,
                              uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
@@ -132,11 +150,10 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          enum _dyld_section_location_kind SECTION_KIND,
-          enum _dyld_section_location_kind SECTION_KIND2,
-          void CONSUME_BLOCK(const void *baseAddress,
-                             const void *start, uintptr_t size,
-                             const void *start2, uintptr_t size2)>
+          int SECTION_KIND, int SECTION_KIND2,
+          void CONSUME_BLOCK(const void *baseAddress, const void *start,
+                             uintptr_t size, const void *start2,
+                             uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
@@ -168,11 +185,10 @@ void addImageCallback2Sections(const mach_header *mh) {
 #if OBJC_ADDLOADIMAGEFUNC2_DEFINED
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          enum _dyld_section_location_kind SECTION_KIND,
-          enum _dyld_section_location_kind SECTION_KIND2,
-          void CONSUME_BLOCK(const void *baseAddress,
-                             const void *start, uintptr_t size,
-                             const void *start2, uintptr_t size2)>
+          int SECTION_KIND, int SECTION_KIND2,
+          void CONSUME_BLOCK(const void *baseAddress, const void *start,
+                             uintptr_t size, const void *start2,
+                             uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh,
                                struct _dyld_section_location_info_s *dyldInfo) {
 #if __POINTER_WIDTH__ == 64
@@ -180,11 +196,15 @@ void addImageCallback2Sections(const mach_header *mh,
 #endif
 
   // Look for a section.
-  auto result = _dyld_lookup_section_info(mh, dyldInfo, SECTION_KIND);
+  auto result = _dyld_lookup_section_info(
+      mh, dyldInfo,
+      static_cast<enum _dyld_section_location_kind>(SECTION_KIND));
   if (!result.buffer)
     return;
 
-  auto result2 = _dyld_lookup_section_info(mh, dyldInfo, SECTION_KIND2);
+  auto result2 = _dyld_lookup_section_info(
+      mh, dyldInfo,
+      static_cast<enum _dyld_section_location_kind>(SECTION_KIND2));
   // No NULL check here, we allow this one not to be present. dyld gives us
   // a NULL pointer and 0 size when the section isn't in the dylib so we don't
   // need to zero anything out.
@@ -198,8 +218,7 @@ void addImageCallback2Sections(const mach_header *mh,
 // slide.
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          enum _dyld_section_location_kind SECTION_KIND,
-          enum _dyld_section_location_kind SECTION_KIND2,
+          int SECTION_KIND, int SECTION_KIND2,
           void CONSUME_BLOCK(const void *baseAddress, const void *start,
                              uintptr_t size, const void *start2,
                              uintptr_t size2)>

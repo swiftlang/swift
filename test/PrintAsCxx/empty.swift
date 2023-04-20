@@ -39,12 +39,18 @@
 // CHECK-NEXT:  #include <string.h>
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  #if __has_include(<ptrauth.h>)
+// CHECK-NEXT:  #if defined(__arm64e__) && __has_include(<ptrauth.h>)
 // CHECK-NEXT:  # include <ptrauth.h>
 // CHECK-NEXT:  #else
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wreserved-macro-identifier"
 // CHECK-NEXT:  # ifndef __ptrauth_swift_value_witness_function_pointer
 // CHECK-NEXT:  #  define __ptrauth_swift_value_witness_function_pointer(x)
 // CHECK-NEXT:  # endif
+// CHECK-NEXT:  # ifndef __ptrauth_swift_class_method_pointer
+// CHECK-NEXT:  # define __ptrauth_swift_class_method_pointer(x)
+// CHECK-NEXT:  # endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #endif
 
@@ -87,6 +93,8 @@
 // CHECK-LABEL: #if defined(__OBJC__)
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 // CHECK-NEXT:  // Look for the C++ interop support header relative to clang's resource dir:
 // CHECK-NEXT:  //  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT:  #if __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)
@@ -98,6 +106,7 @@
 // CHECK-NEXT:  #elif __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  #endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #if __has_feature(objc_modules)
 // CHECK:       #ifndef SWIFT_PRINTED_CORE
 // CHECK:       } // namespace swift

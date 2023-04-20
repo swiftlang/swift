@@ -39,7 +39,7 @@ class VersionRange {
   //    x.y.x: all versions greater than or equal to x.y.z
 
   enum class ExtremalRange { Empty, All };
-  
+
   // A version range is either an extremal value (Empty, All) or
   // a single version tuple value representing the lower end point x.y.z of a
   // range [x.y.z, +Inf).
@@ -47,7 +47,7 @@ class VersionRange {
     llvm::VersionTuple LowerEndpoint;
     ExtremalRange ExtremalValue;
   };
-  
+
   unsigned HasLowerEndpoint : 1;
 
 public:
@@ -86,7 +86,7 @@ public:
   bool isContainedIn(const VersionRange &Other) const {
     if (isEmpty() || Other.isAll())
       return true;
-    
+
     if (isAll() || Other.isEmpty())
       return false;
 
@@ -326,11 +326,14 @@ public:
     OSVersion.unionWith(other.getOSVersion());
   }
 
-  bool isAvailableAsSPI() const {
-    return SPI && *SPI;
+  bool isAvailableAsSPI() const { return SPI && *SPI; }
+
+  /// Returns a representation of this range as a string for debugging purposes.
+  std::string getAsString() const {
+    return "AvailabilityContext(" + OSVersion.getAsString() +
+           (isAvailableAsSPI() ? ", spi" : "") + ")";
   }
 };
-
 
 class AvailabilityInference {
 public:
@@ -343,8 +346,8 @@ public:
   /// to ToDecl.
   static void
   applyInferredAvailableAttrs(Decl *ToDecl,
-                                 ArrayRef<const Decl *> InferredFromDecls,
-                                 ASTContext &Context);
+                              ArrayRef<const Decl *> InferredFromDecls,
+                              ASTContext &Context);
 
   static AvailabilityContext inferForType(Type t);
 
@@ -371,8 +374,7 @@ public:
                                                                ASTContext &C);
 
   static AvailabilityContext
-    annotatedAvailableRangeForAttr(const SpecializeAttr* attr, ASTContext &ctx);
-
+  annotatedAvailableRangeForAttr(const SpecializeAttr *attr, ASTContext &ctx);
 };
 
 } // end namespace swift

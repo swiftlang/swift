@@ -1,6 +1,5 @@
-// TODO: re-enable the simplification passes once rdar://104875010 is fixed
-// RUN: %target-swift-emit-silgen -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-emit-sil -Xllvm -sil-disable-pass=simplification %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
 
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
@@ -66,7 +65,8 @@ var value: Bool { false }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[MARK]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_struct [[DD]]
 // SILGEN:   destroy_value [[LHS]]
 // SILGEN:   destroy_value [[RHS]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
@@ -74,7 +74,8 @@ var value: Bool { false }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   end_lifetime [[MARKED]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
+// SILGEN:   end_lifetime [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
 
 ////////////////////////
@@ -83,11 +84,11 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -132,11 +133,11 @@ public func testIntPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -184,11 +185,11 @@ public func testIntPairWithDeinit() {
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
 // SILGEN: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -233,11 +234,11 @@ public func testKlassPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits23testKlassPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -330,7 +331,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   switch_enum [[MARK]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   switch_enum [[DD]] : $KlassEnumPairWithDeinit, case #KlassEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #KlassEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
 //
 // SILGEN: [[BB_LHS]]([[ARG:%.*]] :
 // SILGEN-NEXT: destroy_value [[ARG]]
@@ -348,7 +350,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
 // SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
-// SILGEN:   switch_enum [[MARK]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
+// SILGEN:   switch_enum [[DD]] : $IntEnumPairWithDeinit, case #IntEnumPairWithDeinit.lhs!enumelt: [[BB_LHS:bb[0-9]+]], case #IntEnumPairWithDeinit.rhs!enumelt: [[BB_RHS:bb[0-9]+]]
 //
 // SILGEN: [[BB_LHS]]([[ARG:%.*]] :
 // SILGEN-NEXT: br [[BB_CONT:bb[0-9]+]]
@@ -367,11 +370,11 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -415,11 +418,11 @@ public func testIntEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -465,11 +468,11 @@ public func testIntEnumPairWithDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -513,11 +516,11 @@ public func testKlassEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits27testKlassEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
+// SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3

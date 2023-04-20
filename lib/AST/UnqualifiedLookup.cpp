@@ -400,6 +400,28 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
   return conditionalStmt->rebindsSelf(Ctx);
 }
 
+// Finds the nearest parent closure, which would define the
+// permitted usage of implicit self. In closures this is most
+// often just `dc` itself, but in functions defined in the
+// closure body this would be some parent context.
+ClosureExpr *closestParentClosure(DeclContext *dc) {
+  if (!dc) {
+    return nullptr;
+  }
+
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
+    return closure;
+  }
+
+  // Stop searching if we find a type decl, since types always
+  // redefine what 'self' means, even when nested inside a closure.
+  if (dc->getContextKind() == DeclContextKind::GenericTypeDecl) {
+    return nullptr;
+  }
+
+  return closestParentClosure(dc->getParent());
+}
+
 ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
     const DeclContext *baseDC) const {
   // Perform an unqualified lookup for the base decl of this result. This
@@ -411,7 +433,7 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   // self _always_ refers to the context's self `ParamDecl`, even if there
   // is another local decl with the name `self` that would be found by
   // `lookupSingleLocalDecl`.
-  auto closureExpr = dyn_cast<ClosureExpr>(factory->DC);
+  auto closureExpr = closestParentClosure(factory->DC);
   if (!closureExpr) {
     return nullptr;
   }
@@ -506,6 +528,8 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(Flags::ExcludeMacroExpansions))
+    nlOptions |= NL_ExcludeMacroExpansions;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
 

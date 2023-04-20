@@ -397,12 +397,12 @@ func test_let() {
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
   // CHECK: [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK: [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK: [[BORROWED_VAL_COPY:%.*]] = begin_borrow [lexical] [[VAL_COPY]]
   // CHECK: function_ref @$s10switch_var6runcedSbyF
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
   case let x where runced():
   // CHECK: [[CASE1]]:
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
   // CHECK:   apply [[A]]([[BORROWED_VAL_COPY]])
   // CHECK:   destroy_value [[VAL_COPY]]
@@ -413,11 +413,11 @@ func test_let() {
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   [[BORROWED_VAL_2:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[BORROWED_VAL_2]]
-  // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [lexical] [[VAL_COPY_2]]
   // CHECK:   function_ref @$s10switch_var6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
   // CHECK: [[CASE2]]:
+  // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [[VAL_COPY_2]]
   // CHECK:   [[B:%.*]] = function_ref @$s10switch_var1b1xySS_tF
   // CHECK:   apply [[B]]([[BORROWED_VAL_COPY_2]])
   // CHECK:   destroy_value [[VAL_COPY_2]]
@@ -428,8 +428,8 @@ func test_let() {
   // CHECK:   destroy_value [[VAL_COPY_2]]
   // CHECK:   [[BORROWED_VAL_3:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
-  // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [lexical] [[VAL_COPY_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
+  // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
   // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
   // CHECK:   apply {{%.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
@@ -467,8 +467,7 @@ func test_mixed_let_var() {
 
   // First pattern.
   // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }, var, name "x"
-  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK:   [[PBOX:%.*]] = project_box [[LIFETIME]]
+  // CHECK:   [[PBOX:%.*]] = project_box [[BOX]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   store [[VAL_COPY]] to [init] [[PBOX]]
   // CHECK:   cond_br {{.*}}, [[CASE1:bb[0-9]+]], [[NOCASE1:bb[0-9]+]]
@@ -478,7 +477,6 @@ func test_mixed_let_var() {
   // CHECK:   [[X:%.*]] = load [copy] [[READ]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
   // CHECK:   apply [[A]]([[X]])
-  // CHECK:   end_borrow [[LIFETIME]]
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -487,11 +485,11 @@ func test_mixed_let_var() {
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [lexical] [[VAL_COPY]]
   // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
 
   // CHECK: [[CASE2]]:
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[B:%.*]] = function_ref @$s10switch_var1b1xySS_tF
   // CHECK:   apply [[B]]([[BORROWED_VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY]]
@@ -505,7 +503,7 @@ func test_mixed_let_var() {
 
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [lexical] [[VAL_COPY]]
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]

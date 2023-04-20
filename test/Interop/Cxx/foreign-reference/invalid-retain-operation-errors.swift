@@ -32,14 +32,14 @@ void badRelease(BadRetainRelease *v, int i);
 
 import Test
 
-// CHECK: error: cannot find retain function 'nonexistant' for reference type 'NonExistant'.
-// CHECK: error: cannot find release function 'nonexistant' for reference type 'NonExistant'.
+// CHECK: error: cannot find retain function 'nonexistant' for reference type 'NonExistant'
+// CHECK: error: cannot find release function 'nonexistant' for reference type 'NonExistant'
 public func test(x: NonExistant) { }
 
-// CHECK: error: reference type 'NoRetainRelease' must have 'retain:' swift attribute.
-// CHECK: error: reference type 'NoRetainRelease' must have 'release:' swift attribute.
+// CHECK: error: reference type 'NoRetainRelease' must have 'retain:' swift attribute
+// CHECK: error: reference type 'NoRetainRelease' must have 'release:' swift attribute
 public func test(x: NoRetainRelease) { }
 
-// CHECK: error: specified retain function 'badRetain' is invalid. Retain must have exactly one argument of type 'BadRetainRelease'
-// CHECK: error: specified release function 'badRelease' is invalid. Release must have exactly one argument of type 'BadRetainRelease'
+// CHECK: error: specified retain function 'badRetain' is invalid; retain function must have exactly one argument of type 'BadRetainRelease'
+// CHECK: error: specified release function 'badRelease' is invalid; release function must have exactly one argument of type 'BadRetainRelease'
 public func test(x: BadRetainRelease) { }

@@ -109,6 +109,11 @@ public:
   /// The set of modules on which this module depends.
   std::vector<std::string> moduleImports;
 
+  /// The set of modules which constitute optional module
+  /// dependencies for this module, such as `@_implementationOnly`
+  /// or `internal` imports.
+  std::vector<std::string> optionalModuleImports;
+
   /// The set of modules on which this module depends, resolved
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
   std::vector<ModuleDependencyID> resolvedModuleDependencies;
@@ -206,10 +211,14 @@ public:
   /// Details common to Swift textual (interface or source) modules
   CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
+  /// Collection of module imports that were detected to be `@Testable`
+  llvm::StringSet<> testableImports;
+
   SwiftSourceModuleDependenciesStorage(
     ArrayRef<StringRef> extraPCMArgs
   ) : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource),
-      textualModuleDetails(extraPCMArgs) {}
+      textualModuleDetails(extraPCMArgs),
+      testableImports(llvm::StringSet<>()) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
     return new SwiftSourceModuleDependenciesStorage(*this);
@@ -217,6 +226,10 @@ public:
 
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftSource;
+  }
+
+  void addTestableImport(ImportPath::Module module) {
+    testableImports.insert(module.front().Item.str());
   }
 };
 
@@ -425,6 +438,11 @@ public:
     return storage->moduleImports;
   }
 
+  /// Retrieve the module-level optional imports.
+  ArrayRef<std::string> getOptionalModuleImports() const {
+    return storage->optionalModuleImports;
+  }
+
   /// Retreive the module-level dependencies.
   const ArrayRef<ModuleDependencyID> getModuleDependencies() const {
     assert(storage->resolved);
@@ -449,6 +467,13 @@ public:
   void setIsResolved(bool isResolved) {
     storage->resolved = isResolved;
   }
+
+  /// For a Source dependency, register a `Testable` import
+  void addTestableImport(ImportPath::Module module);
+
+  /// Whether or not a queried module name is a `@Testable` import dependency
+  /// of this module. Can only return `true` for Swift source modules.
+  bool isTestableImport(StringRef moduleName) const;
 
   /// Whether the dependencies are for a Swift module: either Textual, Source, Binary, or Placeholder.
   bool isSwiftModule() const;
@@ -487,6 +512,11 @@ public:
   /// Retrieve the dependencies for a placeholder dependency module stub.
   const SwiftPlaceholderModuleDependencyStorage *
     getAsPlaceholderDependencyModule() const;
+
+  /// Add a dependency on the given module, if it was not already in the set.
+  void addOptionalModuleImport(StringRef module,
+                               llvm::StringSet<> *alreadyAddedModules = nullptr);
+
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleImport(StringRef module,
@@ -567,14 +597,6 @@ class SwiftDependencyScanningService {
       clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
       SharedFilesystemCache;
 
-  /// All cached Swift source module dependencies, in the order in which they
-  /// were encountered
-  std::vector<ModuleDependencyID> AllSourceModules;
-
-  /// Dependencies for all Swift source-based modules discovered. Each one is
-  /// the main module of a prior invocation of the scanner.
-  ModuleNameToDependencyMap SwiftSourceModuleDependenciesMap;
-
   /// A map from a String representing the target triple of a scanner invocation
   /// to the corresponding cached dependencies discovered so far when using this
   /// triple.
@@ -650,10 +672,6 @@ private:
   ContextSpecificGlobalCacheState *
   getCacheForScanningContextHash(StringRef scanContextHash) const;
 
-  /// Look for source-based module dependency details
-  Optional<const ModuleDependencyInfo*>
-  findSourceModuleDependency(StringRef moduleName) const;
-
   /// Look for module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
@@ -667,28 +685,17 @@ private:
                                                ModuleDependencyInfo dependencies,
                                                StringRef scanContextHash);
 
-  /// Record source-module dependencies for the given module.
-  const ModuleDependencyInfo *recordSourceDependency(StringRef moduleName,
-                                                     ModuleDependencyInfo dependencies);
-
   /// Update stored dependencies for the given module.
   const ModuleDependencyInfo *updateDependency(ModuleDependencyID moduleID,
                                                ModuleDependencyInfo dependencies,
                                                StringRef scanContextHash);
 
-  /// Reference the list of all module dependencies that are not source-based
-  /// modules (i.e. interface dependencies, binary dependencies, clang
-  /// dependencies).
+  /// Reference the list of all module dependency infos for a given scanning context
   const std::vector<ModuleDependencyID> &
-  getAllNonSourceModules(StringRef scanningContextHash) const {
+  getAllModules(StringRef scanningContextHash) const {
     auto contextSpecificCache =
         getCacheForScanningContextHash(scanningContextHash);
     return contextSpecificCache->AllModules;
-  }
-
-  /// Return the list of all source-based modules discovered by this cache
-  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
-    return AllSourceModules;
   }
 };
 
@@ -756,10 +763,6 @@ public:
   /// to a kind-qualified set of module IDs.
   void resolveDependencyImports(ModuleDependencyID moduleID,
                                 const std::vector<ModuleDependencyID> &dependencyIDs);
-
-  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
-    return globalScanningService.getAllSourceModules();
-  }
   
   StringRef getMainModuleName() const {
     return mainScanModuleName;

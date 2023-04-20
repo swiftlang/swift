@@ -60,8 +60,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse the 'each' keyword for a type parameter pack 'each T'.
     SourceLoc EachLoc;
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        Tok.isContextualKeyword("each")) {
+    if (Tok.isContextualKeyword("each")) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
       EachLoc = consumeToken();
@@ -78,8 +77,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse and diagnose the unsupported ellipsis for a type parameter pack
     // 'T...'.
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        startsWithEllipsis(Tok)) {
+    if (startsWithEllipsis(Tok)) {
       const auto EllipsisLoc = consumeStartingEllipsis();
       // TODO: token length hardcoded because calculation for ellipsis
       // incorrectly includes '>' if one follows (as can occur in this parse).
@@ -288,6 +286,13 @@ ParserStatus Parser::parseGenericWhereClause(
       break;
     }
 
+    // Parse the 'repeat' keyword for requirement expansions.
+    bool isRequirementExpansion = false;
+    if (Tok.is(tok::kw_repeat)) {
+      consumeToken();
+      isRequirementExpansion = true;
+    }
+
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
     ParserResult<TypeRepr> FirstType = parseType();
@@ -326,7 +331,8 @@ ParserStatus Parser::parseGenericWhereClause(
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(
               FirstType.get(), ColonLoc,
-              LayoutConstraintLoc(Layout, LayoutLoc)));
+              LayoutConstraintLoc(Layout, LayoutLoc),
+              isRequirementExpansion));
         }
       } else {
         // Parse the protocol or composition.
@@ -337,7 +343,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
-            FirstType.get(), ColonLoc, Protocol.get()));
+            FirstType.get(), ColonLoc, Protocol.get(), isRequirementExpansion));
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
@@ -367,15 +373,18 @@ ParserStatus Parser::parseGenericWhereClause(
         // completion token in the TypeRepr.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
             FirstType.get(), EqualLoc,
-            new (Context) ErrorTypeRepr(SecondType.get()->getLoc())));
+            new (Context) ErrorTypeRepr(SecondType.get()->getLoc()),
+            isRequirementExpansion));
       } else {
         Requirements.push_back(RequirementRepr::getSameType(
-            FirstType.get(), EqualLoc, SecondType.get()));
+            FirstType.get(), EqualLoc, SecondType.get(),
+            isRequirementExpansion));
       }
     } else if (FirstType.hasCodeCompletion()) {
       // Recover by adding dummy constraint.
       Requirements.push_back(RequirementRepr::getTypeConstraint(
-          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc)));
+          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc),
+          isRequirementExpansion));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();

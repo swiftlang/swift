@@ -287,9 +287,12 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
     ErrMsg += ModuleName;
     return true;
   }
-  if (Mod->failedToLoad() && ModuleName == "CxxStdlib") {
+  if (Mod->failedToLoad()) {
     // We might fail to load the underlying Clang module
-    // for a Swift overlay module like 'CxxStdlib'. Make sure an error is reported in this case, so that we can either retry to load with C++ interoperability enabled, and if that fails, we can report this to the user.
+    // for a Swift overlay module like 'CxxStdlib', or a mixed-language
+    // framework. Make sure an error is reported in this case, so that we can
+    // either retry to load with C++ interoperability enabled, and if that
+    // fails, we can report this to the user.
     ErrMsg = "Could not load underlying module for: ";
     ErrMsg += ModuleName;
     return true;
@@ -721,7 +724,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
       }
       if (retryWithCxxEnabled) {
           std::vector<const char *> AdjustedArgs(Args.begin(), Args.end());
-          AdjustedArgs.push_back("-cxx-interoperability-mode=swift-5.9");
+          AdjustedArgs.push_back("-cxx-interoperability-mode=default");
           return editorOpenInterface(Consumer, Name, ModuleName, Group, AdjustedArgs,
                                      SynthesizedExtensions, InterestedUSR);
       }

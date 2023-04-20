@@ -1,9 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift
 
 func debugPrint<each T>(_ items: repeat each T)
-  where each T: CustomDebugStringConvertible
+  where repeat each T: CustomDebugStringConvertible
 {
   /*for (item: T) in items {
     stdout.write(item.debugDescription)
@@ -11,7 +9,7 @@ func debugPrint<each T>(_ items: repeat each T)
 }
 
 func max<each T>(_ values: repeat each T) -> (repeat each T)?
-  where each T: Comparable
+  where repeat each T: Comparable
 {
   return nil
 }
@@ -21,7 +19,7 @@ func min<each T: Comparable>(_ values: repeat each T) -> (repeat each T)? {
 }
 
 func invalidPacks() {
-  func monovariadic1() -> (each String) {} // expected-error {{'each' cannot be applied to non-pack type 'String'}}
+  func monovariadic1() -> (each String) {} // expected-error {{'each' cannot be applied to non-pack type 'String'}}{{28-32=}}
   func monovariadic2<T>() -> (repeat T) {} // expected-error {{pack expansion 'T' must contain at least one pack reference}}
   func monovariadic3<T, U>() -> (T, repeat U) {} // expected-error {{pack expansion 'U' must contain at least one pack reference}}
 }

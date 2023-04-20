@@ -1864,6 +1864,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
   }
 
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkMustCheckInst: {
     // Mark must check goes on the project_box, so it isn't a ref.
     assert(!dfs.isRef());
@@ -2638,6 +2639,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
+  case SILInstructionKind::PackElementSetInst:
     visitor(&I->getAllOperands()[StoreInst::Dest]);
     return;
 
@@ -2655,7 +2657,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst: {
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+  case SILInstructionKind::PackElementGetInst: {
     // Assuming all the above have only a single address operand.
     assert(I->getNumOperands() - I->getNumTypeDependentOperands() == 1);
     Operand *singleOperand = &I->getAllOperands()[0];
@@ -2688,6 +2691,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:

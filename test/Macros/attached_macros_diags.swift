@@ -1,3 +1,5 @@
+// REQUIRES: swift_swift_parser
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name MacrosTest
 
 @attached(accessor) macro m1() = #externalMacro(module: "MyMacros", type: "Macro1")

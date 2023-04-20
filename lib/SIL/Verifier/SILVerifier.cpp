@@ -69,9 +69,15 @@ static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
 static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
                                              llvm::cl::init(false));
 
-static llvm::cl::opt<bool> VerifyDIHoles(
-                              "verify-di-holes",
-                              llvm::cl::init(true));
+// This verification is affects primarily debug info and end users don't derive
+// a benefit from seeing its results.
+static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
+#ifndef NDEBUG
+                                                                true
+#else
+                                                                false
+#endif
+                                                                ));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -667,6 +673,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
+      case SILInstructionKind::MarkMustCheckInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -5719,10 +5726,9 @@ public:
       auto substConformances = [&](CanType dependentType,
                                    Type conformingType,
                                    ProtocolDecl *protocol) -> ProtocolConformanceRef {
-        // FIXME: substitute back to the pack context to get the
-        // corresponding conformance pack, then project out the
-        // appropriate lane.
-        llvm_unreachable("unimplemented");
+        // FIXME: This violates the spirit of this verifier check.
+        return protocol->getParentModule()
+            ->lookupConformance(conformingType, protocol);
       };
 
       // If the pack components and expected element types are SIL types,
@@ -5914,6 +5920,14 @@ public:
             "Operand value should be an object");
     require(mvi->getType() == mvi->getOperand()->getType(),
             "Result and operand must have the same type, today.");
+  }
+
+  void checkDropDeinitInst(DropDeinitInst *ddi) {
+    require(ddi->getType() == ddi->getOperand()->getType(),
+            "Result and operand must have the same type.");
+    require(ddi->getType().isMoveOnlyNominalType(),
+            "drop_deinit only allowed for move-only types");
+    require(F.hasOwnership(), "drop_deinit only allowed in OSSA");
   }
 
   void checkMarkMustCheckInst(MarkMustCheckInst *i) {
@@ -6236,6 +6250,11 @@ public:
     if (!VerifyDIHoles)
       return;
 
+    // These transforms don't set everything they move to implicit.
+    if (M->getASTContext().LangOpts.Playground ||
+        M->getASTContext().LangOpts.PCMacro)
+      return;
+
     // This check only makes sense at -Onone. Optimizations,
     // e.g. inlining, can move scopes around.
     llvm::DenseSet<const SILDebugScope *> AlreadySeenScopes;
@@ -6252,7 +6271,17 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
+      // FIXME: Profile counters for loop bodies may be emitted before the
+      // instructions for the loop variable, but in a deeper scope.
+      if (isa<IncrementProfilerCounterInst>(SI))
+        continue;
+      if (!SI.getLoc().hasValidLineNumber())
+        continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
+        continue;
+      // FIXME: These still leave holes in the scopes. We should make them
+      // inherit the sourrounding scope in IRGenSIL.
+      if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
 
       // If we haven't seen this debug scope yet, update the

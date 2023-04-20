@@ -390,7 +390,7 @@ public:
   void visit(FileUnit *file) {
     auto visitFile = [this](FileUnit *file) {
       SmallVector<Decl *, 16> decls;
-      file->getTopLevelDecls(decls);
+      file->getTopLevelDeclsWithAuxiliaryDecls(decls);
 
       addMainIfNecessary(file);
 

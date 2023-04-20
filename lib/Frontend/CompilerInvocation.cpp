@@ -159,6 +159,31 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
 }
 
+void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
+  if (!LangOpts.BlocklistConfigFilePaths.empty())
+    return;
+  if (SearchPathOpts.RuntimeResourcePath.empty())
+    return;
+  // XcodeDefault.xctoolchain/usr/lib/swift
+  SmallString<64> blocklistDir{SearchPathOpts.RuntimeResourcePath};
+  // XcodeDefault.xctoolchain/usr/lib
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr/local/lib/swift/blocklists
+  llvm::sys::path::append(blocklistDir, "local", "lib", "swift", "blocklists");
+  std::error_code EC;
+  if (llvm::sys::fs::is_directory(blocklistDir)) {
+    for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
+         F != FE; F.increment(EC)) {
+      StringRef ext = llvm::sys::path::extension(F->path());
+      if (ext == "yml" || ext == "yaml") {
+        LangOpts.BlocklistConfigFilePaths.push_back(F->path());
+      }
+    }
+  }
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
@@ -438,9 +463,24 @@ enum class CxxCompatMode {
 static CxxCompatMode validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return CxxCompatMode::off;
+  if (mode == "default")
+    return CxxCompatMode::enabled;
+  // FIXME: Drop swift-5.9.
   if (mode == "swift-5.9")
     return CxxCompatMode::enabled;
   return CxxCompatMode::invalid;
+}
+
+static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
+                                         DiagnosticEngine &diags) {
+  // General invalid argument error
+  diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                 verArg->getAsString(Args), verArg->getValue());
+
+  // Note valid C++ interoperability modes.
+  auto validVers = {llvm::StringRef("off"), llvm::StringRef("default")};
+  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
+  diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -523,6 +563,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_deserialization_safety)) {
     Opts.EnableDeserializationSafety
       = A->getOption().matches(OPT_enable_deserialization_safety);
+  } else if (auto A = Args.getLastArg(OPT_enable_access_control,
+                                      OPT_disable_access_control)) {
+    // Disable deserialization safety along with access control.
+    Opts.EnableDeserializationSafety
+      = A->getOption().matches(OPT_enable_access_control);
+  }
+
+  if (auto A = Args.getLastArg(OPT_enable_access_control,
+                               OPT_disable_access_control)) {
+    Opts.EnableAccessControl
+      = A->getOption().matches(OPT_enable_access_control);
   }
 
   // Whether '/.../' regex literals are enabled. This implies experimental
@@ -542,8 +593,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // forward slash regex `/.../`.
     if (!Opts.EnableExperimentalStringProcessing)
       Opts.EnableBareSlashRegexLiterals = false;
-  } else {
-    Opts.EnableExperimentalStringProcessing = true;
   }
 
   Opts.DisableAvailabilityChecking |=
@@ -577,12 +626,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnOnPotentiallyUnavailableEnumCase |=
       Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case);
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
-
-  if (auto A = Args.getLastArg(OPT_enable_access_control,
-                               OPT_disable_access_control)) {
-    Opts.EnableAccessControl
-      = A->getOption().matches(OPT_enable_access_control);
-  }
 
   if (auto A = Args.getLastArg(OPT_disable_typo_correction,
                                OPT_typo_correction_limit)) {
@@ -705,6 +748,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
       Opts.Features.insert(*feature);
     }
+
+    // Hack: In order to support using availability macros in SPM packages, we
+    // need to be able to use:
+    //    .enableExperimentalFeature("AvailabilityMacro='...'")
+    // within the package manifest and the feature recognizer can't recognize
+    // this form of feature, so specially handle it here until features can
+    // maybe have extra arguments in the future.
+    auto strRef = StringRef(A->getValue());
+    if (strRef.startswith("AvailabilityMacro=")) {
+      auto availability = strRef.split("=").second;
+
+      Opts.AvailabilityMacros.push_back(availability.str());
+    }
   }
 
   // Map historical flags over to future features.
@@ -752,6 +808,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
+
+  if (Args.hasArg(OPT_enable_builtin_module))
+    Opts.Features.insert(Feature::BuiltinModule);
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -939,10 +998,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
     Opts.EnableCXXInterop |= (interopCompatMode == CxxCompatMode::enabled);
 
-    if (interopCompatMode == CxxCompatMode::invalid) {
-      Diags.diagnose(SourceLoc(), diag::invalid_interop_compat_mode);
-      Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
-    }
+    if (interopCompatMode == CxxCompatMode::invalid)
+      diagnoseCxxInteropCompatMode(A, Args, Diags);
   }
   
   if (Args.hasArg(OPT_enable_experimental_cxx_interop)) {
@@ -1163,6 +1220,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
+  for (auto &block: FrontendOpts.BlocklistConfigFilePaths)
+    Opts.BlocklistConfigFilePaths.push_back(block);
   if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
     Opts.ActiveConcurrencyModel =
         llvm::StringSwitch<ConcurrencyModel>(A->getValue())
@@ -1170,8 +1229,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Case("task-to-thread", ConcurrencyModel::TaskToThread)
             .Default(ConcurrencyModel::Standard);
   }
-
-  Opts.EnableBuiltinModule = Args.hasArg(OPT_enable_builtin_module);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
@@ -1366,8 +1423,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   // type seems to be NoneAction.
   if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::REPL &&
       FrontendOpts.RequestedAction != FrontendOptions::ActionType::NoneAction &&
-      (Args.hasArg(OPT_enable_import_objc_forward_declarations) ||
-       LangOpts.isSwiftVersionAtLeast(6))) {
+      LangOpts.hasFeature(Feature::ImportObjcForwardDeclarations)) {
     Opts.ImportForwardDeclarations = true;
   }
 
@@ -1408,6 +1464,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
+
+  // Forward the FrontendOptions to clang importer option so it can be
+  // accessed when creating clang module compilation invocation.
+  if (FrontendOpts.EnableCAS)
+    Opts.CASPath = FrontendOpts.CASPath;
 
   return false;
 }
@@ -2366,6 +2427,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
+  Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files);
 
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
@@ -2660,6 +2722,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
+
+  Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
+                                                       OPT_disable_layout_string_value_witnesses,
+                                                       Opts.EnableLayoutStringValueWitnesses);
+
+  Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
+                                      OPT_disable_layout_string_value_witnesses_instantiation,
+                                      Opts.EnableLayoutStringValueWitnessesInstantiation);
+
+  if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
+      !Opts.EnableLayoutStringValueWitnesses) {
+    Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
+    return true;
+  }
+
   return false;
 }
 
@@ -2841,6 +2918,7 @@ bool CompilerInvocation::parseArgs(
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
   setDefaultPrebuiltCacheIfNecessary();
+  setDefaultBlocklistsIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);

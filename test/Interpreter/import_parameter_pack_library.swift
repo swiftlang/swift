@@ -10,12 +10,11 @@
 
 // REQUIRES: executable_test
 
-// FIXME: Optimizations disabled for all parameter pack tests in test/Interpreter/
-// REQUIRES: swift_test_mode_optimize_none
-
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import variadic_generic_library
 import StdlibUnittest

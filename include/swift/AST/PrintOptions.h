@@ -293,9 +293,6 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
-  /// Whether to print the \c each keyword for pack archetypes.
-  bool PrintExplicitEach = false;
-
   /// Whether to print the \c any keyword for existential
   /// types.
   bool PrintExplicitAny = false;
@@ -483,6 +480,9 @@ struct PrintOptions {
   /// When printing a type alias type, whether print the underlying type instead
   /// of the alias.
   bool PrintTypeAliasUnderlyingType = false;
+
+  /// Print the definition of a macro, e.g. `= #externalMacro(...)`.
+  bool PrintMacroDefinitions = true;
 
   /// Use aliases when printing references to modules to avoid ambiguities
   /// with types sharing a name with a module.

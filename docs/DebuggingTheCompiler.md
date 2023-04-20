@@ -164,6 +164,7 @@ constraints and present the final type checked solution, e.g.:
 
 ```
 ---Constraint solving at [test.swift:3:1 - line:3:1]---
+
 ---Initial constraints for the given expression---
 (integer_literal_expr type='$T0' location=test.swift:3:1 range=[test.swift:3:1 - line:3:1] value=0 builtin_initializer=**NULL** initializer=**NULL**)
 
@@ -172,14 +173,14 @@ Type Variables:
    ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
 Inactive Constraints:
-  $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+  $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
   (Potential Binding(s): 
     ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int])
   (attempting type variable $T0 := Int
-    (considering -> $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+    (considering: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       (simplification result:
-        (removed constraint: $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];)
+        (removed constraint: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1])
       )
       (outcome: simplified)
     )
@@ -188,7 +189,7 @@ Inactive Constraints:
         > $T0 := Int
       )
       (Removed Constraint: 
-        > $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+        > $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       )
     )
     (found solution: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>)

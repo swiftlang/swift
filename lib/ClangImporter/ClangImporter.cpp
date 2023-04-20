@@ -66,6 +66,7 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -74,6 +75,7 @@
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
 #include <memory>
@@ -940,10 +942,8 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.str().str();
 }
 
-
-Optional<std::string>
-ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              StringRef SwiftPCHHash) {
+Optional<std::string> ClangImporter::getOrCreatePCH(
+    const ClangImporterOptions &ImporterOptions, StringRef SwiftPCHHash) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -959,8 +959,8 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
         << EC.message();
       return None;
     }
-    auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.value());
+    auto FailedToEmit =
+        emitBridgingPCH(ImporterOptions.BridgingHeader, PCHFilename.value());
     if (FailedToEmit) {
       return None;
     }
@@ -1693,13 +1693,13 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   clonedInstance->setFileManager(&fileManager);
   clonedInstance->createSourceManager(fileManager);
   clonedInstance->setTarget(&Impl.Instance->getTarget());
+  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
 
-bool
-ClangImporter::emitBridgingPCH(StringRef headerPath,
-                               StringRef outputPCHPath) {
+bool ClangImporter::emitBridgingPCH(
+    StringRef headerPath, StringRef outputPCHPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
@@ -1728,7 +1728,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
-bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
+bool ClangImporter::runPreprocessor(
+    StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
   auto LangOpts = invocation.getLangOpts();
@@ -1752,9 +1753,8 @@ bool ClangImporter::runPreprocessor(StringRef inputPath, StringRef outputPath) {
   return emitInstance->getDiagnostics().hasErrorOccurred();
 }
 
-bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
-                                          StringRef moduleName,
-                                          StringRef outputPath) {
+bool ClangImporter::emitPrecompiledModule(
+    StringRef moduleMapPath, StringRef moduleName, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
@@ -1788,8 +1788,8 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
   return false;
 }
 
-bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
-                                          StringRef outputPath) {
+bool ClangImporter::dumpPrecompiledModule(
+    StringRef modulePath, StringRef outputPath) {
   auto dumpInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = dumpInstance->getInvocation();
 
@@ -1855,7 +1855,8 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    ModuleVersionInfo *versionInfo) {
+                                    ModuleVersionInfo *versionInfo,
+                                    bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
@@ -3344,6 +3345,7 @@ void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recu
 }
 
 void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
+                                  OptionSet<ModuleLookupFlags> flags,
                                   SmallVectorImpl<ValueDecl*> &results) const {
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
@@ -4407,8 +4409,8 @@ static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Imp
                                               HeaderLoc loc, Diagnostic diag) {
   auto importedLoc =
     Impl.SwiftContext.getClangModuleLoader()->importSourceLocation(loc.clangLoc);
-  Impl.diagnose(loc, diag)
-    .fixItInsert(importedLoc, "SWIFT_REFERENCE_TYPE(<#retain#>, <#release#>) ");
+  Impl.diagnose(loc, diag).fixItInsert(
+      importedLoc, "SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>) ");
 }
 
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
@@ -5621,13 +5623,7 @@ importName(const clang::NamedDecl *D,
 
 Type ClangImporter::importFunctionReturnType(
     const clang::FunctionDecl *clangDecl, DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
-  bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
-  if (auto imported =
-          Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
-              .getType())
+  if (auto imported = Impl.importFunctionReturnType(clangDecl, dc).getType())
     return imported;
   return dc->getASTContext().getNeverType();
 }
@@ -6394,7 +6390,9 @@ static bool hasIteratorAPIAttr(const clang::Decl *decl) {
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   // Probably a class template that has not yet been specialized:
   if (!decl->getDefinition())
-    return false;
+    // If the definition is unknown, there is no way to determine if the type
+    // stores pointers. Stay on the safe side and assume that it does.
+    return true;
 
   auto checkType = [](clang::QualType t) {
     if (t->isPointerType())
@@ -6689,9 +6687,10 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return false;
         }
 
-        // Mark this as safe to help our diganostics down the road.
         if (!cxxRecordReturnType->getDefinition()) {
-          return true;
+          // This is a templated type that has not been instantiated yet. We do
+          // not know if it is safe. Assume that it isn't.
+          return false;
         }
 
         if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&

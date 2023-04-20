@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 756; // build complexEquality executor builtin
+const uint16_t SWIFTMODULE_VERSION_MINOR = 780; // serialize PackConformance
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -139,6 +139,21 @@ public:
 // in the same way.
 using ProtocolConformanceID = DeclID;
 using ProtocolConformanceIDField = DeclIDField;
+
+// The low two bits of the ProtocolConformanceID determine the kind:
+// 00 -- abstract conformance
+// 01 -- concrete conformance
+// 10 -- pack conformance
+struct SerializedProtocolConformanceKind {
+  enum  {
+    Abstract = 0,
+    Concrete = 1,
+    Pack = 2,
+
+    Shift = 2,
+    Mask = 3
+  };
+};
 
 // GenericSignatureID must be the same as DeclID because it is stored in the
 // same way.
@@ -619,6 +634,7 @@ enum class MacroRole : uint8_t {
   Member,
   Peer,
   Conformance,
+  CodeItem,
 };
 using MacroRoleField = BCFixed<3>;
 
@@ -1326,13 +1342,9 @@ namespace decls_block {
   );
 
   TYPE_LAYOUT(PackTypeLayout,
-    PACK_TYPE
+    PACK_TYPE,
+    BCArray<TypeIDField>  // component types
   );
-
-  using PackTypeEltLayout = BCRecordLayout<
-    PACK_TYPE_ELT,
-    TypeIDField         // type
-  >;
 
   TYPE_LAYOUT(SILPackTypeLayout,
     SIL_PACK_TYPE,
@@ -1726,6 +1738,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCVBR<5>,    // number of parameter name components
     BCVBR<3>,    // builtin macro definition ID
+    BCFixed<1>,  // whether it has an expanded macro definition
     IdentifierIDField, // external module name, for external macros
     IdentifierIDField,  // external type name, for external macros
     BCArray<IdentifierIDField> // name components,
@@ -1733,6 +1746,22 @@ namespace decls_block {
     // The record is trailed by:
     // - its generic parameters, if any
     // - parameter list, if present
+    // - expanded macro definition, if needed.
+  >;
+
+  /// The expanded macro definition text.
+  using ExpandedMacroDefinitionLayout = BCRecordLayout<
+    EXPANDED_MACRO_DEFINITION,
+    BCFixed<1>, // whether it has replacements
+    BCBlob // expansion text
+    // potentially trailed by the expanded macro replacements
+  >;
+
+  /// The replacements to be performed for an expanded macro definition.
+  using ExpandedMacroReplacementsLayout = BCRecordLayout<
+    EXPANDED_MACRO_REPLACEMENTS,
+    BCArray<BCVBR<6>> // a set of replacement triples (start offset,
+                      // end offset, parameter index)
   >;
 
   using InlinableBodyTextLayout = BCRecordLayout<
@@ -1894,6 +1923,13 @@ namespace decls_block {
     GenericSignatureIDField, // the generic signature
     BCFixed<2>, // the builtin conformance kind
     BCArray<BCVBR<6>> // conditional requirements
+  >;
+
+  using PackConformanceLayout = BCRecordLayout<
+    PACK_CONFORMANCE,
+    TypeIDField,                         // pattern type
+    DeclIDField,                         // the protocol
+    BCArray<ProtocolConformanceIDField>  // pattern conformances
   >;
 
   using ProtocolConformanceXrefLayout = BCRecordLayout<
@@ -2330,6 +2366,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,

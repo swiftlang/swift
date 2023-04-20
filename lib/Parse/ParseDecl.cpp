@@ -209,7 +209,9 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  parseSourceFileViaASTGen(items, existingParsingTransaction);
+  if (!SF.getParsingOptions()
+      .contains(SourceFile::ParsingFlags::DisableSwiftParserASTGen))
+    parseSourceFileViaASTGen(items, existingParsingTransaction);
 #endif
 
   // Prime the lexer.
@@ -259,36 +261,40 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   }
 
 #if SWIFT_SWIFT_PARSER
-  if (existingParsingTransaction)
-    existingParsingTransaction->abort();
+  if (!SF.getParsingOptions().contains(
+          SourceFile::ParsingFlags::DisableSwiftParserASTGen)) {
+    if (existingParsingTransaction)
+      existingParsingTransaction->abort();
 
-  // Perform round-trip and/or validation checking.
-  if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
-       Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
-      SF.exportedSourceFile) {
-    if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
-        swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+    // Perform round-trip and/or validation checking.
+    if ((Context.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+         Context.LangOpts.hasFeature(Feature::ParserValidation)) &&
+        SF.exportedSourceFile &&
+        !SourceMgr.hasIDEInspectionTargetBuffer()) {
+      if (Context.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+          swift_ASTGen_roundTripCheck(SF.exportedSourceFile)) {
+        SourceLoc loc;
+        if (auto bufferID = SF.getBufferID()) {
+          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+        }
+        diagnose(loc, diag::parser_round_trip_error);
+      } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
+                 !Context.Diags.hadAnyError() &&
+                 swift_ASTGen_emitParserDiagnostics(
+                     &Context.Diags, SF.exportedSourceFile,
+                     /*emitOnlyErrors=*/true,
+                     /*downgradePlaceholderErrorsToWarnings=*/
+                     Context.LangOpts.Playground ||
+                         Context.LangOpts.WarnOnEditorPlaceholder)) {
+        // We might have emitted warnings in the C++ parser but no errors, in
+        // which case we still have `hadAnyError() == false`. To avoid emitting
+        // the same warnings from SwiftParser, only emit errors from SwiftParser
+        SourceLoc loc;
+        if (auto bufferID = SF.getBufferID()) {
+          loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
+        }
+        diagnose(loc, diag::parser_new_parser_errors);
       }
-      diagnose(loc, diag::parser_round_trip_error);
-    } else if (Context.LangOpts.hasFeature(Feature::ParserValidation) &&
-               !Context.Diags.hadAnyError() &&
-               swift_ASTGen_emitParserDiagnostics(
-                   &Context.Diags, SF.exportedSourceFile,
-                   /*emitOnlyErrors=*/true,
-                   /*downgradePlaceholderErrorsToWarnings=*/
-                       Context.LangOpts.Playground ||
-                       Context.LangOpts.WarnOnEditorPlaceholder)) {
-      // We might have emitted warnings in the C++ parser but no errors, in
-      // which case we still have `hadAnyError() == false`. To avoid emitting
-      // the same warnings from SwiftParser, only emit errors from SwiftParser
-      SourceLoc loc;
-      if (auto bufferID = SF.getBufferID()) {
-        loc = Context.SourceMgr.getLocForBufferStart(*bufferID);
-      }
-      diagnose(loc, diag::parser_new_parser_errors);
     }
   }
 #endif
@@ -300,8 +306,7 @@ Parser::parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
                                  bool suppressDiagnostics) {
 #if SWIFT_SWIFT_PARSER
   Optional<DiagnosticTransaction> existingParsingTransaction;
-  if (!SourceMgr.hasIDEInspectionTargetBuffer() &&
-      SF.Kind != SourceFileKind::SIL) {
+  if (SF.Kind != SourceFileKind::SIL) {
     StringRef contents =
         SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
 
@@ -2199,6 +2204,7 @@ static Optional<MacroRole> getMacroRole(
   auto role = llvm::StringSwitch<Optional<MacroRole>>(roleName->str())
       .Case("declaration", MacroRole::Declaration)
       .Case("expression", MacroRole::Expression)
+      .Case("codeItem", MacroRole::CodeItem)
       .Case("accessor", MacroRole::Accessor)
       .Case("memberAttribute", MacroRole::MemberAttribute)
       .Case("member", MacroRole::Member)
@@ -6453,8 +6459,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   }
 
   // Reject variadic associated types with a specific error.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-      Tok.isContextualKeyword("each")) {
+  if (Tok.isContextualKeyword("each")) {
     const auto EachLoc = consumeToken();
     diagnose(EachLoc, diag::associatedtype_cannot_be_variadic)
         .fixItRemoveChars(EachLoc, Tok.getLoc());
@@ -6478,8 +6483,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   }
 
   // Reject (early syntax) variadic associated types with a specific error.
-  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-      startsWithEllipsis(Tok)) {
+  if (startsWithEllipsis(Tok)) {
     const auto EllipsisLoc = consumeStartingEllipsis();
     const auto EllipsisEnd = Lexer::getLocForEndOfToken(SourceMgr, EllipsisLoc);
     diagnose(EllipsisLoc, diag::associatedtype_cannot_be_variadic)

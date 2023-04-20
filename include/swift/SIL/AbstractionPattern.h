@@ -524,9 +524,6 @@ class AbstractionPattern {
       assert(OrigType == signature.getReducedType(origType));
       GenericSig = signature;
     }
-    assert(!subs || !OrigType->hasTypeParameter() ||
-           subs.getGenericSignature()->isEqual(
-             getGenericSignatureForFunctionComponent()));
   }
 
   void initClangType(SubstitutionMap subs, CanGenericSignature signature,
@@ -1089,15 +1086,9 @@ public:
   AbstractionPattern withSubstitutions(SubstitutionMap subs) const {
     AbstractionPattern result = *this;
     if (subs) {
-#ifndef NDEBUG
       // If we have a generic signature, it should match the substitutions.
-      // But there are situations in which it's okay that we don't store
-      // a signature.
-      auto sig = getGenericSignatureForFunctionComponent();
-      assert((sig && sig->isEqual(subs.getGenericSignature())) ||
-             !OrigType ||
-             !OrigType->hasTypeParameter());
-#endif
+      // But in corner cases, "match" can mean that it applies to an inner
+      // local generic context, which is not something we can easily assert.
       result.GenericSubs = subs;
     }
     return result;
@@ -1283,8 +1274,9 @@ public:
   }
 
   /// Is the given tuple type a valid substitution of this abstraction
-  /// pattern?
-  bool matchesTuple(CanTupleType substType) const;
+  /// pattern?  Note that the type doesn't have to be a tuple type in the
+  /// case of a vanishing tuple.
+  bool matchesTuple(CanType substType) const;
 
   bool isTuple() const {
     switch (getKind()) {
@@ -1344,6 +1336,14 @@ public:
 
   bool doesTupleContainPackExpansionType() const;
 
+  /// If this type is a tuple type that vanishes (is flattened to its
+  /// singleton non-expansion element) under the stored substitutions,
+  /// return the abstraction pattern of the surviving element.
+  ///
+  /// If the surviving element came from an expansion element, the
+  /// returned element is the pattern type of the expansion.
+  Optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
+
   static AbstractionPattern
   projectTupleElementType(const AbstractionPattern *base, size_t index) {
     return base->getTupleElementType(index);
@@ -1360,8 +1360,9 @@ public:
   /// original type and how many elements of the substituted type they
   /// expand to.
   ///
-  /// This pattern must be a tuple pattern.
-  void forEachTupleElement(CanTupleType substType,
+  /// This pattern must be a tuple pattern.  The substituted type may be
+  /// a non-tuple only if this is a vanshing tuple pattern.
+  void forEachTupleElement(CanType substType,
          llvm::function_ref<void(TupleElementGenerator &element)> fn) const;
 
   /// Perform a parallel visitation of the elements of a tuple type,
@@ -1372,7 +1373,7 @@ public:
   ///
   /// This pattern must match the substituted type, but it may be an
   /// opaque pattern.
-  void forEachExpandedTupleElement(CanTupleType substType,
+  void forEachExpandedTupleElement(CanType substType,
       llvm::function_ref<void(AbstractionPattern origEltType,
                               CanType substEltType,
                               const TupleTypeElt &elt)> handleElement) const;

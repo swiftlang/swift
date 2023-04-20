@@ -419,8 +419,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberTanType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
     tangentProperty->setInterfaceType(memberTanType);
-    Pattern *memberPattern = NamedPattern::createImplicit(C, tangentProperty);
-    memberPattern->setType(memberTanType);
+    Pattern *memberPattern =
+        NamedPattern::createImplicit(C, tangentProperty, memberTanType);
     memberPattern =
         TypedPattern::createImplicit(C, memberPattern, memberTanType);
     memberPattern->setType(memberTanType);

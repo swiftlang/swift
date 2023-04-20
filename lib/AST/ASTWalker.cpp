@@ -422,6 +422,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
     }
 
+    if (auto def = MD->definition) {
+      // Don't walk into unchecked definitions.
+      if (auto expansion = dyn_cast<MacroExpansionExpr>(def)) {
+        if (!expansion->getType().isNull()) {
+          if (auto newDef = doIt(def))
+            MD->definition = newDef;
+          else
+            return true;
+        }
+      }
+    }
+
     // Visit trailing requirements
     if (WalkGenerics && visitTrailingRequirements(MD))
        return true;
@@ -430,6 +442,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", MED);
+#endif
     bool shouldWalkArguments, shouldWalkExpansion;
     std::tie(shouldWalkArguments, shouldWalkExpansion) =
         Walker.shouldWalkMacroArgumentsAndExpansion();
@@ -1329,6 +1344,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     std::tie(shouldWalkArguments, shouldWalkExpansion) =
         Walker.shouldWalkMacroArgumentsAndExpansion();
 
+    if (auto *substituteDecl = E->getSubstituteDecl()) {
+      if (doIt(substituteDecl))
+        return nullptr;
+      // Visiting the substitute macro expansion decl will visit the same
+      // argument list. Skip visiting it again.
+      shouldWalkArguments = false;
+    }
+
     if (shouldWalkArguments && E->getArgs()) {
       ArgumentList *args = doIt(E->getArgs());
       if (!args) return nullptr;
@@ -1458,7 +1481,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInGeneratedBuffer())
+        D->isInMacroExpansionInContext())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {

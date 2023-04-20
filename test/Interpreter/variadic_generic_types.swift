@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
 // RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
 
-// FIXME: Fix the optimizer
-// REQUIRES: swift_test_mode_optimize_none
-
 // REQUIRES: executable_test
 
 // Because of -enable-experimental-feature VariadicGenerics
@@ -107,7 +104,7 @@ types.test("LayoutReq") {
 }
 
 public struct OuterSeq<each T: Sequence> {
-  public struct InnerSeq<each U: Sequence> where each T.Element == each U.Element {}
+  public struct InnerSeq<each U: Sequence> where repeat each T.Element == each U.Element {}
 }
 
 types.test("SameTypeReq") {

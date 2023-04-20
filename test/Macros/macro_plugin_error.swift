@@ -1,10 +1,10 @@
-// REQUIRES: OS=macosx
+// REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
 // RUN: %clang \
-// RUN:  -isysroot %sdk \
+// RUN:  -isysroot %host_sdk \
 // RUN:  -I %swift_src_root/include \
 // RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
 // RUN:  -Wl,-rpath,%swift-lib-dir \

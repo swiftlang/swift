@@ -455,6 +455,12 @@ OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   return OperandOwnership::TrivialUse;
 }
 
+OperandOwnership
+OperandOwnershipClassifier::visitDropDeinitInst(DropDeinitInst *i) {
+  return i->getType().isAddress() ? OperandOwnership::TrivialUse
+                                  : OperandOwnership::ForwardingConsume;
+}
+
 // Get the OperandOwnership for instantaneous apply, yield, and return uses.
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.

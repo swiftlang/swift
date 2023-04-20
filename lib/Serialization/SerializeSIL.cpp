@@ -1482,7 +1482,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
-  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
@@ -1559,6 +1559,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                                                      : false;
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::MarkMustCheckInst: {
+    unsigned Attr = unsigned(cast<MarkMustCheckInst>(&SI)->getCheckKind());
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
   case SILInstructionKind::MarkUninitializedInst: {
@@ -1675,6 +1680,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(PEGI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         packTypeRef,
@@ -1716,6 +1722,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(TPEAI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         tupleTypeRef,
@@ -1862,7 +1869,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto &opei = cast<OpenPackElementInst>(SI);
     auto envRef =
       S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
-    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
+    auto operand = opei.getIndexOperand();
+    auto operandRef = addValueRef(operand);
+    auto operandType = operand->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+
+    SILOpenPackElementLayout::emitRecord(Out, ScratchRecord,
+          SILAbbrCodes[SILOpenPackElementLayout::Code],
+          envRef,
+          operandTypeRef, unsigned(operandType.getCategory()),
+          operandRef);
     break;
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
@@ -3052,6 +3068,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
   registerSILAbbr<SILInstHasSymbolLayout>();
+  registerSILAbbr<SILOpenPackElementLayout>();
+  registerSILAbbr<SILPackElementGetLayout>();
+  registerSILAbbr<SILPackElementSetLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

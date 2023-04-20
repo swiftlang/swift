@@ -7,9 +7,6 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
-// FIXME: rdar://107112715 test failing on iOS simulator
-// UNSUPPORTED: OS=ios
-
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
@@ -26,7 +23,7 @@ final class NaiveQueueExecutor: SerialExecutor, CustomStringConvertible {
     self.queue = queue
   }
 
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     let unowned = UnownedJob(job)
     queue.sync {
       unowned.runSynchronously(on: self.asUnownedSerialExecutor())
@@ -65,7 +62,7 @@ actor MyActor {
   }
 
   func test(expectedExecutor: NaiveQueueExecutor) {
-    preconditionTaskOnExecutor(expectedExecutor, message: "Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
+    expectedExecutor.preconditionIsolated("Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
     print("\(Self.self): [\(self.executor.name)] on same context as [\(expectedExecutor.name)]")
   }
 }

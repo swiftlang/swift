@@ -24,6 +24,7 @@
 #include "SemanticARCOptVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 
@@ -392,6 +393,20 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     return true;
   }
 
+  // The lifetime of the original ends after the lifetime of the copy. If the
+  // original is lexical, its lifetime must not be shortened through deinit
+  // barriers.
+  if (cvi->getOperand()->isLexical()) {
+    // At this point, visitedInsts contains all the instructions between the
+    // consuming use of the copy and the destroy.  If any of those instructions
+    // is a deinit barrier, it would be illegal to shorten the original lexical
+    // value's lifetime to end at that consuming use.  Bail if any are.
+    if (llvm::any_of(visitedInsts, [](auto *inst) {
+          return mayBeDeinitBarrierNotConsideringSideEffects(inst);
+        }))
+      return false;
+  }
+
   // If we reached this point, isUseBetweenInstAndBlockEnd succeeded implying
   // that we found destroy_value to be after our consuming use. Noting that
   // additionally, the routine places all instructions in between consuming use
@@ -492,6 +507,12 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
             return !visitedInsts.count(endScopeUse->getUser());
           }))
         return false;
+  }
+  // Check whether the uses considered immediately above are all effectively
+  // instantaneous uses. Pointer escapes propagate values ways that may not be
+  // discoverable.
+  if (hasPointerEscape(operand)) {
+    return false;
   }
 
   // Ok, we now know that we can eliminate this value.

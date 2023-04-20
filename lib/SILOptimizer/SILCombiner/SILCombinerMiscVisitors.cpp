@@ -2391,3 +2391,136 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
   replaceInstUsesWith(*DFEI, newValue);
   return eraseInstFromFunction(*DFEI);
 }
+
+// Simplify `pack_length` with constant-length pack.
+//
+// Before:
+// %len = pack_length $Pack{Int, String, Float}
+//
+// After:
+// %len = integer_literal Builtin.Word, 3
+SILInstruction *SILCombiner::visitPackLengthInst(PackLengthInst *PLI) {
+  auto PackTy = PLI->getPackType();
+  if (!PackTy->containsPackExpansionType()) {
+    return Builder.createIntegerLiteral(PLI->getLoc(), PLI->getType(),
+                                        PackTy->getNumElements());
+  }
+
+  return nullptr;
+}
+
+// Simplify `pack_element_get` where the index is a `dynamic_pack_index` with
+// a constant operand.
+//
+// Before:
+// %idx = integer_literal Builtin.Word, N
+// %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
+// %pack_elt = pack_element_get %pack_value, %pack_idx, @element("...")
+//
+// After:
+// %pack_idx = scalar_pack_index %Pack{Int, String, Float}, N
+// %concrete_elt = pack_element_get %pack_value, %pack_idx, <<concrete type>>
+// %pack_elt = unchecked_addr_cast %concrete_elt, @element("...")
+SILInstruction *SILCombiner::visitPackElementGetInst(PackElementGetInst *PEGI) {
+  auto *DPII = dyn_cast<DynamicPackIndexInst>(PEGI->getIndex());
+  if (DPII == nullptr)
+    return nullptr;
+
+  auto PackTy = PEGI->getPackType();
+  if (PackTy->containsPackExpansionType())
+    return nullptr;
+
+  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
+  if (Op == nullptr)
+    return nullptr;
+
+  if (Op->getValue().uge(PackTy->getNumElements()))
+    return nullptr;
+
+  unsigned Index = Op->getValue().getZExtValue();
+  auto *SPII = Builder.createScalarPackIndex(
+      DPII->getLoc(), Index, DPII->getIndexedPackType());
+
+  auto ElementTy = SILType::getPrimitiveAddressType(
+      PEGI->getPackType().getElementType(Index));
+  auto *NewPEGI = Builder.createPackElementGet(
+      PEGI->getLoc(), SPII, PEGI->getPack(),
+      ElementTy);
+
+  return Builder.createUncheckedAddrCast(
+      PEGI->getLoc(), NewPEGI, PEGI->getElementType());
+}
+
+// Simplify `tuple_pack_element_addr` where the index is a `dynamic_pack_index`
+//with a constant operand.
+//
+// Before:
+// %idx = integer_literal Builtin.Word, N
+// %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
+// %tuple_elt = tuple_pack_element_addr %tuple_value, %pack_idx, @element("...")
+//
+// After:
+// %concrete_elt = tuple_element_addr %tuple_value, N
+// %tuple_elt = unchecked_addr_cast %concrete_elt, @element("...")
+SILInstruction *
+SILCombiner::visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI) {
+  auto *DPII = dyn_cast<DynamicPackIndexInst>(TPEAI->getIndex());
+  if (DPII == nullptr)
+    return nullptr;
+
+  auto PackTy = DPII->getIndexedPackType();
+  if (PackTy->containsPackExpansionType())
+    return nullptr;
+
+  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
+  if (Op == nullptr)
+    return nullptr;
+
+  if (Op->getValue().uge(PackTy->getNumElements()))
+    return nullptr;
+
+  unsigned Index = Op->getValue().getZExtValue();
+
+  auto *TEAI = Builder.createTupleElementAddr(
+      TPEAI->getLoc(), TPEAI->getTuple(), Index);
+  return Builder.createUncheckedAddrCast(
+      TPEAI->getLoc(), TEAI, TPEAI->getElementType());
+}
+
+// This is a hack. When optimizing a simple pack expansion expression which
+// forms a tuple from a pack, like `(repeat each t)`, after the above
+// peepholes we end up with:
+//
+// %src = unchecked_addr_cast %real_src, @element("...")
+// %dst = unchecked_addr_cast %real_dst, @element("...")
+// copy_addr %src, %dst
+//
+// Simplify this to
+//
+// copy_addr %real_src, %real_dst
+//
+// Assuming that %real_src and %real_dst have the same type.
+//
+// In this simple case, this eliminates the opened element archetype entirely.
+// However, a more principled peephole would be to transform an
+// open_pack_element with a scalar index by replacing all usages of the
+// element archetype with a concrete type.
+SILInstruction *
+SILCombiner::visitCopyAddrInst(CopyAddrInst *CAI) {
+  auto *Src = dyn_cast<UncheckedAddrCastInst>(CAI->getSrc());
+  auto *Dst = dyn_cast<UncheckedAddrCastInst>(CAI->getDest());
+
+  if (Src == nullptr || Dst == nullptr)
+    return nullptr;
+
+  if (Src->getType() != Dst->getType() ||
+      !Src->getType().is<ElementArchetypeType>())
+    return nullptr;
+
+  if (Src->getOperand()->getType() != Dst->getOperand()->getType())
+    return nullptr;
+
+  return Builder.createCopyAddr(
+      CAI->getLoc(), Src->getOperand(), Dst->getOperand(),
+      CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+}

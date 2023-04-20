@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
@@ -37,6 +37,15 @@ CxxSequenceTestSuite.test("SimpleEmptySequence to Swift.Set") {
   let seq = SimpleEmptySequence()
   let set = Set(seq)
   expectTrue(set.isEmpty)
+}
+
+CxxSequenceTestSuite.test("SimpleSequence.forEach") {
+  let seq = SimpleSequence()
+  var array: [Int32] = []
+  seq.forEach {
+    array.append($0)
+  }
+  expectEqual([1, 2, 3, 4] as [Int32], array)
 }
 
 runAllTests()

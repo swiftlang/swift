@@ -25,59 +25,44 @@
 
 using namespace swift;
 
-bool swift::hasPointerEscape(BorrowedValue value) {
-  assert(value.kind == BorrowedValueKind::BeginBorrow ||
-         value.kind == BorrowedValueKind::LoadBorrow);
-  GraphNodeWorklist<Operand *, 8> worklist;
-  for (Operand *use : value->getUses()) {
-    if (use->getOperandOwnership() != OperandOwnership::NonUse)
-      worklist.insert(use);
+bool swift::hasPointerEscape(BorrowedValue original) {
+  ValueWorklist worklist(original->getFunction());
+  worklist.push(*original);
+
+  if (auto *phi = SILArgument::asPhi(*original)) {
+    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
+      worklist.pushIfNotVisited(operand->get());
+      return true;
+    });
   }
 
-  while (Operand *op = worklist.pop()) {
-    switch (op->getOperandOwnership()) {
-    case OperandOwnership::NonUse:
-    case OperandOwnership::TrivialUse:
-    case OperandOwnership::ForwardingConsume:
-    case OperandOwnership::DestroyingConsume:
-      llvm_unreachable("this operand cannot handle an inner guaranteed use");
-
-    case OperandOwnership::ForwardingUnowned:
-    case OperandOwnership::PointerEscape:
-      return true;
-
-    case OperandOwnership::Borrow:
-    case OperandOwnership::EndBorrow:
-    case OperandOwnership::InstantaneousUse:
-    case OperandOwnership::UnownedInstantaneousUse:
-    case OperandOwnership::InteriorPointer:
-    case OperandOwnership::BitwiseEscape:
-      break;
-    case OperandOwnership::Reborrow: {
-      SILArgument *phi = cast<BranchInst>(op->getUser())
-                             ->getDestBB()
-                             ->getArgument(op->getOperandNumber());
-      for (auto *use : phi->getUses()) {
-        if (use->getOperandOwnership() != OperandOwnership::NonUse)
-          worklist.insert(use);
-      }
-      break;
-    }
-    case OperandOwnership::GuaranteedForwarding: {
-      // This may follow a guaranteed phis.
-      ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
-        // Do not include transitive uses with 'none' ownership
-        if (result->getOwnershipKind() == OwnershipKind::None)
-          return true;
-        for (auto *resultUse : result->getUses()) {
-          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
-            worklist.insert(resultUse);
-          }
-        }
+  while (auto value = worklist.pop()) {
+    for (auto *op : value->getUses()) {
+      switch (op->getOperandOwnership()) {
+      case OperandOwnership::ForwardingUnowned:
+      case OperandOwnership::PointerEscape:
         return true;
-      });
-      break;
-    }
+
+      case OperandOwnership::Reborrow: {
+        SILArgument *phi = PhiOperand(op).getValue();
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+
+      case OperandOwnership::GuaranteedForwarding: {
+        // This may follow guaranteed phis.
+        ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
+          // Do not include transitive uses with 'none' ownership
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
   return false;
@@ -97,7 +82,7 @@ bool swift::hasPointerEscape(SILValue original) {
       return true;
     });
   }
-  while (auto value = worklist.popAndForget()) {
+  while (auto value = worklist.pop()) {
     for (auto use : value->getUses()) {
       switch (use->getOperandOwnership()) {
       case OperandOwnership::PointerEscape:
@@ -761,6 +746,30 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
     return BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
+  }
+  }
+  llvm_unreachable("covered switch");
+}
+
+SILValue BorrowingOperand::getScopeIntroducingUserResult() {
+  switch (kind) {
+  case BorrowingOperandKind::Invalid:
+  case BorrowingOperandKind::Yield:
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+    return SILValue();
+
+  case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::BeginBorrow:
+    return cast<SingleValueInstruction>(op->getUser());
+
+  case BorrowingOperandKind::BeginApply:
+    return cast<BeginApplyInst>(op->getUser())->getTokenResult();
+
+  case BorrowingOperandKind::Branch: {
+    PhiOperand phiOp(op);
+    return phiOp.getValue();
   }
   }
   llvm_unreachable("covered switch");
@@ -2221,12 +2230,16 @@ protected:
 
 bool swift::visitEnclosingDefs(SILValue value,
                                function_ref<bool(SILValue)> visitor) {
+  if (isa<SILUndef>(value))
+    return true;
   return FindEnclosingDefs(value->getFunction())
     .visitEnclosingDefs(value, visitor);
 }
 
 bool swift::visitBorrowIntroducers(SILValue value,
                                    function_ref<bool(SILValue)> visitor) {
+  if (isa<SILUndef>(value))
+    return true;
   return FindEnclosingDefs(value->getFunction())
     .visitBorrowIntroducers(value, visitor);
 }

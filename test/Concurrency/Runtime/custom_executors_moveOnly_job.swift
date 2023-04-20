@@ -6,14 +6,11 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
-// FIXME: rdar://107112715 test failing on iOS simulator, investigating
-// UNSUPPORTED: OS=ios
-
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
 final class InlineExecutor: SerialExecutor, CustomStringConvertible {
-  public func enqueue(_ job: __owned Job) {
+  public func enqueue(_ job: __owned ExecutorJob) {
     job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 

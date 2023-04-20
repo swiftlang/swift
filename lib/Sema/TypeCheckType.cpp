@@ -42,8 +42,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -1373,7 +1374,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       repr->overwriteNameRef(DeclNameRef(ctx.getIdentifier(RemappedTy)));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
-      if (TypeName == ctx.getSwiftName(KnownFoundationEntity::NSUInteger)) {
+      if (TypeName == swift::getSwiftName(KnownFoundationEntity::NSUInteger)) {
         diags.diagnose(L, diag::note_remapped_type, "UInt")
           .fixItReplace(R, "UInt");
       }
@@ -4615,21 +4616,29 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
   if (!packReference->isParameterPack()) {
     auto diag =
         ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
+    bool addEachFixitApplied = false;
     if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
       if (auto *packIdentBinding = packIdent->getBoundDecl()) {
         if (packIdentBinding->getLoc().isValid()) {
           diag.fixItInsert(packIdentBinding->getLoc(), "each ");
+          addEachFixitApplied = true;
         }
       }
     }
-    // TODO: else 'each' probably should be removed preceding repr
+    if (const auto eachLoc = repr->getEachLoc();
+        !addEachFixitApplied && eachLoc.isValid()) {
+      const auto eachLocEnd =
+          Lexer::getLocForEndOfToken(ctx.SourceMgr, eachLoc);
+      diag.fixItRemoveChars(eachLoc, eachLocEnd);
+    }
     return packReference;
   }
 
-  if (!options.contains(TypeResolutionFlags::AllowPackReferences)) {
+  if (!options.contains(TypeResolutionFlags::AllowPackReferences) &&
+      !options.contains(TypeResolutionFlags::SILMode)) {
     ctx.Diags.diagnose(repr->getLoc(),
                        diag::pack_reference_outside_expansion,
-                       packReference, /*inExpression*/false);
+                       packReference);
     return ErrorType::get(ctx);
   }
 
@@ -4660,12 +4669,22 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
+  Optional<unsigned> moveOnlyElementIndex = None;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
-    if (ty->hasError())
+    if (ty->hasError()) {
       hadError = true;
+    }
+    // Tuples with move-only elements aren't yet supported.
+    // Track the presence of a noncopyable field for diagnostic purposes.
+    // We don't need to re-diagnose if a tuple contains another tuple, though,
+    // since we should've diagnosed the inner tuple already.
+    if (ty->isPureMoveOnly() && !moveOnlyElementIndex.has_value()
+        && !isa<TupleTypeRepr>(tyR)) {
+      moveOnlyElementIndex = i;
+    }
 
     auto eltName = repr->getElementName(i);
 
@@ -4713,6 +4732,13 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
       return ParenType::get(ctx, elements[0].getType());
+  }
+  
+  if (moveOnlyElementIndex.has_value()
+      && !options.contains(TypeResolutionFlags::SILType)
+      && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+    diagnose(repr->getElementType(*moveOnlyElementIndex)->getLoc(),
+             diag::tuple_move_only_not_supported);
   }
 
   return TupleType::get(elements, ctx);
@@ -5158,6 +5184,10 @@ public:
     if (T->isInvalid())
       return;
 
+    if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+      return;
+    }
+
     // Compute the type repr to attach 'any' to.
     TypeRepr *replaceRepr = T;
     // Insert parens in expression context for '(any P).self'
@@ -5190,7 +5220,7 @@ public:
       OS << ")";
 
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(T->getBoundDecl())) {
-      if (proto->existentialRequiresAny() && !Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+      if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(T->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -5208,7 +5238,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!protoDecl->existentialRequiresAny() || Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
+          if (!protoDecl->existentialRequiresAny())
             continue;
 
           Ctx.Diags.diagnose(T->getNameLoc(),

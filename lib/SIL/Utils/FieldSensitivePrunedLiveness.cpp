@@ -69,6 +69,11 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
       numElements += TypeSubElementCount(
           type.getFieldType(fieldDecl, mod, context), mod, context);
     number = numElements;
+
+    // If we do not have any elements, just set our size to 1.
+    if (numElements == 0)
+      number = 1;
+
     return;
   }
 

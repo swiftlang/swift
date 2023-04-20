@@ -1,3 +1,5 @@
+// REQUIRES: swift_swift_parser
+
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
@@ -5,8 +7,9 @@
 // expected-warning@-2{{external macro implementation type}}
 // expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
-// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
+// expected-warning@-1{{external macro definitions are now written using #externalMacro}}
 // expected-warning@-2{{external macro implementation type}}
+// expected-note@-3{{use '#externalMacro'}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
 @freestanding(expression) macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-warning@-1{{external macro implementation type}}
 
@@ -159,6 +162,11 @@ func callMacroWithDefaults() {
 public macro MacroOrType() = #externalMacro(module: "A", type: "MacroOrType")
 // expected-warning@-1{{external macro implementation type}}
 
+@freestanding(codeItem, names: named(foo))
+public macro badCodeItemMacro() = #externalMacro(module: "A", type: "B")
+// expected-error@-2{{'codeItem' macros are not allowed to introduce names}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found}}
+
 struct MacroOrType {
   typealias Nested = Int
 }
@@ -167,3 +175,13 @@ func test() {
   let _: [MacroOrType.Nested] = []
   _ = [MacroOrType.Nested]()
 }
+
+// Make sure we have the right declaration context for type-checking the result
+// types of macros. At one point, we would reject the following macro.
+protocol MyProto {
+}
+struct MyStruct<T: MyProto> {
+}
+
+@freestanding(expression) macro myMacro<T : MyProto>(_ value: MyStruct<T>) -> MyStruct<T> = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}

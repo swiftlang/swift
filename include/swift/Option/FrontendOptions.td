@@ -240,6 +240,9 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -307,10 +310,6 @@ def disable_experimental_clang_importer_diagnostics :
 def enable_experimental_eager_clang_module_diagnostics :
   Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
   HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
-
-def enable_import_objc_forward_declarations :
-  Flag<["-"], "enable-import-objc-forward-declarations">,
-  HelpText<"Attempt to import Objective-C forward declarations">;
 
 def enable_experimental_pairwise_build_block :
   Flag<["-"], "enable-experimental-pairwise-build-block">,
@@ -1022,6 +1021,18 @@ def disable_type_layouts : Flag<["-"], "disable-type-layout">,
 def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
   HelpText<"Force type layout based lowering for structs">;
 
+def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
+  HelpText<"Enable layout string based value witnesses">;
+
+def disable_layout_string_value_witnesses : Flag<["-"], "disable-layout-string-value-witnesses">,
+  HelpText<"Disable layout string based value witnesses">;
+
+def enable_layout_string_value_witnesses_instantiation : Flag<["-"], "enable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Enable runtime instantiation of layout string value witnesses for generic types">;
+
+def disable_layout_string_value_witnesses_instantiation : Flag<["-"], "disable-layout-string-value-witnesses-instantiation">,
+  HelpText<"Disable runtime instantiation of layout string value witnesses for generic types">;
+
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
 
@@ -1179,6 +1190,13 @@ def enable_emit_generic_class_ro_t_list :
   Flag<["-"], "enable-emit-generic-class-ro_t-list">,
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
+
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  HelpText<"Check compiler output determinisim by running it twice">;
+def always_compile_output_files :
+  Flag<["-"], "always-compile-output-files">,
+  HelpText<"Always compile output files even it might not change the results">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

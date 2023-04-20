@@ -30,6 +30,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
@@ -260,12 +261,22 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
+    case MacroRole::CodeItem:
     case MacroRole::Accessor:
     case MacroRole::MemberAttribute:
-    case MacroRole::Peer:
     case MacroRole::Conformance:
       parentLoc = expansion.getStartLoc();
       break;
+    case MacroRole::Peer: {
+      ASTContext &ctx = SF->getASTContext();
+      SourceManager &sourceMgr = ctx.SourceMgr;
+      auto generatedSourceInfo =
+          *sourceMgr.getGeneratedSourceInfo(*SF->getBufferID());
+
+      ASTNode node = ASTNode::getFromOpaqueValue(generatedSourceInfo.astNode);
+      parentLoc = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
+      break;
+    }
     case MacroRole::Member: {
       // For synthesized member macros, take the end loc of the
       // enclosing declaration (before the closing brace), because
@@ -317,7 +328,6 @@ public:
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
-  VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
   // are visited separately.
@@ -353,6 +363,7 @@ public:
   VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
   VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
   VISIT_AND_CREATE(MacroDecl, MacroDeclScope)
+  VISIT_AND_CREATE(MacroExpansionDecl, MacroExpansionDeclScope)
 
 #undef VISIT_AND_CREATE
 
@@ -723,6 +734,8 @@ NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(MacroDeclScope)
+NO_NEW_INSERTION_POINT(MacroDefinitionScope)
+NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 
@@ -1115,8 +1128,28 @@ void MacroDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
       decl, getPotentiallyOpaqueGenericParams(decl), this);
   if (decl->parameterList) {
-    scopeCreator.constructExpandAndInsert<ParameterListScope>(
+    leaf = scopeCreator.constructExpandAndInsert<ParameterListScope>(
         leaf, decl->parameterList, nullptr);
+  }
+  if (auto def = decl->definition) {
+    scopeCreator
+      .constructExpandAndInsert<MacroDefinitionScope>(leaf, def);
+  }
+}
+
+void
+MacroDefinitionScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(ASTNode(definition), this);
+}
+
+void MacroExpansionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  // FIXME: If we get attributes on macro expansions, visit them here.
+  if (auto argList = decl->getArgs()) {
+    for (const auto &arg : *argList) {
+      scopeCreator.addExprToScopeTree(arg.getExpr(), this);
+    }
   }
 }
 

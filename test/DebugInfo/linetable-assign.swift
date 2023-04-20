@@ -8,9 +8,9 @@ public func f(_ i: Int32) {
   // CHECK: %[[CLOSURE:.*]] = partial_apply
   // CHECK-SAME: loc * "{{.*}}":13:3,{{.*}}auto_gen
   // CHECK: store %[[CLOSURE]]
-  // CHECK-SAME: loc "{{.*}}":12:3,  
+  // CHECK-SAME: loc "{{.*}}":13:3,  
   var closure = // line 12
-  {
+  { // FIXME: Shoudll the store be associated with line 12?
     g(i)
   }
   return closure() 

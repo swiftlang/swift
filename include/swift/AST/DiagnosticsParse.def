@@ -424,6 +424,8 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
       "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+ERROR(destructor_decl_on_noncopyable_enum,none,
+      "deinitializers are not yet supported on noncopyable enums", ())
 ERROR(destructor_decl_on_objc_enum,none,
       "deinitializers cannot be declared on an @objc enum type", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
@@ -2047,8 +2049,8 @@ ERROR(macro_role_attr_expected_kind,PointsToFirstBadToken,
       "expected %select{a freestanding|an attached}0 macro role such as "
       "%select{'expression'|'accessor'}0", (bool))
 ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
-      "expected %select{a freestanding|an attached}0 macro cannot have "
-      "the %1 role", (bool, Identifier))
+      "%select{a freestanding|an attached}0 macro cannot have the %1 role",
+      (bool, Identifier))
 ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
       "@%select{freestanding|attached}0 has no argument with label %1",
       (bool, Identifier))

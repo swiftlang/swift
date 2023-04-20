@@ -15,6 +15,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/ScopedHashTable.h"
 
@@ -49,6 +50,7 @@ namespace {
 class LowerHopToActor {
   SILFunction *F;
   DominanceInfo *Dominance;
+  SILOptFunctionBuilder &functionBuilder;
 
   /// A map from an actor value to the executor we've derived for it.
   llvm::ScopedHashTable<SILValue, SILValue> ExecutorForActor;
@@ -56,12 +58,18 @@ class LowerHopToActor {
   bool processHop(HopToExecutorInst *hop);
   bool processExtract(ExtractExecutorInst *extract);
 
-  SILValue emitGetExecutor(SILBuilderWithScope &B, SILLocation loc,
+  SILValue emitGetExecutor(SILBuilderWithScope &B,
+                           SILLocation loc,
                            SILValue actor, bool makeOptional);
 
 public:
-  LowerHopToActor(SILFunction *f, DominanceInfo *dominance)
-    : F(f), Dominance(dominance) { }
+  LowerHopToActor(SILFunction *f,
+                  SILOptFunctionBuilder &FunctionBuilder,
+                  DominanceInfo *dominance)
+    : F(f),
+      Dominance(dominance),
+      functionBuilder(FunctionBuilder)
+      { }
 
   /// The entry point to the transformation.
   bool run();
@@ -154,28 +162,6 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
   return nullptr;
 }
 
-static AccessorDecl *getUnwrapLocalUnownedExecutorGetter(ASTContext &ctx,
-                                              ProtocolDecl *actorProtocol) {
-  for (auto member: actorProtocol->getAllMembers()) { // FIXME: remove this, just go to the extension
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor)
-        return var->getAccessor(AccessorKind::Get);
-    }
-  }
-
-  for (auto extension: actorProtocol->getExtensions()) {
-    for (auto member: extension->getAllMembers()) {
-      if (auto var = dyn_cast<VarDecl>(member)) {
-        if (var->getName() == ctx.Id__unwrapLocalUnownedExecutor) {
-          return var->getAccessor(AccessorKind::Get);
-        }
-      }
-    }
-  }
-
-  return nullptr;
-}
-
 SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
                                           SILLocation loc, SILValue actor,
                                           bool makeOptional) {
@@ -199,6 +185,9 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
   // If the actor type is a default actor, go ahead and devirtualize here.
   auto module = F->getModule().getSwiftModule();
   SILValue unmarkedExecutor;
+
+  // Determine if the actor is a "default actor" in which case we'll build a default
+  // actor executor ref inline, rather than calling out to the user-provided executor function.
   if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
     auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
@@ -208,36 +197,11 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     unmarkedExecutor =
       B.createBuiltin(loc, builtinName, resultType, subs, {actor});
 
-    // Otherwise, go through Actor.unownedExecutor.
-  } else if (actorType->isDistributedActor()) {
-    auto actorKind = KnownProtocolKind::DistributedActor;
-    auto actorProtocol = ctx.getProtocol(actorKind);
-    auto req = getUnwrapLocalUnownedExecutorGetter(ctx, actorProtocol);
-    assert(req && "Distributed library broken");
-    SILDeclRef fn(req, SILDeclRef::Kind::Func);
-
-    auto actorConf = module->lookupConformance(actorType, actorProtocol);
-    assert(actorConf &&
-           "hop_to_executor with distributed actor that doesn't conform to DistributedActor");
-
-    auto subs = SubstitutionMap::get(req->getGenericSignature(),
-                                     {actorType}, {actorConf});
-    auto fnType = F->getModule().Types.getConstantFunctionType(*F, fn);
-
-    auto witness =
-      B.createWitnessMethod(loc, actorType, actorConf, fn,
-                            SILType::getPrimitiveObjectType(fnType));
-    auto witnessCall = B.createApply(loc, witness, subs, {actor});
-
-    // The protocol requirement returns an Optional<UnownedSerialExecutor>;
-    // extract the Builtin.Executor from it.
-    auto executorDecl = ctx.getUnownedSerialExecutorDecl();
-    auto executorProps = executorDecl->getStoredProperties();
-    assert(executorProps.size() == 1);
-    unmarkedExecutor =
-      B.createStructExtract(loc, witnessCall, executorProps[0]);
+    // Otherwise, go through (Distributed)Actor.unownedExecutor.
   } else {
-    auto actorKind = KnownProtocolKind::Actor;
+    auto actorKind = actorType->isDistributedActor() ?
+                     KnownProtocolKind::DistributedActor :
+                     KnownProtocolKind::Actor;
     auto actorProtocol = ctx.getProtocol(actorKind);
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");
@@ -286,7 +250,8 @@ class LowerHopToActorPass : public SILFunctionTransform {
   void run() override {
     auto fn = getFunction();
     auto domTree = getAnalysis<DominanceAnalysis>()->get(fn);
-    LowerHopToActor pass(getFunction(), domTree);
+    auto functionBuilder = SILOptFunctionBuilder(*this);
+    LowerHopToActor pass(getFunction(), functionBuilder, domTree);
     if (pass.run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }

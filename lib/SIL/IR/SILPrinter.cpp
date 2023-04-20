@@ -1996,6 +1996,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitDropDeinitInst(DropDeinitInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitMarkMustCheckInst(MarkMustCheckInst *I) {
     using CheckKind = MarkMustCheckInst::CheckKind;
     switch (I->getCheckKind()) {
@@ -2009,6 +2013,9 @@ public:
       break;
     case CheckKind::AssignableButNotConsumable:
       *this << "[assignable_but_not_consumable] ";
+      break;
+    case CheckKind::InitableButNotConsumable:
+      *this << "[initable_but_not_consumable] ";
       break;
     }
     *this << getIDAndType(I->getOperand());

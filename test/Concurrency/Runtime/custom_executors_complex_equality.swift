@@ -7,9 +7,6 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
-// FIXME: rdar://107112715 test failing on iOS simulator, investigating
-// UNSUPPORTED: OS=ios
-
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
@@ -66,7 +63,7 @@ actor MyActor {
   }
 
   func test(expectedExecutor: NaiveQueueExecutor, expectedQueue: DispatchQueue) {
-    preconditionTaskOnExecutor(expectedExecutor, message: "Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
+    expectedExecutor.preconditionIsolated("Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
     print("\(Self.self): [\(self.executor.name)] on same context as [\(expectedExecutor.name)]")
   }
 }

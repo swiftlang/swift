@@ -59,12 +59,18 @@ static void emitObjCConditional(raw_ostream &out,
 
 static void writePtrauthPrologue(raw_ostream &os) {
   emitCxxConditional(os, [&]() {
-    os << "#if __has_include(<ptrauth.h>)\n";
+    os << "#if defined(__arm64e__) && __has_include(<ptrauth.h>)\n";
     os << "# include <ptrauth.h>\n";
     os << "#else\n";
-    os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
-    os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
-    os << "# endif\n";
+    ClangSyntaxPrinter(os).printIgnoredDiagnosticBlock(
+        "reserved-macro-identifier", [&]() {
+          os << "# ifndef __ptrauth_swift_value_witness_function_pointer\n";
+          os << "#  define __ptrauth_swift_value_witness_function_pointer(x)\n";
+          os << "# endif\n";
+          os << "# ifndef __ptrauth_swift_class_method_pointer\n";
+          os << "#  define __ptrauth_swift_class_method_pointer(x)\n";
+          os << "# endif\n";
+        });
     os << "#endif\n";
   });
 }

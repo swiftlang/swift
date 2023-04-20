@@ -1635,7 +1635,22 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       SmallVector<SynthesizedArg, 4> synthesizedArgs;
       for (unsigned i = 0, n = argTuple->getNumElements(); i != n; ++i) {
         const auto &elt = argTuple->getElement(i);
-        AnyFunctionType::Param argument(elt.getType(), elt.getName());
+
+        // If tuple doesn't have a label for its first element
+        // and parameter does, let's assume parameter's label
+        // to aid argument matching. For example:
+        //
+        // \code
+        // func test(val: Int, _: String) {}
+        //
+        // test(val: (42, "")) // expands into `(val: 42, "")`
+        // \endcode
+        Identifier label = elt.getName();
+        if (i == 0 && !elt.hasName() && params[0].hasLabel()) {
+          label = params[0].getLabel();
+        }
+
+        AnyFunctionType::Param argument(elt.getType(), label);
         synthesizedArgs.push_back(SynthesizedArg{i, argument});
         argsWithLabels.push_back(argument);
       }
@@ -1740,8 +1755,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
     // inout and @autoclosure.
-    if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        paramInfo.isVariadicGenericParameter(paramIdx)) {
+    if (paramInfo.isVariadicGenericParameter(paramIdx)) {
       // If generic parameter comes from a variadic type declaration it's
       // possible that it got specialized early and is no longer represented
       // by a pack expansion type. For example, consider expression -
@@ -1897,11 +1911,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       }
 
       auto argLabel = argument.getLabel();
-      if (paramInfo.hasExternalPropertyWrapper(argIdx) || argLabel.hasDollarPrefix()) {
-        auto *param = getParameterAt(callee, argIdx);
+      if (paramInfo.hasExternalPropertyWrapper(paramIdx) ||
+          argLabel.hasDollarPrefix()) {
+        auto *param = getParameterAt(callee, paramIdx);
         assert(param);
-        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
-                                               argLabel, subKind, loc).isFailure()) {
+        if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
+                                               const_cast<ParamDecl *>(param),
+                                               argLabel, subKind, loc)
+                .isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
         continue;
@@ -4267,16 +4284,17 @@ ConstraintSystem::matchTypesBindTypeVar(
   // pack expansion expression.
   if (!typeVar->getImpl().canBindToPack() &&
       (type->is<PackArchetypeType>() || type->is<PackType>())) {
-    if (shouldAttemptFixes()) {
-      auto *fix = AllowInvalidPackReference::create(*this, type,
-                                                    getConstraintLocator(locator));
-      if (!recordFix(fix)) {
-        recordPotentialHole(typeVar);
-        return getTypeMatchSuccess();
-      }
-    }
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
 
-    return getTypeMatchFailure(locator);
+    auto *fix = AllowInvalidPackReference::create(
+        *this, type, getConstraintLocator(locator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+
+    // Don't allow the invalid pack reference to propagate to other
+    // bindings.
+    type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
   }
 
   // Binding to a pack expansion type is always an error in Swift 6 mode.
@@ -5140,6 +5158,14 @@ bool ConstraintSystem::repairFailures(
 
       if (auto *inoutExpr = dyn_cast<InOutExpr>(AE->getSrc())) {
         auto *loc = getConstraintLocator(inoutExpr);
+
+        // Remove all of the restrictions because none of them
+        // are going to succeed.
+        conversionsOrFixes.erase(
+            llvm::remove_if(
+                conversionsOrFixes,
+                [](const auto &entry) { return bool(entry.getRestriction()); }),
+            conversionsOrFixes.end());
 
         if (hasFixFor(loc, FixKind::RemoveAddressOf))
           return true;

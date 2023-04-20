@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -5393,28 +5394,12 @@ namespace {
           }
         }
         // For a non-expression macro, expand it as a declaration.
-        else if (macro->getMacroRoles().contains(MacroRole::Declaration)) {
+        else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
+                 macro->getMacroRoles().contains(MacroRole::CodeItem)) {
           if (!E->getSubstituteDecl()) {
             auto *med = E->createSubstituteDecl();
-            E->setSubstituteDecl(med);
             TypeChecker::typeCheckDecl(med);
           }
-          // To prevent AST nodes from being visited twice, we've sunk the
-          // original argument list down to the substitute macro expansion decl,
-          // and we'll replace the expr's arguments with opaque values.
-          SmallVector<Argument, 4> newArguments;
-          for (auto arg : *E->getArgs()) {
-            arg.setExpr(new (cs.getASTContext()) OpaqueValueExpr(
-                arg.getSourceRange(), cs.getType(arg.getExpr())));
-            newArguments.push_back(arg);
-          }
-          auto newArgList = ArgumentList::create(
-              cs.getASTContext(), E->getArgs()->getLParenLoc(), newArguments,
-              E->getArgs()->getRParenLoc(),
-              E->getArgs()->getFirstTrailingClosureIndex(),
-              E->getArgs()->isImplicit());
-          E->setArgs(newArgList);
-          cs.setType(E, cs.getASTContext().getVoidType());
         }
         // Other macro roles may also be encountered here, as they use
         // `MacroExpansionExpr` for resolution. In those cases, do not expand.
@@ -5505,7 +5490,7 @@ Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
 /// index. This looks through inheritance for inherited default args.
 static ConcreteDeclRef getDefaultArgOwner(ConcreteDeclRef owner,
                                           unsigned index) {
-  auto *param = getParameterAt(owner.getDecl(), index);
+  auto *param = getParameterAt(owner, index);
   assert(param);
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
     return getDefaultArgOwner(owner.getOverriddenDecl(), index);
@@ -5866,6 +5851,65 @@ static void applyContextualClosureFlags(
   }
 }
 
+// For variadic generic declarations we need to compute a substituted
+// version of bindings because all of the packs are exploaded in the
+// substituted function type.
+//
+// \code
+// func fn<each T>(_: repeat each T) {}
+//
+// fn("", 42)
+// \endcode
+//
+// The type of `fn` in the call is `(String, Int) -> Void` but bindings
+// have only one parameter at index `0` with two argument positions: 0, 1.
+static bool shouldSubstituteParameterBindings(ConcreteDeclRef callee) {
+  auto subst = callee.getSubstitutions();
+  if (subst.empty())
+    return false;
+
+  auto sig = subst.getGenericSignature();
+  return llvm::any_of(
+      sig.getGenericParams(),
+      [&](const GenericTypeParamType *GP) { return GP->isParameterPack(); });
+}
+
+/// Compute parameter binding substitutions by exploding pack expansions
+/// into multiple bindings (if they matched more than one argument) and
+/// ignoring empty ones.
+static void computeParameterBindingsSubstitutions(
+    ConcreteDeclRef callee, ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<ParamBinding> origBindings,
+    SmallVectorImpl<ParamBinding> &substitutedBindings) {
+  for (unsigned bindingIdx = 0, numBindings = origBindings.size();
+       bindingIdx != numBindings; ++bindingIdx) {
+    if (origBindings[bindingIdx].size() > 1) {
+      const auto &param = params[substitutedBindings.size()];
+      if (!param.isVariadic()) {
+#ifndef NDEBUG
+        auto *PD = getParameterAt(callee.getDecl(), bindingIdx);
+        assert(PD && PD->getInterfaceType()->is<PackExpansionType>());
+#endif
+        // Explode binding set to match substituted function parameters.
+        for (auto argIdx : origBindings[bindingIdx])
+          substitutedBindings.push_back({argIdx});
+        continue;
+      }
+    }
+
+    const auto &bindings = origBindings[bindingIdx];
+    if (bindings.size() == 0) {
+      auto *PD = getParameterAt(callee.getDecl(), bindingIdx);
+      // Skip pack expansions with no arguments because they are not
+      // present in the substituted function type.
+      if (PD->getInterfaceType()->is<PackExpansionType>())
+        continue;
+    }
+
+    substitutedBindings.push_back(bindings);
+  }
+}
+
 ArgumentList *ExprRewriter::coerceCallArguments(
     ArgumentList *args, AnyFunctionType *funcType, ConcreteDeclRef callee,
     ApplyExpr *apply, ConstraintLocatorBuilder locator,
@@ -5919,9 +5963,18 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   assert(solution.argumentMatchingChoices.count(locatorPtr) == 1);
   auto parameterBindings = solution.argumentMatchingChoices.find(locatorPtr)
                                ->second.parameterBindings;
+  bool shouldSubstituteBindings = shouldSubstituteParameterBindings(callee);
+
+  SmallVector<ParamBinding, 4> substitutedBindings;
+  if (shouldSubstituteBindings) {
+    computeParameterBindingsSubstitutions(callee, params, parameterBindings,
+                                          substitutedBindings);
+  } else {
+    substitutedBindings = parameterBindings;
+  }
 
   SmallVector<Argument, 4> newArgs;
-  for (unsigned paramIdx = 0, numParams = parameterBindings.size();
+  for (unsigned paramIdx = 0, numParams = substitutedBindings.size();
        paramIdx != numParams; ++paramIdx) {
     // Extract the parameter.
     const auto &param = params[paramIdx];
@@ -5935,7 +5988,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
       // The first argument of this vararg parameter may have had a label;
       // save its location.
-      auto &varargIndices = parameterBindings[paramIdx];
+      auto &varargIndices = substitutedBindings[paramIdx];
       SourceLoc labelLoc;
       if (!varargIndices.empty())
         labelLoc = args->getLabelLoc(varargIndices[0]);
@@ -5984,11 +6037,22 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     }
 
     // Handle default arguments.
-    if (parameterBindings[paramIdx].empty()) {
+    if (substitutedBindings[paramIdx].empty()) {
+      auto paramIdxForDefault = paramIdx;
+      // If bindings were substituted we need to find "original"
+      // (or contextless) parameter index for the default argument.
+      if (shouldSubstituteBindings) {
+        auto *paramList = getParameterList(callee.getDecl());
+        assert(paramList);
+        paramIdxForDefault =
+            paramList->getOrigParamIndex(callee.getSubstitutions(), paramIdx);
+      }
+
       auto owner = getDefaultArgOwner(callee, paramIdx);
       auto paramTy = param.getParameterType();
       auto *defArg = new (ctx) DefaultArgumentExpr(
-          owner, paramIdx, args->getStartLoc(), paramTy, dc);
+          owner, paramIdxForDefault, args->getStartLoc(), paramTy, dc);
+
       cs.cacheType(defArg);
       newArgs.emplace_back(SourceLoc(), param.getLabel(), defArg);
       continue;
@@ -5997,8 +6061,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // Otherwise, we have a plain old ordinary argument.
 
     // Extract the argument used to initialize this parameter.
-    assert(parameterBindings[paramIdx].size() == 1);
-    unsigned argIdx = parameterBindings[paramIdx].front();
+    assert(substitutedBindings[paramIdx].size() == 1);
+    unsigned argIdx = substitutedBindings[paramIdx].front();
     auto arg = args->get(argIdx);
     auto *argExpr = arg.getExpr();
     auto argType = cs.getType(argExpr);
@@ -6042,7 +6106,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     };
 
     if (paramInfo.hasExternalPropertyWrapper(paramIdx)) {
-      auto *paramDecl = getParameterAt(callee.getDecl(), paramIdx);
+      auto *paramDecl = getParameterAt(callee, paramIdx);
       assert(paramDecl);
 
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];

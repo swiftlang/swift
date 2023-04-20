@@ -110,6 +110,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
   allocateBuffer(Conformances, core->Conformances);
+  allocateBuffer(PackConformances, core->PackConformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
@@ -123,56 +124,19 @@ bool ModuleFile::allowCompilerErrors() const {
   return getContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
-Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
-                                            bool recoverFromIncompatibility) {
-  PrettyStackTraceModuleFile stackEntry(*this);
-
-  assert(!hasError() && "error already detected; should not call this");
-  assert(!FileContext && "already associated with an AST module");
-  FileContext = file;
-  Status status = Status::Valid;
-
-  ModuleDecl *M = file->getParentModule();
-  // The real (on-disk) name of the module should be checked here as that's the
-  // actually loaded module. In case module aliasing is used when building the main
-  // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
-  // that maps to 'Foo' is actually Bar.swiftmodule|.swiftinterface (applies to swift
-  // modules only), which is retrieved via M->getRealName(). If no module aliasing is
-  // used, M->getRealName() will return the same value as M->getName(), which is 'Foo'.
-  if (M->getRealName().str() != Core->Name) {
-    return error(Status::NameMismatch);
-  }
-
+Status
+ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
+                                           SourceLoc diagLoc,
+                                           bool forTestable) {
   ASTContext &ctx = getContext();
-
-  llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
-  if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
-      !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
-    status = Status::TargetIncompatible;
-    if (!recoverFromIncompatibility)
-      return error(status);
-  } else if (ctx.LangOpts.EnableTargetOSChecking && !M->isResilient() &&
-             isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
-    status = Status::TargetTooNew;
-    if (!recoverFromIncompatibility)
-      return error(status);
-  }
-
-  StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
-  if (SDKPath.empty() ||
-      !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
-    for (const auto &searchPath : Core->SearchPaths) {
-      ctx.addSearchPath(
-        ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
-        searchPath.IsFramework,
-        searchPath.IsSystem);
-    }
-  }
-
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  ModuleDecl *M = file->getParentModule();
 
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
+    if (forTestable && dependency.isLoaded())
+      continue;
+
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
@@ -196,7 +160,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     }
 
     ModuleLoadingBehavior transitiveBehavior =
-      getTransitiveLoadingBehavior(dependency);
+      getTransitiveLoadingBehavior(dependency, forTestable);
 
     if (ctx.LangOpts.EnableModuleLoadingRemarks) {
       ctx.Diags.diagnose(diagLoc,
@@ -259,6 +223,59 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     return error(Status::MissingDependency);
   }
 
+  return Status::Valid;
+}
+
+Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                            bool recoverFromIncompatibility) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+
+  assert(!hasError() && "error already detected; should not call this");
+  assert(!FileContext && "already associated with an AST module");
+  FileContext = file;
+  Status status = Status::Valid;
+
+  ModuleDecl *M = file->getParentModule();
+  // The real (on-disk) name of the module should be checked here as that's the
+  // actually loaded module. In case module aliasing is used when building the main
+  // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
+  // that maps to 'Foo' is actually Bar.swiftmodule|.swiftinterface (applies to swift
+  // modules only), which is retrieved via M->getRealName(). If no module aliasing is
+  // used, M->getRealName() will return the same value as M->getName(), which is 'Foo'.
+  if (M->getRealName().str() != Core->Name) {
+    return error(Status::NameMismatch);
+  }
+
+  ASTContext &ctx = getContext();
+
+  llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
+  if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
+      !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
+    status = Status::TargetIncompatible;
+    if (!recoverFromIncompatibility)
+      return error(status);
+  } else if (ctx.LangOpts.EnableTargetOSChecking && !M->isResilient() &&
+             isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
+    status = Status::TargetTooNew;
+    if (!recoverFromIncompatibility)
+      return error(status);
+  }
+
+  StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
+  if (SDKPath.empty() ||
+      !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
+    for (const auto &searchPath : Core->SearchPaths) {
+      ctx.addSearchPath(
+        ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
+        searchPath.IsFramework,
+        searchPath.IsSystem);
+    }
+  }
+
+  Status res = loadDependenciesForFileContext(file, diagLoc,
+                                            /*forTestable=*/false);
+  if (res != Status::Valid) return res;
+
   if (Core->Bits.HasEntryPoint) {
     FileContext->getParentModule()->registerEntryPointFile(FileContext,
                                                            SourceLoc(),
@@ -269,7 +286,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 }
 
 ModuleLoadingBehavior
-ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency) const {
+ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
+    bool forTestable) const {
   ASTContext &ctx = getContext();
   ModuleDecl *mod = FileContext->getParentModule();
 
@@ -280,7 +298,8 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency) const {
   return Core->getTransitiveLoadingBehavior(dependency.Core,
                                             ctx.LangOpts.DebuggerSupport,
                                             isPartialModule,
-                                            ctx.LangOpts.PackageName);
+                                            ctx.LangOpts.PackageName,
+                                            forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -1302,7 +1321,7 @@ ModuleFile::getGroupNameByUSR(StringRef USR) const {
   return None;
 }
 
-Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
+Identifier ModuleFile::getDiscriminatorForPrivateDecl(const Decl *D) {
   Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
   assert(!discriminator.empty() && "no discriminator found for decl");
   return discriminator;

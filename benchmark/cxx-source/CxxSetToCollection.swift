@@ -36,6 +36,11 @@ public let benchmarks = [
     runFunction: run_CxxSetOfU32_to_Set,
     tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: makeSetOnce),
+  BenchmarkInfo(
+    name: "CxxSetU32.forEach",
+    runFunction: run_CxxSetOfU32_forEach,
+    tags: [.validation, .bridging, .cxxInterop],
+    setUpFunction: makeSetOnce),
 ]
 
 func makeSetOnce() {
@@ -55,6 +60,15 @@ public func run_CxxSetOfU32_to_Array(_ n: Int) {
 public func run_CxxSetOfU32_to_Set(_ n: Int) {
   for _ in 0..<n {
     blackHole(Set(set))
+  }
+}
+
+@inline(never)
+public func run_CxxSetOfU32_forEach(_ n: Int) {
+  for _ in 0..<n {
+    set.forEach {
+      blackHole($0)
+    }
   }
 }
 
