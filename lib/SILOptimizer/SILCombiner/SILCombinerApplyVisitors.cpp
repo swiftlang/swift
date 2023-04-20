@@ -505,6 +505,13 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
 }
 
 bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+  // FIXME(katei): Disable for WebAssembly for now because
+  // KeyPath cc is unstable and KeyPathProjector hask violates
+  // some assert assumptions
+  SILModule &M = AI->getModule();
+  if (M.getASTContext().LangOpts.Target.isOSBinFormatWasm())
+    return false;
+
   if (SILFunction *callee = AI->getReferencedFunctionOrNull()) {
     return tryOptimizeKeypathApplication(AI, callee);
   }
@@ -550,6 +557,13 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
+  // FIXME(katei): Disable for WebAssembly for now because
+  // KeyPath cc is unstable and KeyPathProjector hask violates
+  // some assert assumptions
+  SILModule &M = AI->getModule();
+  if (M.getASTContext().LangOpts.Target.isOSBinFormatWasm())
+    return false;
+
   // Disable in OSSA because KeyPathProjector is not fully ported
   if (AI->getFunction()->hasOwnership())
     return false;
