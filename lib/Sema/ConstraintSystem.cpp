@@ -1009,21 +1009,10 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   // underlying return type.
   auto opaqueLocator = locator.withPathElement(
       LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl));
+
   OpenedTypeMap replacements;
   openGeneric(DC, opaqueDecl->getOpaqueInterfaceGenericSignature(),
               opaqueLocator, replacements);
-
-  // If there is an outer generic signature, bind the outer parameters based
-  // on the substitutions in the opaque type.
-  auto subs = opaque->getSubstitutions();
-  if (auto genericSig = subs.getGenericSignature()) {
-    for (auto *genericParamPtr : genericSig.getGenericParams()) {
-      Type genericParam(genericParamPtr);
-      addConstraint(
-          ConstraintKind::Bind, openType(genericParam, replacements),
-          genericParam.subst(subs), opaqueLocator);
-    }
-  }
 
   recordOpenedTypes(opaqueLocatorKey, replacements);
 
@@ -1773,6 +1762,8 @@ static void bindArchetypesFromContext(
     auto genericSig = parentDC->getGenericSignatureOfContext();
     for (auto *paramTy : genericSig.getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
+      if (paramTy->isParameterPack())
+        contextTy = PackType::getSingletonPackExpansion(contextTy);
       bindPrimaryArchetype(paramTy, contextTy);
     }
 

@@ -293,9 +293,6 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
-  /// Whether to print the \c each keyword for pack archetypes.
-  bool PrintExplicitEach = false;
-
   /// Whether to print the \c any keyword for existential
   /// types.
   bool PrintExplicitAny = false;

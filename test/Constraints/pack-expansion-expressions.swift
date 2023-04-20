@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature VariadicGenerics
 
 // REQUIRES: asserts
 
@@ -83,9 +83,9 @@ func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
 }
 
 func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
-  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
-  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'U' and 'T' have the same shape}}
+  _ = (repeat (each t, each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat Array<(each T, each U)>()) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
+  _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 }
 
 func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
@@ -133,7 +133,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
 
   _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'U' and 'T' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each U' and 'each T' have the same shape}}
 }
 
 protocol Generatable {
@@ -257,24 +257,24 @@ func forwardFunctionPack<each T>(functions: repeat (each T) -> Bool) {
 
 func packOutsideExpansion<each T>(_ t: repeat each T) {
   _ = t
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   forward(t)
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   _ = each t
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   forward(each t)
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   let tuple = (repeat each t)
 
   _ = tuple.element
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 
   _ = each tuple.element
-  // expected-error@-1{{pack reference 'T' can only appear in pack expansion}}
+  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
 }
 
 func identity<T>(_ t: T) -> T { t }
@@ -380,4 +380,19 @@ do {
   _ = Defaulted(t: "a", 0, 1.0) // Ok
   _ = Defaulted(t: "b", 0) // Ok
   _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
+}
+
+// rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
+protocol Q {
+  associatedtype B
+}
+
+do {
+  struct G<each T>: Q {
+    typealias B = (repeat each T)
+  }
+
+  func f<each T>(_: repeat each T) -> some Q {
+    return G<repeat each T>() // Ok
+  }
 }

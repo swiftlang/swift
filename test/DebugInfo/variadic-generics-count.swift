@@ -25,7 +25,7 @@ public func f3<each T>(ts: repeat each T, more_ts: repeat each T) {
 }
 
 public func f4<each U, each V>(us: repeat (each U, each V)) {
-  // CHECK: define {{.*}} @"$s1a2f42usyx_q_txQp_tq_RhzRvzRv_r0_lF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT4_1:.*]], %swift.type** {{.*}}, %swift.type** {{.*}})
+  // CHECK: define {{.*}} @"$s1a2f42usyx_q_txQp_tRvzRv_q_Rhzr0_lF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT4_1:.*]], %swift.type** {{.*}}, %swift.type** {{.*}})
   // CHECK-DAG: store i{{32|64}} [[COUNT4_1]], i{{32|64}}* %[[COUNT4_1_A:.*]], align
   // CHECK-DAG: call void @llvm.dbg.declare({{.*}}[[COUNT4_1_A]], metadata ![[COUNT4_1_VAR:[0-9]+]], metadata !DIExpression())
   // CHECK-LABEL: ret void
