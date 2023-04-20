@@ -307,10 +307,10 @@ func borrowObjectFunctionCall() {
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[BORROW:%.*]] = load_borrow [[MARKED_ADDR]]
+// CHECK: [[BORROW:%.*]] = load [copy] [[MARKED_ADDR]]
 // CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA16NonTrivialStructVhF :
 // CHECK: apply [[FN]]([[BORROW]])
-// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[BORROW]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s8moveonly29moveOnlyStructNonConsumingUseyyF'
 func moveOnlyStructNonConsumingUse() {
@@ -330,10 +330,10 @@ func moveOnlyStructNonConsumingUse() {
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARKED_ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK:   [[BORROW:%.*]] = load_borrow [[GEP]]
+// CHECK:   [[BORROW:%.*]] = load [copy] [[GEP]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA17NonTrivialStruct2VhF : $@convention(thin) (@guaranteed NonTrivialStruct2) -> ()
 // CHECK:   apply [[FN]]([[BORROW]])
-// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[BORROW]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovecD15NonConsumingUseyyF'
 func moveOnlyStructMoveOnlyStructNonConsumingUse() {
@@ -508,10 +508,10 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   [[FIELD:%.*]] = ref_element_addr [[BORROWED_COPYABLE_KLASS]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
 // CHECK:   [[ACCESS_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS_MARK]]
+// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load [copy] [[ACCESS_MARK]]
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVhF :
 // CHECK:   apply [[FN]]([[BORROWED_MOVEONLY_KLASS]])
-// CHECK:   end_borrow [[BORROWED_MOVEONLY_KLASS]]
+// CHECK:   destroy_value [[BORROWED_MOVEONLY_KLASS]]
 // CHECK:   destroy_value [[COPYABLE_KLASS]]
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyabledede9KlassMovecF15NonConsumingUseyyF'
 func moveOnlyStructCopyableStructCopyableStructCopyableKlassMoveOnlyKlassNonConsumingUse() {
@@ -649,25 +649,25 @@ func enumSwitchTest1(_ e: __shared EnumSwitchTests.E) {
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: end_access [[ACCESS]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[MARKED_GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[GEP]] : $*NonTrivialStruct2
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[GEP]] : $*NonTrivialStruct2
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: end_access [[ACCESS]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
