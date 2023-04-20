@@ -726,7 +726,6 @@ void swift::rewriting::realizeInheritedRequirements(
     // handle suppressed requirements
     if (inheritedEntries[index].isSuppressed) {
       // TODO: we should be adding a requirement for Copyable if not suppressed.
-      assert(false && "unexpected suppressed entry");
       continue;
     }
 

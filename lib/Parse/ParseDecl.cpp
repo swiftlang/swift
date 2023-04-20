@@ -5686,31 +5686,12 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    // parse the "without" operator
-    SourceLoc withoutLoc;
-    if (Tok.isTilde()) {
-      auto loc = consumeToken();
-
-      if (!options.contains(PI_AllowSuppression))
-        diagnose(loc, diag::suppress_illegal_here);
-      else
-        withoutLoc = loc;
-    }
-
     auto ParsedTypeResult = parseType();
     Status |= ParsedTypeResult;
 
-    // If it's a single type, record the type under the appropriate entry.
-    if (ParsedTypeResult.isNonNull()) {
-      TypeRepr *typeRepr = ParsedTypeResult.get();
+    if (ParsedTypeResult.isNonNull())
+      Inherited.push_back(InheritedEntry(ParsedTypeResult.get()));
 
-      // is the parsed type meant to be a suppressed entry?
-      if (withoutLoc) {
-        typeRepr = new (Context) SuppressedTypeRepr(typeRepr, withoutLoc);
-      }
-
-      Inherited.push_back(InheritedEntry(typeRepr));
-    }
   } while (HasNextType);
 
   return Status;
@@ -8171,7 +8152,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    Status |= parseInheritance(Inherited, {});
     ED->setAllInheritedEntries(Context.AllocateCopy(Inherited));
   }
 
@@ -8432,7 +8413,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    Status |= parseInheritance(Inherited, {});
     SD->setAllInheritedEntries(Context.AllocateCopy(Inherited));
   }
 
@@ -8523,7 +8504,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
     SmallVector<InheritedEntry, 2> Inherited;
-    Status |= parseInheritance(Inherited, {PI_AllowSuppression});
+    Status |= parseInheritance(Inherited, {});
     CD->setAllInheritedEntries(Context.AllocateCopy(Inherited));
 
   // Parse python style inheritance clause and replace parentheses with a colon

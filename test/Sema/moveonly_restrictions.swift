@@ -227,9 +227,11 @@ struct StructHolder {
     }
 }
 
-protocol DanceHall: ~Copyable {} // expected-error {{cannot suppress conformances here}}
+protocol DanceHall: ~Copyable {} // expected-error {{cannot suppress conformance to 'Copyable' on protocol}}
 
 actor Speedcore: ~Copyable {}
+
+extension StructHolder: ~Copyable {} // expected-error {{cannot suppress conformance to 'Copyable' on extension}}
 
 
 

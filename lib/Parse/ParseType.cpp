@@ -417,6 +417,11 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     return parseSILBoxType(generics, attrs);
   }
 
+  // parse the "without" operator
+  SourceLoc withoutLoc;
+  if (Tok.isTilde())
+    withoutLoc = consumeToken();
+
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID, reason);
   status |= ParserStatus(ty);
   if (ty.isNull())
@@ -565,6 +570,11 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     if (tyR)
       tyR->walk(walker);
   }
+
+  // Wrap the type more tightly to "without" than other attributes.
+  // TODO: require parens around the composition if we saw a "without".
+  if (withoutLoc)
+    tyR = new(Context) SuppressedTypeRepr(tyR, withoutLoc);
 
   return makeParserResult(
       status,

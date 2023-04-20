@@ -1,30 +1,41 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol P: Copyable {} // expected-error {{'Copyable' is unavailable}}
-struct S: P {}
+public protocol P: Copyable {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+public struct S: P {}
 
-typealias PleaseLetMeDoIt = Copyable // expected-error {{'Copyable' is unavailable}}
-typealias WhatIfIQualify = Swift.Copyable // expected-error {{'Copyable' is unavailable}}
+public typealias PleaseLetMeDoIt = Copyable // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+public typealias WhatIfIQualify = Swift.Copyable // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
 
-class C: Copyable {} // expected-error {{'Copyable' is unavailable}}
+public class C: Swift.Copyable {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
 
-@_moveOnly struct MOStruct: Copyable {}
-// expected-error@-1 {{move-only struct 'MOStruct' cannot conform to 'Copyable'}}
-// expected-error@-2 {{'Copyable' is unavailable}}
+public func whatever<T>(_ t: T) where T: Copyable {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+public func vatever<T: Copyable>(_ t: T) {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+public func alias<T: PleaseLetMeDoIt>(_ t: T) {}
+public func buttever(_ t: any Copyable) {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+public func zuttever(_ t: some Copyable) {} // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
 
-
-func whatever<T>(_ t: T) where T: Copyable {} // expected-error {{'Copyable' is unavailable}}
-func vatever<T: Copyable>(_ t: T) {} // expected-error {{'Copyable' is unavailable}}
-func buttever(_ t: any Copyable) {} // expected-error {{'Copyable' is unavailable}}
-func zuttever(_ t: some Copyable) {} // expected-error 2{{'Copyable' is unavailable}}
-
-enum RockNRoll<T: Copyable> { // expected-error {{'Copyable' is unavailable}}
- case isNoisePollution(Copyable) // expected-error {{'Copyable' is unavailable}}
- case isMusic(T)
+public enum RockNRoll<T: Copyable> { // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+  case isNoisePollution(Copyable) // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+  case isMusic(T)
 }
 
-enum namespace {
+public enum namespace {
   typealias Copyable = Int
 
   func Copyable() -> Copyable { return 0 }
+}
+
+struct AVX: Copyable, ~Copyable, Sendable { // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+                                            // expected-error@-1 {{move-only struct 'AVX' cannot conform to 'Copyable'}}
+  deinit {}
+}
+
+extension Copyable { // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+  func clone() -> Self { return self }
+}
+
+func checkIt(_ t: Copyable) // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+    -> Copyable { // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+  let y: Copyable = t // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
+  return y
 }

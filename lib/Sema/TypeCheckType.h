@@ -84,6 +84,10 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this resolution happens under an explicit ownership specifier.
   HasOwnership = 1 << 13,
+
+  /// Whether this resolution happens under the suppression of a type's implicit
+  /// conformance, such as the "without" operator `~`
+  IsSuppressed = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.
@@ -419,6 +423,48 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in an inheritance clause.
+  bool isInheritanceClause() const {
+    switch (base) {
+    case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+      return true;
+
+    case Context::None:
+    case Context::FunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::MacroDecl:
+    case Context::EnumPatternPayload:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
       return false;
     }
   }

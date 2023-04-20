@@ -6898,8 +6898,11 @@ ERROR(noncopyable_objc_enum, none,
 ERROR(suppress_cannot_suppress,none,
       "cannot suppress implicit conformance to %0", (Type))
 
+ERROR(suppress_cannot_suppress_here,none,
+      "suppression of %0 conformance cannot appear here", (Type))
+
 ERROR(suppress_on_wrong_decl,none,
-      "cannot suppress conformance on %0", (DescriptiveDeclKind))
+      "cannot suppress conformance to %0 on %1", (Type, DescriptiveDeclKind))
 
 ERROR(suppress_duplicate,none,
       "implicit conformance to %0 already suppressed", (Type))
@@ -6908,6 +6911,14 @@ NOTE(suppress_previously_here,none,
 
 ERROR(suppress_not_protocol,none,
       "suppression of non-protocol type %0", (Type))
+
+ERROR(copyable_only_suppression,none,
+      "'Copyable' can only be suppressed via '~Copyable' at this time",
+      ())
+
+ERROR(suppression_illegal_here,none,
+      "suppression cannot appear here",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions

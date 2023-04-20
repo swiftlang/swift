@@ -2085,6 +2085,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
+    NeverNullType resolveSuppressedTypeRepr(SuppressedTypeRepr *repr,
+                                            TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2374,9 +2376,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
   case TypeReprKind::Suppressed:
-      // Currently, parsing and other type checking code prevents invalid
-      // suppressed types from being formed, so just resolve the base.
-      return resolveType(cast<SuppressedTypeRepr>(repr)->getBase(), options);
+    return resolveSuppressedTypeRepr(cast<SuppressedTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -3391,7 +3391,11 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           nestedRepr = specifierRepr->getBase();
           continue;
         case TypeReprKind::Suppressed:
-          llvm_unreachable("unexpected suppressed type for function param");
+          // Can't have a suppressed type as a function param.
+          diagnose(specifierRepr->getLoc(), diag::suppression_illegal_here);
+          specifierRepr->setInvalid();
+          nestedRepr = specifierRepr->getBase();
+          break;
         default:
           break;
         }
@@ -4177,6 +4181,19 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  // Do not allow unsuppressed uses of Copyable anywhere.
+  if (!options.contains(TypeResolutionFlags::IsSuppressed)) {
+    if (auto protoTy = result->getAs<ProtocolType>()) {
+      if (auto protoDecl = protoTy->getDecl()) {
+        if (protoDecl->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+          diagnose(repr->getLoc(), diag::copyable_only_suppression);
+          repr->setInvalid();
+          return ErrorType::get(getASTContext());
+        }
+      }
+    }
+  }
+
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
@@ -4319,6 +4336,39 @@ TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                               TypeResolutionOptions options) {
   // TODO: more diagnostics
   return resolveType(repr->getBase(), options);
+}
+
+NeverNullType
+TypeResolver::resolveSuppressedTypeRepr(SuppressedTypeRepr *repr,
+                                        TypeResolutionOptions options) {
+  auto baseType = resolveType(repr->getBase(),
+                              options | TypeResolutionFlags::IsSuppressed);
+  if (baseType->hasError())
+    return baseType;
+
+  // Can't suppress outside of an inheritance clause.
+  if (!options.isInheritanceClause()) {
+    if (baseType->isConstraintType()) {
+      // Give a more detailed message if they tried to suppress a constraint
+      // in an illegal spot. This specifically excludes existentials because
+      // we don't want to complain about an 'any Equatable' as that's not a
+      // constraint.
+      diagnose(repr->getLoc(), diag::suppress_cannot_suppress_here, baseType);
+    } else {
+      diagnose(repr->getLoc(), diag::suppression_illegal_here);
+    }
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
+  }
+
+  // Can't suppress a non-constraint type in an inheritance clause.
+  if (!baseType->isConstraintType()) {
+    diagnose(repr->getLoc(), diag::suppress_not_protocol, baseType);
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
+  }
+
+  return baseType;
 }
 
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,

@@ -150,9 +150,9 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
   let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-  let _: Copyable = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: Copyable = mo // expected-error {{'Copyable' can only be suppressed via '~Copyable' at this time}}
 
   _ = MO() as P // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   _ = MO() as any P // expected-error {{move-only type 'MO' cannot be used with generics yet}}

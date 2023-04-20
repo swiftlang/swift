@@ -90,29 +90,22 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 // implicit conformances.
 static void checkSuppressedEntries(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  if (declUnion.is<const ExtensionDecl*>())
-    return; // nothing to check; extensions don't carry suppressed conformances
-
   auto typeDecl = declUnion.dyn_cast<const TypeDecl *>();
-  assert(typeDecl);
+  auto extnDecl = declUnion.dyn_cast<const ExtensionDecl*>();
 
-#ifndef NDEBUG
-  if (isa<AssociatedTypeDecl>(typeDecl)
-      || isa<GenericTypeParamDecl>(typeDecl)) {
-    assert(typeDecl->getSuppressed().empty()
-               && "unexpected suppressed conformances");
-  }
-#endif
+  ASTContext &ctx =
+      typeDecl ? typeDecl->getASTContext() : extnDecl->getASTContext();
 
-  ASTContext &ctx = typeDecl->getASTContext();
+  ArrayRef<InheritedEntry> allEntries =
+      typeDecl ? typeDecl->getAllInheritedEntries()
+               : extnDecl->getAllInheritedEntries();
+
   auto &diags = ctx.Diags;
+  bool haveMoveOnlyClasses = ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses);
 
   using EntryTracker = std::unordered_map<KnownProtocolKind,
                                           InheritedEntry const *>;
   EntryTracker seenEntries;
-
-  bool haveMoveOnlyClasses =
-      typeDecl->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
 
   // TODO: this pattern of iterating over the indicies of all entries is
   //  an all too common pattern throughout the type-checker. It's a symptom of
@@ -120,7 +113,6 @@ static void checkSuppressedEntries(
   //  either automatically perform these type resolution requests, or know
   //  the requests have already been performed very early on. It's the primary
   //  thing preventing us from using the InheritedEntryRange accessors.
-  ArrayRef<InheritedEntry> allEntries = typeDecl->getAllInheritedEntries();
   for (unsigned i : indices(allEntries)) {
     auto &suppressed = allEntries[i];
 
@@ -128,7 +120,7 @@ static void checkSuppressedEntries(
       continue;
 
     // Resolve and validate the type if needed.
-    InheritedTypeRequest request{typeDecl, i, TypeResolutionStage::Interface};
+    InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
     Type suppressedTy = evaluateOrDefault(ctx.evaluator, request, Type());
 
     // If we couldn't resolve the type or it contains an error, ignore it.
@@ -136,23 +128,33 @@ static void checkSuppressedEntries(
       continue;
 
     // only structs, enums, and some classes can have suppressed entries
-    if (!(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl)
-        || (isa<ClassDecl>(typeDecl) && haveMoveOnlyClasses))) {
+    if (typeDecl) {
+      if (!(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl)
+          || (isa<ClassDecl>(typeDecl) && haveMoveOnlyClasses))) {
+        diags.diagnose(suppressed.getLoc(),
+                       diag::suppress_on_wrong_decl,
+                       suppressedTy,
+                       typeDecl->getDescriptiveKind());
+        // FIXME: a great fix-it would be to remove the entire entry,
+        //  including any trailing comma. See checkInheritedEntry
+        //  for an example of the logic to do that. You'll need to update it
+        //  using MergedArrayRef so it understands source locations for both
+        //  suppressed and inherited entries.
+        continue;
+      }
+    } else {
+      assert(extnDecl);
       diags.diagnose(suppressed.getLoc(),
                      diag::suppress_on_wrong_decl,
-                     typeDecl->getDescriptiveKind());
-      // FIXME: a great fix-it would be to remove the entire entry,
-      //  including any trailing comma. See checkInheritedEntry
-      //  for an example of the logic to do that. You'll need to update it
-      //  using MergedArrayRef so it understands source locations for both
-      //  suppressed and inherited entries.
+                     suppressedTy,
+                     extnDecl->getDescriptiveKind());
       continue;
     }
 
     // Ensure it is a suppressible protocol.
-    if (auto protocolTy = dyn_cast<ProtocolType>(suppressedTy))
-      if (auto protocolDecl = protocolTy->getDecl())
-        if (auto knownProtocol = protocolDecl->getKnownProtocolKind())
+    if (auto protocolTy = dyn_cast<ProtocolType>(suppressedTy)) {
+      if (auto protocolDecl = protocolTy->getDecl()) {
+        if (auto knownProtocol = protocolDecl->getKnownProtocolKind()) {
           if (isSuppressibleProtocol(*knownProtocol)) {
             // remember that we've seen this suppression for the type
             EntryTracker::iterator iter;
@@ -178,20 +180,16 @@ static void checkSuppressedEntries(
 
             continue;
           }
-
-    // At this point, the suppressed type is wrong. Tailor the error messages.
-
-    if (suppressedTy->isConstraintType()) {
-      diags.diagnose(suppressed.getLoc(),
-                     diag::suppress_cannot_suppress,
-                     suppressedTy);
-      // FIXME: a great fix-it would be to remove the entire entry.
-    } else {
-      diags.diagnose(suppressed.getLoc(),
-                     diag::suppress_not_protocol,
-                     suppressedTy);
-      // FIXME: a great fix-it would be to remove the entire entry.
+        }
+      }
     }
+
+    // At this point, the suppressed type is wrong.
+    assert(suppressedTy->isConstraintType());
+    diags.diagnose(suppressed.getLoc(),
+                   diag::suppress_cannot_suppress,
+                   suppressedTy);
+    // FIXME: a great fix-it would be to remove the entire entry.
   }
 }
 
@@ -2912,7 +2910,7 @@ public:
           return;
 
         // go over the all types directly conformed-to by the extension
-        for (auto entry : extension->getAllInheritedEntries()) {
+        for (auto entry : extension->getInherited()) {
           diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
                                                entry.getType());
         }

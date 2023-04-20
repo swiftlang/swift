@@ -1200,7 +1200,6 @@ public:
     PI_Default               = 0,
     PI_AllowClassRequirement = 1 << 1,
     PI_AllowAnyObject        = 1 << 2,
-    PI_AllowSuppression      = 1 << 3,
   };
 
   using ParseInheritanceOptions = OptionSet<ParseInheritanceFlags>;

@@ -413,9 +413,9 @@ void AccessControlCheckerBase::checkGenericParamAccess(
       if (allInheritedEntries.empty())
         continue;
       assert(allInheritedEntries.size() == 1);
-      assert(allInheritedEntries.front().isSuppressed == false);
-      checkTypeAccessImpl(allInheritedEntries.front().getType(),
-                          allInheritedEntries.front().getTypeRepr(),
+      auto entry = allInheritedEntries.front();
+      checkTypeAccessImpl(entry.getType(),
+                          entry.getTypeRepr(),
                           accessScope, DC, /*mayBeInferred*/false,
                           callback);
     }
@@ -1923,9 +1923,8 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
         if (allInheritedEntries.empty())
           continue;
         assert(allInheritedEntries.size() == 1);
-        auto inherited = allInheritedEntries.front();
-        assert(!inherited.isSuppressed);
-        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+        auto entry = allInheritedEntries.front();
+        checkType(entry.getType(), entry.getTypeRepr(), ownerDecl);
       }
     }
 
