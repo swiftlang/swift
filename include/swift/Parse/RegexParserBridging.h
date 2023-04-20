@@ -27,8 +27,8 @@
 ///              past.
 /// - MustBeRegex: whether an error during lexing should be considered a regex
 ///                literal, or some thing else.
-/// - OptionalDiagnosticEngine: RegexLiteralLexingFn should diagnose the
-///                             token using this engine.
+/// - BridgedOptionalDiagnosticEngine: RegexLiteralLexingFn should diagnose the
+///                                    token using this engine.
 ///
 /// Returns: A bool indicating whether lexing was completely erroneous, and
 ///          cannot be recovered from, or false if there either was no error,
@@ -36,7 +36,7 @@
 typedef bool (*RegexLiteralLexingFn)(
     /*CurPtrPtr*/ const char *_Nonnull *_Nonnull,
     /*BufferEnd*/ const char *_Nonnull,
-    /*MustBeRegex*/ bool, swift::DiagnosticEngine *_Nullable);
+    /*MustBeRegex*/ bool, BridgedOptionalDiagnosticEngine);
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn _Nullable fn);
 
 /// Parse a regex literal string. Takes the following arguments:
@@ -48,8 +48,8 @@ void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn _Nullable fn);
 /// - CaptureStructureSize: The size of the capture structure buffer. Must be
 ///                         greater than or equal to `strlen(InputPtr) + 3`.
 /// - DiagnosticBaseLoc: Start location of the regex literal.
-/// - DiagnosticEngine: RegexLiteralParsingFn should diagnose the
-///                     parsing errors using this engine.
+/// - BridgedDiagnosticEngine: RegexLiteralParsingFn should diagnose the
+///                            parsing errors using this engine.
 ///
 /// Returns: A bool value indicating if there was an error while parsing.
 typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
@@ -57,7 +57,7 @@ typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
                                       /*CaptureStructureOut*/ void *_Nonnull,
                                       /*CaptureStructureSize*/ unsigned,
                                       /*DiagnosticBaseLoc*/ swift::SourceLoc,
-                                      swift::DiagnosticEngine &);
+                                      BridgedDiagnosticEngine);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
 
 #endif // REGEX_PARSER_BRIDGING
