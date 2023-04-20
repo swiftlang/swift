@@ -583,6 +583,11 @@ public:
     Condition = Info;
   }
 
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
+
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
@@ -685,6 +690,11 @@ public:
   /// FIXME: Find a better way to implement this. Allows conditions to be
   ///        stored in \c ASTNode.
   StmtCondition *getCondPointer() { return &Cond; }
+
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&

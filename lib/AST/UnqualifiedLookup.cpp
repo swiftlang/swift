@@ -397,25 +397,7 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
     return false;
   }
 
-  // Find the condition that defined the self decl,
-  // and check that both its LHS and RHS are 'self'
-  for (auto cond : conditionalStmt->getCond()) {
-    if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
-      continue;
-    }
-    
-    if (auto pattern = cond.getPattern()) {
-      if (pattern->getBoundName() != Ctx.Id_self) {
-        continue;
-      }
-    }
-
-    if (auto selfDRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
-      return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-    }
-  }
-
-  return false;
+  return conditionalStmt->rebindsSelf(Ctx);
 }
 
 ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
