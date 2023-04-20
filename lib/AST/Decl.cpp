@@ -368,7 +368,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 }
 
 OrigDeclAttributes Decl::getOriginalAttrs() const {
-  return OrigDeclAttributes(getAttrs(), getModuleContext());
+  return OrigDeclAttributes(getAttrs(), this);
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
@@ -767,8 +767,22 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   return Range;
 }
 
-bool Decl::isInGeneratedBuffer() const {
-  return getModuleContext()->isInGeneratedBuffer(getStartLoc());
+bool Decl::isInMacroExpansionInContext() const {
+  auto *dc = getDeclContext();
+  auto parentFile = dc->getParentSourceFile();
+  auto *mod = getModuleContext();
+  auto *file = mod->getSourceFileContainingLocation(getStartLoc());
+
+  // Decls in macro expansions always have a source file. The source
+  // file can be null if the decl is implicit or has an invalid
+  // source location.
+  if (!parentFile || !file)
+    return false;
+
+  if (file->getBufferID() == parentFile->getBufferID())
+    return false;
+
+  return file->getFulfilledMacroRole() != None;
 }
 
 SourceLoc Decl::getLocFromSource() const {
