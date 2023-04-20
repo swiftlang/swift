@@ -17,10 +17,17 @@ public func calleer() {
   caller(1, "hi", false)
 }
 
+public func foo<each T: Equatable>(_: repeat each T) {}
+
+@_transparent public func bar(x: Int, y: String) {
+  foo(x, y)
+}
+
 #elseif APP
 
 import pack_expansion_type
 
 caller(1, "hi", false)
+bar(x: 1, y: "hi")
 
 #endif

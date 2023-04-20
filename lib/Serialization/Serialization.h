@@ -231,6 +231,10 @@ class Serializer : public SerializerBase {
                        index_block::PROTOCOL_CONFORMANCE_OFFSETS>
   ConformancesToSerialize;
 
+  ASTBlockRecordKeeper<PackConformance *, ProtocolConformanceID,
+                       index_block::PACK_CONFORMANCE_OFFSETS>
+  PackConformancesToSerialize;
+
   ASTBlockRecordKeeper<const SILLayout *, SILLayoutID,
                        index_block::SIL_LAYOUT_OFFSETS>
   SILLayoutsToSerialize;
@@ -365,7 +369,11 @@ private:
 
   /// Writes a protocol conformance.
   void writeASTBlockEntity(ProtocolConformance *conformance);
+
   void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
+
+  /// Writes a pack conformance.
+  void writeASTBlockEntity(PackConformance *conformance);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -503,16 +511,10 @@ public:
   /// The protocol conformance will be scheduled for serialization
   /// if necessary.
   ///
-  /// \param genericEnv When provided, the generic environment that describes
-  /// the archetypes within the substitutions. The replacement types within
-  /// the substitution will be mapped out of the generic environment before
-  /// being written.
-  ///
   /// \returns The ID for the given conformance in this module.
-  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
-  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance,
-                                   GenericEnvironment *genericEnv = nullptr);
+  ProtocolConformanceID addConformanceRef(ProtocolConformance *conformance);
+  ProtocolConformanceID addConformanceRef(PackConformance *conformance);
+  ProtocolConformanceID addConformanceRef(ProtocolConformanceRef conformance);
 
   SmallVector<ProtocolConformanceID, 4>
   addConformanceRefs(ArrayRef<ProtocolConformanceRef> conformances);
