@@ -111,13 +111,13 @@ public:
 
 private:
   Kind kind;
-  Identifier identifier;
+  DeclName name;
 
 public:
-  MacroIntroducedDeclName(Kind kind, Identifier identifier = Identifier())
-      : kind(kind), identifier(identifier) {};
+  MacroIntroducedDeclName(Kind kind, DeclName name = DeclName())
+      : kind(kind), name(name) {};
 
-  static MacroIntroducedDeclName getNamed(Identifier name) {
+  static MacroIntroducedDeclName getNamed(DeclName name) {
     return MacroIntroducedDeclName(Kind::Named, name);
   }
 
@@ -138,7 +138,7 @@ public:
   }
 
   Kind getKind() const { return kind; }
-  Identifier getIdentifier() const { return identifier; }
+  DeclName getName() const { return name; }
 };
 
 }

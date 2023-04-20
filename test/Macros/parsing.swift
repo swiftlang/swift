@@ -24,6 +24,7 @@ protocol Q { associatedtype Assoc }
 // expected-error @+1 {{macro 'm7' must declare its applicable roles}}
 @freestanding macro m7(_: String) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm7'; the type must be public and provided via '-load-plugin-library'}}
+
 // expected-error @+2 {{expected a freestanding macro role such as 'expression'}}
 // expected-error @+1 {{macro 'm8' must declare its applicable roles}}
 @freestanding(abc) macro m8(_: String) = #externalMacro(module: "A", type: "M4")
