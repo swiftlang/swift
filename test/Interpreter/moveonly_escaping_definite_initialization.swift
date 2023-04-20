@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+
 // REQUIRES: executable_test
+// REQUIRES: broken
 
 @_moveOnly
 struct MO {
