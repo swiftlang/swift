@@ -271,7 +271,7 @@ struct Pair<First, Second> {
   init(_ first: First, _ second: Second) {}
 }
 
-// CHECK-LABEL: @$s4main9makePairs6firsts7secondsAA4PairVyxq_GxQp_txxQp_q_xQptq_RhzRvzRv_r0_lF
+// CHECK-LABEL: @$s4main9makePairs6firsts7secondsAA4PairVyxq_GxQp_txxQp_q_xQptRvzRv_q_Rhzr0_lF
 // CHECK-SAME: $@convention(thin) <each First, each Second where (repeat (each First, each Second)) : Any> (@pack_guaranteed Pack{repeat each First}, @pack_guaranteed Pack{repeat each Second}) -> @pack_out Pack{repeat Pair<each First, each Second>}
 func makePairs<each First, each Second>(
   firsts first: repeat each First,

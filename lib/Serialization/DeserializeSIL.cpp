@@ -1284,6 +1284,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
+  case SIL_OPEN_PACK_ELEMENT:
+    SILOpenPackElementLayout::readRecord(scratch, Attr,
+                                         TyID, TyCategory, ValID);
+    RawOpCode = (unsigned)SILInstructionKind::OpenPackElementInst;
+    break;
   case SIL_PACK_ELEMENT_GET:
     SILPackElementGetLayout::readRecord(scratch, RawOpCode,
                                         TyID, TyCategory,
@@ -1424,7 +1429,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::OpenPackElementInst: {
-    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
+    assert(RecordKind == SIL_OPEN_PACK_ELEMENT && "Layout should be OpenPackElement");
     auto index = getLocalValue(ValID,
         getSILType(MF->getType(TyID), (SILValueCategory) TyCategory, Fn));
     auto env = MF->getGenericEnvironmentChecked(Attr);
