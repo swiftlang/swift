@@ -99,20 +99,34 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    auto &cs = getConstraintSystem();
-
     if (rawType->hasTypeVariable() || rawType->hasPlaceholder()) {
-      rawType = rawType.transform([&](Type type) {
+      rawType = rawType.transform([&](Type type) -> Type {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
           auto resolvedType = S.simplifyType(typeVar);
+
+          if (!resolvedType->hasUnresolvedType())
+            return resolvedType;
+
+          // If type variable was simplified to an unresolved pack expansion
+          // type, let's examine its original pattern type because it could
+          // contain type variables replaceable with their generic parameter
+          // types.
+          if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
+            auto *locator = typeVar->getImpl().getLocator();
+            auto *openedExpansionTy =
+                locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+                    .getOpenedType();
+            auto patternType = resolveType(openedExpansionTy->getPatternType());
+            return PackExpansionType::get(patternType,
+                                          expansion->getCountType());
+          }
+
           Type GP = typeVar->getImpl().getGenericParameter();
-          return resolvedType->is<UnresolvedType>() && GP
-                     ? GP
-                     : resolvedType;
+          return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
         }
 
         return type->isPlaceholder()
-                   ? Type(cs.getASTContext().TheUnresolvedType)
+                   ? Type(type->getASTContext().TheUnresolvedType)
                    : type;
       });
     }
