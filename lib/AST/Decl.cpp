@@ -3692,6 +3692,13 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() < AccessLevel::Public);
 
+  // Access notes may add attributes that affect this calculus.
+  (void)evaluateOrDefault(
+      this->getASTContext().evaluator,
+      ApplyAccessNoteRequest{const_cast<ValueDecl *>(this),
+                             AccessNoteRequestFlags::AccessLevel},
+      {});
+
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())

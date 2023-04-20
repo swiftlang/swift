@@ -961,6 +961,12 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
 
+  // Access notes may add attributes that affect this calculus.
+  // Access notes may add attributes that affect this calculus.
+  (void)evaluateOrDefault(
+      decl->getASTContext().evaluator,
+      ApplyAccessNoteRequest{decl, AccessNoteRequestFlags::Dynamic}, {});
+
   // Add dynamic if -enable-implicit-dynamic was requested.
   TypeChecker::addImplicitDynamicAttribute(decl);
 

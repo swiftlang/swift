@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -62,6 +63,37 @@ public:
   SWIFT_DEBUG_DUMP;
 };
 
+enum class AccessNoteRequestFlags : size_t {
+  /// Evaluate accessnote to potentially add ObjC related keywords
+  /// like `@objc` or `@objc(ObjCName)`.
+  ObjCVisibility = 0x1,
+
+  /// Evaluate accessnote to potentially add dynamic keyword.
+  Dynamic = 0x2,
+
+  /// Evaluate accessnote to potentially add access level related keywords
+  /// like `@usableFromInline` or `public`.
+  AccessLevel = 0x4,
+
+  All = 0x7,
+};
+
+inline bool operator&(AccessNoteRequestFlags a, AccessNoteRequestFlags b) {
+  return (size_t(a) & size_t(b)) != 0;
+}
+inline AccessNoteRequestFlags operator|(AccessNoteRequestFlags a,
+                                        AccessNoteRequestFlags b) {
+  return AccessNoteRequestFlags(size_t(a) | size_t(b));
+}
+inline AccessNoteRequestFlags operator-(AccessNoteRequestFlags a,
+                                        AccessNoteRequestFlags b) {
+  return AccessNoteRequestFlags(size_t(a) & ~size_t(b));
+}
+inline AccessNoteRequestFlags &operator|=(AccessNoteRequestFlags &a,
+                                          AccessNoteRequestFlags b) {
+  return a = (a | b);
+}
+
 /// An individual access note specifying modifications to a declaration.
 class AccessNote {
 public:
@@ -75,6 +107,14 @@ public:
   /// If \c true, add a dynamic modifier; if \c false, delete a dynamic
   /// modifier; if \c None, do nothing.
   Optional<bool> Dynamic;
+
+  /// If \c true, add a public modifier; if \c false, delete a public
+  /// modifier; if \c None, do nothing.
+  Optional<bool> Public;
+
+  /// If \c true, add a usableFromInline modifier; if \c false, delete a
+  /// usableFromInline modifier; if \c None, do nothing.
+  Optional<bool> UsableFromInline;
 
   /// If set, modify an @objc attribute to give it the specified \c ObjCName.
   /// If \c ObjC would otherwise be \c None, it will be set to \c true.

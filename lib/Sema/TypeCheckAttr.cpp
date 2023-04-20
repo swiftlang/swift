@@ -1542,8 +1542,11 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
-  if (auto VD = dyn_cast<ValueDecl>(D))
-    TypeChecker::applyAccessNote(VD);
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    (void)evaluateOrDefault(
+        VD->getASTContext().evaluator,
+        ApplyAccessNoteRequest{VD, AccessNoteRequestFlags::All}, {});
+  }
 
   AttributeChecker Checker(D);
   // We need to check all availableAttrs, OriginallyDefinedInAttr and

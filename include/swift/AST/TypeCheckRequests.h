@@ -16,20 +16,21 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
-#include "swift/AST/ActorIsolation.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/AccessNotes.h"
+#include "swift/AST/ActorIsolation.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Type.h"
-#include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
@@ -2909,7 +2910,8 @@ public:
 /// Looks up and applies the access note for a given declaration.
 class ApplyAccessNoteRequest
     : public SimpleRequest<ApplyAccessNoteRequest,
-                           evaluator::SideEffect(ValueDecl *),
+                           evaluator::SideEffect(ValueDecl *,
+                                                 AccessNoteRequestFlags),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2917,13 +2919,15 @@ public:
 private:
   friend SimpleRequest;
 
-  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD,
+                                 AccessNoteRequestFlags flags) const;
 
 public:
   // Cached.
   bool isCached() const { return true; }
 };
 
+void simple_display(llvm::raw_ostream &out, AccessNoteRequestFlags flags);
 
 class TypeCheckSourceFileRequest
     : public SimpleRequest<

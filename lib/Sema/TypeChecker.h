@@ -1268,11 +1268,6 @@ bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
                            SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 
-/// Forces all changes specified by the module's access notes file to be
-/// applied to this declaration. It is safe to call this function more than
-/// once.
-void applyAccessNote(ValueDecl *VD);
-
 /// Returns true if the given type conforms to `Differentiable` in the
 /// module of `dc`. If `tangentVectorEqualsSelf` is true, returns true iff
 /// the given type additionally satisfies `Self == Self.TangentVector`.
