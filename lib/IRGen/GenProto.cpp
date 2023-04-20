@@ -3753,18 +3753,24 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
   case GenericRequirement::Kind::WitnessTable:
   case GenericRequirement::Kind::WitnessTablePack: {
     auto proto = requirement.getProtocol();
-    auto conf = subs.lookupConformance(requirement.getTypeParameter(), proto);
-
-    // FIXME: Remove this
-    if (conf.isPack() && isa<PackArchetypeType>(type)) {
-      assert(wasUnwrappedPack);
-      assert(conf.getPack()->getPatternConformances().size() == 1);
-      conf = conf.getPack()->getPatternConformances()[0];
-    }
-
     setProtocolWitnessTableName(IGF.IGM, value, type, proto);
-    auto kind = LocalTypeDataKind::forProtocolWitnessTable(conf);
-    IGF.setUnscopedLocalTypeData(type, kind, value);
+
+    if (subs) {
+      auto conf = subs.lookupConformance(requirement.getTypeParameter(), proto);
+
+      // FIXME: Remove this
+      if (conf.isPack() && isa<PackArchetypeType>(type)) {
+        assert(wasUnwrappedPack);
+        assert(conf.getPack()->getPatternConformances().size() == 1);
+        conf = conf.getPack()->getPatternConformances()[0];
+      }
+
+      auto kind = LocalTypeDataKind::forProtocolWitnessTable(conf);
+      IGF.setUnscopedLocalTypeData(type, kind, value);
+    } else {
+      auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(proto);
+      IGF.setUnscopedLocalTypeData(type, kind, value);
+    }
     break;
   }
   }
