@@ -889,7 +889,7 @@ bool SemaAnnotator::shouldIgnore(Decl *D) {
   // by a member attribute expansion. Note that we would have already skipped
   // this decl if we were ignoring expansions, so no need to check that.
   if (auto *missing = dyn_cast<MissingDecl>(D)) {
-    if (D->isInGeneratedBuffer())
+    if (D->isInMacroExpansionInContext())
       return false;
   }
 
