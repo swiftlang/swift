@@ -2584,12 +2584,12 @@ public:
 
 /// Predicate used to filter attributes to only the original attributes.
 class OrigDeclAttrFilter {
-  ModuleDecl *mod;
+  const Decl *decl;
 
 public:
-  OrigDeclAttrFilter() : mod(nullptr) {}
+  OrigDeclAttrFilter() : decl(nullptr) {}
 
-  OrigDeclAttrFilter(ModuleDecl *mod) : mod(mod) {}
+  OrigDeclAttrFilter(const Decl *decl) : decl(decl) {}
 
   Optional<const DeclAttribute *>
   operator()(const DeclAttribute *Attr) const;
@@ -2611,7 +2611,7 @@ private:
 public:
   OrigDeclAttributes() : origRange(make_range(DeclAttributes::const_iterator(nullptr), DeclAttributes::const_iterator(nullptr)), OrigDeclAttrFilter()) {}
 
-  OrigDeclAttributes(const DeclAttributes &allAttrs, ModuleDecl *mod) : origRange(make_range(allAttrs.begin(), allAttrs.end()), OrigDeclAttrFilter(mod)) {}
+  OrigDeclAttributes(const DeclAttributes &allAttrs, const Decl *decl) : origRange(make_range(allAttrs.begin(), allAttrs.end()), OrigDeclAttrFilter(decl)) {}
 
   OrigFilteredRange::iterator begin() const { return origRange.begin(); }
   OrigFilteredRange::iterator end() const { return origRange.end(); }

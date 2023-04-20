@@ -368,7 +368,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 }
 
 OrigDeclAttributes Decl::getOriginalAttrs() const {
-  return OrigDeclAttributes(getAttrs(), getModuleContext());
+  return OrigDeclAttributes(getAttrs(), this);
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
