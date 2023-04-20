@@ -1481,7 +1481,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInGeneratedBuffer())
+        D->isInMacroExpansionInContext())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
