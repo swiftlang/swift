@@ -27,3 +27,7 @@ struct Unused : Base {
 };
 
 using UnusedInt = Unused<int>;
+
+struct VirtualNonAbstractBase {
+  virtual void nonAbstractMethod() const;
+};

@@ -3451,6 +3451,11 @@ namespace {
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
+      if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
+        Impl.markUnavailable(
+            cast<ValueDecl>(method),
+            "virtual functions are not yet available in Swift");
+      }
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
