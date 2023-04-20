@@ -3638,10 +3638,10 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
       if (numFields <= NumInlineGlobalIvarOffsets) {
         _globalIvarOffsets = _inlineGlobalIvarOffsets;
         // Make sure all the entries start out null.
-        memset(_globalIvarOffsets, 0, sizeof(size_t *) * numFields);
+        memset(_globalIvarOffsets, 0, numFields * sizeof(size_t *));
       } else {
         _globalIvarOffsets =
-            static_cast<size_t **>(calloc(sizeof(size_t *), numFields));
+            static_cast<size_t **>(calloc(numFields, sizeof(size_t *)));
       }
     }
     return _globalIvarOffsets;
