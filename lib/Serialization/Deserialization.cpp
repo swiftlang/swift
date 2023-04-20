@@ -871,8 +871,8 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
 
   case SerializedProtocolConformanceKind::Pack: {
     auto conformanceIndex = (conformanceID >> SerializedProtocolConformanceKind::Shift) - 1;
-    assert(conformanceIndex < Conformances.size() && "invalid pack conformance ID");
-    auto &conformanceOrOffset = Conformances[conformanceIndex];
+    assert(conformanceIndex < PackConformances.size() && "invalid pack conformance ID");
+    auto &conformanceOrOffset = PackConformances[conformanceIndex];
     if (!conformanceOrOffset.isComplete()) {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       if (auto error = diagnoseFatalIfNotSuccess(
