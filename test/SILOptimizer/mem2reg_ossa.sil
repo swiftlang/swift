@@ -516,7 +516,7 @@ bb7:
 }
 
 // CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical :
-// CHECK:         alloc_stack
+// CHECK-NOT:         alloc_stack
 // CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical'
 sil [ossa] @test_optional_in_multiple_blocks_lexical : $@convention(method) (@guaranteed Optional<Klass>) -> () {
 bb0(%0 : @guaranteed $Optional<Klass>):
@@ -542,7 +542,7 @@ bb7:
 }
 
 // CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue :
-// CHECK:         alloc_stack
+// CHECK-NOT:         alloc_stack
 // CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical_storedvalue'
 sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue : $@convention(method) (@owned Optional<Klass>) -> () {
 bb0(%0 : @owned $Optional<Klass>):
