@@ -2833,7 +2833,10 @@ void swift::swift_initStructMetadataWithLayoutString(
       previousFieldOffset = fieldType->vw_size();
       fullOffset += previousFieldOffset;
     } else if (fieldType->isAnyExistentialType()) {
-      auto tag = RefCountingKind::Existential;
+      auto *existential = dyn_cast<ExistentialTypeMetadata>(fieldType);
+      assert(existential);
+      auto tag = existential->isClassBounded() ? RefCountingKind::Unknown
+                                               : RefCountingKind::Existential;
       *(uint64_t*)(layoutStr + layoutStrOffset) =
         ((uint64_t)tag << 56) | offset;
       layoutStrOffset += sizeof(uint64_t);
