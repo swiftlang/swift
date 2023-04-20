@@ -853,8 +853,18 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
 
 Optional<const DeclAttribute *>
 OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
-  if (!mod || mod->isInGeneratedBuffer(Attr->AtLoc))
+  auto declLoc = decl->getStartLoc();
+  auto *mod = decl->getModuleContext();
+  auto *declFile = mod->getSourceFileContainingLocation(declLoc);
+  auto *attrFile = mod->getSourceFileContainingLocation(Attr->AtLoc);
+  if (!declFile || !attrFile)
+    return Attr;
+
+  // Only attributes in the same buffer as the declaration they're attached to
+  // are part of the original attribute list.
+  if (declFile->getBufferID() != attrFile->getBufferID())
     return None;
+
   return Attr;
 }
 
