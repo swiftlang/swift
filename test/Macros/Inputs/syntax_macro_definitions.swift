@@ -1360,3 +1360,18 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
     ]
   }
 }
+
+public struct MultiStatementClosure: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+      {
+        let temp = 10
+        let result = temp
+        return result
+      }()
+      """
+  }
+}
