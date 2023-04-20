@@ -377,47 +377,38 @@ public func classAssignToVar5Arg2(_ x: __shared Klass, _ x2: inout Klass) { // e
 
 public func classAccessAccessField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
-    borrowVal(x2.k) // expected-note {{consuming use here}}
+    borrowVal(x2.k)
     for _ in 0..<1024 {
-        borrowVal(x2.k) // expected-note {{consuming use here}}
+        borrowVal(x2.k)
     }
 }
 
 public func classAccessAccessFieldArg(_ x2: inout Klass) {
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    borrowVal(x2.k) // expected-note {{consuming use here}}
     for _ in 0..<1024 {
-        borrowVal(x2.k) // expected-note {{consuming use here}}
+        borrowVal(x2.k)
     }
 }
 
 public func classAccessConsumeField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = Klass()
     // Since a class is a reference type, we do not emit an error here.
-    consumeVal(x2.k) // expected-note {{consuming use here}}
+    consumeVal(x2.k)
     // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-note {{consuming use here}}
+        consumeVal(x2.k)
         // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func classAccessConsumeFieldArg(_ x2: inout Klass) {
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     // Since a class is a reference type, we do not emit an error here.
-    consumeVal(x2.k) // expected-note {{consuming use here}}
+    consumeVal(x2.k)
     // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
 
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-note {{consuming use here}}
+        consumeVal(x2.k)
         // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
@@ -682,45 +673,37 @@ public func finalClassAssignToVar5Arg2(_ x2: inout FinalKlass) {
 
 public func finalClassAccessField() {
     var x2 = FinalKlass()
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
-    borrowVal(x2.k) // expected-note {{consuming use here}}
+    borrowVal(x2.k)
     for _ in 0..<1024 {
-        borrowVal(x2.k) // expected-note {{consuming use here}}
+        borrowVal(x2.k)
     }
 }
 
 public func finalClassAccessFieldArg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    borrowVal(x2.k) // expected-note {{consuming use here}}
+    borrowVal(x2.k)
     for _ in 0..<1024 {
-        borrowVal(x2.k) // expected-note {{consuming use here}}
+        borrowVal(x2.k)
     }
 }
 
 public func finalClassConsumeField() {
     var x2 = FinalKlass()
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
     x2 = FinalKlass()
 
-    consumeVal(x2.k) // expected-note {{consuming use here}}
+    consumeVal(x2.k)
     // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-note {{consuming use here}}
+        consumeVal(x2.k)
         // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
 
 public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
-    // expected-error @-1 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    // expected-error @-2 {{'x2' has consuming use that cannot be eliminated due to a tight exclusivity scope}}
-    consumeVal(x2.k) // expected-note {{consuming use here}}
+    consumeVal(x2.k)
     // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
-        consumeVal(x2.k) // expected-note {{consuming use here}}
+        consumeVal(x2.k)
         // expected-error @-1 {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     }
 }
