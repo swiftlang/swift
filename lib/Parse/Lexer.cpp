@@ -694,6 +694,11 @@ void Lexer::lexHash() {
 #include "swift/AST/TokenKinds.def"
   .Default(tok::pound);
 
+  // If we found '#assert' but that experimental feature is not enabled,
+  // treat it as '#'.
+  if (Kind == tok::pound_assert && !LangOpts.hasFeature(Feature::StaticAssert))
+    Kind = tok::pound;
+
   // If we didn't find a match, then just return tok::pound.  This is highly
   // dubious in terms of error recovery, but is useful for code completion and
   // SIL parsing.

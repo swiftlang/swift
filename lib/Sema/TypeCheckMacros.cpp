@@ -30,6 +30,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Demangling/Demangler.h"
@@ -441,6 +442,9 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 /// Adjust the given mangled name for a macro expansion to produce a valid
 /// buffer name.
 static std::string adjustMacroExpansionBufferName(StringRef name) {
+  if (name.empty()) {
+    return "<macro-expansion>";
+  }
   std::string result;
   if (name.startswith(MANGLING_PREFIX_STR)) {
     result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
@@ -676,9 +680,6 @@ Expr *swift::expandMacroExpr(
   if (!sourceFile)
     return nullptr;
 
-  // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
-
   MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
 
   if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression)) {
@@ -686,21 +687,19 @@ Expr *swift::expandMacroExpr(
     return nullptr;
   }
 
-  /// The discriminator used for the macro.
-  std::string cachedDiscriminator;
-  auto getDiscriminator = [&]() -> StringRef {
-    if (!cachedDiscriminator.empty())
-      return cachedDiscriminator;
+  // Evaluate the macro.
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
 
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
 #if SWIFT_SWIFT_PARSER
     if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
       Mangle::ASTMangler mangler;
-      cachedDiscriminator = mangler.mangleMacroExpansion(expansionExpr);
+      return mangler.mangleMacroExpansion(expansionExpr);
     }
 #endif
-
-    return cachedDiscriminator;
-  };
+    return "";
+  });
 
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
@@ -722,8 +721,8 @@ Expr *swift::expandMacroExpr(
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
         macroDef.getExpanded(), macro, expr->getArgs());
-    llvm::MallocAllocator allocator;
-    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
     break;
   }
 
@@ -757,14 +756,16 @@ Expr *swift::expandMacroExpr(
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), getDiscriminator().data(),
-        getDiscriminator().size(), astGenSourceFile,
+        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
+        discriminator->size(), astGenSourceFile,
         expr->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return nullptr;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
+        adjustMacroExpansionBufferName(*discriminator));
+    free((void *)evaluatedSourceAddress);
     break;
 #else
     ctx.Diags.diagnose(expr->getLoc(), diag::macro_unsupported);
@@ -773,26 +774,18 @@ Expr *swift::expandMacroExpr(
   }
   }
 
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  if (getDiscriminator().empty())
-    bufferName = "macro-expansion";
-  else {
-    bufferName = adjustMacroExpansionBufferName(getDiscriminator());
-  }
-
   // Dump macro expansions to standard output, if requested.
   if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName << " as " << expandedType.getString()
+    llvm::errs() << evaluatedSource->getBufferIdentifier() << " as "
+                 << expandedType.getString()
                  << "\n------------------------------\n"
-                 << evaluatedSource
+                 << evaluatedSource->getBuffer()
                  << "\n------------------------------\n";
   }
 
   // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  unsigned macroBufferID =
+      sourceMgr.addNewSourceBuffer(std::move(evaluatedSource));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
     GeneratedSourceInfo::ExpressionMacroExpansion,
@@ -803,7 +796,6 @@ Expr *swift::expandMacroExpr(
     dc
   };
   sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.
@@ -865,9 +857,6 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   if (!sourceFile)
     return None;
 
-  // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
-
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
   auto macroRoles = macro->getMacroRoles();
   assert(macroRoles.contains(MacroRole::Declaration) ||
@@ -879,6 +868,19 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     med->diagnose(diag::macro_recursive, macro->getName());
     return None;
   }
+
+  // Evaluate the macro.
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
+
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
+#if SWIFT_SWIFT_PARSER
+    Mangle::ASTMangler mangler;
+    return mangler.mangleMacroExpansion(med);
+#else
+    return "";
+#endif
+  });
 
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
@@ -899,8 +901,8 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
         macroDef.getExpanded(), macro, med->getArgs());
-    llvm::MallocAllocator allocator;
-    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
     break;
   }
 
@@ -945,21 +947,20 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     if (!astGenSourceFile)
       return None;
 
-    Mangle::ASTMangler mangler;
-    auto discriminator = mangler.mangleMacroExpansion(med);
-
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
-        discriminator.size(), astGenSourceFile,
+        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
+        discriminator->size(), astGenSourceFile,
         med->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return None;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
+        adjustMacroExpansionBufferName(*discriminator));
+    free((void *)evaluatedSourceAddress);
     break;
 #else
     med->diagnose(diag::macro_unsupported);
@@ -968,26 +969,17 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   }
   }
 
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  {
-    Mangle::ASTMangler mangler;
-    bufferName = adjustMacroExpansionBufferName(
-        mangler.mangleMacroExpansion(med));
-  }
-
   // Dump macro expansions to standard output, if requested.
   if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
+    llvm::errs() << evaluatedSource->getBufferIdentifier()
                  << "\n------------------------------\n"
-                 << evaluatedSource
+                 << evaluatedSource->getBuffer()
                  << "\n------------------------------\n";
   }
 
   // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  unsigned macroBufferID =
+      sourceMgr.addNewSourceBuffer(std::move(evaluatedSource));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
       GeneratedSourceInfo::FreestandingDeclMacroExpansion,
@@ -998,7 +990,6 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
       dc
   };
   sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.
@@ -1092,9 +1083,18 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   }
 
   // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
 
-  std::string discriminator;
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
+#if SWIFT_SWIFT_PARSER
+    Mangle::ASTMangler mangler;
+    return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
+#else
+    return "";
+#endif
+  });
+
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -1115,7 +1115,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     auto result = expandMacroDefinition(
         macroDef.getExpanded(), macro, attr->getArgs());
     llvm::MallocAllocator allocator;
-    evaluatedSource = NullTerminatedStringRef(result, allocator);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
     break;
   }
 
@@ -1161,26 +1162,22 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
-    {
-      Mangle::ASTMangler mangler;
-      discriminator =
-        mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
-    }
-
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator.data(),
-        discriminator.size(), static_cast<uint32_t>(role), astGenAttrSourceFile,
-        attr->AtLoc.getOpaquePointerValue(), astGenDeclSourceFile,
-        searchDecl->getStartLoc().getOpaquePointerValue(),
+        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
+        discriminator->size(), static_cast<uint32_t>(role),
+        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
+        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
       return nullptr;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
+        adjustMacroExpansionBufferName(*discriminator));
+    free((void *)evaluatedSourceAddress);
     break;
 #else
     attachedTo->diagnose(diag::macro_unsupported);
@@ -1189,14 +1186,11 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   }
   }
 
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName = adjustMacroExpansionBufferName(discriminator);
-
   // Dump macro expansions to standard output, if requested.
   if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
+    llvm::errs() << evaluatedSource->getBufferIdentifier()
                  << "\n------------------------------\n"
-                 << evaluatedSource
+                 << evaluatedSource->getBuffer()
                  << "\n------------------------------\n";
   }
 
@@ -1284,9 +1278,8 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
   }
 
   // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  unsigned macroBufferID =
+      sourceMgr.addNewSourceBuffer(std::move(evaluatedSource));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
   GeneratedSourceInfo sourceInfo{
       generatedSourceKind,
@@ -1297,7 +1290,6 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
       attr
   };
   sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.

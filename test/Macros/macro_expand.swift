@@ -94,6 +94,7 @@ struct Bad {}
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
 @freestanding(expression) macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
+@freestanding(expression) macro assert(_: Bool) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
 
 func testFileID(a: Int, b: Int) {
   // CHECK: MacroUser/macro_expand.swift
@@ -141,6 +142,10 @@ func testStringify(a: Int, b: Int) {
   // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
 
   _ = (b, b2, s2, s3)
+}
+
+func testAssert(a: Int, b: Int) {
+  #assert(a == b)
 }
 
 public struct Outer {

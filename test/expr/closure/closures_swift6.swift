@@ -154,6 +154,61 @@ public class TestImplicitSelfForWeakSelfCapture {
       guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
+    
+    doVoidStuff { [weak self] in
+      func innerFunction1() {
+          method() // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note {{reference 'self?.' explicitly}}
+          self?.method()
+      }
+      
+      guard let self else { return }
+      
+      func innerFunction2() {
+          method()
+          self.method()
+      }
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      func innerFunction1() {
+          method() // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note {{reference 'self?.' explicitly}}
+          self?.method()
+      }
+      
+      guard let self else { return }
+      
+      func innerFunction2() {
+          method()
+          self.method()
+      }
+    }
+  }
+}
+
+class NoImplicitSelfInInnerClass {
+  func method() { }
+  
+  private init() { // expected-note {{'self' declared here}} expected-note {{'self' declared here}}
+    doVoidStuff {
+      class InnerType { // expected-note {{type declared here}}
+          func functionInsideInnerType() {
+            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          }
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      method()
+      
+      class InnerType { // expected-note {{type declared here}}
+          func functionInsideInnerType() {
+            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          }
+      }
+    }
   }
 }
 
