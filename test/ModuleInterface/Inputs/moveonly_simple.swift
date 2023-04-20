@@ -1,12 +1,15 @@
+public enum SwiftCoin : ~Copyable {
+  case penny
+  case nickel
 
-public class Message { var s: String = "hello" }
-
-public struct FileDescriptor : ~Copyable {
-  public var x: Int = 0
-  public var msg: Message = Message()
+  init() { self = .penny }
 }
 
-public class FileHandle {
-  var file: FileDescriptor = FileDescriptor()
+// ensures old attribute still works.
+@_moveOnly public enum ObjCCoin {
+  case penny
+  case nickel
+
+  init() { self = .penny }
 }
 
