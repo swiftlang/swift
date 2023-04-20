@@ -55,7 +55,7 @@ extension Never: Decodable {
     let context = DecodingError.Context(
       codingPath: decoder.codingPath,
       debugDescription: "Unable to decode an instance of Never.")
-    throw DecodingError.dataCorrupted(context)
+    throw DecodingError.typeMismatch(Never.self, context)
   }
 }
 
