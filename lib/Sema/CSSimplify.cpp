@@ -5114,6 +5114,19 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  // Check whether this is a tuple with a single unlabeled element
+  // i.e. `(_: Int)` and return type of that element if so. Note that
+  // if the element is pack expansion type the tuple is significant.
+  auto isSingleUnlabeledElementTuple = [](Type type) -> Type {
+    if (auto *tuple = type->getAs<TupleType>()) {
+      if (tuple->getNumElements() == 1 && !tuple->getElement(0).hasName()) {
+        auto eltType = tuple->getElement(0).getType();
+        return isPackExpansionType(eltType) ? Type() : eltType;
+      }
+    }
+    return Type();
+  };
+
   if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
                                          conversionsOrFixes,
                                          getConstraintLocator(locator)))
@@ -5928,6 +5941,14 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(fix);
     }
 
+    // Solver can unwrap contextual type in an unlabeled one-element tuple
+    // while matching type to a tuple that contains one or more pack expansion
+    // types (because such tuples can loose their elements under substitution),
+    // if that's the case, let's just produce a regular contextual mismatch fix.
+    if (auto contextualType = isSingleUnlabeledElementTuple(rhs)) {
+      rhs = contextualType;
+    }
+
     if (purpose == CTP_Initialization && lhs->is<TupleType>() &&
         rhs->is<TupleType>()) {
       auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
@@ -6122,6 +6143,13 @@ bool ConstraintSystem::repairFailures(
     // top level type and not just a part of it.
     if (tupleLocator->findLast<LocatorPathElt::OptionalPayload>())
       break;
+
+    if (tupleLocator->isForContextualType()) {
+      if (auto contextualTy = isSingleUnlabeledElementTuple(rhs)) {
+        return repairFailures(lhs, contextualTy, matchKind, flags,
+                              conversionsOrFixes, tupleLocator);
+      }
+    }
 
     ConstraintFix *fix;
     if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
