@@ -1212,8 +1212,7 @@ ManglingError Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleDependentPseudogenericSignature(Node *node,
                                                                unsigned depth) {
-  // handled inline
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  return mangleDependentGenericSignature(node, depth + 1);
 }
 
 ManglingError Remangler::mangleDestructor(Node *node, unsigned depth) {
