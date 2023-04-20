@@ -545,11 +545,17 @@ public:
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     ThePattern = P;
   }
+  
+  /// Pattern Binding Accessors.
+  Expr *getInitializerOrNull() const {
+    return getKind() == CK_PatternBinding ? Condition.get<Expr *>() : nullptr;
+  }
 
   Expr *getInitializer() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     return Condition.get<Expr *>();
   }
+  
   void setInitializer(Expr *E) {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     Condition = E;
