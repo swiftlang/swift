@@ -615,13 +615,9 @@ public:
           break;
         }
       }
-      if (parentNode) {
-        if (shapeIndex > 0)
-          parent = createBoundGenericTypeReconstructingParent(
-              parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
-        else
-          return nullptr;
-      }
+      if (parentNode)
+        parent = createBoundGenericTypeReconstructingParent(
+            parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
     }
 
     return BoundGenericTypeRef::create(*this, mangling.result(), genericParams,

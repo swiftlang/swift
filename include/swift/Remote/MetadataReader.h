@@ -2959,19 +2959,13 @@ private:
           // Only consider generic contexts of type class, enum or struct.
           // There are other context types that can be generic, but they should
           // not affect the generic shape.
-          if (current->getKind() == ContextDescriptorKind::Class ||
-              current->getKind() == ContextDescriptorKind::Enum ||
-              current->getKind() == ContextDescriptorKind::Struct) {
-            if (genericContext) {
-              auto contextHeader = genericContext->getGenericContextHeader();
-              paramsPerLevel.emplace_back(contextHeader.NumParams -
-                                          runningCount);
-              runningCount += paramsPerLevel.back();
-            } else {
-              // If there is no generic context, this is a non-generic type
-              // which has 0 generic parameters.
-              paramsPerLevel.emplace_back(0);
-            }
+          if (genericContext &&
+              (current->getKind() == ContextDescriptorKind::Class ||
+               current->getKind() == ContextDescriptorKind::Enum ||
+               current->getKind() == ContextDescriptorKind::Struct)) {
+            auto contextHeader = genericContext->getGenericContextHeader();
+            paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
+            runningCount += paramsPerLevel.back();
           }
         };
     countLevels(descriptor, runningCount);
