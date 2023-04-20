@@ -482,27 +482,22 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
     return false;
   }
 
-  // The RHS could be a `LoadExpr` or `DeclRefExpr`
-  Expr *loadExprSubExpr = nullptr;
-  if (auto LE = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
-    loadExprSubExpr = LE->getSubExpr();
-  }
-
-  if (requireLoadExpr) {
-    exprToCheckForDRE = loadExprSubExpr;
-  } else {
-    if (loadExprSubExpr) {
-      exprToCheckForDRE = loadExprSubExpr;
-    }
-    exprToCheckForDRE = exprToCheckForDRE->getSemanticsProvidingExpr();
-  }
-
-  DeclRefExpr *condDRE = dyn_cast_or_null<DeclRefExpr>(exprToCheckForDRE);
-  if (!condDRE || !condDRE->getDecl()->hasName()) {
+  if (requireLoadExpr && !isa<LoadExpr>(exprToCheckForDRE)) {
     return false;
   }
 
-  return condDRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
+  if (auto *load = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
+    exprToCheckForDRE = load->getSubExpr();
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(
+          exprToCheckForDRE->getSemanticsProvidingExpr())) {
+    auto *decl = DRE->getDecl();
+    return decl && decl->hasName() ? decl->getName().isSimpleName(Ctx.Id_self)
+                                   : false;
+  }
+
+  return false;
 }
 
 PoundAvailableInfo *
