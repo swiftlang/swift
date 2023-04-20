@@ -189,9 +189,9 @@ ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
       (StringRef))
 
-ERROR(error_bad_package_name,none,
-      "package name \"%0\" is not a valid identifier",
-      (StringRef))
+ERROR(error_empty_package_name,none,
+      "package-name is empty",
+      ())
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_module_alias_invalid_format,none,
