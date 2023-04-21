@@ -397,45 +397,7 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
     return false;
   }
 
-  // Find the condition that defined the self decl,
-  // and check that both its LHS and RHS are 'self'
-  for (auto cond : conditionalStmt->getCond()) {
-    if (auto pattern = cond.getPattern()) {
-      bool isSelfRebinding = false;
-
-      if (pattern->getBoundName() == Ctx.Id_self) {
-        isSelfRebinding = true;
-      }
-
-      else if (auto OSP = dyn_cast<OptionalSomePattern>(pattern)) {
-        if (auto subPattern = OSP->getSubPattern()) {
-          isSelfRebinding = subPattern->getBoundName() == Ctx.Id_self;
-        }
-      }
-
-      if (!isSelfRebinding) {
-        continue;
-      }
-    }
-
-    Expr *exprToCheckForDRE = cond.getInitializer();
-    if (auto LE = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
-      if (auto subexpr = LE->getSubExpr()) {
-        exprToCheckForDRE = subexpr;
-      }
-    }
-
-    exprToCheckForDRE = exprToCheckForDRE->getSemanticsProvidingExpr();
-
-    DeclRefExpr *condDRE = dyn_cast<DeclRefExpr>(exprToCheckForDRE);
-    if (!condDRE || !condDRE->getDecl()->hasName()) {
-      return false;
-    }
-
-    return condDRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
-  }
-
-  return false;
+  return conditionalStmt->rebindsSelf(Ctx);
 }
 
 // Finds the nearest parent closure, which would define the

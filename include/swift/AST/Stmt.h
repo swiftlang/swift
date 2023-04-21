@@ -556,11 +556,17 @@ public:
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     ThePattern = P;
   }
+  
+  /// Pattern Binding Accessors.
+  Expr *getInitializerOrNull() const {
+    return getKind() == CK_PatternBinding ? Condition.get<Expr *>() : nullptr;
+  }
 
   Expr *getInitializer() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     return Condition.get<Expr *>();
   }
+  
   void setInitializer(Expr *E) {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     Condition = E;
@@ -587,6 +593,11 @@ public:
     assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
     Condition = Info;
   }
+
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -690,6 +701,11 @@ public:
   /// FIXME: Find a better way to implement this. Allows conditions to be
   ///        stored in \c ASTNode.
   StmtCondition *getCondPointer() { return &Cond; }
+
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&

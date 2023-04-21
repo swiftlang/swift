@@ -983,6 +983,82 @@ class NoImplicitSelfInInnerClass {
     }
     
   }
+  
+  func foo(condition: Bool) {
+    doVoidStuff { [weak self] in
+      guard condition, let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, condition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard condition, let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, condition else { return }
+      method()
+    }
+  }
+
+  func foo(optionalCondition: Bool?) {
+    doVoidStuff { [weak self] in
+      guard let optionalCondition, optionalCondition, let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, let optionalCondition, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let optionalCondition, let self, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let optionalCondition, optionalCondition, let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, let optionalCondition, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let optionalCondition, let self, optionalCondition else { return }
+      method()
+    }
+  }
+  
+  func foo() {
+    doVoidStuff { [weak self] in
+      guard #available(SwiftStdlib 5.8, *), let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, #available(SwiftStdlib 5.8, *) else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard #available(SwiftStdlib 5.8, *), let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, #available(SwiftStdlib 5.8, *) else { return }
+      method()
+    }
+  }
 }
 
 public class TestRebindingSelfIsDisallowed {
