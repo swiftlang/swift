@@ -4,20 +4,23 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+public struct IntTuple {
+    let values: (Int64, Int64, Int64, Int64, Int64, Int64)
+}
+
 public enum Large {
-    case first(Int64, Int64, Int64, Int64, Int64, Int64)
+    case first(IntTuple)
     case second
 }
 
 public func makeLarge(_ x: Int) -> Large {
-    return x >= 0 ? .first(0, 1, 2, 3, 4, 5) : .second
+    return x >= 0 ? .first(IntTuple(values: (0, 1, 2, 3, 4, 5))) : .second
 }
 
 public func printLarge(_ en: Large) {
     switch en {
-    case let .first(a, b, c, d, e, f):
-        let x = (a, b, c, d, e, f)
-        print("Large.first\(x)")
+    case let .first(x):
+        print("Large.first\(x.values)")
     case .second:
         print("Large.second")
     }
@@ -29,7 +32,7 @@ public func passThroughLarge(_ en: Large) -> Large {
 
 public func inoutLarge(_ en: inout Large, _ x: Int) {
     if x >= 0 {
-        en = .first(-1, -2, -3, -4, -5, -6)
+        en = .first(IntTuple(values: (-1, -2, -3, -4, -5, -6)))
     } else {
         en = .second
     }
