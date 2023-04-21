@@ -301,7 +301,12 @@ PackType *PackType::getSingletonPackExpansion(Type param) {
 }
 
 CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
-  return CanPackType(PackType::getSingletonPackExpansion(param));
+  // Note: You can't just wrap the result in CanPackType() here because
+  // PackExpansionType has the additional requirement that the count type
+  // must be a reduced shape.
+  return cast<PackType>(
+    PackType::getSingletonPackExpansion(param)
+      ->getCanonicalType());
 }
 
 PackExpansionType *PackType::unwrapSingletonPackExpansion() const {
