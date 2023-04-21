@@ -198,11 +198,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
-
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    assert(typeSizeAlign && "unknown layout for non-resilient type!");
-    if (typeSizeAlign->size == 0) {
+    // typeSizeAlign can be null if this is not a fixed-layout type,
+    // e.g. it has resilient fields.
+    if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       return;
     }
