@@ -56,6 +56,11 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
+// The option should be written into a .private.swiftinterface module interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option can be safely ignored by the older compiler.
+def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
+
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -530,7 +535,7 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
 def package_name : Separate<["-"], "package-name">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorablePrivate]>,
   HelpText<"Name of the package the module belongs to">;
 def export_as : Separate<["-"], "export-as">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
