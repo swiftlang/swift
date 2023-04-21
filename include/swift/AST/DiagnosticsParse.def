@@ -461,7 +461,8 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
-
+ERROR(operator_decl_should_not_contain_other_attributes, none, 
+      "unexpected attribute %0 in operator declaration", (StringRef))
 WARNING(operator_decl_remove_designated_types,none,
         "designated types are no longer used by the compiler; please remove "
         "the designated type list from this operator declaration", ())
