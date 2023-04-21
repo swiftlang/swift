@@ -2586,8 +2586,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
   eraseExistingTypeContextDescriptor(IGM, type);
 
   bool hasLayoutString = false;
-  auto lowered = getLoweredTypeInPrimaryContext(
-          IGM, type->getDeclaredType()->getCanonicalType());
+  auto lowered = getLoweredTypeInPrimaryContext(IGM, type);
   auto &ti = IGM.getTypeInfo(lowered);
   auto *typeLayoutEntry =
       ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
@@ -3131,8 +3130,7 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
           !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
-      auto lowered = getLoweredTypeInPrimaryContext(
-          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
@@ -3792,8 +3790,7 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
           !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
-      auto lowered = getLoweredTypeInPrimaryContext(
-          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
@@ -5042,8 +5039,7 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
           !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
-      auto lowered = getLoweredTypeInPrimaryContext(
-          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
@@ -5136,10 +5132,8 @@ namespace {
   getValueWitnessTableForGenericValueType(IRGenModule &IGM,
                                           NominalTypeDecl *decl,
                                           bool &dependent) {
-    CanType unboundType
-      = decl->getDeclaredType()->getCanonicalType();
-    
-    dependent = hasDependentValueWitnessTable(IGM, unboundType);
+    dependent = hasDependentValueWitnessTable(IGM, decl);
+    CanType unboundType = decl->getDeclaredType()->getCanonicalType();
     return emitValueWitnessTable(IGM, unboundType, dependent,
                                  /*relative reference*/ true);
   }
@@ -5461,8 +5455,7 @@ namespace {
       if (!IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) ||
           !IGM.getOptions().EnableLayoutStringValueWitnesses)
         return nullptr;
-      auto lowered = getLoweredTypeInPrimaryContext(
-          IGM, Target->getDeclaredType()->getCanonicalType());
+      auto lowered = getLoweredTypeInPrimaryContext(IGM, Target);
       auto &ti = IGM.getTypeInfo(lowered);
       auto *typeLayoutEntry =
           ti.buildTypeLayoutEntry(IGM, lowered, /*useStructLayouts*/ true);
