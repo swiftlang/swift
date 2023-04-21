@@ -2768,8 +2768,9 @@ namespace {
         // correct handling of patterns like `_ as Foo` where `_` would
         // get a type of `Foo` but `is` pattern enclosing it could still be
         // inferred from enclosing context.
-        auto isType = CS.createTypeVariable(CS.getConstraintLocator(pattern),
-                                            TVO_CanBindToNoEscape);
+        auto isType =
+            CS.createTypeVariable(CS.getConstraintLocator(pattern),
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, isType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
