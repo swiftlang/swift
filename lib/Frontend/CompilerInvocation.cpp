@@ -839,8 +839,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_package_name)) {
     auto pkgName = A->getValue();
-    if (!Lexer::isIdentifier(pkgName))
-      Diags.diagnose(SourceLoc(), diag::error_bad_package_name, pkgName);
+    if (StringRef(pkgName).empty())
+      Diags.diagnose(SourceLoc(), diag::error_empty_package_name);
     else
       Opts.PackageName = pkgName;
   }
