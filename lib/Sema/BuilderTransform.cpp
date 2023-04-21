@@ -1174,13 +1174,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
       if (auto *closure =
               getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
-        auto closureTy = getClosureType(closure);
-        simplifyType(closureTy).visit([&](Type componentTy) {
-          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-            assignFixedType(typeVar,
-                            PlaceholderType::get(getASTContext(), typeVar));
-          }
-        });
+        recordTypeVariablesAsHoles(getClosureType(closure));
       }
 
       return getTypeMatchSuccess();
