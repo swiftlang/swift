@@ -6161,8 +6161,10 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isAny()) {
       rhs.visit([&](Type type) {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
-          assignFixedType(typeVar,
-                          PlaceholderType::get(getASTContext(), typeVar));
+          if (!getFixedType(typeVar)) {
+            assignFixedType(typeVar,
+                            PlaceholderType::get(getASTContext(), typeVar));
+          }
         }
       });
     }
