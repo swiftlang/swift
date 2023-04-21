@@ -210,7 +210,7 @@ func concreteReturnFunctionInvalid() {
 }
 
 func patternInstantiationTupleTest1<each T>() -> (repeat Array<each T>) {}
-// expected-note@-1 2 {{in call to function 'patternInstantiationTupleTest1()'}}
+// expected-note@-1 {{in call to function 'patternInstantiationTupleTest1()'}}
 func patternInstantiationTupleTest2<each T, each U>() -> (repeat Dictionary<each T, each U>) {}
 
 func patternInstantiationFunctionTest1<each T>() -> (repeat Array<each T>) -> () {}
@@ -240,10 +240,9 @@ func patternInstantiationConcreteValid() {
 
 func patternInstantiationConcreteInvalid() {
   let _: Set<Int> = patternInstantiationTupleTest1()
-  // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
-  // expected-error@-2 {{cannot convert value of type '(repeat Array<each T>)' to specified type 'Set<Int>'}}
+  // expected-error@-1 {{cannot convert value of type '(repeat Array<Pack{_}>)' to specified type 'Set<Int>'}}
 
-  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<Pack{Int, _}>)' is not convertible to '(Array<Int>, Set<String>)', tuples have a different number of elements}}
 }
 
 func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repeat each U)
@@ -273,7 +272,7 @@ func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
   // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
-  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{type of expression is ambiguous without more context}}
+  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<Pack{repeat each T, _}>)' is not convertible to '(repeat Array<each T>, Set<String>)', tuples have a different number of elements}}
 }
 
 // rdar://107996926 - Vanishing metatype of tuple not supported
