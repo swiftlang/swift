@@ -306,6 +306,41 @@ func testNested(_ e: E) throws -> Int {
 // CHECK:       dealloc_stack [[RESULT_STORAGE]] : $*Int
 // CHECK:       return [[VAL]] : $Int
 
+func testPoundIf1() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    #if true
+    1
+    #else
+    ""
+    #endif
+  case false:
+    #if false
+    ""
+    #else
+    2
+    #endif
+  }
+  return x
+}
+
+func testPoundIf2() -> Int {
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #else
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+    #endif
+  case false:
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+  }
+}
+
 func testAssignment() {
   var x = 0
   x = switch Bool.random() { case true: 0 case false: 1 }

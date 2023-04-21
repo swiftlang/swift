@@ -2524,11 +2524,7 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
     if (!BS)
       continue;
 
-    auto elts = BS->getElements();
-    if (elts.size() != 1)
-      continue;
-
-    auto *S = elts.front().dyn_cast<Stmt *>();
+    auto *S = BS->getSingleActiveStatement();
     if (!S)
       continue;
 
@@ -2615,7 +2611,7 @@ ArrayRef<Expr *> SingleValueStmtExpr::getSingleExprBranches(
     auto *BS = dyn_cast<BraceStmt>(branch);
     if (!BS)
       continue;
-    if (auto *E = BS->getSingleExpressionElement())
+    if (auto *E = BS->getSingleActiveExpression())
       scratch.push_back(E);
   }
   return scratch;

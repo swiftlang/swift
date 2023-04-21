@@ -463,6 +463,100 @@ func testThrowInference() {
   }
 }
 
+// MARK: Pound if
+
+func testPoundIf1() -> Int {
+  if .random() {
+    #if true
+    0
+    #else
+    ""
+    #endif
+  } else {
+    0
+  }
+}
+
+func testPoundIf2() -> String {
+  if .random() {
+    #if true
+    0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+}
+
+func testPoundIf3() -> String {
+  if .random() {
+    #if false
+    0
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+}
+
+func testPoundIf4() -> String {
+  let x = if .random() {
+    #if true
+    0 // expected-error {{branches have mismatching types 'Int' and 'String'}}
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+  return x
+}
+
+func testPoundIf5() -> String {
+  let x = if .random() {
+    #if false
+    0
+    #else
+    ""
+    #endif
+  } else {
+    ""
+  }
+  return x
+}
+
+func testPoundIfClosure1() -> Int {
+  let fn = {
+    if .random() {
+      #if true
+        0
+      #else
+        ""
+      #endif
+    } else {
+      0
+    }
+  }
+  return fn()
+}
+
+func testPoundIfClosure2() -> String {
+  let fn: () -> String = {
+    if .random() {
+      #if true
+        0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+      #else
+        ""
+      #endif
+    } else {
+      ""
+    }
+  }
+  return fn()
+}
+
 // MARK: Subtyping
 
 class A {}
