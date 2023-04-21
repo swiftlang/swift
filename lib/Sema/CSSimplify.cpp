@@ -2412,13 +2412,16 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
       auto elementLoc = cs.getConstraintLocator(loc,
           LocatorPathElt::PackElement(freshTypeVars.size()));
       if (packExpansionElt != nullptr) {
-        auto *freshTypeVar =
-            cs.createTypeVariable(elementLoc, TVO_CanBindToPack);
+        auto *freshTypeVar = cs.createTypeVariable(
+            elementLoc,
+            TVO_CanBindToPack |
+                (typeVar->getImpl().canBindToHole() ? TVO_CanBindToHole : 0));
         freshTypeVars.push_back(PackExpansionType::get(
             freshTypeVar, packExpansionElt->getCountType()));
       } else {
-        freshTypeVars.push_back(
-            cs.createTypeVariable(elementLoc, /*options=*/0));
+        freshTypeVars.push_back(cs.createTypeVariable(
+            elementLoc,
+            typeVar->getImpl().canBindToHole() ? TVO_CanBindToHole : 0));
       }
     }
   }
