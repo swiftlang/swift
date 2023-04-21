@@ -104,7 +104,8 @@ for symbol in required_dependencies:
         print("Error: Required dependency '{}' missing".format(symbol))
         fail = True
 
-allowlist = set(common_expected_dependencies + vendor_specific_dependencies + threading_package_dependencies)
+allowlist = set(common_expected_dependencies + vendor_specific_dependencies +
+                threading_package_dependencies)
 for symbol in deps:
     if symbol not in allowlist:
         print("Error: Unexpected dependency '{}'".format(symbol))
