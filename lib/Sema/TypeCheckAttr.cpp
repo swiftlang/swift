@@ -2067,6 +2067,15 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_throwing_to_cxx,
                VD->getDescriptiveKind(), VD);
       break;
+    case UnrepresentableIndirectEnum:
+      diagnose(attr->getLocation(), diag::expose_indirect_enum_cxx, VD);
+      break;
+    case UnrepresentableEnumCaseType:
+      diagnose(attr->getLocation(), diag::expose_enum_case_type_to_cxx, VD);
+      break;
+    case UnrepresentableEnumCaseTuple:
+      diagnose(attr->getLocation(), diag::expose_enum_case_tuple_to_cxx, VD);
+      break;
     }
   }
 
