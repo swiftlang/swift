@@ -1328,13 +1328,12 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
   LLVM_DEBUG(llvm::dbgs() << "*** Fixing the terminator " << *ti << ".\n");
 
   LiveValues values = getEffectiveLiveOutValues(phiBlocks, predBlock);
-  auto ownedValues = values.getOwned();
 
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: "
-                          << ownedValues.stored);
+                          << values.getStored());
 
   SmallVector<SILValue> vals;
-  vals.push_back(ownedValues.replacement(asi, nullptr));
+  vals.push_back(values.replacement(asi, nullptr));
 
   addArgumentsToBranch(vals, destBlock, ti);
   deleter.forceDelete(ti);
