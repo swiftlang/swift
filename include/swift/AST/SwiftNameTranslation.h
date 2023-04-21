@@ -72,7 +72,10 @@ enum RepresentationError {
   UnrepresentableRequiresClientEmission,
   UnrepresentableGeneric,
   UnrepresentableGenericRequirements,
-  UnrepresentableThrows
+  UnrepresentableThrows,
+  UnrepresentableIndirectEnum,
+  UnrepresentableEnumCaseType,
+  UnrepresentableEnumCaseTuple,
 };
 
 struct DeclRepresentation {
