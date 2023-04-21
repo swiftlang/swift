@@ -3867,6 +3867,14 @@ private:
         break;
       case IsSingleValueStmtResult::Kind::UnterminatedBranches: {
         for (auto *branch : mayProduceSingleValue.getUnterminatedBranches()) {
+          if (auto *BS = dyn_cast<BraceStmt>(branch)) {
+            if (BS->empty()) {
+              Diags.diagnose(branch->getStartLoc(),
+                             diag::single_value_stmt_branch_empty,
+                             S->getKind());
+              continue;
+            }
+          }
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_throw,
                          S->getKind());

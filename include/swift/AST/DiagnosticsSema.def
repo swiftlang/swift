@@ -1143,6 +1143,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(single_value_stmt_branch_empty,none,
+      "expected expression in branch of '%0' expression",
+      (StmtKind))
 ERROR(single_value_stmt_branch_must_end_in_throw,none,
       "non-expression branch of '%0' expression may only end with a 'throw'",
       (StmtKind))
