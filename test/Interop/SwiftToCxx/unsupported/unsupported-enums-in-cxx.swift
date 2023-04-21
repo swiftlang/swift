@@ -27,3 +27,8 @@ public indirect enum unsupportedEnumIndirect {
     case B
 }
 
+@_expose(Cxx) // expected-error {{enum 'unsupportedEnumProtocolType' can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++}}
+public enum unsupportedEnumProtocolType {
+    case A
+    case B(Error)
+}
