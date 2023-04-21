@@ -9,7 +9,7 @@
 
 @attached(
   member,
-  names: named(Storage), named(storage), named(getStorage), named(method), named(`init`)
+  names: named(init), named(Storage), named(storage), named(getStorage()), named(method), named(init(other:))
 )
 macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
@@ -55,7 +55,7 @@ print(MyType.MyType3.self)
 
 @attached(
   member,
-  names: named(RawValue), named(rawValue), named(`init`)
+  names: named(RawValue), named(rawValue), named(init)
 )
 public macro NewType<T>() = #externalMacro(module: "MacroDefinition", type: "NewTypeMacro")
 
