@@ -989,9 +989,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getDestroyStrongFunction(IGM));
     } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
                IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
+      auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
-            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
-                                            /*useStructLayouts*/true)) {
+            typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
@@ -1017,9 +1018,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
                IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
+      auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
-            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
-                                            /*useStructLayouts*/true)) {
+            typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
@@ -1037,9 +1039,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getAssignWithCopyStrongFunction(IGM));
     } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
                IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
+      auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
-            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
-                                            /*useStructLayouts*/true)) {
+            typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
@@ -1057,9 +1060,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getAssignWithTakeStrongFunction(IGM));
     } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
                IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
+      auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
-            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
-                                            /*useStructLayouts*/true)) {
+            typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
@@ -1077,9 +1081,10 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getInitWithCopyStrongFunction(IGM));
     } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
                IGM.getOptions().EnableLayoutStringValueWitnesses) {
+      auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
+      auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
-            concreteTI.buildTypeLayoutEntry(IGM, concreteType,
-                                            /*useStructLayouts*/true)) {
+            typeInfo.buildTypeLayoutEntry(IGM, ty, /*useStructLayouts*/true)) {
         auto genericSig = concreteType.getNominalOrBoundGenericNominal()
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
