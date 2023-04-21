@@ -174,7 +174,8 @@ class LockingConcurrentMapStorage {
   // TargetGenericMetadataInstantiationCache::PrivateData. On 32-bit archs, that
   // space is not large enough to accommodate a Mutex along with everything
   // else. There, use a SmallMutex to squeeze into the available space.
-  using MutexTy = std::conditional_t<sizeof(void *) == 8, Mutex, SmallMutex>;
+  using MutexTy = std::conditional_t<sizeof(void *) == 8 && sizeof(Mutex) <= 56,
+                                     Mutex, SmallMutex>;
   StableAddressConcurrentReadableHashMap<EntryType,
                                          TaggedMetadataAllocator<Tag>, MutexTy>
       Map;
