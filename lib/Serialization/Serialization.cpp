@@ -1214,8 +1214,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // distinguish them.
   ImportSet publicImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Exported);
-  ImportSet privateImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
+  ImportSet defaultImportSet =
+      getImportsAsSet(M, {ModuleDecl::ImportFilterKind::Default,
+                          ModuleDecl::ImportFilterKind::SPIOnly});
   ImportSet packageOnlyImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::PackageOnly);
   ImportSet internalOrBelowImportSet =
@@ -1265,7 +1266,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // form here.
     if (publicImportSet.count(import))
       stableImportControl = ImportControl::Exported;
-    else if (privateImportSet.count(import))
+    else if (defaultImportSet.count(import))
       stableImportControl = ImportControl::Normal;
     else if (packageOnlyImportSet.count(import))
       stableImportControl = ImportControl::PackageOnly;
