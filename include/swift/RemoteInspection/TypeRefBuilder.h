@@ -570,16 +570,15 @@ public:
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.
-  const BoundGenericTypeRef *createBoundGenericTypeReconstructingParent(
+  const BoundGenericTypeRef *reconstructParentsOfBoundGenericType(
       const NodePointer startNode,
       const std::vector<size_t> &genericParamsPerLevel,
       const llvm::ArrayRef<const TypeRef *> &args)
   {
-    // Collect all the relevant nodes, including the current node
+    // Collect the first N parents that potentially have generic args
+    // (Ignore the last genericParamPerLevel, which
+    // applies to the startNode itself.)
     std::vector<NodePointer> nodes;
-
-    // Iterate our parents, collecting the first N parents
-    // that potentially have generic args
     NodePointer node = startNode;
     while (nodes.size() < genericParamsPerLevel.size() - 1) {
       if (!node || !node->hasChildren()) {
@@ -607,7 +606,6 @@ public:
     // the generic argument list...
     const BoundGenericTypeRef *typeref = nullptr;
     auto argBegin = args.begin();
-    size_t totalArgs = 0;
     for (size_t i = 0; i < nodes.size(); i++) {
       // Get the mangling for this node
       auto mangling = Demangle::mangleNode(nodes[i]);
@@ -621,41 +619,14 @@ public:
       if (numGenericArgs == 0) {
 	continue;
       }
-      if (numGenericArgs > args.size() || totalArgs + numGenericArgs > args.size()) {
-	return nullptr;
-      }
       auto argEnd = argBegin + numGenericArgs;
-      totalArgs += numGenericArgs;
       std::vector<const TypeRef *> params(argBegin, argEnd);
       argBegin = argEnd;
       
-      // Extend the typeref up one level
+      // Extend the typeref list towards the innermost type
       typeref = BoundGenericTypeRef::create(*this, mangling.result(), params, typeref);
     }
-
-    // Now let's stack the startNode on top of the parent list
-    // to obtain the final full typeref:
-    auto mangling = Demangle::mangleNode(startNode);
-    if (!mangling.isSuccess()) {
-      return nullptr;
-    }
-
-    // Collect the final set of generic params for the
-    // startNode.  Note: This will sometimes be empty:
-    // consider `Foo<Int, String>.Bar.Baz<Double>.Quux`
-    // which has 2 parents in the parent list
-    // (`Foo<Int,String>`, `Baz<Double>`), and the
-    // startNode is `Quux` with no params.
-    auto numGenericArgs = genericParamsPerLevel[genericParamsPerLevel.size() - 1];
-    auto argEnd = argBegin + numGenericArgs;
-    if (argEnd != args.end()) {
-      // This node should exactly consume the remaining args
-      return nullptr;
-    }
-    std::vector<const TypeRef *> params(argBegin, argEnd);
-
-    // Build and return the top typeref
-    return BoundGenericTypeRef::create(*this, mangling.result(), params, typeref);
+    return typeref;
   }
 
   const BoundGenericTypeRef *
@@ -672,15 +643,50 @@ public:
     }
 
     // Otherwise, work from a full demangle tree to produce a
-    // typeref that includes all parents that have generic params
+    // typeref that includes information about parent generic args
     auto node = Dem.demangleType(builtTypeDecl->mangledName);
-    if (node && node->hasChildren() && node->getKind() == Node::Kind::Type) {
-      auto type = node->getFirstChild();
-      auto genericParamsPerLevel = *maybeGenericParamsPerLevel;
-      return createBoundGenericTypeReconstructingParent(type, genericParamsPerLevel, args);
-    } else {
+    if (!node || !node->hasChildren() || node->getKind() != Node::Kind::Type) {
       return nullptr;
     }
+    auto startNode = node->getFirstChild();
+    auto mangling = Demangle::mangleNode(startNode);
+    if (!mangling.isSuccess()) {
+      return nullptr;
+    }
+
+    // Sanity:  Verify that the generic params per level add
+    // up exactly to the number of args we were provided, and
+    // that we don't have a rediculous number of either one
+    auto genericParamsPerLevel = *maybeGenericParamsPerLevel;
+    if (genericParamsPerLevel.size() > 1000 || args.size() > 1000) {
+      return nullptr;
+    }
+    size_t totalParams = 0;
+    for (size_t i = 0; i < genericParamsPerLevel.size(); i++) {
+      if (genericParamsPerLevel[i] > args.size()) {
+	return nullptr;
+      }
+      totalParams += genericParamsPerLevel[i];
+    }
+    if (totalParams != args.size()) {
+      return nullptr;
+    }
+
+    // Reconstruct all parents that have non-zero generic params
+    auto parents = reconstructParentsOfBoundGenericType(startNode, genericParamsPerLevel, args);
+
+    // Collect the final set of generic params for the
+    // innermost type.  Note: This will sometimes be empty:
+    // consider `Foo<Int, String>.Bar.Baz<Double>.Quux`
+    // which has 2 parents in the parent list
+    // (`Foo<Int,String>`, `Baz<Double>`), and the
+    // startNode is `Quux` with no params.
+    auto numGenericArgs = genericParamsPerLevel[genericParamsPerLevel.size() - 1];
+    auto argBegin = args.end() - numGenericArgs;
+    std::vector<const TypeRef *> params(argBegin, args.end());
+
+    // Build and return the top typeref
+    return BoundGenericTypeRef::create(*this, mangling.result(), params, parents);
   }
 
   const BoundGenericTypeRef *
