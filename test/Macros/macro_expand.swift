@@ -237,8 +237,8 @@ func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
 
 // Test source location information.
 func testSourceLocations(x: Int, yolo: Int, zulu: Int) {
-  // CHECK-MACRO-PRINTED: Source range for LHS is MacroUser/macro_expand.swift: [[@LINE+3]]:5-[[@LINE+3]]:13
-  // CHECK-MACRO-PRINTED: Source range for LHS is MacroUser/macro_expand.swift: [[@LINE+2]]:5-[[@LINE+2]]:6
+  // CHECK-MACRO-PRINTED: Source range for LHS is "MacroUser/macro_expand.swift": [[@LINE+3]]:5-[[@LINE+3]]:13
+  // CHECK-MACRO-PRINTED: Source range for LHS is "MacroUser/macro_expand.swift": [[@LINE+2]]:5-[[@LINE+2]]:6
   _ = #leftHandOperandFinder(
     x + yolo + zulu
   )
