@@ -16,6 +16,34 @@ public func async_dead_arg_call(o: consuming AnyObject) async {
   await bar()
 }
  
+// CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @_lexical @owned
+// CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
+// CHECK:         apply [[CALLEE]]()
+// CHECK:         hop_to_executor [[EXECUTOR]]
+// CHECK:         destroy_value [[MOVE]]
+// CHECK-LABEL: } // end sil function 'async_dead_arg_call_lexical'
+@_silgen_name("async_dead_arg_call_lexical")
+public func async_dead_arg_call_lexical(@_noEagerMove o: consuming AnyObject) async {
+  await bar()
+  // o should be destroyed here
+}
+
+extension C {
+  // CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical_method : {{.*}} {
+  // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @_lexical @owned
+  // CHECK-LABEL: } // end sil function 'async_dead_arg_call_lexical_method'
+  @_silgen_name("async_dead_arg_call_lexical_method")
+  @_noEagerMove
+  consuming
+  public func async_dead_arg_call_lexical_method() async {
+    await bar()
+    // self should be destroyed here
+  }
+}
+
 public class C {
   // CHECK-LABEL: sil [ossa] @async_dead_arg_call_method : {{.*}} {
   // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @_eagerMove @owned
