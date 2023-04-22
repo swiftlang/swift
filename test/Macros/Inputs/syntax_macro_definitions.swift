@@ -149,7 +149,7 @@ public enum AddBlocker: ExpressionMacro {
               ExprSyntax(
                 binOp.with(
                   \.operatorToken,
-                  binOp.operatorToken.withKind(.binaryOperator("-"))
+                  binOp.operatorToken.with(\.tokenKind, .binaryOperator("-"))
                 )
               )
             )
@@ -694,7 +694,7 @@ extension DeclGroupSyntax {
   /// Enumerate the stored properties that syntactically occur in this
   /// declaration.
   func storedProperties() -> [VariableDeclSyntax] {
-    return members.members.compactMap { member in
+    return memberBlock.members.compactMap { member in
       guard let variable = member.decl.as(VariableDeclSyntax.self),
             variable.isStoredProperty else {
         return nil
@@ -1033,7 +1033,7 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro {
       """
 
     let memberList = MemberDeclListSyntax(
-      declaration.members.members.filter {
+      declaration.memberBlock.members.filter {
         $0.decl.isObservableStoredProperty
       }
     )
