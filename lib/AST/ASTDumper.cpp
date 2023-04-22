@@ -1030,7 +1030,7 @@ namespace {
       if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
         OS << " nonEphemeral";
 
-      switch (P->getLifetimeAnnotation()) {
+      switch (P->getLifetimeAnnotationFromAttributes()) {
       case LifetimeAnnotation::EagerMove:
         OS << " _eagerMove";
         break;
