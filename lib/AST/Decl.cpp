@@ -7049,8 +7049,11 @@ LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
   auto specifier = getSpecifier();
   // Copyable parameters which are consumed have eager-move semantics.
   if (specifier == ParamDecl::Specifier::Consuming &&
-      !getType()->isPureMoveOnly())
+      !getType()->isPureMoveOnly()) {
+    if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+      return LifetimeAnnotation::Lexical;
     return LifetimeAnnotation::EagerMove;
+  }
   return getLifetimeAnnotationFromAttributes();
 }
 
@@ -9243,8 +9246,11 @@ LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
   // Copyable parameters which are consumed have eager-move semantics.
   if (getSelfAccessKind() == SelfAccessKind::Consuming) {
     auto *selfDecl = getImplicitSelfDecl();
-    if (selfDecl && !selfDecl->getType()->isPureMoveOnly())
+    if (selfDecl && !selfDecl->getType()->isPureMoveOnly()) {
+      if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+        return LifetimeAnnotation::Lexical;
       return LifetimeAnnotation::EagerMove;
+    }
   }
   return getLifetimeAnnotationFromAttributes();
 }
