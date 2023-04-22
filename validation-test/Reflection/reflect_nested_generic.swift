@@ -37,6 +37,10 @@ reflect(enum: Outer1.C<Void>.Inner.S<(Int,Int)>?.none)
 
 //CHECK: Type info:
 
+// This is the layout for 64-bit targets (Note, this example
+// has no pointer-based elements, so we don't need to distinguish
+// extra inhabitants for platforms with varying pointer layouts.)
+
 //X64-NEXT: (single_payload_enum size=19 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 //X64-NEXT:   (case name=some index=0 offset=0
 //X64-NEXT:     (struct size=18 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
@@ -60,7 +64,7 @@ reflect(enum: Outer1.C<Void>.Inner.S<(Int,Int)>?.none)
 //X64-NEXT:           (case name=none index=1)))))
 //X64-NEXT:   (case name=none index=1))
 
-//TODO:  X32
+//TODO:  Work out the layout for 32-bit targets
 
 //CHECK: Mangled name: $s22reflect_nested_generic6Outer1O1CC1SVy_yt_Si_SitGSg
 //CHECK-NEXT: Demangled name: Swift.Optional<reflect_nested_generic.Outer1.C<()>.S<(Swift.Int, Swift.Int)>>
@@ -78,6 +82,9 @@ struct Outer2 {
   enum E<T: P> {
     struct Inner {
       enum F<U: P> {
+        struct Innerer {
+	  var u: U? = nil
+	}
       case u(U)
       case a
       case b
@@ -96,7 +103,7 @@ reflect(enum: Outer2.E<S1>.Inner.F<S2>.b)
 //CHECK-NEXT:   (bound_generic_enum reflect_nested_generic.Outer2.E
 //CHECK-NEXT:     (struct reflect_nested_generic.S1)))
 
-// Note: layout here is correct for both 32- and 64-bit platforms
+// Note: layout here is same for both 32- and 64-bit platforms
 
 //CHECK: Type info:
 //CHECK-NEXT: (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
@@ -110,6 +117,37 @@ reflect(enum: Outer2.E<S1>.Inner.F<S2>.b)
 
 //CHECK: Enum value:
 //CHECK-NEXT: (enum_value name=b index=2)
+
+reflect(enum: Outer2.E<S1>.Inner.F<S2>.Innerer?.none)
+
+//CHECK: Reflecting an enum.
+//CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+//CHECK-NEXT: Type reference:
+//CHECK-NEXT: (bound_generic_enum Swift.Optional
+//CHECK-NEXT:   (bound_generic_struct reflect_nested_generic.Outer2.E.Inner.F.Innerer
+//CHECK-NEXT:     (bound_generic_enum reflect_nested_generic.Outer2.E.Inner.F
+//CHECK-NEXT:       (struct reflect_nested_generic.S2)
+//CHECK-NEXT:       (bound_generic_enum reflect_nested_generic.Outer2.E
+//CHECK-NEXT:         (struct reflect_nested_generic.S1)))))
+
+// This layout is the same for 32-bit or 64-bit platforms
+
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:   (case name=some index=0 offset=0
+//CHECK-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:       (field name=u offset=0
+//CHECK-NEXT:         (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:           (case name=some index=0 offset=0
+//CHECK-NEXT:             (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+//CHECK-NEXT:           (case name=none index=1)))))
+//CHECK-NEXT:   (case name=none index=1))
+
+//CHECK-NEXT: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FO7InnererVy_AA2S1V_AA2S2V_GSg
+//CHECK-NEXT: Demangled name: Swift.Optional<reflect_nested_generic.Outer2.E<reflect_nested_generic.S1>.F<reflect_nested_generic.S2>.Innerer<>>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=none index=1)
 
 doneReflecting()
 
