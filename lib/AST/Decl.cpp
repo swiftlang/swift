@@ -10264,7 +10264,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   for (auto expandedName : attr->getNames()) {
     switch (expandedName.getKind()) {
     case MacroIntroducedDeclNameKind::Named: {
-      names.push_back(DeclName(expandedName.getIdentifier()));
+      names.push_back(DeclName(expandedName.getName()));
       break;
     }
 
@@ -10284,7 +10284,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       std::string prefixedName;
       {
         llvm::raw_string_ostream out(prefixedName);
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
         out << baseName.getIdentifier();
       }
 
@@ -10302,7 +10302,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       {
         llvm::raw_string_ostream out(suffixedName);
         out << baseName.getIdentifier();
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
       }
 
       Identifier nameId = ctx.getIdentifier(suffixedName);
