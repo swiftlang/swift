@@ -38,9 +38,9 @@
 @attached(accessor) public macro myWrapper() = #externalMacro(module: "SomeModule", type: "Wrapper")
 
 // CHECK: #if compiler(>=5.3) && $Macros && $AttachedMacros
-// CHECK: @attached(member, names: named(`init`), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
+// CHECK: @attached(member, names: named(init), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
 // CHECK-NEXT: #endif
-@attached(member, names: named(`init`), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
+@attached(member, names: named(init), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
 
 // CHECK-NOT: internalStringify
 @freestanding(expression) macro internalStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
