@@ -63,6 +63,8 @@ public func consumeVal(_ k: __owned NonTrivialCopyableStruct2) {}
 public func consumeVal(_ s: __owned NonTrivialStruct) {}
 public func consumeVal(_ s: __owned NonTrivialStruct2) {}
 
+var bool: Bool { false }
+
 ///////////
 // Tests //
 ///////////
@@ -802,4 +804,47 @@ struct EmptyStruct {
   // CHECK: } // end sil function '$s8moveonly11EmptyStructVACycfC'
   init() {
   }
+}
+
+///////////////////////////////
+// Conditionally Initialized //
+///////////////////////////////
+
+// CHECK: sil hidden [ossa] @$s8moveonly31testConditionallyInitializedLetyyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box ${ let NonTrivialStruct }, let, name "x"
+// CHECK: [[MARK_UNINIT:%.*]] = mark_uninitialized [var] [[BOX]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROW]]
+// CHECK: cond_br {{%.*}}, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
+//
+// CHECK: [[LHS_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [[MARKED]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[RHS_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [[MARKED]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// CHECK:   [[BORROW_LOAD:%.*]] = load [copy] [[MARKED]]
+// CHECK:   apply {{%.*}}([[BORROW_LOAD]])
+// CHECK:   destroy_value [[BORROW_LOAD]]
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   [[TAKE_LOAD:%.*]] = load [take] [[MARKED]]
+// CHECK:   apply {{%.*}}([[TAKE_LOAD]])
+// CHECK: } // end sil function '$s8moveonly31testConditionallyInitializedLetyyF'
+func testConditionallyInitializedLet() {
+    let x: NonTrivialStruct
+
+    if bool {
+        x = NonTrivialStruct()
+    } else {
+        x = NonTrivialStruct()
+    }
+
+    borrowVal(x)
+    consumeVal(x)
 }
