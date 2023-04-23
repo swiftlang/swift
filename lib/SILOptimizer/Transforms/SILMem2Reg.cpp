@@ -195,6 +195,13 @@ public:
     return LiveValues::forOwned({stored, move});
   }
 
+  static LiveValues forValues(SILValue stored, SILValue lexical) {
+    if (stored->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      return LiveValues::forGuaranteed({stored, lexical});
+    }
+    return LiveValues::forOwned({stored, lexical});
+  }
+
   static LiveValues toReplace(AllocStackInst *asi, SILValue replacement) {
     if (replacement->getOwnershipKind() == OwnershipKind::Guaranteed) {
       return LiveValues::forGuaranteed(Guaranteed::toReplace(asi, replacement));
@@ -715,6 +722,27 @@ static bool canEndLexicalLifetime(LiveValues values) {
   return values.canEndLexicalLifetime();
 }
 
+static SILValue getLexicalValueForStore(SILInstruction *inst,
+                                        AllocStackInst *asi) {
+  assert(isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst));
+
+  SILValue stored = inst->getOperand(CopyLikeInstruction::Src);
+  LLVM_DEBUG(llvm::dbgs() << "*** Found Store def " << stored);
+
+  if (!lexicalLifetimeEnsured(asi)) {
+    return SILValue();
+  }
+  if (isa<StoreBorrowInst>(inst)) {
+    if (isGuaranteedLexicalValue(stored)) {
+      return SILValue();
+    }
+    auto borrow = cast<BeginBorrowInst>(inst->getNextInstruction());
+    return borrow;
+  }
+  auto move = cast<MoveValueInst>(inst->getNextInstruction());
+  return move;
+}
+
 /// Begin a lexical borrow scope for the value stored into the provided
 /// StoreInst after that instruction.
 ///
@@ -1233,27 +1261,9 @@ StackAllocationPromoter::getLiveOutValues(BlockSetVector &phiBlocks,
     BlockToInstMap::iterator it = initializationPoints.find(domBlock);
     if (it != initializationPoints.end()) {
       auto *inst = it->second;
-      assert(isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst));
-
-      SILValue stored = inst->getOperand(CopyLikeInstruction::Src);
-      LLVM_DEBUG(llvm::dbgs() << "*** Found Store def " << stored);
-
-      if (!lexicalLifetimeEnsured(asi)) {
-        auto values = LiveValues::forOwned(stored, {});
-        return values;
-      }
-      if (isa<StoreBorrowInst>(inst)) {
-        if (isGuaranteedLexicalValue(stored)) {
-          auto values = LiveValues::forGuaranteed(stored, {});
-          return values;
-        }
-        auto borrow = cast<BeginBorrowInst>(inst->getNextInstruction());
-        auto values = LiveValues::forGuaranteed(stored, borrow);
-        return values;
-      }
-      auto move = cast<MoveValueInst>(inst->getNextInstruction());
-      auto values = LiveValues::forOwned(stored, move);
-      return values;
+      auto stored = inst->getOperand(CopyLikeInstruction::Src);
+      auto lexical = getLexicalValueForStore(inst, asi);
+      return LiveValues::forValues(stored, lexical);
     }
 
     // If there is a Phi definition in this block:
@@ -1806,8 +1816,13 @@ void StackAllocationPromoter::run() {
   if (asi->getType().isOrHasEnum()) {
     for (auto it : initializationPoints) {
       auto *si = it.second;
-      auto src = si->getOperand(0);
-      valuesToComplete.push_back(src);
+      auto stored = si->getOperand(CopyLikeInstruction::Src);
+      valuesToComplete.push_back(stored);
+      if (lexicalLifetimeEnsured(asi)) {
+        if (auto lexical = getLexicalValueForStore(si, asi)) {
+          valuesToComplete.push_back(lexical);
+        }
+      }
     }
   }
 
@@ -1817,8 +1832,12 @@ void StackAllocationPromoter::run() {
   // Now, complete lifetimes!
   OSSALifetimeCompletion completion(function, domInfo);
 
+  // We may have incomplete lifetimes for enum locations on trivial paths.
+  // After promoting them, complete lifetime here.
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it);
+    // Set forceBoundaryCompletion as true so that we complete at boundary for
+    // lexical values as well.
+    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
   }
 }
 
@@ -2119,33 +2138,6 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
                             << *alloc);
     deleter.forceDeleteWithUsers(alloc);
     return true;
-  } else {
-    auto enableOptimizationForEnum = [](AllocStackInst *asi) {
-      if (asi->isLexical()) {
-        return false;
-      }
-      for (auto *use : asi->getUses()) {
-        auto *user = use->getUser();
-        if (!isa<StoreInst>(user) && !isa<StoreBorrowInst>(user)) {
-          continue;
-        }
-        auto stored = user->getOperand(CopyLikeInstruction::Src);
-        if (stored->isLexical()) {
-          return false;
-        }
-      }
-      return true;
-    };
-    // For stack locs of enum type that are lexical or with lexical stored
-    // values, we require that all uses are in the same block. This is because
-    // we can have incomplete lifetime of enum typed addresses, and on
-    // converting to value form this causes verification error. For all other
-    // stack locs of enum type, we use the lifetime completion utility to fix
-    // the lifetime. But when we have a lexical value, the utility can complete
-    // lifetimes on dead end blocks only.
-    if (f.hasOwnership() && alloc->getType().isOrHasEnum() &&
-        !enableOptimizationForEnum(alloc))
-      return false;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);

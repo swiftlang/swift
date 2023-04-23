@@ -731,8 +731,6 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
-  bool isOrHasEnum = tempObj->getType().isOrHasEnum();
-
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
@@ -742,15 +740,6 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
     if (user == si)
       continue;
-
-    // For lexical stored values that are enums, we require that all uses are in
-    // the same block. This is because we can have incomplete address lifetimes
-    // on none/trivial paths. and OSSALifetimeCompletion currently can complete
-    // lexical values only in the presence of dead end blocks.
-    if (isOrHasEnum && si->getSrc()->isLexical() &&
-        user->getParent() != si->getParent() && !isa<DeallocStackInst>(user)) {
-      return std::next(si->getIterator());
-    }
 
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {
@@ -955,7 +944,7 @@ void TempRValueOptPass::run() {
   // Call the utlity to complete ossa lifetime.
   OSSALifetimeCompletion completion(function, da->get(function));
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it);
+    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
   }
 }
 

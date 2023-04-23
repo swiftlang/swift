@@ -142,7 +142,8 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
 /// This is only meant to cleanup lifetimes that lead to dead-end blocks. After
 /// recursively completing all nested scopes, it then simply ends the lifetime
 /// at the Unreachable instruction.
-bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value) {
+bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
+    SILValue value, bool forceBoundaryCompletion) {
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this](SILValue innerBorrowedValue) {
@@ -152,7 +153,7 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value) {
   liveness.compute(domInfo, handleInnerScope);
 
   bool changed = false;
-  if (value->isLexical()) {
+  if (value->isLexical() && !forceBoundaryCompletion) {
     changed |= endLifetimeAtUnreachableBlocks(value, liveness.getLiveness());
   } else {
     changed |= endLifetimeAtBoundary(value, liveness.getLiveness());
