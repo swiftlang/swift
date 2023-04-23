@@ -450,10 +450,19 @@ void verifyKeyPathComponent(SILModule &M,
 /// Check if according to the SIL language model this memory /must only/ be used
 /// immutably. Today this is only applied to in_guaranteed arguments and
 /// open_existential_addr. We should expand it as needed.
+///
+/// Consuming a trivial type has no effect, so we return false in that
+/// case. SILGen avoids generating copies and destroys for trivial types when
+/// ownership would otherwise require it.
 struct ImmutableAddressUseVerifier {
   SmallVector<Operand *, 32> worklist;
 
-  bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
+  bool isTrivial(Operand *use) {
+    SILValue value = use->get();
+    return value->getType().isTrivial(value->getFunction());
+  }
+
+  bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv, bool isTrivial) {
     switch (conv) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Pack_Guaranteed:
@@ -471,9 +480,11 @@ struct ImmutableAddressUseVerifier {
 
     case SILArgumentConvention::Pack_Out:
     case SILArgumentConvention::Pack_Owned:
-    case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In:
+      return !isTrivial;
+
+    case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Indirect_Inout:
       return true;
 
@@ -481,7 +492,7 @@ struct ImmutableAddressUseVerifier {
     case SILArgumentConvention::Direct_Guaranteed:
     case SILArgumentConvention::Direct_Owned:
       assert(conv.isIndirectConvention() && "Expect an indirect convention");
-      return true; // return something "conservative".
+      return !isTrivial; // return something "conservative".
     }
     llvm_unreachable("covered switch isn't covered?!");
   }
@@ -490,14 +501,14 @@ struct ImmutableAddressUseVerifier {
     ApplySite apply(use->getUser());
     assert(apply && "Not an apply instruction kind");
     auto conv = apply.getArgumentConvention(*use);
-    return isConsumingOrMutatingArgumentConvention(conv);
+    return isConsumingOrMutatingArgumentConvention(conv, isTrivial(use));
   }
 
   bool isConsumingOrMutatingYieldUse(Operand *use) {
     // For now, just say that it is non-consuming for now.
     auto *yield = cast<YieldInst>(use->getUser());
     auto conv = yield->getArgumentConventionForOperand(*use);
-    return isConsumingOrMutatingArgumentConvention(conv);
+    return isConsumingOrMutatingArgumentConvention(conv, isTrivial(use));
   }
 
   // A "copy_addr %src [take] to *" is consuming on "%src".
@@ -507,7 +518,7 @@ struct ImmutableAddressUseVerifier {
     if (copyAddr->getDest() == use->get())
       return true;
     if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
-      return true;
+      return !isTrivial(use);
     return false;
   }
 
@@ -516,7 +527,7 @@ struct ImmutableAddressUseVerifier {
     if (copyAddr->getDest() == use->get())
       return true;
     if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
-      return true;
+      return !isTrivial(use);
     return false;
   }
 
