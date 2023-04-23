@@ -42,7 +42,7 @@ public struct FileIDMacro: ExpressionMacro {
       throw CustomError.message("can't find location for macro")
     }
 
-    let fileLiteral: ExprSyntax = "\(literal: sourceLoc.file)"
+    let fileLiteral: ExprSyntax = "\(sourceLoc.file)"
     return fileLiteral.with(\.leadingTrivia, macro.leadingTrivia)
   }
 }
@@ -565,7 +565,7 @@ public struct AddExtMembers: MemberMacro {
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let uniqueClassName = context.createUniqueName("uniqueClass")
+    let uniqueClassName = context.makeUniqueName("uniqueClass")
 
     let instanceMethod: DeclSyntax =
       """
