@@ -4528,28 +4528,6 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
   }
 
-  // See if our rvalue is a box whose boxed type matches the destTL type. In
-  // that case, emit a project_box eagerly. This can happen for escaping
-  // captured move only arguments.
-  if (auto boxType = rvalue->getType().getAs<SILBoxType>()) {
-    auto fieldType = rvalue->getType().getSILBoxFieldType(&F, 0);
-    assert(fieldType.isMoveOnly());
-    if (fieldType.getObjectType() == destTL.getLoweredType()) {
-      SILValue box = rvalue;
-      rvalue = B.createProjectBox(loc, rvalue, 0);
-      // If we have a let, we rely on the typechecker to error if we attempt to
-      // assign to it.
-      bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
-      if (isMutable)
-        rvalue = B.createMarkMustCheckInst(
-            loc, rvalue,
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-      B.emitCopyAddrOperation(loc, rvalue, dest, IsNotTake, isInit);
-      B.emitDestroyValueOperation(loc, box);
-      return;
-    }
-  }
-
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
     assert(!silConv.useLoweredAddresses()
