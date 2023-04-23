@@ -726,3 +726,34 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+
+// Reloading a trivial value is ok after the aggregate is deinitialized.
+sil [ossa] @test_mixed : $@convention(thin) (@in Mixed, Int) -> Int {
+bb0(%0 : $*Mixed, %1 : $Int):
+  %2 = struct_element_addr %0 : $*Mixed, #Mixed.i
+  store %1 to [trivial] %2 : $*Int
+  destroy_addr %0 : $*Mixed
+  %3 = load [trivial] %2 : $*Int
+  return %3 : $Int
+}
+
+// rdar://108001491 (SIL verification failed: Found mutating or
+// consuming use of an in_guaranteed parameter?!:
+// !ImmutableAddressUseVerifier().isMutatingOrConsuming(fArg))
+//
+// Allow an argument of guaranteed trivial type to be consumed.
+
+// Passed by address, but does not need to be resilient for this SIL test.
+struct ResilientValue {
+  var value: Builtin.Int32
+}
+
+sil @takeResilientValue : $@convention(thin) (@in ResilientValue) -> ()
+
+sil [thunk] [ossa] @testImutableAddressArgument : $@convention(thin) (@in_guaranteed ResilientValue) -> () {
+bb0(%0 : $*ResilientValue):
+  %1 = function_ref @takeResilientValue : $@convention(thin) (@in ResilientValue) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@in ResilientValue) -> ()
+  %v = tuple ()
+  return %v : $()
+}

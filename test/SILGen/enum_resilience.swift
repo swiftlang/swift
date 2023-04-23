@@ -206,3 +206,24 @@ public func resilientIfCase(_ e: MyResilientEnum) -> Bool {
   case .loki: ()
   }
 }
+
+
+// -----------------------------------------------------------------------------
+// rdar://108001491 (SIL verification failed: Found mutating or
+// consuming use of an in_guaranteed parameter?!:
+// !ImmutableAddressUseVerifier().isMutatingOrConsuming(fArg))
+//
+// The entityReference thunk requires @in_guaranteed ownership, but
+// the enum initializer takes its argument @in.
+
+public struct EntityIdentifier {
+  public let value: Swift.UInt64
+}
+
+public protocol ObjectProtocol {
+  static func entityReference(_ id: EntityIdentifier) -> Self
+}
+
+public enum Object : ObjectProtocol {
+  case entityReference(EntityIdentifier)
+}
