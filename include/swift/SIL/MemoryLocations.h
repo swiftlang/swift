@@ -251,6 +251,13 @@ public:
     if (auto *loc = getLocation(addr))
       bits.reset(loc->subLocations);
   }
+
+  // Nontrivial values are never deinitialized. For forward dataflow, use
+  // clearNonTrivialBits for operations that deinitialize without deallocating.
+  void clearNonTrivialBits(Bits &bits, SILValue addr) {
+    if (auto *loc = getLocation(addr))
+      bits.reset(loc->subLocations & getNonTrivialLocations());
+  }
   
   void genBits(Bits &genSet, Bits &killSet, SILValue addr) const {
     if (auto *loc = getLocation(addr)) {
@@ -263,6 +270,16 @@ public:
     if (auto *loc = getLocation(addr)) {
       killSet |= loc->subLocations;
       genSet.reset(loc->subLocations);
+    }
+  }
+
+  // Nontrivial values are never deinitialized. For forward dataflow, use
+  // killNonTrivialBits for operations that deinitialize without deallocating.
+  void killNonTrivialBits(Bits &genSet, Bits &killSet, SILValue addr) {
+    if (auto *loc = getLocation(addr)) {
+      Bits killLocations = loc->subLocations & getNonTrivialLocations();
+      killSet |= killLocations;
+      genSet.reset(killLocations);
     }
   }
 

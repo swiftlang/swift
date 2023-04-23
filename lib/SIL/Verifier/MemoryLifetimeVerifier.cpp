@@ -131,6 +131,10 @@ class MemoryLifetimeVerifier {
     locations.killBits(blockState.genSet, blockState.killSet, addr);
   }
 
+  void killNonTrivialBits(BitDataflow::BlockState &blockState, SILValue addr) {
+    locations.killNonTrivialBits(blockState.genSet, blockState.killSet, addr);
+  }
+
 public:
   MemoryLifetimeVerifier(SILFunction *function) :
     function(function), locations(/*handleNonTrivialProjections*/ true,
@@ -335,7 +339,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         auto *LI = cast<LoadInst>(&I);
         switch (LI->getOwnershipQualifier()) {
           case LoadOwnershipQualifier::Take:
-            killBits(state, LI->getOperand());
+            killNonTrivialBits(state, LI->getOperand());
             break;
           default:
             break;
@@ -354,7 +358,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::CopyAddrInst: {
         auto *CAI = cast<CopyAddrInst>(&I);
         if (CAI->isTakeOfSrc())
-          killBits(state, CAI->getSrc());
+          killNonTrivialBits(state, CAI->getSrc());
         genBits(state, CAI->getDest());
         break;
       }
@@ -385,6 +389,8 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         break;
       }
       case SILInstructionKind::DestroyAddrInst:
+        killNonTrivialBits(state, I.getOperand(0));
+        break;
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));
         break;
@@ -392,7 +398,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
         SILValue src = I.getOperand(CopyLikeInstruction::Src);
         SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
-        killBits(state, src);
+        killNonTrivialBits(state, src);
         genBits(state, dest);
         break;
       }
@@ -478,11 +484,11 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
   } else if (auto *castInst = dyn_cast<CheckedCastAddrBranchInst>(term)) {
     switch (castInst->getConsumptionKind()) {
     case CastConsumptionKind::TakeAlways:
-      locations.killBits(getSet, killSet, castInst->getSrc());
+      locations.killNonTrivialBits(getSet, killSet, castInst->getSrc());
       break;
     case CastConsumptionKind::TakeOnSuccess:
       if (castInst->getSuccessBB() == block)
-        locations.killBits(getSet, killSet, castInst->getSrc());
+        locations.killNonTrivialBits(getSet, killSet, castInst->getSrc());
       break;
     case CastConsumptionKind::CopyOnSuccess:
       break;
@@ -499,7 +505,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         bool isTryApply) {
   switch (convention) {
     case SILArgumentConvention::Indirect_In:
-      killBits(state, op.get());
+      killNonTrivialBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
       // try_apply is special, because an @out result is only initialized
@@ -600,7 +606,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireBitsSet(bits, LI->getOperand(), &I);
         switch (LI->getOwnershipQualifier()) {
           case LoadOwnershipQualifier::Take:
-            locations.clearBits(bits, LI->getOperand());
+            locations.clearNonTrivialBits(bits, LI->getOperand());
             requireNoStoreBorrowLocation(LI->getOperand(), &I);
             break;
           case LoadOwnershipQualifier::Copy:
@@ -639,7 +645,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         auto *CAI = cast<CopyAddrInst>(&I);
         requireBitsSet(bits, CAI->getSrc(), &I);
         if (CAI->isTakeOfSrc()) {
-          locations.clearBits(bits, CAI->getSrc());
+          locations.clearNonTrivialBits(bits, CAI->getSrc());
           requireNoStoreBorrowLocation(CAI->getSrc(), &I);
         }
         if (CAI->isInitializationOfDest()) {
@@ -702,7 +708,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::DestroyAddrInst: {
         SILValue opVal = cast<DestroyAddrInst>(&I)->getOperand();
         requireBitsSet(bits | ~nonTrivialLocations, opVal, &I);
-        locations.clearBits(bits, opVal);
+        locations.clearNonTrivialBits(bits, opVal);
         requireNoStoreBorrowLocation(opVal, &I);
         break;
       }
@@ -721,7 +727,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         SILValue src = I.getOperand(CopyLikeInstruction::Src);
         SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
         requireBitsSet(bits, src, &I);
-        locations.clearBits(bits, src);
+        locations.clearNonTrivialBits(bits, src);
         requireBitsClear(bits & nonTrivialLocations, dest, &I);
         locations.setBits(bits, dest);
         requireNoStoreBorrowLocation(dest, &I);
@@ -816,7 +822,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In:
       requireBitsSet(bits, argumentOp.get(), applyInst);
-      locations.clearBits(bits, argumentOp.get());
+      locations.clearNonTrivialBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
       requireBitsClear(bits & locations.getNonTrivialLocations(),
