@@ -1102,18 +1102,16 @@ namespace {
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
                                     takeActorIsolation());
-          // LValue accesses to a `let` box are only ever going to make through
-          // definite initialization if they are initializations, which don't
-          // require checking since there's no former value to potentially
-          // misuse yet.
-          if (!box || box->getOperand()->getType().castTo<SILBoxType>()
-                ->getLayout()->isMutable()) {
-            addr = SGF.B.createMarkMustCheckInst(
-                loc, addr,
-                isReadAccess(getAccessKind())
+          // Mark all move only as having mark_must_check.
+          //
+          // DISCUSSION: LValue access to let boxes must have a mark_must_check
+          // to allow for DI to properly handle delayed initialization of the
+          // boxes and convert those to initable_but_not_consumable.
+          addr = SGF.B.createMarkMustCheckInst(
+              loc, addr,
+              isReadAccess(getAccessKind())
                   ? MarkMustCheckInst::CheckKind::NoConsumeOrAssign
                   : MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-          }
           return ManagedValue::forLValue(addr);
         }
       }

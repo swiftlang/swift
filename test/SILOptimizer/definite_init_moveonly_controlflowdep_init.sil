@@ -1,0 +1,134 @@
+// RUN: %target-sil-opt -module-name definite_init_moveonly_controlflowdep_init -enable-sil-verify-all -definite-init %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name definite_init_moveonly_controlflowdep_init -enable-sil-verify-all -definite-init -raw-sil-inst-lowering -sil-move-only-checker -verify %s
+
+// Test that we properly handle both escaping and non-escaping variants.
+
+@_moveOnly
+struct S {}
+
+sil @borrowVal : $@convention(thin) (@guaranteed S) -> ()
+sil @consumeVal : $@convention(thin) (@owned S) -> ()
+sil @getVal : $@convention(thin) () -> @owned S
+sil @closureTakeVal : $@convention(thin) (@guaranteed { let S }) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @letControlFlowDependentInitializationNoEscape : $@convention(thin) () -> () {
+// CHECK: [[STACK:%.*]] = alloc_stack
+// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[STACK]]
+// CHECK: cond_br undef, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
+//
+// CHECK: [[LHS_BB]]:
+// CHECK:   assign {{%.*}} to [init] [[MARK]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[RHS_BB]]:
+// CHECK:   assign {{%.*}} to [init] [[MARK]]
+// CHECK:   br [[CONT_BB]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
+// CHECK:   apply {{%.*}}([[LOAD]])
+// CHECK:   destroy_value [[LOAD]]
+// CHECK:   [[LOAD:%.*]] = load [take] [[MARK]]
+// CHECK:   apply {{%.*}}([[LOAD]])
+// CHECK:   destroy_addr [[MARK]]
+// CHECK:   dealloc_stack [[STACK]]
+// CHECK: } // end sil function 'letControlFlowDependentInitializationNoEscape'
+sil hidden [ossa] @letControlFlowDependentInitializationNoEscape : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S, let, name "s"
+  %1 = mark_uninitialized [var] %0 : $*S
+  %2 = mark_must_check [consumable_and_assignable] %1 : $*S
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = function_ref @getVal : $@convention(thin) () -> @owned S
+  %9 = apply %8() : $@convention(thin) () -> @owned S
+  assign %9 to %2 : $*S
+  br bb3
+
+bb2:
+  %13 = function_ref @getVal : $@convention(thin) () -> @owned S
+  %14 = apply %13() : $@convention(thin) () -> @owned S
+  assign %14 to %2 : $*S
+  br bb3
+
+bb3:
+  %17 = load [copy] %2 : $*S
+  %18 = function_ref @borrowVal : $@convention(thin) (@guaranteed S) -> ()
+  %19 = apply %18(%17) : $@convention(thin) (@guaranteed S) -> ()
+  destroy_value %17 : $S
+  %21 = load [take] %2 : $*S
+  %22 = function_ref @consumeVal : $@convention(thin) (@owned S) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (@owned S) -> ()
+  destroy_addr %2 : $*S
+  dealloc_stack %0 : $*S
+  %26 = tuple ()
+  return %26 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @letControlFlowDependentInitializationEscape : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK: cond_br undef, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
+//
+// CHECK: [[LHS_BB]]:
+// CHECK:   [[MARK:%.*]] = mark_must_check [initable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [init] [[MARK]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[RHS_BB]]:
+// CHECK:   [[MARK:%.*]] = mark_must_check [initable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [init] [[MARK]]
+// CHECK:   br [[CONT_BB]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   [[MARK:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
+// CHECK:   apply {{%.*}}([[LOAD]])
+// CHECK:   destroy_value [[LOAD]]
+//
+// The checker will properly error and say that this is illegal on a let.
+// CHECK:   [[MARK:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   [[LOAD:%.*]] = load [take] [[MARK]]
+// CHECK:   apply {{%.*}}([[LOAD]])
+sil hidden [ossa] @letControlFlowDependentInitializationEscape : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box ${ let S }, let, name "s"
+  %2 = mark_uninitialized [var] %1 : ${ let S }
+  %3 = project_box %2 : ${ let S }, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %9 = function_ref @getVal : $@convention(thin) () -> @owned S
+  %10 = apply %9() : $@convention(thin) () -> @owned S
+  %11 = mark_must_check [assignable_but_not_consumable] %3 : $*S
+  assign %10 to %11 : $*S
+  br bb3
+
+bb2:
+  %15 = function_ref @getVal : $@convention(thin) () -> @owned S
+  %16 = apply %15() : $@convention(thin) () -> @owned S
+  %17 = mark_must_check [assignable_but_not_consumable] %3 : $*S
+  assign %16 to %17 : $*S
+  br bb3
+
+bb3:
+  %20 = mark_must_check [no_consume_or_assign] %3 : $*S
+  %21 = load [copy] %20 : $*S
+  %22 = function_ref @borrowVal : $@convention(thin) (@guaranteed S) -> ()
+  %23 = apply %22(%21) : $@convention(thin) (@guaranteed S) -> ()
+  destroy_value %21 : $S
+  %25 = mark_must_check [assignable_but_not_consumable] %3 : $*S
+  // expected-error @-1 {{'s' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
+  %26 = load [take] %25 : $*S
+  %27 = function_ref @consumeVal : $@convention(thin) (@owned S) -> ()
+  %28 = apply %27(%26) : $@convention(thin) (@owned S) -> ()
+  %29 = function_ref @closureTakeVal : $@convention(thin) (@guaranteed { let S }) -> ()
+  %30 = copy_value %2 : ${ let S }
+  mark_function_escape %3 : $*S
+  %32 = partial_apply [callee_guaranteed] %29(%30) : $@convention(thin) (@guaranteed { let S }) -> ()
+  destroy_value %32 : $@callee_guaranteed () -> ()
+  destroy_value %2 : ${ let S }
+  %37 = tuple ()
+  return %37 : $()
+}
