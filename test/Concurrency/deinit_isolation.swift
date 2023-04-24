@@ -7,13 +7,16 @@
 // Fixtures
 
 @globalActor final actor FirstActor {
-  static let shared: FirstActor = FirstActor()
+  static let shared = FirstActor()
 }
 
 @globalActor final actor SecondActor {
-  static let shared: SecondActor = SecondActor()
+  static let shared = SecondActor()
 }
 
+@globalActor private final actor PrivateActor {
+  static let shared = PrivateActor()
+}
 
 @FirstActor
 func isolatedFunc() {}  // expected-note 11{{calls to global function 'isolatedFunc()' from outside of its actor context are implicitly asynchronous}}
@@ -432,3 +435,10 @@ class DifferentIsolatedDeinitIsolated2: BaseWithDeinitIsolatedOnSecondActor {
     }
 }
 
+#if !SILGEN
+public class PublicIsolatedOnPrivateActor {
+    // TODO: Both should be producing an error
+    @PrivateActor public func ababahalamaha() {}
+    @PrivateActor deinit {}
+}
+#endif

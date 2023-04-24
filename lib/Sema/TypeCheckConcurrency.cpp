@@ -5082,24 +5082,28 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   };
 
+  auto isolationFromAttr = getIsolationFromAttributes(value);
+
   // No need to isolate implicit deinit, unless there is already an isolated one
   // in the superclass
-  if (value->isImplicit() && isa<DestructorDecl>(value)) {
-    ValueDecl *overriddenValue = value->getOverriddenDeclOrSuperDeinit();
-    ActorIsolation isolation = ActorIsolation::forUnspecified();
-    if (overriddenValue) {
-      isolation = getOverriddenIsolationFor(value);
-    }
+  if (isa<DestructorDecl>(value)) {
+    if (value->isImplicit() && !isolationFromAttr) {
+      ValueDecl *overriddenValue = value->getOverriddenDeclOrSuperDeinit();
+      ActorIsolation isolation = ActorIsolation::forUnspecified();
+      if (overriddenValue) {
+        isolation = getOverriddenIsolationFor(value);
+      }
 
-    if (hasIsolatedSelf && isolation.isUnspecified()) {
-      // Don't use 'unspecified' for actors, use 'nonisolated' instead
-      // To force generation of the 'nonisolated' attribute in SIL and
-      // .swiftmodule
-      isolation = ActorIsolation::forNonisolated(false);
-    }
+      if (hasIsolatedSelf && isolation.isUnspecified()) {
+        // Don't use 'unspecified' for actors, use 'nonisolated' instead
+        // To force generation of the 'nonisolated' attribute in SIL and
+        // .swiftmodule
+        isolation = ActorIsolation::forNonisolated(false);
+      }
 
-    addAttributesForActorIsolation(isolation);
-    return isolation;
+      addAttributesForActorIsolation(isolation);
+      return isolation;
+    }
   }
 
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -5113,7 +5117,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (isa<DestructorDecl>(value) && actor->getName().is("MainActor") &&
         actor->getDeclContext()->isModuleScopeContext() &&
         actor->getDeclContext()->getParentModule()->getABIName().is("Swift")) {
-      return ActorIsolation::forUnspecified();
+      auto isolation = ActorIsolation::forNonisolated(false);
+      addAttributesForActorIsolation(isolation);
+      return isolation;
     }
     return ActorIsolation::forActorInstanceSelf(value);
   }
@@ -5192,7 +5198,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return isolation;
   };
 
-  auto isolationFromAttr = getIsolationFromAttributes(value);
   if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
@@ -5216,6 +5221,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       return *mainIsolation;
     }
   }
+
   // If this declaration has one of the actor isolation attributes, report
   // that.
   if (isolationFromAttr) {
