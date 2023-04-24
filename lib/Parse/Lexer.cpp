@@ -214,7 +214,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
     // inserted to mark the code completion token. If the IDE inspection offset
     // points to a normal character, no code completion token should be
     // inserted.
-    if (Ptr >= BufferStart && Ptr <= BufferEnd && *Ptr == '\0') {
+    if (Ptr >= BufferStart && Ptr < BufferEnd && *Ptr == '\0') {
       CodeCompletionPtr = Ptr;
     }
   }
