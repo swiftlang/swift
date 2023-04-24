@@ -2920,8 +2920,8 @@ namespace {
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
         return setType(
-            CS.createTypeVariable(
-              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape));
+            CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole));
       }
 
       llvm_unreachable("Unhandled pattern kind");
