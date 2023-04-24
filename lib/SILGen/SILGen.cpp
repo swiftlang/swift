@@ -729,11 +729,18 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
         return IGM.getFunction(constant, NotForDefinition);
       });
 
-  // If we have global actor isolation for our constant, put the isolation onto
-  // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
+  if (constant.kind == SILDeclRef::Kind::Deallocator) {
+    // Deallocating destructor is always nonisolated.
+    // Isolation of the deinit applies only to isolated deallocator and
+    // destroyer.
+    F->setActorIsolation(ActorIsolation::forNonisolated(false));
+  } else {
+    // If we have global actor isolation for our constant, put the isolation
+    // onto the function.
+    if (auto isolation =
+            getActorIsolationOfContext(constant.getInnermostDeclContext())) {
+      F->setActorIsolation(isolation);
+    }
   }
 
   assert(F && "SILFunction should have been defined");
@@ -1231,11 +1238,18 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
     F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
   }
 
-  // If we have global actor isolation for our constant, put the isolation onto
-  // the function.
-  if (auto isolation =
-          getActorIsolationOfContext(constant.getInnermostDeclContext())) {
-    F->setActorIsolation(isolation);
+  if (constant.kind == SILDeclRef::Kind::Deallocator) {
+    // Deallocating destructor is always nonisolated.
+    // Isolation of the deinit applies only to isolated deallocator and
+    // destroyer.
+    F->setActorIsolation(ActorIsolation::forNonisolated(false));
+  } else {
+    // If we have global actor isolation for our constant, put the isolation
+    // onto the function.
+    if (auto isolation =
+            getActorIsolationOfContext(constant.getInnermostDeclContext())) {
+      F->setActorIsolation(isolation);
+    }
   }
 
   // Create a debug scope for the function using astNode as source location.
