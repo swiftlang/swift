@@ -461,8 +461,8 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// If this operand's user has a single borrowed value result return a
-  /// valid BorrowedValue instance.
+  /// If this operand's user has a borrowed value result return a valid
+  /// BorrowedValue instance.
   BorrowedValue getBorrowIntroducingUserResult() const;
 
   /// Compute the implicit uses that this borrowing operand "injects" into the
