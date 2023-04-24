@@ -266,6 +266,7 @@ void SILGenFunction::emitDeallocatingClassDestructor(DestructorDecl *dd,
     // Deallocate the object.
     selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
     B.createDeallocRef(loc, selfForDealloc);
+
   });
 }
 
