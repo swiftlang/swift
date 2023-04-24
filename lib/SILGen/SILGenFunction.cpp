@@ -57,7 +57,7 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
   SourceLoc SLoc = F.getLocation().getSourceLoc();
   if (SF && SLoc) {
     FnASTScope = ast_scope::ASTScopeImpl::findStartingScopeForLookup(SF, SLoc);
-    ScopeMap.insert({FnASTScope, F.getDebugScope()});
+    ScopeMap.insert({{FnASTScope, nullptr}, F.getDebugScope()});
   }
 }
 
@@ -215,27 +215,29 @@ const SILDebugScope *SILGenFunction::getOrCreateScope(SourceLoc SLoc) {
   if (!astScope->getParent())
     return nullptr;
 
-  const SILDebugScope *Scope = getOrCreateScope(astScope);
+  const SILDebugScope *Scope = getOrCreateScope(astScope, F.getDebugScope());
   assert(Scope && "failed to construct SILDebugScope from ASTScope");
   return Scope;
 }
 
 namespace {
 struct MacroInfo {
-  MacroInfo(SourceLoc SLoc) : Loc(SLoc) {}
-  RegularLocation Loc;
-  std::string Name;
+  MacroInfo(SourceLoc SLoc, SourceLoc ExpansionSLoc)
+      : SLoc(SLoc), ExpansionSLoc(ExpansionSLoc) {}
+  SourceLoc SLoc;
+  SourceLoc ExpansionSLoc;
+  RegularLocation ExpansionLoc = RegularLocation((Decl*)nullptr);
+  std::string Name = "__unknown_macro__";
   bool Freestanding = false;
 };
 }
 
+/// Return location of the macro expansion and the macro name.
 static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
-  SourceLoc MacroSLoc = Info.generatedSourceRange.getStart();
-  MacroInfo Result(MacroSLoc);
-  Result.Name = "__unknown_macro__";
+  MacroInfo Result(Info.generatedSourceRange.getStart(),
+                   Info.originalSourceRange.getStart());
   if (!Info.astNode)
     return Result;
-
   // Keep this in sync with ASTMangler::appendMacroExpansionContext().
   Mangle::ASTMangler mangler;
   switch (Info.kind) {
@@ -243,11 +245,11 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
     auto parent = ASTNode::getFromOpaqueValue(Info.astNode);
     if (auto expr =
             cast_or_null<MacroExpansionExpr>(parent.dyn_cast<Expr *>())) {
-      Result.Loc = RegularLocation(expr);
+      Result.ExpansionLoc = RegularLocation(expr);
       Result.Name = mangler.mangleMacroExpansion(expr);
     } else {
       auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
-      Result.Loc = RegularLocation(decl);
+      Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
     break;
@@ -255,7 +257,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
         ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
-    Result.Loc = RegularLocation(expansion);
+    Result.ExpansionLoc = RegularLocation(expansion);
     Result.Name = mangler.mangleMacroExpansion(expansion);
     Result.Freestanding = true;
     break;
@@ -268,7 +270,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
     auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
-      Result.Loc = RegularLocation(macroDecl);
+      Result.ExpansionLoc = RegularLocation(macroDecl);
       Result.Name = macroDecl->getBaseName().userFacingName();
       Result.Freestanding = true;
     }
@@ -297,53 +299,59 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
   if (Macro.Freestanding)
     return nullptr;
   
-  SourceLoc OrigSLoc = GeneratedSourceInfo->originalSourceRange.getStart();
-  if (!OrigSLoc)
-    return nullptr;
-
+  const SILDebugScope *TopLevelScope;
   auto It = InlinedScopeMap.find(BufferID);
   if (It != InlinedScopeMap.end())
-    return It->second;
+    TopLevelScope = It->second;
+  else {
+    // Recursively create one inlined function + scope per layer of generated
+    // sources.  Chains of Macro expansions are representad as flat
+    // function-level scopes.
+    SILGenFunctionBuilder B(SGM);
+    auto &ASTContext = SGM.M.getASTContext();
+    auto ExtInfo = SILFunctionType::ExtInfo::getThin();
+    auto FunctionType = SILFunctionType::get(
+        nullptr, ExtInfo, SILCoroutineKind::None,
+        ParameterConvention::Direct_Unowned, /*Params*/ {},
+        /*yields*/
+        {},
+        /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(), ASTContext);
+    StringRef MacroName = ASTContext.getIdentifier(Macro.Name).str();
+    RegularLocation MacroLoc(Macro.SLoc);
+    // Use the ExpansionLoc as the location so IRGenDebugInfo can extract the
+    // human-readable macro name from the MacroExpansionDecl.
+    SILFunction *MacroFn = B.getOrCreateFunction(
+        Macro.ExpansionLoc, MacroName,
+        SILLinkage::DefaultForDeclaration, FunctionType, IsNotBare,
+        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
+    // At the end of the chain ExpansionLoc should be a macro expansion node.
+    const SILDebugScope *InlinedAt = nullptr;
+    const SILDebugScope *ExpansionScope = getOrCreateScope(Macro.ExpansionSLoc);
 
-  // Recursively create one inlined function + scope per layer of generated
-  // sources.  Chains of Macro expansions are representad as flat function-level
-  // scopes.
-  SILGenFunctionBuilder B(SGM);
-  auto &ASTContext = SGM.M.getASTContext();
-  auto ExtInfo = SILFunctionType::ExtInfo::getThin();
-  auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned, /*Params*/ {},
-      /*yields*/
-      {},
-      /*Results*/ {}, None, SubstitutionMap(), SubstitutionMap(), ASTContext);
-  StringRef MacroName = ASTContext.getIdentifier(Macro.Name).str();
-  
-  SILFunction *MacroFn = B.getOrCreateFunction(
-      Macro.Loc, MacroName, SILLinkage::DefaultForDeclaration, FunctionType,
-      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
-  // At the end of the chain OrigSLoc should be a macro expansion node.
-  const SILDebugScope *InlinedAt = nullptr;
-  const SILDebugScope *OrigScope = getOrCreateScope(OrigSLoc);
-  RegularLocation OrigLoc(OrigSLoc);
-  // Inject an extra scope to hold the inlined call site.
-  if (OrigScope)
-    InlinedAt = new (SGM.M)
-        SILDebugScope(Macro.Freestanding ? Macro.Loc : OrigLoc, nullptr,
-                      OrigScope, OrigScope->InlinedCallSite);
+    // Inject an extra scope to hold the inlined call site.
+    if (ExpansionScope)
+      InlinedAt = new (SGM.M)
+          SILDebugScope(Macro.ExpansionLoc, nullptr, ExpansionScope,
+                        ExpansionScope->InlinedCallSite);
 
-  const SILDebugScope *Scope =
-      new (SGM.M) SILDebugScope(Macro.Loc, MacroFn, nullptr, InlinedAt);
+    TopLevelScope =
+        new (SGM.M) SILDebugScope(MacroLoc, MacroFn, nullptr, InlinedAt);
 
-  InlinedScopeMap.insert({BufferID, Scope});
-  return Scope;
+    InlinedScopeMap.insert({BufferID, TopLevelScope});
+  }
+
+  // Create the scope hierarchy inside the macro expansion.
+  auto *MacroAstScope =
+      ast_scope::ASTScopeImpl::findStartingScopeForLookup(SF, Macro.SLoc);
+  return getOrCreateScope(MacroAstScope, TopLevelScope,
+                          TopLevelScope->InlinedCallSite);
 }
 
 const SILDebugScope *
-SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope) {
-  const SILDebugScope *FnScope = F.getDebugScope();
-
+SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
+                                 const SILDebugScope *FnScope,
+                                 const SILDebugScope *InlinedAt) {
   if (!ASTScope)
     return FnScope;
 
@@ -351,7 +359,7 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope) {
   if (ASTScope == FnASTScope)
     return FnScope;
 
-  auto It = ScopeMap.find(ASTScope);
+  auto It = ScopeMap.find({ASTScope, InlinedAt});
   if (It != ScopeMap.end())
     return It->second;
 
@@ -374,20 +382,21 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope) {
     //        Since the arguments to Constructor aren't marked as implicit,
     //        argument b is in the scope of v, but the call to Constructor
     //        isn't, which correctly triggers the scope hole verifier.
-    return B.getCurrentDebugScope();
+    auto *CurScope = B.getCurrentDebugScope();
+    return CurScope->InlinedCallSite != InlinedAt ? FnScope : CurScope;
   }
 
   // Collapse BraceStmtScopes whose parent is a .*BodyScope.
   if (auto Parent = ASTScope->getParent().getPtrOrNull())
     if (Parent->getSourceRangeOfThisASTNode() ==
         ASTScope->getSourceRangeOfThisASTNode())
-      return getOrCreateScope(Parent);
+      return getOrCreateScope(Parent, FnScope, InlinedAt);
 
   // The calls to defer closures have cleanup source locations pointing to the
   // defer. Reparent them into the current debug scope.
   auto *AncestorScope = ASTScope->getParent().getPtrOrNull();
   while (AncestorScope && AncestorScope != FnASTScope &&
-         !ScopeMap.count(AncestorScope)) {
+         !ScopeMap.count({AncestorScope, InlinedAt})) {
     if (auto *FD = dyn_cast_or_null<FuncDecl>(
           AncestorScope->getDeclIfAny().getPtrOrNull())) {
       if (cast<DeclContext>(FD) != FunctionDC)
@@ -404,10 +413,16 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope) {
   };
 
   const SILDebugScope *Parent =
-      getOrCreateScope(ASTScope->getParent().getPtrOrNull());
-  RegularLocation Loc(ASTScope->getSourceRangeOfThisASTNode().Start);
-  SILScope = new (SGM.M) SILDebugScope(Loc, &F, Parent);
-  ScopeMap.insert({ASTScope, SILScope});
+    getOrCreateScope(ASTScope->getParent().getPtrOrNull(), FnScope, InlinedAt);
+  SourceLoc SLoc = ASTScope->getSourceRangeOfThisASTNode().Start;
+  RegularLocation Loc(SLoc);
+  SILScope = new (SGM.M)
+      SILDebugScope(Loc, FnScope->getParentFunction(), Parent, InlinedAt);
+  ScopeMap.insert({{ASTScope, InlinedAt}, SILScope});
+
+  assert(SILScope->getParentFunction() == &F &&
+         "inlinedAt points to other function");
+
   return SILScope;
 }
 
