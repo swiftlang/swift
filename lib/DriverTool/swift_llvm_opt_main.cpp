@@ -1,4 +1,4 @@
-//===--- LLVMOpt.cpp ------------------------------------------------------===//
+//===--- swift_llvm_opt_main.cpp ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -74,51 +74,56 @@ static llvm::codegen::RegisterCodeGenFlags CGF;
 //                            Option Declarations
 //===----------------------------------------------------------------------===//
 
-// The OptimizationList is automatically populated with registered passes by the
-// PassNameParser.
-//
-static llvm::cl::list<const llvm::PassInfo *, bool, llvm::PassNameParser>
-    PassList(llvm::cl::desc("Optimizations available:"));
+struct SwiftLLVMOptOptions {
+  // The OptimizationList is automatically populated with registered passes by the
+  // PassNameParser.
+  //
+  llvm::cl::list<const llvm::PassInfo *, bool, llvm::PassNameParser>
+    PassList = llvm::cl::list<const llvm::PassInfo *, bool, llvm::PassNameParser>(llvm::cl::desc("Optimizations available:"));
 
-static llvm::cl::opt<bool>
-    Optimized("O", llvm::cl::desc("Optimization level O. Similar to swift -O"));
+  llvm::cl::opt<bool>
+    Optimized = llvm::cl::opt<bool>("O", llvm::cl::desc("Optimization level O. Similar to swift -O"));
 
-// TODO: I wanted to call this 'verify', but some other pass is using this
-// option.
-static llvm::cl::opt<bool> VerifyEach(
-    "verify-each",
-    llvm::cl::desc("Should we spend time verifying that the IR is well "
-                   "formed"));
+  // TODO: I wanted to call this 'verify', but some other pass is using this
+  // option.
+  llvm::cl::opt<bool>
+    VerifyEach = llvm::cl::opt<bool>(
+      "verify-each",
+      llvm::cl::desc("Should we spend time verifying that the IR is well "
+                     "formed"));
 
-static llvm::cl::opt<std::string>
-    TargetTriple("mtriple",
-                 llvm::cl::desc("Override target triple for module"));
+  llvm::cl::opt<std::string>
+    TargetTriple = llvm::cl::opt<std::string>("mtriple",
+                   llvm::cl::desc("Override target triple for module"));
 
-static llvm::cl::opt<bool>
-    PrintStats("print-stats",
-               llvm::cl::desc("Should LLVM Statistics be printed"));
+  llvm::cl::opt<bool>
+    PrintStats = llvm::cl::opt<bool>("print-stats",
+                 llvm::cl::desc("Should LLVM Statistics be printed"));
 
-static llvm::cl::opt<std::string> InputFilename(llvm::cl::Positional,
-                                          llvm::cl::desc("<input file>"),
-                                          llvm::cl::init("-"),
-                                          llvm::cl::value_desc("filename"));
+  llvm::cl::opt<std::string>
+    InputFilename = llvm::cl::opt<std::string>(llvm::cl::Positional,
+                                            llvm::cl::desc("<input file>"),
+                                            llvm::cl::init("-"),
+                                            llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<std::string>
-    OutputFilename("o", llvm::cl::desc("Override output filename"),
-                   llvm::cl::value_desc("filename"));
+  llvm::cl::opt<std::string>
+    OutputFilename = llvm::cl::opt<std::string>("o", llvm::cl::desc("Override output filename"),
+                     llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<std::string> DefaultDataLayout(
-    "default-data-layout",
-    llvm::cl::desc("data layout string to use if not specified by module"),
-    llvm::cl::value_desc("layout-string"), llvm::cl::init(""));
+  llvm::cl::opt<std::string>
+    DefaultDataLayout = llvm::cl::opt<std::string>(
+      "default-data-layout",
+      llvm::cl::desc("data layout string to use if not specified by module"),
+      llvm::cl::value_desc("layout-string"), llvm::cl::init(""));
+};
 
 //===----------------------------------------------------------------------===//
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
 
-static llvm::CodeGenOpt::Level GetCodeGenOptLevel() {
+static llvm::CodeGenOpt::Level GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
   // TODO: Is this the right thing to do here?
-  if (Optimized)
+  if (options.Optimized)
     return llvm::CodeGenOpt::Default;
   return llvm::CodeGenOpt::None;
 }
@@ -126,7 +131,8 @@ static llvm::CodeGenOpt::Level GetCodeGenOptLevel() {
 // Returns the TargetMachine instance or zero if no triple is provided.
 static llvm::TargetMachine *
 getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
-                 StringRef FeaturesStr, const llvm::TargetOptions &Options) {
+                 StringRef FeaturesStr, const llvm::TargetOptions &targetOptions,
+                 const SwiftLLVMOptOptions &options) {
   std::string Error;
   const auto *TheTarget = llvm::TargetRegistry::lookupTarget(
       llvm::codegen::getMArch(), TheTriple, Error);
@@ -136,9 +142,9 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
   }
 
   return TheTarget->createTargetMachine(
-      TheTriple.getTriple(), CPUStr, FeaturesStr, Options,
+      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
       Optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
-      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel());
+      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }
 
 static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
@@ -148,14 +154,8 @@ static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
   EmitPasses.run(M);
 }
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
-static inline void addPass(llvm::legacy::PassManagerBase &PM, llvm::Pass *P) {
+static inline void addPass(llvm::legacy::PassManagerBase &PM, llvm::Pass *P,
+                           const SwiftLLVMOptOptions &options) {
   // Add the pass to the pass manager...
   PM.add(P);
   if (P->getPassID() == &SwiftAAWrapperPass::ID) {
@@ -167,20 +167,21 @@ static inline void addPass(llvm::legacy::PassManagerBase &PM, llvm::Pass *P) {
   }
 
   // If we are verifying all of the intermediate steps, add the verifier...
-  if (VerifyEach)
+  if (options.VerifyEach)
     PM.add(llvm::createVerifierPass());
 }
 
 static void runSpecificPasses(StringRef Binary, llvm::Module *M,
                               llvm::TargetMachine *TM,
-                              llvm::Triple &ModuleTriple) {
+                              llvm::Triple &ModuleTriple,
+                              const SwiftLLVMOptOptions &options) {
   llvm::legacy::PassManager Passes;
   llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
   Passes.add(new llvm::TargetLibraryInfoWrapperPass(TLII));
 
   const llvm::DataLayout &DL = M->getDataLayout();
-  if (DL.isDefault() && !DefaultDataLayout.empty()) {
-    M->setDataLayout(DefaultDataLayout);
+  if (DL.isDefault() && !options.DefaultDataLayout.empty()) {
+    M->setDataLayout(options.DefaultDataLayout);
   }
 
   // Add internal analysis passes from the target machine.
@@ -194,7 +195,7 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
     Passes.add(TPC);
   }
 
-  for (const llvm::PassInfo *PassInfo : PassList) {
+  for (const llvm::PassInfo *PassInfo : options.PassList) {
     llvm::Pass *P = nullptr;
     if (PassInfo->getNormalCtor())
       P = PassInfo->getNormalCtor()();
@@ -203,7 +204,7 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
                    << ": cannot create pass: " << PassInfo->getPassName()
                    << "\n";
     if (P) {
-      addPass(Passes, P);
+      addPass(Passes, P, options);
     }
   }
 
@@ -215,8 +216,7 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
 //                            Main Implementation
 //===----------------------------------------------------------------------===//
 
-int main(int argc, char **argv) {
-  PROGRAM_START(argc, argv);
+int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
   // Initialize passes
@@ -247,9 +247,11 @@ int main(int argc, char **argv) {
   initializeInlineTreePrinterPass(Registry);
   initializeLegacySwiftMergeFunctionsPass(Registry);
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
+  SwiftLLVMOptOptions options;
 
-  if (PrintStats)
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift LLVM optimizer\n");
+
+  if (options.PrintStats)
     llvm::EnableStatistics();
 
   llvm::SMDiagnostic Err;
@@ -257,7 +259,7 @@ int main(int argc, char **argv) {
   // Load the input module...
   auto LLVMContext = std::make_unique<llvm::LLVMContext>();
   std::unique_ptr<llvm::Module> M =
-      parseIRFile(InputFilename, Err, *LLVMContext.get());
+      parseIRFile(options.InputFilename, Err, *LLVMContext.get());
 
   if (!M) {
     Err.print(argv[0], llvm::errs());
@@ -265,24 +267,24 @@ int main(int argc, char **argv) {
   }
 
   if (verifyModule(*M, &llvm::errs())) {
-    llvm::errs() << argv[0] << ": " << InputFilename
+    llvm::errs() << argv[0] << ": " << options.InputFilename
            << ": error: input module is broken!\n";
     return 1;
   }
 
   // If we are supposed to override the target triple, do so now.
-  if (!TargetTriple.empty())
-    M->setTargetTriple(llvm::Triple::normalize(TargetTriple));
+  if (!options.TargetTriple.empty())
+    M->setTargetTriple(llvm::Triple::normalize(options.TargetTriple));
 
   // Figure out what stream we are supposed to write to...
   std::unique_ptr<llvm::ToolOutputFile> Out;
   // Default to standard output.
-  if (OutputFilename.empty())
-    OutputFilename = "-";
+  if (options.OutputFilename.empty())
+    options.OutputFilename = "-";
 
   std::error_code EC;
   Out.reset(
-      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::OF_None));
+      new llvm::ToolOutputFile(options.OutputFilename, EC, llvm::sys::fs::OF_None));
   if (EC) {
     llvm::errs() << EC.message() << '\n';
     return 1;
@@ -291,13 +293,13 @@ int main(int argc, char **argv) {
   llvm::Triple ModuleTriple(M->getTargetTriple());
   std::string CPUStr, FeaturesStr;
   llvm::TargetMachine *Machine = nullptr;
-  const llvm::TargetOptions Options =
+  const llvm::TargetOptions targetOptions =
       llvm::codegen::InitTargetOptionsFromCodeGenFlags(ModuleTriple);
 
   if (ModuleTriple.getArch()) {
     CPUStr = llvm::codegen::getCPUStr();
     FeaturesStr = llvm::codegen::getFeaturesStr();
-    Machine = getTargetMachine(ModuleTriple, CPUStr, FeaturesStr, Options);
+    Machine = getTargetMachine(ModuleTriple, CPUStr, FeaturesStr, targetOptions, options);
   }
 
   std::unique_ptr<llvm::TargetMachine> TM(Machine);
@@ -306,7 +308,7 @@ int main(int argc, char **argv) {
   // flags.
   llvm::codegen::setFunctionAttributes(CPUStr, FeaturesStr, *M);
 
-  if (Optimized) {
+  if (options.Optimized) {
     IRGenOptions Opts;
     Opts.OptMode = OptimizationMode::ForSpeed;
     Opts.OutputKind = IRGenOutputKind::LLVMAssemblyAfterOptimization;
@@ -314,7 +316,7 @@ int main(int argc, char **argv) {
     // Then perform the optimizations.
     performLLVMOptimizations(Opts, M.get(), TM.get(), &Out->os());
   } else {
-    runSpecificPasses(argv[0], M.get(), TM.get(), ModuleTriple);
+    runSpecificPasses(argv[0], M.get(), TM.get(), ModuleTriple, options);
     // Finally dump the output.
     dumpOutput(*M, Out->os());
   }

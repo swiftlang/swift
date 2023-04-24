@@ -81,6 +81,9 @@ extern int sil_passpipeline_dumper_main(ArrayRef<const char *> argv, void *MainA
 /// Run 'swift-dependency-tool'
 extern int swift_dependency_tool_main(ArrayRef<const char *> argv, void *MainAddr);
 
+/// Run 'swift-llvm-opt'
+extern int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr);
+
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
@@ -311,6 +314,8 @@ static int run_driver(StringRef ExecName,
     return sil_passpipeline_dumper_main(argv, (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::SwiftDependencyTool:
     return swift_dependency_tool_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SwiftLLVMOpt:
+    return swift_llvm_opt_main(argv, (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),

@@ -56,7 +56,6 @@ function(get_test_dependencies SDK result_var_name)
       swift-demangle
       swift-demangle-yamldump
       swift-ide-test
-      swift-llvm-opt
       swift-refactor
       swift-reflection-dump
       swift-remoteast-test)
