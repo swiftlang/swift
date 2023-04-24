@@ -544,6 +544,30 @@ public:
     }
   }
 
+  // Think of a single-payload enum as being encoded in "pages".
+  // The discriminator (tag) tells us which page we're on:
+  // * Page 0 is the payload page which can either store
+  //   the single payload case (any valid value
+  //   for the payload) or any of N non-payload cases
+  //   (encoded as XIs for the payload)
+  // * Other pages use the payload area to encode non-payload
+  //   cases.  The number of cases that can be encoded
+  //   on each such page depends only on the size of the
+  //   payload area.
+  //
+  // The above logic generalizes the following important cases:
+  // * A payload with XIs will generally have enough to
+  //   encode all payloadcases.  It will have no discriminator
+  //   case, so everything is effectively on "page zero."
+  // * If the payload has no XIs but is not zero-sized, then
+  //   we'll need a page one.  That page will usually be
+  //   large enough to encode all non-payload cases.
+  // * If the payload is zero-sized, then we only have a
+  //   discriminator.  In effect, the single-payload enum
+  //   degenerates in this case to a non-payload enum
+  //   (except for the subtle distinction that the
+  //   single-payload enum doesn't export XIs).
+
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
                        int *CaseIndex) const override {
@@ -552,7 +576,7 @@ public:
     auto DiscriminatorAddress = address + PayloadSize;
     auto DiscriminatorSize = getSize() - PayloadSize;
     unsigned discriminator = 0;
-    if (getSize() > PayloadSize) {
+    if (DiscriminatorSize > 0) {
       if (!reader.readInteger(DiscriminatorAddress,
                               DiscriminatorSize,
                               &discriminator)) {
@@ -574,9 +598,9 @@ public:
         return false;
       }
       auto casesPerNonPayloadPage =
-        DiscriminatorSize >= 4
+        PayloadSize >= 4
          ? ValueWitnessFlags::MaxNumExtraInhabitants
-         : (1UL << (DiscriminatorSize * 8UL));
+         : (1UL << (PayloadSize * 8UL));
       ComputedCase =
         1
         + nonPayloadCasesUsingXIs
@@ -618,7 +642,7 @@ public:
 //   case c(Int)
 // }
 //
-// // Enums with one payload with no XIs
+// // Enums with one non-empty payload but that has no XIs
 // // (This is almost but not quite the same as the single-payload
 // // case.  Different in that this MPE exposes extra tag values
 // // as XIs to an enclosing enum; SPEs don't do that.)
