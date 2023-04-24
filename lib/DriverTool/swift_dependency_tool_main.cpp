@@ -175,43 +175,38 @@ enum class ActionType : unsigned {
   YAMLToBinary
 };
 
-namespace options {
-
-static llvm::cl::OptionCategory Category("swift-dependency-tool Options");
-
-static llvm::cl::opt<std::string>
-InputFilename("input-filename",
-              llvm::cl::desc("Name of the input file"),
-              llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-OutputFilename("output-filename",
-               llvm::cl::desc("Name of the output file"),
-               llvm::cl::cat(Category));
-
-static llvm::cl::opt<ActionType>
-Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
-       llvm::cl::cat(Category),
-       llvm::cl::values(
-           clEnumValN(ActionType::BinaryToYAML,
-                      "to-yaml", "Convert new binary .swiftdeps format to YAML"),
-           clEnumValN(ActionType::YAMLToBinary,
-                      "from-yaml", "Convert YAML to new binary .swiftdeps format")));
-
-}
-
-int main(int argc, char *argv[]) {
-  PROGRAM_START(argc, argv);
+int swift_dependency_tool_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::HideUnrelatedOptions(options::Category);
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Dependency Tool\n");
+  llvm::cl::OptionCategory Category("swift-dependency-tool Options");
+
+  llvm::cl::opt<std::string>
+  InputFilename("input-filename",
+                llvm::cl::desc("Name of the input file"),
+                llvm::cl::cat(Category));
+
+  llvm::cl::opt<std::string>
+  OutputFilename("output-filename",
+                 llvm::cl::desc("Name of the output file"),
+                 llvm::cl::cat(Category));
+
+  llvm::cl::opt<ActionType>
+  Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
+         llvm::cl::cat(Category),
+         llvm::cl::values(
+             clEnumValN(ActionType::BinaryToYAML,
+                        "to-yaml", "Convert new binary .swiftdeps format to YAML"),
+             clEnumValN(ActionType::YAMLToBinary,
+                        "from-yaml", "Convert YAML to new binary .swiftdeps format")));
+
+  llvm::cl::HideUnrelatedOptions(Category);
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift Dependency Tool\n");
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
   llvm::vfs::OnDiskOutputBackend outputBackend;
 
-  switch (options::Action) {
+  switch (Action) {
   case ActionType::None: {
     llvm::errs() << "action required\n";
     llvm::cl::PrintHelpMessage();
@@ -219,14 +214,14 @@ int main(int argc, char *argv[]) {
   }
 
   case ActionType::BinaryToYAML: {
-    auto fg = SourceFileDepGraph::loadFromPath(options::InputFilename, true);
+    auto fg = SourceFileDepGraph::loadFromPath(InputFilename, true);
     if (!fg) {
       llvm::errs() << "Failed to read dependency file\n";
       return 1;
     }
 
     bool hadError =
-      withOutputPath(diags, outputBackend, options::OutputFilename,
+      withOutputPath(diags, outputBackend, OutputFilename,
         [&](llvm::raw_pwrite_stream &out) {
           out << "# Fine-grained v0\n";
           llvm::yaml::Output yamlWriter(out);
@@ -241,7 +236,7 @@ int main(int argc, char *argv[]) {
   }
 
   case ActionType::YAMLToBinary: {
-    auto bufferOrError = llvm::MemoryBuffer::getFile(options::InputFilename);
+    auto bufferOrError = llvm::MemoryBuffer::getFile(InputFilename);
     if (!bufferOrError) {
       llvm::errs() << "Failed to read dependency file\n";
       return 1;
@@ -258,7 +253,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (writeFineGrainedDependencyGraphToPath(
-            diags, outputBackend, options::OutputFilename, fg)) {
+            diags, outputBackend, OutputFilename, fg)) {
       llvm::errs() << "Failed to write binary swiftdeps\n";
       return 1;
     }

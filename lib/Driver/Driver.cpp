@@ -104,6 +104,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("sil-nm", DriverKind::SILNM)
           .Case("sil-llvm-gen", DriverKind::SILLLVMGen)
           .Case("sil-passpipeline-dumper", DriverKind::SILPassPipelineDumper)
+          .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
           .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
@@ -3565,6 +3566,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SILNM:
   case DriverKind::SILLLVMGen:
   case DriverKind::SILPassPipelineDumper:
+  case DriverKind::SwiftDependencyTool:
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:

@@ -171,6 +171,7 @@ public:
     SILNM,           // sil-nm
     SILLLVMGen,      // sil-llvm-gen
     SILPassPipelineDumper, // sil-passpipeline-dumper
+    SwiftDependencyTool,   // swift-dependency-tool
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
