@@ -18,14 +18,14 @@ public final class Klass {
 
 var boolValue: Bool { return true }
 
-public func borrowVal(_ x: __shared Klass) {}
-public func borrowVal(_ x: __shared CopyableKlass) {}
-public func borrowVal(_ x: __shared FinalKlass) {}
-public func borrowVal(_ x: __shared AggStruct) {}
-public func borrowVal(_ x: __shared KlassPair) {}
-public func borrowVal(_ x: __shared AggGenericStruct<String>) {}
-public func borrowVal<T>(_ x: __shared AggGenericStruct<T>) {}
-public func borrowVal(_ x: __shared EnumTy) {}
+public func borrowVal(_ x: borrowing Klass) {}
+public func borrowVal(_ x: borrowing CopyableKlass) {}
+public func borrowVal(_ x: borrowing FinalKlass) {}
+public func borrowVal(_ x: borrowing AggStruct) {}
+public func borrowVal(_ x: borrowing KlassPair) {}
+public func borrowVal(_ x: borrowing AggGenericStruct<String>) {}
+public func borrowVal<T>(_ x: borrowing AggGenericStruct<T>) {}
+public func borrowVal(_ x: borrowing EnumTy) {}
 
 public func consumeVal(_ x: __owned Klass) {}
 public func consumeVal(_ x: __owned FinalKlass) {}
@@ -47,7 +47,7 @@ public final class FinalKlass {
 // Class Tests //
 /////////////////
 
-public func classSimpleChainTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classSimpleChainTest(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
                // expected-error @-1 {{'x2' consumed more than once}}
     let y2 = x2 // expected-note {{consuming use here}}
@@ -57,7 +57,7 @@ public func classSimpleChainTest(_ x: __shared Klass) { // expected-error {{'x' 
     borrowVal(k2)
 }
 
-public func classSimpleChainArgTest(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classSimpleChainArgTest(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -75,12 +75,12 @@ public func classSimpleChainOwnedArgTest2(_ x2: consuming Klass) {
     borrowVal(k2)
 }
 
-public func classSimpleNonConsumingUseTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classSimpleNonConsumingUseTest(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func classSimpleNonConsumingUseArgTest(_ x2: __shared Klass) {
+public func classSimpleNonConsumingUseArgTest(_ x2: borrowing Klass) {
     borrowVal(x2)
 }
 
@@ -92,14 +92,14 @@ public func classSimpleNonConsumingUseOwnedArgTest2(_ x2: consuming Klass) {
     borrowVal(x2)
 }
 
-public func classMultipleNonConsumingUseTest(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classMultipleNonConsumingUseTest(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func classMultipleNonConsumingUseArgTest(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classMultipleNonConsumingUseArgTest(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -117,7 +117,7 @@ public func classMultipleNonConsumingUseOwnedArgTest2(_ x2: consuming Klass) {
     consumeVal(x2)
 }
 
-public func classUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -125,7 +125,7 @@ public func classUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' 
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classUseAfterConsumeArg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classUseAfterConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -143,14 +143,14 @@ public func classUseAfterConsumeOwnedArg2(_ x2: consuming Klass) { // expected-e
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classDoubleConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDoubleConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classDoubleConsumeArg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classDoubleConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -165,7 +165,7 @@ public func classDoubleConsumeOwnedArg2(_ x2: consuming Klass) { // expected-err
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func classLoopConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classLoopConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -173,7 +173,7 @@ public func classLoopConsume(_ x: __shared Klass) { // expected-error {{'x' has 
     }
 }
 
-public func classLoopConsumeArg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classLoopConsumeArg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -191,7 +191,7 @@ public func classLoopConsumeOwnedArg2(_ x2: consuming Klass) { // expected-error
     }
 }
 
-public func classDiamond(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDiamond(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -200,7 +200,7 @@ public func classDiamond(_ x: __shared Klass) { // expected-error {{'x' has guar
     }
 }
 
-public func classDiamondArg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classDiamondArg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -224,7 +224,7 @@ public func classDiamondOwnedArg2(_ x2: consuming Klass) {
     }
 }
 
-public func classDiamondInLoop(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classDiamondInLoop(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -238,7 +238,7 @@ public func classDiamondInLoop(_ x: __shared Klass) { // expected-error {{'x' ha
     }
 }
 
-public func classDiamondInLoopArg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classDiamondInLoopArg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -272,7 +272,7 @@ public func classDiamondInLoopOwnedArg2(_ x2: consuming Klass) { // expected-err
     }
 }
 
-public func classAssignToVar1(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar1(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -281,7 +281,7 @@ public func classAssignToVar1(_ x: __shared Klass) { // expected-error {{'x' has
     consumeVal(x3)
 }
 
-public func classAssignToVar1Arg(_ x: __shared Klass, _ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classAssignToVar1Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                 // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -292,7 +292,7 @@ public func classAssignToVar1Arg(_ x: __shared Klass, _ x2: __shared Klass) { //
 // NOTE: consumeVal(x3) shouldn't be marked! This is most likely due to some form of
 // load forwarding. We may need to make predictable mem opts more conservative
 // with move only var.
-public func classAssignToVar1OwnedArg(_ x: __shared Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
+public func classAssignToVar1OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
     // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -300,7 +300,7 @@ public func classAssignToVar1OwnedArg(_ x: __shared Klass, _ x2: __owned Klass) 
     consumeVal(x3)
 }
 
-public func classAssignToVar1OwnedArg2(_ x: __shared Klass, _ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
+public func classAssignToVar1OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x2' consumed more than once}}
     // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -308,7 +308,7 @@ public func classAssignToVar1OwnedArg2(_ x: __shared Klass, _ x2: consuming Klas
     consumeVal(x3)
 }
 
-public func classAssignToVar2(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar2(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -316,7 +316,7 @@ public func classAssignToVar2(_ x: __shared Klass) { // expected-error {{'x' has
     borrowVal(x3)
 }
 
-public func classAssignToVar2Arg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classAssignToVar2Arg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x3)
@@ -335,7 +335,7 @@ public func classAssignToVar2OwnedArg2(_ x2: consuming Klass) { // expected-erro
 }
 
 // NOTE: consumeVal(x3) should not be marked.
-public func classAssignToVar3(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar3(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
@@ -343,26 +343,26 @@ public func classAssignToVar3(_ x: __shared Klass) { // expected-error {{'x' has
 }
 
 // NOTE: consumeVal(x3) is a bug.
-public func classAssignToVar3Arg(_ x: __shared Klass, _ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classAssignToVar3Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                             // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar3OwnedArg(_ x: __shared Klass, _ x2: __owned Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar3OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar3OwnedArg2(_ x: __shared Klass, _ x2: consuming Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar3OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func classAssignToVar4(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar4(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     let x3 = x2 // expected-note {{consuming use here}}
@@ -370,7 +370,7 @@ public func classAssignToVar4(_ x: __shared Klass) { // expected-error {{'x' has
     consumeVal(x3)
 }
 
-public func classAssignToVar4Arg(_ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classAssignToVar4Arg(_ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x3)
@@ -388,7 +388,7 @@ public func classAssignToVar4OwnedArg2(_ x2: consuming Klass) { // expected-erro
     consumeVal(x3)
 }
 
-public func classAssignToVar5(_ x: __shared Klass) {  // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAssignToVar5(_ x: borrowing Klass) {  // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
     // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -397,7 +397,7 @@ public func classAssignToVar5(_ x: __shared Klass) {  // expected-error {{'x' ha
     consumeVal(x3)
 }
 
-public func classAssignToVar5Arg(_ x: __shared Klass, _ x2: __shared Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func classAssignToVar5Arg(_ x: borrowing Klass, _ x2: borrowing Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                             // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2)
@@ -405,7 +405,7 @@ public func classAssignToVar5Arg(_ x: __shared Klass, _ x2: __shared Klass) { //
     consumeVal(x3)
 }
 
-public func classAssignToVar5OwnedArg(_ x: __shared Klass, _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
+public func classAssignToVar5OwnedArg(_ x: borrowing Klass, _ x2: __owned Klass) { // expected-error {{'x2' used after consume}}
                                                                          // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -413,7 +413,7 @@ public func classAssignToVar5OwnedArg(_ x: __shared Klass, _ x2: __owned Klass) 
     consumeVal(x3)
 }
 
-public func classAssignToVar5OwnedArg2(_ x: __shared Klass, _ x2: consuming Klass) { // expected-error {{'x2' used after consume}}
+public func classAssignToVar5OwnedArg2(_ x: borrowing Klass, _ x2: consuming Klass) { // expected-error {{'x2' used after consume}}
                                                                          // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -421,7 +421,7 @@ public func classAssignToVar5OwnedArg2(_ x: __shared Klass, _ x2: consuming Klas
     consumeVal(x3)
 }
 
-public func classAccessAccessField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAccessAccessField(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.k)
     for _ in 0..<1024 {
@@ -429,7 +429,7 @@ public func classAccessAccessField(_ x: __shared Klass) { // expected-error {{'x
     }
 }
 
-public func classAccessAccessFieldArg(_ x2: __shared Klass) {
+public func classAccessAccessFieldArg(_ x2: borrowing Klass) {
     borrowVal(x2.k)
     for _ in 0..<1024 {
         borrowVal(x2.k)
@@ -450,7 +450,7 @@ public func classAccessAccessFieldOwnedArg2(_ x2: consuming Klass) {
     }
 }
 
-public func classAccessConsumeField(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func classAccessConsumeField(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
@@ -458,7 +458,7 @@ public func classAccessConsumeField(_ x: __shared Klass) { // expected-error {{'
     }
 }
 
-public func classAccessConsumeFieldArg(_ x2: __shared Klass) {
+public func classAccessConsumeFieldArg(_ x2: borrowing Klass) {
     consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
@@ -490,14 +490,14 @@ extension Klass {
 // Final Class //
 /////////////////
 
-public func finalClassSimpleChainTest(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassSimpleChainTest(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func finalClassSimpleChainTestArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassSimpleChainTestArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -515,12 +515,12 @@ public func finalClassSimpleChainTestOwnedArg2(_ x2: consuming FinalKlass) {
     borrowVal(k2)
 }
 
-public func finalClassSimpleNonConsumingUseTest(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassSimpleNonConsumingUseTest(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func finalClassSimpleNonConsumingUseTestArg(_ x2: __shared FinalKlass) {
+public func finalClassSimpleNonConsumingUseTestArg(_ x2: borrowing FinalKlass) {
     borrowVal(x2)
 }
 
@@ -532,14 +532,14 @@ public func finalClassSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming FinalKl
     borrowVal(x2)
 }
 
-public func finalClassMultipleNonConsumingUseTest(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassMultipleNonConsumingUseTest(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func finalClassMultipleNonConsumingUseTestArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassMultipleNonConsumingUseTestArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -557,7 +557,7 @@ public func finalClassMultipleNonConsumingUseTestownedArg2(_ x2: consuming Final
     consumeVal(x2)
 }
 
-public func finalClassUseAfterConsume(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassUseAfterConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -565,7 +565,7 @@ public func finalClassUseAfterConsume(_ x: __shared FinalKlass) { // expected-er
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func finalClassUseAfterConsumeArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassUseAfterConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -583,14 +583,14 @@ public func finalClassUseAfterConsumeOwnedArg2(_ x2: consuming FinalKlass) { // 
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func finalClassDoubleConsume(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassDoubleConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func finalClassDoubleConsumeArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassDoubleConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -605,7 +605,7 @@ public func finalClassDoubleConsumeownedArg2(_ x2: consuming FinalKlass) { // ex
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func finalClassLoopConsume(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassLoopConsume(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -613,7 +613,7 @@ public func finalClassLoopConsume(_ x: __shared FinalKlass) { // expected-error 
     }
 }
 
-public func finalClassLoopConsumeArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassLoopConsumeArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -631,7 +631,7 @@ public func finalClassLoopConsumeOwnedArg2(_ x2: consuming FinalKlass) { // expe
     }
 }
 
-public func finalClassDiamond(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassDiamond(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -640,7 +640,7 @@ public func finalClassDiamond(_ x: __shared FinalKlass) { // expected-error {{'x
     }
 }
 
-public func finalClassDiamondArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassDiamondArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -664,7 +664,7 @@ public func finalClassDiamondOwnedArg2(_ x2: consuming FinalKlass) {
     }
 }
 
-public func finalClassDiamondInLoop(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassDiamondInLoop(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed by a use in a loop}}
@@ -678,7 +678,7 @@ public func finalClassDiamondInLoop(_ x: __shared FinalKlass) { // expected-erro
     }
 }
 
-public func finalClassDiamondInLoopArg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassDiamondInLoopArg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -712,7 +712,7 @@ public func finalClassDiamondInLoopOwnedArg2(_ x2: consuming FinalKlass) { // ex
     }
 }
 
-public func finalClassAssignToVar1(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar1(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -721,7 +721,7 @@ public func finalClassAssignToVar1(_ x: __shared FinalKlass) { // expected-error
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar1Arg(_ x: __shared FinalKlass, _ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar1Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -729,7 +729,7 @@ public func finalClassAssignToVar1Arg(_ x: __shared FinalKlass, _ x2: __shared F
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar1OwnedArg(_ x: __shared FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
+public func finalClassAssignToVar1OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
                                                                                         // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -737,7 +737,7 @@ public func finalClassAssignToVar1OwnedArg(_ x: __shared FinalKlass, _ x2: __own
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar1OwnedArg2(_ x: __shared FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
+public func finalClassAssignToVar1OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' consumed more than once}}
                                                                                         // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -745,7 +745,7 @@ public func finalClassAssignToVar1OwnedArg2(_ x: __shared FinalKlass, _ x2: cons
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar2(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar2(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -753,7 +753,7 @@ public func finalClassAssignToVar2(_ x: __shared FinalKlass) { // expected-error
     borrowVal(x3)
 }
 
-public func finalClassAssignToVar2Arg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar2Arg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x3)
@@ -771,33 +771,33 @@ public func finalClassAssignToVar2OwnedArg2(_ x2: consuming FinalKlass) { // exp
     borrowVal(x3)
 }
 
-public func finalClassAssignToVar3(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar3(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar3Arg(_ x: __shared FinalKlass, _ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar3Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar3OwnedArg(_ x: __shared FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar3OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar3OwnedArg2(_ x: __shared FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar3OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar4(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar4(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     let x3 = x2 // expected-note {{consuming use here}}
@@ -805,7 +805,7 @@ public func finalClassAssignToVar4(_ x: __shared FinalKlass) { // expected-error
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar4Arg(_ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar4Arg(_ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x3)
@@ -823,7 +823,7 @@ public func finalClassAssignToVar4OwnedArg2(_ x2: consuming FinalKlass) { // exp
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar5(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar5(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -832,7 +832,7 @@ public func finalClassAssignToVar5(_ x: __shared FinalKlass) { // expected-error
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar5Arg(_ x: __shared FinalKlass, _ x2: __shared FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func finalClassAssignToVar5Arg(_ x: borrowing FinalKlass, _ x2: borrowing FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2)
@@ -840,7 +840,7 @@ public func finalClassAssignToVar5Arg(_ x: __shared FinalKlass, _ x2: __shared F
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar5OwnedArg(_ x: __shared FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' used after consume}}
+public func finalClassAssignToVar5OwnedArg(_ x: borrowing FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' used after consume}}
                                                                                         // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -848,7 +848,7 @@ public func finalClassAssignToVar5OwnedArg(_ x: __shared FinalKlass, _ x2: __own
     consumeVal(x3)
 }
 
-public func finalClassAssignToVar5OwnedArg2(_ x: __shared FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' used after consume}}
+public func finalClassAssignToVar5OwnedArg2(_ x: borrowing FinalKlass, _ x2: consuming FinalKlass) { // expected-error {{'x2' used after consume}}
                                                                                         // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -856,7 +856,7 @@ public func finalClassAssignToVar5OwnedArg2(_ x: __shared FinalKlass, _ x2: cons
     consumeVal(x3)
 }
 
-public func finalClassAccessField(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassAccessField(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.k)
     for _ in 0..<1024 {
@@ -864,7 +864,7 @@ public func finalClassAccessField(_ x: __shared FinalKlass) { // expected-error 
     }
 }
 
-public func finalClassAccessFieldArg(_ x2: __shared FinalKlass) {
+public func finalClassAccessFieldArg(_ x2: borrowing FinalKlass) {
     borrowVal(x2.k)
     for _ in 0..<1024 {
         borrowVal(x2.k)
@@ -885,7 +885,7 @@ public func finalClassAccessFieldOwnedArg2(_ x2: consuming FinalKlass) {
     }
 }
 
-public func finalClassConsumeField(_ x: __shared FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func finalClassConsumeField(_ x: borrowing FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
@@ -893,7 +893,7 @@ public func finalClassConsumeField(_ x: __shared FinalKlass) { // expected-error
     }
 }
 
-public func finalClassConsumeFieldArg(_ x2: __shared FinalKlass) {
+public func finalClassConsumeFieldArg(_ x2: borrowing FinalKlass) {
     consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
     for _ in 0..<1024 {
         consumeVal(x2.k) // expected-error {{'x2.k' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it}}
@@ -936,14 +936,14 @@ public struct AggStruct {
     var pair: KlassPair
 }
 
-public func aggStructSimpleChainTest(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructSimpleChainTest(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func aggStructSimpleChainTestArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructSimpleChainTestArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -961,12 +961,12 @@ public func aggStructSimpleChainTestOwnedArg2(_ x2: consuming AggStruct) {
     borrowVal(k2)
 }
 
-public func aggStructSimpleNonConsumingUseTest(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructSimpleNonConsumingUseTest(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func aggStructSimpleNonConsumingUseTestArg(_ x2: __shared AggStruct) {
+public func aggStructSimpleNonConsumingUseTestArg(_ x2: borrowing AggStruct) {
     borrowVal(x2)
 }
 
@@ -978,14 +978,14 @@ public func aggStructSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming AggStruc
     borrowVal(x2)
 }
 
-public func aggStructMultipleNonConsumingUseTest(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructMultipleNonConsumingUseTest(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func aggStructMultipleNonConsumingUseTestArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructMultipleNonConsumingUseTestArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1003,7 +1003,7 @@ public func aggStructMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming AggStr
     consumeVal(x2)
 }
 
-public func aggStructUseAfterConsume(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructUseAfterConsume(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -1011,7 +1011,7 @@ public func aggStructUseAfterConsume(_ x: __shared AggStruct) { // expected-erro
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggStructUseAfterConsumeArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructUseAfterConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1029,14 +1029,14 @@ public func aggStructUseAfterConsumeOwnedArg2(_ x2: consuming AggStruct) { // ex
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggStructDoubleConsume(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructDoubleConsume(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggStructDoubleConsumeArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructDoubleConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -1051,7 +1051,7 @@ public func aggStructDoubleConsumeOwnedArg2(_ x2: consuming AggStruct) { // expe
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggStructLoopConsume(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructLoopConsume(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -1059,7 +1059,7 @@ public func aggStructLoopConsume(_ x: __shared AggStruct) { // expected-error {{
     }
 }
 
-public func aggStructLoopConsumeArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructLoopConsumeArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1077,7 +1077,7 @@ public func aggStructLoopConsumeOwnedArg2(_ x2: consuming AggStruct) { // expect
     }
 }
 
-public func aggStructDiamond(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructDiamond(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -1086,7 +1086,7 @@ public func aggStructDiamond(_ x: __shared AggStruct) { // expected-error {{'x' 
     }
 }
 
-public func aggStructDiamondArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructDiamondArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1110,7 +1110,7 @@ public func aggStructDiamondOwnedArg2(_ x2: consuming AggStruct) {
     }
 }
 
-public func aggStructDiamondInLoop(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructDiamondInLoop(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed by a use in a loop}}
@@ -1124,7 +1124,7 @@ public func aggStructDiamondInLoop(_ x: __shared AggStruct) { // expected-error 
     }
 }
 
-public func aggStructDiamondInLoopArg(_ x2: __shared AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggStructDiamondInLoopArg(_ x2: borrowing AggStruct) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1158,7 +1158,7 @@ public func aggStructDiamondInLoopOwnedArg2(_ x2: consuming AggStruct) { // expe
     }
 }
 
-public func aggStructAccessField(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructAccessField(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
@@ -1166,7 +1166,7 @@ public func aggStructAccessField(_ x: __shared AggStruct) { // expected-error {{
     }
 }
 
-public func aggStructAccessFieldArg(_ x2: __shared AggStruct) {
+public func aggStructAccessFieldArg(_ x2: borrowing AggStruct) {
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1187,7 +1187,7 @@ public func aggStructAccessFieldOwnedArg2(_ x2: consuming AggStruct) {
     }
 }
 
-public func aggStructConsumeField(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructConsumeField(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -1198,7 +1198,7 @@ public func aggStructConsumeField(_ x: __shared AggStruct) { // expected-error {
     }
 }
 
-public func aggStructConsumeFieldArg(_ x2: __shared AggStruct) {
+public func aggStructConsumeFieldArg(_ x2: borrowing AggStruct) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -1227,7 +1227,7 @@ public func aggStructConsumeFieldOwnedArg2(_ x2: consuming AggStruct) {
     }
 }
 
-public func aggStructAccessGrandField(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructAccessGrandField(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -1235,7 +1235,7 @@ public func aggStructAccessGrandField(_ x: __shared AggStruct) { // expected-err
     }
 }
 
-public func aggStructAccessGrandFieldArg(_ x2: __shared AggStruct) {
+public func aggStructAccessGrandFieldArg(_ x2: borrowing AggStruct) {
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -1256,7 +1256,7 @@ public func aggStructAccessGrandFieldOwnedArg2(_ x2: consuming AggStruct) {
     }
 }
 
-public func aggStructConsumeGrandField(_ x: __shared AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggStructConsumeGrandField(_ x: borrowing AggStruct) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -1267,7 +1267,7 @@ public func aggStructConsumeGrandField(_ x: __shared AggStruct) { // expected-er
     }
 }
 
-public func aggStructConsumeGrandFieldArg(_ x2: __shared AggStruct) {
+public func aggStructConsumeGrandFieldArg(_ x2: borrowing AggStruct) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -1371,14 +1371,14 @@ public struct AggGenericStruct<T> { // FIXME: for better test coverage this shou
     var pair: KlassPair
 }
 
-public func aggGenericStructSimpleChainTest(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTestArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -1396,12 +1396,12 @@ public func aggGenericStructSimpleChainTestOwnedArg2(_ x2: consuming AggGenericS
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTest(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleNonConsumingUseTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: __shared AggGenericStruct<String>) {
+public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: borrowing AggGenericStruct<String>) {
     borrowVal(x2)
 }
 
@@ -1413,14 +1413,14 @@ public func aggGenericStructSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming A
     borrowVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTest(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTest(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1438,7 +1438,7 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming
     consumeVal(x2)
 }
 
-public func aggGenericStructUseAfterConsume(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -1446,7 +1446,7 @@ public func aggGenericStructUseAfterConsume(_ x: __shared AggGenericStruct<Strin
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructUseAfterConsumeArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1464,14 +1464,14 @@ public func aggGenericStructUseAfterConsumeOwnedArg2(_ x2: consuming AggGenericS
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructDoubleConsume(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructDoubleConsumeArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -1486,7 +1486,7 @@ public func aggGenericStructDoubleConsumeOwnedArg2(_ x2: consuming AggGenericStr
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructLoopConsume(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsume(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -1494,7 +1494,7 @@ public func aggGenericStructLoopConsume(_ x: __shared AggGenericStruct<String>) 
     }
 }
 
-public func aggGenericStructLoopConsumeArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsumeArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1512,7 +1512,7 @@ public func aggGenericStructLoopConsumeOwnedArg2(_ x2: consuming AggGenericStruc
     }
 }
 
-public func aggGenericStructDiamond(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamond(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -1521,7 +1521,7 @@ public func aggGenericStructDiamond(_ x: __shared AggGenericStruct<String>) { //
     }
 }
 
-public func aggGenericStructDiamondArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1545,7 +1545,7 @@ public func aggGenericStructDiamondOwnedArg2(_ x2: consuming AggGenericStruct<St
     }
 }
 
-public func aggGenericStructDiamondInLoop(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoop(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed by a use in a loop}}
@@ -1559,7 +1559,7 @@ public func aggGenericStructDiamondInLoop(_ x: __shared AggGenericStruct<String>
     }
 }
 
-public func aggGenericStructDiamondInLoopArg(_ x2: __shared AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoopArg(_ x2: borrowing AggGenericStruct<String>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1593,7 +1593,7 @@ public func aggGenericStructDiamondInLoopOwnedArg2(_ x2: consuming AggGenericStr
     }
 }
 
-public func aggGenericStructAccessField(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
@@ -1601,7 +1601,7 @@ public func aggGenericStructAccessField(_ x: __shared AggGenericStruct<String>) 
     }
 }
 
-public func aggGenericStructAccessFieldArg(_ x2: __shared AggGenericStruct<String>) {
+public func aggGenericStructAccessFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1622,7 +1622,7 @@ public func aggGenericStructAccessFieldOwnedArg2(_ x2: consuming AggGenericStruc
     }
 }
 
-public func aggGenericStructConsumeField(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -1633,7 +1633,7 @@ public func aggGenericStructConsumeField(_ x: __shared AggGenericStruct<String>)
     }
 }
 
-public func aggGenericStructConsumeFieldArg(_ x2: __shared AggGenericStruct<String>) {
+public func aggGenericStructConsumeFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -1662,7 +1662,7 @@ public func aggGenericStructConsumeFieldOwnedArg2(_ x2: consuming AggGenericStru
     }
 }
 
-public func aggGenericStructAccessGrandField(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessGrandField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -1670,7 +1670,7 @@ public func aggGenericStructAccessGrandField(_ x: __shared AggGenericStruct<Stri
     }
 }
 
-public func aggGenericStructAccessGrandFieldArg(_ x2: __shared AggGenericStruct<String>) {
+public func aggGenericStructAccessGrandFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -1691,7 +1691,7 @@ public func aggGenericStructAccessGrandFieldOwnedArg2(_ x2: consuming AggGeneric
     }
 }
 
-public func aggGenericStructConsumeGrandField(_ x: __shared AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeGrandField(_ x: borrowing AggGenericStruct<String>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -1702,7 +1702,7 @@ public func aggGenericStructConsumeGrandField(_ x: __shared AggGenericStruct<Str
     }
 }
 
-public func aggGenericStructConsumeGrandFieldArg(_ x2: __shared AggGenericStruct<String>) {
+public func aggGenericStructConsumeGrandFieldArg(_ x2: borrowing AggGenericStruct<String>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -1735,14 +1735,14 @@ public func aggGenericStructConsumeGrandFieldOwnedArg2(_ x2: consuming AggGeneri
 // Aggregate Generic Struct + Generic But Body is Trivial //
 ////////////////////////////////////////////////////////////
 
-public func aggGenericStructSimpleChainTest<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleChainTestArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -1760,12 +1760,12 @@ public func aggGenericStructSimpleChainTestOwnedArg2<T>(_ x2: consuming AggGener
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTest<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructSimpleNonConsumingUseTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestArg<T>(_ x2: __shared AggGenericStruct<T>) {
+public func aggGenericStructSimpleNonConsumingUseTestArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     borrowVal(x2)
 }
 
@@ -1777,14 +1777,14 @@ public func aggGenericStructSimpleNonConsumingUseTestOwnedArg2<T>(_ x2: consumin
     borrowVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTest<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: __shared AggGenericStruct<T>) { //expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructMultipleNonConsumingUseTestArg<T>(_ x2: borrowing AggGenericStruct<T>) { //expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1802,7 +1802,7 @@ public func aggGenericStructMultipleNonConsumingUseTestOwnedArg2<T>(_ x2: consum
     consumeVal(x2)
 }
 
-public func aggGenericStructUseAfterConsume<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -1810,7 +1810,7 @@ public func aggGenericStructUseAfterConsume<T>(_ x: __shared AggGenericStruct<T>
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructUseAfterConsumeArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructUseAfterConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -1828,14 +1828,14 @@ public func aggGenericStructUseAfterConsumeOwnedArg2<T>(_ x2: consuming AggGener
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructDoubleConsume<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructDoubleConsumeArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDoubleConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -1850,7 +1850,7 @@ public func aggGenericStructDoubleConsumeOwnedArg2<T>(_ x2: consuming AggGeneric
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func aggGenericStructLoopConsume<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsume<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -1858,7 +1858,7 @@ public func aggGenericStructLoopConsume<T>(_ x: __shared AggGenericStruct<T>) { 
     }
 }
 
-public func aggGenericStructLoopConsumeArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructLoopConsumeArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -1876,7 +1876,7 @@ public func aggGenericStructLoopConsumeOwnedArg2<T>(_ x2: consuming AggGenericSt
     }
 }
 
-public func aggGenericStructDiamond<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamond<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -1885,7 +1885,7 @@ public func aggGenericStructDiamond<T>(_ x: __shared AggGenericStruct<T>) { // e
     }
 }
 
-public func aggGenericStructDiamondArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -1909,7 +1909,7 @@ public func aggGenericStructDiamondOwnedArg2<T>(_ x2: consuming AggGenericStruct
     }
 }
 
-public func aggGenericStructDiamondInLoop<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoop<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed by a use in a loop}}
@@ -1923,7 +1923,7 @@ public func aggGenericStructDiamondInLoop<T>(_ x: __shared AggGenericStruct<T>) 
     }
 }
 
-public func aggGenericStructDiamondInLoopArg<T>(_ x2: __shared AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func aggGenericStructDiamondInLoopArg<T>(_ x2: borrowing AggGenericStruct<T>) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -1957,7 +1957,7 @@ public func aggGenericStructDiamondInLoopOwnedArg2<T>(_ x2: consuming AggGeneric
     }
 }
 
-public func aggGenericStructAccessField<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
@@ -1965,7 +1965,7 @@ public func aggGenericStructAccessField<T>(_ x: __shared AggGenericStruct<T>) { 
     }
 }
 
-public func aggGenericStructAccessFieldArg<T>(_ x2: __shared AggGenericStruct<T>) {
+public func aggGenericStructAccessFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1986,7 +1986,7 @@ public func aggGenericStructAccessFieldOwnedArg2<T>(_ x2: consuming AggGenericSt
     }
 }
 
-public func aggGenericStructConsumeField<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -1997,7 +1997,7 @@ public func aggGenericStructConsumeField<T>(_ x: __shared AggGenericStruct<T>) {
     }
 }
 
-public func aggGenericStructConsumeFieldArg<T>(_ x2: __shared AggGenericStruct<T>) {
+public func aggGenericStructConsumeFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.lhs) // expected-note {{consuming use here}}
@@ -2026,7 +2026,7 @@ public func aggGenericStructConsumeFieldOwnedArg2<T>(_ x2: consuming AggGenericS
     }
 }
 
-public func aggGenericStructAccessGrandField<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructAccessGrandField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
@@ -2034,7 +2034,7 @@ public func aggGenericStructAccessGrandField<T>(_ x: __shared AggGenericStruct<T
     }
 }
 
-public func aggGenericStructAccessGrandFieldArg<T>(_ x2: __shared AggGenericStruct<T>) {
+public func aggGenericStructAccessGrandFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -2055,7 +2055,7 @@ public func aggGenericStructAccessGrandFieldOwnedArg2<T>(_ x2: consuming AggGene
     }
 }
 
-public func aggGenericStructConsumeGrandField<T>(_ x: __shared AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func aggGenericStructConsumeGrandField<T>(_ x: borrowing AggGenericStruct<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed by a use in a loop}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -2066,7 +2066,7 @@ public func aggGenericStructConsumeGrandField<T>(_ x: __shared AggGenericStruct<
     }
 }
 
-public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: __shared AggGenericStruct<T>) {
+public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: borrowing AggGenericStruct<T>) {
     // expected-error @-1 {{'x2' has a move only field that was consumed before later uses}}
     // expected-error @-2 {{'x2' has a move only field that was consumed before later uses}}
     consumeVal(x2.pair.lhs) // expected-note {{consuming use here}}
@@ -2107,14 +2107,14 @@ public enum EnumTy {
     func doSomething() -> Bool { true }
 }
 
-public func enumSimpleChainTest(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumSimpleChainTest(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func enumSimpleChainTestArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumSimpleChainTestArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let y2 = x2 // expected-note {{consuming use here}}
     let k2 = y2
     borrowVal(k2)
@@ -2132,12 +2132,12 @@ public func enumSimpleChainTestOwnedArg2(_ x2: consuming EnumTy) {
     borrowVal(k2)
 }
 
-public func enumSimpleNonConsumingUseTest(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumSimpleNonConsumingUseTest(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
 }
 
-public func enumSimpleNonConsumingUseTestArg(_ x2: __shared EnumTy) {
+public func enumSimpleNonConsumingUseTestArg(_ x2: borrowing EnumTy) {
     borrowVal(x2)
 }
 
@@ -2149,14 +2149,14 @@ public func enumSimpleNonConsumingUseTestOwnedArg2(_ x2: consuming EnumTy) {
     borrowVal(x2)
 }
 
-public func enumMultipleNonConsumingUseTest(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumMultipleNonConsumingUseTest(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func enumMultipleNonConsumingUseTestArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumMultipleNonConsumingUseTestArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2174,7 +2174,7 @@ public func enumMultipleNonConsumingUseTestOwnedArg2(_ x2: consuming EnumTy) {
     consumeVal(x2)
 }
 
-public func enumUseAfterConsume(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumUseAfterConsume(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     borrowVal(x2)
@@ -2182,7 +2182,7 @@ public func enumUseAfterConsume(_ x: __shared EnumTy) { // expected-error {{'x' 
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func enumUseAfterConsumeArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumUseAfterConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
@@ -2200,14 +2200,14 @@ public func enumUseAfterConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-e
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func enumDoubleConsume(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumDoubleConsume(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x  // expected-error {{'x2' consumed more than once}}
                 // expected-note @-1 {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func enumDoubleConsumeArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumDoubleConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
 }
@@ -2222,7 +2222,7 @@ public func enumDoubleConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-err
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func enumLoopConsume(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumLoopConsume(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -2230,7 +2230,7 @@ public func enumLoopConsume(_ x: __shared EnumTy) { // expected-error {{'x' has 
     }
 }
 
-public func enumLoopConsumeArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumLoopConsumeArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consuming use here}}
     }
@@ -2248,7 +2248,7 @@ public func enumLoopConsumeOwnedArg2(_ x2: consuming EnumTy) { // expected-error
     }
 }
 
-public func enumDiamond(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumDiamond(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     if boolValue {
         consumeVal(x2)
@@ -2257,7 +2257,7 @@ public func enumDiamond(_ x: __shared EnumTy) { // expected-error {{'x' has guar
     }
 }
 
-public func enumDiamondArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumDiamondArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if boolValue {
         consumeVal(x2) // expected-note {{consuming use here}}
     } else {
@@ -2281,7 +2281,7 @@ public func enumDiamondOwnedArg2(_ x2: consuming EnumTy) {
     }
 }
 
-public func enumDiamondInLoop(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumDiamondInLoop(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed by a use in a loop}}
@@ -2295,7 +2295,7 @@ public func enumDiamondInLoop(_ x: __shared EnumTy) { // expected-error {{'x' ha
     }
 }
 
-public func enumDiamondInLoopArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumDiamondInLoopArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consuming use here}}
@@ -2329,7 +2329,7 @@ public func enumDiamondInLoopOwnedArg2(_ x2: consuming EnumTy) { // expected-err
     }
 }
 
-public func enumAssignToVar1(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar1(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -2338,7 +2338,7 @@ public func enumAssignToVar1(_ x: __shared EnumTy) { // expected-error {{'x' has
     consumeVal(x3)
 }
 
-public func enumAssignToVar1Arg(_ x: __shared EnumTy, _ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumAssignToVar1Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                              // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -2346,7 +2346,7 @@ public func enumAssignToVar1Arg(_ x: __shared EnumTy, _ x2: __shared EnumTy) { /
     consumeVal(x3)
 }
 
-public func enumAssignToVar1OwnedArg(_ x: __shared EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumAssignToVar1OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
                                                                           // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -2354,7 +2354,7 @@ public func enumAssignToVar1OwnedArg(_ x: __shared EnumTy, _ x2: __owned EnumTy)
     consumeVal(x3)
 }
 
-public func enumAssignToVar1OwnedArg2(_ x: __shared EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
+public func enumAssignToVar1OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' consumed more than once}}
                                                                           // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
@@ -2362,7 +2362,7 @@ public func enumAssignToVar1OwnedArg2(_ x: __shared EnumTy, _ x2: consuming Enum
     consumeVal(x3)
 }
 
-public func enumAssignToVar2(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar2(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -2370,7 +2370,7 @@ public func enumAssignToVar2(_ x: __shared EnumTy) { // expected-error {{'x' has
     borrowVal(x3)
 }
 
-public func enumAssignToVar2Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumAssignToVar2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x3)
@@ -2388,33 +2388,33 @@ public func enumAssignToVar2OwnedArg2(_ x2: consuming EnumTy) { // expected-erro
     borrowVal(x3)
 }
 
-public func enumAssignToVar3(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar3(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func enumAssignToVar3Arg(_ x: __shared EnumTy, _ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumAssignToVar3Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                              // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func enumAssignToVar3OwnedArg(_ x: __shared EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar3OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func enumAssignToVar3OwnedArg2(_ x: __shared EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar3OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use here}}
     consumeVal(x3)
 }
 
-public func enumAssignToVar4(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar4(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     let x3 = x2 // expected-note {{consuming use here}}
@@ -2422,7 +2422,7 @@ public func enumAssignToVar4(_ x: __shared EnumTy) { // expected-error {{'x' has
     consumeVal(x3)
 }
 
-public func enumAssignToVar4Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumAssignToVar4Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     let x3 = x2 // expected-note {{consuming use here}}
     consumeVal(x2) // expected-note {{consuming use here}}
     consumeVal(x3)
@@ -2440,7 +2440,7 @@ public func enumAssignToVar4OwnedArg2(_ x2: consuming EnumTy) { // expected-erro
     consumeVal(x3)
 }
 
-public func enumAssignToVar5(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumAssignToVar5(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     var x3 = x2 // expected-note {{consuming use here}}
@@ -2449,7 +2449,7 @@ public func enumAssignToVar5(_ x: __shared EnumTy) { // expected-error {{'x' has
     consumeVal(x3)
 }
 
-public func enumAssignToVar5Arg(_ x: __shared EnumTy, _ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumAssignToVar5Arg(_ x: borrowing EnumTy, _ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                              // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2)
@@ -2457,7 +2457,7 @@ public func enumAssignToVar5Arg(_ x: __shared EnumTy, _ x2: __shared EnumTy) { /
     consumeVal(x3)
 }
 
-public func enumAssignToVar5OwnedArg(_ x: __shared EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
+public func enumAssignToVar5OwnedArg(_ x: borrowing EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' used after consume}}
                                                                           // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -2465,7 +2465,7 @@ public func enumAssignToVar5OwnedArg(_ x: __shared EnumTy, _ x2: __owned EnumTy)
     consumeVal(x3)
 }
 
-public func enumAssignToVar5OwnedArg2(_ x: __shared EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
+public func enumAssignToVar5OwnedArg2(_ x: borrowing EnumTy, _ x2: consuming EnumTy) { // expected-error {{'x2' used after consume}}
                                                                           // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use here}}
     borrowVal(x2) // expected-note {{non-consuming use here}}
@@ -2473,7 +2473,7 @@ public func enumAssignToVar5OwnedArg2(_ x: __shared EnumTy, _ x2: consuming Enum
     consumeVal(x3)
 }
 
-public func enumPatternMatchIfLet1(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchIfLet1(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
                // expected-note @-1 {{consuming use here}}
     if case let .klass(x) = x2 { // expected-note {{consuming use here}}
@@ -2484,7 +2484,7 @@ public func enumPatternMatchIfLet1(_ x: __shared EnumTy) { // expected-error {{'
     }
 }
 
-public func enumPatternMatchIfLet1Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchIfLet1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     if case let .klass(x) = x2 { // expected-note {{consuming use here}}
         borrowVal(x)
     }
@@ -2511,7 +2511,7 @@ public func enumPatternMatchIfLet1OwnedArg2(_ x2: consuming EnumTy) { // expecte
     }
 }
 
-public func enumPatternMatchIfLet2(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchIfLet2(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed by a use in a loop}}
                // expected-note @-1 {{consuming use here}}
     for _ in 0..<1024 {
@@ -2521,7 +2521,7 @@ public func enumPatternMatchIfLet2(_ x: __shared EnumTy) { // expected-error {{'
     }
 }
 
-public func enumPatternMatchIfLet2Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchIfLet2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     for _ in 0..<1024 {
         if case let .klass(x) = x2 {  // expected-note {{consuming use here}}
             borrowVal(x)
@@ -2545,7 +2545,7 @@ public func enumPatternMatchIfLet2OwnedArg2(_ x2: consuming EnumTy) { // expecte
     }
 }
 
-public func enumPatternMatchSwitch1(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch1(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     switch x2 { // expected-note {{consuming use here}}
@@ -2557,7 +2557,7 @@ public func enumPatternMatchSwitch1(_ x: __shared EnumTy) { // expected-error {{
     }
 }
 
-public func enumPatternMatchSwitch1Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch1Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         borrowVal(k)
@@ -2589,7 +2589,7 @@ public func enumPatternMatchSwitch1OwnedArg2(_ x2: consuming EnumTy) { // expect
     }
 }
 
-public func enumPatternMatchSwitch2(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     switch x2 {
     case let .klass(k):
@@ -2599,7 +2599,7 @@ public func enumPatternMatchSwitch2(_ x: __shared EnumTy) { // expected-error {{
     }
 }
 
-public func enumPatternMatchSwitch2Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k):
         borrowVal(k)
@@ -2627,7 +2627,7 @@ public func enumPatternMatchSwitch2OwnedArg2(_ x2: consuming EnumTy) {
 }
 
 // QOI: We can do better here. We should also flag x2
-public func enumPatternMatchSwitch2WhereClause(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2WhereClause(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' used after consume}}
                // expected-note @-1 {{consuming use here}}
     switch x2 { // expected-note {{consuming use here}}
@@ -2641,7 +2641,7 @@ public func enumPatternMatchSwitch2WhereClause(_ x: __shared EnumTy) { // expect
     }
 }
 
-public func enumPatternMatchSwitch2WhereClauseArg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2WhereClauseArg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
            where x2.doSomething():
@@ -2677,7 +2677,7 @@ public func enumPatternMatchSwitch2WhereClauseOwnedArg2(_ x2: consuming EnumTy) 
     }
 }
 
-public func enumPatternMatchSwitch2WhereClause2(_ x: __shared EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2WhereClause2(_ x: borrowing EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     switch x2 {
     case let .klass(k)
@@ -2690,7 +2690,7 @@ public func enumPatternMatchSwitch2WhereClause2(_ x: __shared EnumTy) { // expec
     }
 }
 
-public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: __shared EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: borrowing EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
     switch x2 { // expected-note {{consuming use here}}
     case let .klass(k)
            where boolValue:
@@ -2730,7 +2730,7 @@ public func enumPatternMatchSwitch2WhereClause2OwnedArg2(_ x2: consuming EnumTy)
 // Closure and Defer Tests //
 /////////////////////////////
 
-public func closureClassUseAfterConsume1(_ x: __shared Klass) {
+public func closureClassUseAfterConsume1(_ x: borrowing Klass) {
     // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     // expected-error @-2 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = { // expected-note {{closure capture here}}
@@ -2743,8 +2743,8 @@ public func closureClassUseAfterConsume1(_ x: __shared Klass) {
     f()
 }
 
-public func closureClassUseAfterConsume2(_ argX: __shared Klass) {
-    let f = { (_ x: __shared Klass) in // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureClassUseAfterConsume2(_ argX: borrowing Klass) {
+    let f = { (_ x: borrowing Klass) in // expected-error {{'x' has guaranteed ownership but was consumed}}
         let x2 = x // expected-error {{'x2' consumed more than once}}
                    // expected-note @-1 {{consuming use here}}
         borrowVal(x2)
@@ -2754,8 +2754,8 @@ public func closureClassUseAfterConsume2(_ argX: __shared Klass) {
     f(argX)
 }
 
-public func closureClassUseAfterConsumeArg(_ argX: __shared Klass) {
-    let f = { (_ x2: __shared Klass) in // expected-error {{'x2' has guaranteed ownership but was consumed}}
+public func closureClassUseAfterConsumeArg(_ argX: borrowing Klass) {
+    let f = { (_ x2: borrowing Klass) in // expected-error {{'x2' has guaranteed ownership but was consumed}}
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consuming use here}}
         consumeVal(x2) // expected-note {{consuming use here}}
@@ -2763,7 +2763,7 @@ public func closureClassUseAfterConsumeArg(_ argX: __shared Klass) {
     f(argX)
 }
 
-public func closureCaptureClassUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
     // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
@@ -2777,7 +2777,7 @@ public func closureCaptureClassUseAfterConsume(_ x: __shared Klass) { // expecte
     f()
 }
 
-public func closureCaptureClassUseAfterConsume1(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureCaptureClassUseAfterConsume1(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
     // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
@@ -2819,7 +2819,7 @@ public func closureCaptureClassUseAfterConsume3(_ x2: inout Klass) {
 }
 
 
-public func closureCaptureClassUseAfterConsumeError(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureCaptureClassUseAfterConsumeError(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x
     // expected-error @-1 {{'x2' consumed more than once}}
     // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
@@ -2835,7 +2835,7 @@ public func closureCaptureClassUseAfterConsumeError(_ x: __shared Klass) { // ex
     let _ = x3
 }
 
-public func closureCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
+public func closureCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{closure capture here}}
@@ -2898,7 +2898,7 @@ public func closureCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
     let _ = x3
 }
 
-public func deferCaptureClassUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func deferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     defer {
@@ -2910,7 +2910,7 @@ public func deferCaptureClassUseAfterConsume(_ x: __shared Klass) { // expected-
     consumeVal(x) // expected-note {{consuming use here}}
 }
 
-public func deferCaptureClassUseAfterConsume2(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func deferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
@@ -2924,7 +2924,7 @@ public func deferCaptureClassUseAfterConsume2(_ x: __shared Klass) { // expected
     let _ = x3
 }
 
-public func deferCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
+public func deferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     borrowVal(x2)
     defer {
@@ -2981,7 +2981,7 @@ public func deferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming Klass) {
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func closureAndDeferCaptureClassUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureAndDeferCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
@@ -2995,7 +2995,7 @@ public func closureAndDeferCaptureClassUseAfterConsume(_ x: __shared Klass) { //
     f()
 }
 
-public func closureAndDeferCaptureClassUseAfterConsume2(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureAndDeferCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
     // expected-error @-2 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
@@ -3011,7 +3011,7 @@ public func closureAndDeferCaptureClassUseAfterConsume2(_ x: __shared Klass) { /
     f()
 }
 
-public func closureAndDeferCaptureClassUseAfterConsume3(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureAndDeferCaptureClassUseAfterConsume3(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' consumed more than once}}
@@ -3030,7 +3030,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3(_ x: __shared Klass) { /
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
+public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     let f = { // expected-note {{closure capture here}}
@@ -3104,7 +3104,7 @@ public func closureAndDeferCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming 
     consumeVal(x2) // expected-note {{consuming use here}}
 }
 
-public func closureAndClosureCaptureClassUseAfterConsume(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureAndClosureCaptureClassUseAfterConsume(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-note {{consuming use here}}
     // expected-error @-1 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
     // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
@@ -3119,7 +3119,7 @@ public func closureAndClosureCaptureClassUseAfterConsume(_ x: __shared Klass) { 
     f()
 }
 
-public func closureAndClosureCaptureClassUseAfterConsume2(_ x: __shared Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+public func closureAndClosureCaptureClassUseAfterConsume2(_ x: borrowing Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     let x2 = x // expected-error {{'x2' consumed more than once}}
     // expected-note @-1 {{consuming use here}}
     // expected-error @-2 {{'x2' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
@@ -3139,7 +3139,7 @@ public func closureAndClosureCaptureClassUseAfterConsume2(_ x: __shared Klass) {
 }
 
 
-public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: __shared Klass) {
+public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: borrowing Klass) {
     // expected-error @-1 {{'x2' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     // expected-error @-2 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
     // expected-error @-3 {{'x2' has guaranteed ownership but was consumed due to being captured by a closure}}
@@ -3260,7 +3260,7 @@ func sameCallSiteTestConsumeTwice(_ k: __owned Klass) { // expected-error {{'k' 
 }
 
 func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' used after consume}}
-    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: __shared Klass) {}
+    func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: borrowing Klass) {}
     consumeKlassAndUseKlass(k, k)
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
