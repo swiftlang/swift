@@ -422,7 +422,7 @@ struct GenericGlobalActor<T> {
 
 @available(SwiftStdlib 5.1, *)
 @MainActor func beets_ma() { onions_sga() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-// expected-note@-1 3{{calls to global function 'beets_ma()' from outside of its actor context are implicitly asynchronous}}
+// expected-note@-1 4{{calls to global function 'beets_ma()' from outside of its actor context are implicitly asynchronous}}
 
 @available(SwiftStdlib 5.1, *)
 actor Crystal {
@@ -863,7 +863,7 @@ extension SomeClassInActor.ID {
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
   // expected-note@+2 2 {{property declared here}}
-  // expected-note@+1 2 {{mutation of this property is only permitted within the actor}}
+  // expected-note@+1 3 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
   // expected-note@+1 {{mutation of this property is only permitted within the actor}}
@@ -971,18 +971,18 @@ actor SomeActorWithInits {
   }
 
   deinit {
-    let _ = self.nonSendable // okay
+    let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
-      isolated() // okay
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
       mutableState += 1 // okay
       nonisolated()
     }
 
     let _ = {
       defer {
-        isolated() // okay
-        mutableState += 1  // okay
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
         nonisolated()
       }
       nonisolated()
@@ -990,7 +990,7 @@ actor SomeActorWithInits {
   }
 
 
-  func isolated() { } // expected-note 7 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -1000,7 +1000,7 @@ class SomeClassWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  static var shared = SomeClassWithInits() // expected-note {{static property declared here}}
+  static var shared = SomeClassWithInits() // expected-note 2{{static property declared here}}
 
   init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
     self.mutableState = 42
@@ -1011,8 +1011,8 @@ class SomeClassWithInits {
 
   deinit {
     print(mutableState) // Okay, we're actor-isolated
-    print(SomeClassWithInits.shared) // Okay, we're actor-isolated
-    beets_ma() // Okay, we're actor-isolated
+    print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+    beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
 
   func isolated() { }
@@ -1347,7 +1347,7 @@ actor Butterfly {
   }
 }
 
-// expected-note@+1 {{calls to global function 'takeIsolated' from outside of its actor context are implicitly asynchronous}}
+// expected-note@+1 2 {{calls to global function 'takeIsolated' from outside of its actor context are implicitly asynchronous}}
 func takeIsolated(_ val: isolated SelfParamIsolationNonMethod) {}
 func take(_ val: SelfParamIsolationNonMethod) {}
 
@@ -1410,13 +1410,16 @@ actor SelfParamIsolationNonMethod {
   }
 
   deinit {
-    acceptAsyncSendableClosureInheriting { self.f() } // fine from actor isolation perspective, and closure is non-escaping
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
     acceptAsyncSendableClosure { self.f() }
 
-    takeIsolated(self) // okay
+    // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
+    takeIsolated(self)
 
     take(self)
   }
@@ -1435,7 +1438,9 @@ final class MainActorInit: Sendable {
   }
 
   deinit {
-    acceptAsyncSendableClosureInheriting { self.f() } // fine from actor isolation perspective, and closure is non-escaping
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
@@ -1447,9 +1452,10 @@ final class MainActorInit: Sendable {
 
 actor DunkTracker {
   private var lebron: Int?
-  private var curry: Int?
+  private var curry: Int? // expected-note {{property declared here}}
 
   deinit {
+    // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a non-isolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
       
     }

@@ -1506,6 +1506,7 @@ namespace  {
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)

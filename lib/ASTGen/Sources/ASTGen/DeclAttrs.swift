@@ -221,6 +221,7 @@ extension ASTGenVisitor {
         .inheritActorContext,
         .inheritsConvenienceInitializers,
         .inlinable,
+        .isolated,
         .lexicalLifetimes,
         .lldbDebuggerFunction,
         .marker,

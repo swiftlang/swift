@@ -50,7 +50,7 @@ actor ActorNoOp {
     self.probe.probeExpectedExecutor = self.unownedExecutor
   }
 
-  deinit {
+  isolated deinit {
     expectTrue(isCurrentExecutor(self.unownedExecutor))
     expectEqual(expectedNumber, TL.number)
     checkTaskLocalStack()
@@ -65,8 +65,7 @@ actor ProxyActor: Actor {
     self.impl = ActorNoOp(expectedNumber: expectedNumber, group: group)
   }
 
-  // Explicit deinit to force isolation
-  deinit {}
+  isolated deinit {}
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     return impl.unownedExecutor

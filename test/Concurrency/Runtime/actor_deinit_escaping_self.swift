@@ -17,7 +17,7 @@ actor EscapeLocked {
     k += 1
   }
   
-  deinit {
+  isolated deinit {
     let g = DispatchGroup()
     g.enter()
     Task.detached {

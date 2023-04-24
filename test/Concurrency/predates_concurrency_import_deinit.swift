@@ -15,7 +15,7 @@ actor ActorWithDeinit {
   var ns: NonStrictClass = NonStrictClass()
   var ss: StrictStruct = StrictStruct()
 
-  nonisolated deinit {
+  deinit {
     print(ns)
     print(ss) // expected-warning{{cannot access property 'ss' with a non-sendable type 'StrictStruct' from non-isolated deinit}}
   }
