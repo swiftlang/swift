@@ -74,6 +74,7 @@
 /include/swift/Sema/                               @hborla @slavapestov @xedin
 /include/swift/Sema/CS*                            @hborla @xedin
 /include/swift/Sema/Constraint*                    @hborla @xedin
+/include/swift/SymbolGraphGen/                     @QuietMisdreavus
 /include/swift/Threading                           @al45tair
 
 # lib
@@ -93,6 +94,7 @@
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
 /lib/DependencyScan                                 @artemcm
 /lib/Driver                                         @artemcm
+/lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus
 /lib/Frontend/*ModuleInterface*                     @artemcm @tshortli
 # TODO: /lib/IRGen/
 /lib/IDE/                                           @ahoppen @bnbarham @rintaro
@@ -121,6 +123,7 @@
 /lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin
 /lib/Serialization/SerializedModuleLoader.cpp       @artemcm
+/lib/SymbolGraphGen                                 @QuietMisdreavus
 /lib/Threading                                      @al45tair
 
 # localization
@@ -153,6 +156,7 @@
 # TODO: /test/SILOptimizer/
 /test/ScanDependencies/                             @artemcm
 /test/Sema/                                         @hborla @slavapestov @xedin
+/test/SymbolGraph/                                  @QuietMisdreavus
 /test/decl/                                         @hborla @slavapestov
 /test/decl/protocol/                                @AnthonyLatsis @hborla @slavapestov
 # FIXME: This file could have a dedicated directory.
