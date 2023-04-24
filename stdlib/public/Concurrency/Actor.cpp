@@ -2172,7 +2172,8 @@ public:
 SWIFT_CC(swift)
 static void swift_task_deinitOnExecutorImpl(void *object,
                                             DeinitWorkFunction *work,
-                                            SerialExecutorRef newExecutor) {
+                                            SerialExecutorRef newExecutor,
+                                            size_t rawFlags) {
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.

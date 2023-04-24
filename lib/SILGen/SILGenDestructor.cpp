@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
@@ -407,9 +408,13 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
     auto castedDeallocator =
         B.createConvertFunction(loc, dtx, workFuncType, false);
 
+    auto wordTy = SILType::getBuiltinWordType(getASTContext());
+    auto *flagsInst =
+        B.createIntegerLiteral(loc, wordTy, 0);
+
     // Schedule isolated execution
     B.createApply(loc, swiftDeinitOnExecutorFunc, {},
-                  {castedSelf, castedDeallocator, executor});
+                  {castedSelf, castedDeallocator, executor, flagsInst});
   });
 }
 
