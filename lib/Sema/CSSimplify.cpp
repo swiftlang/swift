@@ -2276,6 +2276,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2489,13 +2490,9 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
   // The count types of two pack expansion types must have the same shape.
-  auto *shapeLoc = getConstraintLocator(
-      locator.withPathElement(ConstraintLocator::PackShape));
-  auto *shapeTypeVar = createTypeVariable(shapeLoc, TVO_CanBindToPack);
-  addConstraint(ConstraintKind::ShapeOf,
-                expansion1->getCountType(), shapeTypeVar, shapeLoc);
-  addConstraint(ConstraintKind::ShapeOf,
-                expansion2->getCountType(), shapeTypeVar, shapeLoc);
+  addConstraint(ConstraintKind::SameShape, expansion1->getCountType(),
+                expansion2->getCountType(),
+                locator.withPathElement(ConstraintLocator::PackShape));
 
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
@@ -2655,6 +2652,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     return true;
   }
 
@@ -3162,6 +3160,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6815,6 +6814,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::PackElementOf:
     case ConstraintKind::ShapeOf:
     case ConstraintKind::ExplicitGenericArguments:
+    case ConstraintKind::SameShape:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -13190,6 +13190,18 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
+static bool hasUnresolvedPackVars(Type type) {
+  // We can't compute a reduced shape if the input type still
+  // contains type variables that might bind to pack archetypes
+  // or pack expansions.
+  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  type->getTypeVariables(typeVars);
+  return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {
+    return typeVar->getImpl().canBindToPack() ||
+           typeVar->getImpl().isPackExpansion();
+  });
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -13229,6 +13241,51 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   auto shape = type1->getReducedShape();
   addConstraint(ConstraintKind::Bind, shape, type2, locator);
   return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  type1 = simplifyType(type1);
+  type2 = simplifyType(type2);
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *sameShape =
+          Constraint::create(*this, ConstraintKind::SameShape, type1, type2,
+                             getConstraintLocator(locator));
+
+      addUnsolvedConstraint(sameShape);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  if (hasUnresolvedPackVars(type1) || hasUnresolvedPackVars(type2))
+    return formUnsolved();
+
+  auto shape1 = type1->getReducedShape();
+  auto shape2 = type2->getReducedShape();
+
+  if (shape1->isEqual(shape2))
+    return SolutionKind::Solved;
+
+  if (shouldAttemptFixes()) {
+    if (type1->hasPlaceholder() || type2->hasPlaceholder())
+      return SolutionKind::Solved;
+
+    unsigned impact = 1;
+    if (locator.endsWith<LocatorPathElt::AnyRequirement>())
+      impact = assessRequirementFailureImpact(*this, shape1, locator);
+
+    auto *fix = SkipSameShapeRequirement::create(*this, type1, type2,
+                                                 getConstraintLocator(locator));
+    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  return SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
@@ -14718,6 +14775,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::SameShape:
+    return simplifySameShapeConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ExplicitGenericArguments:
     return simplifyExplicitGenericArgumentsConstraint(
         first, second, subflags, locator);
@@ -14889,13 +14949,7 @@ void ConstraintSystem::addConstraint(Requirement req,
     auto type1 = req.getFirstType();
     auto type2 = req.getSecondType();
 
-    auto *shapeLoc = getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::PackShape));
-    auto typeVar = createTypeVariable(shapeLoc,
-                                      TVO_CanBindToPack);
-
-    addConstraint(ConstraintKind::ShapeOf, type1, typeVar, locator);
-    addConstraint(ConstraintKind::ShapeOf, type2, typeVar, locator);
+    addConstraint(ConstraintKind::SameShape, type1, type2, locator);
     return;
   }
 
@@ -15318,6 +15372,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyShapeOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
         constraint.getLocator());
+
+  case ConstraintKind::SameShape:
+    return simplifySameShapeConstraint(constraint.getFirstType(),
+                                       constraint.getSecondType(),
+                                       /*flags*/ None, constraint.getLocator());
 
   case ConstraintKind::ExplicitGenericArguments:
     return simplifyExplicitGenericArgumentsConstraint(

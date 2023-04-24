@@ -4871,6 +4871,12 @@ private:
       Type type1, Type type2, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
+  /// Simplify a same-shape constraint by comparing the reduced shape of the
+  /// left hand side to the right hand side.
+  SolutionKind simplifySameShapeConstraint(Type type1, Type type2,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,

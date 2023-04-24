@@ -133,7 +133,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
 
   _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each U' and 'each T' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each T' and 'each U' have the same shape}}
 }
 
 protocol Generatable {
