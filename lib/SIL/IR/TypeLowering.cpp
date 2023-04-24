@@ -4034,10 +4034,12 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
 
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-    return getDestructorInterfaceType(cast<DestructorDecl>(vd),
-                                      c.kind == SILDeclRef::Kind::Deallocator,
-                                      c.isForeign);
-  
+  case SILDeclRef::Kind::IsolatedDeallocator:
+    return getDestructorInterfaceType(
+        cast<DestructorDecl>(vd),
+        c.kind == SILDeclRef::Kind::Deallocator, // TODO: Handled isolated
+        c.isForeign);
+
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(var->hasStorage() &&
@@ -4076,7 +4078,8 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
-  case SILDeclRef::Kind::Deallocator: {
+  case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator: {
     auto captureInfo = getLoweredLocalCaptures(c);
     return ::getGenericSignatureWithCapturedEnvironments(
       *c.getAnyFunctionRef(), captureInfo);
