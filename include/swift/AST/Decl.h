@@ -1099,14 +1099,19 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<NoEagerMoveAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
+  /// The effective lifetime resulting from the decorations on the declaration.
+  ///
+  /// Usually, this, not getLifetimeAnnotationFromAttributes should be used.
+  LifetimeAnnotation getLifetimeAnnotation() const;
+
+  /// The source-level lifetime attribute, either @_eagerMove or @_noEagerMove
+  /// that the declaration bears.
+  ///
+  /// Usually getLifetimeAnnotation should be used.
+  ///
+  /// Needed to access the attributes before the AST has been fully formed, such
+  /// as when printing.
+  LifetimeAnnotation getLifetimeAnnotationFromAttributes() const;
 
   bool isNoImplicitCopy() const {
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
@@ -6327,6 +6332,8 @@ public:
   Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
 
+  LifetimeAnnotation getLifetimeAnnotation() const;
+
   /// Is the type of this parameter 'inout'?
   bool isInOut() const { return getSpecifier() == Specifier::InOut; }
 
@@ -7337,6 +7344,8 @@ public:
   bool isMainTypeMainMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);

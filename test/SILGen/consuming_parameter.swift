@@ -4,7 +4,7 @@ func bar(_: String) {}
 
 // CHECK-LABEL: sil {{.*}} @${{.*}}3foo
 func foo(y: consuming String, z: String) -> () -> String {
-    // CHECK: bb0(%0 : @owned $String, %1 : @guaranteed $String):
+    // CHECK: bb0(%0 : @_eagerMove @owned $String, %1 : @guaranteed $String):
     // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }
     // CHECK:   [[Y:%.*]] = project_box [[BOX]]
     // CHECK:   store %0 to [init] [[Y]]
@@ -33,7 +33,7 @@ struct Butt {
 
     // CHECK-LABEL: sil {{.*}} @${{.*}}4Butt{{.*}}6merged
     consuming func merged(with other: Butt) -> () -> Butt {
-        // CHECK: bb0(%0 : @guaranteed $Butt, %1 : @owned $Butt):
+        // CHECK: bb0(%0 : @guaranteed $Butt, %1 : @_eagerMove @owned $Butt):
         // CHECK:   [[BOX:%.*]] = alloc_box ${ var Butt }
         // CHECK:   [[SELF:%.*]] = project_box [[BOX]]
         // CHECK:   store %1 to [init] [[SELF]]
