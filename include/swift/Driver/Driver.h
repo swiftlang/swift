@@ -168,6 +168,7 @@ public:
     Batch,           // swiftc
     SILOpt,          // sil-opt
     SILFuncExtractor,// sil-func-extractor
+    SILNM,           // sil-nm
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph

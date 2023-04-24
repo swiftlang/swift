@@ -53,7 +53,6 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps_binaries
       lldb-moduleimport-test
       sil-llvm-gen
-      sil-nm
       sil-passpipeline-dumper
       swift-frontend
       swift-demangle
