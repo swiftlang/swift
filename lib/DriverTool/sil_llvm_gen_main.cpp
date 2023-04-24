@@ -1,4 +1,4 @@
-//===--- SILLLVMGen.cpp ---------------------------------------------------===//
+//===--- sil_llvm_gen_main.cpp --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -48,107 +48,107 @@
 #include <cstdio>
 using namespace swift;
 
-static llvm::cl::opt<std::string> InputFilename(llvm::cl::desc("input file"),
-                                                llvm::cl::init("-"),
-                                                llvm::cl::Positional);
+struct SILLLVMGenOptions {
+  llvm::cl::opt<std::string>
+    InputFilename = llvm::cl::opt<std::string>(llvm::cl::desc("input file"),
+                                                  llvm::cl::init("-"),
+                                                  llvm::cl::Positional);
 
-static llvm::cl::opt<std::string>
-    OutputFilename("o", llvm::cl::init("-"), llvm::cl::desc("output filename"));
+  llvm::cl::opt<std::string>
+    OutputFilename = llvm::cl::opt<std::string>("o", llvm::cl::init("-"), llvm::cl::desc("output filename"));
 
-static llvm::cl::list<std::string>
-    ImportPaths("I",
-                llvm::cl::desc("add a directory to the import search path"));
+  llvm::cl::list<std::string>
+    ImportPaths = llvm::cl::list<std::string>("I",
+                  llvm::cl::desc("add a directory to the import search path"));
 
-static llvm::cl::list<std::string> FrameworkPaths(
-    "F", llvm::cl::desc("add a directory to the framework search path"));
+  llvm::cl::list<std::string>
+    FrameworkPaths = llvm::cl::list<std::string>(
+      "F", llvm::cl::desc("add a directory to the framework search path"));
 
-static llvm::cl::opt<std::string>
-    ModuleName("module-name",
-               llvm::cl::desc("The name of the module if processing"
-                              " a module. Necessary for processing "
-                              "stdin."));
+  llvm::cl::opt<std::string>
+    ModuleName = llvm::cl::opt<std::string>("module-name",
+                 llvm::cl::desc("The name of the module if processing"
+                                " a module. Necessary for processing "
+                                "stdin."));
 
-static llvm::cl::opt<std::string> ResourceDir(
-    "resource-dir",
-    llvm::cl::desc("The directory that holds the compiler resource files"));
+  llvm::cl::opt<std::string>
+    ResourceDir = llvm::cl::opt<std::string>(
+      "resource-dir",
+      llvm::cl::desc("The directory that holds the compiler resource files"));
 
-static llvm::cl::opt<std::string>
-    SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
-                                  "importer."),
-            llvm::cl::init(""));
+  llvm::cl::opt<std::string>
+    SDKPath = llvm::cl::opt<std::string>("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
+                                                               "importer."),
+              llvm::cl::init(""));
 
-static llvm::cl::opt<std::string> Target("target",
-                                         llvm::cl::desc("target triple"));
+  llvm::cl::opt<std::string>
+    Target = llvm::cl::opt<std::string>("target",
+                                           llvm::cl::desc("target triple"));
 
-static llvm::cl::opt<bool>
-    PrintStats("print-stats", llvm::cl::desc("Print various statistics"));
+  llvm::cl::opt<bool>
+    PrintStats = llvm::cl::opt<bool>("print-stats", llvm::cl::desc("Print various statistics"));
 
-static llvm::cl::opt<std::string>
-    ModuleCachePath("module-cache-path",
-                    llvm::cl::desc("Clang module cache path"));
+  llvm::cl::opt<std::string>
+    ModuleCachePath = llvm::cl::opt<std::string>("module-cache-path",
+                      llvm::cl::desc("Clang module cache path"));
 
-static llvm::cl::opt<bool>
-    PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
+  llvm::cl::opt<bool>
+    PerformWMO = llvm::cl::opt<bool>("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-static llvm::cl::opt<IRGenOutputKind> OutputKind(
-    "output-kind", llvm::cl::desc("Type of output to produce"),
-    llvm::cl::values(clEnumValN(IRGenOutputKind::LLVMAssemblyAfterOptimization,
-                                "llvm-as", "Emit llvm assembly"),
-                     clEnumValN(IRGenOutputKind::LLVMBitcode, "llvm-bc",
-                                "Emit llvm bitcode"),
-                     clEnumValN(IRGenOutputKind::NativeAssembly, "as",
-                                "Emit native assembly"),
-                     clEnumValN(IRGenOutputKind::ObjectFile, "object",
-                                "Emit an object file")),
-    llvm::cl::init(IRGenOutputKind::ObjectFile));
+  llvm::cl::opt<IRGenOutputKind>
+    OutputKind = llvm::cl::opt<IRGenOutputKind>(
+      "output-kind", llvm::cl::desc("Type of output to produce"),
+      llvm::cl::values(clEnumValN(IRGenOutputKind::LLVMAssemblyAfterOptimization,
+                                  "llvm-as", "Emit llvm assembly"),
+                       clEnumValN(IRGenOutputKind::LLVMBitcode, "llvm-bc",
+                                  "Emit llvm bitcode"),
+                       clEnumValN(IRGenOutputKind::NativeAssembly, "as",
+                                  "Emit native assembly"),
+                       clEnumValN(IRGenOutputKind::ObjectFile, "object",
+                                  "Emit an object file")),
+      llvm::cl::init(IRGenOutputKind::ObjectFile));
 
-static llvm::cl::opt<bool>
-    DisableLegacyTypeInfo("disable-legacy-type-info",
-        llvm::cl::desc("Don't try to load backward deployment layouts"));
+  llvm::cl::opt<bool>
+    DisableLegacyTypeInfo = llvm::cl::opt<bool>("disable-legacy-type-info",
+          llvm::cl::desc("Don't try to load backward deployment layouts"));
+};
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
-int main(int argc, char **argv) {
-  PROGRAM_START(argc, argv);
+int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM IR Generator\n");
+  SILLLVMGenOptions options;
 
-  if (PrintStats)
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift LLVM IR Generator\n");
+
+  if (options.PrintStats)
     llvm::EnableStatistics();
 
   CompilerInvocation Invocation;
 
-  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(
-      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.setImportSearchPaths(options.ImportPaths);
   std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : FrameworkPaths) {
+  for (const auto &path : options.FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
   Invocation.setFrameworkSearchPaths(FramePaths);
   // Set the SDK path and target if given.
-  if (SDKPath.getNumOccurrences() == 0) {
+  if (options.SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
     if (SDKROOT)
-      SDKPath = SDKROOT;
+      options.SDKPath = SDKROOT;
   }
-  if (!SDKPath.empty())
-    Invocation.setSDKPath(SDKPath);
-  if (!Target.empty())
-    Invocation.setTargetTriple(Target);
-  if (!ResourceDir.empty())
-    Invocation.setRuntimeResourcePath(ResourceDir);
+  if (!options.SDKPath.empty())
+    Invocation.setSDKPath(options.SDKPath);
+  if (!options.Target.empty())
+    Invocation.setTargetTriple(options.Target);
+  if (!options.ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options.ResourceDir);
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
 
   // Setup the language options
@@ -160,16 +160,16 @@ int main(int argc, char **argv) {
 
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
-  Opts.OutputKind = OutputKind;
-  Opts.DisableLegacyTypeInfo = DisableLegacyTypeInfo;
+  Opts.OutputKind = options.OutputKind;
+  Opts.DisableLegacyTypeInfo = options.DisableLegacyTypeInfo;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+      Invocation.setUpInputForSILTool(options.InputFilename, options.ModuleName,
                                       /*alwaysSetModuleToMain*/ false,
-                                      /*bePrimary*/ !PerformWMO, extendedInfo);
+                                      /*bePrimary*/ !options.PerformWMO, extendedInfo);
   if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    fprintf(stderr, "Error! Failed to open file: %s\n", options.InputFilename.c_str());
     exit(-1);
   }
 
@@ -184,16 +184,16 @@ int main(int argc, char **argv) {
   }
 
   llvm::vfs::OnDiskOutputBackend Backend;
-  auto outFile = Backend.createFile(OutputFilename);
+  auto outFile = Backend.createFile(options.OutputFilename);
   if (!outFile) {
     CI.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
-                           OutputFilename, toString(outFile.takeError()));
+                           options.OutputFilename, toString(outFile.takeError()));
     return 1;
   }
   auto closeFile = llvm::make_scope_exit([&]() {
     if (auto E = outFile->keep()) {
       CI.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
-                             OutputFilename, toString(std::move(E)));
+                             options.OutputFilename, toString(std::move(E)));
     }
   });
 
@@ -204,10 +204,10 @@ int main(int argc, char **argv) {
   const auto &SILOpts = Invocation.getSILOptions();
   auto &SILTypes = CI.getSILTypes();
   auto moduleName = CI.getMainModule()->getName().str();
-  const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
+  const PrimarySpecificPaths PSPs(options.OutputFilename, options.InputFilename);
 
   auto getDescriptor = [&]() -> IRGenDescriptor {
-    if (PerformWMO) {
+    if (options.PerformWMO) {
       return IRGenDescriptor::forWholeModule(
           mod, Opts, TBDOpts, SILOpts, SILTypes,
           /*SILMod*/ nullptr, moduleName, PSPs);

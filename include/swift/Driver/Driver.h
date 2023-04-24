@@ -169,6 +169,7 @@ public:
     SILOpt,          // sil-opt
     SILFuncExtractor,// sil-func-extractor
     SILNM,           // sil-nm
+    SILLLVMGen,      // sil-llvm-gen
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
