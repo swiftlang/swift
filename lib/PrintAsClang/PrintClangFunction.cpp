@@ -1581,3 +1581,16 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
   bodyPrinter(typeRefs);
   outOfLineOS << "}\n";
 }
+
+ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+    PrimitiveTypeMapping &typeMapping,
+    SwiftToClangInteropContext &interopContext, DeclAndTypePrinter &declPrinter,
+    const ModuleDecl *emittedModule, Type ty) {
+  CFunctionSignatureTypePrinterModifierDelegate delegate;
+  CFunctionSignatureTypePrinter typePrinter(
+      llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
+      interopContext, delegate, emittedModule, declPrinter,
+      FunctionSignatureTypeUse::TypeReference);
+  return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
+                           /*isInOutParam=*/false);
+}
