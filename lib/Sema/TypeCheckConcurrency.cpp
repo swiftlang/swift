@@ -4954,7 +4954,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto &ctx = declContext->getASTContext();
 
   // Normally we are checking if overriding declaration can be called by calling
-  // overriden declaration But in case of destructors, overriden declaration is
+  // overriden declaration. But in case of destructors, overriden declaration is
   // always callable by definition and we are checking that subclas deinit can
   // call super deinit.
   bool isDtor = isa<DestructorDecl>(value);
@@ -5113,7 +5113,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     assert(actor && "could not find the actor that 'self' is isolated to");
 
     // Bootstrapping hack: force _Concurrency.MainActor.deinit() to be
-    // non-isolated
+    // non-isolated even when importing from SDK's swiftmodule without
+    // `nonisolated` attribute.
     if (isa<DestructorDecl>(value) && actor->getName().is("MainActor") &&
         actor->getDeclContext()->isModuleScopeContext() &&
         actor->getDeclContext()->getParentModule()->getABIName().is("Swift")) {
