@@ -1283,7 +1283,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (funcDecl->getParameters()->size() != 1)
       continue;
     if (auto param = funcDecl->getParameters()->front()) {
-      StructDecl* jobDecl;
+      StructDecl *jobDecl = nullptr;
       if (auto decl = C.getExecutorJobDecl()) {
         jobDecl = decl;
       } else if (auto decl = C.getJobDecl()) {
