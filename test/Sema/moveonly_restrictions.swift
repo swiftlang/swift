@@ -210,7 +210,7 @@ enum Color {
     case green
     case blue
 
-    static func same(_ c1: __shared Color, c2: __shared Color) -> Bool {
+    static func same(_ c1: borrowing Color, c2: borrowing Color) -> Bool {
         return c1 == c2
         // expected-error@-1 {{binary operator '==' cannot be applied to two 'Color' operands}}
     }
