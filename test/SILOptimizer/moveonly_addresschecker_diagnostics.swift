@@ -2378,7 +2378,7 @@ func fieldSensitiveTestReinitEnumMultiBlock2() {
 
 func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' consumed more than once}}
     func consumeKlassTwice(_ k: __owned Klass, _ k2: __owned Klass) {}
-    consumeKlassTwice(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
+    consumeKlassTwice(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access}}
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{consuming use here}}
     // expected-note @-3 {{conflicting access is here}}
@@ -2387,7 +2387,7 @@ func sameCallSiteTestConsumeTwice(_ k: inout Klass) { // expected-error {{'k' co
 
 func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndUseKlass(_ k: __owned Klass, _ k2: __shared Klass) {}
-    consumeKlassAndUseKlass(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
+    consumeKlassAndUseKlass(k, k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access}}
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
     // expected-note @-3 {{conflicting access is here}}
@@ -2396,7 +2396,7 @@ func sameCallSiteConsumeAndUse(_ k: inout Klass) { // expected-error {{'k' used 
 
 func inoutAndConsumingUse(_ k: inout Klass) { // expected-error {{'k' used after consume}}
     func consumeKlassAndInoutUseKlass(_ k: __owned Klass, _ k2: inout Klass) {}
-    consumeKlassAndInoutUseKlass(k, &k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access; consider copying to a local variable}}
+    consumeKlassAndInoutUseKlass(k, &k) // expected-error {{overlapping accesses to 'k', but deinitialization requires exclusive access}}
     // expected-note @-1 {{non-consuming use here}}
     // expected-note @-2 {{consuming use here}}
     // expected-note @-3 {{conflicting access is here}}
@@ -2503,7 +2503,7 @@ func borrowAndConsumeAtSameTimeTest2(x: consuming NonTrivialStruct) { // expecte
     borrowAndConsumeAtSameTime(x, consume: x)
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
-    // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+    // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
     // expected-note @-4 {{conflicting access is here}}
 }
 
