@@ -440,8 +440,8 @@ struct BorrowingOperand {
   /// values do not themselves introduce a borrow scope. In other words, they
   /// cannot be reborrowed.
   ///
-  /// If true, the visitBorrowIntroducingUserResults() can be called to acquire
-  /// each BorrowedValue that introduces a new borrow scopes.
+  /// If true, getBorrowIntroducingUserResult() can be called to acquire the
+  /// BorrowedValue that introduces a new borrow scope.
   bool hasBorrowIntroducingUser() const {
     // TODO: Can we derive this by running a borrow introducer check ourselves?
     switch (kind) {
@@ -461,19 +461,9 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Visit all of the "results" of the user of this operand that are borrow
-  /// scope introducers for the specific scope that this borrow scope operand
-  /// summarizes.
-  ///
-  /// Precondition: hasBorrowIntroducingUser() is true
-  ///
-  /// Returns false and early exits if \p visitor returns false.
-  bool visitBorrowIntroducingUserResults(
-      function_ref<bool(BorrowedValue)> visitor) const;
-
-  /// If this operand's user has a single borrowed value result return a
-  /// valid BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult();
+  /// If this operand's user has a borrowed value result return a valid
+  /// BorrowedValue instance.
+  BorrowedValue getBorrowIntroducingUserResult() const;
 
   /// Return the borrowing operand's value.
   SILValue getScopeIntroducingUserResult();
