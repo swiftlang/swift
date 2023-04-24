@@ -167,6 +167,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     SILOpt,          // sil-opt
+    SILFuncExtractor,// sil-func-extractor
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph

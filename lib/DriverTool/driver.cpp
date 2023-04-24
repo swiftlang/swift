@@ -66,6 +66,9 @@ std::string getExecutablePath(const char *FirstArg) {
 /// Run 'sil-opt'
 extern int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr);
 
+/// Run 'sil-func-extractor'
+extern int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr);
+
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
@@ -286,6 +289,8 @@ static int run_driver(StringRef ExecName,
   switch (TheDriver.getDriverKind()) {
   case Driver::DriverKind::SILOpt:
     return sil_opt_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SILFuncExtractor:
+    return sil_func_extractor_main(argv, (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),

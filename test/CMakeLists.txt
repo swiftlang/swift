@@ -52,7 +52,6 @@ function(get_test_dependencies SDK result_var_name)
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
       lldb-moduleimport-test
-      sil-func-extractor
       sil-llvm-gen
       sil-nm
       sil-passpipeline-dumper
