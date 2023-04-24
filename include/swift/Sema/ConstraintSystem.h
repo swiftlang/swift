@@ -3885,11 +3885,11 @@ public:
   /// variable representing a pack expansion type, let's resolve the expansion.
   ///
   /// \param typeVar The type variable representing pack expansion type.
-  /// \param locator The locator associated with contextual type.
+  /// \param contextualType The contextual type this pack expansion variable
+  /// would be bound/equated to.
   ///
   /// \returns `true` if pack expansion has been resolved, `false` otherwise.
-  bool resolvePackExpansion(TypeVariableType *typeVar,
-                            ConstraintLocatorBuilder locator);
+  bool resolvePackExpansion(TypeVariableType *typeVar, Type contextualType);
 
   /// Assign a fixed type to the given type variable.
   ///

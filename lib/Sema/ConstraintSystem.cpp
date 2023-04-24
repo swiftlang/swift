@@ -7229,21 +7229,6 @@ TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
     return;
   }
 
-  // Pack expansion type variable can only ever have one binding
-  // which is handled by \c resolvePackExpansion.
-  //
-  // There is no need to iterate over other bindings here because
-  // there is no use for contextual types (unlike closures that can
-  // propagate contextual information into the body).
-  if (TypeVar->getImpl().isPackExpansion()) {
-    for (const auto &entry : bindings.Defaults) {
-      auto *constraint = entry.second;
-      Bindings.push_back(getDefaultBinding(constraint));
-    }
-
-    return;
-  }
-
   // A binding to `Any` which should always be considered as a last resort.
   Optional<Binding> Any;
 
@@ -7259,6 +7244,40 @@ TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
       Bindings.push_back(binding);
     }
   };
+
+  if (TypeVar->getImpl().isPackExpansion()) {
+    SmallVector<Binding> viableBindings;
+
+    // Collect possible contextual types (keep in mind that pack
+    // expansion type variable gets bound to its "opened" type
+    // regardless). To be viable the binding has to come from `bind`
+    // or `equal` constraint (i.e. same-type constraint or explicit
+    // generic argument) and be fully resolved.
+    llvm::copy_if(bindings.Bindings, std::back_inserter(viableBindings),
+                  [&](const Binding &binding) {
+                    auto *source = binding.getSource();
+                    if (source->getKind() == ConstraintKind::Bind ||
+                        source->getKind() == ConstraintKind::Equal) {
+                      auto type = binding.BindingType;
+                      return type->is<PackExpansionType>() &&
+                             !type->hasTypeVariable();
+                    }
+                    return false;
+                  });
+
+    // If there is a single fully resolved contextual type, let's
+    // use it as a binding to help with performance and diagnostics.
+    if (viableBindings.size() == 1) {
+      addBinding(viableBindings.front());
+    } else {
+      for (const auto &entry : bindings.Defaults) {
+        auto *constraint = entry.second;
+        Bindings.push_back(getDefaultBinding(constraint));
+      }
+    }
+
+    return;
+  }
 
   for (const auto &binding : bindings.Bindings) {
     addBinding(binding);
