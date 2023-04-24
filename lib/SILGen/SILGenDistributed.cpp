@@ -88,31 +88,36 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 /// }
 /// \endverbatim
 void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
-                                                   ManagedValue selfValue,
+                                                   SILValue selfValue,
                                                    Type selfTy,
                                                    SILBasicBlock *isRemoteBB,
                                                    SILBasicBlock *isLocalBB) {
   ASTContext &ctx = getASTContext();
 
-  FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
-  assert(isRemoteFn && "Could not find 'is remote' function, is the "
-                       "'Distributed' module available?");
+  SILValue isRemoteResultUnwrapped;
+  {
+    FullExpr CleanupScope(Cleanups, CleanupLocation(Loc));
+    ManagedValue borrowedSelf = emitManagedBeginBorrow(Loc, selfValue);
 
-  auto conformances = SGM.M.getSwiftModule()->collectExistentialConformances(
-      selfTy->getCanonicalType(), ctx.getAnyObjectType());
+    FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
+    assert(isRemoteFn && "Could not find 'is remote' function, is the "
+                         "'Distributed' module available?");
 
-  ManagedValue selfAnyObject = B.createInitExistentialRef(
-      Loc,
-      /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
-      /*formalConcreteType=*/selfTy->getCanonicalType(),
-      selfValue, conformances);
-  auto result = emitApplyOfLibraryIntrinsic(
-      Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
+    auto conformances = SGM.M.getSwiftModule()->collectExistentialConformances(
+        selfTy->getCanonicalType(), ctx.getAnyObjectType());
 
-  SILValue isRemoteResult = std::move(result).forwardAsSingleValue(*this, Loc);
-  SILValue isRemoteResultUnwrapped =
-      emitUnwrapIntegerResult(Loc, isRemoteResult);
+    ManagedValue selfAnyObject = B.createInitExistentialRef(
+        Loc,
+        /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
+        /*formalConcreteType=*/selfTy->getCanonicalType(), borrowedSelf,
+        conformances);
+    auto result = emitApplyOfLibraryIntrinsic(
+        Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
 
+    SILValue isRemoteResult =
+        std::move(result).forwardAsSingleValue(*this, Loc);
+    isRemoteResultUnwrapped = emitUnwrapIntegerResult(Loc, isRemoteResult);
+  }
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
 

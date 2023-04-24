@@ -330,8 +330,7 @@ func test() {
   // CHECK-NEXT: resolve type:DA_userDefined_isolated, address:ActorAddress(address: "remote-2")
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-2")
-  // TODO: Fix this. Remote proxies should not have isolated deinit.
-  // CHECK-NEXT: Deinit ActorSystem: mainThread=false
+  // CHECK-NEXT: Deinit ActorSystem: mainThread=true
 
   print("DONE")
   // CHECK-NEXT: DONE
