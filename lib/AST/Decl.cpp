@@ -1094,6 +1094,25 @@ bool Decl::isStdlibDecl() const {
          DC->getParentModule()->isStdlibModule();
 }
 
+LifetimeAnnotation Decl::getLifetimeAnnotationFromAttributes() const {
+  auto &attrs = getAttrs();
+  if (attrs.hasAttribute<EagerMoveAttr>())
+    return LifetimeAnnotation::EagerMove;
+  if (attrs.hasAttribute<NoEagerMoveAttr>())
+    return LifetimeAnnotation::Lexical;
+  return LifetimeAnnotation::None;
+}
+
+LifetimeAnnotation Decl::getLifetimeAnnotation() const {
+  if (auto *pd = dyn_cast<ParamDecl>(this)) {
+    return pd->getLifetimeAnnotation();
+  }
+  if (auto *fd = dyn_cast<FuncDecl>(this)) {
+    return fd->getLifetimeAnnotation();
+  }
+  return getLifetimeAnnotationFromAttributes();
+}
+
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
   ASTContext &ctx = getASTContext();
 
@@ -7040,6 +7059,18 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
+  auto specifier = getSpecifier();
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (specifier == ParamDecl::Specifier::Consuming &&
+      !getType()->isPureMoveOnly()) {
+    if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::EagerMove;
+  }
+  return getLifetimeAnnotationFromAttributes();
+}
+
 StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
   switch (specifier) {
   case ParamSpecifier::Default:
@@ -9223,6 +9254,19 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
   return evaluateOrDefault(ctx.evaluator,
                            SelfAccessKindRequest{const_cast<FuncDecl *>(this)},
                            SelfAccessKind::NonMutating);
+}
+
+LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (getSelfAccessKind() == SelfAccessKind::Consuming) {
+    auto *selfDecl = getImplicitSelfDecl();
+    if (selfDecl && !selfDecl->getType()->isPureMoveOnly()) {
+      if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+        return LifetimeAnnotation::Lexical;
+      return LifetimeAnnotation::EagerMove;
+    }
+  }
+  return getLifetimeAnnotationFromAttributes();
 }
 
 bool FuncDecl::isCallAsFunctionMethod() const {
