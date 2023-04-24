@@ -552,8 +552,8 @@ public:
   FuncDecl *getAsyncMainDrainQueue();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
-  /// Retrieve the _Concurrency._performOnExecutor intrinsic.
-  FuncDecl *getPerformOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
+  FuncDecl *getDeinitOnExecutor();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 

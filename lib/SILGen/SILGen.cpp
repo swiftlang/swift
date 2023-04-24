@@ -448,8 +448,8 @@ FuncDecl *SILGenModule::getSwiftJobRun() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_swiftJobRun");
 }
 
-FuncDecl *SILGenModule::getPerformOnExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_performOnExecutor");
+FuncDecl *SILGenModule::getDeinitOnExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_deinitOnExecutor");
 }
 
 FuncDecl *SILGenModule::getExit() {

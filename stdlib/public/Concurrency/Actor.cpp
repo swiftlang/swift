@@ -2143,35 +2143,36 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 namespace {
 /// Job that allows to use executor API to schedule a block of task-less
 /// synchronous code.
-class AdHocJob : public Job {
+class IsolatedDeinitJob : public Job {
 private:
-  void *Context;
-  AdHocWorkFunction *Work;
+  void *Object;
+  DeinitWorkFunction *Work;
 
 public:
-  AdHocJob(JobPriority priority, void *context, AdHocWorkFunction *work)
-      : Job({JobKind::AdHoc, priority}, &process), Context(context),
+  IsolatedDeinitJob(JobPriority priority, void *object,
+                    DeinitWorkFunction *work)
+      : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
         Work(work) {}
 
   SWIFT_CC(swiftasync)
   static void process(Job *_job) {
-    auto *job = cast<AdHocJob>(_job);
-    void *ctx = job->Context;
-    AdHocWorkFunction *work = job->Work;
+    auto *job = cast<IsolatedDeinitJob>(_job);
+    void *object = job->Object;
+    DeinitWorkFunction *work = job->Work;
     delete job;
-    return work(ctx);
+    return work(object);
   }
 
   static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::AdHoc;
+    return job->Flags.getKind() == JobKind::IsolatedDeinit;
   }
 };
 } // namespace
 
 SWIFT_CC(swift)
-static void swift_task_performOnExecutorImpl(void *context,
-                                             AdHocWorkFunction *work,
-                                             SerialExecutorRef newExecutor) {
+static void swift_task_deinitOnExecutorImpl(void *object,
+                                            DeinitWorkFunction *work,
+                                            SerialExecutorRef newExecutor) {
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
@@ -2179,11 +2180,11 @@ static void swift_task_performOnExecutorImpl(void *context,
   // Note that swift_task_isCurrentExecutor() returns true for @MainActor
   // when running on the main thread without any executor
   if (swift_task_isCurrentExecutor(newExecutor)) {
-    return work(context); // 'return' forces tail call
+    return work(object); // 'return' forces tail call
   }
 
   // Optimize deallocation of the default actors
-  if (context == newExecutor.getIdentity() && newExecutor.isDefaultActor()) {
+  if (newExecutor.isDefaultActor() && object == newExecutor.getIdentity()) {
     // Try to take the lock. This should always succeed, unless someone is
     // running the actor using unsafe unowned reference.
     if (asImpl(newExecutor.getDefaultActor())->tryLock(false)) {
@@ -2202,7 +2203,7 @@ static void swift_task_performOnExecutorImpl(void *context,
       trackingInfo.enterAndShadow(newExecutor, TaskExecutorRef::undefined());
 
       // Run the work.
-      work(context);
+      work(object);
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
@@ -2222,7 +2223,7 @@ static void swift_task_performOnExecutorImpl(void *context,
   auto priority = currentTask ? swift_task_currentPriority(currentTask)
                               : swift_task_getCurrentThreadPriority();
 
-  auto job = new AdHocJob(priority, context, work);
+  auto job = new IsolatedDeinitJob(priority, object, work);
   swift_task_enqueue(job, newExecutor);
 }
 
