@@ -3337,6 +3337,13 @@ public:
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
 
+  /// Record all unbound type variables that occur in the given type
+  /// as being bound to "hole" type represented by \c PlaceholderType
+  /// in this constraint system.
+  ///
+  /// \param type The type on which to holeify.
+  void recordTypeVariablesAsHoles(Type type);
+
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
