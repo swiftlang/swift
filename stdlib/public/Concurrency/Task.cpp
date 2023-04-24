@@ -1674,56 +1674,6 @@ swift_task_createNullaryContinuationJobImpl(
   return job;
 }
 
-/// Job that allows to use executor API to schedule a block of task-less
-/// synchronous code.
-class AdHocJob : public Job {
-private:
-  void *Context;
-  AdHocWorkFunction *Work;
-
-public:
-  AdHocJob(JobPriority priority, void *context, AdHocWorkFunction *work)
-      : Job({JobKind::AdHoc, priority}, &process), Context(context),
-        Work(work) {}
-
-  SWIFT_CC(swiftasync)
-  static void process(Job *_job) {
-    auto *job = cast<AdHocJob>(_job);
-    void *ctx = job->Context;
-    AdHocWorkFunction *work = job->Work;
-    delete job;
-    return work(ctx);
-  }
-
-  static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::AdHoc;
-  }
-};
-
-SWIFT_CC(swift)
-static void swift_task_performOnExecutorImpl(void *context,
-                                             AdHocWorkFunction *work,
-                                             SerialExecutorRef newExecutor) {
-  auto currentExecutor = swift_task_getCurrentExecutor();
-
-  // If the current executor is compatible with running the new executor,
-  // we can just immediately continue running with the resume function
-  // we were passed in.
-  //
-  // Note that swift_task_isCurrentExecutor() returns true for @MainActor
-  // when running on the main thread without any executor
-  if (swift_task_isCurrentExecutor(newExecutor)) {
-    return work(context); // 'return' forces tail call
-  }
-
-  auto currentTask = swift_task_getCurrent();
-  auto priority = currentTask ? swift_task_currentPriority(currentTask)
-                              : swift_task_getCurrentThreadPriority();
-
-  auto job = new AdHocJob(priority, context, work);
-  swift_task_enqueue(job, newExecutor);
-}
-
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);

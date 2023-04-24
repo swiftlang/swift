@@ -55,6 +55,21 @@ actor ActorNoOp {
   }
 }
 
+actor ProxyActor: Actor {
+  private let impl: ActorNoOp
+
+  init(expectedNumber: Int, group: DispatchGroup) {
+    self.impl = ActorNoOp(expectedNumber: expectedNumber, group: group)
+  }
+
+  // Explicit deinit to force isolation
+  deinit {}
+
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    return impl.unownedExecutor
+  }
+}
+
 @globalActor actor AnotherActor: GlobalActor {
   static let shared = AnotherActor()
 
@@ -107,7 +122,7 @@ class ClassNoOp: Probe {
 let tests = TestSuite("Isolated Deinit")
 
 if #available(SwiftStdlib 5.1, *) {
-  tests.test("fast path") {
+  tests.test("class sync fast path") {
     let group = DispatchGroup()
     group.enter(1)
     Task {
@@ -120,15 +135,37 @@ if #available(SwiftStdlib 5.1, *) {
     group.wait()
   }
   
-  tests.test("slow path") {
+  tests.test("class sync slow path") {
     let group = DispatchGroup()
-    group.enter(2)
+    group.enter(1)
     Task {
-      TL.$number.withValue(37) {
-        _ = ActorNoOp(expectedNumber: 0, group: group)
-      }
       TL.$number.withValue(99) {
         _ = ClassNoOp(expectedNumber: 0, group: group)
+      }
+    }
+    group.wait()
+  }
+
+  tests.test("actor sync fast path") {
+    let group = DispatchGroup()
+    group.enter(1)
+    Task {
+      TL.$number.withValue(99) {
+        // Despite last release happening not on the actor itself,
+        // this is still a fast path due to optimisation for deallocating actors.
+        _ = ActorNoOp(expectedNumber: 99, group: group)
+      }
+    }
+    group.wait()
+  }
+
+  tests.test("actor sync slow path") {
+    let group = DispatchGroup()
+    group.enter(1)
+    Task {
+      TL.$number.withValue(99) {
+        // Using ProxyActor breaks optimization
+        _ = ProxyActor(expectedNumber: 0, group: group)
       }
     }
     group.wait()
