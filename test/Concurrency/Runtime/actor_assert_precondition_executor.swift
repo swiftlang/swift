@@ -78,10 +78,12 @@ actor Someone {
         await MainFriend().callCheckMainActor()
       }
 
+      #if !os(WASI)
       tests.test("precondition on actor (main): wrongly assume the main executor, from actor on other executor") {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor()
       }
+      #endif
 
       // === Global actor -----------------------------------------------------
 
