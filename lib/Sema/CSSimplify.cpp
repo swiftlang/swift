@@ -4196,15 +4196,15 @@ static bool isBindable(TypeVariableType *typeVar, Type type) {
 
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypesBindTypeVar(
-    TypeVariableType *typeVar, Type type, ConstraintKind kind,
+    TypeVariableType *typeVar, Type origType, ConstraintKind kind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator,
     llvm::function_ref<TypeMatchResult()> formUnsolvedResult) {
   assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
-  assert(!type->is<TypeVariableType>() && "Expected a non-type variable!");
+  assert(!origType->is<TypeVariableType>() && "Expected a non-type variable!");
 
   // Simplify the right-hand type and perform the "occurs" check.
   typeVar = getRepresentative(typeVar);
-  type = simplifyType(type, flags);
+  auto type = simplifyType(origType, flags);
   if (!isBindable(typeVar, type)) {
     if (shouldAttemptFixes()) {
       // If type variable is allowed to be a hole and it can't be bound to
@@ -4306,7 +4306,7 @@ ConstraintSystem::matchTypesBindTypeVar(
     if (!flags.contains(TMF_BindingTypeVariable))
       return formUnsolvedResult();
 
-    return resolvePackExpansion(typeVar, locator)
+    return resolvePackExpansion(typeVar, origType)
                ? getTypeMatchSuccess()
                : getTypeMatchFailure(locator);
   }
@@ -11354,17 +11354,30 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 }
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
-                                            ConstraintLocatorBuilder locator) {
+                                            Type contextualType) {
+  auto *locator = typeVar->getImpl().getLocator();
+
   Type openedExpansionType;
-  if (auto last = locator.last()) {
-    auto expansionElt = last->castTo<LocatorPathElt::PackExpansionType>();
-    openedExpansionType = expansionElt.getOpenedType();
+  if (auto expansionElt =
+          locator->getLastElementAs<LocatorPathElt::PackExpansionType>()) {
+    openedExpansionType = expansionElt->getOpenedType();
   }
 
   if (!openedExpansionType)
     return false;
 
-  assignFixedType(typeVar, openedExpansionType, getConstraintLocator(locator));
+  assignFixedType(typeVar, openedExpansionType, locator);
+
+  // We have a fully resolved contextual pack expansion type, let's
+  // apply it right away.
+  if (!contextualType->isEqual(openedExpansionType)) {
+    assert(contextualType->is<PackExpansionType>() &&
+           !contextualType->hasTypeVariable());
+    auto result = matchTypes(openedExpansionType, contextualType,
+                             ConstraintKind::Equal, {}, locator);
+    return !result.isFailure();
+  }
+
   return true;
 }
 
