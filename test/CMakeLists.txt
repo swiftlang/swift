@@ -85,6 +85,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-ar
       llvm-as
       llvm-bcanalyzer
+      llvm-cas
       llvm-cov
       llvm-dis
       llvm-dwarfdump

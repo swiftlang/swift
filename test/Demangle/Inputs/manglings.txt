@@ -456,3 +456,4 @@ $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfM
 @__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_ ---> peer macro @addCompletionHandler expansion #1 of f in macro_expand_peers.S
 @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered
+$sxSo8_NSRangeVRlzCRl_Cr0_llySo12ModelRequestCyxq_GIsPetWAlYl_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(witness_method) @yield_once <A, B where A: AnyObject, B: AnyObject> @substituted <A> (@inout A) -> (@yields @inout __C._NSRange) for <__C.ModelRequest<A, B>>

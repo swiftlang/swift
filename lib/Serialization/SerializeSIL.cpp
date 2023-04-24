@@ -1869,7 +1869,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto &opei = cast<OpenPackElementInst>(SI);
     auto envRef =
       S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
-    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
+    auto operand = opei.getIndexOperand();
+    auto operandRef = addValueRef(operand);
+    auto operandType = operand->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+
+    SILOpenPackElementLayout::emitRecord(Out, ScratchRecord,
+          SILAbbrCodes[SILOpenPackElementLayout::Code],
+          envRef,
+          operandTypeRef, unsigned(operandType.getCategory()),
+          operandRef);
     break;
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
@@ -3059,6 +3068,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
   registerSILAbbr<SILInstHasSymbolLayout>();
+  registerSILAbbr<SILOpenPackElementLayout>();
   registerSILAbbr<SILPackElementGetLayout>();
   registerSILAbbr<SILPackElementSetLayout>();
 

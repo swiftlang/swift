@@ -748,6 +748,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
       Opts.Features.insert(*feature);
     }
+
+    // Hack: In order to support using availability macros in SPM packages, we
+    // need to be able to use:
+    //    .enableExperimentalFeature("AvailabilityMacro='...'")
+    // within the package manifest and the feature recognizer can't recognize
+    // this form of feature, so specially handle it here until features can
+    // maybe have extra arguments in the future.
+    auto strRef = StringRef(A->getValue());
+    if (strRef.startswith("AvailabilityMacro=")) {
+      auto availability = strRef.split("=").second;
+
+      Opts.AvailabilityMacros.push_back(availability.str());
+    }
   }
 
   // Map historical flags over to future features.
@@ -826,8 +839,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_package_name)) {
     auto pkgName = A->getValue();
-    if (!Lexer::isIdentifier(pkgName))
-      Diags.diagnose(SourceLoc(), diag::error_bad_package_name, pkgName);
+    if (StringRef(pkgName).empty())
+      Diags.diagnose(SourceLoc(), diag::error_empty_package_name);
     else
       Opts.PackageName = pkgName;
   }
@@ -1451,6 +1464,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
+
+  // Forward the FrontendOptions to clang importer option so it can be
+  // accessed when creating clang module compilation invocation.
+  if (FrontendOpts.EnableCAS)
+    Opts.CASPath = FrontendOpts.CASPath;
 
   return false;
 }

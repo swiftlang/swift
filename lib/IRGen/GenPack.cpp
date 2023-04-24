@@ -954,6 +954,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     return openablePackParams.contains(
         ty->getRootGenericParam()->getCanonicalType());
   };
+
   enumerateGenericSignatureRequirements(
       environment->getGenericSignature().getCanonicalSignature(),
       [&](GenericRequirement requirement) {
@@ -996,7 +997,18 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     llvm::SmallVector<llvm::Value *, 2> wtables;
     auto *metadata = emitTypeMetadataPackElementRef(
         IGF, packType, conformances, index, MetadataState::Complete, wtables);
-    IGF.bindArchetype(archetype, metadata, MetadataState::Complete, wtables);
+
+    auto reqt = GenericRequirement::forMetadata(archetype);
+    bindGenericRequirement(IGF, reqt, metadata, MetadataState::Complete,
+                           SubstitutionMap());
+
+    assert(conformances.size() == wtables.size());
+    for (unsigned i : indices(wtables)) {
+      auto reqt = GenericRequirement::forWitnessTable(
+          archetype, conformances[i].getRequirement());
+      bindGenericRequirement(IGF, reqt, wtables[i], MetadataState::Complete,
+                             SubstitutionMap());
+    }
   }
 }
 

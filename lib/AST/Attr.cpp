@@ -853,8 +853,18 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
 
 Optional<const DeclAttribute *>
 OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
-  if (!mod || mod->isInGeneratedBuffer(Attr->AtLoc))
+  auto declLoc = decl->getStartLoc();
+  auto *mod = decl->getModuleContext();
+  auto *declFile = mod->getSourceFileContainingLocation(declLoc);
+  auto *attrFile = mod->getSourceFileContainingLocation(Attr->AtLoc);
+  if (!declFile || !attrFile)
+    return Attr;
+
+  // Only attributes in the same buffer as the declaration they're attached to
+  // are part of the original attribute list.
+  if (declFile->getBufferID() != attrFile->getBufferID())
     return None;
+
   return Attr;
 }
 
@@ -1372,9 +1382,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           [&](MacroIntroducedDeclName name) {
             Printer << getMacroIntroducedDeclNameString(name.getKind());
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
-              StringRef nameText = name.getIdentifier().str();
-              bool shouldEscape = escapeKeywordInContext(
-                  nameText, PrintNameContext::Normal) || nameText == "$";
+              SmallString<32> buffer;
+              StringRef nameText = name.getName().getString(buffer);
+              bool shouldEscape = nameText == "$";
               Printer << "(";
               if (shouldEscape)
                 Printer << "`";

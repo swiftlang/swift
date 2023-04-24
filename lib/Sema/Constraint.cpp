@@ -380,9 +380,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " (isolated)";
 
     if (Locator) {
-      Out << " [[";
+      Out << " @ ";
       Locator->dump(sm, Out);
-      Out << "]]";
     }
     Out << ":\n";
     
@@ -479,7 +478,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -487,7 +486,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -608,9 +607,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   }
 
   if (Locator && !skipLocator) {
-    Out << " [[";
+    Out << " @ ";
     Locator->dump(sm, Out);
-    Out << "]];";
   }
 }
 

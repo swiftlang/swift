@@ -27,6 +27,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -882,6 +883,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
+  BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
   BLOCK_RECORD(index_block, NESTED_TYPE_DECLS);
@@ -924,6 +926,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
+  BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
+  BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
+  BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1214,8 +1219,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // distinguish them.
   ImportSet publicImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::Exported);
-  ImportSet privateImportSet =
-      getImportsAsSet(M, ModuleDecl::ImportFilterKind::Default);
+  ImportSet defaultImportSet =
+      getImportsAsSet(M, {ModuleDecl::ImportFilterKind::Default,
+                          ModuleDecl::ImportFilterKind::SPIOnly});
   ImportSet packageOnlyImportSet =
       getImportsAsSet(M, ModuleDecl::ImportFilterKind::PackageOnly);
   ImportSet internalOrBelowImportSet =
@@ -1265,7 +1271,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // form here.
     if (publicImportSet.count(import))
       stableImportControl = ImportControl::Exported;
-    else if (privateImportSet.count(import))
+    else if (defaultImportSet.count(import))
       stableImportControl = ImportControl::Normal;
     else if (packageOnlyImportSet.count(import))
       stableImportControl = ImportControl::PackageOnly;
@@ -1676,39 +1682,42 @@ void Serializer::writeLocalNormalProtocolConformance(
 }
 
 serialization::ProtocolConformanceID
-Serializer::addConformanceRef(ProtocolConformance *conformance,
-                              GenericEnvironment *genericEnv) {
-  return addConformanceRef(ProtocolConformanceRef(conformance), genericEnv);
+Serializer::addConformanceRef(ProtocolConformance *conformance) {
+  return addConformanceRef(ProtocolConformanceRef(conformance));
 }
 
 serialization::ProtocolConformanceID
-Serializer::addConformanceRef(ProtocolConformanceRef ref,
-                              GenericEnvironment *genericEnv) {
+Serializer::addConformanceRef(PackConformance *conformance) {
+  return addConformanceRef(ProtocolConformanceRef(conformance));
+}
+
+serialization::ProtocolConformanceID
+Serializer::addConformanceRef(ProtocolConformanceRef ref) {
   if (ref.isInvalid()) {
     return 0;
   }
 
-  // Abstract protocol conformances are very common, so we avoid making
-  // a separate record for them by just emitting a declaration reference
-  // to the protocol and then using the low bit of the ID to distinguish
-  // abstract from concrete conformances.
-
   if (ref.isAbstract()) {
     auto protocolID = addDeclRef(ref.getAbstract());
     assert(protocolID != 0);
-    return protocolID << 1;
+    return ((protocolID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Abstract);
   }
 
-  auto conformance = ref.getConcrete();
-
-  if (genericEnv && conformance->getType()->hasArchetype()) {
-    ref = ref.mapConformanceOutOfContext();
-    assert(!ref.isInvalid() && !ref.isAbstract());
-    conformance = ref.getConcrete();
+  if (ref.isConcrete()) {
+    auto conformance = ref.getConcrete();
+    auto rawID = ConformancesToSerialize.addRef(conformance);
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Concrete);
   }
 
-  auto rawID = ConformancesToSerialize.addRef(conformance);
-  return (rawID << 1) + 1;
+  if (ref.isPack()) {
+    auto rawID = PackConformancesToSerialize.addRef(ref.getPack());
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
+            SerializedProtocolConformanceKind::Pack);
+  }
+
+  llvm_unreachable("Unknown conformance kind");
 }
 
 void
@@ -1794,6 +1803,25 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         requirementData);
     break;
   }
+}
+
+void
+Serializer::writeASTBlockEntity(PackConformance *conformance) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[PackConformanceLayout::Code];
+
+  SmallVector<ProtocolConformanceID, 4> patternConformances;
+  for (auto patternConf : conformance->getPatternConformances()) {
+    patternConformances.push_back(addConformanceRef(patternConf));
+  }
+
+  PackConformanceLayout::emitRecord(
+      Out, ScratchRecord,
+      abbrCode,
+      addTypeRef(conformance->getType()),
+      addDeclRef(conformance->getProtocol()),
+      patternConformances);
 }
 
 SmallVector<ProtocolConformanceID, 4>
@@ -3013,17 +3041,27 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto rawMacroRole =
           getRawStableMacroRole(theAttr->getMacroRole());
       SmallVector<IdentifierID, 4> introducedDeclNames;
-      for (auto name : theAttr->getNames()) {
+      for (auto introducedName : theAttr->getNames()) {
         introducedDeclNames.push_back(IdentifierID(
-            getRawStableMacroIntroducedDeclNameKind(name.getKind())));
-        introducedDeclNames.push_back(
-            S.addDeclBaseNameRef(name.getIdentifier()));
+            getRawStableMacroIntroducedDeclNameKind(introducedName.getKind())));
+
+        auto name = introducedName.getName();
+        introducedDeclNames.push_back(S.addDeclBaseNameRef(name.getBaseName()));
+        if (name.isSimpleName()) {
+          introducedDeclNames.push_back(0);
+          continue;
+        }
+
+        auto argumentLabels = name.getArgumentNames();
+        introducedDeclNames.push_back(argumentLabels.size() + 1);
+        for (auto label : argumentLabels)
+          introducedDeclNames.push_back(S.addDeclBaseNameRef(label));
       }
 
       MacroRoleDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           static_cast<uint8_t>(theAttr->getMacroSyntax()),
-          rawMacroRole, theAttr->getNames().size(),
+          rawMacroRole, introducedDeclNames.size(),
           introducedDeclNames);
       return;
     }
@@ -3124,14 +3162,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (hasSafeMembers)
         return true;
 
-      // We can mark the extension unsafe only if it has no  public
+      // We can mark the extension unsafe only if it has no public
       // conformances.
       auto protocols = ext->getLocalProtocols(
                                         ConformanceLookupKind::OnlyExplicit);
-      bool hasSafeConformances = std::any_of(protocols.begin(),
-                                             protocols.end(),
-                                             isDeserializationSafe);
-      if (hasSafeConformances)
+      if (!protocols.empty())
         return true;
 
       // Truly empty extensions are safe, it may happen in swiftinterfaces.
@@ -3140,6 +3175,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       return false;
     }
+
+    if (isa<ProtocolDecl>(decl))
+      return true;
 
     auto value = cast<ValueDecl>(decl);
 
@@ -5640,6 +5678,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
+  registerDeclTypeAbbr<PackConformanceLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
   registerDeclTypeAbbr<SILLayoutLayout>();
@@ -5679,6 +5718,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(ConformancesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
   } while (wroteSomething);
 }
@@ -6282,6 +6323,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
+    writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
 
     Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,

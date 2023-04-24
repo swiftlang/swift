@@ -23,6 +23,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -349,6 +350,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
+
+  Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
+  Opts.CASPath =
+      Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
+  Opts.CASFSRootID = Args.getLastArgValue(OPT_cas_fs);
+
   return false;
 }
 

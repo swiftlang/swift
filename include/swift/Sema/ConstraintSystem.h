@@ -5765,7 +5765,7 @@ public:
   void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    Out << "type variable " << TypeVar->getString(PO)
+    Out << "type variable binding " << TypeVar->getString(PO)
         << " := " << Binding.BindingType->getString(PO);
   }
 };

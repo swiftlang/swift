@@ -196,6 +196,39 @@ func testVar() -> Int {
   return x
 }
 
+func testPoundIf1() -> Int {
+  let x = if .random() {
+    #if true
+    1
+    #else
+    ""
+    #endif
+  } else {
+    #if false
+    ""
+    #else
+    2
+    #endif
+  }
+  return x
+}
+
+func testPoundIf2() -> Int {
+  if .random() {
+    #if false
+    0
+    #else
+    #if true
+    if .random() { 0 } else { 1 }
+    #endif
+    #endif
+  } else {
+    #if true
+    if .random() { 0 } else { 1 }
+    #endif
+  }
+}
+
 func testCatch() -> Int {
   do {
     let x = if .random() {

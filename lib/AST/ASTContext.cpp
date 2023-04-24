@@ -2023,6 +2023,8 @@ static void diagnoseScannerFailure(StringRef moduleName,
 Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate,
+    bool optionalDependencyLookup,
+    bool isTestableImport,
     llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
   // Check whether we've cached this result.
@@ -2044,12 +2046,14 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
 
   for (auto &loader : getImpl().ModuleLoaders) {
     if (auto dependencies =
-        loader->getModuleDependencies(moduleName, cache, delegate))
+        loader->getModuleDependencies(moduleName, cache, delegate,
+                                      isTestableImport))
       return dependencies;
   }
 
-  diagnoseScannerFailure(moduleName, Diags, cache,
-                         dependencyOf);
+  if (!optionalDependencyLookup)
+    diagnoseScannerFailure(moduleName, Diags, cache,
+                           dependencyOf);
   return None;
 }
 
@@ -4594,8 +4598,9 @@ CanSILFunctionType SILFunctionType::get(
     ProtocolConformanceRef witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
-  assert(!ext.isPseudogeneric() || genericSig);
-  
+  assert(!ext.isPseudogeneric() || genericSig ||
+         coroutineKind != SILCoroutineKind::None);
+
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 
@@ -6407,6 +6412,7 @@ LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();
@@ -6429,6 +6435,7 @@ LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
   if (!plugin) {
     Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                    llvm::toString(plugin.takeError()));
+    return nullptr;
   }
 
   return plugin.get();

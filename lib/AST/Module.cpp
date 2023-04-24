@@ -816,13 +816,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return foundSourceFile;
 }
 
-bool ModuleDecl::isInGeneratedBuffer(SourceLoc loc) {
-  SourceFile *file = getSourceFileContainingLocation(loc);
-  if (!file)
-    return false;
-  return file->Kind == SourceFileKind::MacroExpansion;
-}
-
 std::pair<unsigned, SourceLoc>
 ModuleDecl::getOriginalLocation(SourceLoc loc) const {
   assert(loc.isValid());
@@ -4072,7 +4065,8 @@ void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
   getTopLevelDecls(nonExpandedDecls);
   for (auto *decl : nonExpandedDecls) {
     decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      results.push_back(auxDecl);
+      if (!isa<ExtensionDecl>(auxDecl))
+        results.push_back(auxDecl);
     });
     results.push_back(decl);
   }

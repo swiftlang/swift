@@ -365,20 +365,40 @@ public struct ComplexNesting<A, B, C, D> {
 }
 
 internal enum InternalEnum {
-    case a(Int, AnyObject)
-    case b(Int)
-    case c(String)
+  case a(Int, AnyObject)
+  case b(Int)
+  case c(String)
 }
 
 public struct InternalEnumWrapper {
-    internal let x: InternalEnum
-    internal let y: Int = 32
+  internal let x: InternalEnum
+  internal let y: Int = 32
 
-    public init(x: AnyObject) {
-        self.x = .a(23, x)
+  public init(x: AnyObject) {
+    self.x = .a(23, x)
+  }
+}
+
+public struct PrespecializedStruct<T> {
+    let y: Int = 0
+    let x: T
+    let z: T
+
+    public init(x: T) {
+        self.x = x
+        self.z = x
     }
 }
 
+@inline(never)
+public func consume<T>(_ x: T.Type) {
+    withExtendedLifetime(x) {}
+}
+public func preSpec() {
+    consume(PrespecializedStruct<AnyObject>.self)
+    consume(PrespecializedStruct<SimpleClass>.self)
+    consume(PrespecializedStruct<Int>.self)
+}
 
 @inline(never)
 public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {

@@ -74,6 +74,15 @@ func testit() {
 
   // CHECK-OUTPUT: doubleSize: true
   print("doubleSize: \(S.doubleSize == getSize(S.self) * 2)")
+
+  // CHECK-OUTPUT: metatype-size-1: true
+  print("metatype-size-1: \(MemoryLayout<S.Type>.size == MemoryLayout<UnsafeRawPointer>.size)")
+  // CHECK-OUTPUT: metatype-size-2: true
+  print("metatype-size-2: \(getSize(S.Type.self) == MemoryLayout<UnsafeRawPointer>.size)")
+  // CHECK-OUTPUT: metatype-alignment: true
+  print("metatype-alignment: \(getAlignment(S.Type.self) == MemoryLayout<UnsafeRawPointer>.alignment)")
+  // CHECK-OUTPUT: metatype-stride: true
+  print("metatype-stride: \(getStride(S.Type.self) == MemoryLayout<UnsafeRawPointer>.stride)")
 }
 
 testit()

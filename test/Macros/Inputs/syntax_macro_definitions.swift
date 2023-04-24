@@ -38,14 +38,25 @@ public struct FileIDMacro: ExpressionMacro {
     of macro: Node,
     in context: Context
   ) throws -> ExprSyntax {
-    guard let sourceLoc = context.location(of: macro),
-      let fileID = sourceLoc.file
-    else {
+    guard let sourceLoc = context.location(of: macro) else {
       throw CustomError.message("can't find location for macro")
     }
 
-    let fileLiteral: ExprSyntax = "\(literal: fileID)"
+    let fileLiteral: ExprSyntax = "\(sourceLoc.file)"
     return fileLiteral.with(\.leadingTrivia, macro.leadingTrivia)
+  }
+}
+
+public struct AssertMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "assert(\(argument))"
   }
 }
 
@@ -554,7 +565,7 @@ public struct AddExtMembers: MemberMacro {
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let uniqueClassName = context.createUniqueName("uniqueClass")
+    let uniqueClassName = context.makeUniqueName("uniqueClass")
 
     let instanceMethod: DeclSyntax =
       """
@@ -711,7 +722,7 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
         fatalError("missing source location information")
       }
 
-      print("Source range for LHS is \(lhsStartLoc.file!): \(lhsStartLoc.line!):\(lhsStartLoc.column!)-\(lhsEndLoc.line!):\(lhsEndLoc.column!)")
+      print("Source range for LHS is \(lhsStartLoc.file): \(lhsStartLoc.line):\(lhsStartLoc.column)-\(lhsEndLoc.line):\(lhsEndLoc.column)")
 
       return .visitChildren
     }
@@ -1358,5 +1369,20 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
       print("from expr")
       """)),
     ]
+  }
+}
+
+public struct MultiStatementClosure: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+      {
+        let temp = 10
+        let result = temp
+        return result
+      }()
+      """
   }
 }

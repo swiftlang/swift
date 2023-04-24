@@ -707,7 +707,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   constraints::dumpAnchor(anchor, sm, out);
 
   for (auto elt : getPath()) {
-    out << " -> ";
+    out << " → ";
     elt.dump(out);
   }
   out << ']';

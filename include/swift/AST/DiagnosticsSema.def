@@ -1143,6 +1143,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(single_value_stmt_branch_empty,none,
+      "expected expression in branch of '%0' expression",
+      (StmtKind))
 ERROR(single_value_stmt_branch_must_end_in_throw,none,
       "non-expression branch of '%0' expression may only end with a 'throw'",
       (StmtKind))
@@ -1685,6 +1688,12 @@ ERROR(expose_generic_requirement_to_cxx,none,
       "generic requirements for %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_throwing_to_cxx,none,
       "%0 %1 can not yet be represented in C++ as it may throw an error", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_indirect_enum_cxx,none,
+      "indirect enum %0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_type_to_cxx,none,
+      "enum %0 can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_tuple_to_cxx,none,
+      "enum %0 can not yet be represented in C++ as one of its cases has multiple associated values", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))

@@ -299,11 +299,37 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
-Expr *BraceStmt::getSingleExpressionElement() const {
-  if (getElements().size() != 1)
-    return nullptr;
+static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
+  while (true) {
+    // Single element brace.
+    if (elts.size() == 1)
+      return true;
 
-  return getElements()[0].dyn_cast<Expr *>();
+    // See if we have a #if as the first element of a 2 element brace, if so we
+    // can recuse into its active clause. If so, the second element will be the
+    // active element.
+    if (elts.size() == 2) {
+      if (auto *D = elts.front().dyn_cast<Decl *>()) {
+        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+          elts = ICD->getActiveClauseElements();
+          continue;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+ASTNode BraceStmt::getSingleActiveElement() const {
+  return hasSingleActiveElement(getElements()) ? getLastElement() : nullptr;
+}
+
+Expr *BraceStmt::getSingleActiveExpression() const {
+  return getSingleActiveElement().dyn_cast<Expr *>();
+}
+
+Stmt *BraceStmt::getSingleActiveStatement() const {
+  return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(Evaluator &eval) const {
@@ -438,6 +464,66 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
       pat->markOwnedByStatement(this);
   
   Cond = e;
+}
+
+/// Whether or not this conditional stmt rebinds self with a `let self`
+/// or `let self = self` condition. If `requireLoadExpr` is `true`,
+/// additionally requires that the RHS of the self condition is a `LoadExpr`.
+bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
+                                         bool requireLoadExpr) const {
+  return llvm::any_of(getCond(), [&Ctx, requireLoadExpr](const auto &cond) {
+    return cond.rebindsSelf(Ctx, requireLoadExpr);
+  });
+}
+
+/// Whether or not this conditional stmt rebinds self with a `let self`
+/// or `let self = self` condition. If `requireLoadExpr` is `true`,
+/// additionally requires that the RHS of the self condition is a `LoadExpr`.
+bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
+                                       bool requireLoadExpr) const {
+  auto pattern = getPatternOrNull();
+  if (!pattern) {
+    return false;
+  }
+
+  // Check whether or not this pattern defines a new `self` decl
+  bool isSelfRebinding = false;
+  if (pattern->getBoundName() == Ctx.Id_self) {
+    isSelfRebinding = true;
+  }
+
+  else if (auto OSP = dyn_cast<OptionalSomePattern>(pattern)) {
+    if (auto subPattern = OSP->getSubPattern()) {
+      isSelfRebinding = subPattern->getBoundName() == Ctx.Id_self;
+    }
+  }
+
+  if (!isSelfRebinding) {
+    return false;
+  }
+
+  // Check that the RHS expr is exactly `self` and not something else
+  Expr *exprToCheckForDRE = getInitializerOrNull();
+  if (!exprToCheckForDRE) {
+    return false;
+  }
+
+  if (requireLoadExpr && !isa<LoadExpr>(exprToCheckForDRE)) {
+    return false;
+  }
+
+  if (auto *load = dyn_cast<LoadExpr>(exprToCheckForDRE)) {
+    exprToCheckForDRE = load->getSubExpr();
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(
+          exprToCheckForDRE->getSemanticsProvidingExpr())) {
+    auto *decl = DRE->getDecl();
+    return decl && decl->hasName() ? decl->getName().isSimpleName(Ctx.Id_self)
+                                   : false;
+  }
+
+  return false;
 }
 
 PoundAvailableInfo *

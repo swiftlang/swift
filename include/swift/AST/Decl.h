@@ -935,9 +935,14 @@ public:
 
   SourceLoc TrailingSemiLoc;
 
-  /// Whether this declaration is within a generated buffer, \c false if this
-  /// declaration was constructed from a serialized module.
-  bool isInGeneratedBuffer() const;
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context. If the decl context is itself in a macro expansion,
+  /// the method returns \c true if this decl is in a different macro
+  /// expansion buffer than the context.
+  ///
+  /// \Note this method returns \c false if this declaration was
+  /// constructed from a serialized module.
+  bool isInMacroExpansionInContext() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -1421,6 +1426,10 @@ public:
 
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
+  }
+
+  bool isTestable() const {
+    return getAttrs().hasAttribute<TestableAttr>();
   }
 
   ModuleDecl *getModule() const { return Mod; }

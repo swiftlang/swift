@@ -2230,12 +2230,16 @@ protected:
 
 bool swift::visitEnclosingDefs(SILValue value,
                                function_ref<bool(SILValue)> visitor) {
+  if (isa<SILUndef>(value))
+    return true;
   return FindEnclosingDefs(value->getFunction())
     .visitEnclosingDefs(value, visitor);
 }
 
 bool swift::visitBorrowIntroducers(SILValue value,
                                    function_ref<bool(SILValue)> visitor) {
+  if (isa<SILUndef>(value))
+    return true;
   return FindEnclosingDefs(value->getFunction())
     .visitBorrowIntroducers(value, visitor);
 }
