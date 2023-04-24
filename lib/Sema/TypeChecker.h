@@ -500,6 +500,10 @@ void checkProtocolSelfRequirements(ValueDecl *decl);
 /// declaration's type, otherwise we have no way to infer them.
 void checkReferencedGenericParams(GenericContext *dc);
 
+/// Ensure we don't re-declare any generic parameters in the current scope,
+/// or shadow a generic parameter from an outer scope.
+void checkShadowedGenericParams(GenericContext *dc);
+
 /// Diagnose a requirement failure.
 ///
 /// \param errorLoc The location at which an error shall be emitted.
