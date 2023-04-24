@@ -2783,6 +2783,10 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
+ERROR(shadowed_generic_param,none,
+      "generic parameter %0 shadows generic parameter from outer scope with the same name",
+      (DeclName))
+
 ERROR(recursive_decl_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature,none,

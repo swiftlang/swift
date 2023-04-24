@@ -6,7 +6,7 @@
 
 struct Struct<T> {
   class Inner {}
-  struct InnerGeneric<T> {}
+  struct InnerGeneric<U> {}
 }
 class Class<T> {}
 
