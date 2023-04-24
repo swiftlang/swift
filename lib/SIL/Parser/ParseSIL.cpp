@@ -48,6 +48,16 @@ static llvm::cl::opt<bool>
 ParseSerializedSIL("parse-serialized-sil",
                    llvm::cl::desc("Parse the output of a serialized module"));
 
+static llvm::cl::opt<bool>
+    DisableInputVerify("sil-disable-input-verify",
+                       llvm::cl::desc("Disable verification of input SIL"),
+                       llvm::cl::init(false));
+
+// Option for testing -silgen-cleanup -enable-complete-ossa
+static llvm::cl::opt<bool>
+ParseIncompleteOSSA("parse-incomplete-ossa",
+                    llvm::cl::desc("Parse OSSA with incomplete lifetimes"));
+
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
@@ -3698,6 +3708,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::DropDeinitInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDropDeinit(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::MarkMustCheckInst: {
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {
@@ -7028,8 +7047,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     return true;
 
   // If SIL parsing succeeded, verify the generated SIL.
-  if (!P.Diags.hadAnyError())
-    FunctionState.F->verify();
+  if (!P.Diags.hadAnyError() && !DisableInputVerify)
+    FunctionState.F->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
 
   return false;
 }

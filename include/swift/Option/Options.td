@@ -1805,7 +1805,24 @@ def nostartfiles:
          HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Do not link in the Swift language startup routines">;
 
+def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  MetaVarName<"<path>">,
+  HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
+
+def cas_path: Separate<["-"], "cas-path">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Path to CAS">, MetaVarName<"<path>">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
+
+def enable_cas: Flag<["-"], "enable-cas">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Enable CAS for swift-frontend">;
+
+def cas_fs: Separate<["-"], "cas-fs">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
 
 def load_plugin_library:
   Separate<["-"], "load-plugin-library">,

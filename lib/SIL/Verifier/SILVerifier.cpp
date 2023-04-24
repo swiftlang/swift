@@ -69,9 +69,15 @@ static llvm::cl::opt<bool> ContinueOnFailure("verify-continue-on-failure",
 static llvm::cl::opt<bool> DumpModuleOnFailure("verify-dump-module-on-failure",
                                              llvm::cl::init(false));
 
-static llvm::cl::opt<bool> VerifyDIHoles(
-                              "verify-di-holes",
-                              llvm::cl::init(true));
+// This verification is affects primarily debug info and end users don't derive
+// a benefit from seeing its results.
+static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
+#ifndef NDEBUG
+                                                                true
+#else
+                                                                false
+#endif
+                                                                ));
 
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
@@ -667,6 +673,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
+      case SILInstructionKind::MarkMustCheckInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -5915,6 +5922,14 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkDropDeinitInst(DropDeinitInst *ddi) {
+    require(ddi->getType() == ddi->getOperand()->getType(),
+            "Result and operand must have the same type.");
+    require(ddi->getType().isMoveOnlyNominalType(),
+            "drop_deinit only allowed for move-only types");
+    require(F.hasOwnership(), "drop_deinit only allowed in OSSA");
+  }
+
   void checkMarkMustCheckInst(MarkMustCheckInst *i) {
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
@@ -6255,6 +6270,12 @@ public:
     SILInstruction *LastSeenScopeInst = nullptr;
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
+        continue;
+      // FIXME: Profile counters for loop bodies may be emitted before the
+      // instructions for the loop variable, but in a deeper scope.
+      if (isa<IncrementProfilerCounterInst>(SI))
+        continue;
+      if (!SI.getLoc().hasValidLineNumber())
         continue;
       if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;

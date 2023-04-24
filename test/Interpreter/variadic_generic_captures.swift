@@ -1,10 +1,7 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
+// RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -31,7 +28,7 @@ types.test("WitnessTable") {
   expectEqual((Int, String, Bool).self, hasWitnessTablePack([1], ["hi"], [false])())
 }
 
-func hasWitnessTablePack2<each T: Sequence>(_: repeat each T) -> () -> Any.Type where (each T).Element: Sequence {
+func hasWitnessTablePack2<each T: Sequence>(_: repeat each T) -> () -> Any.Type where repeat (each T).Element: Sequence {
   return { return (repeat (each T).Element.Element).self }
 }
 

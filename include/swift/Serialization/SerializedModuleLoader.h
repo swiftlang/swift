@@ -20,6 +20,8 @@
 
 namespace swift {
 class ModuleFile;
+class PathObfuscator;
+enum class ModuleLoadingBehavior;
 namespace file_types {
   enum ID : uint8_t;
 }
@@ -84,7 +86,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool skipBuildingInterface, bool &isFramework, bool &isSystemModule);
+      bool skipBuildingInterface, bool isTestableDependencyLookup,
+      bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -105,7 +108,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) = 0;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool isTestableDependencyLookup = false) = 0;
 
   std::error_code
   openModuleFile(
@@ -146,6 +150,16 @@ protected:
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo> scanModuleFile(Twine modulePath, bool isFramework);
 
+  static llvm::ErrorOr<llvm::StringSet<>>
+  getModuleImportsOfModule(Twine modulePath,
+                           ModuleLoadingBehavior transitiveBehavior,
+                           bool isFramework,
+                           bool isRequiredOSSAModules,
+                           StringRef SDKName,
+                           StringRef packageName,
+                           llvm::vfs::FileSystem *fileSystem,
+                           PathObfuscator &recoverer);
+
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
   getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
@@ -179,7 +193,8 @@ public:
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo) override;
+                               ModuleVersionInfo *versionInfo,
+                               bool isTestableDependencyLookup = false) override;
 
   /// Import a module with the given module path.
   ///
@@ -214,7 +229,8 @@ public:
 
   virtual Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) override;
+      InterfaceSubContextDelegate &delegate,
+      bool isTestableImport) override;
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -232,7 +248,8 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool isTestableDependencyLookup = false) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -286,7 +303,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -298,7 +316,8 @@ public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
   bool canImportModule(ImportPath::Module named,
-                       ModuleVersionInfo *versionInfo) override;
+                       ModuleVersionInfo *versionInfo,
+                       bool isTestableDependencyLookup = false) override;
 
   ModuleDecl *
   loadModule(SourceLoc importLoc,

@@ -588,8 +588,31 @@ static SILValue constantFoldBinary(BuiltinInst *BI,
   // Are there valid uses for these in stdlib?
   case BuiltinValueKind::Add:
   case BuiltinValueKind::Mul:
-  case BuiltinValueKind::Sub:
-    return nullptr;
+  case BuiltinValueKind::Sub: {
+    OperandValueArrayRef Args = BI->getArguments();
+    auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+    auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+    if (!RHS || !LHS)
+      return nullptr;
+    APInt LHSI = LHS->getValue();
+    APInt RHSI = RHS->getValue();
+
+    switch (ID) {
+    default: llvm_unreachable("Not all cases are covered!");
+    case BuiltinValueKind::Add:
+      LHSI += RHSI;
+      break;
+    case BuiltinValueKind::Mul:
+      LHSI *= RHSI;
+      break;
+    case BuiltinValueKind::Sub:
+      LHSI -= RHSI;
+      break;
+    }
+
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), LHSI);
+  }
 
   case BuiltinValueKind::And:
   case BuiltinValueKind::AShr:

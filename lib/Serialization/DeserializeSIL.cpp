@@ -1284,12 +1284,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
+  case SIL_OPEN_PACK_ELEMENT:
+    SILOpenPackElementLayout::readRecord(scratch, Attr,
+                                         TyID, TyCategory, ValID);
+    RawOpCode = (unsigned)SILInstructionKind::OpenPackElementInst;
+    break;
   case SIL_PACK_ELEMENT_GET:
-    SILPackElementGetLayout::readRecord(scratch,
+    SILPackElementGetLayout::readRecord(scratch, RawOpCode,
                                         TyID, TyCategory,
                                         TyID2, TyCategory2, ValID2,
                                         ValID3);
-    RawOpCode = (unsigned)SILInstructionKind::PackElementGetInst;
     break;
   case SIL_PACK_ELEMENT_SET:
     SILPackElementSetLayout::readRecord(scratch,
@@ -1332,7 +1336,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::AllocPackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    ResultInst = Builder.createAllocStack(
+    ResultInst = Builder.createAllocPack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
   }
@@ -1425,7 +1429,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::OpenPackElementInst: {
-    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
+    assert(RecordKind == SIL_OPEN_PACK_ELEMENT && "Layout should be OpenPackElement");
     auto index = getLocalValue(ValID,
         getSILType(MF->getType(TyID), (SILValueCategory) TyCategory, Fn));
     auto env = MF->getGenericEnvironmentChecked(Attr);
@@ -2197,6 +2201,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         IsLexical);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
+    break;
+  }
+
+  case SILInstructionKind::DropDeinitInst: {
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createDropDeinit(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
 

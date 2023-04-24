@@ -406,10 +406,6 @@ public:
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
 
-  /// Whether the given location is inside a generated buffer, \c false if
-  /// the given location isn't in this module.
-  bool isInGeneratedBuffer(SourceLoc loc);
-
   // Retrieve the buffer ID and source location of the outermost location that
   // caused the generation of the buffer containing \p loc. \p loc and its
   // buffer if it isn't in a generated buffer or has no original location.

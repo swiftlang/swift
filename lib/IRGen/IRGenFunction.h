@@ -561,14 +561,6 @@ public:
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
 
-//--- Declaration emission -----------------------------------------------------
-public:
-
-  void bindArchetype(ArchetypeType *type,
-                     llvm::Value *metadata,
-                     MetadataState metadataState,
-                     ArrayRef<llvm::Value*> wtables);
-
 //--- Type emission ------------------------------------------------------------
 public:
   /// Look up a local type metadata reference, returning a null response

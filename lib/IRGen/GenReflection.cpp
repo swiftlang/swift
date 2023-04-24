@@ -490,10 +490,8 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
-            auto origSig = genericEnv->getGenericSignature();
             conformance = conformance.subst(origType,
-              QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(origSig.getPointer()));
+                genericEnv->getForwardingSubstitutionMap());
           }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
           IGF.Builder.CreateRet(ret);
@@ -1081,6 +1079,7 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
 
 class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
   CanType type;
+  CanType typeInContext;
   const FixedTypeInfo *ti;
 
 public:
@@ -1088,12 +1087,12 @@ public:
                                     const NominalTypeDecl *nominalDecl)
     : ReflectionMetadataBuilder(IGM) {
     type = nominalDecl->getDeclaredType()->getCanonicalType();
-    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
-        nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
+    typeInContext = nominalDecl->getDeclaredTypeInContext()->getCanonicalType();
+    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(typeInContext));
   }
 
   void layout() override {
-    auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInPrimaryContext(type));
+    auto &strategy = getEnumImplStrategy(IGM, typeInContext);
     bool isMPE = strategy.getElementsWithPayload().size() > 1;
     assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that doesn't have multiple payloads");
 

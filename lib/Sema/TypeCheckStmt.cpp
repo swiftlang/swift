@@ -2658,23 +2658,26 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
         body->walk(ContextualizeClosuresAndMacros(AFD));
       }
-    } else if (func->hasSingleExpressionBody() &&
-               func->getResultInterfaceType()->isVoid()) {
-      // The function returns void.  We don't need an explicit return, no matter
-      // what the type of the expression is. Take the inserted return back out.
-      body->setLastElement(func->getSingleExpressionBody());
-    } else if (func->getBody()->getNumElements() == 1 &&
-               !func->getResultInterfaceType()->isVoid()) {
+    } else {
+      if (func->hasSingleExpressionBody() &&
+          func->getResultInterfaceType()->isVoid()) {
+        // The function returns void.  We don't need an explicit return, no
+        // matter what the type of the expression is. Take the inserted return
+        // back out.
+        body->setLastElement(func->getSingleExpressionBody());
+      }
       // If there is a single statement in the body that can be turned into a
       // single expression return, do so now.
-      if (auto *S = func->getBody()->getLastElement().dyn_cast<Stmt *>()) {
-        if (S->mayProduceSingleValue(evaluator)) {
-          auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-              ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-          body->setLastElement(RS);
-          func->setHasSingleExpressionBody();
-          func->setSingleExpressionBody(SVE);
+      if (!func->getResultInterfaceType()->isVoid()) {
+        if (auto *S = body->getSingleActiveStatement()) {
+          if (S->mayProduceSingleValue(evaluator)) {
+            auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+                ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
+            auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
+            body->setLastElement(RS);
+            func->setHasSingleExpressionBody();
+            func->setSingleExpressionBody(SVE);
+          }
         }
       }
     }
@@ -2872,20 +2875,17 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    if (BS->getSingleExpressionElement()) {
+    if (BS->getSingleActiveExpression()) {
       hadSingleExpr = true;
       continue;
     }
 
     // We also allow single value statement branches, which we can wrap in
     // a SingleValueStmtExpr.
-    auto elts = BS->getElements();
-    if (elts.size() == 1) {
-      if (auto *S = elts.back().dyn_cast<Stmt *>()) {
-        if (S->mayProduceSingleValue(eval)) {
-          hadSingleExpr = true;
-          continue;
-        }
+    if (auto *S = BS->getSingleActiveStatement()) {
+      if (S->mayProduceSingleValue(eval)) {
+        hadSingleExpr = true;
+        continue;
       }
     }
     if (!doesBraceEndWithThrow(BS))

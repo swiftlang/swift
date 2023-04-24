@@ -159,6 +159,31 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
 }
 
+void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
+  if (!LangOpts.BlocklistConfigFilePaths.empty())
+    return;
+  if (SearchPathOpts.RuntimeResourcePath.empty())
+    return;
+  // XcodeDefault.xctoolchain/usr/lib/swift
+  SmallString<64> blocklistDir{SearchPathOpts.RuntimeResourcePath};
+  // XcodeDefault.xctoolchain/usr/lib
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr
+  llvm::sys::path::remove_filename(blocklistDir);
+  // XcodeDefault.xctoolchain/usr/local/lib/swift/blocklists
+  llvm::sys::path::append(blocklistDir, "local", "lib", "swift", "blocklists");
+  std::error_code EC;
+  if (llvm::sys::fs::is_directory(blocklistDir)) {
+    for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
+         F != FE; F.increment(EC)) {
+      StringRef ext = llvm::sys::path::extension(F->path());
+      if (ext == "yml" || ext == "yaml") {
+        LangOpts.BlocklistConfigFilePaths.push_back(F->path());
+      }
+    }
+  }
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
@@ -538,6 +563,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_deserialization_safety)) {
     Opts.EnableDeserializationSafety
       = A->getOption().matches(OPT_enable_deserialization_safety);
+  } else if (auto A = Args.getLastArg(OPT_enable_access_control,
+                                      OPT_disable_access_control)) {
+    // Disable deserialization safety along with access control.
+    Opts.EnableDeserializationSafety
+      = A->getOption().matches(OPT_enable_access_control);
+  }
+
+  if (auto A = Args.getLastArg(OPT_enable_access_control,
+                               OPT_disable_access_control)) {
+    Opts.EnableAccessControl
+      = A->getOption().matches(OPT_enable_access_control);
   }
 
   // Whether '/.../' regex literals are enabled. This implies experimental
@@ -590,12 +626,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnOnPotentiallyUnavailableEnumCase |=
       Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case);
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
-
-  if (auto A = Args.getLastArg(OPT_enable_access_control,
-                               OPT_disable_access_control)) {
-    Opts.EnableAccessControl
-      = A->getOption().matches(OPT_enable_access_control);
-  }
 
   if (auto A = Args.getLastArg(OPT_disable_typo_correction,
                                OPT_typo_correction_limit)) {
@@ -718,6 +748,19 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
       Opts.Features.insert(*feature);
     }
+
+    // Hack: In order to support using availability macros in SPM packages, we
+    // need to be able to use:
+    //    .enableExperimentalFeature("AvailabilityMacro='...'")
+    // within the package manifest and the feature recognizer can't recognize
+    // this form of feature, so specially handle it here until features can
+    // maybe have extra arguments in the future.
+    auto strRef = StringRef(A->getValue());
+    if (strRef.startswith("AvailabilityMacro=")) {
+      auto availability = strRef.split("=").second;
+
+      Opts.AvailabilityMacros.push_back(availability.str());
+    }
   }
 
   // Map historical flags over to future features.
@@ -796,8 +839,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_package_name)) {
     auto pkgName = A->getValue();
-    if (!Lexer::isIdentifier(pkgName))
-      Diags.diagnose(SourceLoc(), diag::error_bad_package_name, pkgName);
+    if (StringRef(pkgName).empty())
+      Diags.diagnose(SourceLoc(), diag::error_empty_package_name);
     else
       Opts.PackageName = pkgName;
   }
@@ -1421,6 +1464,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableSourceImport |=
       Args.hasArg(OPT_disable_clangimporter_source_import);
+
+  // Forward the FrontendOptions to clang importer option so it can be
+  // accessed when creating clang module compilation invocation.
+  if (FrontendOpts.EnableCAS)
+    Opts.CASPath = FrontendOpts.CASPath;
 
   return false;
 }
@@ -2870,6 +2918,7 @@ bool CompilerInvocation::parseArgs(
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
   setDefaultPrebuiltCacheIfNecessary();
+  setDefaultBlocklistsIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);

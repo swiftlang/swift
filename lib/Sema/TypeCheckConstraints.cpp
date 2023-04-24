@@ -1442,14 +1442,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
-        tv->getImpl().print(out);
+        tv->print(out, PO);
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
         const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
-      tv->getImpl().print(out);
+      tv->print(out, PO);
       out << " equivalent to ";
       Type(rep).print(out, PO);
     }
@@ -1575,6 +1575,16 @@ void ConstraintSystem::print(raw_ostream &out) const {
       openedExistential.first->dump(&getASTContext().SourceMgr, out);
       out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
+    }
+  }
+
+  if (!PackExpansionEnvironments.empty()) {
+    out.indent(indent) << "Pack Expansion Environments:\n";
+    for (const auto &env : PackExpansionEnvironments) {
+      out.indent(indent + 2);
+      env.first->dump(&getASTContext().SourceMgr, out);
+      out << " = (" << env.second.first << ", "
+          << env.second.second->getString(PO) << ")" << '\n';
     }
   }
 

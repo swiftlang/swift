@@ -163,11 +163,21 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
+
+  // Match signed add with overflow, unsigned add with overflow and
+  // add without overflow.
   if (!match(RecNext, m_TupleExtractOperation(
                           m_ApplyInst(BuiltinValueKind::SAddOver,
                                       m_SILPhiArgument(RecArg), m_One()),
-                          0)))
+                          0)) &&
+      !match(RecNext, m_TupleExtractOperation(
+                          m_ApplyInst(BuiltinValueKind::UAddOver,
+                                      m_SILPhiArgument(RecArg), m_One()),
+                          0)) &&
+      !match(RecNext, m_ApplyInst(BuiltinValueKind::Add,
+                                      m_SILPhiArgument(RecArg), m_One()))) {
     return None;
+  }
 
   if (RecArg->getParent() != Header)
     return None;

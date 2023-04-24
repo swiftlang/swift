@@ -83,7 +83,7 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
      (StringRef))
 
 WARNING(clang_swift_attr_unhandled,none,
-        "Ignoring unknown Swift attribute or modifier '%0'", (StringRef))
+        "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 WARNING(clang_error_code_must_be_sendable,none,
         "cannot make error code type '%0' non-sendable because Swift errors "
@@ -160,77 +160,75 @@ NOTE(incomplete_interface, none, "interface %0 is incomplete", (const clang::Nam
 NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::NamedDecl*))
 NOTE(incomplete_record, none, "record '%0' is not defined (incomplete)", (StringRef))
 NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
-NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy/destroy", (StringRef))
+NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
 NOTE(reference_passed_by_value, none, "function uses foreign reference type "
                                       "'%0' as a value in %1 types which breaks "
-                                      "'swift_shared_reference' contract (outlined in "
-                                      "C++ Interop User Manual).",
+                                      "'swift_shared_reference' contract",
      (StringRef, StringRef))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
-                                                "automatically available: %1. "
-                                                "Does this type have reference "
+                                                "automatically available: %1; "
+                                                "does this type have reference "
                                                 "semantics?",
      (StringRef, StringRef))
 
 NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
-                                          "of type '%1' is unavailable. ",
+                                          "of type '%1' is unavailable",
      (StringRef, StringRef))
 NOTE(projection_ptr_not_imported, none, "C++ method '%0' that returns a pointer "
-                                          "of type '%1' is unavailable. ",
+                                          "of type '%1' is unavailable",
      (StringRef, StringRef))
 NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a reference "
-                                          "of type '%1' is unavailable. ",
+                                          "of type '%1' is unavailable",
      (StringRef, StringRef))
 NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
-                                    "interior pointer. ",
+                                    "interior pointer",
      (StringRef))
-NOTE(mark_self_contained, none, "Mark type '%0' as 'SWIFT_SELF_CONTAINED' in C++ to "
-                                 "make methods that use it available in Swift. ",
+NOTE(mark_self_contained, none, "annotate type '%0' with 'SWIFT_SELF_CONTAINED' in C++ to "
+                                 "make methods that return it available in Swift",
      (StringRef))
 NOTE(mark_safe_to_import, none, "annotate method '%0' with 'SWIFT_RETURNS_INDEPENDENT_VALUE' in C++ to "
                                 "make it available in Swift",
      (StringRef))
 
-NOTE(at_to_subscript, none, "Do you want to replace it with a call "
+NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",
      ())
-NOTE(get_swift_iterator, none, "Do you want to make a Swift iterator instead?",
+NOTE(get_swift_iterator, none, "do you want to make a Swift iterator instead?",
      ())
-NOTE(replace_with_nil, none, "Do you want to compare against 'nil' instead?'",
+NOTE(replace_with_nil, none, "do you want to compare against 'nil' instead?",
      ())
-NOTE(get_first_element, none, "Do you want to get the first element instead?",
+NOTE(get_first_element, none, "do you want to get the first element instead?",
      ())
-NOTE(get_last_element, none, "Do you want to get the last element instead?",
+NOTE(get_last_element, none, "do you want to get the last element instead?",
      ())
 
 NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
                                   "iterator is unavailable",
      (StringRef))
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
-                                        "are potentially unsafe. Try re-writing "
-                                        "to use Swift iterator APIs.", ())
+                                        "are potentially unsafe; try using Swift collection APIs instead", ())
 
 ERROR(reference_type_must_have_retain_attr,none,
-      "reference type '%0' must have 'retain:' swift attribute.", (StringRef))
+      "reference type '%0' must have 'retain:' swift attribute", (StringRef))
 ERROR(reference_type_must_have_release_attr,none,
-      "reference type '%0' must have 'release:' swift attribute.", (StringRef))
+      "reference type '%0' must have 'release:' swift attribute", (StringRef))
 ERROR(foreign_reference_types_cannot_find_retain,none,
-      "cannot find retain function '%0' for reference type '%1'.", (StringRef, StringRef))
+      "cannot find retain function '%0' for reference type '%1'", (StringRef, StringRef))
 ERROR(foreign_reference_types_cannot_find_release,none,
-      "cannot find release function '%0' for reference type '%1'.", (StringRef, StringRef))
+      "cannot find release function '%0' for reference type '%1'", (StringRef, StringRef))
 ERROR(too_many_reference_type_retain_operations,none,
-      "too many functions with name '%0'. There must be exactly one retain "
-      "function for reference type '%1'.", (StringRef, StringRef))
+      "multiple functions '%0' found; there must be exactly one retain "
+      "function for reference type '%1'", (StringRef, StringRef))
 ERROR(too_many_reference_type_release_operations,none,
-      "too many functions with name '%0'. There must be exactly one release "
-      "function for reference type '%1'.", (StringRef, StringRef))
+      "multiple functions '%0' found; there must be exactly one release "
+      "function for reference type '%1'", (StringRef, StringRef))
 ERROR(foreign_reference_types_invalid_retain,none,
-      "specified retain function '%0' is invalid. Retain must have exactly one "
+      "specified retain function '%0' is invalid; retain function must have exactly one "
       "argument of type '%1'", (StringRef, StringRef))
 ERROR(foreign_reference_types_invalid_release,none,
-      "specified release function '%0' is invalid. Release must have exactly "
+      "specified release function '%0' is invalid; release function must have exactly "
       "one argument of type '%1'", (StringRef, StringRef))
 
 
@@ -257,6 +255,7 @@ NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (c
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(record_method_not_imported, none, "method %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(objc_property_not_imported, none, "property %0 unavailable (cannot import)", (const clang::NamedDecl*))
+NOTE(unsupported_return_type, none, "C++ function %0 is unavailable: return type is unavailable in Swift", (const clang::NamedDecl*))
 
 NOTE(placeholder_for_forward_declared_interface_member_access_failure, none,
      "class '%0' will be imported as an opaque placeholder class and may be "

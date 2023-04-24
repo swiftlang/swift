@@ -102,6 +102,25 @@ bb0:
 // CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 
+// Compute an expression using a chain of arithmetic with non-overflowing instructions: 2 * (2 + 3) - 3
+sil @fold_arithmetic_without_overflow : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 2
+ %110 = integer_literal $Builtin.Int64, 3
+ %19 = builtin "add_Int64"(%0 : $Builtin.Int64, %110 : $Builtin.Int64) : $Builtin.Int64
+ %21 = builtin "mul_Int64"(%0 : $Builtin.Int64, %19 : $Builtin.Int64) : $Builtin.Int64
+ %23 = builtin "sub_Int64"(%21 : $Builtin.Int64, %110 : $Builtin.Int64) : $Builtin.Int64
+ return %23 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_arithmetic_without_overflow
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int64, 3
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 7
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
 // Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)
 sil @fold_trunc : $@convention(thin) () -> Builtin.Int64 {
 bb0:

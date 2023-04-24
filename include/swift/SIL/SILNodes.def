@@ -461,6 +461,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
                     DoesNotRelease)
+  SINGLE_VALUE_INST(DropDeinitInst, drop_deinit, SingleValueInstruction, None,
+                    DoesNotRelease)
   // A canary value inserted by a SIL generating frontend to signal to the move
   // checker to check a specific value.  Valid only in Raw SIL. The relevant
   // checkers should remove the mark_must_check instruction after successfully

@@ -649,11 +649,20 @@ renameAvailabilityInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo) {
     AvailKind = RefactorAvailableKind::Unavailable_has_no_name;
   }
 
+  auto isInMacroExpansionBuffer = [](const ValueDecl *VD) -> bool {
+    auto *module = VD->getModuleContext();
+    auto *file = module->getSourceFileContainingLocation(VD->getLoc());
+    if (!file)
+      return false;
+
+    return file->getFulfilledMacroRole() != None;
+  };
+
   if (AvailKind == RefactorAvailableKind::Available) {
     SourceLoc Loc = VD->getLoc();
     if (!Loc.isValid()) {
       AvailKind = RefactorAvailableKind::Unavailable_has_no_location;
-    } else if (VD->getModuleContext()->isInGeneratedBuffer(Loc)) {
+    } else if (isInMacroExpansionBuffer(VD)) {
       AvailKind = RefactorAvailableKind::Unavailable_decl_in_macro;
     }
   }

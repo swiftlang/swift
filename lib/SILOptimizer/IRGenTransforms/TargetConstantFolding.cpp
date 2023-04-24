@@ -141,7 +141,8 @@ private:
 
   const TypeInfo &getTypeInfoOfBuiltin(BuiltinInst *bi, IRGenModule &IGM) {
     SubstitutionMap subs = bi->getSubstitutions();
-    SILType lowered = IGM.getLoweredType(subs.getReplacementTypes()[0]);
+    SILType lowered = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                         subs.getReplacementTypes()[0]);
     return IGM.getTypeInfo(lowered);
   }
 };

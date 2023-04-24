@@ -2540,3 +2540,200 @@ func enumSwitchTest1(_ e: __owned EnumSwitchTests.E) {
         break
     }
 }
+
+///////////////////////////////////////////
+// Empty Struct Guaranteed Argument Test //
+///////////////////////////////////////////
+
+@_moveOnly
+struct EmptyStruct {
+  var bool: Bool { false }
+  func doSomething() {}
+  mutating func doSomething2() {}
+  consuming func doSomething3() {}
+}
+
+func borrow(_ x: borrowing EmptyStruct) {}
+func consume(_ x: consuming EmptyStruct) {}
+
+func testEmptyStruct() {
+  func testGuaranteedArg1(_ x: borrowing EmptyStruct) {
+    borrow(x)
+  }
+
+  func testGuaranteedArg2(_ x: borrowing EmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    consume(x) // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg3(_ x: borrowing EmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let _ = x // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg4(_ x: borrowing EmptyStruct) {
+    _ = x
+  }
+
+  func testGuaranteedArg5(_ x: borrowing EmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let y = x // expected-note {{consuming use here}}
+    _ = y
+  }
+
+  func testGuaranteedArg6(_ x: borrowing EmptyStruct) {
+    x.doSomething()
+  }
+
+  func testGuaranteedArg7(_ x: borrowing EmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    x.doSomething3() // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg7a(_ x: borrowing EmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    x.doSomething3() // expected-note {{consuming use here}}
+    x.doSomething3() // expected-note {{consuming use here}}
+  }
+}
+
+////////////////////////////////////
+// Struct Containing Empty Struct //
+////////////////////////////////////
+
+// Make sure that we handle a struct that recursively holds an empty struct
+// correctly.
+@_moveOnly
+struct StructContainingEmptyStruct {
+  var x: EmptyStruct
+}
+
+func borrow(_ x: borrowing StructContainingEmptyStruct) {}
+func consume(_ x: consuming StructContainingEmptyStruct) {}
+
+func testStructContainingEmptyStruct() {
+  func testGuaranteedArg1(_ x: borrowing StructContainingEmptyStruct) {
+    borrow(x)
+  }
+
+  func testGuaranteedArg2(_ x: borrowing StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    consume(x) // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg3(_ x: borrowing StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let _ = x // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg4(_ x: borrowing StructContainingEmptyStruct) {
+    _ = x
+  }
+
+  func testGuaranteedArg5(_ x: borrowing StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let y = x // expected-note {{consuming use here}}
+    _ = y
+  }
+
+  func testGuaranteedArg6(_ x: borrowing StructContainingEmptyStruct) {
+    x.x.doSomething()
+  }
+
+  func testGuaranteedArg7(_ x: borrowing StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg7a(_ x: borrowing StructContainingEmptyStruct) {
+    // expected-error @-1 {{'x' has a move only field that was consumed before later uses}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+    x.x.doSomething3() // expected-note {{boundary use here}}
+  }
+}
+
+////////////////////////////////////
+// Struct Containing Empty Struct //
+////////////////////////////////////
+
+// Make sure that we handle a struct that recursively holds an empty struct
+// correctly.
+@_moveOnly
+struct StructContainingTwoEmptyStruct {
+  var x: EmptyStruct
+  var y: EmptyStruct
+}
+
+func borrow(_ x: borrowing StructContainingTwoEmptyStruct) {}
+func consume(_ x: consuming StructContainingTwoEmptyStruct) {}
+
+func testStructContainingTwoEmptyStruct() {
+  func testGuaranteedArg1(_ x: borrowing StructContainingTwoEmptyStruct) {
+    borrow(x)
+  }
+
+  func testGuaranteedArg2(_ x: borrowing StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    consume(x) // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg3(_ x: borrowing StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let _ = x // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg4(_ x: borrowing StructContainingTwoEmptyStruct) {
+    _ = x
+  }
+
+  func testGuaranteedArg5(_ x: borrowing StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    let y = x // expected-note {{consuming use here}}
+    _ = y
+  }
+
+  func testGuaranteedArg6(_ x: borrowing StructContainingTwoEmptyStruct) {
+    x.x.doSomething()
+  }
+
+  func testGuaranteedArg7(_ x: borrowing StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    x.x.doSomething3() // expected-note {{consuming use here}}
+  }
+
+  func testGuaranteedArg8(_ x: borrowing StructContainingTwoEmptyStruct) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    x.y.doSomething3() // expected-note {{consuming use here}}
+  }
+}
+
+//////////////////////////////////
+// Enum Containing Empty Struct //
+//////////////////////////////////
+
+@_moveOnly
+enum MyEnum2 {
+case first(EmptyStruct)
+case second(String)
+}
+
+@_moveOnly
+enum MyEnum {
+case first(EmptyStruct)
+case second(String)
+case third(MyEnum2)
+}
+
+func testMyEnum() {
+  func test1(_ x: borrowing MyEnum) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    if case let .first(y) = x { // expected-note {{consuming use here}}
+      _ = y
+    }
+  }
+
+  func test2(_ x: borrowing MyEnum) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    if case let .third(.first(y)) = x { // expected-note {{consuming use here}}
+      _ = y
+    }
+  }
+}

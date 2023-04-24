@@ -342,26 +342,6 @@ trueOrFalse(OnOffTty oot) {
 bool
 run_backtracer()
 {
-  // Forward our task port to the backtracer; we use the same technique that
-  // libxpc uses to forward one of its ports on fork(), except that we aren't
-  // going to call fork() so libxpc's atfork handler won't run and we'll get
-  // to send the task port to the child.
-  //
-  // I would very much like to send a task *read* port, but for some reason
-  // that doesn't work here.  As a result, what we do instead is send the
-  // control port but have the backtracer use it to get the read port and
-  // immediately drop the control port.
-  //
-  // That *should* be safe enough in practice; if someone could replace the
-  // backtracer, then they can also replace libswiftCore, and since we do
-  // this early on in backtracer start-up, the control port won't be valid
-  // by the time anyone gets to try anything nefarious.
-  mach_port_t ports[] = {
-    mach_task_self(),
-  };
-
-  mach_ports_register(mach_task_self(), ports, 1);
-
   // Set-up the backtracer's command line arguments
   switch (_swift_backtraceSettings.algorithm) {
   case UnwindAlgorithm::Fast:

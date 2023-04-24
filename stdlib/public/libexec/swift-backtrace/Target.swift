@@ -101,31 +101,13 @@ class Target {
 
   var mcontext: MContext
 
-  static func getParentTask() -> task_t? {
-    var ports: mach_port_array_t? = nil
-    var portCount: mach_msg_type_number_t = 0
-
-    // For some reason, we can't pass a task read port this way, but we
-    // *can* pass the control port.  So do that and then ask for a read port
-    // before immediately dropping the control port from this process.
-
-    let kr = mach_ports_lookup(mach_task_self_, &ports, &portCount)
+  static func getTask(pid: pid_t) -> task_t? {
+    var port: task_t = 0
+    let kr = task_read_for_pid(mach_task_self_, pid, &port)
     if kr != KERN_SUCCESS {
       return nil
     }
-
-    if let ports = ports, portCount != 0 {
-      var taskPort: mach_port_t = 0
-      let kr = task_get_special_port(ports[0], TASK_READ_PORT, &taskPort)
-      if kr != KERN_SUCCESS {
-        mach_port_deallocate(mach_task_self_, ports[0])
-        return nil
-      }
-      mach_port_deallocate(mach_task_self_, ports[0])
-      return task_t(taskPort)
-    } else {
-      return nil
-    }
+    return port
   }
 
   static func getProcessName(pid: pid_t) -> String {
@@ -141,14 +123,39 @@ class Target {
     }
   }
 
+  static func isPlatformBinary(pid: pid_t) -> Bool {
+    var flags = UInt32(0)
+
+    return csops(pid,
+                 UInt32(CS_OPS_STATUS),
+                 &flags,
+                 MemoryLayout<UInt32>.size) != 0 ||
+      (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH)) != 0
+  }
+
   init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool) {
     pid = getppid()
-    if let parentTask = Self.getParentTask() {
-      task = parentTask
-    } else {
-      print("swift-backtrace: couldn't fetch parent task", to: &standardError)
+
+    if Self.isPlatformBinary(pid: pid) {
+      /* Exit silently in this case; either
+
+         1. We can't call csops(), because we're sandboxed, or
+         2. The target is a platform binary.
+
+         If we get killed, that is also fine. */
       exit(1)
     }
+
+    // This will normally only succeed if the parent process has
+    // the com.apple.security.get-task-allow privilege.  That gets set
+    // automatically if you're developing in Xcode; if you're developing
+    // on the command line or using SwiftPM, you will need to code sign
+    // your binary with that entitlement to get this to work.
+    guard let parentTask = Self.getTask(pid: pid) else {
+      exit(1)
+    }
+
+    task = parentTask
 
     reader = RemoteMemoryReader(task: __swift_task_t(task))
 

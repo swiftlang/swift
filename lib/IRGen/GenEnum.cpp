@@ -279,62 +279,6 @@ EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
   }
 }
 
-void EnumImplStrategy::callOutlinedCopy(IRGenFunction &IGF,
-                                        Address dest, Address src, SILType T,
-                                        IsInitialization_t isInit,
-                                        IsTake_t isTake) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedCopy(dest, src, T, *TI, isInit, isTake);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedCopy(dest, src, T, *TI, isInit, isTake);
-    return;
-  }
-
-  if (isInit == IsInitialization && isTake == IsTake) {
-    return emitInitializeWithTakeCall(IGF, T, dest, src);
-  } else if (isInit == IsInitialization && isTake == IsNotTake) {
-    return emitInitializeWithCopyCall(IGF, T, dest, src);
-  } else if (isInit == IsNotInitialization && isTake == IsTake) {
-    return emitAssignWithTakeCall(IGF, T, dest, src);
-  } else if (isInit == IsNotInitialization && isTake == IsNotTake) {
-    return emitAssignWithCopyCall(IGF, T, dest, src);
-  }
-  llvm_unreachable("unknown case");
-}
-
-void EnumImplStrategy::callOutlinedDestroy(IRGenFunction &IGF,
-                                           Address addr, SILType T) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-    OutliningMetadataCollector collector(IGF);
-    if (T.hasArchetype()) {
-      collectMetadataForOutlining(collector, T);
-    }
-    collector.emitCallToOutlinedDestroy(addr, T, *TI);
-    return;
-  }
-
-  if (!T.hasArchetype()) {
-    // Call the outlined copy function (the implementation will call vwt in this
-    // case).
-    OutliningMetadataCollector collector(IGF);
-    collector.emitCallToOutlinedDestroy(addr, T, *TI);
-    return;
-  }
-
-  emitDestroyCall(IGF, T, addr);
-  return;
-}
-
 namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
@@ -549,7 +493,7 @@ namespace {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitAssignWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->assignWithCopy(
@@ -564,7 +508,7 @@ namespace {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitAssignWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->assignWithTake(
@@ -586,7 +530,7 @@ namespace {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithCopy(
@@ -601,7 +545,7 @@ namespace {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithTake(
@@ -657,7 +601,7 @@ namespace {
           !getSingleton()->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!ElementsAreABIAccessible) {
           emitDestroyCall(IGF, T, addr);
-        } else if (isOutlined || T.hasLocalArchetype()) {
+        } else if (isOutlined || T.hasParameterizedExistential()) {
           getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                   getSingletonType(IGF.IGM, T), isOutlined);
         } else {
@@ -2810,7 +2754,7 @@ namespace {
       }
       if (!ElementsAreABIAccessible) {
         return emitDestroyCall(IGF, T, addr);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         switch (CopyDestroyKind) {
         case TriviallyDestroyable:
           return;
@@ -2854,24 +2798,7 @@ namespace {
         }
         }
       } else {
-        if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
-          OutliningMetadataCollector collector(IGF);
-          if (T.hasArchetype()) {
-            collectMetadataForOutlining(collector, T);
-          }
-          collector.emitCallToOutlinedDestroy(addr, T, *TI);
-          return;
-        }
-
-        if (!T.hasArchetype()) {
-          // Call the outlined copy function (the implementation will call vwt
-          // in this case).
-          OutliningMetadataCollector collector(IGF);
-          collector.emitCallToOutlinedDestroy(addr, T, *TI);
-          return;
-        }
-
-        emitDestroyCall(IGF, T, addr);
+        callOutlinedDestroy(IGF, addr, T);
         return;
       }
     }
@@ -3114,7 +3041,7 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitAssignWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
@@ -3125,7 +3052,7 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitAssignWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
@@ -3136,7 +3063,7 @@ namespace {
                             SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
@@ -3147,7 +3074,7 @@ namespace {
                             SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
@@ -4972,7 +4899,7 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitAssignWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
@@ -4983,7 +4910,7 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitAssignWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
@@ -4994,7 +4921,7 @@ namespace {
                             SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
@@ -5005,7 +4932,7 @@ namespace {
                             SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
@@ -5039,7 +4966,7 @@ namespace {
       }
       if (!ElementsAreABIAccessible) {
         emitDestroyCall(IGF, T, addr);
-      } else if (isOutlined || T.hasLocalArchetype()) {
+      } else if (isOutlined || T.hasParameterizedExistential()) {
         switch (CopyDestroyKind) {
         case TriviallyDestroyable:
           return;

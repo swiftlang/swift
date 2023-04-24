@@ -687,6 +687,7 @@ void ClosureCloner::visitEndAccessInst(EndAccessInst *eai) {
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
 void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  getBuilder().setCurrentDebugScope(getOpScope(lbi->getDebugScope()));
   assert(lbi->getFunction()->hasOwnership() &&
          "We should only see a load borrow in ownership qualified SIL");
   if (SILValue value = getProjectBoxMappedVal(lbi->getOperand())) {
@@ -729,6 +730,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
 void ClosureCloner::visitLoadInst(LoadInst *li) {
+  getBuilder().setCurrentDebugScope(getOpScope(li->getDebugScope()));
   if (SILValue value = getProjectBoxMappedVal(li->getOperand())) {
     // Loads of the address argument get eliminated completely; the uses of
     // the loads get mapped to uses of the new object type argument.

@@ -82,6 +82,7 @@ namespace swift {
   class ExtensionDecl;
   struct ExternalSourceLocs;
   class LoadedExecutablePlugin;
+  class LoadedLibraryPlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -159,7 +160,7 @@ namespace ide {
 /// While the names of Foundation types aren't likely to change in
 /// Objective-C, their mapping into Swift can. Therefore, when
 /// referring to names of Foundation entities in Swift, use this enum
-/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+/// and \c swift::getSwiftName or \c ASTContext::getSwiftId.
 enum class KnownFoundationEntity {
 #define FOUNDATION_ENTITY(Name) Name,
 #include "swift/AST/KnownFoundationEntities.def"
@@ -168,6 +169,10 @@ enum class KnownFoundationEntity {
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Retrieve the Swift name for the given Foundation entity, where
+/// "NS" prefix stripping will apply under omit-needless-words.
+StringRef getSwiftName(KnownFoundationEntity kind);
 
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
@@ -1027,6 +1032,8 @@ public:
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
+      bool optionalDependencyLookup = false,
+      bool isTestableImport = false,
       llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
@@ -1343,14 +1350,10 @@ public:
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
-  /// Retrieve the Swift name for the given Foundation entity, where
-  /// "NS" prefix stripping will apply under omit-needless-words.
-  StringRef getSwiftName(KnownFoundationEntity kind);
-
   /// Retrieve the Swift identifier for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
   Identifier getSwiftId(KnownFoundationEntity kind) {
-    return getIdentifier(getSwiftName(kind));
+    return getIdentifier(swift::getSwiftName(kind));
   }
 
   /// Populate \p names with visible top level module names.
@@ -1496,7 +1499,7 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  void *loadLibraryPlugin(StringRef path);
+  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
   /// module by '-load-plugin-executable'.

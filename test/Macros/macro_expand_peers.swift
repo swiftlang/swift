@@ -6,12 +6,12 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DTEST_DIAGNOSTICS
 
 // Check with the imported macro library vs. the local declaration of the macro.
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -DTEST_DIAGNOSTICS
 
 
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library %s -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
@@ -33,13 +33,16 @@ macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "
 macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition", type: "AddClassReferencingSelfMacro")
 #endif
 
+@attached(peer, names: arbitrary)
+macro addCompletionHandlerArbitrarily(_: Int) = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
+
 struct S {
   @addCompletionHandler
   func f(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
 
-  // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
+  // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_.swift
   // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
   // CHECK-DUMP:   Task {
   // CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
@@ -59,10 +62,10 @@ extension S {
     return b
   }
 
-  // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1g1a3for_SSSi_SSSdtYaF20addCompletionHandlerfMp_.swift
-  // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
+  // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1g20addCompletionHandlerfMp_.swift
+  // CHECK-DUMP: func g(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
   // CHECK-DUMP:   Task {
-  // CHECK-DUMP:     completionHandler(await f(a: a, for: b, value))
+  // CHECK-DUMP:     completionHandler(await g(a: a, for: b, value))
   // CHECK-DUMP:   }
   // CHECK-DUMP: }
 
@@ -101,9 +104,9 @@ func global(a: Int, b: String) {
   print(a, b)
 }
 
-// CHECK-DUMP: @__swiftmacro_18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_.swift
-// CHECK-DUMP: struct $s18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_6globalfMu0_ {
-// CHECK-DUMP:   func $s18macro_expand_peers6global1a1bySi_SStF10wrapInTypefMp_6globalfMu_(a: Int, b: String)  {
+// CHECK-DUMP: @__swiftmacro_18macro_expand_peers6global10wrapInTypefMp_.swift
+// CHECK-DUMP: struct $s18macro_expand_peers6global10wrapInTypefMp_6globalfMu0_ {
+// CHECK-DUMP:   func $s18macro_expand_peers6global10wrapInTypefMp_6globalfMu_(a: Int, b: String)  {
 // CHECK-DUMP:     global(a: a, b: b)
 // CHECK-DUMP:   }
 // CHECK-DUMP: }
@@ -130,3 +133,26 @@ struct Main {
 
 @AddClassReferencingSelf
 protocol MyProto { }
+
+// Reference cycles amongst arbitrary peer macros and macro arguments.
+let x = 10
+let y = 10
+struct S2 {
+  @addCompletionHandlerArbitrarily(x)
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+
+  @addCompletionHandlerArbitrarily(y)
+  func g(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+
+  #if TEST_DIAGNOSTICS
+  // expected-error@+1{{cannot find 'nonexistent' in scope}}
+  @addCompletionHandlerArbitrarily(nonexistent)
+  func h(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+  #endif
+}

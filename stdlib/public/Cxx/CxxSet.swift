@@ -18,6 +18,7 @@ public protocol CxxSet<Element> {
 }
 
 extension CxxSet {
+  @inlinable
   public func contains(_ element: Element) -> Bool {
     return count(element) > 0
   }

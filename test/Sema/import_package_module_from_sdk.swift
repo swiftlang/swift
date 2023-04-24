@@ -21,6 +21,10 @@
 
 // RUN: %target-swift-frontend -typecheck -verify %t/Client2.swift -package-name libPkg -I %t
 
+// RUN: rm %t/LibLocal.swiftmodule
+// RUN: not %target-swift-frontend -typecheck %t/Client2.swift -package-name libPkg -I %t  2>&1 | %FileCheck %s
+// CHECK: error: no such module 'LibLocal'
+
 //--- Lib.swift
 package func log(level: Int) {}
 
@@ -37,5 +41,3 @@ import LibLocal
 func someFunc() {
   log(level: 1)
 }
-
-

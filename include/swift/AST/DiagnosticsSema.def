@@ -1143,6 +1143,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(single_value_stmt_branch_empty,none,
+      "expected expression in branch of '%0' expression",
+      (StmtKind))
 ERROR(single_value_stmt_branch_must_end_in_throw,none,
       "non-expression branch of '%0' expression may only end with a 'throw'",
       (StmtKind))
@@ -1685,6 +1688,12 @@ ERROR(expose_generic_requirement_to_cxx,none,
       "generic requirements for %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_throwing_to_cxx,none,
       "%0 %1 can not yet be represented in C++ as it may throw an error", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_indirect_enum_cxx,none,
+      "indirect enum %0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_type_to_cxx,none,
+      "enum %0 can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_tuple_to_cxx,none,
+      "enum %0 can not yet be represented in C++ as one of its cases has multiple associated values", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -2002,9 +2011,9 @@ ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
-      "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' could not be "
-      "converted: %1.",
+      "could not generate C++ types from the generic Swift types provided; "
+      "the following Swift type(s) provided to '%0' could not be "
+      "converted: %1",
       (StringRef, StringRef))
 
 // Type aliases
@@ -5372,8 +5381,14 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
+ERROR(tuple_move_only_not_supported,none,
+      "tuples with noncopyable elements are not supported", ())
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
+      ())
+
+ERROR(experimental_type_with_parameter_pack,none,
+      "generic types with parameter packs are experimental",
       ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
@@ -5387,9 +5402,8 @@ ERROR(invalid_expansion_argument,none,
 ERROR(expansion_not_variadic,none,
       "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
-      "pack reference %0 can only appear in pack expansion "
-      "%select{or generic requirement|}1",
-      (Type, /*inExpression*/ bool))
+      "pack reference %0 can only appear in pack expansion ",
+      (Type))
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))

@@ -1,12 +1,9 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
+// RUN: %target-run-simple-swift
 
 // FIXME: Fix the optimizer
 // REQUIRES: swift_test_mode_optimize_none
 
 // REQUIRES: executable_test
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
 
 import StdlibUnittest
 

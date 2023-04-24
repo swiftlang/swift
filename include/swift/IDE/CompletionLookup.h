@@ -461,13 +461,17 @@ public:
                                          DynamicLookupInfo dynamicLookupInfo);
 
 private:
+  /// Normalize the type for 'isDupelicate' check.
+  Type normalizeTypeForDuplicationCheck(Type Ty);
+
   /// Returns true if duplicate checking is enabled (via
   /// \c shouldCheckForDuplicates) and this decl + type combination has been
   /// checked previously. Returns false otherwise.
   bool isDuplicate(const ValueDecl *D, Type Ty) {
     if (!CheckForDuplicates)
       return false;
-    return !PreviouslySeen.insert({D, Ty}).second;
+    return !PreviouslySeen.insert({D, normalizeTypeForDuplicationCheck(Ty)})
+                .second;
   }
 
   /// Returns true if duplicate checking is enabled (via
@@ -477,7 +481,8 @@ private:
     if (!CheckForDuplicates)
       return false;
     Type Ty = getTypeOfMember(D, dynamicLookupInfo);
-    return !PreviouslySeen.insert({D, Ty}).second;
+    return !PreviouslySeen.insert({D, normalizeTypeForDuplicationCheck(Ty)})
+                .second;
   }
 
 public:

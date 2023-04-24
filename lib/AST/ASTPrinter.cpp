@@ -1732,11 +1732,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
-          if (param->isParameterPack())
-            Printer << "each ";
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
+            if (param->isParameterPack())
+              Printer << "each ";
             Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                           GP);
             Printer.printName(GP->getName(),
@@ -1835,23 +1835,30 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << "(repeat (each ";
+    Printer << "(repeat (";
     printTransformedType(req.getFirstType());
-    Printer << ", each ";
+    Printer << ", ";
     printTransformedType(req.getSecondType());
     Printer << ")) : Any";
     return;
   case RequirementKind::Layout:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
   case RequirementKind::Superclass:
+    if (req.getFirstType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " : ";
     break;
   case RequirementKind::SameType:
+    if (req.getFirstType()->hasParameterPack() ||
+        req.getSecondType()->hasParameterPack())
+      Printer << "repeat ";
     printTransformedType(req.getFirstType());
     Printer << " == ";
     break;
@@ -3201,6 +3208,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureTupleConformances(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   auto &attrs = decl->getAttrs();
   return std::any_of(attrs.begin(), attrs.end(), [](auto *attr) {
@@ -3262,6 +3273,10 @@ static bool usesFeatureMoveOnly(Decl *decl) {
 
 static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
+}
+
+static bool usesFeatureMoveOnlyTuples(Decl *decl) {
+  return false;
 }
 
 static bool usesFeatureNoImplicitCopy(Decl *decl) {
@@ -5699,10 +5714,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getInstanceType());
     } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
-      if (param->isParameterPack() && Options.PrintExplicitEach)
+      if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack() && Options.PrintExplicitEach)
+      if (archetype->isParameterPack())
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -6038,11 +6053,8 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    PrintOptions innerOptions = Options;
-    innerOptions.PrintExplicitEach = true;
-
     Printer << "repeat ";
-    TypePrinter(Printer, innerOptions).visit(T->getPatternType());
+    visit(T->getPatternType());
   }
 
   void visitTupleType(TupleType *T) {
@@ -6952,8 +6964,7 @@ public:
   }
 
   void printEach() {
-    if (Options.PrintExplicitEach)
-      Printer << "each ";
+    Printer << "each ";
   }
 
   void printArchetypeCommon(ArchetypeType *T) {

@@ -213,6 +213,10 @@ Solution ConstraintSystem::finalize() {
     solution.ImplicitCallAsFunctionRoots.insert(implicitRoot);
   }
 
+  for (const auto &env : PackExpansionEnvironments) {
+    solution.PackExpansionEnvironments.insert(env);
+  }
+
   return solution;
 }
 
@@ -365,7 +369,7 @@ bool ConstraintSystem::simplify() {
     if (isDebugMode()) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent());
-      log << "(considering -> ";
+      log << "(considering: ";
       constraint->print(log, &getASTContext().SourceMgr,
                         solverState->getCurrentIndent());
       log << "\n";
@@ -1481,7 +1485,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Constraint solving at ";
+    log << "\n---Constraint solving at ";
     auto R = target.getSourceRange();
     if (R.isValid()) {
       R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);

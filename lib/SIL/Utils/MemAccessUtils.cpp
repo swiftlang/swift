@@ -406,13 +406,15 @@ bool swift::isLetAddress(SILValue address) {
 bool swift::mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
-  bool isUnidentified = false;
-  visitAccessedAddress(instruction, [&isUnidentified](Operand *operand) {
+  bool retval = false;
+  visitAccessedAddress(instruction, [&retval](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
-    if (accessStorage.getKind() == AccessRepresentation::Kind::Unidentified)
-      isUnidentified = true;
+    auto kind = accessStorage.getKind();
+    if (kind == AccessRepresentation::Kind::Unidentified ||
+        kind == AccessRepresentation::Kind::Global)
+      retval = true;
   });
-  return isUnidentified;
+  return retval;
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
@@ -1864,6 +1866,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
   }
 
+  case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkMustCheckInst: {
     // Mark must check goes on the project_box, so it isn't a ref.
     assert(!dfs.isRef());
@@ -2690,6 +2693,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:

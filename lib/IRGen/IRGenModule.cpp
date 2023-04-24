@@ -124,13 +124,15 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   }
   if (!Opts.TrapFuncName.empty()) {
@@ -1573,8 +1575,7 @@ void AutolinkKind::collectEntriesFromLibraries(
   llvm::LLVMContext &ctx = IGM.getLLVMContext();
 
   switch (Value) {
-  case AutolinkKind::LLVMLinkerOptions:
-  case AutolinkKind::SwiftAutoLinkExtract: {
+  case AutolinkKind::LLVMLinkerOptions: {
     // On platforms that support autolinking, continue to use the metadata.
     for (LinkLibrary linkLib : AutolinkEntries) {
       switch (linkLib.getKind()) {
@@ -1590,6 +1591,24 @@ void AutolinkKind::collectEntriesFromLibraries(
         Entries.insert(llvm::MDNode::get(ctx, args));
         continue;
       }
+      }
+      llvm_unreachable("Unhandled LibraryKind in switch.");
+    }
+    return;
+  }
+  case AutolinkKind::SwiftAutoLinkExtract: {
+    // On platforms that support autolinking, continue to use the metadata.
+    for (LinkLibrary linkLib : AutolinkEntries) {
+      switch (linkLib.getKind()) {
+      case LibraryKind::Library: {
+        llvm::SmallString<32> opt =
+            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+        Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+        continue;
+      }
+      case LibraryKind::Framework:
+        // Frameworks are not supported with Swift Autolink Extract.
+        continue;
       }
       llvm_unreachable("Unhandled LibraryKind in switch.");
     }

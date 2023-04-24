@@ -116,6 +116,13 @@ struct NativeObjectWrapper {
 
 sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
 
+class X {}
+struct S {}
+
+sil @getX : $@convention(thin) () -> @owned X
+sil @getS : $@convention(thin) (@owned X) -> @out S
+sil @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+
 ///////////
 // Tests //
 ///////////
@@ -923,3 +930,51 @@ bb0:
   destroy_value %0 : ${ var Bool }
   return %11 : $Bool
 }
+
+// Don't do this optimization:
+//   Eliminate copy of lexical value which ends after lifetime of copy IF there
+//   may be deinit barriers between the final consume and the copy.
+//
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValue : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getX
+// CHECK:         [[X:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[MX:%[^,]+]] = move_value [lexical] [[X]]
+// CHECK:         destroy_value [[MX]] : $X
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValue'
+sil [ossa] @testDestroyedLexicalValue : $@convention(thin) () -> @owned FakeOptional<X> {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  %loadWeakX_from = function_ref @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  %o = apply %loadWeakX_from(%a) : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  // ^^^^^ Deinit barrier
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  return %o : $FakeOptional<X>
+}
+
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValueNoBarriers : {{.*}} {
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValueNoBarriers'
+sil [ossa] @testDestroyedLexicalValueNoBarriers : $@convention(thin) () -> () {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  %r = tuple ()
+  return %r : $()
+}
+

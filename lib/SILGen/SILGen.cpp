@@ -2196,6 +2196,10 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       // Emit auxiliary decls.
       D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        // Skip extensions decls; they are visited below.
+        if (isa<ExtensionDecl>(auxiliaryDecl))
+          return;
+
         FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                         "SILgen-decl", auxiliaryDecl);
         SGM.visit(auxiliaryDecl);
@@ -2204,6 +2208,34 @@ public:
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
       SGM.visit(D);
+    }
+
+    // FIXME: Visit macro-generated extensions separately.
+    //
+    // The code below that visits auxiliary decls of the top-level
+    // decls in the source file does not work for nested types with
+    // attached conformance macros:
+    // ```
+    // struct Outer {
+    //   @AddConformance struct Inner {}
+    // }
+    // ```
+    // Because the attached-to decl is not at the top-level. To fix this,
+    // visit the macro-generated conformances that are recorded in the
+    // synthesized file unit to cover all macro-generated extension decls.
+    if (auto *synthesizedFile = sf->getSynthesizedFile()) {
+      for (auto *D : synthesizedFile->getTopLevelDecls()) {
+        if (!isa<ExtensionDecl>(D))
+          continue;
+
+        auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
+        if (sf->getFulfilledMacroRole() != MacroRole::Conformance)
+          continue;
+
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-decl", D);
+        SGM.visit(D);
+      }
     }
 
     for (Decl *D : sf->getHoistedDecls()) {

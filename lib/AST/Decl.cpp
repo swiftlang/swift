@@ -368,14 +368,16 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 }
 
 OrigDeclAttributes Decl::getOriginalAttrs() const {
-  return OrigDeclAttributes(getAttrs(), getModuleContext());
+  return OrigDeclAttributes(getAttrs(), this);
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
-  auto mutableThis = const_cast<Decl *>(this);
-  (void)evaluateOrDefault(getASTContext().evaluator,
-                          ExpandMemberAttributeMacros{mutableThis},
-                          { });
+  if (!getASTContext().evaluator.hasActiveResolveMacroRequest()) {
+    auto mutableThis = const_cast<Decl *>(this);
+    (void)evaluateOrDefault(getASTContext().evaluator,
+                            ExpandMemberAttributeMacros{mutableThis},
+                            { });
+  }
 
   return getAttrs();
 }
@@ -765,8 +767,22 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   return Range;
 }
 
-bool Decl::isInGeneratedBuffer() const {
-  return getModuleContext()->isInGeneratedBuffer(getStartLoc());
+bool Decl::isInMacroExpansionInContext() const {
+  auto *dc = getDeclContext();
+  auto parentFile = dc->getParentSourceFile();
+  auto *mod = getModuleContext();
+  auto *file = mod->getSourceFileContainingLocation(getStartLoc());
+
+  // Decls in macro expansions always have a source file. The source
+  // file can be null if the decl is implicit or has an invalid
+  // source location.
+  if (!parentFile || !file)
+    return false;
+
+  if (file->getBufferID() == parentFile->getBufferID())
+    return false;
+
+  return file->getFulfilledMacroRole() != None;
 }
 
 SourceLoc Decl::getLocFromSource() const {
@@ -6018,9 +6034,18 @@ bool ProtocolDecl::existentialConformsToSelf() const {
     ExistentialConformsToSelfRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
-bool ProtocolDecl::existentialRequiresAny() const {
+bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
   return evaluateOrDefault(getASTContext().evaluator,
-    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
+                           HasSelfOrAssociatedTypeRequirementsRequest{
+                               const_cast<ProtocolDecl *>(this)},
+                           true);
+}
+
+bool ProtocolDecl::existentialRequiresAny() const {
+  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
+  return hasSelfOrAssociatedTypeRequirements();
 }
 
 ArrayRef<AssociatedTypeDecl *>
@@ -10239,7 +10264,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   for (auto expandedName : attr->getNames()) {
     switch (expandedName.getKind()) {
     case MacroIntroducedDeclNameKind::Named: {
-      names.push_back(DeclName(expandedName.getIdentifier()));
+      names.push_back(DeclName(expandedName.getName()));
       break;
     }
 
@@ -10259,7 +10284,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       std::string prefixedName;
       {
         llvm::raw_string_ostream out(prefixedName);
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
         out << baseName.getIdentifier();
       }
 
@@ -10277,7 +10302,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       {
         llvm::raw_string_ostream out(suffixedName);
         out << baseName.getIdentifier();
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
       }
 
       Identifier nameId = ctx.getIdentifier(suffixedName);

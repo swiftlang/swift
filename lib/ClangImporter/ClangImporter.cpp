@@ -1855,7 +1855,8 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    ModuleVersionInfo *versionInfo) {
+                                    ModuleVersionInfo *versionInfo,
+                                    bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
@@ -5622,13 +5623,7 @@ importName(const clang::NamedDecl *D,
 
 Type ClangImporter::importFunctionReturnType(
     const clang::FunctionDecl *clangDecl, DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
-  bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
-  if (auto imported =
-          Impl.importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt)
-              .getType())
+  if (auto imported = Impl.importFunctionReturnType(clangDecl, dc).getType())
     return imported;
   return dc->getASTContext().getNeverType();
 }

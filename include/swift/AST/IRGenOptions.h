@@ -560,12 +560,18 @@ public:
     return OptMode == OptimizationMode::ForSize;
   }
 
-  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+  std::string getDebugFlags(StringRef PrivateDiscriminator,
+                            bool EnableCXXInterop) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
         Flags += " ";
       Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    if (EnableCXXInterop) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-experimental-cxx-interop";
     }
     return Flags;
   }

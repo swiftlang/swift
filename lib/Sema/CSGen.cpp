@@ -4604,7 +4604,7 @@ bool ConstraintSystem::generateConstraints(
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
-      log << "---Initial constraints for the given expression---\n";
+      log << "\n---Initial constraints for the given expression---\n";
       print(log, expr);
       log << "\n";
       print(log);

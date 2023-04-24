@@ -647,6 +647,10 @@ final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
 }
 
+final public class DropDeinitInst : SingleValueInstruction, UnaryInstruction {
+  public var fromValue: Value { operand.value }
+}
+
 final public class StrongCopyUnownedValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryInstruction  {}

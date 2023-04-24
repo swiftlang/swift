@@ -22,27 +22,27 @@ import CxxStdlib
 
 public func test(v: V) {
   // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
-  // CHECK: note: Do you want to make a Swift iterator instead?
+  // CHECK: note: do you want to make a Swift iterator instead?
   // CHECK: ^~~~~
   // CHECK: makeIterator
   _ = v.begin()
   
   // CHECK: note: C++ method 'end' that returns an iterator is unavailable
-  // CHECK: note: Do you want to compare against 'nil' instead?'
+  // CHECK: note: do you want to compare against 'nil' instead?
   // CHECK: ^~~~
   // CHECK: nil
   _ = v.end()
 
-  // CHECK: note: C++ method 'front' that returns a reference of type 'UnsafePointer' is unavailable.
-  // CHECK: note: C++ method 'front' may return an interior pointer.
-  // CHECK: note: Do you want to get the first element instead?
+  // CHECK: note: C++ method 'front' that returns a reference of type 'UnsafePointer' is unavailable
+  // CHECK: note: C++ method 'front' may return an interior pointer
+  // CHECK: note: do you want to get the first element instead?
   // CHECK: ^~~~~~~
   // CHECK: first
   _ = v.front()
   
-  // CHECK: note: C++ method 'back' that returns a reference of type 'UnsafePointer' is unavailable.
-  // CHECK: note: C++ method 'back' may return an interior pointer.
-  // CHECK: note: Do you want to get the last element instead?
+  // CHECK: note: C++ method 'back' that returns a reference of type 'UnsafePointer' is unavailable
+  // CHECK: note: C++ method 'back' may return an interior pointer
+  // CHECK: note: do you want to get the last element instead?
   // CHECK: ^~~~~~
   // CHECK: last
   _ = v.back()

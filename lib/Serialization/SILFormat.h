@@ -159,6 +159,7 @@ namespace sil_block {
     SIL_INST_INCREMENT_PROFILER_COUNTER,
     SIL_MOVEONLY_DEINIT,
     SIL_INST_HAS_SYMBOL,
+    SIL_OPEN_PACK_ELEMENT,
     SIL_PACK_ELEMENT_GET,
     SIL_PACK_ELEMENT_SET,
   };
@@ -469,8 +470,18 @@ namespace sil_block {
   >;
 
   // The pack_element_get instruction.
+  using SILOpenPackElementLayout = BCRecordLayout<
+    SIL_OPEN_PACK_ELEMENT,
+    GenericEnvironmentIDField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField
+  >;
+
+  // The pack_element_get instruction.
   using SILPackElementGetLayout = BCRecordLayout<
     SIL_PACK_ELEMENT_GET,
+    SILInstOpCodeField,
     TypeIDField,            // element type
     SILTypeCategoryField,   // element type category
     TypeIDField,            // pack type

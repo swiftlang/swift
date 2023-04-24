@@ -1340,6 +1340,9 @@ public:
                                         const clang::FunctionDecl *clangDecl,
                                         bool allowNSUIntegerAsInt);
 
+  ImportedType importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                                        DeclContext *dc);
+
   /// Import the parameter list for a function
   ///
   /// \param clangDecl The underlying declaration, if any; should only be

@@ -75,3 +75,29 @@ public func testArgPassingExpansion<X>(arg: G<X>) {
 public func testArgPassingPartial() {
   Holder< >.takePartial(arg: 0)
 }
+
+func makeTuple<each T>(_ t: repeat each T) -> (repeat each T) {
+  return (repeat each t)
+}
+
+// rdar://107972801
+// CHECK-LABEL: sil {{.*}}@$s4main7makeOneyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK:       bb0(%0 : $*T, %1 : $*T):
+// CHECK:         [[RET_PACK:%.*]] = alloc_pack $Pack{T}
+// CHECK-NEXT:    [[INDEX:%.*]] = scalar_pack_index 0 of $Pack{T}
+// CHECK-NEXT:    pack_element_set %0 : $*T into [[INDEX]] of [[RET_PACK]] :
+// CHECK-NEXT:    [[ARG_PACK:%.*]] = alloc_pack $Pack{T}
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr %1 to [init] [[TEMP]] : $*T
+// CHECK-NEXT:    [[INDEX:%.*]] = scalar_pack_index 0 of $Pack{T}
+// CHECK-NEXT:    pack_element_set [[TEMP]] : $*T into [[INDEX]] of [[ARG_PACK]] :
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[FN:%.*]] = function_ref @$s4main9makeTupleyxxQp_txxQpRvzlF : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @pack_out Pack{repeat each τ_0_0}
+// CHECK-NEXT:    apply [[FN]]<Pack{T}>([[RET_PACK]], [[ARG_PACK]])
+// CHECK-NEXT:    destroy_addr [[TEMP]] : $*T
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*T
+// CHECK-NEXT:    dealloc_pack [[ARG_PACK]] : $*Pack{T}
+// CHECK-NEXT:    dealloc_pack [[RET_PACK]] : $*Pack{T}
+public func makeOne<T>(_ t: T) -> T {
+  return makeTuple(t)
+}

@@ -4,10 +4,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 
-// REQUIRES: rdar104762037
-
-// rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
+
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
 
 import _Concurrency
 

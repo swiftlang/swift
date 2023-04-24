@@ -297,6 +297,84 @@ bb6(%72 : $Builtin.Int64):
   return %401 : $()
 }
 
+// CHECK-LABEL: sil @loop_unroll_unsigned_overflow_1
+// CHECK: bb0
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  builtin "uadd_with_overflow_Word"
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2
+// CHECK:  br bb7
+// CHECK: bb3
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  builtin "uadd_with_overflow_Word"
+// CHECK:  br bb5
+// CHECK: bb5
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
+
+sil @loop_unroll_unsigned_overflow_1 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %5 = builtin "uadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// CHECK-LABEL: sil @loop_unroll_no_overflow_1
+// CHECK: bb0
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  builtin "add_Int64"
+// CHECK:  cond_br {{.*}}, bb2, bb3
+// CHECK: bb2
+// CHECK:  br bb7
+// CHECK: bb3
+// CHECK:  br bb4
+// CHECK: bb4
+// CHECK:  builtin "add_Int64"
+// CHECK:  br bb5
+// CHECK: bb5
+// CHECK:  br bb7
+// CHECK: bb7:
+// CHECK:  return
+
+sil @loop_unroll_no_overflow_1 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "add_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %7 = builtin "cmp_eq_Int64"(%5 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%5 : $Builtin.Int64)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
 // CHECK-LABEL: sil @unroll_with_exit_block_arg_2
 // CHECK: bb1({{.*}}):
 // CHECK:   cond_br {{.*}}, bb4, bb2

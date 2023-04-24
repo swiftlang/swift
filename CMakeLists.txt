@@ -243,6 +243,10 @@ option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
     "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
     TRUE)
 
+option(SWIFT_BUILD_STDLIB_CXX_MODULE
+  "If not building stdlib, controls whether to build the Cxx module"
+  TRUE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -1265,6 +1269,10 @@ else()
 
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
+
+    if(SWIFT_BUILD_STDLIB_CXX_MODULE)
+      add_subdirectory(stdlib/public/Cxx)
+    endif()
   endif()
 
   if (BUILD_SWIFT_CONCURRENCY_BACK_DEPLOYMENT_LIBRARIES)
@@ -1274,7 +1282,7 @@ else()
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftRemoteInspection,
   # so ensure we build that when building tools.
-  if(SWIFT_INCLUDE_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS OR SWIFT_BUILD_STDLIB_CXX_MODULE)
     add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 
