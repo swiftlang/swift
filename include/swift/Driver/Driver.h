@@ -166,6 +166,7 @@ public:
   enum class DriverKind {
     Interactive,     // swift
     Batch,           // swiftc
+    SILOpt,          // sil-opt
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph

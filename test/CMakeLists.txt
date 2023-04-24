@@ -55,7 +55,6 @@ function(get_test_dependencies SDK result_var_name)
       sil-func-extractor
       sil-llvm-gen
       sil-nm
-      sil-opt
       sil-passpipeline-dumper
       swift-frontend
       swift-demangle

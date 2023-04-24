@@ -17,7 +17,6 @@ if(SWIFT_BUILD_SOURCEKIT)
 endif()
 
 add_swift_tool_subdirectory(driver)
-add_swift_tool_subdirectory(sil-opt)
 add_swift_tool_subdirectory(swift-compatibility-symbols)
 add_swift_tool_subdirectory(swift-dependency-tool)
 add_swift_tool_subdirectory(swift-demangle)
