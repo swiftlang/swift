@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: executable_test
+// REQUIRES: libdispatch
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
@@ -31,6 +32,7 @@ actor EscapeLocked {
 
 @main struct Main {
   static func main() async {
+    // Ideally these tests should be compile-time errors
     let tests = TestSuite("EscapingSelf")
     tests.test("escape while locked") {
       _ = EscapeLocked()

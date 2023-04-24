@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -verify %s
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
 
@@ -22,7 +22,7 @@
 func isolatedFunc() {}  // expected-note 11{{calls to global function 'isolatedFunc()' from outside of its actor context are implicitly asynchronous}}
 
 // CHECK-LABEL: class BaseWithNonisolatedDeinit {
-// CHECK: @objc deinit
+// CHECK: {{(@objc )?}}deinit
 // CHECK: }
 // CHECK-SYMB-NOT: BaseWithNonisolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation25BaseWithNonisolatedDeinitCfZ
@@ -32,7 +32,7 @@ func isolatedFunc() {}  // expected-note 11{{calls to global function 'isolatedF
 class BaseWithNonisolatedDeinit {}
 
 // CHECK-LABEL: class BaseWithDeinitIsolatedOnFirstActor {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: BaseWithDeinitIsolatedOnFirstActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -45,7 +45,7 @@ class BaseWithDeinitIsolatedOnFirstActor {
 }
 
 // CHECK-LABEL: class BaseWithDeinitIsolatedOnSecondActor {
-// CHECK: @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: BaseWithDeinitIsolatedOnSecondActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
@@ -60,7 +60,7 @@ class BaseWithDeinitIsolatedOnSecondActor {
 // MARK: - Part 1 - Actors
 
 // CHECK-LABEL: actor ImplicitDeinitActor {
-// CHECK: @objc nonisolated deinit
+// CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ImplicitDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation19ImplicitDeinitActorCfZ
@@ -72,7 +72,7 @@ actor ImplicitDeinitActor {
 }
 
 // CHECK-LABEL: actor ExplicitDeinitActor {
-// CHECK: @objc deinit
+// CHECK: {{(@objc )?}}deinit
 // CHECK: }
 // CHECK-SYMB: // ExplicitDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: actor_instance. name: 'self'
@@ -90,7 +90,7 @@ actor ExplicitDeinitActor {
 }
 
 // CHECK-LABEL: actor NonisolatedDeinitActor {
-// CHECK: @objc nonisolated deinit
+// CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
 // CHECK-SYMB-NOT: NonisolatedDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation22NonisolatedDeinitActorCfZ
@@ -107,7 +107,7 @@ actor NonisolatedDeinitActor {
 }
 
 // CHECK-LABEL: actor IsolatedDeinitActor {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // IsolatedDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -126,7 +126,7 @@ actor IsolatedDeinitActor {
 // MARK: - Part 2.1 - Without base class
 
 // CHECK-LABEL: @FirstActor class ImplicitDeinit {
-// CHECK: @objc deinit
+// CHECK: {{(@objc )?}}deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ImplicitDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation14ImplicitDeinitCfZ
@@ -139,7 +139,7 @@ class ImplicitDeinit {
 }
 
 // CHECK-LABEL: @FirstActor class ExplicitDeinit {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // ExplicitDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -156,7 +156,7 @@ class ExplicitDeinit {
 }
 
 // CHECK-LABEL: @FirstActor class NonisolatedDeinit {
-// CHECK: @objc nonisolated deinit
+// CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
 // CHECK-SYMB-NOT: NonisolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation17NonisolatedDeinitCfZ
@@ -174,7 +174,7 @@ class NonisolatedDeinit {
 }
 
 // CHECK-LABEL: class IsolatedDeinit {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // IsolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -190,7 +190,7 @@ class IsolatedDeinit {
 }
 
 // CHECK-LABEL: @FirstActor class DifferentIsolatedDeinit {
-// CHECK: @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // DifferentIsolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
@@ -211,7 +211,7 @@ class DifferentIsolatedDeinit {
 // MARK: - Part 2.2 - Base class with nonisolated deinit
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ImplicitDeinitInheritNonisolated : BaseWithNonisolatedDeinit {
-// CHECK: @objc deinit
+// CHECK: {{(@objc )?}}deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ImplicitDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation32ImplicitDeinitInheritNonisolatedCfZ
@@ -224,7 +224,7 @@ class ImplicitDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ExplicitDeinitInheritNonisolated : BaseWithNonisolatedDeinit {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // ExplicitDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -241,7 +241,7 @@ class ExplicitDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class NonisolatedDeinitInheritNonisolated : BaseWithNonisolatedDeinit {
-// CHECK: @objc nonisolated deinit
+// CHECK: {{(@objc )?}}nonisolated deinit
 // CHECK: }
 // CHECK-SYMB-NOT: NonisolatedDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation024NonisolatedDeinitInheritC0CfZ
@@ -259,7 +259,7 @@ class NonisolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers class IsolatedDeinitInheritNonisolated : BaseWithNonisolatedDeinit {
-// CHECK: @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // IsolatedDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -275,7 +275,7 @@ class IsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class DifferentIsolatedDeinitInheritNonisolated : BaseWithNonisolatedDeinit {
-// CHECK:   @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // DifferentIsolatedDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
@@ -296,7 +296,7 @@ class DifferentIsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // MARK: - Part 2.3 - Base class with isolated deinit
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ImplicitDeinitInheritIsolated1 : BaseWithDeinitIsolatedOnFirstActor {
-// CHECK:   @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated1.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -310,7 +310,7 @@ class ImplicitDeinitInheritIsolated1: BaseWithDeinitIsolatedOnFirstActor {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ExplicitDeinitIsolated1 : BaseWithDeinitIsolatedOnFirstActor {
-// CHECK:   @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // ExplicitDeinitIsolated1.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -337,7 +337,7 @@ class NonisolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
 #endif
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers class IsolatedDeinitIsolated1 : BaseWithDeinitIsolatedOnFirstActor {
-// CHECK:   @objc @FirstActor deinit
+// CHECK: {{(@objc )?}}@FirstActor deinit
 // CHECK: }
 // CHECK-SYMB: // IsolatedDeinitIsolated1.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
@@ -365,7 +365,7 @@ class DifferentIsolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
 // MARK: - Part 2.4 - Base class with isolated deinit with different actor
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ImplicitDeinitInheritIsolated2 : BaseWithDeinitIsolatedOnSecondActor {
-// CHECK:   @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated2.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
@@ -379,7 +379,7 @@ class ImplicitDeinitInheritIsolated2: BaseWithDeinitIsolatedOnSecondActor {
 }
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class ExplicitDeinitIsolated2 : BaseWithDeinitIsolatedOnSecondActor {
-// CHECK:   @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // ExplicitDeinitIsolated2.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
@@ -417,7 +417,7 @@ class IsolatedDeinitIsolated2: BaseWithDeinitIsolatedOnSecondActor {
 #endif
 
 // CHECK-LABEL: @_inheritsConvenienceInitializers @FirstActor class DifferentIsolatedDeinitIsolated2 : BaseWithDeinitIsolatedOnSecondActor {
-// CHECK:   @objc @SecondActor deinit
+// CHECK: {{(@objc )?}}@SecondActor deinit
 // CHECK: }
 // CHECK-SYMB: // DifferentIsolatedDeinitIsolated2.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
