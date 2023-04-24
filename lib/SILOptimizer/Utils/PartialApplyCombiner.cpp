@@ -239,10 +239,11 @@ bool PartialApplyCombiner::combine() {
     auto *use = worklist.pop_back_val();
     auto *user = use->getUser();
 
-    // Recurse through copy_value
-    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
-      for (auto *copyUse : cast<SingleValueInstruction>(user)->getUses())
-        worklist.push_back(copyUse);
+    // Recurse through ownership instructions.
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user) ||
+        isa<MoveValueInst>(user)) {
+      for (auto *ownershipUse : cast<SingleValueInstruction>(user)->getUses())
+        worklist.push_back(ownershipUse);
       continue;
     }
 
