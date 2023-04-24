@@ -111,6 +111,11 @@ swift_create_post_build_symlink(swift-frontend
 
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-passpipeline-dumper${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 

@@ -170,6 +170,7 @@ public:
     SILFuncExtractor,// sil-func-extractor
     SILNM,           // sil-nm
     SILLLVMGen,      // sil-llvm-gen
+    SILPassPipelineDumper, // sil-passpipeline-dumper
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph

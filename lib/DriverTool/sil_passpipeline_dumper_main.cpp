@@ -1,4 +1,4 @@
-//===--- SILPassPipelineDumper.cpp ----------------------------------------===//
+//===--- sil_passpipeline_dumper_main.cpp ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -25,12 +25,15 @@
 
 using namespace swift;
 
-static llvm::cl::opt<PassPipelineKind>
-    PipelineKind(llvm::cl::desc("<pipeline kind>"), llvm::cl::values(
+struct SILPassPipelineDumperOptions {
+  llvm::cl::opt<PassPipelineKind>
+    PipelineKind = llvm::cl::opt<PassPipelineKind>(llvm::cl::desc("<pipeline kind>"),
+                                                   llvm::cl::values(
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
   clEnumValN(PassPipelineKind::NAME, #NAME, DESCRIPTION),
 #include "swift/SILOptimizer/PassManager/PassPipeline.def"
                                                         clEnumValN(0, "", "")));
+};
 
 namespace llvm {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
@@ -44,17 +47,18 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
 }
 } // namespace llvm
 
-int main(int argc, char **argv) {
-  PROGRAM_START(argc, argv);
+int sil_passpipeline_dumper_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::ParseCommandLineOptions(argc, argv,
+  SILPassPipelineDumperOptions options;
+
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(),
                                     "Swift SIL Pass Pipeline Dumper\n");
 
   // TODO: add options to manipulate this.
   SILOptions Opt;
 
-  switch (PipelineKind) {
+  switch (options.PipelineKind) {
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
   case PassPipelineKind::NAME: {                                               \
     SILPassPipelinePlan::get##NAME##PassPipeline(Opt).print(llvm::outs());     \
