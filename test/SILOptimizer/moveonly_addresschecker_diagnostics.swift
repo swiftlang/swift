@@ -459,6 +459,12 @@ public func finalClassSimpleNonConsumingUseTest(_ x: __owned FinalKlass) {
     borrowVal(x2)
 }
 
+public func finalClassSimpleNonConsumingUseTest2(_ x: consuming FinalKlass) {
+    var x2 = x
+    x2 = FinalKlass()
+    borrowVal(x2)
+}
+
 public func finalClassSimpleNonConsumingUseTestArg(_ x2: inout FinalKlass) {
     borrowVal(x2)
 }
@@ -2142,11 +2148,53 @@ func moveOperatorTest(_ k: __owned Klass) {
     let _ = k3
 }
 
+func moveOperatorTest2(_ k: consuming Klass) {
+    var k2 = k
+    // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
+    k2 = Klass()
+    let k3 = consume k2 // expected-note {{consuming use here}}
+    let _ = consume k2
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+    _ = k2
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+    let _ = k2
+    // expected-note @-1 {{consuming use here}}
+    let _ = k3
+}
+
 /////////////////////////////////////////
 // Black hole initialization test case//
 /////////////////////////////////////////
 
 func blackHoleKlassTestCase(_ k: __owned Klass) {
+    var k2 = k
+    // expected-error @-1 {{'k2' consumed more than once}}
+    // expected-error @-2 {{'k2' consumed more than once}}
+    // expected-error @-3 {{'k2' consumed more than once}}
+    // expected-error @-4 {{'k2' consumed more than once}}
+    let _ = k2 // expected-note {{consuming use here}}
+    let _ = k2 // expected-note {{consuming use here}}
+
+    k2 = Klass()
+    var _ = k2 // expected-note {{consuming use here}}
+    var _ = k2
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+
+    _ = k2
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{consuming use here}}
+
+    // TODO: Why do we not also get 2 errors here?
+    _ = k2
+    // expected-note @-1 {{consuming use here}}
+}
+
+func blackHoleKlassTestCase2(_ k: consuming Klass) {
     var k2 = k
     // expected-error @-1 {{'k2' consumed more than once}}
     // expected-error @-2 {{'k2' consumed more than once}}
@@ -2449,6 +2497,14 @@ func borrowAndConsumeAtSameTimeTest(x: __owned NonTrivialStruct) { // expected-e
     borrowAndConsumeAtSameTime(x, consume: x)
     // expected-note @-1 {{consuming use here}}
     // expected-note @-2 {{non-consuming use here}}
+}
+
+func borrowAndConsumeAtSameTimeTest2(x: consuming NonTrivialStruct) { // expected-error {{'x' used after consume}}
+    borrowAndConsumeAtSameTime(x, consume: x)
+    // expected-note @-1 {{consuming use here}}
+    // expected-note @-2 {{non-consuming use here}}
+    // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+    // expected-note @-4 {{conflicting access is here}}
 }
 
 ////////////////
