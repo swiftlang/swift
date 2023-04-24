@@ -1103,13 +1103,6 @@ void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
   if (score.Data[SK_Fix] == 0)
     return;
 
-  auto holeify = [&](Type componentTy) {
-    if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-      CS.assignFixedType(
-          typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
-    }
-  };
-
   // If this conjunction represents a closure and inference
   // has failed, let's bind all of unresolved type variables
   // in its interface type to holes to avoid extraneous
@@ -1118,14 +1111,13 @@ void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
   if (locator->directlyAt<ClosureExpr>()) {
     auto closureTy =
         CS.getClosureType(castToExpr<ClosureExpr>(locator->getAnchor()));
-
-    CS.simplifyType(closureTy).visit(holeify);
+    CS.recordTypeVariablesAsHoles(closureTy);
   }
 
   // Same for a SingleValueStmtExpr, turn any unresolved type variables present
   // in its type into holes.
   if (locator->isForSingleValueStmtConjunction()) {
     auto *SVE = castToExpr<SingleValueStmtExpr>(locator->getAnchor());
-    CS.simplifyType(CS.getType(SVE)).visit(holeify);
+    CS.recordTypeVariablesAsHoles(CS.getType(SVE));
   }
 }
