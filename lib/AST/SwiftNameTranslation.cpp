@@ -234,6 +234,29 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
         return {Unsupported, UnrepresentableThrows};
     }
   }
+  if (const auto *enumDecl = dyn_cast<EnumDecl>(VD)) {
+    if (enumDecl->isIndirect())
+      return {Unsupported, UnrepresentableIndirectEnum};
+    for (const auto *enumCase : enumDecl->getAllCases()) {
+      for (const auto *elementDecl : enumCase->getElements()) {
+        if (!elementDecl->hasAssociatedValues())
+          continue;
+        // Do not expose any enums with > 1
+        // enum parameter, or any enum parameter
+        // whose type we do not yet support.
+        if (auto *params = elementDecl->getParameterList()) {
+          if (params->size() > 1)
+            return {Unsupported, UnrepresentableEnumCaseTuple};
+          for (const auto *param : *params) {
+            auto paramType = param->getInterfaceType();
+            if (!paramType->is<GenericTypeParamType>() &&
+                !paramType->getNominalOrBoundGenericNominal())
+              return {Unsupported, UnrepresentableEnumCaseType};
+          }
+        }
+      }
+    }
+  }
   // Generic requirements are not yet supported in C++.
   if (genericSignature && !genericSignature->getRequirements().empty())
     return {Unsupported, UnrepresentableGenericRequirements};
