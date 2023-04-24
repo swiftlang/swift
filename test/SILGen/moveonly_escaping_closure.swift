@@ -72,7 +72,7 @@ func testGlobalClosureCaptureVar() {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1:29 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1:29 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2:26 {{conflicting access is here}}
     }
     globalClosureCaptureVar()
@@ -134,7 +134,7 @@ func testLocalLetClosureCaptureVar() {
         consumeVal(x) // expected-note {{consuming use here}}
         consumeVal(x) // expected-note {{consuming use here}}
         borrowConsumeVal(x, x) // expected-note {{consuming use here}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
@@ -190,7 +190,7 @@ func testLocalVarClosureCaptureVar() {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f = {}
@@ -251,7 +251,7 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
@@ -318,7 +318,7 @@ func testConsumingNoEscapeClosureCaptureVar(_ f: consuming () -> ()) {
         // expected-note @-1 {{consuming use here}}
         // expected-note @-2 {{consuming use here}}
         // expected-note @-3 {{non-consuming use here}}
-        // expected-error @-4 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-4 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-5 {{conflicting access is here}}
     }
     f()
@@ -384,7 +384,7 @@ func testConsumingEscapeClosureCaptureVar(_ f: consuming @escaping () -> ()) {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
@@ -723,7 +723,7 @@ func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
         consumeVal(x) // expected-note {{captured here}}
         borrowConsumeVal(x, x) // expected-note {{captured here}}
         // expected-note @-1 {{captured here}}
-        // expected-error @-2 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-2 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-3 {{conflicting access is here}}
     }
     globalClosureCaptureInOut()
@@ -767,7 +767,7 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
         consumeVal(x) // expected-note {{captured here}}
         borrowConsumeVal(x, x) // expected-note {{captured here}}
         // expected-note @-1 {{captured here}}
-        // expected-error @-2 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-2 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-3 {{conflicting access is here}}
     }
     f()
@@ -817,7 +817,7 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
         borrowConsumeVal(x, x)
         // expected-note @-1 {{captured here}}
         // expected-note @-2 {{captured here}}
-        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-4 {{conflicting access is here}}
     }
     f = {}
@@ -867,7 +867,7 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
         borrowConsumeVal(x, x)
         // expected-note @-1 {{captured here}}
         // expected-note @-2 {{captured here}}
-        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-4 {{conflicting access is here}}
     }
     f()
@@ -923,7 +923,7 @@ func testConsumingNoEscapeClosureCaptureInOut(_ f: consuming () -> (), _ x: inou
         consumeVal(x) // expected-note {{consuming use here}}
         // expected-note @-1 {{consuming use here}}
         borrowConsumeVal(x, x)
-        // expected-error @-1 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
         // expected-note @-3 {{non-consuming use here}}
         // expected-note @-4 {{non-consuming use here}}
@@ -980,7 +980,7 @@ func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _
         borrowConsumeVal(x, x)
         // expected-note @-1 {{captured here}}
         // expected-note @-2 {{captured here}}
-        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-3 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-4 {{conflicting access is here}}
     }
     f()
@@ -1043,7 +1043,7 @@ func testGlobalClosureCaptureConsuming(_ x: consuming SingleElt) {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1:29 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1:29 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2:26 {{conflicting access is here}}
     }
     globalClosureCaptureConsuming()
@@ -1104,7 +1104,7 @@ func testLocalLetClosureCaptureConsuming(_ x: consuming SingleElt) {
         consumeVal(x) // expected-note {{consuming use here}}
         consumeVal(x) // expected-note {{consuming use here}}
         borrowConsumeVal(x, x) // expected-note {{consuming use here}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
@@ -1158,7 +1158,7 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f = {}
@@ -1225,7 +1225,7 @@ func testConsumingNoEscapeClosureCaptureConsuming(_ f: consuming () -> (),
         // expected-note @-1 {{consuming use here}}
         // expected-note @-2 {{consuming use here}}
         // expected-note @-3 {{non-consuming use here}}
-        // expected-error @-4 {{overlapping accesses to 'x', but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-4 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-5 {{conflicting access is here}}
     }
     f()
@@ -1289,7 +1289,7 @@ func testConsumingEscapeClosureCaptureConsuming(_ f: consuming @escaping () -> (
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
         borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access; consider copying to a local variable}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
