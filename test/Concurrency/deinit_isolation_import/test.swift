@@ -58,7 +58,7 @@ class ProbeExplicit_RoundtripNonisolated: RoundtripNonisolated {
 // CHECK: }
 // CHECK-SYMB: ProbeImplicit_RoundtripIsolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
-// CHECK-SYMB-NEXT: sil private [ossa] @$s4test31ProbeImplicit_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeImplicit_RoundtripIsolated) -> () {
+// CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeImplicit_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeImplicit_RoundtripIsolated) -> () {
 // CHECK-SYMB: // ProbeImplicit_RoundtripIsolated.__deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeImplicit_RoundtripIsolatedCfD : $@convention(method) (@owned ProbeImplicit_RoundtripIsolated) -> () {
@@ -70,7 +70,7 @@ class ProbeImplicit_RoundtripIsolated: RoundtripIsolated {}
 // CHECK: }
 // CHECK-SYMB: ProbeExplicit_RoundtripIsolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
-// CHECK-SYMB-NEXT: sil private [ossa] @$s4test31ProbeExplicit_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeExplicit_RoundtripIsolated) -> () {
+// CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeExplicit_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeExplicit_RoundtripIsolated) -> () {
 // CHECK-SYMB: // ProbeExplicit_RoundtripIsolated.__deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeExplicit_RoundtripIsolatedCfD : $@convention(method) (@owned ProbeExplicit_RoundtripIsolated) -> () {
@@ -147,7 +147,7 @@ class ProbeImplicit_BaseIsolatedClass: BaseIsolatedClass {}
 // CHECK: }
 // CHECK-SYMB: // ProbeExplicit_BaseIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
-// CHECK-SYMB-NEXT: sil private [ossa] @$s4test31ProbeExplicit_BaseIsolatedClassCfZ : $@convention(thin) (@owned ProbeExplicit_BaseIsolatedClass) -> () {
+// CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeExplicit_BaseIsolatedClassCfZ : $@convention(thin) (@owned ProbeExplicit_BaseIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeExplicit_BaseIsolatedClass.__deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeExplicit_BaseIsolatedClassCfD : $@convention(method) (@owned ProbeExplicit_BaseIsolatedClass) -> () {
@@ -172,7 +172,7 @@ class ProbeImplicit_DerivedIsolatedClass: DerivedIsolatedClass {}
 // CHECK: }
 // CHECK-SYMB: // ProbeExplicit_DerivedIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
-// CHECK-SYMB-NEXT: sil private [ossa] @$s4test34ProbeExplicit_DerivedIsolatedClassCfZ : $@convention(thin) (@owned ProbeExplicit_DerivedIsolatedClass) -> () {
+// CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test34ProbeExplicit_DerivedIsolatedClassCfZ : $@convention(thin) (@owned ProbeExplicit_DerivedIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeExplicit_DerivedIsolatedClass.__deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test34ProbeExplicit_DerivedIsolatedClassCfD : $@convention(method) (@owned ProbeExplicit_DerivedIsolatedClass) -> () {
