@@ -3526,6 +3526,8 @@ ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
 ERROR(eagermove_and_lexical_combined,none,
       "@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes "
       "and can't be combined", ())
+ERROR(eagermove_and_noncopyable_combined,none,
+      "@_eagerMove cannot be applied to NonCopyable types", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
