@@ -7054,6 +7054,28 @@ ERROR(invalid_macro_role_for_macro_syntax,none,
 ERROR(macro_cannot_introduce_names,none,
       "'%0' macros are not allowed to introduce names", (StringRef))
 
+ERROR(macro_resolve_circular_reference, none,
+      "circular reference resolving %select{freestanding|attached}0 macro %1",
+      (bool, DeclName))
+NOTE(macro_resolve_circular_reference_through, none,
+     "while resolving %select{freestanding|attached}0 macro %1",
+     (bool, DeclName))
+
+ERROR(macro_expand_circular_reference, none,
+      "circular reference expanding %0 macro %1", (StringRef, DeclName))
+NOTE(macro_expand_circular_reference_through, none,
+     "circular reference expanding %0 macro %1", (StringRef, DeclName))
+
+ERROR(macro_expand_circular_reference_entity, none,
+      "circular reference expanding %0 macros on %1", (StringRef, DeclName))
+NOTE(macro_expand_circular_reference_entity_through, none,
+     "circular reference expanding %0 macros on %1", (StringRef, DeclName))
+
+ERROR(macro_expand_circular_reference_unnamed, none,
+      "circular reference expanding %0 macros", (StringRef))
+NOTE(macro_expand_circular_reference_unnamed_through, none,
+     "circular reference expanding %0 macros", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
 //------------------------------------------------------------------------------
