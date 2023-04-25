@@ -1168,30 +1168,16 @@ namespace {
 /// An early transform that we run to convert any load_borrow that are copied
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
-struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
+struct CopiedLoadBorrowEliminationVisitor final
+    : public TransitiveAddressWalker {
   SILFunction *fn;
   StackList<LoadBorrowInst *> targets;
 
-  CopiedLoadBorrowEliminationVisitor(SILFunction *fn)
-      : AccessUseVisitor(AccessUseType::Inner,
-                         NestedAccessType::IgnoreAccessBegin),
-        fn(fn), targets(fn) {}
+  CopiedLoadBorrowEliminationVisitor(SILFunction *fn) : fn(fn), targets(fn) {}
 
-  bool visitUse(Operand *op, AccessUseType useTy) override {
-    LLVM_DEBUG(
-      llvm::dbgs() << "CopiedLBElim visiting ";
-      switch (useTy) {
-      case AccessUseType::Exact:
-        llvm::dbgs() << "exact      ";
-        break;
-      case AccessUseType::Inner:
-        llvm::dbgs() << "inner      ";
-        break;
-      case AccessUseType::Overlapping:
-        llvm::dbgs() << "overlapping";
-        break;
-      }
-      llvm::dbgs() << " use: " << *op->getUser());
+  bool visitUse(Operand *op) override {
+    LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim visiting ";
+               llvm::dbgs() << " User: " << *op->getUser());
     auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
     if (!lbi)
       return true;
@@ -1318,7 +1304,6 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
   LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
 
   SILFunction *fn = rootAddress->getFunction();
-  SILModule &mod = fn->getModule();
 
   // We walk down from our ancestor to our projection, emitting an error if any
   // of our types have a deinit.
@@ -1365,7 +1350,7 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
 namespace {
 
 /// Visit all of the uses of value in preparation for running our algorithm.
-struct GatherUsesVisitor : public AccessUseVisitor {
+struct GatherUsesVisitor final : public TransitiveAddressWalker {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
@@ -1380,12 +1365,10 @@ struct GatherUsesVisitor : public AccessUseVisitor {
                     UseState &useState, MarkMustCheckInst *markedValue,
                     DiagnosticEmitter &diagnosticEmitter,
                     SSAPrunedLiveness &gatherUsesLiveness)
-      : AccessUseVisitor(AccessUseType::Inner,
-                         NestedAccessType::IgnoreAccessBegin),
-        moveChecker(moveChecker), useState(useState), markedValue(markedValue),
+      : moveChecker(moveChecker), useState(useState), markedValue(markedValue),
         diagnosticEmitter(diagnosticEmitter), liveness(gatherUsesLiveness) {}
 
-  bool visitUse(Operand *op, AccessUseType useTy) override;
+  bool visitUse(Operand *op) override;
   void reset(MarkMustCheckInst *address) { useState.address = address; }
   void clear() { useState.clear(); }
 
@@ -1442,7 +1425,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
 // mayWriteToMemory and just call that instead. Possibly add additional
 // verification that visitAccessPathUses recognizes all instructions that may
 // propagate pointers (even though they don't write).
-bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
+bool GatherUsesVisitor::visitUse(Operand *op) {
   // If this operand is for a dependent type, then it does not actually access
   // the operand's address value. It only uses the metatype defined by the
   // operation (e.g. open_existential).
@@ -1453,19 +1436,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
-  LLVM_DEBUG(
-    switch (useTy) {
-    case AccessUseType::Exact:
-      llvm::dbgs() << "Visiting exact       user: ";
-      break;
-    case AccessUseType::Inner:
-      llvm::dbgs() << "Visiting inner       user: ";
-      break;
-    case AccessUseType::Overlapping:
-      llvm::dbgs() << "Visiting overlapping user: ";
-      break;
-    }
-    llvm::dbgs() << *user);
+  LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *user;);
 
   // First check if we have init/reinit. These are quick/simple.
   if (::memInstMustInitialize(op)) {
@@ -2427,20 +2398,13 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
 
-  auto accessPathWithBase = AccessPathWithBase::computeInScope(markedAddress);
-  auto accessPath = accessPathWithBase.accessPath;
-  if (!accessPath.isValid()) {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid access path: " << *markedAddress);
-    return false;
-  }
-
   // Before we do anything, canonicalize load_borrow + copy_value into load
   // [copy] + begin_borrow for further processing. This just eliminates a case
   // that the checker doesn't need to know about.
   {
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
-    if (!visitAccessPathBaseUses(copiedLoadBorrowEliminator, accessPathWithBase,
-                                 fn)) {
+    if (AddressUseKind::Unknown ==
+        std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
                               << *markedAddress);
       return false;
@@ -2457,7 +2421,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
                             diagnosticEmitter, gatherUsesLiveness);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(markedAddress);
-  if (!visitAccessPathBaseUses(visitor, accessPathWithBase, fn)) {
+  if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
     return false;
   }

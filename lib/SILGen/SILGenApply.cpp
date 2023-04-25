@@ -41,8 +41,9 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
-#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
@@ -4238,7 +4239,25 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
   assert(!param.isConsumed() && "emitting borrow into consumed parameter?");
   if (value.getType().isAddress()) {
     if (!param.isIndirectInGuaranteed() || !SGF.silConv.useLoweredAddresses()) {
-      value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+      if (value.getType().isMoveOnly()) {
+        // We use a formal access load [copy] instead of a load_borrow here
+        // since in the case where we have a second parameter that is consuming,
+        // we want to avoid emitting invalid SIL and instead allow for the
+        // exclusivity checker to emit an error due to the conflicting access
+        // scopes.
+        //
+        // NOTE: We are not actually hurting codegen here since due to the way
+        // scopes are layered, the destroy_value of the load [copy] is
+        // guaranteed to be within the access scope meaning that it is easy for
+        // SIL passes like the move only checker to convert this to a
+        // load_borrow.
+        value = SGF.B.createFormalAccessLoadCopy(loc, value);
+        // Strip off the cleanup from the load [copy] since we do not want the
+        // cleanup to be forwarded.
+        value = ManagedValue::forUnmanaged(value.getValue());
+      } else {
+        value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+      }
     }
   }
 

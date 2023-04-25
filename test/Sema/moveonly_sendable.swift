@@ -27,7 +27,7 @@ func invalidFile() async -> FileDescriptor {
   return FileDescriptor(id: -1)
 }
 
-func takeNotSendable(_ nsmo: __shared NotSendableMO) async {}
+func takeNotSendable(_ nsmo: borrowing NotSendableMO) async {}
 
 actor A {
   init(_ t: __owned FileDescriptor) {}
@@ -42,7 +42,7 @@ actor A {
 }
 
 @MainActor
-func processFiles(_ a: A, _ anotherFile: __shared FileDescriptor) async {
+func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   let file = await invalidFile()
   await a.takeFileDescriptor(file)
 
@@ -96,7 +96,7 @@ func takeSomeSendable(_ s: some Sendable) {}
 // expected-error@+1 {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 func mkSendable() -> Sendable { return FileDescriptor(id: 0) }
 
-func tryToCastIt(_ fd: __shared FileDescriptor) {
+func tryToCastIt(_ fd: borrowing FileDescriptor) {
   let _: any Sendable = fd // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
   let _: Sendable = fd // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 
@@ -145,7 +145,7 @@ class Container<T> where T:Sendable {
   init(_ t: T) { self.elm = t }
 }
 
-func createContainer(_ fd: __shared FileDescriptor) {
+func createContainer(_ fd: borrowing FileDescriptor) {
   let _: Container<Sendable> = Container(fd) // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
   let _: Container<Sendable> = Container(CopyableStruct())
 }
@@ -158,7 +158,7 @@ extension Sendable {
   }
 }
 
-func tryToDupe(_ fd: __shared FileDescriptor) {
+func tryToDupe(_ fd: borrowing FileDescriptor) {
   fd.doIllegalThings() // expected-error {{move-only type 'FileDescriptor' cannot be used with generics yet}}
 }
 
