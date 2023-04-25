@@ -8857,3 +8857,45 @@ bool GlobalActorFunctionMismatchFailure::diagnoseAsError() {
   emitDiagnostic(message, getFromType(), getToType());
   return true;
 }
+
+bool DestructureTupleToUseWithPackExpansionParameter::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto argLoc = locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+
+  {
+    auto diagnostic =
+        emitDiagnostic(diag::cannot_convert_tuple_into_pack_expansion_parameter,
+                       argLoc.getParamIdx(), ParamShape->getNumElements(),
+                       isExpr<TupleExpr>(getAnchor()));
+
+    if (auto *tupleExpr = getAsExpr<TupleExpr>(getAnchor())) {
+      diagnostic.fixItRemove(tupleExpr->getLParenLoc());
+      diagnostic.fixItRemove(tupleExpr->getRParenLoc());
+    }
+  }
+
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return true;
+
+  if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+    emitDiagnosticAt(decl, diag::decl_declared_here, decl->getName());
+  }
+
+  return true;
+}
+
+bool DestructureTupleToUseWithPackExpansionParameter::diagnoseAsNote() {
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload || !selectedOverload->choice.isDecl())
+    return false;
+
+  auto *choice = selectedOverload->choice.getDecl();
+  auto argLoc =
+      getLocator()->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+
+  emitDiagnosticAt(
+      choice, diag::cannot_convert_tuple_into_pack_expansion_parameter_note,
+      argLoc.getParamIdx(), ParamShape->getNumElements());
+  return true;
+}

@@ -2976,6 +2976,30 @@ private:
   bool diagnoseTupleElement();
 };
 
+/// Diagnose situation when a single argument to tuple type is passed to
+/// a value pack expansion parameter that expects distinct N elements:
+///
+/// ```swift
+/// struct S<each T> {
+///   func test(x: Int, _: repeat each T) {}
+/// }
+///
+/// S<Int, String>().test(x: 42, (2, "b"))
+/// ```
+class DestructureTupleToUseWithPackExpansionParameter final
+    : public FailureDiagnostic {
+  PackType *ParamShape;
+
+public:
+  DestructureTupleToUseWithPackExpansionParameter(const Solution &solution,
+                                                  PackType *paramShape,
+                                                  ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ParamShape(paramShape) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
