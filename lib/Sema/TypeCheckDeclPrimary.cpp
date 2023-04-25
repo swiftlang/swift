@@ -3796,7 +3796,7 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
 
   // Resolve macro candidates.
   auto macro = evaluateOrDefault(
-      ctx.evaluator, ResolveMacroRequest{MED, dc},
+      ctx.evaluator, ResolveMacroRequest{MED, MED},
       ConcreteDeclRef());
   if (!macro)
     return None;

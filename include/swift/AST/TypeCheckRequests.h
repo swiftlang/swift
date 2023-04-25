@@ -3243,6 +3243,12 @@ public:
   friend llvm::hash_code hash_value(const UnresolvedMacroReference &ref) {
     return reinterpret_cast<ptrdiff_t>(ref.pointer.getOpaqueValue());
   }
+
+  friend SourceLoc extractNearestSourceLoc(
+      const UnresolvedMacroReference &ref
+  ) {
+    return ref.getSigilLoc();
+  }
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -3252,7 +3258,7 @@ void simple_display(llvm::raw_ostream &out,
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
                            ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                                           const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3262,10 +3268,13 @@ private:
 
   ConcreteDeclRef
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
-           DeclContext *dc) const;
+           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
+
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 class ResolveTypeEraserTypeRequest
@@ -3917,6 +3926,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all accessor macros attached to the given declaration.
@@ -3937,6 +3948,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all conformance macros attached to the given declaration.
@@ -3957,6 +3970,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all member attribute macros attached to the given
@@ -3977,6 +3992,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand synthesized member macros attached to the given declaration.
@@ -3996,6 +4013,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Represent a loaded plugin either an in-process library or an executable.
@@ -4050,6 +4069,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Resolve an external macro given its module and type name.
