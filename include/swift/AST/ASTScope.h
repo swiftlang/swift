@@ -413,6 +413,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return SF; }
 
   ASTContext &getASTContext() const override;
+  bool ignoreInDebugInfo() const override { return true; }
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
