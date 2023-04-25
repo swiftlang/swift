@@ -21,4 +21,4 @@ cmake -G Ninja \
   "${SOURCE_PATH}/swift-corelibs-xctest"
   
 ninja -v
-DESTDIR="$DESTINATION_TOOLCHAIN/usr" ninja -v install
+DESTDIR="$DESTINATION_TOOLCHAIN/usr/lib" ninja -v install
