@@ -332,8 +332,8 @@ func test_pack_expansions_with_closures() {
 // rdar://107151854 - crash on invalid due to specialized pack expansion
 func test_pack_expansion_specialization() {
   struct Data<each T> {
-    init(_: repeat each T) {} // expected-note 2 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {} // expected-note 2 {{'init(vals:)' declared here}}
+    init(_: repeat each T) {} // expected-note 3 {{'init(_:)' declared here}}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}

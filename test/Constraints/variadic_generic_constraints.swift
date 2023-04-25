@@ -58,14 +58,14 @@ takesParallelSequences(t: Array<String>(), Set<Int>(), u: Array<Int>(), Set<Stri
 // Same-shape requirements
 
 func zip<each T, each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {}
+// expected-note@-1 {{'zip(t:u:)' declared here}}
 
 let _ = zip()  // ok
 let _ = zip(t: 1, u: "hi")  // ok
 let _ = zip(t: 1, 2, u: "hi", "hello")  // ok
 let _ = zip(t: 1, 2, 3, u: "hi", "hello", "greetings")  // ok
-
-// FIXME: Bad diagnostic
-let _ = zip(t: 1, u: "hi", "hello", "greetings")  // expected-error {{type of expression is ambiguous without more context}}
+let _ = zip(t: 1, u: "hi", "hello", "greetings")  // expected-error {{extra arguments at positions #3, #4 in call}}
+// expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'Pack{Int}' and 'Pack{String, String, String}' have the same shape}}
 
 func goodCallToZip<each T, each U>(t: repeat each T, u: repeat each U) where (repeat (each T, each U)): Any {
   _ = zip(t: repeat each t, u: repeat each u)
