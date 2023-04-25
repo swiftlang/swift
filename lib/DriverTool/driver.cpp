@@ -63,6 +63,27 @@ std::string getExecutablePath(const char *FirstArg) {
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
 
+/// Run 'sil-opt'
+extern int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'sil-func-extractor'
+extern int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'sil-nm'
+extern int sil_nm_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'sil-llvm-gen'
+extern int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'sil-passpipeline-dumper'
+extern int sil_passpipeline_dumper_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'swift-dependency-tool'
+extern int swift_dependency_tool_main(ArrayRef<const char *> argv, void *MainAddr);
+
+/// Run 'swift-llvm-opt'
+extern int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr);
+
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
@@ -281,6 +302,20 @@ static int run_driver(StringRef ExecName,
 
   Driver TheDriver(Path, ExecName, argv, Diags);
   switch (TheDriver.getDriverKind()) {
+  case Driver::DriverKind::SILOpt:
+    return sil_opt_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SILFuncExtractor:
+    return sil_func_extractor_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SILNM:
+    return sil_nm_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SILLLVMGen:
+    return sil_llvm_gen_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SILPassPipelineDumper:
+    return sil_passpipeline_dumper_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SwiftDependencyTool:
+    return swift_dependency_tool_main(argv, (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SwiftLLVMOpt:
+    return swift_llvm_opt_main(argv, (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),

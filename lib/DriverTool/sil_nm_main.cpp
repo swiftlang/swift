@@ -1,4 +1,4 @@
-//===--- SILNM.cpp --------------------------------------------------------===//
+//===--- sil_nm_main.cpp --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -46,52 +46,50 @@
 
 using namespace swift;
 
-static llvm::cl::opt<std::string> InputFilename(llvm::cl::desc("input file"),
-                                                llvm::cl::init("-"),
-                                                llvm::cl::Positional);
+struct SILNMOptions {
+  llvm::cl::opt<std::string>
+    InputFilename = llvm::cl::opt<std::string>(llvm::cl::desc("input file"),
+                                               llvm::cl::init("-"),
+                                               llvm::cl::Positional);
 
-static llvm::cl::list<std::string>
-    ImportPaths("I",
-                llvm::cl::desc("add a directory to the import search path"));
+  llvm::cl::list<std::string>
+    ImportPaths = llvm::cl::list<std::string>("I",
+                  llvm::cl::desc("add a directory to the import search path"));
 
-static llvm::cl::opt<std::string>
-    ModuleName("module-name",
-               llvm::cl::desc("The name of the module if processing"
-                              " a module. Necessary for processing "
-                              "stdin."));
+  llvm::cl::opt<std::string>
+    ModuleName = llvm::cl::opt<std::string>("module-name",
+                 llvm::cl::desc("The name of the module if processing"
+                                " a module. Necessary for processing "
+                                "stdin."));
 
-static llvm::cl::opt<bool>
-    DemangleNames("demangle",
-                  llvm::cl::desc("Demangle names of entities outputted"));
+  llvm::cl::opt<bool>
+    DemangleNames = llvm::cl::opt<bool>("demangle",
+                    llvm::cl::desc("Demangle names of entities outputted"));
 
-static llvm::cl::opt<std::string>
-    ModuleCachePath("module-cache-path",
-                    llvm::cl::desc("Clang module cache path"));
+  llvm::cl::opt<std::string>
+    ModuleCachePath = llvm::cl::opt<std::string>("module-cache-path",
+                      llvm::cl::desc("Clang module cache path"));
 
-static llvm::cl::opt<std::string> ResourceDir(
-    "resource-dir",
-    llvm::cl::desc("The directory that holds the compiler resource files"));
+  llvm::cl::opt<std::string>
+    ResourceDir = llvm::cl::opt<std::string>(
+      "resource-dir",
+      llvm::cl::desc("The directory that holds the compiler resource files"));
 
-static llvm::cl::opt<std::string>
-    SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
-                                  "importer."),
-            llvm::cl::init(""));
+  llvm::cl::opt<std::string>
+    SDKPath = llvm::cl::opt<std::string>("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
+                                    "importer."),
+              llvm::cl::init(""));
 
-static llvm::cl::opt<std::string> Triple("target",
-                                         llvm::cl::desc("target triple"));
+  llvm::cl::opt<std::string>
+    Triple = llvm::cl::opt<std::string>("target", llvm::cl::desc("target triple"));
+};
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
-static void printAndSortNames(std::vector<StringRef> &Names, char Code) {
+static void printAndSortNames(std::vector<StringRef> &Names, char Code,
+                              const SILNMOptions &options) {
   std::sort(Names.begin(), Names.end());
   for (StringRef N : Names) {
     llvm::outs() << Code << " ";
-    if (DemangleNames) {
+    if (options.DemangleNames) {
       llvm::outs() << swift::Demangle::demangleSymbolAsString(N);
     } else {
       llvm::outs() << N;
@@ -100,65 +98,66 @@ static void printAndSortNames(std::vector<StringRef> &Names, char Code) {
   }
 }
 
-static void nmModule(SILModule *M) {
+static void nmModule(SILModule *M, const SILNMOptions &options) {
   {
     std::vector<StringRef> FuncNames;
-    llvm::transform(*M, std::back_inserter(FuncNames),
-                    std::mem_fn(&SILFunction::getName));
-    printAndSortNames(FuncNames, 'F');
+    for (SILFunction &f : *M) {
+      FuncNames.push_back(f.getName());
+    }
+    printAndSortNames(FuncNames, 'F', options);
   }
 
   {
     std::vector<StringRef> GlobalNames;
-    llvm::transform(M->getSILGlobals(), std::back_inserter(GlobalNames),
-                    std::mem_fn(&SILGlobalVariable::getName));
-    printAndSortNames(GlobalNames, 'G');
+    for (SILGlobalVariable &g : M->getSILGlobals()) {
+      GlobalNames.push_back(g.getName());
+    }
+    printAndSortNames(GlobalNames, 'G', options);
   }
 
   {
     std::vector<StringRef> WitnessTableNames;
-    llvm::transform(M->getWitnessTables(),
-                    std::back_inserter(WitnessTableNames),
-                    std::mem_fn(&SILWitnessTable::getName));
-    printAndSortNames(WitnessTableNames, 'W');
+    for (SILWitnessTable &wt : M->getWitnessTables()) {
+      WitnessTableNames.push_back(wt.getName());
+    }
+    printAndSortNames(WitnessTableNames, 'W', options);
   }
 
   {
     std::vector<StringRef> VTableNames;
-    llvm::transform(M->getVTables(), std::back_inserter(VTableNames),
-                    [](const SILVTable *VT) -> StringRef {
-                      return VT->getClass()->getName().str();
-                    });
-    printAndSortNames(VTableNames, 'V');
+    for (SILVTable *vt : M->getVTables()) {
+      VTableNames.push_back(vt->getClass()->getName().str());
+    }
+    printAndSortNames(VTableNames, 'V', options);
   }
 }
 
-int main(int argc, char **argv) {
-  PROGRAM_START(argc, argv);
+int sil_nm_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "SIL NM\n");
+  SILNMOptions options;
+
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "SIL NM\n");
 
   CompilerInvocation Invocation;
 
-  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(
-      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.setImportSearchPaths(options.ImportPaths);
   // Set the SDK path and target if given.
-  if (SDKPath.getNumOccurrences() == 0) {
+  if (options.SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
     if (SDKROOT)
-      SDKPath = SDKROOT;
+      options.SDKPath = SDKROOT;
   }
-  if (!SDKPath.empty())
-    Invocation.setSDKPath(SDKPath);
-  if (!Triple.empty())
-    Invocation.setTargetTriple(Triple);
-  if (!ResourceDir.empty())
-    Invocation.setRuntimeResourcePath(ResourceDir);
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  if (!options.SDKPath.empty())
+    Invocation.setSDKPath(options.SDKPath);
+  if (!options.Triple.empty())
+    Invocation.setTargetTriple(options.Triple);
+  if (!options.ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options.ResourceDir);
+  Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
@@ -166,11 +165,11 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+      Invocation.setUpInputForSILTool(options.InputFilename, options.ModuleName,
                                       /*alwaysSetModuleToMain*/ true,
                                       /*bePrimary*/ false, extendedInfo);
   if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    fprintf(stderr, "Error! Failed to open file: %s\n", options.InputFilename.c_str());
     exit(-1);
   }
 
@@ -191,7 +190,7 @@ int main(int argc, char **argv) {
 
   auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
                                    CI.getSILOptions());
-  nmModule(SILMod.get());
+  nmModule(SILMod.get(), options);
 
   return CI.getASTContext().hadError();
 }

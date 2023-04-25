@@ -1,4 +1,4 @@
-//===--- SILFunctionExtractor.cpp - SIL function extraction utility -------===//
+//===--- sil_func_extractor_main.cpp --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -49,96 +49,99 @@
 
 using namespace swift;
 
-static llvm::cl::opt<std::string> InputFilename(llvm::cl::desc("input file"),
+struct SILFuncExtractorOptions {
+  llvm::cl::opt<std::string>
+    InputFilename = llvm::cl::opt<std::string>(llvm::cl::desc("input file"),
                                                 llvm::cl::init("-"),
                                                 llvm::cl::Positional);
 
-static llvm::cl::opt<std::string>
-    OutputFilename("o", llvm::cl::desc("output filename"), llvm::cl::init("-"));
+  llvm::cl::opt<std::string>
+    OutputFilename = llvm::cl::opt<std::string>("o", llvm::cl::desc("output filename"), llvm::cl::init("-"));
 
-static llvm::cl::opt<bool>
-    EmitVerboseSIL("emit-verbose-sil",
+  llvm::cl::opt<bool>
+    EmitVerboseSIL = llvm::cl::opt<bool>("emit-verbose-sil",
                    llvm::cl::desc("Emit locations during sil emission."));
 
-static llvm::cl::list<std::string>
-    CommandLineFunctionNames("func",
+  llvm::cl::list<std::string>
+    CommandLineFunctionNames = llvm::cl::list<std::string>("func",
                              llvm::cl::desc("Function names to extract."));
-static llvm::cl::opt<std::string> FunctionNameFile(
+  llvm::cl::opt<std::string>
+    FunctionNameFile = llvm::cl::opt<std::string>(
     "func-file", llvm::cl::desc("File to load additional function names from"));
 
-static llvm::cl::opt<bool>
-EmitSIB("emit-sib",
+  llvm::cl::opt<bool>
+    EmitSIB = llvm::cl::opt<bool>("emit-sib",
         llvm::cl::desc("Emit a sib file as output instead of a sil file"));
 
-static llvm::cl::opt<bool> InvertMatch(
-    "invert",
-    llvm::cl::desc("Match functions whose name do not "
-                   "match the names of the functions to be extracted"));
+  llvm::cl::opt<bool>
+    InvertMatch = llvm::cl::opt<bool>(
+                  "invert",
+                  llvm::cl::desc("Match functions whose name do not "
+                  "match the names of the functions to be extracted"));
 
-static llvm::cl::list<std::string>
-    ImportPaths("I",
+  llvm::cl::list<std::string>
+    ImportPaths = llvm::cl::list<std::string>("I",
                 llvm::cl::desc("add a directory to the import search path"));
 
-static llvm::cl::opt<std::string>
-    ModuleName("module-name",
+  llvm::cl::opt<std::string>
+    ModuleName = llvm::cl::opt<std::string>("module-name",
                llvm::cl::desc("The name of the module if processing"
                               " a module. Necessary for processing "
                               "stdin."));
 
-static llvm::cl::opt<std::string>
-    ModuleCachePath("module-cache-path",
+  llvm::cl::opt<std::string>
+    ModuleCachePath = llvm::cl::opt<std::string>("module-cache-path",
                     llvm::cl::desc("Clang module cache path"));
 
-static llvm::cl::opt<std::string> ResourceDir(
-    "resource-dir",
-    llvm::cl::desc("The directory that holds the compiler resource files"));
+  llvm::cl::opt<std::string>
+    ResourceDir = llvm::cl::opt<std::string>(
+                "resource-dir",
+                llvm::cl::desc("The directory that holds the compiler resource files"));
 
-static llvm::cl::opt<std::string>
-    SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
+  llvm::cl::opt<std::string>
+    SDKPath = llvm::cl::opt<std::string>("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                                   "importer."),
-            llvm::cl::init(""));
+              llvm::cl::init(""));
 
-static llvm::cl::opt<std::string> Triple("target",
-                                         llvm::cl::desc("target triple"));
+  llvm::cl::opt<std::string>
+    Triple = llvm::cl::opt<std::string>("target",
+                                        llvm::cl::desc("target triple"));
 
-static llvm::cl::opt<bool>
-    EmitSortedSIL("emit-sorted-sil", llvm::cl::Hidden, llvm::cl::init(false),
+  llvm::cl::opt<bool>
+    EmitSortedSIL = llvm::cl::opt<bool>("emit-sorted-sil", llvm::cl::Hidden, llvm::cl::init(false),
                   llvm::cl::desc("Sort Functions, VTables, Globals, "
                                  "WitnessTables by name to ease diffing."));
 
-static llvm::cl::opt<bool>
-DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
-               llvm::cl::init(false),
-               llvm::cl::desc("Do not dump AST."));
+  llvm::cl::opt<bool>
+    DisableASTDump = llvm::cl::opt<bool>("sil-disable-ast-dump", llvm::cl::Hidden,
+                 llvm::cl::init(false),
+                 llvm::cl::desc("Do not dump AST."));
 
-static llvm::cl::opt<bool> EnableOSSAModules(
-    "enable-ossa-modules",
-    llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                   "this is disabled we do not serialize in OSSA "
-                   "form when optimizing."));
+  llvm::cl::opt<bool>
+    EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules",
+      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
+                     "this is disabled we do not serialize in OSSA "
+                     "form when optimizing."));
 
-static llvm::cl::opt<llvm::cl::boolOrDefault> EnableObjCInterop(
-    "enable-objc-interop",
-    llvm::cl::desc("Whether the Objective-C interop should be enabled. "
-                   "The value is `true` by default on Darwin platforms."));
+  llvm::cl::opt<llvm::cl::boolOrDefault>
+    EnableObjCInterop = llvm::cl::opt<llvm::cl::boolOrDefault>(
+      "enable-objc-interop",
+      llvm::cl::desc("Whether the Objective-C interop should be enabled. "
+                     "The value is `true` by default on Darwin platforms."));
+};
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
-static void getFunctionNames(std::vector<std::string> &Names) {
-  std::copy(CommandLineFunctionNames.begin(), CommandLineFunctionNames.end(),
+static void getFunctionNames(std::vector<std::string> &Names,
+                             const SILFuncExtractorOptions &options) {
+  std::copy(options.CommandLineFunctionNames.begin(), options.CommandLineFunctionNames.end(),
             std::back_inserter(Names));
 
-  if (!FunctionNameFile.empty()) {
+  if (!options.FunctionNameFile.empty()) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-        llvm::MemoryBuffer::getFileOrSTDIN(FunctionNameFile);
+        llvm::MemoryBuffer::getFileOrSTDIN(options.FunctionNameFile);
     if (!FileBufOrErr) {
       fprintf(stderr, "Error! Failed to open file: %s\n",
-              InputFilename.c_str());
+              options.InputFilename.c_str());
       exit(-1);
     }
     StringRef Buffer = FileBufOrErr.get()->getBuffer();
@@ -168,7 +171,8 @@ static bool stringInSortedArray(
 }
 
 void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
-                             ArrayRef<std::string> DemangledNames) {
+                             ArrayRef<std::string> DemangledNames,
+                             const SILFuncExtractorOptions &options) {
   assert((!MangledNames.empty() || !DemangledNames.empty()) &&
          "Expected names of function we want to retain!");
   assert(M && "Expected a SIL module to extract from.");
@@ -191,7 +195,7 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
           return str1.substr(0, str1.find(' ')) <
                  str2.substr(0, str2.find(' '));
         });
-    if ((FoundMangledName || FoundDemangledName) ^ InvertMatch) {
+    if ((FoundMangledName || FoundDemangledName) ^ options.InvertMatch) {
       LLVM_DEBUG(llvm::dbgs() << "    Not removing!\n");
       continue;
     }
@@ -225,57 +229,57 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
   performSILDeadFunctionElimination(M);
 }
 
-int main(int argc, char **argv) {
-  PROGRAM_START(argc, argv);
+int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL Extractor\n");
+  SILFuncExtractorOptions options;
+
+  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift SIL Extractor\n");
 
   CompilerInvocation Invocation;
 
-  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(
-      argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.setImportSearchPaths(options.ImportPaths);
   // Set the SDK path and target if given.
-  if (SDKPath.getNumOccurrences() == 0) {
+  if (options.SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
     if (SDKROOT)
-      SDKPath = SDKROOT;
+      options.SDKPath = SDKROOT;
   }
-  if (!SDKPath.empty())
-    Invocation.setSDKPath(SDKPath);
-  if (!Triple.empty())
-    Invocation.setTargetTriple(Triple);
-  if (!ResourceDir.empty())
-    Invocation.setRuntimeResourcePath(ResourceDir);
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  if (!options.SDKPath.empty())
+    Invocation.setSDKPath(options.SDKPath);
+  if (!options.Triple.empty())
+    Invocation.setTargetTriple(options.Triple);
+  if (!options.ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options.ResourceDir);
+  Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
-  if (EnableObjCInterop == llvm::cl::BOU_UNSET) {
+  if (options.EnableObjCInterop == llvm::cl::BOU_UNSET) {
     Invocation.getLangOptions().EnableObjCInterop =
         Invocation.getLangOptions().Target.isOSDarwin();
   } else {
     Invocation.getLangOptions().EnableObjCInterop =
-        EnableObjCInterop == llvm::cl::BOU_TRUE;
+    options.EnableObjCInterop == llvm::cl::BOU_TRUE;
   }
 
   SILOptions &Opts = Invocation.getSILOptions();
-  Opts.EmitVerboseSIL = EmitVerboseSIL;
-  Opts.EmitSortedSIL = EmitSortedSIL;
-  Opts.EnableOSSAModules = EnableOSSAModules;
+  Opts.EmitVerboseSIL = options.EmitVerboseSIL;
+  Opts.EmitSortedSIL = options.EmitSortedSIL;
+  Opts.EnableOSSAModules = options.EnableOSSAModules;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+      Invocation.setUpInputForSILTool(options.InputFilename, options.ModuleName,
                                       /*alwaysSetModuleToMain*/ true,
                                       /*bePrimary*/ false, extendedInfo);
   if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    fprintf(stderr, "Error! Failed to open file: %s\n", options.InputFilename.c_str());
     exit(-1);
   }
 
@@ -297,13 +301,13 @@ int main(int argc, char **argv) {
   auto SILMod = performASTLowering(CI.getMainModule(), CI.getSILTypes(),
                                    CI.getSILOptions());
 
-  if (CommandLineFunctionNames.empty() && FunctionNameFile.empty())
+  if (options.CommandLineFunctionNames.empty() && options.FunctionNameFile.empty())
     return CI.getASTContext().hadError();
 
   // For efficient usage, we separate our names into two separate sorted
   // lists, one of managled names, and one of unmangled names.
   std::vector<std::string> Names;
-  getFunctionNames(Names);
+  getFunctionNames(Names, options);
 
   // First partition our function names into mangled/demangled arrays.
   auto FirstDemangledName = std::partition(
@@ -339,14 +343,14 @@ int main(int argc, char **argv) {
                              llvm::errs() << "    " << str << '\n';
                            }));
 
-  removeUnwantedFunctions(SILMod.get(), MangledNames, DemangledNames);
+  removeUnwantedFunctions(SILMod.get(), MangledNames, DemangledNames, options);
 
-  if (EmitSIB) {
+  if (options.EmitSIB) {
     llvm::SmallString<128> OutputFile;
-    if (OutputFilename.size()) {
-      OutputFile = OutputFilename;
-    } else if (ModuleName.size()) {
-      OutputFile = ModuleName;
+    if (options.OutputFilename.size()) {
+      OutputFile = options.OutputFilename;
+    } else if (options.ModuleName.size()) {
+      OutputFile = options.ModuleName;
       llvm::sys::path::replace_extension(
           OutputFile, file_types::getExtension(file_types::TY_SIB));
     } else {
@@ -365,14 +369,14 @@ int main(int argc, char **argv) {
     serialize(CI.getMainModule(), serializationOpts, symbolGraphOpts, SILMod.get());
   } else {
     const StringRef OutputFile =
-        OutputFilename.size() ? StringRef(OutputFilename) : "-";
+    options.OutputFilename.size() ? StringRef(options.OutputFilename) : "-";
 
     auto SILOpts = SILOptions();
-    SILOpts.EmitVerboseSIL = EmitVerboseSIL;
-    SILOpts.EmitSortedSIL = EmitSortedSIL;
+    SILOpts.EmitVerboseSIL = options.EmitVerboseSIL;
+    SILOpts.EmitSortedSIL = options.EmitSortedSIL;
 
     if (OutputFile == "-") {
-      SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
+      SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !options.DisableASTDump);
     } else {
       std::error_code EC;
       llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::OF_None);
@@ -381,7 +385,8 @@ int main(int argc, char **argv) {
                      << '\n';
         return 1;
       }
-      SILMod->print(OS, CI.getMainModule(), SILOpts, !DisableASTDump);
+      SILMod->print(OS, CI.getMainModule(), SILOpts, !options.DisableASTDump);
     }
   }
+  return 0;
 }
