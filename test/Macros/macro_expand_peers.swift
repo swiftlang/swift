@@ -145,9 +145,8 @@ struct S2 {
   }
 
   #if TEST_DIAGNOSTICS
-  // FIXME: Causes reference cycles
-  // should have error {{cannot find 'nonexistent' in scope}}
-  // @addCompletionHandlerArbitrarily(nonexistent)
+  // expected-error@+1 {{cannot find 'nonexistent' in scope}}
+  @addCompletionHandlerArbitrarily(nonexistent)
   func h(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
