@@ -8,11 +8,11 @@
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts
 
-struct Variadic<T..., U> {
-  struct Inner<V..., W> {}
+struct Variadic<each T, U> {
+  struct Inner<each V, W> {}
 }
 
-extension Variadic where each T: Equatable {
+extension Variadic where repeat each T: Equatable {
   struct Constrained {}
 }
 

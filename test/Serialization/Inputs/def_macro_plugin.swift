@@ -36,3 +36,18 @@ public struct WrapAllProperties: MemberAttributeMacro {
   }
 }
 
+public struct ArbitraryMembersMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      init(coding: String) {
+        fatalError("boom")
+      }
+      """
+    ]
+  }
+}

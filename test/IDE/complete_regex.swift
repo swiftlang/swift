@@ -5,8 +5,6 @@
 
 func testLiteral() {
   /foo/.#^RE_LITERAL_MEMBER^#
-// RE_LITERAL_MEMBER: Begin completions
 // RE_LITERAL_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Regex<Substring>#];
-// RE_LITERAL_MEMBER: End completions
 }
 

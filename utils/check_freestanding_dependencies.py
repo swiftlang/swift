@@ -40,6 +40,13 @@ math_dependencies = [
     "_log2l", "_logf", "_logl", "_nearbyintl", "_remainder", "_remainderf",
     "_remainderl", "_rintl", "_roundl", "_sin", "_sinf", "_sinl", "_truncl",
 ]
+threading_package_dependencies = [
+    "_pthread_mutex_destroy", "_pthread_cond_broadcast",
+    "_pthread_get_stacksize_np", "_pthread_key_create", "_pthread_self",
+    "_pthread_equal", "_pthread_mutex_lock", "_pthread_getspecific",
+    "_pthread_mutex_unlock", "_pthread_cond_wait", "_pthread_setspecific",
+    "_pthread_get_stackaddr_np"
+]
 common_expected_dependencies = [
     "___bzero", "___divti3", "___error", "___stderrp", "___stdoutp",
     "___truncsfhf2", "___udivti3", "_abort", "_arc4random_buf",
@@ -49,6 +56,7 @@ common_expected_dependencies = [
     "_posix_memalign", "_putc", "_read", "_realloc", "_snprintf", "_strchr",
     "_strcmp", "_strdup", "_strlen", "_strncmp", "_strtod", "_strtof",
     "_strtol", "_strtold", "_vprintf", "_vsnprintf", "_write",
+    "_stat", "_stat$INODE64",
 ] + cxx_dependencies + math_dependencies
 vendor_apple_specific_dependencies = [
     "___stack_chk_fail", "___stack_chk_guard",
@@ -96,7 +104,8 @@ for symbol in required_dependencies:
         print("Error: Required dependency '{}' missing".format(symbol))
         fail = True
 
-allowlist = set(common_expected_dependencies + vendor_specific_dependencies)
+allowlist = set(common_expected_dependencies + vendor_specific_dependencies +
+                threading_package_dependencies)
 for symbol in deps:
     if symbol not in allowlist:
         print("Error: Unexpected dependency '{}'".format(symbol))

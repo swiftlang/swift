@@ -34,6 +34,9 @@ namespace {
 // MARK: - Utilities
 
 void typeCheckDeclAndParentClosures(ValueDecl *VD) {
+  if (!VD) {
+    return;
+  }
   // We need to type check any parent closures because their types are
   // encoded in the USR of ParentContexts in the cursor info response.
   auto DC = VD->getDeclContext();
@@ -118,7 +121,7 @@ public:
 /// Walks the AST, looking for a node at \c LocToResolve. While walking the
 /// AST, also gathers information about shorthand shadows.
 class NodeFinder : ASTWalker {
-  SourceFile &SrcFile;
+  DeclContext &DC;
   SourceLoc LocToResolve;
 
   /// As we are walking the tree, this variable is updated to the last seen
@@ -136,11 +139,10 @@ class NodeFinder : ASTWalker {
   llvm::DenseMap<ValueDecl *, ValueDecl *> ShorthandShadowedDecls;
 
 public:
-  NodeFinder(SourceFile &SrcFile, SourceLoc LocToResolve)
-      : SrcFile(SrcFile), LocToResolve(LocToResolve),
-        DeclContextStack({&SrcFile}) {}
+  NodeFinder(DeclContext &DC, SourceLoc LocToResolve)
+      : DC(DC), LocToResolve(LocToResolve), DeclContextStack({&DC}) {}
 
-  void resolve() { SrcFile.walk(*this); }
+  void resolve() { DC.walkContext(*this); }
 
   std::unique_ptr<NodeFinderResult> takeResult() { return std::move(Result); }
 
@@ -158,15 +160,17 @@ public:
   }
 
 private:
-  SourceManager &getSourceMgr() const {
-    return SrcFile.getASTContext().SourceMgr;
-  }
+  SourceManager &getSourceMgr() const { return DC.getASTContext().SourceMgr; }
 
   /// The decl context that is currently being walked.
   DeclContext *getCurrentDeclContext() { return DeclContextStack.back(); }
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
     return getSourceMgr().containsRespectingReplacedRanges(Range, LocToResolve);
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -212,7 +216,9 @@ private:
     if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
       for (auto ShorthandShadows :
            getShorthandShadows(CaptureList, getCurrentDeclContext())) {
-        assert(ShorthandShadowedDecls.count(ShorthandShadows.first) == 0);
+        assert(ShorthandShadowedDecls.count(ShorthandShadows.first) == 0 ||
+               ShorthandShadowedDecls[ShorthandShadows.first] ==
+                   ShorthandShadows.second);
         ShorthandShadowedDecls[ShorthandShadows.first] =
             ShorthandShadows.second;
       }
@@ -225,7 +231,8 @@ private:
     switch (E->getKind()) {
     case ExprKind::DeclRef:
     case ExprKind::UnresolvedDot:
-    case ExprKind::UnresolvedDeclRef: {
+    case ExprKind::UnresolvedDeclRef:
+    case ExprKind::OverloadedDeclRef: {
       assert(Result == nullptr);
       Result =
           std::make_unique<NodeFinderExprResult>(E, getCurrentDeclContext());
@@ -273,13 +280,33 @@ public:
   };
 
 private:
-  /// The expression for which we want to provide cursor info results.
-  Expr *ResolveExpr;
+  /// The location to resolve and the \c DeclContext to resolve it in.
+  /// Note that we cannot store the expression to resolve directly because an
+  /// \c UnresolvedDeclRefExpr might be replaced by an \c OverloadedDeclRefExpr
+  /// and thus the constraint system solution doesn't know about the
+  /// \c UnresolvedDeclRefExpr. Instead, we find the expression to resolve in
+  /// the source file again after expression pre-check has run.
+  DeclContext &DC;
+  SourceLoc ResolveLoc;
 
   SmallVector<CursorInfoDeclReference, 1> Results;
 
+  Expr *getExprToResolve() {
+    NodeFinder Finder(DC, ResolveLoc);
+    Finder.resolve();
+    auto Result = Finder.takeResult();
+    if (!Result || Result->getKind() != NodeFinderResultKind::Expr) {
+      return nullptr;
+    }
+    return cast<NodeFinderExprResult>(Result.get())->getExpr();
+  }
+
   void sawSolutionImpl(const Solution &S) override {
     auto &CS = S.getConstraintSystem();
+    auto ResolveExpr = getExprToResolve();
+    if (!ResolveExpr) {
+      return;
+    }
 
     auto Locator = CS.getConstraintLocator(ResolveExpr);
     auto CalleeLocator = S.getCalleeLocator(Locator);
@@ -303,29 +330,28 @@ private:
   }
 
 public:
-  CursorInfoTypeCheckSolutionCallback(Expr *ResolveExpr)
-      : ResolveExpr(ResolveExpr) {}
+  CursorInfoTypeCheckSolutionCallback(DeclContext &DC, SourceLoc ResolveLoc)
+      : DC(DC), ResolveLoc(ResolveLoc) {}
 
   ArrayRef<CursorInfoDeclReference> getResults() const { return Results; }
 };
 
 // MARK: - CursorInfoDoneParsingCallback
 
-class CursorInfoDoneParsingCallback : public IDEInspectionCallbacks {
+class CursorInfoDoneParsingCallback : public DoneParsingCallback {
   CursorInfoConsumer &Consumer;
   SourceLoc RequestedLoc;
 
 public:
   CursorInfoDoneParsingCallback(Parser &P, CursorInfoConsumer &Consumer,
                                 SourceLoc RequestedLoc)
-      : IDEInspectionCallbacks(P), Consumer(Consumer),
-        RequestedLoc(RequestedLoc) {}
+      : DoneParsingCallback(), Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
-  ResolvedCursorInfoPtr getDeclResult(NodeFinderDeclResult *DeclResult,
-                                      SourceFile *SrcFile,
-                                      NodeFinder &Finder) const {
+  std::vector<ResolvedCursorInfoPtr>
+  getDeclResult(NodeFinderDeclResult *DeclResult, SourceFile *SrcFile,
+                NodeFinder &Finder) const {
     typeCheckDeclAndParentClosures(DeclResult->getDecl());
-    return new ResolvedValueRefCursorInfo(
+    auto CursorInfo = new ResolvedValueRefCursorInfo(
         SrcFile, RequestedLoc, DeclResult->getDecl(),
         /*CtorTyRef=*/nullptr,
         /*ExtTyRef=*/nullptr, /*IsRef=*/false, /*Ty=*/Type(),
@@ -335,24 +361,27 @@ public:
         /*IsDynamic=*/false,
         /*ReceiverTypes=*/{},
         Finder.getShorthandShadowedDecls(DeclResult->getDecl()));
+    return {CursorInfo};
   }
 
-  ResolvedCursorInfoPtr getExprResult(NodeFinderExprResult *ExprResult,
-                                      SourceFile *SrcFile,
-                                      NodeFinder &Finder) const {
+  std::vector<ResolvedCursorInfoPtr>
+  getExprResult(NodeFinderExprResult *ExprResult, SourceFile *SrcFile,
+                NodeFinder &Finder) const {
     Expr *E = ExprResult->getExpr();
     DeclContext *DC = ExprResult->getDeclContext();
 
     // Type check the statemnt containing E and listen for solutions.
-    CursorInfoTypeCheckSolutionCallback Callback(E);
-    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
-        DC->getASTContext().SolutionCallback, &Callback);
-    typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
-                          E->getLoc());
+    CursorInfoTypeCheckSolutionCallback Callback(*DC, RequestedLoc);
+    {
+      llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+          DC->getASTContext().SolutionCallback, &Callback);
+      typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext::declContext(DC),
+                            E->getLoc());
+    }
 
     if (Callback.getResults().empty()) {
       // No results.
-      return nullptr;
+      return {};
     }
 
     for (auto Info : Callback.getResults()) {
@@ -361,34 +390,38 @@ public:
       typeCheckDeclAndParentClosures(Info.ReferencedDecl);
     }
 
-    if (Callback.getResults().size() != 1) {
-      // FIXME: We need to be able to report multiple results.
-      return nullptr;
-    }
-
     // Deliver results
 
-    auto Res = Callback.getResults()[0];
-    SmallVector<NominalTypeDecl *> ReceiverTypes;
-    if (Res.IsDynamicRef && Res.BaseType) {
-      if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
-        ReceiverTypes = {ReceiverType};
-      } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
-        // Look through metatypes to get the nominal type decl.
-        if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
+    std::vector<ResolvedCursorInfoPtr> Results;
+    for (auto Res : Callback.getResults()) {
+      SmallVector<NominalTypeDecl *> ReceiverTypes;
+      if (isa<ModuleDecl>(Res.ReferencedDecl)) {
+        // ResolvedModuleRefCursorInfo is not supported by solver-based cursor
+        // info yet.
+        continue;
+      }
+      if (Res.IsDynamicRef && Res.BaseType) {
+        if (auto ReceiverType = Res.BaseType->getAnyNominal()) {
           ReceiverTypes = {ReceiverType};
+        } else if (auto MT = Res.BaseType->getAs<AnyMetatypeType>()) {
+          // Look through metatypes to get the nominal type decl.
+          if (auto ReceiverType = MT->getInstanceType()->getAnyNominal()) {
+            ReceiverTypes = {ReceiverType};
+          }
         }
       }
-    }
 
-    return new ResolvedValueRefCursorInfo(
-        SrcFile, RequestedLoc, Res.ReferencedDecl,
-        /*CtorTyRef=*/nullptr,
-        /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
-        /*ContainerType=*/Res.BaseType,
-        /*CustomAttrRef=*/None,
-        /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
-        Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
+      auto CursorInfo = new ResolvedValueRefCursorInfo(
+          SrcFile, RequestedLoc, Res.ReferencedDecl,
+          /*CtorTyRef=*/nullptr,
+          /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
+          /*ContainerType=*/Res.BaseType,
+          /*CustomAttrRef=*/None,
+          /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
+          Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
+      Results.push_back(CursorInfo);
+    }
+    return Results;
   }
 
   void doneParsing(SourceFile *SrcFile) override {
@@ -401,7 +434,7 @@ public:
     if (!Result) {
       return;
     }
-    ResolvedCursorInfoPtr CursorInfo;
+    std::vector<ResolvedCursorInfoPtr> CursorInfo;
     switch (Result->getKind()) {
     case NodeFinderResultKind::Decl:
       CursorInfo = getDeclResult(cast<NodeFinderDeclResult>(Result.get()),
@@ -432,8 +465,10 @@ swift::ide::makeCursorInfoCallbacksFactory(CursorInfoConsumer &Consumer,
                                    SourceLoc RequestedLoc)
         : Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new CursorInfoDoneParsingCallback(P, Consumer, RequestedLoc);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callback = std::make_shared<CursorInfoDoneParsingCallback>(
+          P, Consumer, RequestedLoc);
+      return {nullptr, Callback};
     }
   };
 

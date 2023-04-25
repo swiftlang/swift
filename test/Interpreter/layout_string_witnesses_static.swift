@@ -1,14 +1,20 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-type-layout -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -c -parse-as-library -o %t/layout_string_witnesses_types.o %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-type-layout -module-name layout_string_witnesses_static %t/layout_string_witnesses_types.o %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -enable-type-layout -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+
+// NOTE: We have to build this as dylib to turn private external symbols into local symbols, so we can observe potential issues with linkage
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
+// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
+// RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: back_deployment_runtime
+
+import Swift
 import layout_string_witnesses_types
 import layout_string_witnesses_types_resilient
 
@@ -189,7 +195,7 @@ class ClassWithSomeProtocol: SomeProtocol {
 
 func testExistential() {
     let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
-    
+
     do {
         let x = ClassWithSomeProtocol()
         testInit(ptr, to: ExistentialWrapper(x: x))
@@ -271,15 +277,105 @@ func testMultiPayloadEnum() {
 
     // CHECK-NEXT: Before deinit
     print("Before deinit")
-        
 
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
-    
+
     ptr.deallocate()
 }
 
 testMultiPayloadEnum()
+
+func testNullableRefEnum() {
+    let ptr = UnsafeMutablePointer<NullableRefEnum>.allocate(capacity: 1)
+
+    do {
+        let x = NullableRefEnum.nonEmpty(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = NullableRefEnum.nonEmpty(SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNullableRefEnum()
+
+func testForwardToPayloadEnum() {
+    let ptr = UnsafeMutablePointer<ForwardToPayloadEnum>.allocate(capacity: 1)
+
+    do {
+        let x = ForwardToPayloadEnum.nonEmpty(SimpleClass(x: 23), 43)
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = ForwardToPayloadEnum.nonEmpty(SimpleClass(x: 28), 65)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testForwardToPayloadEnum()
+
+struct InternalEnumWrapperWrapper {
+    let x: InternalEnumWrapper
+}
+
+func testInternalEnumWrapper() {
+    let ptr = UnsafeMutablePointer<InternalEnumWrapperWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = InternalEnumWrapper(x: SimpleClass(x: 23))
+        testInit(ptr, to: .init(x: x))
+    }
+
+    do {
+        let y = InternalEnumWrapper(x: SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: .init(x: y))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testInternalEnumWrapper()
 
 #if os(macOS)
 func testObjc() {

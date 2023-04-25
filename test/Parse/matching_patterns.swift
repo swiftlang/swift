@@ -25,18 +25,19 @@ case 1 + 2:
 case square(9):
   ()
 
-// 'var' and 'let' patterns.
+// 'var', 'let', and 'inout' patterns.
 case var a:
   a = 1
 case let a:
   a = 1         // expected-error {{cannot assign}}
+case inout a: // expected-error {{'inout' may only be used on parameters}} expected-error {{'is' keyword required to pattern match against type name}}
+  a = 1 // expected-error {{cannot find 'a' in scope}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
   print(a, terminator: "")
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
   b += 1
-
 // 'Any' pattern.
 case _:
   ()
@@ -47,7 +48,7 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 }
 
 switch (x,x) {
-case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected-note {{'a' previously declared here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected-note {{'a' previously declared here}}
   fallthrough
 case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
@@ -120,7 +121,6 @@ if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern wi
                                                    // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
 
 
-
 switch n {
 case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
   ()
@@ -142,7 +142,7 @@ case Voluntary<Int>.Mere,
   ()
 case .Twain,
      .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
-                // expected-note@-69 {{'Twain' declared here}}
+                // expected-note@-68 {{'Twain' declared here}}
      .Twain(_, _),
      .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int)'}}
   ()
@@ -307,8 +307,6 @@ do {
   while case let _ as [Derived] = arr {}
   // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
 
-  // FIXME: https://github.com/apple/swift/issues/61850
-  // expected-warning@+1 {{heterogeneous collection literal could only be inferred to '[[Base]]'; add explicit type annotation if this is intentional}}
   for case _ as [Derived] in [arr] {}
 
   if case is [Derived] = arr {}

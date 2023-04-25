@@ -438,7 +438,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
 }
 
 template<typename T>
-static void diagnoseDuplicateDecls(const T &decls) {
+static void diagnoseDuplicateDecls(T &&decls) {
   llvm::SmallDenseMap<DeclBaseName, const ValueDecl *> names;
   for (auto *current : decls) {
     if (!current->hasName() || current->isImplicit())
@@ -453,6 +453,14 @@ static void diagnoseDuplicateDecls(const T &decls) {
                           current->getName()), [&]() {
         other->diagnose(diag::invalid_redecl_prev, other->getName());
       });
+
+      // Mark the decl as invalid, unless it's a GenericTypeParamDecl, which is
+      // expected to maintain its type of GenericTypeParamType.
+      // This is needed to avoid emitting a duplicate diagnostic when running
+      // redeclaration checking in the case where the VarDecl is part of the
+      // enclosing context, e.g `let (x, x) = (0, 0)`.
+      if (!isa<GenericTypeParamDecl>(current))
+        current->setInvalid();
     }
   }
 }
@@ -465,6 +473,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   for (auto gp : *genericParams) {
+    // Diagnose generic types with a parameter packs if VariadicGenerics
+    // is not enabled.
+    auto *decl = ownerCtx->getAsDecl();
+    auto &ctx = decl->getASTContext();
+    if (gp->isParameterPack() && isa<GenericTypeDecl>(decl) &&
+        !ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+      decl->diagnose(diag::experimental_type_with_parameter_pack);
+    }
+
     TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
@@ -1223,46 +1240,6 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
   }
 }
 
-/// Check that, if this declaration is a member of an `@_objcImplementation`
-/// extension, it is either `final` or `@objc` (which may have been inferred by
-/// checking whether it shadows an imported declaration).
-static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
-  // We check the properties instead of their accessors.
-  if (isa<AccessorDecl>(VD))
-    return;
-
-  // Are we in an @_objcImplementation extension?
-  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  if (!ED || !ED->isObjCImplementation())
-    return;
-
-  assert(ED->getSelfClassDecl() &&
-         !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
-         "@_objcImplementation on non-class or Swift class?");
-
-  if (!VD->isObjCMemberImplementation())
-    return;
-
-  if (VD->isObjC()) {
-    assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
-           "@objc decls in @_objcImplementations should be dynamic!");
-    return;
-  }
-
-  auto &diags = VD->getASTContext().Diags;
-  diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
-                 VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
-
-  if (canBeRepresentedInObjC(VD))
-    diags.diagnose(VD, diag::fixit_add_objc_for_objc_implementation,
-                   VD->getDescriptiveKind())
-        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
-
-  diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
-                 VD->getDescriptiveKind())
-      .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
-}
-
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
@@ -1853,9 +1830,13 @@ public:
 
   void visit(Decl *decl) {
     // Visit auxiliary decls first.
-    decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-      this->visit(auxiliaryDecl);
-    });
+    // We don't do this for members of classes because it happens as part of
+    // visiting their ABI members.
+    if (!isa<ClassDecl>(decl->getDeclContext())) {
+      decl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        this->visit(auxiliaryDecl);
+      });
+    }
 
     if (auto *Stats = getASTContext().Stats)
       ++Stats->getFrontendCounters().NumDeclsTypechecked;
@@ -1907,10 +1888,6 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // If this is in an `@_objcImplementation` extension, check whether it's
-      // valid there.
-      checkObjCImplementationMemberAvoidsVTable(VD);
-
       // Check for actor isolation of top-level and local declarations.
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
@@ -1952,13 +1929,31 @@ public:
     // diagnostics.
     (void)ID->getDecls();
 
+    auto target = ID->getModule();
+    if (target && // module would be nil if loading fails
+        !getASTContext().LangOpts.PackageName.empty() &&
+        getASTContext().LangOpts.PackageName == target->getPackageName().str() &&
+        !target->isNonSwiftModule() && // target is a Swift module
+        target->isNonUserModule()) { // target module is in distributed SDK
+      // If reached here, a binary module (.swiftmodule) instead of interface of the
+      // target was loaded for the main module, where both belong to the same package;
+      // this is an expected behavior, but it should have been loaded from the local
+      // build directory, not from distributed SDK. In such case, we show a warning.
+      auto &diags = ID->getASTContext().Diags;
+      diags.diagnose(ID,
+                     diag::in_package_module_not_compiled_locally,
+                     target->getBaseIdentifier(),
+                     target->getPackageName(),
+                     target->getModuleFilename());
+    }
+
     // Report the public import of a private module.
     if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
-      auto target = ID->getModule();
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
           !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
+          ID->getAccessLevel() == AccessLevel::Public &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;
@@ -2012,14 +2007,13 @@ public:
     TypeChecker::checkDeclAttributes(MD);
     checkAccessControl(MD);
 
-    if (!Ctx.LangOpts.hasFeature(Feature::Macros))
-      MD->diagnose(diag::macro_experimental);
     if (!MD->getDeclContext()->isModuleScopeContext())
       MD->diagnose(diag::macro_in_nested, MD->getName());
     if (!MD->getAttrs().hasAttribute<MacroRoleAttr>(/*AllowInvalid*/ true))
       MD->diagnose(diag::macro_without_role, MD->getName());
 
     TypeChecker::checkParameterList(MD->getParameterList(), MD);
+    checkDefaultArguments(MD->getParameterList());
 
     // Check the macro definition.
     switch (auto macroDef = MD->getDefinition()) {
@@ -2029,6 +2023,7 @@ public:
 
     case MacroDefinition::Kind::Invalid:
     case MacroDefinition::Kind::Builtin:
+    case MacroDefinition::Kind::Expanded:
       // Nothing else to check here.
       break;
 
@@ -2056,12 +2051,10 @@ public:
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
     // Assign a discriminator.
     (void)MED->getDiscriminator();
-
-    auto rewritten = evaluateOrDefault(
-        Ctx.evaluator, ExpandMacroExpansionDeclRequest{MED}, {});
-
-    for (auto *decl : rewritten)
-      visit(decl);
+    // Decls in expansion already visited as auxiliary decls.
+    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+      TypeChecker::typeCheckASTNode(node, MED->getDeclContext());
+    });
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -2589,6 +2582,13 @@ public:
       }
     }
 
+    // -----
+    // NonCopyableChecks
+    //
+
+    if (ED->isObjC() && ED->isMoveOnly()) {
+      ED->diagnose(diag::moveonly_objc_enum_banned);
+    }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
@@ -2967,15 +2967,6 @@ public:
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(CD);
 
-    // Ban non-final classes from having move only fields.
-    if (!CD->isFinal()) {
-      for (auto *field : CD->getStoredProperties()) {
-        if (field->getType()->isPureMoveOnly()) {
-          field->diagnose(
-              diag::moveonly_non_final_class_cannot_contain_moveonly_field);
-        }
-      }
-    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -3427,6 +3418,8 @@ public:
       // FIXME: Should we duplicate any other logic from visitClassDecl()?
     }
 
+    TypeChecker::checkObjCImplementation(ED);
+
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -3610,17 +3603,47 @@ public:
       addDelayedFunction(CD);
     }
 
+    // a move-only / noncopyable type cannot have a failable initializer, since
+    // that would require the ability to wrap one inside an optional
+    if (CD->isFailable()) {
+      if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (nom->isMoveOnly()) {
+          CD->diagnose(diag::moveonly_failable_init);
+        }
+      }
+    }
+
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Only check again for destructor decl outside of a class if our dstructor
+    // Only check again for destructor decl outside of a class if our destructor
     // is not marked as invalid.
     if (!DD->isInvalid()) {
-      auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
+      auto *nom = dyn_cast<NominalTypeDecl>(
+                             DD->getDeclContext()->getImplementedObjCContext());
       if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
-        DD->diagnose(diag::destructor_decl_outside_class);
+        DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+      }
+
+      // Temporarily ban deinit on noncopyable enums, unless the experimental
+      // feature flag is set.
+      if (!DD->getASTContext().LangOpts.hasFeature(
+              Feature::MoveOnlyEnumDeinits) &&
+          nom->isMoveOnly() && isa<EnumDecl>(nom)) {
+        DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
+      }
+
+      // If we have a noncopyable type, check if we have an @objc enum with a
+      // deinit and emit a specialized error. We will have technically already
+      // emitted an error since @objc enum cannot be marked noncopyable, but
+      // this at least makes it a bit clearer to the user that the deinit is
+      // also incorrect.
+      if (auto *e = dyn_cast_or_null<EnumDecl>(nom)) {
+        if (e->isObjC()) {
+          DD->diagnose(diag::destructor_decl_on_objc_enum);
+        }
       }
     }
 
@@ -3765,30 +3788,33 @@ void TypeChecker::checkParameterList(ParameterList *params,
   }
 }
 
-ArrayRef<Decl *>
+Optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
   auto &ctx = MED->getASTContext();
   auto *dc = MED->getDeclContext();
-  auto foundMacros = TypeChecker::lookupMacros(
-      MED->getDeclContext(), MED->getMacroName(),
-      MED->getLoc(), MacroRole::Declaration);
-  if (foundMacros.empty()) {
-    MED->diagnose(diag::macro_undefined, MED->getMacroName().getBaseIdentifier())
-        .highlight(MED->getMacroNameLoc().getSourceRange());
-    return {};
-  }
+
   // Resolve macro candidates.
   auto macro = evaluateOrDefault(
       ctx.evaluator, ResolveMacroRequest{MED, dc},
       ConcreteDeclRef());
   if (!macro)
-    return {};
+    return None;
   MED->setMacroRef(macro);
 
-  // Expand the macro.
-  SmallVector<Decl *, 2> expandedTemporary;
-  if (!expandFreestandingDeclarationMacro(MED, expandedTemporary))
-    return {};
-  return ctx.AllocateCopy(expandedTemporary);
+  auto roles = cast<MacroDecl>(macro.getDecl())->getMacroRoles();
+  // If it's not a declaration macro or a code item macro, it must have been
+  // parsed as an expression macro, and this decl is just its substitute decl.
+  // So there's no thing to be done here.
+  if (!roles.contains(MacroRole::Declaration) &&
+      !roles.contains(MacroRole::CodeItem))
+    return None;
+
+  // For now, restrict global freestanding macros in script mode.
+  if (dc->isModuleScopeContext() &&
+      dc->getParentSourceFile()->isScriptMode()) {
+    MED->diagnose(diag::global_freestanding_macro_script);
+  }
+
+  return expandFreestandingMacro(MED);
 }

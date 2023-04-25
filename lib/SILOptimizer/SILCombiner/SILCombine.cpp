@@ -24,7 +24,6 @@
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -166,6 +165,7 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
                          bool removeCondFails, bool enableCopyPropagation) :
   parentTransform(trans),
   AA(trans->getPassManager()->getAnalysis<AliasAnalysis>(trans->getFunction())),
+  CA(trans->getPassManager()->getAnalysis<BasicCalleeAnalysis>()),
   DA(trans->getPassManager()->getAnalysis<DominanceAnalysis>()),
   PCA(trans->getPassManager()->getAnalysis<ProtocolConformanceAnalysis>()),
   CHA(trans->getPassManager()->getAnalysis<ClassHierarchyAnalysis>()),
@@ -353,8 +353,9 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   CanonicalizeOSSALifetime canonicalizer(
       false /*prune debug*/,
       !parentTransform->getFunction()->shouldOptimize() /*maximize lifetime*/,
-      NLABA, domTree, deleter);
-  CanonicalizeBorrowScope borrowCanonicalizer(deleter);
+      parentTransform->getFunction(), NLABA, domTree, CA, deleter);
+  CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
+                                              deleter);
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();

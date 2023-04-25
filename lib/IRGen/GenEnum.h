@@ -160,8 +160,10 @@ protected:
   /// Constructs a TypeInfo for an enum of the best possible kind for its
   /// layout, FixedEnumTypeInfo or LoadableEnumTypeInfo.
   TypeInfo *getFixedEnumTypeInfo(llvm::StructType *T, Size S, SpareBitVector SB,
-                                 Alignment A, IsPOD_t isPOD,
-                                 IsBitwiseTakable_t isBT);
+                                 Alignment A,
+                                 IsTriviallyDestroyable_t isTriviallyDestroyable,
+                                 IsBitwiseTakable_t isBT,
+                                 IsCopyable_t isCopyable);
   
 public:
   virtual ~EnumImplStrategy() { }
@@ -188,8 +190,8 @@ public:
     return cast<llvm::StructType>(getTypeInfo().getStorageType());
   }
   
-  IsPOD_t isPOD(ResilienceExpansion expansion) const {
-    return getTypeInfo().isPOD(expansion);
+  IsTriviallyDestroyable_t isTriviallyDestroyable(ResilienceExpansion expansion) const {
+    return getTypeInfo().isTriviallyDestroyable(expansion);
   }
   
   /// \group Query enum layout
@@ -447,9 +449,13 @@ public:
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,
-                        IsTake_t isTake) const;
+                        IsTake_t isTake) const {
+    TI->callOutlinedCopy(IGF, dest, src, T, isInit, isTake);
+  }
 
-  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const {
+    TI->callOutlinedDestroy(IGF, addr, T);
+  }
 
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const = 0;
@@ -457,7 +463,7 @@ public:
   virtual TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
                         SILType T,
-                        bool useStructLayouts = false) const = 0;
+                        bool useStructLayouts) const = 0;
 
   virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                          ReferenceCounting *rc) const {

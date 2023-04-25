@@ -99,9 +99,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
-  propPat->setType(propertyType);
-
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
   propPat = TypedPattern::createImplicit(C, propPat, propertyType);
   propPat->setType(propertyType);
 
@@ -151,9 +149,7 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
-  propPat->setType(propertyType);
-
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
   propPat = TypedPattern::createImplicit(C, propPat, propertyType);
   propPat->setType(propertyType);
 

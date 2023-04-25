@@ -164,7 +164,8 @@ private:
   MutableTerm getReducedShapeTerm(Type type) const;
 
 public:
-  Type getReducedShape(Type type) const;
+  Type getReducedShape(Type type,
+                       TypeArrayView<GenericTypeParamType> genericParams) const;
 
   bool haveSameShape(Type type1, Type type2) const;
 

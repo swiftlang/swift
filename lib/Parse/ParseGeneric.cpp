@@ -46,7 +46,7 @@ ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
-  bool HasNextParam;
+  bool HasNextParam{};
   do {
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
@@ -58,6 +58,14 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
+    // Parse the 'each' keyword for a type parameter pack 'each T'.
+    SourceLoc EachLoc;
+    if (Tok.isContextualKeyword("each")) {
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::contextual_keyword);
+      EachLoc = consumeToken();
+    }
+
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;
@@ -67,11 +75,21 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       break;
     }
 
-    // Parse the ellipsis for a type parameter pack  'T...'.
-    SourceLoc EllipsisLoc;
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-        startsWithEllipsis(Tok)) {
-      EllipsisLoc = consumeStartingEllipsis();
+    // Parse and diagnose the unsupported ellipsis for a type parameter pack
+    // 'T...'.
+    if (startsWithEllipsis(Tok)) {
+      const auto EllipsisLoc = consumeStartingEllipsis();
+      // TODO: token length hardcoded because calculation for ellipsis
+      // incorrectly includes '>' if one follows (as can occur in this parse).
+      constexpr int EllipsisLength = 3;
+      const auto EllipsisEnd = EllipsisLoc.getAdvancedLoc(EllipsisLength);
+      auto Diag = diagnose(Tok, diag::type_parameter_pack_ellipsis);
+      Diag.fixItRemoveChars(EllipsisLoc, EllipsisEnd);
+      if (!EachLoc.isValid()) {
+        Diag.fixItInsert(NameLoc, "each ");
+      }
+      Result.setIsParseError();
+      break;
     }
 
     // Parse the ':' followed by a type.
@@ -101,9 +119,9 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack = EllipsisLoc.isValid();
+    const bool isParameterPack = EachLoc.isValid();
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EllipsisLoc,
+        CurDeclContext, Name, NameLoc, EachLoc,
         /*index*/ GenericParams.size(), isParameterPack);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
@@ -260,11 +278,19 @@ ParserStatus Parser::parseGenericWhereClause(
   bool HasNextReq;
   do {
     if (Tok.is(tok::code_complete)) {
-      if (IDECallbacks)
-        IDECallbacks->completeGenericRequirement();
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeGenericRequirement();
+      }
       EndLoc = consumeToken(tok::code_complete);
       Status.setHasCodeCompletionAndIsError();
       break;
+    }
+
+    // Parse the 'repeat' keyword for requirement expansions.
+    bool isRequirementExpansion = false;
+    if (Tok.is(tok::kw_repeat)) {
+      consumeToken();
+      isRequirementExpansion = true;
     }
 
     // Parse the leading type. It doesn't necessarily have to be just a type
@@ -305,7 +331,8 @@ ParserStatus Parser::parseGenericWhereClause(
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(
               FirstType.get(), ColonLoc,
-              LayoutConstraintLoc(Layout, LayoutLoc)));
+              LayoutConstraintLoc(Layout, LayoutLoc),
+              isRequirementExpansion));
         }
       } else {
         // Parse the protocol or composition.
@@ -316,7 +343,7 @@ ParserStatus Parser::parseGenericWhereClause(
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
-            FirstType.get(), ColonLoc, Protocol.get()));
+            FirstType.get(), ColonLoc, Protocol.get(), isRequirementExpansion));
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
@@ -346,15 +373,18 @@ ParserStatus Parser::parseGenericWhereClause(
         // completion token in the TypeRepr.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
             FirstType.get(), EqualLoc,
-            new (Context) ErrorTypeRepr(SecondType.get()->getLoc())));
+            new (Context) ErrorTypeRepr(SecondType.get()->getLoc()),
+            isRequirementExpansion));
       } else {
         Requirements.push_back(RequirementRepr::getSameType(
-            FirstType.get(), EqualLoc, SecondType.get()));
+            FirstType.get(), EqualLoc, SecondType.get(),
+            isRequirementExpansion));
       }
     } else if (FirstType.hasCodeCompletion()) {
       // Recover by adding dummy constraint.
       Requirements.push_back(RequirementRepr::getTypeConstraint(
-          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc)));
+          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc),
+          isRequirementExpansion));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();

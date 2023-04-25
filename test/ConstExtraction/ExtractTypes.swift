@@ -27,18 +27,21 @@ public struct Types : MyProto {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeA.Type"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeAVm"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeB.Type"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeBOm"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeC.Type"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeCCm"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ]

@@ -36,9 +36,9 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
     }
   }
 
-  SolutionApplicationTarget completionTarget(fallbackExpr, fallbackDC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+  SyntacticElementTarget completionTarget(fallbackExpr, fallbackDC, CTP_Unused,
+                                          Type(),
+                                          /*isDiscared=*/true);
 
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
                              [&](const Solution &S) { sawSolution(S); });
@@ -52,11 +52,9 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
     // the contextual type might have a global actor attribute but because no
     // methods from that global actor are called in the closure, the closure has
     // a non-actor type.
-    auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(E));
-    if (target != S.solutionApplicationTargets.end()) {
-      if (auto Ty = target->second.getClosureContextualType()) {
+    if (auto target = S.getTargetFor(dyn_cast<ClosureExpr>(E))) {
+      if (auto Ty = target->getClosureContextualType())
         return Ty;
-      }
     }
     if (!S.hasType(E)) {
       return Type();
@@ -97,7 +95,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
   llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
       ClosureActorIsolations;
   bool IsAsync = isContextAsync(S, DC);
-  for (auto SAT : S.solutionApplicationTargets) {
+  for (auto SAT : S.targets) {
     if (auto ACE = getAsExpr<AbstractClosureExpr>(SAT.second.getAsASTNode())) {
       ClosureActorIsolations[ACE] = getClosureActorIsolation(S, ACE);
     }
@@ -112,7 +110,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
     DisallowVoid |= ExpectedTy && !ExpectedTy->isVoid();
     DisallowVoid |= !ParentExpr &&
                     CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
-    for (auto SAT : S.solutionApplicationTargets) {
+    for (auto SAT : S.targets) {
       if (DisallowVoid) {
         // DisallowVoid is already set. No need to iterate further.
         break;

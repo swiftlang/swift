@@ -1,3 +1,5 @@
+import Swift
+
 public class SimpleClass {
     public let x: Int
 
@@ -134,6 +136,88 @@ public struct ExistentialRefWrapper {
     }
 }
 
+public enum NullableRefEnum {
+    case nonEmpty(SimpleClass)
+    case empty
+}
+
+public enum ForwardToPayloadEnum {
+    case nonEmpty(SimpleClass, Int)
+    case empty
+}
+
+public struct GenericTupleWrapper<T> {
+    let x: Int = 23
+    let y: (T, Int)
+
+    public init(_ y: (T, Int)) {
+        self.y = y
+    }
+}
+
+public struct GenericNestedOuter<T> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
+public struct GenericNestedRefOuter<T: AnyObject> {
+    public struct Inner {
+        let x: Int = 34
+        let y: T
+
+        public init(_ y: T) {
+            self.y = y
+        }
+    }
+}
+
+public enum SimpleEnum {
+    case a(AnyObject, Int)
+    case b
+    case c(Int, AnyObject)
+}
+
+struct SimpleEnumWrapper {
+    let x: SimpleEnum
+    let y: Int = 2
+}
+
+public struct GenericEnumWrapper<T> {
+    let x: SimpleEnumWrapper
+    let y: T
+
+    public init(_ x: SimpleEnum, _ y: T) {
+        self.x = SimpleEnumWrapper(x: x)
+        self.y = y
+    }
+}
+
+public struct Recursive3<T> {
+    let x: Int
+    let y: AnyObject
+}
+
+public struct Recursive2<T> {
+    let x: Recursive3<Recursive<T>>
+    let y: AnyObject
+}
+
+public struct Recursive<T> {
+    let x: T
+    let xs: Recursive2<T>?
+
+    public init(_ x: T, _ xs: Recursive2<T>?) {
+        self.x = x
+        self.xs = xs
+    }
+}
+
 #if os(macOS)
 import Foundation
 
@@ -222,6 +306,98 @@ public struct MultiPayloadEnumWrapper {
         self.x = x
         self.y = y
     }
+}
+
+public struct ComplexNesting<A, B, C, D> {
+    let pre: Filler = Filler()
+    let a: NestedA<A>
+    let b: NestedB<B>
+    let c: NestedC<C>
+    let d: NestedD<D>
+
+    struct Filler {
+        let x: Int16 = 23
+        let y: Bool = false
+    }
+
+    struct NestedA<T> {
+        let x: Int = 32
+        let y: NestedB<T>
+        let z: Bool = false
+
+        init(y: T) {
+            self.y = NestedB(y: y)
+        }
+    }
+
+    struct NestedB<T> {
+        let x: Bool = false
+        let y: NestedC<T>
+        let z: Int = 32
+
+        init(y: T) {
+            self.y = NestedC(y: y)
+        }
+    }
+
+    enum NestedC<T> {
+        case a(Int, T, Bool)
+        case b(Int, Bool)
+        case c
+
+        init(y: T) {
+            self = .a(32, y, false)
+        }
+    }
+
+    struct NestedD<T> {
+        let x: Bool = false
+        let y: T
+        let z: Int = 32
+    }
+
+    public init(_ a: A, _ b: B, _ c: C, _ d: D) {
+        self.a = NestedA(y: a)
+        self.b = NestedB(y: b)
+        self.c = NestedC(y: c)
+        self.d = NestedD(y: d)
+    }
+}
+
+internal enum InternalEnum {
+  case a(Int, AnyObject)
+  case b(Int)
+  case c(String)
+}
+
+public struct InternalEnumWrapper {
+  internal let x: InternalEnum
+  internal let y: Int = 32
+
+  public init(x: AnyObject) {
+    self.x = .a(23, x)
+  }
+}
+
+public struct PrespecializedStruct<T> {
+    let y: Int = 0
+    let x: T
+    let z: T
+
+    public init(x: T) {
+        self.x = x
+        self.z = x
+    }
+}
+
+@inline(never)
+public func consume<T>(_ x: T.Type) {
+    withExtendedLifetime(x) {}
+}
+public func preSpec() {
+    consume(PrespecializedStruct<AnyObject>.self)
+    consume(PrespecializedStruct<SimpleClass>.self)
+    consume(PrespecializedStruct<Int>.self)
 }
 
 @inline(never)

@@ -142,6 +142,10 @@ def run_build_script_helper(action, host_target, product, args):
                     host_target).platform.swiftpm_config(
                     args, output_dir=build_toolchain_path,
                     swift_toolchain=toolchain_path, resource_path=resource_dir)]
+
+    if args.enable_asan:
+        helper_cmd.append('--enable-asan')
+
     if args.verbose_build:
         helper_cmd.append('--verbose')
 

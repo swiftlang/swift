@@ -388,8 +388,12 @@ namespace {
       };
 
       auto classDecl = dyn_cast<ClassDecl>(theClass);
-      if (classDecl && classDecl->isRootDefaultActor()) {
-        fn(Field::DefaultActorStorage);
+      if (classDecl) {
+        if (classDecl->isRootDefaultActor()) {
+          fn(Field::DefaultActorStorage);
+        } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+          fn(Field::NonDefaultDistributedActorStorage);
+        }
       }
 
       for (auto decl :
@@ -1090,7 +1094,7 @@ namespace {
     TaggedUnion<ClassUnion, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
     const ClassLayout *FieldLayout;
-    
+
     ClassDecl *getClass() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
@@ -1194,7 +1198,7 @@ namespace {
     SmallVector<ProtocolDecl*, 4> Protocols;
     SmallVector<VarDecl*, 8> InstanceProperties;
     SmallVector<VarDecl*, 8> ClassProperties;
-    
+
     llvm::Constant *Name = nullptr;
 
     SmallVectorImpl<MethodDescriptor> &getMethodList(ValueDecl *decl) {
@@ -1226,8 +1230,11 @@ namespace {
           FieldLayout(&fieldLayout) {
       visitConformances(getClass()->getImplementationContext());
 
-      if (getClass()->isRootDefaultActor())
+      if (getClass()->isRootDefaultActor()) {
         Ivars.push_back(Field::DefaultActorStorage);
+      } else if (getClass()->isNonDefaultExplicitDistributedActor()) {
+        Ivars.push_back(Field::NonDefaultDistributedActorStorage);
+      }
       visitImplementationMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
@@ -2020,6 +2027,9 @@ namespace {
         if (field.getKind() == Field::DefaultActorStorage) {
           offsetPtr = nullptr;
           break;
+        } else if (field.getKind() == Field::NonDefaultDistributedActorStorage) {
+          offsetPtr = nullptr;
+          break;
         }
 
         // Otherwise, we should have a normal stored property.
@@ -2435,6 +2445,9 @@ namespace {
             break;
           case Field::Kind::DefaultActorStorage:
             os << "default_actor_storage";
+            break;
+          case Field::Kind::NonDefaultDistributedActorStorage:
+            os << "non_default_distributed_actor_storage";
             break;
         }
         os << ")";

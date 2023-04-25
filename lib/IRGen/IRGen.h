@@ -48,11 +48,19 @@ enum class StackProtectorMode : bool { NoStackProtector, StackProtector };
 
 class Size;
 
-enum IsPOD_t : bool { IsNotPOD, IsPOD };
-inline IsPOD_t operator&(IsPOD_t l, IsPOD_t r) {
-  return IsPOD_t(unsigned(l) & unsigned(r));
+/// True if no runtime work has to occur to destroy values of a type.
+/// If the type is also copyable, this also implies that the type is bitwise-
+/// copyable.
+enum IsTriviallyDestroyable_t : bool {
+  IsNotTriviallyDestroyable,
+  IsTriviallyDestroyable,
+};
+inline IsTriviallyDestroyable_t operator&(IsTriviallyDestroyable_t l,
+                                           IsTriviallyDestroyable_t r) {
+  return IsTriviallyDestroyable_t(unsigned(l) & unsigned(r));
 }
-inline IsPOD_t &operator&=(IsPOD_t &l, IsPOD_t r) {
+inline IsTriviallyDestroyable_t &operator&=(IsTriviallyDestroyable_t &l,
+                                             IsTriviallyDestroyable_t r) {
   return (l = (l & r));
 }
 
@@ -77,6 +85,14 @@ inline IsBitwiseTakable_t operator&(IsBitwiseTakable_t l, IsBitwiseTakable_t r) 
   return IsBitwiseTakable_t(unsigned(l) & unsigned(r));
 }
 inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t r) {
+  return (l = (l & r));
+}
+
+enum IsCopyable_t : bool { IsNotCopyable, IsCopyable };
+inline IsCopyable_t operator&(IsCopyable_t l, IsCopyable_t r) {
+  return IsCopyable_t(unsigned(l) & unsigned(r));
+}
+inline IsCopyable_t &operator&=(IsCopyable_t &l, IsCopyable_t r) {
   return (l = (l & r));
 }
 

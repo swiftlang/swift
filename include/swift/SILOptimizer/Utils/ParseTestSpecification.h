@@ -155,8 +155,8 @@ private:
   template <typename Subtype>
   typename Subtype::Stored getInstance(StringRef name, Argument &argument) {
     if (isa<Subtype>(argument)) {
-      auto string = cast<Subtype>(argument).getValue();
-      return string;
+      auto stored = cast<Subtype>(argument).getValue();
+      return stored;
     }
     llvm::errs() << "Attempting to take a " << name << " argument but have\n";
     argument.print(llvm::errs());

@@ -409,6 +409,12 @@ public:
   // return false
   static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
                                                Expr *rhsExpr);
+
+  // Return `nil` is the `testExp` is `false`.
+  static GuardStmt *returnNilIfFalseGuardTypeChecked(ASTContext &C,
+                                                     Expr *testExpr,
+                                                     Type optionalWrappedType);
+
   // return lhs < rhs
   static GuardStmt *
   returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);

@@ -160,7 +160,8 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
 
             auto generatedInfo =
                 sourceMgr.getGeneratedSourceInfo(*potentialLCA->getBufferID());
-            expansionLoc = generatedInfo->originalSourceRange.getStart();
+            if (generatedInfo)
+              expansionLoc = generatedInfo->originalSourceRange.getStart();
             potentialLCA = potentialLCA->getEnclosingSourceFile();
           }
         }
@@ -258,6 +259,17 @@ NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
 }
 NullablePtr<const GenericParamList> MacroDeclScope::genericParams() const {
   return decl->getParsedGenericParams();
+}
+
+bool MacroDeclScope::lookupLocalsOrMembers(
+    DeclConsumer consumer) const {
+  if (auto *paramList = decl->parameterList) {
+    for (auto *paramDecl : *paramList)
+      if (consumer.consume({paramDecl}))
+        return true;
+  }
+
+  return false;
 }
 
 #pragma mark lookInMyGenericParameters

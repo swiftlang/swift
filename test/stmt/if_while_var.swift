@@ -42,8 +42,13 @@ if var nonOptional { nonOptional = nonOptionalStruct(); _ = nonOptional } // exp
 guard let nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard var nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 
-if let nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
-if var nonOptional.property { } // expected-error{{unwrap condition requires a valid identifier}} expected-error{{pattern matching in a condition requires the 'case' keyword}}
+if let nonOptional.property { }
+// expected-error@-1 {{unwrap condition requires a valid identifier}}
+// expected-error@-2 {{initializer for conditional binding must have Optional type, not 'Any'}}
+
+if var nonOptional.property { }
+// expected-error@-1 {{unwrap condition requires a valid identifier}}
+// expected-error@-2 {{initializer for conditional binding must have Optional type, not 'Any'}}
 
 guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
@@ -65,7 +70,11 @@ class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
-if let {} // expected-error {{expected '{' after 'if' condition}} expected-error {{pattern matching in a condition requires the 'case' keyword}} expected-error {{unwrap condition requires a valid identifier}}
+if let {}
+// expected-error@-1 {{expected '{' after 'if' condition}}
+// expected-error@-2 {{unwrap condition requires a valid identifier}}
+// expected-error@-3 {{initializer for conditional binding must have Optional type, not '() -> ()'}}
+
 if let x = { } // expected-error{{'{' after 'if'}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
 // expected-warning@-1{{value 'x' was defined but never used}}
 

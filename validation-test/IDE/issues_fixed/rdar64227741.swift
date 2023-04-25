@@ -35,4 +35,3 @@ func test() {
 
 // CHECK: Begin completions, 1 items
 // CHECK: Decl[InstanceVar]/CurrNominal:      magnitude[#Float#]; name=magnitude
-// CHECK: End completions

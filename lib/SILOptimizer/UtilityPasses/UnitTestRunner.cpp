@@ -69,7 +69,9 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipLiveness.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -122,7 +124,11 @@ class UnitTestRunner : public SILFunctionTransform {
                  << name << " with: ";
     for (unsigned long index = 0, size = components.size(); index < size;
          ++index) {
-      llvm::errs() << components[index];
+      auto componentString = components[index].trim();
+      if (componentString.empty())
+        continue;
+
+      llvm::errs() << componentString;
       if (index != size - 1) {
         llvm::errs() << ", ";
       }
@@ -179,8 +185,7 @@ struct DumpFunction : UnitTest {
 struct FunctionGetSelfArgumentIndex : UnitTest {
   FunctionGetSelfArgumentIndex(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
-    auto index =
-        SILFunction_getSelfArgumentIndex(BridgedFunction{getFunction()});
+    auto index = BridgedFunction{getFunction()}.getSelfArgumentIndex();
     llvm::errs() << "self argument index = " << index << "\n";
   }
 };
@@ -266,9 +271,42 @@ struct TestSpecificationTest : UnitTest {
   }
 };
 
+// Arguments:
+// - value: the value to check for escaping
+// Dumps:
+// - the value
+// - whether it has a pointer escape
+struct OwnershipUtilsHasPointerEscape : UnitTest {
+  OwnershipUtilsHasPointerEscape(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto value = arguments.takeValue();
+    auto has = hasPointerEscape(value);
+    value->print(llvm::errs());
+    auto *boolString = has ? "true" : "false";
+    llvm::errs() << boolString << "\n";
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: OSSA Lifetime Unit Tests
 //===----------------------------------------------------------------------===//
+
+// Arguments:
+// - the lexical borrow to fold
+// Dumpts:
+// - the function
+struct LexicalDestroyFoldingTest : UnitTest {
+  LexicalDestroyFoldingTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto value = arguments.takeValue();
+    auto *bbi = cast<BeginBorrowInst>(value);
+    InstructionDeleter deleter;
+    foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
+    getFunction()->dump();
+  }
+};
 
 // Arguments:
 // - variadic list of - instruction: a last user
@@ -301,7 +339,7 @@ struct SSALivenessTest : UnitTest {
     llvm::outs() << "SSA lifetime analysis: " << value;
 
     SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-    SSAPrunedLiveness liveness(&discoveredBlocks);
+    SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
     liveness.initializeDef(value);
     LiveRangeSummary summary = liveness.computeSimple();
     if (summary.innerBorrowKind == InnerBorrowKind::Reborrowed)
@@ -336,7 +374,7 @@ struct ScopedAddressLivenessTest : UnitTest {
     assert(scopedAddress);
 
     SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-    SSAPrunedLiveness liveness(&discoveredBlocks);
+    SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
     scopedAddress.computeTransitiveLiveness(liveness);
     liveness.print(llvm::outs());
 
@@ -347,9 +385,12 @@ struct ScopedAddressLivenessTest : UnitTest {
 };
 
 // Arguments:
-// - variadic list of live-range defining values
+// - variadic list of live-range defining values or instructions
 // Dumps:
 // - the liveness result and boundary
+//
+// Computes liveness for the specified def nodes by finding all their direct SSA
+// uses. If the def is an instruction, then all results are considered.
 struct MultiDefLivenessTest : UnitTest {
   MultiDefLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
 
@@ -359,11 +400,78 @@ struct MultiDefLivenessTest : UnitTest {
 
     llvm::outs() << "MultiDef lifetime analysis:\n";
     while (arguments.hasUntaken()) {
-      SILValue value = arguments.takeValue();
-      llvm::outs() << "  def: " << value;
-      liveness.initializeDef(value);
+      auto argument = arguments.takeArgument();
+      if (isa<InstructionArgument>(argument)) {
+        auto *instruction = cast<InstructionArgument>(argument).getValue();
+        llvm::outs() << "  def instruction: " << instruction;
+        liveness.initializeDef(instruction);
+      } else {
+        SILValue value = cast<ValueArgument>(argument).getValue();
+        llvm::outs() << "  def value: " << value;
+        liveness.initializeDef(value);
+      }
     }
     liveness.computeSimple();
+    liveness.print(llvm::outs());
+
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    boundary.print(llvm::outs());
+  }
+};
+
+// Arguments:
+// - the string "defs:"
+// - list of live-range defining values or instructions
+// - the string "uses:"
+// - variadic list of live-range user instructions
+// Dumps:
+// - the liveness result and boundary
+//
+// Computes liveness for the specified def nodes by considering only the
+// specified uses. The actual uses of the def nodes are ignored.
+//
+// This is useful for testing non-ssa liveness, for example, of memory
+// locations. In that case, the def nodes may be stores and the uses may be
+// destroy_addrs.
+struct MultiDefUseLivenessTest : UnitTest {
+  MultiDefUseLivenessTest(UnitTestRunner *pass) : UnitTest(pass) {}
+
+  void invoke(Arguments &arguments) override {
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    MultiDefPrunedLiveness liveness(getFunction(), &discoveredBlocks);
+
+    llvm::outs() << "MultiDef lifetime analysis:\n";
+    if (arguments.takeString() != "defs:") {
+      llvm::report_fatal_error(
+        "test specification expects the 'defs:' label\n");
+    }
+    while (true) {
+      auto argument = arguments.takeArgument();
+      if (isa<InstructionArgument>(argument)) {
+        auto *instruction = cast<InstructionArgument>(argument).getValue();
+        llvm::outs() << "  def instruction: " << *instruction;
+        liveness.initializeDef(instruction);
+        continue;
+      }
+      if (isa<ValueArgument>(argument)) {
+        SILValue value = cast<ValueArgument>(argument).getValue();
+        llvm::outs() << "  def value: " << value;
+        liveness.initializeDef(value);
+        continue;
+      }
+      if (cast<StringArgument>(argument).getValue() != "uses:") {
+        llvm::report_fatal_error(
+          "test specification expects the 'uses:' label\n");
+      }
+      break;
+    }
+    while (arguments.hasUntaken()) {
+      auto *inst = arguments.takeInstruction();
+      // lifetimeEnding has no effects on liveness, it's only a cache for the
+      // caller.
+      liveness.updateForUse(inst, /*lifetimeEnding*/false);
+    }
     liveness.print(llvm::outs());
 
     PrunedLivenessBoundary boundary;
@@ -387,13 +495,15 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
     auto pruneDebug = arguments.takeBool();
     auto maximizeLifetimes = arguments.takeBool();
     auto respectAccessScopes = arguments.takeBool();
     InstructionDeleter deleter;
     CanonicalizeOSSALifetime canonicalizer(
-        pruneDebug, maximizeLifetimes,
-        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree, deleter);
+        pruneDebug, maximizeLifetimes, getFunction(),
+        respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
+        calleeAnalysis, deleter);
     auto value = arguments.takeValue();
     canonicalizer.canonicalizeValueLifetime(value);
     getFunction()->dump();
@@ -411,7 +521,7 @@ struct CanonicalizeBorrowScopeTest : UnitTest {
     auto borrowedValue = BorrowedValue(value);
     assert(borrowedValue && "specified value isn't a BorrowedValue!?");
     InstructionDeleter deleter;
-    CanonicalizeBorrowScope canonicalizer(deleter);
+    CanonicalizeBorrowScope canonicalizer(value->getFunction(), deleter);
     canonicalizer.canonicalizeBorrowScope(borrowedValue);
     getFunction()->dump();
   }
@@ -602,6 +712,21 @@ struct ExtendedLinearLivenessTest : UnitTest {
   }
 };
 
+// Arguments:
+// - SILValue: value
+// Dumps:
+// - function
+struct OSSALifetimeCompletionTest : UnitTest {
+  OSSALifetimeCompletionTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    SILValue value = arguments.takeValue();
+    llvm::dbgs() << "OSSA lifetime completion: " << value;
+    OSSALifetimeCompletion completion(getFunction(), /*domInfo*/nullptr);
+    completion.completeOSSALifetime(value);
+    getFunction()->dump();    
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: SimplifyCFG Unit Tests
 //===----------------------------------------------------------------------===//
@@ -773,11 +898,15 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("find-borrow-introducers", FindBorrowIntroducers)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS("has-pointer-escape", OwnershipUtilsHasPointerEscape)
     ADD_UNIT_TEST_SUBCLASS("interior-liveness", InteriorLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("is-lexical", IsLexicalTest)
+    ADD_UNIT_TEST_SUBCLASS("lexical-destroy-folding", LexicalDestroyFoldingTest)
     ADD_UNIT_TEST_SUBCLASS("linear-liveness", LinearLivenessTest)
     ADD_UNIT_TEST_SUBCLASS("multidef-liveness", MultiDefLivenessTest)
+    ADD_UNIT_TEST_SUBCLASS("multidefuse-liveness", MultiDefUseLivenessTest)
+    ADD_UNIT_TEST_SUBCLASS("ossa-lifetime-completion", OSSALifetimeCompletionTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
 

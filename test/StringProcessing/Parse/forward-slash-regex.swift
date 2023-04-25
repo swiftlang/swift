@@ -121,6 +121,7 @@ do {
 } // expected-error {{expected expression after operator}}
 
 _ = /x/??/x/ // expected-error {{'/' is not a postfix unary operator}}
+// expected-error@-1 2 {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
 
 _ = /x/ ... /y/ // expected-error {{referencing operator function '...' on 'Comparable' requires that 'Regex<Substring>' conform to 'Comparable'}}
 

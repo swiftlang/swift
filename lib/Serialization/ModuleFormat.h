@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 745; // _lexicalLifetimes attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 781; // compound introduced names
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -139,6 +139,21 @@ public:
 // in the same way.
 using ProtocolConformanceID = DeclID;
 using ProtocolConformanceIDField = DeclIDField;
+
+// The low two bits of the ProtocolConformanceID determine the kind:
+// 00 -- abstract conformance
+// 01 -- concrete conformance
+// 10 -- pack conformance
+struct SerializedProtocolConformanceKind {
+  enum  {
+    Abstract = 0,
+    Concrete = 1,
+    Pack = 2,
+
+    Shift = 2,
+    Mask = 3
+  };
+};
 
 // GenericSignatureID must be the same as DeclID because it is stored in the
 // same way.
@@ -335,18 +350,21 @@ using CtorInitializerKindField = BCFixed<2>;
 enum class ParamDeclSpecifier : uint8_t {
   Default = 0,
   InOut = 1,
-  Shared = 2,
-  Owned = 3,
+  Borrowing = 2,
+  Consuming = 3,
+  LegacyShared = 4,
+  LegacyOwned = 5,
 };
-using ParamDeclSpecifierField = BCFixed<2>;
+using ParamDeclSpecifierField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class VarDeclIntroducer : uint8_t {
   Let = 0,
-  Var = 1
+  Var = 1,
+  InOut = 2,
 };
-using VarDeclIntroducerField = BCFixed<1>;
+using VarDeclIntroducerField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -403,9 +421,11 @@ using MetatypeRepresentationField = BCFixed<2>;
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
+  LegacyConsuming,
   Consuming,
+  Borrowing
 };
-using SelfAccessKindField = BCFixed<2>;
+using SelfAccessKindField = BCFixed<3>;
   
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
@@ -479,16 +499,6 @@ enum ReferenceOwnership : uint8_t {
   Unmanaged,
 };
 using ReferenceOwnershipField = BCFixed<2>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum ValueOwnership : uint8_t {
-  Default = 0,
-  InOut,
-  Shared,
-  Owned
-};
-using ValueOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -588,10 +598,14 @@ enum class ImportControl : uint8_t {
   Normal = 0,
   /// `@_exported import FooKit`
   Exported,
-  /// `@_uncheckedImplementationOnly import FooKit`
-  ImplementationOnly
+  /// `@_implementationOnly import FooKit`
+  ImplementationOnly,
+  /// `internal import FooKit` or more restrictive.
+  InternalOrBelow,
+  /// `package import FooKit`
+  PackageOnly,
 };
-using ImportControlField = BCFixed<2>;
+using ImportControlField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -620,6 +634,7 @@ enum class MacroRole : uint8_t {
   Member,
   Peer,
   Conformance,
+  CodeItem,
 };
 using MacroRoleField = BCFixed<3>;
 
@@ -1158,7 +1173,7 @@ namespace decls_block {
     BCFixed<1>,          // vararg?
     BCFixed<1>,          // autoclosure?
     BCFixed<1>,          // non-ephemeral?
-    ValueOwnershipField, // inout, shared or owned?
+    ParamDeclSpecifierField, // inout, shared or owned?
     BCFixed<1>,          // isolated
     BCFixed<1>,          // noDerivative?
     BCFixed<1>           // compileTimeConst
@@ -1327,13 +1342,9 @@ namespace decls_block {
   );
 
   TYPE_LAYOUT(PackTypeLayout,
-    PACK_TYPE
+    PACK_TYPE,
+    BCArray<TypeIDField>  // component types
   );
-
-  using PackTypeEltLayout = BCRecordLayout<
-    PACK_TYPE_ELT,
-    TypeIDField         // type
-  >;
 
   TYPE_LAYOUT(SILPackTypeLayout,
     SIL_PACK_TYPE,
@@ -1727,6 +1738,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCVBR<5>,    // number of parameter name components
     BCVBR<3>,    // builtin macro definition ID
+    BCFixed<1>,  // whether it has an expanded macro definition
     IdentifierIDField, // external module name, for external macros
     IdentifierIDField,  // external type name, for external macros
     BCArray<IdentifierIDField> // name components,
@@ -1734,6 +1746,22 @@ namespace decls_block {
     // The record is trailed by:
     // - its generic parameters, if any
     // - parameter list, if present
+    // - expanded macro definition, if needed.
+  >;
+
+  /// The expanded macro definition text.
+  using ExpandedMacroDefinitionLayout = BCRecordLayout<
+    EXPANDED_MACRO_DEFINITION,
+    BCFixed<1>, // whether it has replacements
+    BCBlob // expansion text
+    // potentially trailed by the expanded macro replacements
+  >;
+
+  /// The replacements to be performed for an expanded macro definition.
+  using ExpandedMacroReplacementsLayout = BCRecordLayout<
+    EXPANDED_MACRO_REPLACEMENTS,
+    BCArray<BCVBR<6>> // a set of replacement triples (start offset,
+                      // end offset, parameter index)
   >;
 
   using InlinableBodyTextLayout = BCRecordLayout<
@@ -1895,6 +1923,13 @@ namespace decls_block {
     GenericSignatureIDField, // the generic signature
     BCFixed<2>, // the builtin conformance kind
     BCArray<BCVBR<6>> // conditional requirements
+  >;
+
+  using PackConformanceLayout = BCRecordLayout<
+    PACK_CONFORMANCE,
+    TypeIDField,                         // pattern type
+    DeclIDField,                         // the protocol
+    BCArray<ProtocolConformanceIDField>  // pattern conformances
   >;
 
   using ProtocolConformanceXrefLayout = BCRecordLayout<
@@ -2242,7 +2277,11 @@ namespace decls_block {
     BCFixed<1>,                // macro syntax
     MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
-    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
+    BCArray<IdentifierIDField> // introduced names, where each is encoded as
+                               //   - introduced kind
+                               //   - base name
+                               //   - # of argument labels + 1 (or 0 if none)
+                               //   - argument labels
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
@@ -2331,6 +2370,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,

@@ -250,7 +250,15 @@ private:
     Finished,
 
     /// The converted value has been extracted.
-    Extracted
+    Extracted,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and we haven't been finished yet.
+    PackExpanding,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and finishInitialization has been called.
+    FinishedPackExpanding,
   };
 
   StateTy State;
@@ -280,6 +288,7 @@ public:
       FinalContext(SGFContext(subInitialization.get())) {
     OwnedSubInitialization = std::move(subInitialization);
   }
+
   
   /// Return the conversion to apply to the unconverted value.
   const Conversion &getConversion() const {
@@ -345,9 +354,26 @@ public:
 
   // Bookkeeping.
   void finishInitialization(SILGenFunction &SGF) override {
-    assert(getState() == Initialized);
-    State = Finished;
+    if (getState() == PackExpanding) {
+      FinalContext.getEmitInto()->finishInitialization(SGF);
+      State = FinishedPackExpanding;
+    } else {
+      assert(getState() == Initialized);
+      State = Finished;
+    }
   }
+
+  // Support pack-expansion initialization.
+  bool canPerformPackExpansionInitialization() const override {
+    if (auto finalInit = FinalContext.getEmitInto())
+      return finalInit->canPerformPackExpansionInitialization();
+    return false;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                llvm::function_ref<void(Initialization *into)> fn) override;
 };
 
 } // end namespace Lowering

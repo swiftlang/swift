@@ -88,7 +88,7 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
       "BOOL", None, None, false};
   mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = {
       "SEL", None, None, true};
-  mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier(ctx.getSwiftName(
+  mappedTypeNames[{ID_ObjectiveC, ctx.getIdentifier(swift::getSwiftName(
                                       KnownFoundationEntity::NSZone))}] = {
       "struct _NSZone *", None, None, true};
 

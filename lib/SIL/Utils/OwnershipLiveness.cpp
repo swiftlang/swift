@@ -87,6 +87,10 @@ struct InteriorLivenessVisitor :
   public OwnershipUseVisitor<InteriorLivenessVisitor> {
 
   InteriorLiveness &interiorLiveness;
+
+  // If domInfo is nullptr, then InteriorLiveness never assumes dominance. As a
+  // result it may report extra unenclosedPhis. In that case, any attempt to
+  // create a new phi would result in an immediately redundant phi.
   const DominanceInfo *domInfo = nullptr;
 
   /// handleInnerScopeCallback may add uses to the inner scope, but it may not
@@ -136,8 +140,10 @@ struct InteriorLivenessVisitor :
   /// Handles begin_borrow, load_borrow, store_borrow, begin_apply.
   bool handleInnerBorrow(BorrowingOperand borrowingOperand) {
     if (handleInnerScopeCallback) {
-      handleInnerScopeCallback(
-        borrowingOperand.getBorrowIntroducingUserResult().value);
+      auto value = borrowingOperand.getScopeIntroducingUserResult();
+      if (value) {
+        handleInnerScopeCallback(value);
+      }
     }
     return true;
   }
@@ -224,10 +230,14 @@ recursivelyVisitInnerGuaranteedPhi(PhiOperand phiOper, bool isReborrow) {
     // other enclosing defs do not have an outer adjacent reborrow.
     return true;
   })) {
+    // TODO: instead of relying on Dominance, we can reformulate this algorithm
+    // to detect redundant phis, similar to the SSAUpdater.
+    //
     // At least one enclosing def is ownershipDef. If ownershipDef dominates
     // phiValue, then this is consistent with a well-formed linear lifetime, and
     // the phi's uses directly contribute to ownershipDef's liveness.
-    if (domInfo->dominates(interiorLiveness.ownershipDef->getParentBlock(),
+    if (domInfo &&
+        domInfo->dominates(interiorLiveness.ownershipDef->getParentBlock(),
                            phiValue->getParentBlock())) {
       if (isReborrow) {
         visitInnerBorrow(phiOper.getOperand());

@@ -55,7 +55,7 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 // Create OptTable class for parsing actual command line arguments
 class TestOptTable : public llvm::opt::OptTable {
 public:
-  TestOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
+  TestOptTable() : OptTable(InfoTable, std::size(InfoTable)){}
 };
 
 } // end anonymous namespace
@@ -120,6 +120,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
+        .Case("active-regions", SourceKitRequest::ActiveRegions)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
         .Case("structure", SourceKitRequest::Structure)
         .Case("format", SourceKitRequest::Format)
@@ -214,12 +215,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       return true;
     }
 
-    case OPT_offset:
-      if (StringRef(InputArg->getValue()).getAsInteger(10, Offset)) {
+    case OPT_offset: {
+      unsigned offset;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, offset)) {
         llvm::errs() << "error: expected integer for 'offset'\n";
         return true;
       }
+
+      Offset = offset;
       break;
+    }
 
     case OPT_length:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Length)) {
@@ -334,6 +339,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       Inputs.push_back(InputArg->getValue());
       break;
 
+    case OPT_primary_file:
+      PrimaryFile = InputArg->getValue();
+      break;
+
     case OPT_rename_spec:
       RenameSpecPath = InputArg->getValue();
       break;
@@ -444,6 +453,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_disable_implicit_string_processing_module_import:
       DisableImplicitStringProcessingModuleImport = true;
+      break;
+
+    case OPT_disable_implicit_backtracing_module_import:
+      DisableImplicitBacktracingModuleImport = true;
       break;
 
     case OPT_UNKNOWN:

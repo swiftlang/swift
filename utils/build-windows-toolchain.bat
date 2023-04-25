@@ -42,6 +42,14 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
+rem TODO(compnerd) remove this clean up code once we have had enough time for
+rem the injection to soak.
+:: Clean up old deployments as that breaks the tests
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap"
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
+
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
@@ -178,12 +186,6 @@ cmake ^
 cmake --build "%BuildRoot%\curl" || (exit /b)
 cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
-:: Prepare system modules
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" || (exit /b)
-copy /y "%SourceRoot%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" || (exit /b)
-
 :: Build Toolchain
 cmake ^
   -B "%BuildRoot%\1" ^
@@ -213,7 +215,7 @@ cmake ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
-  -D SWIFT_ENABLE_EXPERIMENTAL_REFLECTION=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION=YES ^
 
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR="%SourceRoot%\swift" ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="%SourceRoot%\cmark" ^
@@ -255,7 +257,7 @@ cmake ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES ^
-  -D SWIFT_ENABLE_EXPERIMENTAL_REFLECTION=YES ^
+  -D SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION=YES ^
 
   -G Ninja ^
   -S %SourceRoot%\swift || (exit /b)
@@ -273,6 +275,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -296,6 +299,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -331,6 +335,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -358,6 +363,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -379,6 +385,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -406,6 +413,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -434,6 +442,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -460,7 +469,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_Swift_FLAGS="-Xcc -DYAML_DECLARE_EXPORT -Xcc -DWIN32" ^
+  -D CMAKE_Swift_FLAGS="-Xcc -DYAML_DECLARE_EXPORT -Xcc -DWIN32 -vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -485,6 +494,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -518,6 +528,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -541,6 +552,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -551,9 +563,63 @@ cmake ^
 cmake --build %BuildRoot%\13 || (exit /b)
 cmake --build %BuildRoot%\13 --target install || (exit /b)
 
+:: Build swift-asn1
+ cmake ^
+   -B %BuildRoot%\14 ^
+
+   -D BUILD_SHARED_LIBS=NO ^
+   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+   -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+   -D CMAKE_MT=mt ^
+   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+   -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
+   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
+   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+
+   -G Ninja ^
+   -S %SourceRoot%\swift-asn1 || (exit /b)
+ cmake --build %BuildRoot%\14 || (exit /b)
+ cmake --build %BuildRoot%\14 --target install || (exit /b)
+
+:: Build swift-certificates
+ cmake ^
+   -B %BuildRoot%\15 ^
+
+   -D BUILD_SHARED_LIBS=NO ^
+   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+   -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+   -D CMAKE_MT=mt ^
+   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+   -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
+   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
+   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+   -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
+   -D SwiftASN1_DIR=%BuildRoot%\14\cmake\modules ^
+
+   -G Ninja ^
+   -S %SourceRoot%\swift-certificates || (exit /b)
+ cmake --build %BuildRoot%\15 || (exit /b)
+ cmake --build %BuildRoot%\15 --target install || (exit /b)
+
 :: Build swift-package-manager
 cmake ^
-  -B %BuildRoot%\14 ^
+  -B %BuildRoot%\16 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -562,6 +628,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -577,17 +644,19 @@ cmake ^
   -D SwiftDriver_DIR=%BuildRoot%\11\cmake\modules ^
   -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
+  -D SwiftASN1_DIR=%BuildRoot%\14\cmake\modules ^
+  -D SwiftCertificates_DIR=%BuildRoot%\15\cmake\modules ^
   -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
   -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swiftpm || (exit /b)
-cmake --build %BuildRoot%\14 || (exit /b)
-cmake --build %BuildRoot%\14 --target install || (exit /b)
+cmake --build %BuildRoot%\16 || (exit /b)
+cmake --build %BuildRoot%\16 --target install || (exit /b)
 
 :: Build IndexStoreDB
 cmake ^
-  -B %BuildRoot%\15 ^
+  -B %BuildRoot%\17 ^
 
   -D BUILD_SHARED_LIBS=NO ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -597,6 +666,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -607,11 +677,11 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\indexstore-db || (exit /b)
-cmake --build %BuildRoot%\15 || (exit /b)
+cmake --build %BuildRoot%\17 || (exit /b)
 
 :: Build swift-syntax
 cmake ^
-  -B %BuildRoot%\16 ^
+  -B %BuildRoot%\18 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -625,12 +695,12 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-syntax || (exit /b)
-cmake --build %BuildRoot%\16 || (exit /b)
-cmake --build %BuildRoot%\16 --target install || (exit /b)
+cmake --build %BuildRoot%\18 || (exit /b)
+cmake --build %BuildRoot%\18 --target install || (exit /b)
 
 :: Build SourceKit-LSP
 cmake ^
-  -B %BuildRoot%\17 ^
+  -B %BuildRoot%\19 ^
 
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -640,6 +710,7 @@ cmake ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy -Xclang -fno-split-cold-code" ^
   -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-vfsoverlay %BuildRoot%/2/stdlib/windows-vfs-overlay.yaml" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
@@ -652,20 +723,20 @@ cmake ^
   -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
   -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
   -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
-  -D SwiftPM_DIR=%BuildRoot%\14\cmake\modules ^
-  -D IndexStoreDB_DIR=%BuildRoot%\15\cmake\modules ^
+  -D SwiftPM_DIR=%BuildRoot%\16\cmake\modules ^
+  -D IndexStoreDB_DIR=%BuildRoot%\17\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
-  -D SwiftSyntax_DIR=%BuildRoot%\16\cmake\modules ^
+  -D SwiftSyntax_DIR=%BuildRoot%\18\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\sourcekit-lsp || (exit /b)
-cmake --build %BuildRoot%\17 || (exit /b)
-cmake --build %BuildRoot%\17 --target install || (exit /b)
+cmake --build %BuildRoot%\19 || (exit /b)
+cmake --build %BuildRoot%\19 --target install || (exit /b)
 
 :: Create Configuration Files
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > %SDKInstallRoot%\SDKSettings.plist
 :: TODO(compnerd) match the XCTest installation name
-python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
+python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
 
 IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
 
@@ -674,18 +745,22 @@ IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestSwift
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==dispatch SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestDispatch
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==foundation SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestFoundation
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==xctest SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestXCTest
+IF %ERRORLEVEL% NEQ 0 (EXIT /B)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
@@ -853,6 +928,7 @@ setlocal enableextensions enabledelayedexpansion
 
 :: Package toolchain.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\toolchain\ ^
   -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
@@ -862,20 +938,19 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
 
 :: Package sdk.msi
-msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\CustomActions\SwiftInstaller\SwiftInstaller.vcxproj -t:restore
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\sdk.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\sdk\ ^
   -p:IntermediateOutputPath=%PackageRoot%\sdk\ ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
-  -p:SDK_ROOT=%SDKInstallRoot%\ ^
-  -p:SWIFT_SOURCE_DIR=%SourceRoot%\swift\ ^
-  -p:PlatformToolset=v142
+  -p:SDK_ROOT=%SDKInstallRoot%\
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\sdk\sdk.msi
 
 :: Package runtime.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\runtime\ ^
   -p:IntermediateOutputPath=%PackageRoot%\runtime\ ^
@@ -885,6 +960,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\runtime.wixproj ^
 
 :: Package devtools.msi
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\devtools.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\devtools\ ^
   -p:IntermediateOutputPath=%PackageRoot%\devtools\ ^
@@ -900,6 +976,7 @@ move %PackageRoot%\devtools\devtools.msi %PackageRoot% || (exit /b)
 
 :: Build Installer
 msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\installer.wixproj ^
+  -restore ^
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\installer\ ^
   -p:IntermediateOutputPath=%PackageRoot%\installer\ ^

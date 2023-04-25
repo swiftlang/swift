@@ -17,7 +17,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -314,6 +313,10 @@ CalleeList CalleeCache::getDestructors(SILType type, bool isExactType) const {
   return getCalleeList(SILDeclRef(classDecl->getDestructor()));
 }
 
+// TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
+BasicCalleeAnalysis::~BasicCalleeAnalysis() {
+}
+
 void BasicCalleeAnalysis::dump() const {
   print(llvm::errs());
 }
@@ -337,55 +340,24 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
-                                            BridgedValue callee) {
-  BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
-  CalleeList cl = bca->getCalleeListOfValue(castToSILValue(callee));
-  return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
-}
+static BridgedCalleeAnalysis::IsDeinitBarrierFn instructionIsDeinitBarrierFunction;
+static BridgedCalleeAnalysis::GetMemBehvaiorFn getMemBehvaiorFunction = nullptr;
 
-BridgedCalleeList CalleeAnalysis_getDestructors(BridgedCalleeAnalysis calleeAnalysis,
-                                                BridgedType type,
-                                                SwiftInt isExactType) {
-  BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
-  CalleeList cl = bca->getDestructors(castToSILType(type), isExactType != 0);
-  return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
-}
-
-SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees) {
-  CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
-                                         callees.incomplete);
-  return cl.end() - cl.begin();
-}
-
-BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
-                                         SwiftInt index) {
-  CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
-                                         callees.incomplete);
-  auto iter = cl.begin() + index;
-  assert(index >= 0 && iter < cl.end());
-  return {*iter};
-}
-
-static InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFunction;
-static CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFunction = nullptr;
-
-void CalleeAnalysis_register(
-    InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFn,
-    CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFn) {
+void BridgedCalleeAnalysis::registerAnalysis(IsDeinitBarrierFn instructionIsDeinitBarrierFn,
+                                             GetMemBehvaiorFn getMemBehvaiorFn) {
   instructionIsDeinitBarrierFunction = instructionIsDeinitBarrierFn;
   getMemBehvaiorFunction = getMemBehvaiorFn;
 }
 
-SILInstruction::MemoryBehavior BasicCalleeAnalysis::
+MemoryBehavior BasicCalleeAnalysis::
 getMemoryBehavior(ApplySite as, bool observeRetains) {
   if (getMemBehvaiorFunction) {
     auto b = getMemBehvaiorFunction({pm->getSwiftPassInvocation()},
                                     {as.getInstruction()->asSILNode()},
                                     observeRetains);
-    return (SILInstruction::MemoryBehavior)b;
+    return (MemoryBehavior)b;
   }
-  return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  return MemoryBehavior::MayHaveSideEffects;
 }
 
 bool swift::isDeinitBarrier(SILInstruction *const instruction,

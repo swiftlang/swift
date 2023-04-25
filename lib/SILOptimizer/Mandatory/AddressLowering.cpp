@@ -352,7 +352,7 @@ static bool isStoreCopy(SILValue value) {
   if (!storeInst)
     return false;
 
-  SSAPrunedLiveness liveness;
+  SSAPrunedLiveness liveness(copyInst->getFunction());
   auto isStoreOutOfRange = [&liveness, storeInst](SILValue root) {
     liveness.initializeDef(root);
     auto summary = liveness.computeSimple();
@@ -3366,7 +3366,7 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
   findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
   liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding() || isa<EndBorrowInst>(use->getUser()));

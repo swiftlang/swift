@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -44,6 +45,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -80,6 +82,7 @@ namespace swift {
   class ExtensionDecl;
   struct ExternalSourceLocs;
   class LoadedExecutablePlugin;
+  class LoadedLibraryPlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -103,6 +106,7 @@ namespace swift {
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
+  class PackageUnit;
   class ModuleDependenciesCache;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -156,7 +160,7 @@ namespace ide {
 /// While the names of Foundation types aren't likely to change in
 /// Objective-C, their mapping into Swift can. Therefore, when
 /// referring to names of Foundation entities in Swift, use this enum
-/// and \c ASTContext::getSwiftName or \c ASTContext::getSwiftId.
+/// and \c swift::getSwiftName or \c ASTContext::getSwiftId.
 enum class KnownFoundationEntity {
 #define FOUNDATION_ENTITY(Name) Name,
 #include "swift/AST/KnownFoundationEntities.def"
@@ -165,6 +169,10 @@ enum class KnownFoundationEntity {
 /// Retrieve the Foundation entity kind for the given Objective-C
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
+
+/// Retrieve the Swift name for the given Foundation entity, where
+/// "NS" prefix stripping will apply under omit-needless-words.
+StringRef getSwiftName(KnownFoundationEntity kind);
 
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
@@ -230,6 +238,7 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
 
 public:
@@ -247,6 +256,7 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
       std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
   ~ASTContext();
 
@@ -279,6 +289,9 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  /// OutputBackend for writing outputs.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -355,6 +368,11 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
+  /// The Swift module currently being compiled.
+  ModuleDecl *MainModule = nullptr;
+
+  /// The block list where we can find special actions based on module name;
+  BlockListStore blockListConfig;
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -694,6 +712,9 @@ public:
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
       AbstractFunctionDecl *thunk) const;
 
+  /// Indicates whether move-only / noncopyable types are supported.
+  bool supportsMoveOnlyTypes() const;
+
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).
   //
@@ -884,6 +905,11 @@ public:
   /// Get the back-deployed availability for concurrency.
   AvailabilityContext getBackDeployedConcurrencyAvailability();
 
+  /// The the availability since when distributed actors are able to have custom
+  /// executors.
+  AvailabilityContext
+  getConcurrencyDistributedActorWithCustomExecutorAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
@@ -926,6 +952,14 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
   AvailabilityContext getSwift57Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.8
+  /// compiler for the target platform.
+  AvailabilityContext getSwift58Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  AvailabilityContext getSwift59Availability();
 
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
@@ -998,6 +1032,8 @@ public:
       StringRef moduleName,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
+      bool optionalDependencyLookup = false,
+      bool isTestableImport = false,
       llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
@@ -1314,14 +1350,10 @@ public:
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
-  /// Retrieve the Swift name for the given Foundation entity, where
-  /// "NS" prefix stripping will apply under omit-needless-words.
-  StringRef getSwiftName(KnownFoundationEntity kind);
-
   /// Retrieve the Swift identifier for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
   Identifier getSwiftId(KnownFoundationEntity kind) {
-    return getIdentifier(getSwiftName(kind));
+    return getIdentifier(swift::getSwiftName(kind));
   }
 
   /// Populate \p names with visible top level module names.
@@ -1378,7 +1410,7 @@ public:
   /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig,
-                                                CanType shapeClass);
+                                                CanGenericTypeParamType shapeClass);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
@@ -1454,14 +1486,40 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
-  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
-  /// search within the library.
-  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
-  
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  LoadedExecutablePlugin *
-  lookupExecutablePluginByModuleName(Identifier moduleName);
+  /// Lookup a library plugin that can handle \p moduleName and return the path
+  /// to it.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<std::string> lookupLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Load the specified dylib plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
+
+  /// Lookup an executable plugin that is declared to handle \p moduleName
+  /// module by '-load-plugin-executable'.
+  /// The path is valid within the VFS, use `FS.getRealPath()` for the
+  /// underlying path.
+  Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
+
+  /// Look for dynamic libraries in paths from `-external-plugin-path` and
+  /// return a pair of `(library path, plugin server executable)` if found.
+  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
+  /// underlying path.
+  Optional<std::pair<std::string, std::string>>
+  lookupExternalLibraryPluginByModuleName(Identifier moduleName);
+
+  /// Launch the specified executable plugin path resolving the path with the
+  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
+  /// returns a nullptr.
+  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
+  /// instance is simply returned.
+  LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
 
   /// Get the plugin registry this ASTContext is using.
   PluginRegistry *getPluginRegistry() const;
@@ -1469,6 +1527,20 @@ public:
   /// Set the plugin registory this ASTContext should use.
   /// This should be called before any plugin is loaded.
   void setPluginRegistry(PluginRegistry *newValue);
+
+  const llvm::StringSet<> &getLoadedPluginLibraryPaths() const;
+
+  /// Get the output backend. The output backend needs to be initialized via
+  /// constructor or `setOutputBackend`.
+  llvm::vfs::OutputBackend &getOutputBackend() const {
+    assert(OutputBackend && "OutputBackend is not setup");
+    return *OutputBackend;
+  }
+  /// Set output backend for virtualized outputs.
+  void setOutputBackend(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend) {
+    OutputBackend = std::move(OutBackend);
+  }
 
 private:
   friend Decl;
@@ -1482,7 +1554,7 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  void loadCompilerPlugins();
+  void createModuleToExecutablePluginMap();
 
   friend TypeBase;
   friend ArchetypeType;

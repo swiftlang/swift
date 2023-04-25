@@ -22,11 +22,10 @@
 
 using namespace swift;
 
-void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
-                                                     unsigned bitNo) {
+void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
   // If, we are visiting this block, then it is not already LiveOut. Mark it
   // LiveWithin to indicate a liveness boundary within the block.
-  markBlockLive(userBB, bitNo, LiveWithin);
+  markBlockLive(userBB, LiveWithin);
 
   BasicBlockWorklist worklist(userBB->getFunction());
   worklist.push(userBB);
@@ -37,12 +36,12 @@ void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
     // Traversal terminates at any previously visited block, including the
     // blocks initialized as definition blocks.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      switch (getBlockLiveness(predBlock, bitNo)) {
+      switch (getBlockLiveness(predBlock)) {
       case Dead:
         worklist.pushIfNotVisited(predBlock);
         LLVM_FALLTHROUGH;
       case LiveWithin:
-        markBlockLive(predBlock, bitNo, LiveOut);
+        markBlockLive(predBlock, LiveOut);
         break;
       case LiveOut:
         break;
@@ -51,114 +50,9 @@ void PrunedLiveBlocks::computeScalarUseBlockLiveness(SILBasicBlock *userBB,
   }
 }
 
-/// Update the current def's liveness based on one specific use instruction.
-///
-/// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
-///
-/// Terminators are not live out of the block.
-void PrunedLiveBlocks::updateForUse(
-    SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
-    SmallVectorImpl<IsLive> &resultingLivenessInfo) {
-  resultingLivenessInfo.clear();
-
-  SWIFT_ASSERT_ONLY(seenUse = true);
-
-  auto *bb = user->getParent();
-  getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
-
-  for (auto pair : llvm::enumerate(resultingLivenessInfo)) {
-    unsigned index = pair.index();
-    unsigned specificBitNo = startBitNo + index;
-    switch (pair.value()) {
-    case LiveOut:
-    case LiveWithin:
-      continue;
-    case Dead: {
-      // This use block has not yet been marked live. Mark it and its
-      // predecessor blocks live.
-      computeScalarUseBlockLiveness(bb, specificBitNo);
-      resultingLivenessInfo.push_back(getBlockLiveness(bb, specificBitNo));
-      continue;
-    }
-    }
-    llvm_unreachable("covered switch");
-  }
-}
-
 //===----------------------------------------------------------------------===//
-//                            MARK: PrunedLiveness
+//                    PrunedLiveBlocks and PrunedLiveness
 //===----------------------------------------------------------------------===//
-
-void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
-  assert(!empty() && "at least one definition must be initialized");
-
-  liveBlocks.updateForUse(user, 0);
-  // Note that a user may use the current value from multiple operands. If any
-  // of the uses are non-lifetime-ending, then we must consider the user
-  // itself non-lifetime-ending; it cannot be a final destroy point because
-  // the value of the non-lifetime-ending operand must be kept alive until the
-  // end of the user. Consider a call that takes the same value using
-  // different conventions:
-  //
-  //   apply %f(%val, %val) : $(@guaranteed, @owned) -> ()
-  //
-  // This call is not considered the end of %val's lifetime. The @owned
-  // argument must be copied.
-  auto iterAndSuccess = users.insert({user, lifetimeEnding});
-  if (!iterAndSuccess.second)
-    iterAndSuccess.first->second &= lifetimeEnding;
-}
-
-InnerBorrowKind PrunedLiveness::updateForBorrowingOperand(Operand *operand) {
-  assert(operand->getOperandOwnership() == OperandOwnership::Borrow);
-
-  // A nested borrow scope is considered a use-point at each scope ending
-  // instruction.
-  //
-  // Note: Ownership liveness should follow reborrows that are dominated by the
-  // ownership definition.
-  if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
-        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-          return false;
-        }
-        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-        return true;
-      })) {
-    return InnerBorrowKind::Reborrowed;
-  }
-  return InnerBorrowKind::Contained;
-}
-
-AddressUseKind PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
-  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
-
-  if (auto scopedAddress = ScopedAddressValue::forUse(operand)) {
-    scopedAddress.visitScopeEndingUses([this](Operand *end) {
-      updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-      return true;
-    });
-    return AddressUseKind::NonEscaping;
-  }
-  // FIXME: findTransitiveUses should be a visitor so we're not recursively
-  // allocating use vectors and potentially merging the use points.
-  SmallVector<Operand *, 8> uses;
-  auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
-  for (auto *use : uses) {
-    updateForUse(use->getUser(), /*lifetimeEnding*/ false);
-  }
-  if (uses.empty()) {
-    // Handle a dead address
-    updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
-  }
-  return useKind;
-}
-
-void PrunedLiveness::extendAcrossLiveness(PrunedLiveness &otherLivesness) {
-  // update this liveness for all the interesting users in otherLiveness.
-  for (std::pair<SILInstruction *, bool> userAndEnd : otherLivesness.users) {
-    updateForUse(userAndEnd.first, userAndEnd.second);
-  }
-}
 
 llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
   switch (isLive) {
@@ -179,10 +73,7 @@ void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
   SmallVector<IsLive, 8> isLive;
   for (auto *block : *discoveredBlocks) {
     block->printAsOperand(OS);
-    OS << ": ";
-    for (unsigned i : range(getNumBitsToTrack()))
-      OS << getStringRef(this->getBlockLiveness(block, i)) << ", ";
-    OS << "\n";
+    OS << ": " << getStringRef(this->getBlockLiveness(block)) << "\n";
   }
 }
 
@@ -273,6 +164,85 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 //===----------------------------------------------------------------------===//
 //                              PrunedLiveRange
 //===----------------------------------------------------------------------===//
+
+template <typename LivenessWithDefs>
+void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
+                                                     bool lifetimeEnding) {
+  liveBlocks.updateForUse(user, asImpl().isUserBeforeDef(user));
+
+  // Note that a user may use the current value from multiple operands. If any
+  // of the uses are non-lifetime-ending, then we must consider the user
+  // itself non-lifetime-ending; it cannot be a final destroy point because
+  // the value of the non-lifetime-ending operand must be kept alive until the
+  // end of the user. Consider a call that takes the same value using
+  // different conventions:
+  //
+  //   apply %f(%val, %val) : $(@guaranteed, @owned) -> ()
+  //
+  // This call is not considered the end of %val's lifetime. The @owned
+  // argument must be copied.
+  auto iterAndSuccess = users.insert({user, lifetimeEnding});
+  if (!iterAndSuccess.second)
+    iterAndSuccess.first->second &= lifetimeEnding;
+}
+
+template <typename LivenessWithDefs>
+InnerBorrowKind
+PrunedLiveRange<LivenessWithDefs>::updateForBorrowingOperand(Operand *operand) {
+  assert(operand->getOperandOwnership() == OperandOwnership::Borrow);
+
+  // A nested borrow scope is considered a use-point at each scope ending
+  // instruction.
+  //
+  // Note: Ownership liveness should follow reborrows that are dominated by the
+  // ownership definition.
+  if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+        return true;
+      })) {
+    return InnerBorrowKind::Reborrowed;
+  }
+  return InnerBorrowKind::Contained;
+}
+
+template <typename LivenessWithDefs>
+AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
+    Operand *operand) {
+  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
+
+  if (auto scopedAddress = ScopedAddressValue::forUse(operand)) {
+    scopedAddress.visitScopeEndingUses([this](Operand *end) {
+      updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+      return true;
+    });
+    return AddressUseKind::NonEscaping;
+  }
+  // FIXME: findTransitiveUses should be a visitor so we're not recursively
+  // allocating use vectors and potentially merging the use points.
+  SmallVector<Operand *, 8> uses;
+  auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
+  for (auto *use : uses) {
+    updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+  }
+  if (uses.empty()) {
+    // Handle a dead address
+    updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
+  }
+  return useKind;
+}
+
+template <typename LivenessWithDefs>
+void PrunedLiveRange<LivenessWithDefs>::extendAcrossLiveness(
+    PrunedLiveness &otherLiveness) {
+  // update this liveness for all the interesting users in otherLiveness.
+  for (std::pair<SILInstruction *, bool> userAndEnd :
+       otherLiveness.getAllUsers()) {
+    updateForUse(userAndEnd.first, userAndEnd.second);
+  }
+}
 
 template <typename LivenessWithDefs>
 LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
@@ -557,6 +527,29 @@ void SSAPrunedLiveness::findBoundariesInBlock(
 //                           MultiDefPrunedLiveness
 //===----------------------------------------------------------------------===//
 
+bool MultiDefPrunedLiveness::isUserBeforeDef(SILInstruction *user) const {
+  auto *block = user->getParent();
+  if (!isDefBlock(block))
+    return false;
+
+  if (llvm::any_of(block->getArguments(), [this](SILArgument *arg) {
+    return isDef(arg);
+  })) {
+    return false;
+  }
+
+  auto *current = user;
+  while (true) {
+    // If user is also a def, then the use is considered before the def.
+    current = current->getPreviousInstruction();
+    if (!current)
+      return true;
+
+    if (isDef(current))
+      return false;
+  }
+}
+
 void MultiDefPrunedLiveness::findBoundariesInBlock(
     SILBasicBlock *block, bool isLiveOut,
     PrunedLivenessBoundary &boundary) const {
@@ -581,6 +574,8 @@ void MultiDefPrunedLiveness::findBoundariesInBlock(
   }
   // Handle a live-out or live-within block with potentially multiple defs
   unsigned prevCount = boundary.deadDefs.size() + boundary.lastUsers.size();
+  (void)prevCount;
+
   bool isLive = isLiveOut;
   for (auto &inst : llvm::reverse(*block)) {
     // Check if the instruction is a def before checking whether it is a
@@ -643,7 +638,7 @@ LiveRangeSummary MultiDefPrunedLiveness::computeSimple() {
 // liveness, clients should check uses that are in PrunedLivenessBoundary.
 void DiagnosticPrunedLiveness::
 updateForUse(SILInstruction *user, bool lifetimeEnding) {
-  PrunedLiveness::updateForUse(user, 0);
+  SSAPrunedLiveness::updateForUse(user, 0);
 
   auto useBlockLive = getBlockLiveness(user->getParent());
   // Record all uses of blocks on the liveness boundary. For blocks marked

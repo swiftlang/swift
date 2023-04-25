@@ -137,7 +137,7 @@ open class OpenSubClass : OpenSuperClass {
 
 class InvalidOpenExtensionClass { }
 
-open extension InvalidOpenExtensionClass {  // expected-error {{extensions cannot be declared 'open'; declare individual members as 'open' instead}} {{1-6=}} {{3-3=public }} {{3-3=public }}
+open extension InvalidOpenExtensionClass {  // expected-error {{extensions cannot be declared 'open'; declare individual members as 'open' instead}} {{1-6=}} {{+1:3-3=public }} {{+3:3-3=public }}
   func C() { } // Insert public
   private func A() { } // OK
   var F: Int { 3 } // Insert public

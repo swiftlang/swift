@@ -226,6 +226,117 @@ func testNeverBranches2() {
   }
 }
 
+// MARK: Outer pound if
+
+func withPoundIf() -> Int {
+  #if true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #endif
+}
+
+func withPoundIfClosure() -> Int {
+  let fn = {
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+  }
+  return fn()
+}
+
+func withPoundIfElse1() -> Int {
+  #if true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElse2() -> Int {
+  #if true
+  0
+  #else
+  switch Bool.random() { case true: 0 case false: 1 }
+  #endif
+}
+
+func withPoundIfElseIf1() -> Int {
+  #if true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #elseif true
+  0
+  #endif
+}
+
+
+func withPoundIfElseIf2() -> Int {
+  #if true
+  0
+  #elseif true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #endif
+}
+
+func withPoundIfElseIfElse1() -> Int {
+  #if true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #elseif true
+  0
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElseIfElse2() -> Int {
+  #if true
+  0
+  #elseif true
+  switch Bool.random() { case true: 0 case false: 1 }
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElseIfElse3() -> Int {
+  #if true
+  0
+  #elseif true
+  0
+  #else
+  switch Bool.random() { case true: 0 case false: 1 }
+  #endif
+}
+
+func withVeryNestedPoundIf() -> Int {
+  #if true
+    #if true
+      #if false
+      ""
+      #else
+      switch Bool.random() { case true: 0 case false: 1 }
+      #endif
+    #elseif true
+    0
+    #endif
+  #endif
+}
+
+func withVeryNestedPoundIfClosure() -> Int {
+  let fn = {
+    #if true
+      #if true
+        #if false
+            ""
+        #else
+            switch Bool.random() { case true: 0 case false: 1 }
+        #endif
+      #elseif true
+          0
+      #endif
+    #endif
+  }
+  return fn()
+}
+
 // MARK: Explicit returns
 
 func explicitReturn1() -> Int {
@@ -702,6 +813,36 @@ func returnBranches6() -> Int {
   return i
 }
 
+func returnBranches6PoundIf() -> Int {
+  // We don't allow multiple expressions.
+  let i = switch Bool.random() {
+  case true:
+    #if true
+    print("hello")
+    0 // expected-warning {{integer literal is unused}}
+    #endif
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  case false:
+    1
+  }
+  return i
+}
+
+func returnBranches6PoundIf2() -> Int {
+  // We don't allow multiple expressions.
+  let i = switch Bool.random() {
+  case true:
+    #if false
+    print("hello")
+    0
+    #endif
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  case false:
+    1
+  }
+  return i
+}
+
 func returnBranches7() -> Int {
   let i = switch Bool.random() {
   case true:
@@ -856,6 +997,135 @@ func nestedType() -> Int {
     return S(x: 0).x
   case false:
     0 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testEmptyBranch() -> Int {
+  // TODO: Ideally we wouldn't emit both diagnostics, the latter is the better
+  // one, but the former is currently emitted by the parser. Ideally the former
+  // one should become semantic, and we'd just avoid it for
+  // SingleValueStmtExprs.
+  let x = switch Bool.random() {
+    case true:
+    // expected-error@-1 {{'case' label in a 'switch' must have at least one executable statement}}
+    // expected-error@-2:14 {{expected expression in branch of 'switch' expression}}
+    case false:
+    0
+  }
+  return x
+}
+
+// MARK: Pound if branches
+
+func testPoundIfBranch1() -> Int {
+  switch Bool.random() {
+  case true:
+    #if true
+    0
+    #endif
+  case false:
+    0
+  }
+}
+
+func testPoundIfBranch2() -> Int {
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #endif
+  case false:
+    0 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testPoundIfBranch3() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    #if false
+    0
+    #endif
+  // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  case false:
+    0
+  }
+  return x
+}
+
+func testPoundIfBranch4() -> Int {
+  switch Bool.random() {
+  case true:
+    #if true
+    0
+    #endif
+  case false:
+    #if true
+    0
+    #endif
+  }
+}
+
+func testPoundIfBranch5() -> Int {
+  // Not allowed (matches the behavior of implict expression returns)
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #endif
+    0 // expected-warning {{integer literal is unused}}
+  case false:
+    1 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testPoundIfBranch6() -> Int {
+  // Not allowed (matches the behavior of implict expression returns)
+  let x = switch Bool.random() {
+  case true:
+    #if false
+    0
+    #endif
+    0 // expected-warning {{integer literal is unused}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  case false:
+    1
+  }
+  return x
+}
+
+func testPoundIfBranch7() -> Int {
+  switch Bool.random() {
+  case true:
+    #if true
+      #if true
+        #if false
+        ""
+        #else
+        0
+        #endif
+      #elseif true
+      ""
+      #endif
+    #endif
+  case false:
+    0
+  }
+}
+
+func testPoundIfBranch8() -> Int {
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #else
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+    #endif
+  case false:
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
   }
 }
 

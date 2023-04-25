@@ -30,21 +30,16 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
+#include "ResilientTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
 
 static CanPackArchetypeType
 getForwardedPackArchetypeType(CanPackType packType) {
-  if (packType->getNumElements() != 1)
-    return CanPackArchetypeType();
-  auto uncastElement = packType.getElementType(0);
-  auto element = dyn_cast<PackExpansionType>(uncastElement);
-  if (!element)
-    return CanPackArchetypeType();
-  auto patternType = element.getPatternType();
-  auto packArchetype = dyn_cast<PackArchetypeType>(patternType);
-  return packArchetype;
+  if (auto expansion = packType.unwrapSingletonPackExpansion())
+    return dyn_cast<PackArchetypeType>(expansion.getPatternType());
+  return CanPackArchetypeType();
 }
 
 static MetadataResponse
@@ -68,6 +63,13 @@ static llvm::Value *tryGetLocalPackTypeData(IRGenFunction &IGF,
     return wtable;
 
   if (auto packArchetypeType = getForwardedPackArchetypeType(packType)) {
+    // Also unwrap the pack conformance, if there is one.
+    if (localDataKind.isPackProtocolConformance()) {
+      localDataKind = LocalTypeDataKind::forProtocolWitnessTable(
+          localDataKind.getPackProtocolConformance()
+              ->getPatternConformances()[0]);
+    }
+
     if (auto *wtable =
             IGF.tryGetLocalTypeData(packArchetypeType, localDataKind))
       return wtable;
@@ -176,7 +178,7 @@ irgen::emitPackArchetypeMetadataRef(IRGenFunction &IGF,
   if (auto result = IGF.tryGetLocalTypeMetadata(type, request))
     return result;
 
-  auto packType = type->getSingletonPackType();
+  auto packType = CanPackType::getSingletonPackExpansion(type);
   auto response = emitTypeMetadataPackRef(IGF, packType, request);
 
   IGF.setScopedLocalTypeMetadata(type, response);
@@ -208,16 +210,17 @@ static Address emitFixedSizeMetadataPackRef(IRGenFunction &IGF,
   return pack;
 }
 
-static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
-                                        CanType elementArchetype,
+/// Use this to index into packs to correctly handle on-heap packs.
+static llvm::Value *loadMetadataAtIndex(IRGenFunction &IGF,
                                         llvm::Value *patternPack,
-                                        llvm::Value *index,
-                                        DynamicMetadataRequest request) {
-  if (auto response = IGF.tryGetLocalTypeMetadata(elementArchetype, request))
-    return response.getMetadata();
-
+                                        llvm::Value *index) {
+  // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
-      IGF.Builder.CreatePointerCast(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
+      IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
+  patternPack =
+      IGF.Builder.CreateAnd(patternPack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  patternPack =
+      IGF.Builder.CreateIntToPtr(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
 
   Address patternPackAddress(patternPack, IGF.IGM.TypeMetadataPtrTy,
                              IGF.IGM.getPointerAlignment());
@@ -227,13 +230,47 @@ static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
       IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
                                     patternPackAddress.getAddress(), index),
       patternPackAddress.getElementType(), patternPackAddress.getAlignment());
-  llvm::Value *metadata = IGF.Builder.CreateLoad(fromPtr);
+  return IGF.Builder.CreateLoad(fromPtr);
+}
+
+static llvm::Value *bindMetadataAtIndex(IRGenFunction &IGF,
+                                        CanType elementArchetype,
+                                        llvm::Value *patternPack,
+                                        llvm::Value *index,
+                                        DynamicMetadataRequest request) {
+  if (auto response = IGF.tryGetLocalTypeMetadata(elementArchetype, request))
+    return response.getMetadata();
+
+  llvm::Value *metadata = loadMetadataAtIndex(IGF, patternPack, index);
 
   // Bind the metadata pack element to the element archetype.
   IGF.setScopedLocalTypeMetadata(elementArchetype,
                                  MetadataResponse::forComplete(metadata));
 
   return metadata;
+}
+
+/// Use this to index into packs to correctly handle on-heap packs.
+static llvm::Value *loadWitnessTableAtIndex(IRGenFunction &IGF,
+                                            llvm::Value *wtablePack,
+                                            llvm::Value *index) {
+  // If the pack is on the heap, the LSB is set, so mask it off.
+  wtablePack =
+      IGF.Builder.CreatePtrToInt(wtablePack, IGF.IGM.SizeTy);
+  wtablePack =
+      IGF.Builder.CreateAnd(wtablePack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  wtablePack =
+      IGF.Builder.CreateIntToPtr(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
+
+  Address patternPackAddress(wtablePack, IGF.IGM.WitnessTablePtrTy,
+                             IGF.IGM.getPointerAlignment());
+
+  // Load the witness table pack element from the current source index.
+  Address fromPtr(
+      IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
+                                    patternPackAddress.getAddress(), index),
+      patternPackAddress.getElementType(), patternPackAddress.getAlignment());
+  return IGF.Builder.CreateLoad(fromPtr);
 }
 
 static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
@@ -244,23 +281,25 @@ static llvm::Value *bindWitnessTableAtIndex(IRGenFunction &IGF,
   auto key = LocalTypeDataKind::forProtocolWitnessTable(conf);
   if (auto *wtable = IGF.tryGetLocalTypeData(elementArchetype, key))
     return wtable;
-  wtablePack =
-      IGF.Builder.CreatePointerCast(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
 
-  Address patternPackAddress(wtablePack, IGF.IGM.WitnessTablePtrTy,
-                             IGF.IGM.getPointerAlignment());
-
-  // Load the witness table pack element from the current source index.
-  Address fromPtr(
-      IGF.Builder.CreateInBoundsGEP(patternPackAddress.getElementType(),
-                                    patternPackAddress.getAddress(), index),
-      patternPackAddress.getElementType(), patternPackAddress.getAlignment());
-  auto *wtable = IGF.Builder.CreateLoad(fromPtr);
+  auto *wtable = loadWitnessTableAtIndex(IGF, wtablePack, index);
 
   // Bind the witness table pack element to the element archetype.
   IGF.setScopedLocalTypeData(elementArchetype, key, wtable);
 
   return wtable;
+}
+
+/// Find the pack archetype for the given interface type in the given
+/// opened element context, which is known to be a forwarding context.
+static CanPackArchetypeType
+getMappedPackArchetypeType(const OpenedElementContext &context, CanType ty) {
+  auto packType = cast<PackType>(
+    context.environment->maybeApplyOuterContextSubstitutions(ty)
+        ->getCanonicalType());
+  auto archetype = getForwardedPackArchetypeType(packType);
+  assert(archetype);
+  return archetype;
 }
 
 static void bindElementSignatureRequirementsAtIndex(
@@ -275,9 +314,7 @@ static void bindElementSignatureRequirementsAtIndex(
           break;
         case GenericRequirement::Kind::MetadataPack: {
           auto ty = requirement.getTypeParameter();
-          auto patternPackArchetype = cast<PackArchetypeType>(
-              context.environment->maybeApplyOuterContextSubstitutions(ty)
-                  ->getCanonicalType());
+          auto patternPackArchetype = getMappedPackArchetypeType(context, ty);
           auto response =
               IGF.emitTypeMetadataRef(patternPackArchetype, request);
           auto elementArchetype =
@@ -295,9 +332,7 @@ static void bindElementSignatureRequirementsAtIndex(
         case GenericRequirement::Kind::WitnessTablePack: {
           auto ty = requirement.getTypeParameter();
           auto proto = requirement.getProtocol();
-          auto patternPackArchetype = cast<PackArchetypeType>(
-              context.environment->maybeApplyOuterContextSubstitutions(ty)
-                  ->getCanonicalType());
+          auto patternPackArchetype = getMappedPackArchetypeType(context, ty);
           auto elementArchetype =
               context.environment
                   ->mapPackTypeIntoElementContext(
@@ -328,8 +363,7 @@ static llvm::Value *emitPackExpansionElementMetadata(
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
       context.environment
-          ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
-          ->getCanonicalType();
+          ->mapContextualPackTypeIntoElementContext(patternTy);
 
   // Emit the element metadata.
   auto element = IGF.emitTypeMetadataRef(instantiatedPatternTy, request)
@@ -362,6 +396,7 @@ static void emitPackExpansionPack(
   IGF.Builder.CreateCondBr(cond, loop, rest);
 
   IGF.Builder.emitBlock(loop);
+  ConditionalDominanceScope condition(IGF);
 
   auto *element = elementForIndex(phi);
 
@@ -458,6 +493,8 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
 
   auto pack = emitTypeMetadataPack(IGF, packType, request);
   auto *metadata = pack.getAddress().getAddress();
+  metadata = IGF.Builder.CreatePointerCast(
+      metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
 
   auto response = MetadataResponse::forComplete(metadata);
   IGF.setScopedLocalTypeMetadata(packType, response);
@@ -503,9 +540,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
 
   // Replace pack archetypes with element archetypes in the pattern type.
   auto instantiatedPatternTy =
-      context.environment
-          ->mapPackTypeIntoElementContext(patternTy->mapTypeOutOfContext())
-          ->getCanonicalType();
+      context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
       context.environment->getGenericSignature()->lookupConformance(
           instantiatedPatternTy, conformance.getRequirement());
@@ -612,6 +647,8 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   auto pack = emitWitnessTablePack(IGF, packType, conformance);
 
   auto *result = pack.getAddress().getAddress();
+  result = IGF.Builder.CreatePointerCast(
+      result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
 
   IGF.setScopedLocalTypeData(packType, localDataKind, result);
 
@@ -620,34 +657,26 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
 
 llvm::Value *irgen::emitTypeMetadataPackElementRef(
     IRGenFunction &IGF, CanPackType packType,
-    ArrayRef<ProtocolDecl *> protocols, llvm::Value *index,
+    ArrayRef<ProtocolConformanceRef> conformances, llvm::Value *index,
     DynamicMetadataRequest request,
     llvm::SmallVectorImpl<llvm::Value *> &wtables) {
   // If the packs have already been materialized, just gep into them.
   auto materializedMetadataPack =
       tryGetLocalPackTypeMetadata(IGF, packType, request);
   llvm::SmallVector<llvm::Value *> materializedWtablePacks;
-  for (auto protocol : protocols) {
+  for (auto conformance : conformances) {
     auto *wtablePack = tryGetLocalPackTypeData(
         IGF, packType,
-        LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol));
+        LocalTypeDataKind::forProtocolWitnessTable(conformance));
     materializedWtablePacks.push_back(wtablePack);
   }
   if (materializedMetadataPack &&
       llvm::all_of(materializedWtablePacks,
                    [](auto *wtablePack) { return wtablePack; })) {
-    auto *gep = IGF.Builder.CreateInBoundsGEP(
-        IGF.IGM.TypeMetadataPtrTy, materializedMetadataPack.getMetadata(),
-        index);
-    auto addr =
-        Address(gep, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
-    auto *metadata = IGF.Builder.CreateLoad(addr);
+    auto *metadataPack = materializedMetadataPack.getMetadata();
+    auto *metadata = loadMetadataAtIndex(IGF, metadataPack, index);
     for (auto *wtablePack : materializedWtablePacks) {
-      auto *gep = IGF.Builder.CreateInBoundsGEP(IGF.IGM.WitnessTablePtrTy,
-                                                wtablePack, index);
-      auto addr = Address(gep, IGF.IGM.WitnessTablePtrTy,
-                          IGF.IGM.getPointerAlignment());
-      auto *wtable = IGF.Builder.CreateLoad(addr);
+      auto *wtable = loadWitnessTableAtIndex(IGF, wtablePack, index);
       wtables.push_back(wtable);
     }
     return metadata;
@@ -668,10 +697,12 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     auto ty = packType.getElementType(index);
     auto response = IGF.emitTypeMetadataRef(ty, request);
     auto *metadata = response.getMetadata();
-    for (auto protocol : protocols) {
+    for (auto conformance : conformances) {
+      auto patternConformance = conformance.getPack()
+          ->getPatternConformances()[index];
       auto *wtable =
           emitWitnessTableRef(IGF, ty, /*srcMetadataCache=*/&metadata,
-                              ProtocolConformanceRef(protocol));
+                              patternConformance);
       wtables.push_back(wtable);
     }
     return metadata;
@@ -773,8 +804,8 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
   auto *metadataPhi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy,
                                             packType.getElementTypes().size());
   llvm::SmallVector<llvm::PHINode *, 2> wtablePhis;
-  wtablePhis.reserve(protocols.size());
-  for (auto idx : indices(protocols)) {
+  wtablePhis.reserve(conformances.size());
+  for (auto idx : indices(conformances)) {
     (void)idx;
     wtablePhis.push_back(IGF.Builder.CreatePHI(
         IGF.IGM.WitnessTablePtrTy, packType.getElementTypes().size()));
@@ -790,7 +821,9 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
   llvm::BasicBlock *previousInBounds = nullptr;
   // The lower bound of indices for the current pack expansion.  Inclusive.
   llvm::Value *lowerBound = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
-  for (auto elementTy : packType.getElementTypes()) {
+  for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
+    auto elementTy = packType.getElementType(i);
+
     // The block within which it will be checked whether %index corresponds to
     // an element of the pack expansion elementTy.
     auto *checkBounds = IGF.createBasicBlock("pack-index-element-bounds");
@@ -802,6 +835,8 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
 
     // (1) Emit check_i {{
     IGF.Builder.emitBlock(checkBounds);
+
+    ConditionalDominanceScope dominanceScope(IGF);
 
     // The upper bound for the current pack expansion.  Exclusive.
     llvm::Value *upperBound = nullptr;
@@ -836,7 +871,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
 
     llvm::Value *metadata = nullptr;
     llvm::SmallVector<llvm::Value *, 2> wtables;
-    wtables.reserve(protocols.size());
+    wtables.reserve(conformances.size());
     if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
       // Actually materialize %inner.  Then use it to get the metadata from the
       // pack expansion at that index.
@@ -846,19 +881,21 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
       auto patternTy = expansionTy.getPatternType();
       metadata = emitPackExpansionElementMetadata(IGF, context, patternTy,
                                                   relativeIndex, request);
-      for (auto protocol : protocols) {
+      for (auto conformance : conformances) {
+        auto patternConformance = conformance.getPack()->getPatternConformances()[i];
         auto *wtable = emitPackExpansionElementWitnessTable(
-            IGF, context, patternTy, ProtocolConformanceRef(protocol),
+            IGF, context, patternTy, patternConformance,
             &metadata, relativeIndex);
         wtables.push_back(wtable);
       }
     } else {
       metadata = IGF.emitTypeMetadataRef(elementTy, request).getMetadata();
-      for (auto protocol : protocols) {
+      for (auto conformance : conformances) {
+        auto patternConformance = conformance.getPack()->getPatternConformances()[i];
         llvm::Value *_metadata = nullptr;
         auto *wtable =
             emitWitnessTableRef(IGF, elementTy, /*srcMetadataCache=*/&_metadata,
-                                ProtocolConformanceRef(protocol));
+                                patternConformance);
         wtables.push_back(wtable);
       }
     }
@@ -905,16 +942,19 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     openablePackParams.insert(genericParam->getCanonicalType());
   });
 
+  auto subs = environment->getPackElementContextSubstitutions();
+
   // Find the archetypes and conformances which must be bound.
   llvm::SmallSetVector<CanType, 2> types;
-  llvm::DenseMap<CanType, llvm::SmallVector<ProtocolDecl *, 2>>
-      protocolsForType;
+  llvm::DenseMap<CanType, llvm::SmallVector<ProtocolConformanceRef, 2>>
+      conformancesForType;
   auto isDerivedFromPackElementGenericTypeParam = [&](CanType ty) -> bool {
     // Is this type itself an openable pack parameter OR a dependent type of
     // one?
     return openablePackParams.contains(
         ty->getRootGenericParam()->getCanonicalType());
   };
+
   enumerateGenericSignatureRequirements(
       environment->getGenericSignature().getCanonicalSignature(),
       [&](GenericRequirement requirement) {
@@ -924,7 +964,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
           if (!isDerivedFromPackElementGenericTypeParam(ty))
             return;
           types.insert(ty);
-          protocolsForType.insert({ty, {}});
+          conformancesForType.insert({ty, {}});
           break;
         }
         case GenericRequirement::Kind::WitnessTablePack: {
@@ -932,8 +972,11 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
           if (!isDerivedFromPackElementGenericTypeParam(ty))
             return;
           types.insert(ty);
-          auto iterator = protocolsForType.insert({ty, {}}).first;
-          iterator->getSecond().push_back(requirement.getProtocol());
+          auto iterator = conformancesForType.insert({ty, {}}).first;
+
+          auto conformance = subs.lookupConformance(
+              ty, requirement.getProtocol());
+          iterator->getSecond().push_back(conformance);
           break;
         }
         case GenericRequirement::Kind::Shape:
@@ -946,16 +989,26 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
   // For each archetype to be bound, find the corresponding conformances and
   // bind the metadata and wtables.
   for (auto ty : types) {
-    auto protocols = protocolsForType.find(ty)->getSecond();
+    auto conformances = conformancesForType.find(ty)->getSecond();
     auto archetype = cast<ElementArchetypeType>(
         environment->mapPackTypeIntoElementContext(ty)->getCanonicalType());
-    auto pack =
-        cast<PackType>(environment->maybeApplyOuterContextSubstitutions(ty)
-                           ->getCanonicalType());
+    auto packType = cast<PackType>(ty.subst(subs)->getCanonicalType());
+
     llvm::SmallVector<llvm::Value *, 2> wtables;
     auto *metadata = emitTypeMetadataPackElementRef(
-        IGF, pack, protocols, index, MetadataState::Complete, wtables);
-    IGF.bindArchetype(archetype, metadata, MetadataState::Complete, wtables);
+        IGF, packType, conformances, index, MetadataState::Complete, wtables);
+
+    auto reqt = GenericRequirement::forMetadata(archetype);
+    bindGenericRequirement(IGF, reqt, metadata, MetadataState::Complete,
+                           SubstitutionMap());
+
+    assert(conformances.size() == wtables.size());
+    for (unsigned i : indices(wtables)) {
+      auto reqt = GenericRequirement::forWitnessTable(
+          archetype, conformances[i].getRequirement());
+      bindGenericRequirement(IGF, reqt, wtables[i], MetadataState::Complete,
+                             SubstitutionMap());
+    }
   }
 }
 
@@ -1002,8 +1055,10 @@ StackAddress irgen::allocatePack(IRGenFunction &IGF, CanSILPackType packType) {
         IGF.IGM.OpaquePtrTy, elementCount);
 
     auto addr = IGF.createAlloca(allocType, IGF.IGM.getPointerAlignment());
-    IGF.Builder.CreateLifetimeStart(addr,
-                                elementSize * elementCount);
+    IGF.Builder.CreateLifetimeStart(addr, elementSize * elementCount);
+
+    // We have an [N x opaque*]*; we need an opaque**.
+    addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.OpaquePtrTy);
     return addr;
   }
 

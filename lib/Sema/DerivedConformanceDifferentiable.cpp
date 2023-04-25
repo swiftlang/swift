@@ -55,7 +55,7 @@ static bool canInvokeMoveByOnProperty(
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
-  return decl->isNonMutating();
+  return !decl->isMutating();
 }
 
 /// Get the stored properties of a nominal type that are relevant for
@@ -419,8 +419,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberTanType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
     tangentProperty->setInterfaceType(memberTanType);
-    Pattern *memberPattern = NamedPattern::createImplicit(C, tangentProperty);
-    memberPattern->setType(memberTanType);
+    Pattern *memberPattern =
+        NamedPattern::createImplicit(C, tangentProperty, memberTanType);
     memberPattern =
         TypedPattern::createImplicit(C, memberPattern, memberTanType);
     memberPattern->setType(memberTanType);

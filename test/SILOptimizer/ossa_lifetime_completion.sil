@@ -1,0 +1,214 @@
+// RUN: %target-sil-opt -enable-ossa-complete-lifetimes -unit-test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+class C {}
+
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
+// CHECK-LABEL: OSSA lifetime completion: %0 = argument of bb0 : $C
+// CHECK: sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @_eagerMove @owned $C):
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
+sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
+entry(%0 : @_eagerMove @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on lexicalOwnedArg: ossa-lifetime-completion with: @argument
+// CHECK: OSSA lifetime completion: %0 = argument of bb0 : $C                         // user: %4
+// CHECK: sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb2:
+// CHECK-NEXT:   destroy_value %0 : $C
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'lexicalOwnedArg'
+// CHECK-LABEL: end running test 1 of 1 on lexicalOwnedArg: ossa-lifetime-completion with: @argument
+sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowTest : $@convention(method) (@owned C) -> () {
+// CHECK: bb1:
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: br bb3
+// CHECK-LABEL: } // end sil function 'borrowTest'
+sil [ossa] @borrowTest : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %borrow = begin_borrow %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %borrow : $C
+  br bb3
+
+bb2:
+  end_borrow %borrow : $C
+  br bb3
+
+bb3:
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @enumTest : $@convention(method) (@guaranteed FakeOptional<C>) -> () {
+// CHECK: bb2
+// CHECK: destroy_value
+// CHECK: br bb3
+// CHECK-LABEL: } // end sil function 'enumTest'
+sil [ossa] @enumTest : $@convention(method) (@guaranteed FakeOptional<C>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<C>):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %copy = copy_value %0 : $FakeOptional<C>
+  %borrow = begin_borrow %copy : $FakeOptional<C>
+  switch_enum %borrow : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%some : @guaranteed $C):
+  end_borrow %borrow : $FakeOptional<C>
+  destroy_value %copy : $FakeOptional<C>
+  br bb3
+
+bb2:
+  end_borrow %borrow : $FakeOptional<C>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+
+sil [ossa] @argTest : $@convention(method) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  debug_value %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb4
+
+bb2:
+  br bb3
+
+bb3:
+  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %r = tuple ()
+  return %r : $()
+
+bb4:
+  unreachable
+}
+
+// Ensure no assert fires while inserting dead end blocks to the worklist
+sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  test_specification "ossa-lifetime-completion @argument"
+  debug_value %0 : $C, let, name "newElements", argno 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  cond_br undef, bb9, bb10
+
+bb3:
+  br bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  unreachable
+
+bb8:
+  %77 = apply undef(%0) : $@convention(method) (@guaranteed C) -> ()
+  destroy_value %0 : $C
+  %79 = tuple ()
+  return %79 : $()
+
+bb9:
+  br bb8
+
+bb10:
+  br bb8
+}
+
+sil @foo : $@convention(thin) (@guaranteed C) -> ()
+
+// Ensure no assert fires while handling lifetime end of partial_apply
+sil [ossa] @testPartialApplyStack1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ossa-lifetime-completion @instruction[0]"
+  %8 = copy_value %0 : $C
+  %9 = begin_borrow %8 : $C
+  %80 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
+  %81 = partial_apply [callee_guaranteed] [on_stack] %80(%9) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %81 : $@noescape @callee_guaranteed () -> ()
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %9 : $C
+  destroy_value %8 : $C
+  %180 = tuple ()
+  return %180 : $()
+}
+
+// Ensure no assert fires while handling lifetime end of partial_apply
+sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  test_specification "ossa-lifetime-completion @instruction[1]"
+  %2 = alloc_stack $C
+  %3 = copy_value %0 : $C
+  %4 = begin_borrow %3 : $C
+  %5 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%4) : $@convention(thin) (@guaranteed C) -> ()
+  %7 = mark_dependence %6 : $@noescape @callee_guaranteed () -> () on %2 : $*C
+  destroy_value %7 : $@noescape @callee_guaranteed () -> ()
+  end_borrow %4 : $C
+  destroy_value %3 : $C
+  dealloc_stack %2 : $*C
+  %12 = tuple ()
+  return %12 : $()
+}
+

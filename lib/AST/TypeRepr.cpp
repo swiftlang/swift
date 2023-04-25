@@ -83,6 +83,11 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
     explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
         : Pred(pred), FoundIt(false) {}
 
+    /// Walk everything in a macro
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkAction walkToTypeReprPre(TypeRepr *ty) override {
       if (Pred(ty)) {
         FoundIt = true;
@@ -591,15 +596,11 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
 #include "swift/AST/TypeReprNodes.def"
     llvm_unreachable("invalid repr kind");
     break;
-  case TypeReprKind::InOut:
-    Printer.printKeyword("inout", Opts, " ");
+  case TypeReprKind::Ownership: {
+    auto ownershipRepr = cast<OwnershipTypeRepr>(this);
+    Printer.printKeyword(ownershipRepr->getSpecifierSpelling(), Opts, " ");
     break;
-  case TypeReprKind::Shared:
-    Printer.printKeyword("__shared", Opts, " ");
-    break;
-  case TypeReprKind::Owned:
-    Printer.printKeyword("__owned", Opts, " ");
-    break;
+  }
   case TypeReprKind::Isolated:
     Printer.printKeyword("isolated", Opts, " ");
     break;
@@ -608,6 +609,14 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     break;
   }
   printTypeRepr(Base, Printer, Opts);
+}
+
+StringRef OwnershipTypeRepr::getSpecifierSpelling() const {
+  return ParamDecl::getSpecifierSpelling(getSpecifier());
+}
+
+ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
+  return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,

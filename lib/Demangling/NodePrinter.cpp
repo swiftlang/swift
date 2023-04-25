@@ -310,7 +310,6 @@ private:
     case Node::Kind::Pack:
     case Node::Kind::SILPackDirect:
     case Node::Kind::SILPackIndirect:
-    case Node::Kind::ConstrainedExistential:
     case Node::Kind::ConstrainedExistentialRequirementList:
     case Node::Kind::ConstrainedExistentialSelf:
     case Node::Kind::Protocol:
@@ -340,6 +339,7 @@ private:
     case Node::Kind::ProtocolListWithAnyObject:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
+    case Node::Kind::ConstrainedExistential:
     case Node::Kind::PackExpansion:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::AccessorAttachedMacroExpansion:
@@ -1434,28 +1434,38 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        /*hasName*/ true);
   case Node::Kind::AccessorAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "accessor macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+                       /*hasName*/true,
+                       ("accessor macro @" +
+                        nodeToString(Node->getChild(2)) + " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
   case Node::Kind::MemberAttributeAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "member attribute macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+                       /*hasName*/true,
+                       ("member attribute macro @" +
+                        nodeToString(Node->getChild(2)) + " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MemberAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "member macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+                       /*hasName*/true,
+                       ("member macro @" + nodeToString(Node->getChild(2)) +
+                        " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::PeerAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "peer macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+                       /*hasName*/true,
+                       ("peer macro @" + nodeToString(Node->getChild(2)) +
+                        " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::ConformanceAttachedMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true, "conformance macro expansion #",
-                       (int)Node->getChild(2)->getIndex() + 1);
+                       /*hasName*/true,
+                       ("conformance macro @" + nodeToString(Node->getChild(2)) +
+                        " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "unique name #",
@@ -3407,6 +3417,11 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
         std::vector<std::string> argumentTypeNames;
+        auto getArgumentTypeName = [&argumentTypeNames](size_t i) {
+          if (i < argumentTypeNames.size())
+            return argumentTypeNames[i];
+          return std::string("<unknown>");
+        };
         // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
@@ -3454,27 +3469,27 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
           if (child->getKind() == Node::Kind::LabelList) {
             size_t numChildren = child->getNumChildren();
             if (numChildren == 0) {
-              subscriptText += unlabelledArg + argumentTypeNames[0];
+              subscriptText += unlabelledArg + getArgumentTypeName(0);
             } else {
               while (idx < numChildren) {
                 Node *argChild = child->getChild(idx);
                 idx += 1;
                 if (argChild->getKind() == Node::Kind::Identifier) {
                   subscriptText += std::string(argChild->getText()) + ": " +
-                                   argumentTypeNames[idx - 1];
+                                   getArgumentTypeName(idx - 1);
                   if (idx != numChildren) {
                     subscriptText += ", ";
                   }
                 } else if (argChild->getKind() ==
                                Node::Kind::FirstElementMarker ||
                            argChild->getKind() == Node::Kind::VariadicMarker) {
-                  subscriptText += unlabelledArg + argumentTypeNames[idx - 1];
+                  subscriptText += unlabelledArg + getArgumentTypeName(idx - 1);
                 }
               }
             }
           }
         } else {
-          subscriptText += unlabelledArg + argumentTypeNames[0];
+          subscriptText += unlabelledArg + getArgumentTypeName(0);
         }
         return subscriptText + ")";
       }

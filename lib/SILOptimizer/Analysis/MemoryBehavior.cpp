@@ -29,7 +29,7 @@ using namespace swift;
 
 namespace {
 
-using MemBehavior = SILInstruction::MemoryBehavior;
+using MemBehavior = MemoryBehavior;
 
 /// Visitor that determines the memory behavior of an instruction relative to a
 /// specific SILValue (i.e. can the instruction cause the value to be read,
@@ -136,7 +136,7 @@ public:
     case SILAccessKind::Deinit:
       // For the same reason we treat a ``load [take]`` or a ``destroy_addr``
       // as a memory write, we do that for a ``begin_access [deinit]`` as well.
-      // See SILInstruction::MemoryBehavior.
+      // See MemoryBehavior.
       return MemBehavior::MayReadWrite;
     case SILAccessKind::Read:
       return MemBehavior::MayRead;

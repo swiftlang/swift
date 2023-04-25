@@ -4,20 +4,23 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
 
+public struct IntTuple {
+    let values: (Int64, Int64, Int64, Int64, Int64, Int64)
+}
+
 public enum Large {
-    case first(Int64, Int64, Int64, Int64, Int64, Int64)
+    case first(IntTuple)
     case second
 }
 
 public func makeLarge(_ x: Int) -> Large {
-    return x >= 0 ? .first(0, 1, 2, 3, 4, 5) : .second
+    return x >= 0 ? .first(IntTuple(values: (0, 1, 2, 3, 4, 5))) : .second
 }
 
 public func printLarge(_ en: Large) {
     switch en {
-    case let .first(a, b, c, d, e, f):
-        let x = (a, b, c, d, e, f)
-        print("Large.first\(x)")
+    case let .first(x):
+        print("Large.first\(x.values)")
     case .second:
         print("Large.second")
     }
@@ -29,7 +32,7 @@ public func passThroughLarge(_ en: Large) -> Large {
 
 public func inoutLarge(_ en: inout Large, _ x: Int) {
     if x >= 0 {
-        en = .first(-1, -2, -3, -4, -5, -6)
+        en = .first(IntTuple(values: (-1, -2, -3, -4, -5, -6)))
     } else {
         en = .second
     }
@@ -46,13 +49,13 @@ public func inoutLarge(_ en: inout Large, _ x: Int) {
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large makeLarge(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9makeLargeyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s5Enums9makeLargeyAA0C0OSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large passThroughLarge(const Large& en) noexcept SWIFT_SYMBOL("s:5Enums16passThroughLargeyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:     _impl::$s5Enums16passThroughLargeyAA0D0OADF(result, _impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }

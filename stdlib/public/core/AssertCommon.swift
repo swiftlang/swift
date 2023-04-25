@@ -29,8 +29,9 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
-@usableFromInline @_transparent
-internal func _isReleaseAssertConfiguration() -> Bool {
+@_transparent
+public // @testable, used in _Concurrency executor preconditions
+func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release

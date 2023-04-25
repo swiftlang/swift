@@ -25,6 +25,15 @@ namespace llvm {
 
 namespace swift {
 
+/// How a dependency should be loaded.
+///
+/// \sa getTransitiveLoadingBehavior
+enum class ModuleLoadingBehavior {
+  Required,
+  Optional,
+  Ignored
+};
+
 /// Serialized core data of a module. The difference with `ModuleFile` is that
 /// `ModuleFileSharedCore` provides immutable data and is independent of a
 /// particular ASTContext. It is designed to be able to be shared across
@@ -110,7 +119,7 @@ public:
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
-    const unsigned RawImportControl : 2;
+    const unsigned RawImportControl : 3;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
@@ -149,6 +158,12 @@ public:
     }
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+    bool isInternalOrBelow() const {
+      return getImportControl() == ImportFilterKind::InternalOrBelow;
+    }
+    bool isPackageOnly() const {
+      return getImportControl() == ImportFilterKind::PackageOnly;
     }
 
     bool isHeader() const { return IsHeader; }
@@ -213,6 +228,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   ArrayRef<RawBitOffset> Conformances;
+
+  /// Pack conformances referenced by this module.
+  ArrayRef<RawBitOffset> PackConformances;
 
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;
@@ -557,6 +575,20 @@ public:
     return Name;
   }
 
+  StringRef getModulePackageName() const {
+    return ModulePackageName;
+  }
+
+  /// Is the module built with testing enabled?
+  bool isTestable() const {
+     return Bits.IsTestable;
+   }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Bits.ResilienceStrategy);
+  }
+
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
@@ -574,6 +606,28 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ///
+  /// If \p debuggerMode, more transitive dependencies should try to be loaded
+  /// as they can be useful in debugging.
+  ///
+  /// If \p isPartialModule, transitive dependencies should be loaded as we're
+  /// in merge-module mode.
+  ///
+  /// If \p packageName is set, transitive package dependencies are loaded if
+  /// loaded from the same package.
+  ///
+  /// If \p forTestable, get the desired loading behavior for a @testable
+  /// import. Reports non-public dependencies as required for a testable
+  /// client so it can access internal details, which in turn can reference
+  /// those non-public dependencies.
+  ModuleLoadingBehavior
+  getTransitiveLoadingBehavior(const Dependency &dependency,
+                               bool debuggerMode,
+                               bool isPartialModule,
+                               StringRef packageName,
+                               bool forTestable) const;
 };
 
 template <typename T, typename RawData>

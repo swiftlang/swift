@@ -19,6 +19,7 @@
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -218,7 +219,8 @@ public:
                      llvm::function_ref<void()> body) {
     if (!optionalKind || optionalKind == OTK_None)
       return body();
-    os << "Swift::Optional<";
+    printBaseName(moduleContext->getASTContext().getStdlibModule());
+    os << "::Optional<";
     body();
     os << '>';
   }
@@ -718,7 +720,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
-    os << "Swift::ThrowingResult<";
+    os << "swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -876,10 +878,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           emitNewParam();
           os << "void * _Nonnull ";
           auto reqt = genericRequirementParam.getRequirement();
-          if (reqt.isWitnessTable())
+          if (reqt.isAnyWitnessTable())
             ClangSyntaxPrinter(os).printBaseName(reqt.getProtocol());
           else
-            assert(reqt.isMetadata());
+            assert(reqt.isAnyMetadata());
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
@@ -1048,7 +1050,8 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
 
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
-       << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+       << ">::type::returnNewValue([&](void * _Nonnull returnValue) "
+          "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
     if (!initializeWithTakeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
     } else {
@@ -1212,7 +1215,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           emitNewParam();
           auto genericRequirement = genericRequirementParam.getRequirement();
           // FIXME: Add protocol requirement support.
-          assert(genericRequirement.isMetadata());
+          assert(genericRequirement.isAnyMetadata());
           if (auto *gtpt = genericRequirement.getTypeParameter()
                                ->getAs<GenericTypeParamType>()) {
             os << "swift::TypeMetadataTrait<";
@@ -1329,17 +1332,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
     os << "#ifdef __cpp_exceptions\n";
-    os << "    throw (Swift::Error(opaqueError));\n";
+    os << "    throw (swift::Error(opaqueError));\n";
     os << "#else\n";
     if (resultTy->isVoid()) {
-      os << "    return Swift::Expected<void>(Swift::Error(opaqueError));\n";
+      os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
       os << "#endif\n";
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
           *directResultType, resultTy, moduleContext, os, cPrologueOS,
           typeMapping, interopContext, [&]() {
-            os << "    return Swift::Expected<";
+            os << "    return swift::Expected<";
             OptionalTypeKind retKind;
             Type objTy;
             std::tie(objTy, retKind) =
@@ -1347,7 +1350,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
             auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                                                   OutputLanguageMode::Cxx);
-            os << ">(Swift::Error(opaqueError));\n";
+            os << ">(swift::Error(opaqueError));\n";
             os << "#endif\n";
 
             // Return the function result value if it doesn't throw.
@@ -1377,6 +1380,7 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1401,6 +1405,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
       resultTy, FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too");
 
+  declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1446,6 +1451,7 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1466,6 +1472,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1480,6 +1487,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isDefinition,
@@ -1494,6 +1502,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       printFunctionSignature(accessor, signature, "operator []", resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;

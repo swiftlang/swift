@@ -22,6 +22,8 @@ struct LoadableIntWrapper {
     return value + x * y;
   }
 
+  operator int() const { return value; }
+
   LoadableIntWrapper &operator++() {
     value++;
     return *this;
@@ -48,6 +50,7 @@ struct LoadableBoolWrapper {
   LoadableBoolWrapper operator!() {
     return LoadableBoolWrapper{.value = !value};
   }
+  operator bool() const { return value; }
 };
 
 template<class T>

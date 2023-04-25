@@ -904,7 +904,17 @@ public:
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify() const;
+  void verify(bool isCompleteOSSA = true,
+              bool checkLinearLifetime = true) const;
+
+  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
+  /// blocks.
+  void verifyIncompleteOSSA() const {
+    verify(/*isCompleteOSSA=*/false);
+  }
+
+  /// Check linear OSSA lifetimes, assuming complete OSSA.
+  void verifyOwnership() const;
 
   /// Check if there are any leaking instructions.
   ///
@@ -1068,8 +1078,22 @@ namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the
 /// Objective-C runtime, i.e., +alloc and -dealloc.
 LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
+
+/// Returns true if SIL/IR lowering for the given declaration should be skipped.
+/// A declaration may not require lowering if, for example, it is annotated as
+/// unavailable and optimization settings allow it to be omitted.
+LLVM_LIBRARY_VISIBILITY bool shouldSkipLowering(Decl *D);
 } // namespace Lowering
 
+/// Apply the given function to each ABI member of \c D skipping the members
+/// that should be skipped according to \c shouldSkipLowering()
+template <typename F>
+void forEachMemberToLower(IterableDeclContext *D, F &&f) {
+  for (auto *member : D->getABIMembers()) {
+    if (!Lowering::shouldSkipLowering(member))
+      f(member);
+  }
+}
 } // namespace swift
 
 #endif

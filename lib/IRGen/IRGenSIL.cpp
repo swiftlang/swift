@@ -722,7 +722,7 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, llvm::MaybeAlign(AI->getAlignment()));
+        Size, llvm::MaybeAlign(AI->getAlign()));
   }
 
   /// Try to emit an inline assembly gadget which extends the lifetime of
@@ -1104,10 +1104,10 @@ public:
           llvm::Value *Shape = emitPackShapeExpression(t);
           if (PackShapeExpressions.insert(Shape).second) {
               llvm::SmallString<8> Buf;
-              llvm::raw_svector_ostream OS(Buf);
-              unsigned Position = PackShapeExpressions.size();
-              OS << "$pack_count_" << Position;
-              SILDebugVariable Var(OS.str(), true, 0);
+              unsigned Position = PackShapeExpressions.size() - 1;
+              llvm::raw_svector_ostream(Buf) << "$pack_count_" << Position;
+              auto Name = IGM.Context.getIdentifier(Buf.str());
+              SILDebugVariable Var(Name.str(), true, 0);
               Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
                                              false /*was move*/);
               if (IGM.DebugInfo)
@@ -1222,7 +1222,15 @@ public:
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
   }
+  void visitDropDeinitInst(DropDeinitInst *i) {
+    auto e = getLoweredExplosion(i->getOperand());
+    setLoweredExplosion(i, e);
+  }
   void visitMarkMustCheckInst(MarkMustCheckInst *i) {
+    llvm_unreachable("Invalid in Lowered SIL");
+  }
+  void visitMarkUnresolvedReferenceBindingInst(
+      MarkUnresolvedReferenceBindingInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
   }
   void visitCopyableToMoveOnlyWrapperValueInst(
@@ -2711,6 +2719,18 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
 
   return fn->getLoweredFunctionType();
 }
+// Async functions that end up with weak_odr or linkonce_odr linkage may not be
+// directly called because we need to preserve the connection between the
+// function's implementation and the function's context size in the async
+// function pointer data structure.
+static bool mayDirectlyCallAsync(SILFunction *fn) {
+  if (fn->getLinkage() == SILLinkage::Shared ||
+      fn->getLinkage() == SILLinkage::PublicNonABI) {
+    return false;
+  }
+
+  return true;
+}
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
@@ -2718,7 +2738,7 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
 
-  auto sig = IGM.getSignature(fnType, fpKind);
+  auto sig = IGM.getSignature(fnType, fpKind, true /*forStaticCall*/);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -2737,7 +2757,8 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
-    secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+    secondaryValue = mayDirectlyCallAsync(fn) ?
+      IGM.getAddrOfSILFunction(fn, NotForDefinition) : nullptr;
 
   // For ordinary sync functions and special async functions, produce
   // only the direct address of the function.  The runtime does not
@@ -5083,7 +5104,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     // If we were not moved return early. If this SILUndef was moved, then we
     // need to let it through so we can ensure the debug info invalidated.
-    if (!i->getWasMoved())
+    if (!i->getUsesMoveableValueDebugInfo())
       return;
   }
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
@@ -5134,18 +5155,18 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (IsAddrVal)
     Copy.emplace_back(emitShadowCopyIfNeeded(
         getLoweredAddress(SILVal).getAddress(), i->getDebugScope(), *VarInfo,
-        IsAnonymous, i->getWasMoved()));
+        IsAnonymous, i->getUsesMoveableValueDebugInfo()));
   else
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           i->getWasMoved(), Copy);
+                           i->getUsesMoveableValueDebugInfo(), Copy);
 
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
-  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getLoc(), *VarInfo, Indirection,
-                               AddrDbgInstrKind(i->getWasMoved()));
+  emitDebugVariableDeclaration(
+      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
+      Indirection, AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -5475,7 +5496,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
-                              /*init*/ true, i->getWasMoved())
+                              /*init*/ true, i->getUsesMoveableValueDebugInfo())
                    .getAddress();
         Indirection =
             InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
@@ -5514,9 +5535,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo) {
-    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo,
-                                 Indirection,
-                                 AddrDbgInstrKind(i->getWasMoved()));
+    emitDebugVariableDeclaration(
+        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
+        AddrDbgInstrKind(i->getUsesMoveableValueDebugInfo()));
   }
 }
 
@@ -5728,8 +5749,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (!Decl)
     return;
 
-  assert(i->getVarInfo() && "alloc_box without debug info");
-  
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -5748,7 +5767,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM, false);
 
   auto VarInfo = i->getVarInfo();
-  assert(VarInfo && "debug_value without debug info");
+  if (!VarInfo)
+    return;
 
   auto Storage =
       emitShadowCopyIfNeeded(boxWithAddr.getAddress(), i->getDebugScope(),
@@ -5865,26 +5885,52 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
     auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
     if (access->getAccessKind() == SILAccessKind::Read) {
       // When we see a signed read access, generate code to:
-      // authenticate the signed pointer, and store the authenticated value to a
-      // shadow stack location. Set the lowered address of the access to this
-      // stack location.
+      // authenticate the signed pointer if non-null, and store the
+      // authenticated value to a shadow stack location. Set the lowered address
+      // of the access to this stack location.
       auto pointerAuthQual = sea->getField()->getPointerAuthQualifier();
       auto *pointerToSignedFptr = getLoweredAddress(sea).getAddress();
       auto *pointerToIntPtr =
           Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
       auto *signedFptr = Builder.CreateLoad(pointerToIntPtr, Int64PtrTy,
                                             IGM.getPointerAlignment());
-      auto *resignedFptr = emitPointerAuthResign(
-          *this, signedFptr,
-          PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr),
-          PointerAuthInfo::emit(*this,
-                                IGM.getOptions().PointerAuth.FunctionPointers,
-                                pointerToSignedFptr, PointerAuthEntity()));
+
+      // Create a stack temporary.
       auto temp = ti.allocateStack(*this, access->getType(), "ptrauth.temp");
       auto *tempAddressToIntPtr =
           Builder.CreateBitCast(temp.getAddressPointer(), Int64PtrPtrTy);
+
+      // Branch based on pointer is null or not.
+      llvm::Value *cond = Builder.CreateICmpNE(
+          signedFptr, llvm::ConstantPointerNull::get(Int64PtrTy));
+      auto *resignNonNull = createBasicBlock("resign-nonnull");
+      auto *resignNull = createBasicBlock("resign-null");
+      auto *resignCont = createBasicBlock("resign-cont");
+      Builder.CreateCondBr(cond, resignNonNull, resignNull);
+
+      // Resign if non-null.
+      Builder.emitBlock(resignNonNull);
+      auto oldAuthInfo =
+          PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
+      // ClangImporter imports the c function pointer as an optional type.
+      PointerAuthEntity entity(
+          sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
+      auto newAuthInfo = PointerAuthInfo::emit(
+          *this, IGM.getOptions().PointerAuth.FunctionPointers,
+          pointerToSignedFptr, entity);
+      auto *resignedFptr =
+          emitPointerAuthResign(*this, signedFptr, oldAuthInfo, newAuthInfo);
       Builder.CreateStore(resignedFptr, tempAddressToIntPtr,
                           IGM.getPointerAlignment());
+      Builder.CreateBr(resignCont);
+
+      // If null, no need to resign.
+      Builder.emitBlock(resignNull);
+      Builder.CreateStore(signedFptr, tempAddressToIntPtr,
+                          IGM.getPointerAlignment());
+      Builder.CreateBr(resignCont);
+
+      Builder.emitBlock(resignCont);
       setLoweredAddress(access, temp.getAddress());
       return;
     }
@@ -5986,8 +6032,9 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
       return;
     }
     // When we see a signed modify access, get the lowered address of the
-    // access which is the shadow stack slot, sign the value and write back to
-    // the struct field.
+    // access which is the shadow stack slot, sign the value if non-null and
+    // write back to the struct field.
+    auto *sea = cast<StructElementAddrInst>(access->getOperand());
     auto *Int64PtrTy = llvm::Type::getInt64PtrTy(IGM.getLLVMContext());
     auto *Int64PtrPtrTy = Int64PtrTy->getPointerTo();
     auto pointerAuthQual = cast<StructElementAddrInst>(access->getOperand())
@@ -5995,21 +6042,45 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
                                ->getPointerAuthQualifier();
     auto *pointerToSignedFptr =
         getLoweredAddress(access->getOperand()).getAddress();
+    auto *pointerToIntPtr =
+        Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
     auto tempAddress = getLoweredAddress(access);
     auto *tempAddressToIntPtr =
         Builder.CreateBitCast(tempAddress.getAddress(), Int64PtrPtrTy);
     auto *tempAddressValue = Builder.CreateLoad(tempAddressToIntPtr, Int64PtrTy,
                                                 IGM.getPointerAlignment());
-    auto *signedFptr = emitPointerAuthResign(
-        *this, tempAddressValue,
-        PointerAuthInfo::emit(*this,
-                              IGM.getOptions().PointerAuth.FunctionPointers,
-                              tempAddress.getAddress(), PointerAuthEntity()),
-        PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr));
+    // Branch based on value is null or not.
+    llvm::Value *cond = Builder.CreateICmpNE(
+        tempAddressValue, llvm::ConstantPointerNull::get(Int64PtrTy));
+    auto *resignNonNull = createBasicBlock("resign-nonnull");
+    auto *resignNull = createBasicBlock("resign-null");
+    auto *resignCont = createBasicBlock("resign-cont");
 
-    auto *pointerToIntPtr =
-        Builder.CreateBitCast(pointerToSignedFptr, Int64PtrPtrTy);
+    Builder.CreateCondBr(cond, resignNonNull, resignNull);
+
+    Builder.emitBlock(resignNonNull);
+
+    // If non-null, resign
+    // ClangImporter imports the c function pointer as an optional type.
+    PointerAuthEntity entity(
+        sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
+    auto oldAuthInfo = PointerAuthInfo::emit(
+        *this, IGM.getOptions().PointerAuth.FunctionPointers,
+        tempAddress.getAddress(), entity);
+    auto newAuthInfo =
+        PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
+    auto *signedFptr = emitPointerAuthResign(*this, tempAddressValue,
+                                             oldAuthInfo, newAuthInfo);
     Builder.CreateStore(signedFptr, pointerToIntPtr, IGM.getPointerAlignment());
+
+    Builder.CreateBr(resignCont);
+
+    // If null, no need to resign
+    Builder.emitBlock(resignNull);
+    Builder.CreateStore(tempAddressValue, pointerToIntPtr, IGM.getPointerAlignment());
+    Builder.CreateBr(resignCont);
+
+    Builder.emitBlock(resignCont);
     return;
   }
   }
@@ -6689,10 +6760,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     
     if (!I->getSubstitutions().empty()) {
       emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
-        [&](GenericRequirement reqt) -> llvm::Value * {
-          return emitGenericRequirementFromSubstitutions(*this, reqt, subs,
-                                                         MetadataState::Complete);
-        });
+                                          MetadataState::Complete, subs);
     }
     
     for (unsigned i : indices(I->getAllOperands())) {

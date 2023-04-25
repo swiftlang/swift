@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 namespace swift {
 class DiagnosticEngine;
@@ -39,6 +40,9 @@ protected:
 
   DiagnosticEngine &diags;
 
+  /// OutputBackend.
+  llvm::vfs::OutputBackend &backend;
+
   /// Graph under construction
   SourceFileDepGraph g;
 
@@ -49,7 +53,8 @@ public:
                                     StringRef swiftDeps,
                                     Fingerprint fileFingerprint,
                                     bool emitDotFileAfterConstruction,
-                                    DiagnosticEngine &diags);
+                                    DiagnosticEngine &diags,
+                                    llvm::vfs::OutputBackend &outputBackend);
 
   virtual ~AbstractSourceFileDepGraphFactory() = default;
 

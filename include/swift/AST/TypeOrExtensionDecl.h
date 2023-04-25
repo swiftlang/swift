@@ -23,6 +23,9 @@
 
 namespace swift {
 
+class DeclContext;
+class IterableDeclContext;
+
 /// Describes either a nominal type declaration or an extension
 /// declaration.
 struct TypeOrExtensionDecl {
@@ -38,6 +41,8 @@ struct TypeOrExtensionDecl {
   class Decl *getAsDecl() const;
   /// Return the contained *Decl as the DeclContext superclass.
   DeclContext *getAsDeclContext() const;
+  /// Return the contained *Decl as the DeclContext superclass.
+  IterableDeclContext *getAsIterableDeclContext() const;
   /// Return the contained NominalTypeDecl or that of the extended type
   /// in the ExtensionDecl.
   NominalTypeDecl *getBaseNominal() const;

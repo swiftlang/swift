@@ -45,6 +45,7 @@ bool useDllStorage(const llvm::Triple &triple);
 class UniversalLinkageInfo {
 public:
   bool IsELFObject;
+  bool IsMSVCEnvironment;
   bool UseDLLStorage;
   bool Internalize;
 

@@ -18,6 +18,8 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
+  DistributedAssertions.swift
+  DistributedDefaultExecutor.swift
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 

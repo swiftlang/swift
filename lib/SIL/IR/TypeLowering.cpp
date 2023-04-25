@@ -178,6 +178,8 @@ namespace {
   class TypeClassifierBase
     : public CanTypeVisitor<Impl, RetTy, AbstractionPattern, IsTypeExpansionSensitive_t>
   {
+    using super =
+      CanTypeVisitor<Impl, RetTy, AbstractionPattern, IsTypeExpansionSensitive_t>;
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
     TypeConverter &TC;
@@ -285,6 +287,15 @@ namespace {
                                            RecursiveProperties::forOpaque());
     }
 
+    RetTy visit(CanType substType, AbstractionPattern origType,
+                IsTypeExpansionSensitive_t isSensitive) {
+      if (auto origEltType = origType.getVanishingTupleElementPatternType()) {
+        return visit(substType, *origEltType, isSensitive);
+      }
+
+      return super::visit(substType, origType, isSensitive);
+    }
+
 #define IMPL(TYPE, LOWERING)                                                 \
     RetTy visit##TYPE##Type(Can##TYPE##Type type, AbstractionPattern orig,   \
                             IsTypeExpansionSensitive_t isSensitive) {        \
@@ -331,11 +342,13 @@ namespace {
     RetTy visitPackExpansionType(CanPackExpansionType type,
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
-                                               IsAddressOnly, IsNotResilient,
-                                               isSensitive,
-                                               DoesNotHaveRawPointer,
-                                               IsLexical});
+      RecursiveProperties props;
+      props.setAddressOnly();
+      props.addSubobject(classifyType(origType.getPackExpansionPatternType(),
+                                      type.getPatternType(),
+                                      TC, Expansion));
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      return asImpl().handleAddressOnly(type, props);
     }
 
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
@@ -359,6 +372,17 @@ namespace {
 
     RetTy visitBuiltinDefaultActorStorageType(
                                          CanBuiltinDefaultActorStorageType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
+    RetTy visitBuiltinNonDefaultDistributedActorStorageType(
+                                         CanBuiltinNonDefaultDistributedActorStorageType type,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
@@ -736,11 +760,12 @@ namespace {
     RetTy visitTupleType(CanTupleType type, AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties props;
-      for (unsigned i = 0, e = type->getNumElements(); i < e; ++i) {
-        props.addSubobject(classifyType(origType.getTupleElementType(i),
-                                        type.getElementType(i),
-                                        TC, Expansion));
-      }
+      origType.forEachExpandedTupleElement(type,
+          [&](AbstractionPattern origEltType, CanType substEltType,
+              const TupleTypeElt &elt) {
+        props.addSubobject(
+          classifyType(origEltType, substEltType, TC, Expansion));
+      });
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
       return asImpl().handleAggregateByProperties(type, props);
     }
@@ -2193,11 +2218,7 @@ namespace {
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
-      RecursiveProperties properties;
-      properties.setAddressOnly();
-      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
-
-      return handleAddressOnly(packType, properties);
+      llvm_unreachable("shouldn't get here with an unlowered type");
     }
 
     TypeLowering *visitSILPackType(CanSILPackType packType,
@@ -2205,6 +2226,12 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      for (auto i : indices(packType.getElementTypes())) {
+        auto &eltLowering =
+          TC.getTypeLowering(packType->getSILElementType(i),
+                             Expansion);
+        properties.addSubobject(eltLowering.getRecursiveProperties());
+      }
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAddressOnly(packType, properties);
@@ -2215,6 +2242,11 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      auto &patternLowering =
+        TC.getTypeLowering(origType.getPackExpansionPatternType(),
+                           packExpansionType.getPatternType(),
+                           Expansion);
+      properties.addSubobject(patternLowering.getRecursiveProperties());
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAddressOnly(packExpansionType, properties);
@@ -2230,12 +2262,12 @@ namespace {
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
-      for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
-        auto eltType = tupleType.getElementType(i);
-        auto origEltType = origType.getTupleElementType(i);
-        auto &lowering = TC.getTypeLowering(origEltType, eltType, Expansion);
-        properties.addSubobject(lowering.getRecursiveProperties());
-      }
+      origType.forEachExpandedTupleElement(tupleType,
+          [&](AbstractionPattern origEltType, CanType substEltType,
+              const TupleTypeElt &elt) {
+        properties.addSubobject(
+          classifyType(origEltType, substEltType, TC, Expansion));
+      });
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
@@ -2323,7 +2355,8 @@ namespace {
         auto sig = field->getDeclContext()->getGenericSignatureOfContext();
         auto interfaceTy = field->getInterfaceType()->getReducedType(sig);
         auto origFieldType = origType.unsafeGetSubstFieldType(field,
-                                                              interfaceTy);
+                                                              interfaceTy,
+                                                              subMap);
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
@@ -2402,7 +2435,8 @@ namespace {
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getArgumentInterfaceType()
-                                 ->getReducedType(D->getGenericSignature()));
+                                 ->getReducedType(D->getGenericSignature()),
+                              subMap);
         properties.addSubobject(classifyType(origEltType, substEltType,
                                              TC, Expansion));
         properties =
@@ -2514,24 +2548,21 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
                                             TypeExpansionContext context,
                                             AbstractionPattern origType,
                                             CanTupleType substType) {
-  assert(origType.matchesTuple(substType));
+  if (substType->getNumElements() == 0) return substType;
 
-  // Does the lowered tuple type differ from the substituted type in
-  // any interesting way?
   bool changed = false;
   SmallVector<TupleTypeElt, 4> loweredElts;
   loweredElts.reserve(substType->getNumElements());
 
-  for (auto i : indices(substType->getElementTypes())) {
-    auto origEltType = origType.getTupleElementType(i);
-    auto substEltType = substType.getElementType(i);
-
-    CanType loweredTy =
-        tc.getLoweredRValueType(context, origEltType, substEltType);
-    changed = (changed || substEltType != loweredTy);
-
-    loweredElts.push_back(substType->getElement(i).getWithType(loweredTy));
-  }
+  origType.forEachExpandedTupleElement(substType,
+                                       [&](AbstractionPattern origEltType,
+                                           CanType substEltType,
+                                           const TupleTypeElt &elt) {
+    auto loweredTy =
+      tc.getLoweredRValueType(context, origEltType, substEltType);
+    if (loweredTy != substEltType) changed = true;
+    loweredElts.push_back(elt.getWithType(loweredTy));
+  });
 
   if (!changed) return substType;
 
@@ -2681,31 +2712,32 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
 #ifndef NDEBUG
 bool TypeConverter::visitAggregateLeaves(
-    Lowering::AbstractionPattern origType, Type substType,
+    Lowering::AbstractionPattern origType, CanType substType,
     TypeExpansionContext context,
-    std::function<bool(Type, Lowering::AbstractionPattern, ValueDecl *,
+    std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
                        Optional<unsigned>)>
         isLeafAggregate,
-    std::function<bool(Type, Lowering::AbstractionPattern, ValueDecl *,
+    std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
                        Optional<unsigned>)>
         visit) {
-  llvm::SmallSet<std::tuple<TypeBase *, ValueDecl *, unsigned>, 16> visited;
+  llvm::SmallSet<std::tuple<CanType, ValueDecl *, unsigned>, 16> visited;
   llvm::SmallVector<
-      std::tuple<TypeBase *, AbstractionPattern, ValueDecl *, unsigned>, 16>
+      std::tuple<CanType, AbstractionPattern, ValueDecl *, unsigned>, 16>
       worklist;
   auto insertIntoWorklist = [&visited,
-                             &worklist](Type substTy, AbstractionPattern origTy,
+                             &worklist](CanType substTy,
+                                        AbstractionPattern origTy,
                                         ValueDecl *field,
                                         Optional<unsigned> maybeIndex) -> bool {
     unsigned index = maybeIndex.value_or(UINT_MAX);
-    if (!visited.insert({substTy.getPointer(), field, index}).second)
+    if (!visited.insert({substTy, field, index}).second)
       return false;
-    worklist.push_back({substTy.getPointer(), origTy, field, index});
+    worklist.push_back({substTy, origTy, field, index});
     return true;
   };
   auto popFromWorklist = [&worklist]()
-      -> std::tuple<Type, AbstractionPattern, ValueDecl *, Optional<unsigned>> {
-    TypeBase *ty;
+      -> std::tuple<CanType, AbstractionPattern, ValueDecl *, Optional<unsigned>> {
+    CanType ty;
     AbstractionPattern origTy = AbstractionPattern::getOpaque();
     ValueDecl *field;
     unsigned index;
@@ -2713,32 +2745,49 @@ bool TypeConverter::visitAggregateLeaves(
     Optional<unsigned> maybeIndex;
     if (index != UINT_MAX)
       maybeIndex = {index};
-    return {ty->getCanonicalType(), origTy, field, index};
+    return {ty, origTy, field, maybeIndex};
   };
-  auto isAggregate = [](Type ty) {
-    return ty->is<TupleType>() || ty->getEnumOrBoundGenericEnum() ||
-           ty->getStructOrBoundGenericStruct();
+  auto isAggregate = [](CanType ty) {
+    return isa<SILPackType>(ty) ||
+           isa<TupleType>(ty) ||
+           isa<PackExpansionType>(ty) ||
+           ty.getEnumOrBoundGenericEnum() ||
+           ty.getStructOrBoundGenericStruct();
   };
   insertIntoWorklist(substType, origType, nullptr, llvm::None);
   while (!worklist.empty()) {
-    Type ty;
+    CanType ty;
     AbstractionPattern origTy = AbstractionPattern::getOpaque();
     ValueDecl *field;
     Optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
+    assert(!field || !index && "both field and index!?");
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
-      if (auto tupleTy = ty->getAs<TupleType>()) {
-        for (unsigned tupleIndex = 0, num = tupleTy->getNumElements();
-             tupleIndex < num; ++tupleIndex) {
-          auto origElementTy = origTy.getTupleElementType(tupleIndex);
-          auto substElementTy =
-              tupleTy->getElementType(tupleIndex)->getCanonicalType();
+      if (auto packTy = dyn_cast<SILPackType>(ty)) {
+        for (auto packIndex : indices(packTy->getElementTypes())) {
+          auto origElementTy = origTy.getPackElementType(packIndex);
+          auto substElementTy = packTy.getElementType(packIndex);
           substElementTy =
               computeLoweredRValueType(context, origElementTy, substElementTy);
           insertIntoWorklist(substElementTy, origElementTy, nullptr,
-                             tupleIndex);
+                             packIndex);
         }
-      } else if (auto *decl = ty->getStructOrBoundGenericStruct()) {
+      } else if (auto tupleTy = dyn_cast<TupleType>(ty)) {
+        unsigned tupleIndex = 0;
+        origTy.forEachExpandedTupleElement(
+            tupleTy,
+            [&](auto origElementTy, auto substElementTy, auto element) {
+              substElementTy =
+                  substOpaqueTypesWithUnderlyingTypes(substElementTy, context);
+              insertIntoWorklist(substElementTy, origElementTy, nullptr,
+                                 tupleIndex);
+              ++tupleIndex;
+            });
+      } else if (auto expansion = dyn_cast<PackExpansionType>(ty)) {
+        insertIntoWorklist(expansion.getPatternType(),
+                           origTy.getPackExpansionPatternType(),
+                           field, index);
+      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap(&M, decl);
           auto substFieldTy =
@@ -2748,11 +2797,12 @@ bool TypeConverter::visitAggregateLeaves(
           auto interfaceTy =
               structField->getInterfaceType()->getReducedType(sig);
           auto origFieldType =
-              origTy.unsafeGetSubstFieldType(structField, interfaceTy);
+              origTy.unsafeGetSubstFieldType(structField, interfaceTy,
+                                             subMap);
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              llvm::None);
         }
-      } else if (auto *decl = ty->getEnumOrBoundGenericEnum()) {
+      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
         auto subMap = ty->getContextSubstitutionMap(&M, decl);
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
@@ -2765,7 +2815,7 @@ bool TypeConverter::visitAggregateLeaves(
                                       ->getCanonicalType();
           auto origElementTy = origTy.unsafeGetSubstFieldType(
               element, element->getArgumentInterfaceType()->getReducedType(
-                           decl->getGenericSignature()));
+                           decl->getGenericSignature()), subMap);
 
           insertIntoWorklist(substElementType, origElementTy, element,
                              llvm::None);
@@ -2785,16 +2835,17 @@ bool TypeConverter::visitAggregateLeaves(
 }
 
 void TypeConverter::verifyLowering(const TypeLowering &lowering,
-                                   AbstractionPattern origType, Type substType,
+                                   AbstractionPattern origType,
+                                   CanType substType,
                                    TypeExpansionContext forExpansion) {
   // Non-trivial lowerings should always be lexical unless all non-trivial
   // fields are eager move.
   if (!lowering.isTrivial() && !lowering.isLexical()) {
     if (lowering.getRecursiveProperties().isInfinite())
       return;
-    auto getLifetimeAnnotation = [](Type ty) -> LifetimeAnnotation {
+    auto getLifetimeAnnotation = [](CanType ty) -> LifetimeAnnotation {
       NominalTypeDecl *nominal;
-      if (!(nominal = ty->getAnyNominal()))
+      if (!(nominal = ty.getAnyNominal()))
         return LifetimeAnnotation::None;
       return nominal->getLifetimeAnnotation();
     };
@@ -2805,9 +2856,9 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
           // The field's type is an aggregate.  Treat it as a leaf if it
           // has a lifetime annotation.
 
-          // If it's a field of a tuple or the top-level type, there's no value
-          // decl on which to look for an attribute.  It's a leaf iff the type
-          // has a lifetime annotation.
+          // If it's a field of a tuple, pack or the top-level type, there's no
+          // value decl on which to look for an attribute.  It's a leaf iff the
+          // type has a lifetime annotation.
           if (index || !field)
             return getLifetimeAnnotation(ty).isSome();
 
@@ -2823,7 +2874,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
 
           // If the leaf is the whole type, verify that it is annotated
           // @_eagerMove.
-          if (ty->getCanonicalType() == substType->getCanonicalType())
+          if (ty == substType)
             return getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
 
           auto &tyLowering = getTypeLowering(origTy, ty, forExpansion);
@@ -2869,7 +2920,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     LoweredRValueTypeVisitor(TypeConverter &TC,
                              TypeExpansionContext forExpansion,
                              AbstractionPattern origType)
-        : TC(TC), forExpansion(forExpansion), origType(origType) {}
+        : TC(TC), forExpansion(forExpansion), origType(origType) {
+      if (auto origEltType = origType.getVanishingTupleElementPatternType())
+        origType = *origEltType;
+    }
 
     // AST function types are turned into SIL function types:
     //   - the type is uncurried as desired
@@ -2994,12 +3048,8 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
           substPatternType);
       changed |= (loweredSubstPatternType != substPatternType);
 
-      CanType substCountType = substPackExpansionType.getCountType();
-      CanType loweredSubstCountType = TC.getLoweredRValueType(
-          forExpansion,
-          origType.getPackExpansionCountType(),
-          substCountType);
-      changed |= (loweredSubstCountType != substCountType);
+      // Count types are AST types and are not lowered.
+      CanType loweredSubstCountType = substPackExpansionType.getCountType();
 
       if (!changed)
         return substPackExpansionType;
@@ -3314,7 +3364,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
-      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+      ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},

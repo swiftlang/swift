@@ -1244,6 +1244,9 @@ public:
       case GenericRequirementKind::Layout:
         return TypeLookupError(
             "Unexpected layout requirement in runtime generic signature");
+      case GenericRequirementKind::SameShape:
+        return TypeLookupError(
+            "Unexpected same-shape requirement in runtime generic signature");
       }
     }
 
@@ -2771,6 +2774,9 @@ private:
             }
             break;
           }
+
+          case GenericRequirementKind::SameShape:
+            llvm_unreachable("Implement me");
           }
         }
 
@@ -3020,11 +3026,6 @@ private:
     for (auto param : generics->getGenericParams()) {
       switch (param.getKind()) {
       case GenericParamKind::Type:
-        // We don't know about type parameters with extra arguments.
-        if (param.hasExtraArgument()) {
-          return {};
-        }
-        
         // The type should have a key argument unless it's been same-typed
         // to another type.
         if (param.hasKeyArgument()) {
@@ -3051,6 +3052,9 @@ private:
         }
         break;
         
+      case GenericParamKind::TypePack:
+        assert(false && "Packs not supported here yet");
+
       default:
         // We don't know about this kind of parameter.
         return {};

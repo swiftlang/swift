@@ -13,7 +13,6 @@ cmake -G Ninja \
   -DCMAKE_BUILD_TYPE="Release" \
   -DCMAKE_SYSROOT="$WASI_SYSROOT_PATH" \
   -DCMAKE_Swift_COMPILER="$DESTINATION_TOOLCHAIN/usr/bin/swiftc" \
-  -DCMAKE_STAGING_PREFIX="$DESTINATION_TOOLCHAIN/usr" \
   -DCMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/toolchain-wasi.cmake" \
   -DLLVM_BIN="$DESTINATION_TOOLCHAIN/usr/bin" \
   -DBUILD_SHARED_LIBS=OFF \
@@ -22,4 +21,4 @@ cmake -G Ninja \
   "${SOURCE_PATH}/swift-corelibs-xctest"
   
 ninja -v
-ninja -v install
+DESTDIR="$DESTINATION_TOOLCHAIN/usr/lib" ninja -v install

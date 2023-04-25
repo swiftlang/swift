@@ -25,12 +25,22 @@ public protocol CxxConvertibleToCollection<Element> {
 
 extension CxxConvertibleToCollection {
   @inlinable
-  internal func forEach(_ body: (RawIterator.Pointee) -> Void) {
+  public func forEach(_ body: (RawIterator.Pointee) throws -> Void) rethrows {
     var rawIterator = __beginUnsafe()
     let endIterator = __endUnsafe()
     while rawIterator != endIterator {
-      body(rawIterator.pointee)
+      try body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
+    }
+  }
+}
+
+// Break the ambiguity between Sequence.forEach and CxxConvertibleToCollection.forEach.
+extension CxxConvertibleToCollection where Self: Sequence {
+  @inlinable
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
+    for element in self {
+      try body(element)
     }
   }
 }
@@ -45,6 +55,7 @@ extension RangeReplaceableCollection {
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
+  @inlinable
   public init<C: CxxConvertibleToCollection>(_ elements: C)
     where C.RawIterator.Pointee == Element {
 
@@ -62,6 +73,7 @@ extension SetAlgebra {
   ///   container when each element is copied in O(1). Note that this might not
   ///   be true for certain C++ types, e.g. those with a custom copy
   ///   constructor that performs additional logic.
+  @inlinable
   public init<C: CxxConvertibleToCollection>(_ elements: C)
     where C.RawIterator.Pointee == Element {
 

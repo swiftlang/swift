@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,7 +25,7 @@ public protocol Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  func encode(to encoder: Encoder) throws
+  func encode(to encoder: any Encoder) throws
 }
 
 /// A type that can decode itself from an external representation.
@@ -36,7 +36,7 @@ public protocol Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  init(from decoder: Decoder) throws
+  init(from decoder: any Decoder) throws
 }
 
 /// A type that can convert itself into and out of an external representation.
@@ -99,7 +99,7 @@ extension CodingKey {
 /// representation.
 public protocol Encoder {
   /// The path of coding keys taken to get to this point in encoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// Any contextual information set by the user for encoding.
   var userInfo: [CodingUserInfoKey: Any] { get }
@@ -123,7 +123,7 @@ public protocol Encoder {
   /// encoding a value through a call to `singleValueContainer()`
   ///
   /// - returns: A new empty unkeyed container.
-  func unkeyedContainer() -> UnkeyedEncodingContainer
+  func unkeyedContainer() -> any UnkeyedEncodingContainer
 
   /// Returns an encoding container appropriate for holding a single primitive
   /// value.
@@ -134,14 +134,14 @@ public protocol Encoder {
   /// `singleValueContainer()`
   ///
   /// - returns: A new empty single value container.
-  func singleValueContainer() -> SingleValueEncodingContainer
+  func singleValueContainer() -> any SingleValueEncodingContainer
 }
 
 /// A type that can decode values from a native format into in-memory
 /// representations.
 public protocol Decoder {
   /// The path of coding keys taken to get to this point in decoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// Any contextual information set by the user for decoding.
   var userInfo: [CodingUserInfoKey: Any] { get }
@@ -163,7 +163,7 @@ public protocol Decoder {
   /// - returns: An unkeyed container view into this decoder.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not an unkeyed container.
-  func unkeyedContainer() throws -> UnkeyedDecodingContainer
+  func unkeyedContainer() throws -> any UnkeyedDecodingContainer
 
   /// Returns the data stored in this decoder as represented in a container
   /// appropriate for holding a single primitive value.
@@ -171,7 +171,7 @@ public protocol Decoder {
   /// - returns: A single value container view into this decoder.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not a single value container.
-  func singleValueContainer() throws -> SingleValueDecodingContainer
+  func singleValueContainer() throws -> any SingleValueDecodingContainer
 }
 
 //===----------------------------------------------------------------------===//
@@ -187,7 +187,7 @@ public protocol KeyedEncodingContainerProtocol {
   associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in encoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// Encodes a null value for the given key.
   ///
@@ -470,7 +470,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - returns: A new unkeyed encoding container.
   mutating func nestedUnkeyedContainer(
     forKey key: Key
-  ) -> UnkeyedEncodingContainer
+  ) -> any UnkeyedEncodingContainer
 
   /// Stores a new nested container for the default `super` key and returns a
   /// new encoder instance for encoding `super` into that container.
@@ -479,14 +479,14 @@ public protocol KeyedEncodingContainerProtocol {
   /// `Key(stringValue: "super", intValue: 0)`.
   ///
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  mutating func superEncoder() -> Encoder
+  mutating func superEncoder() -> any Encoder
 
   /// Stores a new nested container for the given key and returns a new encoder
   /// instance for encoding `super` into that container.
   ///
   /// - parameter key: The key to encode `super` for.
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  mutating func superEncoder(forKey key: Key) -> Encoder
+  mutating func superEncoder(forKey key: Key) -> any Encoder
 }
 
 // An implementation of _KeyedEncodingContainerBase and
@@ -512,7 +512,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   }
 
   /// The path of coding keys taken to get to this point in encoding.
-  public var codingPath: [CodingKey] {
+  public var codingPath: [any CodingKey] {
     return _box.codingPath
   }
 
@@ -908,7 +908,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   /// - returns: A new unkeyed encoding container.
   public mutating func nestedUnkeyedContainer(
     forKey key: Key
-  ) -> UnkeyedEncodingContainer {
+  ) -> any UnkeyedEncodingContainer {
     return _box.nestedUnkeyedContainer(forKey: key)
   }
 
@@ -919,7 +919,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   /// `Key(stringValue: "super", intValue: 0)`.
   ///
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  public mutating func superEncoder() -> Encoder {
+  public mutating func superEncoder() -> any Encoder {
     return _box.superEncoder()
   }
 
@@ -928,7 +928,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   ///
   /// - parameter key: The key to encode `super` for.
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  public mutating func superEncoder(forKey key: Key) -> Encoder {
+  public mutating func superEncoder(forKey key: Key) -> any Encoder {
     return _box.superEncoder(forKey: key)
   }
 }
@@ -942,7 +942,7 @@ public protocol KeyedDecodingContainerProtocol {
   associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in decoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// All the keys the `Decoder` has for this container.
   ///
@@ -1430,7 +1430,7 @@ public protocol KeyedDecodingContainerProtocol {
   ///   not an unkeyed container.
   func nestedUnkeyedContainer(
     forKey key: Key
-  ) throws -> UnkeyedDecodingContainer
+  ) throws -> any UnkeyedDecodingContainer
 
   /// Returns a `Decoder` instance for decoding `super` from the container
   /// associated with the default `super` key.
@@ -1443,7 +1443,7 @@ public protocol KeyedDecodingContainerProtocol {
   ///   for the default `super` key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the default `super` key.
-  func superDecoder() throws -> Decoder
+  func superDecoder() throws -> any Decoder
 
   /// Returns a `Decoder` instance for decoding `super` from the container
   /// associated with the given key.
@@ -1454,7 +1454,7 @@ public protocol KeyedDecodingContainerProtocol {
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  func superDecoder(forKey key: Key) throws -> Decoder
+  func superDecoder(forKey key: Key) throws -> any Decoder
 }
 
 // An implementation of _KeyedDecodingContainerBase and
@@ -1480,7 +1480,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   }
 
   /// The path of coding keys taken to get to this point in decoding.
-  public var codingPath: [CodingKey] {
+  public var codingPath: [any CodingKey] {
     return _box.codingPath
   }
 
@@ -2083,7 +2083,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   ///   not an unkeyed container.
   public func nestedUnkeyedContainer(
     forKey key: Key
-  ) throws -> UnkeyedDecodingContainer {
+  ) throws -> any UnkeyedDecodingContainer {
     return try _box.nestedUnkeyedContainer(forKey: key)
   }
 
@@ -2097,7 +2097,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   ///   for the default `super` key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the default `super` key.
-  public func superDecoder() throws -> Decoder {
+  public func superDecoder() throws -> any Decoder {
     return try _box.superDecoder()
   }
 
@@ -2110,7 +2110,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  public func superDecoder(forKey key: Key) throws -> Decoder {
+  public func superDecoder(forKey key: Key) throws -> any Decoder {
     return try _box.superDecoder(forKey: key)
   }
 }
@@ -2126,7 +2126,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
 /// their format.
 public protocol UnkeyedEncodingContainer {
   /// The path of coding keys taken to get to this point in encoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// The number of elements encoded into the container.
   var count: Int { get }
@@ -2387,13 +2387,13 @@ public protocol UnkeyedEncodingContainer {
   /// Encodes an unkeyed encoding container and returns it.
   ///
   /// - returns: A new unkeyed encoding container.
-  mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer
+  mutating func nestedUnkeyedContainer() -> any UnkeyedEncodingContainer
 
   /// Encodes a nested container and returns an `Encoder` instance for encoding
   /// `super` into that container.
   ///
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  mutating func superEncoder() -> Encoder
+  mutating func superEncoder() -> any Encoder
 }
 
 /// A type that provides a view into a decoder's storage and is used to hold
@@ -2403,7 +2403,7 @@ public protocol UnkeyedEncodingContainer {
 /// their format.
 public protocol UnkeyedDecodingContainer {
   /// The path of coding keys taken to get to this point in decoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// The number of elements contained within this container.
   ///
@@ -2802,7 +2802,7 @@ public protocol UnkeyedDecodingContainer {
   /// - returns: An unkeyed decoding container view into `self`.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not an unkeyed container.
-  mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer
+  mutating func nestedUnkeyedContainer() throws -> any UnkeyedDecodingContainer
 
   /// Decodes a nested container and returns a `Decoder` instance for decoding
   /// `super` from that container.
@@ -2810,7 +2810,7 @@ public protocol UnkeyedDecodingContainer {
   /// - returns: A new `Decoder` to pass to `super.init(from:)`.
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null, or of there are no more values to decode.
-  mutating func superDecoder() throws -> Decoder
+  mutating func superDecoder() throws -> any Decoder
 }
 
 //===----------------------------------------------------------------------===//
@@ -2821,7 +2821,7 @@ public protocol UnkeyedDecodingContainer {
 /// non-keyed value.
 public protocol SingleValueEncodingContainer {
   /// The path of coding keys taken to get to this point in encoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// Encodes a null value.
   ///
@@ -2971,7 +2971,7 @@ public protocol SingleValueEncodingContainer {
 /// nonkeyed value.
 public protocol SingleValueDecodingContainer {
   /// The path of coding keys taken to get to this point in encoding.
-  var codingPath: [CodingKey] { get }
+  var codingPath: [any CodingKey] { get }
 
   /// Decodes a null value.
   ///
@@ -3183,7 +3183,7 @@ public enum EncodingError: Error {
   public struct Context: Sendable {
     /// The path of coding keys taken to get to the point of the failing encode
     /// call.
-    public let codingPath: [CodingKey]
+    public let codingPath: [any CodingKey]
 
     /// A description of what went wrong, for debugging purposes.
     public let debugDescription: String
@@ -3201,7 +3201,7 @@ public enum EncodingError: Error {
     /// - parameter underlyingError: The underlying error which caused this
     ///   error, if any.
     public init(
-      codingPath: [CodingKey],
+      codingPath: [any CodingKey],
       debugDescription: String,
       underlyingError: Error? = nil
     ) {
@@ -3266,7 +3266,7 @@ public enum DecodingError: Error {
   public struct Context: Sendable {
     /// The path of coding keys taken to get to the point of the failing decode
     /// call.
-    public let codingPath: [CodingKey]
+    public let codingPath: [any CodingKey]
 
     /// A description of what went wrong, for debugging purposes.
     public let debugDescription: String
@@ -3284,7 +3284,7 @@ public enum DecodingError: Error {
     /// - parameter underlyingError: The underlying error which caused this
     ///   error, if any.
     public init(
-      codingPath: [CodingKey],
+      codingPath: [any CodingKey],
       debugDescription: String,
       underlyingError: Error? = nil
     ) {
@@ -3313,7 +3313,7 @@ public enum DecodingError: Error {
   ///
   /// As associated values, this case contains the attempted key and context
   /// for debugging.
-  case keyNotFound(CodingKey, Context)
+  case keyNotFound(any CodingKey, Context)
 
   /// An indication that the data is corrupted or otherwise invalid.
   ///
@@ -3418,7 +3418,7 @@ extension DecodingError {
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError(
-    in container: UnkeyedDecodingContainer,
+    in container: any UnkeyedDecodingContainer,
     debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(
@@ -3440,7 +3440,7 @@ extension DecodingError {
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError(
-    in container: SingleValueDecodingContainer,
+    in container: any SingleValueDecodingContainer,
     debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(codingPath: container.codingPath,
@@ -4498,7 +4498,7 @@ extension Bool: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Bool.self)
   }
 
@@ -4508,13 +4508,13 @@ extension Bool: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Bool, Self: Encodable {
+extension RawRepresentable<Bool> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Bool`.
   ///
@@ -4522,13 +4522,13 @@ extension RawRepresentable where RawValue == Bool, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Bool, Self: Decodable {
+extension RawRepresentable<Bool> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Bool`.
   ///
@@ -4536,7 +4536,7 @@ extension RawRepresentable where RawValue == Bool, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4558,7 +4558,7 @@ extension String: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(String.self)
   }
 
@@ -4568,13 +4568,13 @@ extension String: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == String, Self: Encodable {
+extension RawRepresentable<String> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `String`.
   ///
@@ -4582,13 +4582,13 @@ extension RawRepresentable where RawValue == String, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == String, Self: Decodable {
+extension RawRepresentable<String> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `String`.
   ///
@@ -4596,7 +4596,7 @@ extension RawRepresentable where RawValue == String, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4618,7 +4618,7 @@ extension Double: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Double.self)
   }
 
@@ -4628,13 +4628,13 @@ extension Double: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Double, Self: Encodable {
+extension RawRepresentable<Double> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Double`.
   ///
@@ -4642,13 +4642,13 @@ extension RawRepresentable where RawValue == Double, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Double, Self: Decodable {
+extension RawRepresentable<Double> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Double`.
   ///
@@ -4656,7 +4656,7 @@ extension RawRepresentable where RawValue == Double, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4678,7 +4678,7 @@ extension Float: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Float.self)
   }
 
@@ -4688,13 +4688,13 @@ extension Float: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Float, Self: Encodable {
+extension RawRepresentable<Float> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Float`.
   ///
@@ -4702,13 +4702,13 @@ extension RawRepresentable where RawValue == Float, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Float, Self: Decodable {
+extension RawRepresentable<Float> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Float`.
   ///
@@ -4716,7 +4716,7 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4740,7 +4740,7 @@ extension Float16: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let floatValue = try Float(from: decoder)
     self = Float16(floatValue)
     if isInfinite && floatValue.isFinite {
@@ -4759,7 +4759,7 @@ extension Float16: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     try Float(self).encode(to: encoder)
   }
 }
@@ -4772,7 +4772,7 @@ extension Int: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int.self)
   }
 
@@ -4782,13 +4782,13 @@ extension Int: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Int, Self: Encodable {
+extension RawRepresentable<Int> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Int`.
   ///
@@ -4796,13 +4796,13 @@ extension RawRepresentable where RawValue == Int, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Int, Self: Decodable {
+extension RawRepresentable<Int> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Int`.
   ///
@@ -4810,7 +4810,7 @@ extension RawRepresentable where RawValue == Int, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4832,7 +4832,7 @@ extension Int8: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int8.self)
   }
 
@@ -4842,13 +4842,13 @@ extension Int8: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Int8, Self: Encodable {
+extension RawRepresentable<Int8> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Int8`.
   ///
@@ -4856,13 +4856,13 @@ extension RawRepresentable where RawValue == Int8, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Int8, Self: Decodable {
+extension RawRepresentable<Int8> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Int8`.
   ///
@@ -4870,7 +4870,7 @@ extension RawRepresentable where RawValue == Int8, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4892,7 +4892,7 @@ extension Int16: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int16.self)
   }
 
@@ -4902,13 +4902,13 @@ extension Int16: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Int16, Self: Encodable {
+extension RawRepresentable<Int16> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Int16`.
   ///
@@ -4916,13 +4916,13 @@ extension RawRepresentable where RawValue == Int16, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Int16, Self: Decodable {
+extension RawRepresentable<Int16> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Int16`.
   ///
@@ -4930,7 +4930,7 @@ extension RawRepresentable where RawValue == Int16, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -4952,7 +4952,7 @@ extension Int32: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int32.self)
   }
 
@@ -4962,13 +4962,13 @@ extension Int32: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Int32, Self: Encodable {
+extension RawRepresentable<Int32> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Int32`.
   ///
@@ -4976,13 +4976,13 @@ extension RawRepresentable where RawValue == Int32, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Int32, Self: Decodable {
+extension RawRepresentable<Int32> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Int32`.
   ///
@@ -4990,7 +4990,7 @@ extension RawRepresentable where RawValue == Int32, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5012,7 +5012,7 @@ extension Int64: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int64.self)
   }
 
@@ -5022,13 +5022,13 @@ extension Int64: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == Int64, Self: Encodable {
+extension RawRepresentable<Int64> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `Int64`.
   ///
@@ -5036,13 +5036,13 @@ extension RawRepresentable where RawValue == Int64, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == Int64, Self: Decodable {
+extension RawRepresentable<Int64> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `Int64`.
   ///
@@ -5050,7 +5050,7 @@ extension RawRepresentable where RawValue == Int64, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5072,7 +5072,7 @@ extension UInt: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt.self)
   }
 
@@ -5082,13 +5082,13 @@ extension UInt: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == UInt, Self: Encodable {
+extension RawRepresentable<UInt> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `UInt`.
   ///
@@ -5096,13 +5096,13 @@ extension RawRepresentable where RawValue == UInt, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == UInt, Self: Decodable {
+extension RawRepresentable<UInt> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `UInt`.
   ///
@@ -5110,7 +5110,7 @@ extension RawRepresentable where RawValue == UInt, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5132,7 +5132,7 @@ extension UInt8: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt8.self)
   }
 
@@ -5142,13 +5142,13 @@ extension UInt8: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == UInt8, Self: Encodable {
+extension RawRepresentable<UInt8> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `UInt8`.
   ///
@@ -5156,13 +5156,13 @@ extension RawRepresentable where RawValue == UInt8, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == UInt8, Self: Decodable {
+extension RawRepresentable<UInt8> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `UInt8`.
   ///
@@ -5170,7 +5170,7 @@ extension RawRepresentable where RawValue == UInt8, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5192,7 +5192,7 @@ extension UInt16: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt16.self)
   }
 
@@ -5202,13 +5202,13 @@ extension UInt16: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == UInt16, Self: Encodable {
+extension RawRepresentable<UInt16> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `UInt16`.
   ///
@@ -5216,13 +5216,13 @@ extension RawRepresentable where RawValue == UInt16, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == UInt16, Self: Decodable {
+extension RawRepresentable<UInt16> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `UInt16`.
   ///
@@ -5230,7 +5230,7 @@ extension RawRepresentable where RawValue == UInt16, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5252,7 +5252,7 @@ extension UInt32: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt32.self)
   }
 
@@ -5262,13 +5262,13 @@ extension UInt32: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == UInt32, Self: Encodable {
+extension RawRepresentable<UInt32> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `UInt32`.
   ///
@@ -5276,13 +5276,13 @@ extension RawRepresentable where RawValue == UInt32, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == UInt32, Self: Decodable {
+extension RawRepresentable<UInt32> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `UInt32`.
   ///
@@ -5290,7 +5290,7 @@ extension RawRepresentable where RawValue == UInt32, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5312,7 +5312,7 @@ extension UInt64: Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt64.self)
   }
 
@@ -5322,13 +5322,13 @@ extension UInt64: Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
   }
 }
 
-extension RawRepresentable where RawValue == UInt64, Self: Encodable {
+extension RawRepresentable<UInt64> where Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `UInt64`.
   ///
@@ -5336,13 +5336,13 @@ extension RawRepresentable where RawValue == UInt64, Self: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
 }
 
-extension RawRepresentable where RawValue == UInt64, Self: Decodable {
+extension RawRepresentable<UInt64> where Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `UInt64`.
   ///
@@ -5350,7 +5350,7 @@ extension RawRepresentable where RawValue == UInt64, Self: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
       throw DecodingError.dataCorrupted(
@@ -5376,7 +5376,7 @@ extension Optional: Encodable where Wrapped: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.singleValueContainer()
     switch self {
     case .none: try container.encodeNil()
@@ -5392,7 +5392,7 @@ extension Optional: Decodable where Wrapped: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let container = try decoder.singleValueContainer()
     if container.decodeNil() {
       self = .none
@@ -5411,7 +5411,7 @@ extension Array: Encodable where Element: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.unkeyedContainer()
     for element in self {
       try container.encode(element)
@@ -5426,7 +5426,7 @@ extension Array: Decodable where Element: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self.init()
 
     var container = try decoder.unkeyedContainer()
@@ -5445,7 +5445,7 @@ extension ContiguousArray: Encodable where Element: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.unkeyedContainer()
     for element in self {
       try container.encode(element)
@@ -5460,7 +5460,7 @@ extension ContiguousArray: Decodable where Element: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self.init()
 
     var container = try decoder.unkeyedContainer()
@@ -5479,7 +5479,7 @@ extension Set: Encodable where Element: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     var container = encoder.unkeyedContainer()
     for element in self {
       try container.encode(element)
@@ -5494,7 +5494,7 @@ extension Set: Decodable where Element: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self.init()
 
     var container = try decoder.unkeyedContainer()
@@ -5520,7 +5520,7 @@ internal struct _DictionaryCodingKey: CodingKey {
     self.intValue = intValue
   }
 
-  fileprivate init(codingKey: CodingKey) {
+  fileprivate init(codingKey: any CodingKey) {
     self.stringValue = codingKey.stringValue
     self.intValue = codingKey.intValue
   }
@@ -5612,7 +5612,7 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  public func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: any Encoder) throws {
     if Key.self == String.self {
       // Since the keys are already Strings, we can use them as keys directly.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
@@ -5657,7 +5657,7 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self.init()
 
     if Key.self == String.self {

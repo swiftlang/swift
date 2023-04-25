@@ -74,7 +74,7 @@ DIST_TOOLCHAIN_SDK=$DIST_TOOLCHAIN_DESTDIR/$TOOLCHAIN_NAME
 
 HOST_BUILD_ROOT=$SOURCE_PATH/host-build
 TARGET_BUILD_ROOT=$SOURCE_PATH/target-build
-HOST_BUILD_DIR=$HOST_BUILD_ROOT/Ninja-Release
+HOST_BUILD_DIR=$HOST_BUILD_ROOT/Ninja-ReleaseAssert
 
 build_host_toolchain() {
   # Build the host toolchain and SDK first.

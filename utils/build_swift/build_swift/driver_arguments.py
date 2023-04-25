@@ -452,6 +452,12 @@ def create_argument_parser():
            help='enable sanitizer coverage for swift tools. Necessary for '
                 'fuzzing swiftc')
 
+    option('--swift-enable-backtracing', toggle_true,
+           default=True,
+           help='enable backtracing support')
+    option('--swift-runtime-fixed-backtracer-path', store,
+           help='if set, provide a fixed path for the Swift backtracer')
+
     option('--compiler-vendor', store,
            choices=['none', 'apple', 'swiftwasm'],
            default=defaults.COMPILER_VENDOR,
@@ -710,8 +716,17 @@ def create_argument_parser():
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
            toggle_true('swiftsyntax_verify_generated_files'),
-           help='set to verify that the generated files in the source tree '
+           help='set to verify that the generated files in the source tree ' +
                 'match the ones that would be generated from current main')
+    option('--swiftsyntax-enable-test-fuzzing',
+           toggle_true('swiftsyntax_enable_test_fuzzing'),
+           help='set to modify test cases in SwiftParserTest to check for ' +
+                'round-trip failures and assertion failures')
+    option('--swiftsyntax-enable-rawsyntax-validation',
+           toggle_true('swiftsyntax_enable_rawsyntax_validation'),
+           help='set to validate that RawSyntax layout nodes contain children of ' +
+                'the expected types and that RawSyntax tokens have the expected ' +
+                'token kinds')
     option('--swiftsyntax-lint',
            toggle_true('swiftsyntax_lint'),
            help='verify that swift-syntax Source code is formatted correctly')
@@ -735,6 +750,9 @@ def create_argument_parser():
            toggle_true('build_swift_inspect'),
            help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
+    option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
+           help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1073,6 +1091,14 @@ def create_argument_parser():
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-swift-remote-mirror', toggle_true,
+           default=True,
+           help='Build Remote Mirror')
+
+    option('--build-swift-libexec', toggle_true,
+           default=True,
+           help='build auxiliary executables')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
@@ -1307,9 +1333,9 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift string processing.')
 
-    option('--enable-experimental-reflection', toggle_true,
+    option('--enable-experimental-observation', toggle_true,
            default=True,
-           help='Enable experimental Swift reflection.')
+           help='Enable experimental Swift observation.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

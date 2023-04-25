@@ -122,6 +122,12 @@ inline bool isForwardingConsume(SILValue value) {
 
 bool hasPointerEscape(BorrowedValue value);
 
+/// Whether the specified OSSA-lifetime introducer has a pointer escape.
+///
+/// precondition: \p value introduces an OSSA-lifetime, either a BorrowedValue
+/// can be constructed from it or it's an owned value
+bool hasPointerEscape(SILValue value);
+
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
 /// requirement. Return true if no PointerEscape use was found.
 ///
@@ -468,6 +474,9 @@ struct BorrowingOperand {
   /// If this operand's user has a single borrowed value result return a
   /// valid BorrowedValue instance.
   BorrowedValue getBorrowIntroducingUserResult();
+
+  /// Return the borrowing operand's value.
+  SILValue getScopeIntroducingUserResult();
 
   /// Compute the implicit uses that this borrowing operand "injects" into the
   /// set of its operands uses.
@@ -1340,6 +1349,21 @@ void visitTransitiveEndBorrows(
 /// - the value is a guaranteed argument to the function
 /// - the value is itself a begin_borrow [lexical]
 bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
+
+/// Whether specified move_value is redundant.
+///
+/// A move_value is redundant if it doesn't
+/// - alter constraints (lexicality, ownership)
+/// - enable optimizations (e.g, separate smaller scopes within which a value
+///   escapes)
+///
+/// For example, if the lifetimes that a move_value separates both have the
+/// same characteristics with respect to
+/// - ownership
+/// - lexicality
+/// - escaping
+/// then the move_value is redundant.
+bool isRedundantMoveValue(MoveValueInst *mvi);
 
 } // namespace swift
 

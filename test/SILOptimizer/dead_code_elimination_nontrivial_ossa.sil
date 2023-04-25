@@ -1022,11 +1022,11 @@ bb0(%0 : $@sil_unmanaged AnyObject):
 
 sil @foo : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [ossa] @test_escape : {{.*}} {
+// CHECK-LABEL: sil [ossa] @test_escape1 : {{.*}} {
 // CHECK: br bb1
 // CHECK: end_borrow
-// CHECK-LABEL: } // end sil function 'test_escape'
-sil [ossa] @test_escape : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function 'test_escape1'
+sil [ossa] @test_escape1 : $@convention(thin) () -> () {
 bb0:
   %13 = function_ref @foo : $@convention(thin) () -> ()
   %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
@@ -1039,6 +1039,27 @@ bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@cal
   %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
   destroy_value %21 : $@noescape @callee_guaranteed () -> ()
   end_borrow %22 : $@callee_guaranteed () -> ()
+  destroy_value %23 : $@callee_guaranteed () -> ()
+  %28 = tuple ()
+  return %28: $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_escape2 : {{.*}} {
+// CHECK: br bb1
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'test_escape2'
+sil [ossa] @test_escape2 : $@convention(thin) () -> () {
+bb0:
+  %13 = function_ref @foo : $@convention(thin) () -> ()
+  %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
+  %15 = convert_escape_to_noescape %14 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %18 = mark_dependence %15 : $@noescape @callee_guaranteed () -> () on %14 : $@callee_guaranteed () -> ()
+  br bb1(%18 : $@noescape @callee_guaranteed () -> (), %14 : $@callee_guaranteed () -> ())
+
+bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
+  %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %21 : $@noescape @callee_guaranteed () -> ()
   destroy_value %23 : $@callee_guaranteed () -> ()
   %28 = tuple ()
   return %28: $()
@@ -1148,5 +1169,30 @@ bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
   destroy_addr %0 : $*Wrapper1
   %9999 = tuple()
   return %9999 : $()
+}
+
+
+class C {}
+
+sil [ossa] @getC : $@convention(thin) () -> (@owned C)
+
+// CHECK-LABEL: sil [ossa] @dont_dce_lexical_phi :
+// CHECK: destroy_value
+// CHECK-LABEL: } // end sil function 'dont_dce_lexical_phi'
+sil [ossa] @dont_dce_lexical_phi : $() -> () {
+ entry:
+   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+   cond_br undef, left, right
+ left:
+   %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+   %m1 = move_value [lexical] %c1 : $C
+   br exit(%m1 : $C)
+ right:
+   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
+   br exit(%c2 : $C)
+ exit(%cm : @owned $C):
+   destroy_value %cm : $C
+   %retval = tuple ()
+   return %retval : $()
 }
 

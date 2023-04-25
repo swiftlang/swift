@@ -116,9 +116,12 @@ bool swift::siloptimizer::cleanupNonCopyableCopiesAfterEmittingDiagnostic(
       auto *inst = &*ii;
       ++ii;
 
-      // Convert load [copy] -> load_borrow + explicit_copy_value.
+      // Convert load [copy] *MoveOnly -> load_borrow + explicit_copy_value.
       if (auto *li = dyn_cast<LoadInst>(inst)) {
         if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+          if (!li->getType().isMoveOnly())
+            continue;
+
           SILBuilderWithScope builder(li);
           auto *lbi = builder.createLoadBorrow(li->getLoc(), li->getOperand());
           auto *cvi = builder.createExplicitCopyValue(li->getLoc(), lbi);
@@ -129,10 +132,13 @@ bool swift::siloptimizer::cleanupNonCopyableCopiesAfterEmittingDiagnostic(
         }
       }
 
-      // Convert copy_addr !take of src to its explicit value form so we don't
-      // error.
+      // Convert copy_addr !take MoveOnly ... -> explicit_copy_addr ...same...
+      // so we don't error.
       if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
         if (!copyAddr->isTakeOfSrc()) {
+          if (!copyAddr->getSrc()->getType().isMoveOnly())
+            continue;
+
           SILBuilderWithScope builder(copyAddr);
           builder.createExplicitCopyAddr(
               copyAddr->getLoc(), copyAddr->getSrc(), copyAddr->getDest(),
@@ -143,10 +149,11 @@ bool swift::siloptimizer::cleanupNonCopyableCopiesAfterEmittingDiagnostic(
         }
       }
 
-      // Convert any copy_value of move_only type to explicit copy value.
+      // Convert any copy_value of MoveOnly type -> explicit_copy_value.
       if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
         if (!cvi->getOperand()->getType().isMoveOnly())
           continue;
+
         SILBuilderWithScope b(cvi);
         auto *expCopy =
             b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());

@@ -186,6 +186,50 @@ extension Task: Equatable {
   }
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.9, *)
+extension Task where Failure == Error {
+    @_spi(MainActorUtilities)
+    @MainActor
+    @available(SwiftStdlib 5.9, *)
+    @discardableResult
+    public static func startOnMainActor(
+        priority: TaskPriority? = nil,
+        @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async throws -> Success
+    ) -> Task<Success, Error> {
+        let flags = taskCreateFlags(priority: priority, isChildTask: false,
+                                    copyTaskLocals: true, inheritContext: true,
+                                    enqueueJob: false,
+                                    addPendingGroupTaskUnconditionally: false)
+        let (task, _) = Builtin.createAsyncTask(flags, work)
+        _startTaskOnMainActor(task)
+        return Task<Success, Error>(task)
+    }
+}
+#endif
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.9, *)
+extension Task where Failure == Never {
+    @_spi(MainActorUtilities)
+    @MainActor
+    @available(SwiftStdlib 5.9, *)
+    @discardableResult
+    public static func startOnMainActor(
+        priority: TaskPriority? = nil,
+        @_inheritActorContext @_implicitSelfCapture _ work: __owned @Sendable @escaping @MainActor() async -> Success
+    ) -> Task<Success, Never> {
+        let flags = taskCreateFlags(priority: priority, isChildTask: false,
+                                    copyTaskLocals: true, inheritContext: true,
+                                    enqueueJob: false,
+                                    addPendingGroupTaskUnconditionally: false)
+        let (task, _) = Builtin.createAsyncTask(flags, work)
+        _startTaskOnMainActor(task)
+        return Task(task)
+    }
+}
+#endif
+
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -270,6 +314,26 @@ extension TaskPriority: Comparable {
 
   public static func >= (lhs: TaskPriority, rhs: TaskPriority) -> Bool {
     lhs.rawValue >= rhs.rawValue
+  }
+}
+
+
+@available(SwiftStdlib 5.9, *)
+extension TaskPriority: CustomStringConvertible {
+  @available(SwiftStdlib 5.9, *)
+  public var description: String {
+    switch self.rawValue {
+    case Self.low.rawValue:
+      return "\(Self.self).low"
+    case Self.medium.rawValue:
+      return "\(Self.self).medium"
+    case Self.high.rawValue:
+      return "\(Self.self).high"
+    case Self.background.rawValue:
+      return "\(Self.self).background"
+    default:
+      return "\(Self.self)(rawValue: \(self.rawValue))"
+    }
   }
 }
 
@@ -859,6 +923,9 @@ extension UnsafeCurrentTask: Equatable {
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
+
+@_silgen_name("swift_task_startOnMainActor")
+fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getJobFlags")

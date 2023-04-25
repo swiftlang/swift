@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances -parse-stdlib
 
 // REQUIRES: asserts
 
@@ -11,7 +11,7 @@ protocol P {
   func f()
 }
 
-extension Builtin.TheTupleType: P where each Elements: P {
+extension Builtin.TheTupleType: P where repeat each Elements: P {
   typealias A = (repeat each Elements.A)
   typealias B = Float
   func f() {}

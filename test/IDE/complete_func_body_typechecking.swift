@@ -39,21 +39,17 @@ struct FooStruct {
   }
 }
 
-// FOO_STRUCT_COMMON: Begin completions
-// FOO_STRUCT_COMMON-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// FOO_STRUCT_COMMON-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
-// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1()[#FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc2({#(a): Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_COMMON-NEXT: End completions
+// FOO_STRUCT_COMMON: Begin completions, 5 items
+// FOO_STRUCT_COMMON-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
+// FOO_STRUCT_COMMON-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
+// FOO_STRUCT_COMMON-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_STRUCT_COMMON-DAG: Decl[InstanceMethod]/CurrNominal: builderFunc1()[#FooStruct#]{{; name=.+$}}
+// FOO_STRUCT_COMMON-DAG: Decl[InstanceMethod]/CurrNominal: builderFunc2({#(a): Int#})[#FooStruct#]{{; name=.+$}}
 
 // ERROR_COMMON: found code completion token
-// ERROR_COMMON-NOT: Begin completions
 
-// LOCALS_COMMON: Begin completions
 // LOCALS_COMMON-DAG: Decl[LocalVar]/Local: localInt[#Int#]{{; name=.+$}}
 // LOCALS_COMMON-DAG: Decl[LocalVar]/Local: localFooObject[#FooStruct#]{{; name=.+$}}
-// LOCALS_COMMON: End completions
 
 func testTypecheckVar1() {
   var localFooObject = FooStruct()

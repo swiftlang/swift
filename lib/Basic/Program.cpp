@@ -100,7 +100,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   llvm::BumpPtrAllocator Alloc;
   const char **argv = toNullTerminatedCStringArray(args, Alloc);
   const char **envp = nullptr;
-  if (env.hasValue()) {
+  if (env.has_value()) {
     envp = toNullTerminatedCStringArray(*env, Alloc);
   }
   const char *progCStr = args[0] == program

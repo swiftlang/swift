@@ -14,7 +14,6 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -280,7 +279,7 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   // Now we have our liveness information. First compute the original boundary
   // (which ignores destroy_value).
   PrunedLivenessBoundary originalBoundary;
-  canonicalizer->findOriginalBoundary(originalBoundary);
+  canonicalizer.findOriginalBoundary(originalBoundary);
 
   // Then use that information to stash for our diagnostics the boundary
   // consuming/non-consuming users as well as enter the boundary consuming users
@@ -289,7 +288,7 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   InstructionSet boundaryConsumingUserSet(value->getFunction());
   for (auto *lastUser : originalBoundary.lastUsers) {
     LLVM_DEBUG(llvm::dbgs() << "Looking at boundary use: " << *lastUser);
-    switch (canonicalizer->isInterestingUser(lastUser)) {
+    switch (canonicalizer.isInterestingUser(lastUser)) {
     case IsInterestingUser::NonUser:
       llvm_unreachable("Last user of original boundary should be a user?!");
     case IsInterestingUser::NonLifetimeEndingUse:
@@ -306,7 +305,7 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
 
   // Then go through any of the consuming interesting uses found by our liveness
   // and any that are not on the boundary are ones that we must error for.
-  for (auto *consumingUser : canonicalizer->getLifetimeEndingUsers()) {
+  for (auto *consumingUser : canonicalizer.getLifetimeEndingUsers()) {
     bool isConsumingUseOnBoundary =
         boundaryConsumingUserSet.contains(consumingUser);
     LLVM_DEBUG(llvm::dbgs() << "Is consuming user on boundary "
@@ -318,13 +317,13 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   }
 }
 
-bool OSSACanonicalizer::canonicalize(SILValue value) {
+bool OSSACanonicalizer::canonicalize() {
   // First compute liveness. If we fail, bail.
-  if (!computeLiveness(value)) {
+  if (!computeLiveness()) {
     return false;
   }
 
-  computeBoundaryData(value);
+  computeBoundaryData(canonicalizer.getCurrentDef());
 
   // Finally, rewrite lifetimes.
   rewriteLifetimes();
@@ -518,8 +517,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
         instToDelete->eraseFromParent();
       });
   InstructionDeleter deleter(std::move(callbacks));
-  OSSACanonicalizer canonicalizer;
-  canonicalizer.init(fn, domTree, deleter);
+  OSSACanonicalizer canonicalizer(fn, domTree, deleter);
   diagnosticEmitter.initCanonicalizer(&canonicalizer);
 
   unsigned initialDiagCount = diagnosticEmitter.getDiagnosticCount();
@@ -527,9 +525,10 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
   while (!moveIntroducers.empty()) {
-    SWIFT_DEFER { canonicalizer.clear(); };
-
     MarkMustCheckInst *markedValue = moveIntroducers.front();
+
+    OSSACanonicalizer::LivenessState livenessState(canonicalizer, markedValue);
+
     moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
@@ -577,7 +576,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
     // instructions containing multiple operands.
 
     // Step 1. Compute liveness.
-    if (!canonicalizer.computeLiveness(markedValue)) {
+    if (!canonicalizer.computeLiveness()) {
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
       LLVM_DEBUG(
           llvm::dbgs()

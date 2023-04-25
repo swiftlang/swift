@@ -151,6 +151,7 @@ KNOWN_SETTINGS=(
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
     build-swift-tools                             "1"               "set to 1 to build Swift host tools"
+    build-swift-libexec                           "1"               "set to 1 to build auxiliary executables"
 
     ## Skip cleaning build directories ...
     skip-clean-libdispatch                        "0"               "skip cleaning the libdispatch build"
@@ -238,6 +239,8 @@ KNOWN_SETTINGS=(
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
     swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
+    swift-enable-backtracing                      "1"               "whether to build the backtracing support"
+    swift-runtime-fixed-backtracer-path           ""                "if set, use a fixed path for the backtracer"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -1211,11 +1214,6 @@ SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-p
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
-# We cannot currently apply the normal rules of skipping here for LLVM. Even if
-# we are skipping building LLVM, we still need to at least build a few tools
-# like tblgen that Swift relies on for building and testing. See the LLVM
-# configure rules.
-PRODUCTS=(llvm)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
@@ -1245,6 +1243,7 @@ function get_host_specific_variable() {
 function calculate_targets_for_host() {
     # Get the values passed by `build-script`.
     SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
+    SWIFT_LIBEXEC_TARGETS=($(get_host_specific_variable ${host} SWIFT_LIBEXEC_TARGETS))
     SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
     SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
     SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
@@ -1402,9 +1401,6 @@ function cmake_config_opt() {
         # CMake automatically adds --target ALL_BUILD if we don't pass this.
         echo "--target ZERO_CHECK "
         case ${product} in
-            llvm)
-                echo "--config ${LLVM_BUILD_TYPE}"
-                ;;
             libcxx)
                 # Reuse LLVM's build type.
                 echo "--config ${LLVM_BUILD_TYPE}"
@@ -1551,6 +1547,9 @@ for host in "${ALL_HOSTS[@]}"; do
              [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]]; then
             echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
         fi
+        if [ $(true_false "${BUILD_SWIFT_LIBEXEC}") == "TRUE" ]; then
+            echo "Building the auxiliary executables for: ${SWIFT_LIBEXEC_TARGETS[@]}"
+        fi
     fi
 
     common_cmake_options_host=("${COMMON_CMAKE_OPTIONS[@]}")
@@ -1632,6 +1631,13 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
+    if [[ "${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH:STRING="${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}"
+        )
+    fi
+
     if [[ "${EXTRA_SWIFT_ARGS}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
@@ -1708,137 +1714,6 @@ for host in "${ALL_HOSTS[@]}"; do
         cmake_options+=("${product_cmake_options[@]}")
 
         case ${product} in
-            llvm)
-                if [[ -n "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" && $(is_cross_tools_host ${host}) ]] ; then
-                    build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
-                elif [[ -n "${LLVM_NINJA_TARGETS}" ]] ; then
-                    build_targets=("${LLVM_NINJA_TARGETS[@]}")
-                fi
-                # indicating we don't want to build LLVM should
-                # override any custom ninja target we specified
-                if [ "${BUILD_LLVM}" == "0" ] ; then
-                    build_targets=(clean)
-                fi
-                if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
-                    # We can't skip the build completely because the standalone
-                    # build of Swift depend on these for building and testing.
-                    build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
-                    # If we are not performing a toolchain only build, then we
-                    # also want to include FileCheck, not, llvm-nm, and similar
-                    # for testing purposes.
-                    if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
-                      build_targets=(
-                          "${build_targets[@]}"
-                          FileCheck
-                          not
-                          llvm-nm
-                          llvm-size
-                      )
-                    fi
-                fi
-
-                if [ "${HOST_LIBTOOL}" ] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DCMAKE_LIBTOOL:PATH="${HOST_LIBTOOL}"
-                    )
-                fi
-
-                # Note: we set the variable:
-                #
-                # LLVM_TOOL_SWIFT_BUILD
-                #
-                # below because this script builds swift separately, and people
-                # often have reasons to symlink the swift directory into
-                # llvm/tools, e.g. to build LLDB.
-                cmake_options=(
-                    "${cmake_options[@]}"
-                    -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
-                    -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
-                    -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
-                    -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
-                    -DLLVM_INCLUDE_DOCS:BOOL=TRUE
-                    -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
-                    -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
-                    "${llvm_cmake_options[@]}"
-                )
-
-                llvm_enable_projects=("clang")
-
-                if [[ ! "${SKIP_BUILD_COMPILER_RT}" && ! $(is_cross_tools_host ${host}) ]]; then
-                    llvm_enable_projects+=("compiler-rt")
-                fi
-
-                if [[ ! "${SKIP_BUILD_CLANG_TOOLS_EXTRA}" ]]; then
-                    llvm_enable_projects+=("clang-tools-extra")
-                fi
-
-                if [[ ! "${SKIP_BUILD_LLD}" ]]; then
-                    llvm_enable_projects+=("lld")
-                fi
-
-                cmake_options+=(
-                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
-                    # In the near future we are aiming to build compiler-rt with
-                    # LLVM_ENABLE_RUNTIMES
-                    # Until that happens, we need to unset this variable from
-                    # LLVM CMakeCache.txt for two reasons
-                    # * prevent PRs testing this variable to affect other runs landing
-                    #   unrelated features
-                    # * avoid fallouts should we land such change and then have to revert
-                    #   it to account for unforeseen regressions
-                    -ULLVM_ENABLE_RUNTIMES
-                )
-
-                # NOTE: This is not a dead option! It is relied upon for certain
-                # bots/build-configs!
-                #
-                # TODO: In the future when we are always cross compiling and
-                # using Toolchain files, we should put this in either a
-                # toolchain file or a cmake cache.
-                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
-                    cmake_options+=(
-                    -DLLVM_BUILD_TOOLS=NO
-                    -DLLVM_INSTALL_TOOLCHAIN_ONLY=YES
-                    -DLLVM_INCLUDE_TESTS=NO
-                    -DCLANG_INCLUDE_TESTS=NO
-                    -DLLVM_INCLUDE_UTILS=NO
-                    -DLLVM_TOOL_LLI_BUILD=NO
-                    -DLLVM_TOOL_LLVM_AR_BUILD=NO
-                    -DCLANG_TOOL_CLANG_CHECK_BUILD=NO
-                    -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
-                    -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
-                    -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
-                    -DCLANG_TOOL_DRIVER_BUILD=$(false_true "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
-                    -DCLANG_TOOL_DIAGTOOL_BUILD=NO
-                    -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
-                    -DCLANG_TOOL_SCAN_VIEW_BUILD=NO
-                    -DCLANG_TOOL_CLANG_FORMAT_BUILD=NO
-                    )
-                fi
-
-                if [[ $(true_false "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
-                    cmake_options+=(
-                        -DLLVM_INCLUDE_TESTS=NO
-                        -DCLANG_INCLUDE_TESTS=NO
-                    )
-                fi
-
-                if [[ $(is_cross_tools_host ${host}) ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
-                        -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
-                        -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
-                    )
-                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
-                fi
-
-                ;;
-
             libcxx)
                 build_targets=(cxx)
                 cmake_options=(
@@ -1998,12 +1873,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
+                    -DSWIFT_BUILD_LIBEXEC:BOOL=$(true_false "${BUILD_SWIFT_LIBEXEC}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
+                    -DSWIFT_ENABLE_BACKTRACING:BOOL=$(true_false "${SWIFT_ENABLE_BACKTRACING}")
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2196,6 +2073,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH:STRING="${SWIFT_RUNTIME_FIXED_BACKTRACER_PATH}"
+                    )
+                fi
+
                 # SWIFT_THREADING_PACKAGE can be:
                 #
                 #    - Empty
@@ -2230,7 +2114,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
+                build_targets=(
+                    all
+                    "${SWIFT_STDLIB_TARGETS[@]}"
+                    "${SWIFT_LIBEXEC_TARGETS[@]}"
+                )
                 if [[ $(true_false "${build_perf_testsuite_this_time}") == "TRUE" ]]; then
                     native_swift_tools_path="$(build_directory_bin ${LOCAL_HOST} swift)"
                     cmake_options=(
@@ -2709,12 +2597,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
 
                     with_pushd "${LIBICU_BUILD_DIR}" \
-                        call env CXXFLAGS=-fPIC "${LIBICU_SOURCE_DIR}"/icu4c/source/runConfigureICU Linux \
+                        call env CXXFLAGS=-fPIC LDFLAGS='-Wl,-rpath=\$$ORIGIN' \
+                        "${LIBICU_SOURCE_DIR}"/icu4c/source/runConfigureICU Linux \
                         ${icu_build_variant_arg} --prefix=${ICU_TMPINSTALL} \
                         ${libicu_enable_debug} \
                         --enable-renaming --with-library-suffix=swift \
                         --libdir=${ICU_TMPLIBDIR} \
-                        --enable-shared --enable-static --enable-rpath \
+                        --enable-shared --enable-static \
                         --enable-strict --disable-icuio \
                         --disable-plugins --disable-dyload --disable-extras \
                         --disable-samples --disable-layoutex --with-data-packaging=auto
@@ -2780,42 +2669,8 @@ for host in "${ALL_HOSTS[@]}"; do
             continue
         fi
 
-        # When we are building LLVM create symlinks to the c++ headers. We need
-        # to do this before building LLVM since compiler-rt depends on being
-        # built with the just built clang compiler. These are normally put into
-        # place during the cmake step of LLVM's build when libcxx is in
-        # tree... but we are not building llvm with libcxx in tree when we build
-        # swift. So we need to do configure's work here.
-        if [[ "${product}" == "llvm" ]]; then
-            # Find the location of the c++ header dir.
-            if [[ "$(uname -s)" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-              HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
-            elif [[ "$(uname -s)" == "Haiku" ]] ; then
-              HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"
-            elif [[ "${ANDROID_DATA}" ]] ; then
-              # This means we're building natively on Android in the Termux
-              # app, which supplies the $PREFIX variable.
-              HOST_CXX_HEADERS_DIR="$PREFIX/include/c++"
-            else # Linux
-              HOST_CXX_HEADERS_DIR="/usr/include/c++"
-            fi
-
-            # Find the path in which the local clang build is expecting to find
-            # the c++ header files.
-            BUILT_CXX_INCLUDE_DIR="$llvm_build_dir/include"
-
-            echo "symlinking the system headers ($HOST_CXX_HEADERS_DIR) into the local clang build directory ($BUILT_CXX_INCLUDE_DIR)."
-            call ln -s -f "$HOST_CXX_HEADERS_DIR" "$BUILT_CXX_INCLUDE_DIR"
-        fi
-
         # Build.
-        #
-        # Even if builds are skipped, Swift configuration relies on
-        # some LLVM tools like TableGen. In the LLVM configure rules
-        # above, a small subset of LLVM build_targets are selected
-        # when SKIP_BUILD is set.
-        if [[ $(not ${SKIP_BUILD}) || "${product}" == "llvm" ]]; then
+        if [[ $(not ${SKIP_BUILD}) ]]; then
             if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
                 # Xcode generator uses "ALL_BUILD" instead of "all".
                 # Also, xcodebuild uses -target instead of bare names.
@@ -2828,13 +2683,6 @@ for host in "${ALL_HOSTS[@]}"; do
             fi
 
             call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
-        fi
-
-        # When we are building LLVM copy over the compiler-rt
-        # builtins for iOS/tvOS/watchOS to ensure that Swift's
-        # stdlib can use compiler-rt builtins when targeting iOS/tvOS/watchOS.
-        if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-            copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "$(build_directory_bin ${host} llvm)/.."
         fi
     done
 done
@@ -2878,9 +2726,6 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
 
         case ${product} in
-            llvm)
-                continue # We don't test LLVM
-                ;;
             libcxx)
                 continue # We don't test libc++
                 ;;
@@ -3200,21 +3045,6 @@ for host in "${ALL_HOSTS[@]}"; do
         INSTALL_TARGETS="install"
 
         case ${product} in
-            llvm)
-                if [[ -z "${INSTALL_LLVM}" ]] ; then
-                    continue
-                fi
-
-                if [[ "${LLVM_INSTALL_COMPONENTS}" == "all" ]] ; then
-                    INSTALL_TARGETS=install
-                elif [[ -n "${LLVM_INSTALL_COMPONENTS}" ]] ; then
-                    if [[ $(is_cross_tools_host ${host}) && "${LLVM_INSTALL_COMPONENTS}" == *"compiler-rt"* ]]; then
-                        INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/compiler-rt;//g' |sed -E 's/;/ install-/g')
-                    else
-                        INSTALL_TARGETS=install-$(echo ${LLVM_INSTALL_COMPONENTS} | sed -E 's/;/ install-/g')
-                    fi
-                fi
-                ;;
             libcxx)
                 if [[ -z "${INSTALL_LIBCXX}" ]] ; then
                     continue
@@ -3340,13 +3170,6 @@ for host in "${ALL_HOSTS[@]}"; do
         build_dir=$(build_directory ${host} ${product})
 
         call env DESTDIR="${host_install_destdir}" "${CMAKE_BUILD[@]}" "${build_dir}" -- ${INSTALL_TARGETS}
-
-        # When we are installing LLVM copy over the compiler-rt
-        # builtins for iOS/tvOS/watchOS to ensure that we don't
-        # have linker errors  when building apps for such platforms.
-        if [[ "${product}" = "llvm" ]] && [[ ! -z "${LLVM_INSTALL_COMPONENTS}" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
-            copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "${host_install_destdir}${host_install_prefix}"
-        fi
     done
 done
 
@@ -3456,10 +3279,10 @@ for host in "${ALL_HOSTS[@]}"; do
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
-            # Codesign dylibs after strip tool
+            # Codesign dylibs and executables in usr/bin after strip tool
             # rdar://45388785
             find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
-              '(' -name "*.dylib" ')' -type f -print | \
+              '(' '(' -path "*/usr/bin/*" -and -perm -0111 ')' -or -name "*.dylib" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
         fi
 
@@ -3520,7 +3343,16 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
-          call ${PLISTBUDDY_BIN} -c "Add Aliases:0 string '${DARWIN_TOOLCHAIN_ALIAS}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+
+          aliases_count=0
+          local IFS=","
+          for alias_name in ${DARWIN_TOOLCHAIN_ALIAS}
+          do
+            call ${PLISTBUDDY_BIN} -c "Add Aliases:${aliases_count} string '${alias_name}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+            aliases_count=$[$aliases_count +1]
+          done
+          unset IFS
+
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings dict" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE string 'NO'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"

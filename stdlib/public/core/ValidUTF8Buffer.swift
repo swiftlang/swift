@@ -127,7 +127,10 @@ extension _ValidUTF8Buffer: RandomAccessCollection {
   @inlinable
   @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
-    _debugPrecondition(_isValid(i))
+    // FIXME(katei): The precondition check is commented out because it
+    // causes bad codegen for `stacksave` on WebAssembly.
+    // See https://github.com/llvm/llvm-project/issues/62235
+    // _debugPrecondition(_isValid(i))
     _debugPrecondition(_isValid(j))
     return (
       i._biasedBits.leadingZeroBitCount - j._biasedBits.leadingZeroBitCount

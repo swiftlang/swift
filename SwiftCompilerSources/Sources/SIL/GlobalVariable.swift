@@ -15,17 +15,17 @@ import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
   public var name: StringRef {
-    return StringRef(bridged: SILGlobalVariable_getName(bridged))
+    return StringRef(bridged: bridged.getName())
   }
 
   public var description: String {
-    let stdString = SILGlobalVariable_debugDescription(bridged)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
 
   public var shortDescription: String { name.string }
 
-  public var isLet: Bool { SILGlobalVariable_isLet(bridged) != 0 }
+  public var isLet: Bool { bridged.isLet() }
 
   // TODO: initializer instructions
 

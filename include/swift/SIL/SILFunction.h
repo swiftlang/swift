@@ -725,6 +725,10 @@ public:
 
   SILType getLoweredType(Type t) const;
 
+  CanType getLoweredRValueType(Lowering::AbstractionPattern orig, Type subst) const;
+
+  CanType getLoweredRValueType(Type t) const;
+
   SILType getLoweredLoadableType(Type t) const;
 
   SILType getLoweredType(SILType t) const;
@@ -1087,7 +1091,7 @@ public:
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
-  SILInstruction::MemoryBehavior getMemoryBehavior(bool observeRetains);
+  MemoryBehavior getMemoryBehavior(bool observeRetains);
 
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
@@ -1269,6 +1273,7 @@ public:
   const SILBasicBlock *getEntryBlock() const { return &front(); }
 
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(llvm::StringRef debugName);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
@@ -1403,18 +1408,30 @@ public:
         decl->getLifetimeAnnotation());
   }
 
-  /// verify - Run the IR verifier to make sure that the SILFunction follows
+  /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(bool SingleFunction = true) const;
+  void verify(bool SingleFunction = true,
+              bool isCompleteOSSA = true,
+              bool checkLinearLifetime = true) const;
+
+  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
+  /// blocks.
+  void verifyIncompleteOSSA() const {
+    verify(/*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+  }
 
   /// Verifies the lifetime of memory locations in the function.
   void verifyMemoryLifetime();
 
-  /// Run the SIL ownership verifier to check for ownership invariant failures.
+  /// Run the SIL ownership verifier to check that all values with ownership
+  /// have a linear lifetime. Regular OSSA invariants are checked separately in
+  /// normal SIL verification.
   ///
-  /// NOTE: The ownership verifier is always run when performing normal IR
+  /// \p deadEndBlocks is nullptr when OSSA lifetimes are complete.
+  ///
+  /// NOTE: The ownership verifier is run when performing normal IR
   /// verification, so this verification can be viewed as a subset of
-  /// SILFunction::verify.
+  /// SILFunction::verify(checkLinearLifetimes=true).
   void verifyOwnership(DeadEndBlocks *deadEndBlocks) const;
 
   /// Verify that all non-cond-br critical edges have been split.

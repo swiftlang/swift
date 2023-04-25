@@ -200,8 +200,8 @@ public struct AsyncStream<Element> {
     /// nil, which signifies the end of the iteration.
     ///
     /// Calling this function more than once has no effect. After calling
-    /// finish, the stream enters a terminal state and doesn't produces any additional
-    /// elements.
+    /// finish, the stream enters a terminal state and doesn't produce any
+    /// additional elements.
     public func finish() {
       storage.finish()
     }
@@ -425,6 +425,27 @@ extension AsyncStream.Continuation {
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
     return storage.yield(())
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncStream {
+  /// Initializes a new ``AsyncStream`` and an ``AsyncStream/Continuation``.
+  ///
+  /// - Parameters:
+  ///   - elementType: The element type of the stream.
+  ///   - limit: The buffering policy that the stream should use.
+  /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
+  /// producer while the stream should be passed to the consumer.
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
+  public static func makeStream(
+      of elementType: Element.Type = Element.self,
+      bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+  ) -> (stream: AsyncStream<Element>, continuation: AsyncStream<Element>.Continuation) {
+    var continuation: AsyncStream<Element>.Continuation!
+    let stream = AsyncStream<Element>(bufferingPolicy: limit) { continuation = $0 }
+    return (stream: stream, continuation: continuation!)
   }
 }
 

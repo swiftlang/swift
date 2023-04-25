@@ -62,10 +62,9 @@ func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in 
 func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
 
 
-// TO-DO Handle plain generic opaque parameters
 func takePrimaryCollections(
-  _ strings:some Collection<String>,
-  _ ints : some Collection<Int>
+  _ strings: Collection<String>,
+  _ ints : Collection<Int>
 ) {
   for s in strings {
     let _: String = s
@@ -75,9 +74,8 @@ func takePrimaryCollections(
     let _: Int = i
   }
 }
-// TO-DO Handle plain generic opaque parameters
 func takeMatchedPrimaryCollections<T: Equatable>(
-  _ first: some Collection<T>, _ second: some Collection<T>
+  _ first: Collection<T>, _ second: Collection<T>
 ) -> Bool {
   first.elementsEqual(second)
 }

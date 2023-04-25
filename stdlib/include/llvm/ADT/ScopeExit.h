@@ -54,7 +54,7 @@ public:
 //
 // Interface is specified by p0052r2.
 template <typename Callable>
-LLVM_NODISCARD detail::scope_exit<typename std::decay<Callable>::type>
+[[nodiscard]] detail::scope_exit<typename std::decay<Callable>::type>
 make_scope_exit(Callable &&F) {
   return detail::scope_exit<typename std::decay<Callable>::type>(
       std::forward<Callable>(F));

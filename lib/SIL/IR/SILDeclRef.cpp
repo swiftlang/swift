@@ -931,10 +931,20 @@ bool SILDeclRef::isNoinline() const {
 
 /// True if the function has the @inline(__always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
-  if (!hasDecl())
+  swift::Decl *decl = nullptr;
+  if (hasDecl()) {
+    decl = getDecl();
+  } else if (auto *ce = getAbstractClosureExpr()) {
+    // Closures within @inline(__always) functions should be always inlined, too.
+    // Note that this is different from @inline(never), because closures inside
+    // @inline(never) _can_ be inlined within the inline-never function.
+    decl = ce->getParent()->getInnermostDeclarationDeclContext();
+    if (!decl)
+      return false;
+  } else {
     return false;
+  }
 
-  auto *decl = getDecl();
   if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Always)
       return true;

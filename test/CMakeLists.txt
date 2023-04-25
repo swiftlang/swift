@@ -85,6 +85,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-ar
       llvm-as
       llvm-bcanalyzer
+      llvm-cas
       llvm-cov
       llvm-dis
       llvm-dwarfdump
@@ -196,7 +197,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -211,7 +212,20 @@ normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
+
+# Get 'SWIFT_HOST_TRIPLE' and 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+endif()
+if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
+  set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+endif()
+get_target_triple(SWIFT_HOST_TRIPLE SWIFT_HOST_TRIPLE_VARIANT "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+  MACCATALYST_BUILD_FLAVOR ""
+  DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
@@ -396,11 +410,21 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
-        if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-          list(APPEND LIT_ARGS "--param" "reflection")
+        if(SWIFT_ENABLE_BACKTRACING)
+          list(APPEND LIT_ARGS "--param" "backtracing")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+          list(APPEND LIT_ARGS "--param" "observation")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+
+        # Enable on-crash backtracing if supported
+        if("${SDK}" STREQUAL "OSX" AND NOT SWIFT_ASAN_BUILD)
+          list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
+        endif()
+
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})

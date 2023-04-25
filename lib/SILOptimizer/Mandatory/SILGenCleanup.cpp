@@ -18,7 +18,11 @@
 
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -96,14 +100,52 @@ namespace {
 // pipeline runs in bottom-up closure order.
 struct SILGenCleanup : SILModuleTransform {
   void run() override;
+
+  bool completeOSSALifetimes(SILFunction *function);
 };
+
+bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
+  if (!getModule()->getOptions().OSSACompleteLifetimes)
+    return false;
+
+  bool changed = false;
+
+  // Lifetimes must be completed inside out (bottom-up in the CFG).
+  PostOrderFunctionInfo *postOrder =
+      getAnalysis<PostOrderAnalysis>()->get(function);
+  OSSALifetimeCompletion completion(function, /*DomInfo*/nullptr);
+  for (auto *block : postOrder->getPostOrder()) {
+    for (SILInstruction &inst : reverse(*block)) {
+      for (auto result : inst.getResults()) {
+        if (completion.completeOSSALifetime(result) ==
+            LifetimeCompletion::WasCompleted) {
+          changed = true;
+        }
+      }
+    }
+    for (SILArgument *arg : block->getArguments()) {
+      if (completion.completeOSSALifetime(arg) ==
+          LifetimeCompletion::WasCompleted) {
+        changed = true;
+      }
+    }
+  }
+  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
+  return changed;
+}
 
 void SILGenCleanup::run() {
   auto &module = *getModule();
   for (auto &function : module) {
+    if (!function.isDefinition())
+      continue;
+
+    PrettyStackTraceSILFunction stackTrace("silgen cleanup", &function);
+
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
+    bool changed = completeOSSALifetimes(&function);
     DeadEndBlocks deadEndBlocks(&function);
     SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 
@@ -116,7 +158,8 @@ void SILGenCleanup::run() {
         ii = sgCanonicalize.deleteDeadOperands(ii, ie);
       }
     }
-    if (sgCanonicalize.changed) {
+    changed |= sgCanonicalize.changed;
+    if (changed) {
       auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
       invalidateAnalysis(&function, invalidKind);
     }

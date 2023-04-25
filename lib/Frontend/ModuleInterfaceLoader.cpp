@@ -40,6 +40,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/xxhash.h"
@@ -790,7 +791,9 @@ class ModuleInterfaceLoaderImpl {
           UsableModulePath = adjacentMod;
           return std::make_error_code(std::errc::not_supported);
         } else if (isInResourceDir(adjacentMod) &&
-                   loadMode == ModuleLoadingMode::PreferSerialized) {
+                   loadMode == ModuleLoadingMode::PreferSerialized &&
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
+                     serialization::Status::SDKMismatch) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is mainly to support development of Swift,
@@ -798,6 +801,8 @@ class ModuleInterfaceLoaderImpl {
           // recompile the standard library. If that happens, don't fall back
           // and silently recompile the standard library -- instead, error like
           // we used to.
+          // Still accept modules built with a different SDK, allowing the use
+          // of one toolchain against a different SDK.
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
                                      "resource-dir at "
                                   << adjacentMod
@@ -897,8 +902,8 @@ class ModuleInterfaceLoaderImpl {
   /// this. If the write was successful, it also updates the
   /// list of dependencies to match what was written to the forwarding file.
   bool writeForwardingModuleAndUpdateDeps(
-      const DiscoveredModule &mod, StringRef outputPath,
-      SmallVectorImpl<FileDependency> &deps) {
+      const DiscoveredModule &mod, llvm::vfs::OutputBackend &backend,
+      StringRef outputPath, SmallVectorImpl<FileDependency> &deps) {
     assert(mod.isPrebuilt() &&
            "cannot write forwarding file for non-prebuilt module");
     ForwardingModule fwd(mod.path);
@@ -934,16 +939,12 @@ class ModuleInterfaceLoaderImpl {
       depsAdjustedToMTime.push_back(adjustedDep);
     }
 
-    // Create the module cache if we haven't created it yet.
-    StringRef parentDir = path::parent_path(outputPath);
-    (void)llvm::sys::fs::create_directories(parentDir);
-
-    auto hadError = withOutputFile(diags, outputPath,
-      [&](llvm::raw_pwrite_stream &out) {
-        llvm::yaml::Output yamlWriter(out);
-        yamlWriter << fwd;
-        return false;
-      });
+    auto hadError = withOutputPath(diags, backend, outputPath,
+                                      [&](llvm::raw_pwrite_stream &out) {
+                                        llvm::yaml::Output yamlWriter(out);
+                                        yamlWriter << fwd;
+                                        return false;
+                                      });
 
     if (hadError)
       return true;
@@ -1002,8 +1003,8 @@ class ModuleInterfaceLoaderImpl {
       // If it's prebuilt, use this time to generate a forwarding module and
       // update the dependencies to use modification times.
       if (module.isPrebuilt())
-        if (writeForwardingModuleAndUpdateDeps(module, cachedOutputPath,
-                                               allDeps))
+        if (writeForwardingModuleAndUpdateDeps(module, ctx.getOutputBackend(),
+                                               cachedOutputPath, allDeps))
           return std::make_error_code(std::errc::not_supported);
 
       // Report the module's dependencies to the dependencyTracker
@@ -1142,7 +1143,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework,
+    bool isTestableImport) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1247,7 +1249,8 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef mo
 
 bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
     StringRef moduleName, StringRef interfacePath,
-    ArrayRef<std::string> candidates, StringRef outputPath) {
+    ArrayRef<std::string> candidates, llvm::vfs::OutputBackend &backend,
+    StringRef outputPath) {
   // Derive .swiftmodule path from the .swiftinterface path.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = interfacePath;
@@ -1265,12 +1268,12 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
                                                    deps, moduleBuffer)) {
       // If so, emit a forwarding module to the candidate.
       ForwardingModule FM(mod);
-      auto hadError = withOutputFile(Ctx.Diags, outputPath,
-        [&](llvm::raw_pwrite_stream &out) {
-          llvm::yaml::Output yamlWriter(out);
-          yamlWriter << FM;
-          return false;
-        });
+      auto hadError = withOutputPath(Ctx.Diags, backend, outputPath,
+                                        [&](llvm::raw_pwrite_stream &out) {
+                                          llvm::yaml::Output yamlWriter(out);
+                                          yamlWriter << FM;
+                                          return false;
+                                        });
       if (!hadError)
         return true;
     }
@@ -1398,19 +1401,25 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
   
-  // First, check if the expected output already exists and possibly up-to-date w.r.t.
-  // all of the dependencies it was built with. If so, early exit.
-  UpToDateModuleCheker checker(Instance.getASTContext(),
-                               RequireOSSAModules_t(Instance.getSILOptions()));
-  ModuleRebuildInfo rebuildInfo;
-  SmallVector<FileDependency, 3> allDeps;
-  std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-  if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps, moduleBuffer)) {
-    if (Instance.getASTContext().LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
-      Instance.getDiags().diagnose(SourceLoc(),
-                                   diag::explicit_interface_build_skipped, outputPath);
+  if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
+    // First, check if the expected output already exists and possibly
+    // up-to-date w.r.t. all of the dependencies it was built with. If so, early
+    // exit.
+    UpToDateModuleCheker checker(
+        Instance.getASTContext(),
+        RequireOSSAModules_t(Instance.getSILOptions()));
+    ModuleRebuildInfo rebuildInfo;
+    SmallVector<FileDependency, 3> allDeps;
+    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
+    if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps,
+                                      moduleBuffer)) {
+      if (Instance.getASTContext()
+              .LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
+        Instance.getDiags().diagnose(
+            SourceLoc(), diag::explicit_interface_build_skipped, outputPath);
+      }
+      return false;
     }
-    return false;
   }
   
   // Read out the compiler version.
@@ -1448,6 +1457,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const ClangImporterOptions &clangImporterOpts,
     bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
@@ -1544,6 +1554,16 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().Features.insert(
       Feature::LayoutPrespecialization);
   }
+
+  // Validate Clang modules once per-build session flags must be consistent
+  // across all module sub-invocations
+  if (clangImporterOpts.ValidateModulesOnce) {
+    genericSubInvocation.getClangImporterOptions().ValidateModulesOnce = true;
+    genericSubInvocation.getClangImporterOptions().BuildSessionFilePath = clangImporterOpts.BuildSessionFilePath;
+    GenericArgs.push_back("-validate-clang-modules-once");
+    GenericArgs.push_back("-clang-build-session-file");
+    GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1586,6 +1606,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
+                                     clangImporterOpts,
                                      Diags->getSuppressRemarks(),
                                      requireOSSAModules);
   // Configure front-end input.
@@ -1621,6 +1642,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions = true;
     GenericArgs.push_back("-application-extension");
   }
+
   // Save the parent invocation's Target Triple
   ParentInvocationTarget = langOpts.Target;
 
@@ -1676,6 +1698,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())
     (void)llvm::sys::fs::create_directories(moduleCachePath);
+
+  // Inherit all block list configuration files
+  frontendOpts.BlocklistConfigFilePaths = langOpts.BlocklistConfigFilePaths;
+  for (auto &blocklist: langOpts.BlocklistConfigFilePaths) {
+    GenericArgs.push_back("-blocklist-file");
+    GenericArgs.push_back(blocklist);
+  }
 }
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
@@ -1963,7 +1992,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
+    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2041,13 +2071,15 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework,
+    bool IsTestableDependencyLookup) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(
-    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
+    ImportPath::Module path, ModuleVersionInfo *versionInfo,
+    bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;

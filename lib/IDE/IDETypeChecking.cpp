@@ -40,11 +40,20 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
   auto startingSize = Results.size();
   M->getDisplayDecls(Results, Recursive);
 
-  // Force Sendable on all types, which might synthesize some extensions.
+  // Force Sendable on all public types, which might synthesize some extensions.
   // FIXME: We can remove this if @_nonSendable stops creating extensions.
   for (auto result : Results) {
-    if (auto NTD = dyn_cast<NominalTypeDecl>(result))
+    if (auto NTD = dyn_cast<NominalTypeDecl>(result)) {
+
+      // Restrict this logic to public and package types. Non-public types
+      // may refer to implementation details and fail at deserialization.
+      auto accessScope = NTD->getFormalAccessScope();
+      if (!M->isMainModule() &&
+          !accessScope.isPublic() && !accessScope.isPackage())
+        continue;
+
       (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+    }
   }
 
   // Remove what we fetched and fetch again, possibly now with additional
@@ -344,16 +353,30 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             return type;
           },
           LookUpConformanceInModule(M));
-        if (SubstReq.hasError())
+
+        SmallVector<Requirement, 2> subReqs;
+        switch (SubstReq.checkRequirement(subReqs)) {
+        case CheckRequirementResult::Success:
+          break;
+
+        case CheckRequirementResult::ConditionalConformance:
+          // FIXME: Need to handle conditional requirements here!
+          break;
+
+        case CheckRequirementResult::PackRequirement:
+          // FIXME
+          assert(false && "Refactor this");
           return true;
 
-        // FIXME: Need to handle conditional requirements here!
-        ArrayRef<Requirement> conditionalRequirements;
-        if (!SubstReq.isSatisfied(conditionalRequirements)) {
+        case CheckRequirementResult::SubstitutionFailure:
+          return true;
+
+        case CheckRequirementResult::RequirementFailure:
           if (!SubstReq.canBeSatisfied())
             return true;
 
           MergeInfo.addRequirement(Req);
+          break;
         }
       }
       return false;

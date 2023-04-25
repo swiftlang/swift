@@ -989,7 +989,7 @@ void AccumulatingTaskGroup::destroy() {
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
 
   // First, remove the group from the task and deallocate the record
-  removeStatusRecord(getTaskRecord());
+  removeStatusRecordFromSelf(getTaskRecord());
 
   // No need to drain our queue here, as by the time we call destroy,
   // all tasks inside the group must have been awaited on already.
@@ -1012,7 +1012,7 @@ void DiscardingTaskGroup::destroy() {
   assert(this->isEmpty() && "Attempted to destroy non-empty task group!");
 
   // First, remove the group from the task and deallocate the record
-  removeStatusRecord(getTaskRecord());
+  removeStatusRecordFromSelf(getTaskRecord());
 
   // No need to drain our queue here, as by the time we call destroy,
   // all tasks inside the group must have been awaited on already.

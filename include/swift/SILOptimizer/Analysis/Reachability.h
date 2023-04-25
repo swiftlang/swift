@@ -243,7 +243,7 @@ public:
     BasicBlockSet unknownEndBlocks;
 
   public:
-    /// The blocks found between the gens and the defBlock into which
+    /// The blocks found between the gens and the initialBlocks into which
     /// reachability may extend.
     BasicBlockSetVector discoveredBlocks;
     /// The sublist of gens which are killed within the blocks where they occur.
@@ -296,15 +296,32 @@ public:
   };
 
   /// Construct a dataflow for the specified function to run from the gens
-  /// provided by \p effects to the specified def block.  So that the result
-  /// structure can be owned by the caller, it is taken by reference here.
+  /// provided by \p effects to the specified \p initialBlocks.  So that the
+  /// result structure can be owned by the caller, it is taken by reference
+  /// here.
   ///
-  /// If a nullptr defBlock is specified, the dataflow may run up to the begin
-  /// of the function.
-  IterativeBackwardReachability(SILFunction *function, SILBasicBlock *defBlock,
+  /// If \p initialBlocks is empty, the dataflow may run up to the begin of the
+  /// function.
+  IterativeBackwardReachability(SILFunction *function,
+                                ArrayRef<SILBasicBlock *> initialBlocks,
                                 Effects &effects, Result &result)
-      : function(function), defBlock(defBlock), effects(effects),
-        result(result), dataflowWorklist(function) {}
+      : function(function), initialBlocks(function), effects(effects),
+        result(result), dataflowWorklist(function) {
+    for (auto *block : initialBlocks) {
+      this->initialBlocks.insert(block);
+    }
+  }
+
+  /// Convenience constructor to pass a single initial block.
+  static IterativeBackwardReachability
+  untilInitialBlock(SILFunction *function, SILBasicBlock *initialBlock,
+                    Effects &effects, Result &result) {
+    using InitialBlocks = ArrayRef<SILBasicBlock *>;
+    InitialBlocks initialBlocks =
+        initialBlock ? InitialBlocks(initialBlock) : InitialBlocks();
+    return IterativeBackwardReachability(function, initialBlocks, effects,
+                                         result);
+  }
 
   /// Step 1: Prepare to run the global dataflow: discover and summarize the
   /// blocks in the relevant region.
@@ -358,9 +375,8 @@ private:
 
   /// The function in which the dataflow will run.
   SILFunction *function;
-  /// The block containing the def for the value--the dataflow will not
-  /// propagate beyond this block.
-  SILBasicBlock *defBlock;
+  /// The blocks beyond which the dataflow will not propagate.
+  BasicBlockSet initialBlocks;
 
   /// Input to the dataflow.
   Effects &effects;
@@ -375,9 +391,9 @@ private:
   /// Current activity of the dataflow.
   Stage stage = Stage::Unstarted;
 
-  /// Whether the def effectively occurs within the specified block.
-  bool isEffectiveDefBlock(SILBasicBlock *block) {
-    return defBlock ? block == defBlock : block == &*function->begin();
+  /// Whether dataflow continues beyond this block.
+  bool stopAtBlock(SILBasicBlock *block) {
+    return initialBlocks.contains(block) || &*function->begin() == block;
   }
 
   /// Form the meet of the end state of the provided predecessor with the begin
@@ -424,8 +440,8 @@ private:
 /// effect of each block for use by the dataflow.
 ///
 /// Starting from the gens, find all blocks which might be reached up to and
-/// including the defBlock.  Summarize the effects of these blocks along the
-/// way.
+/// including the initialBlocks.  Summarize the effects of these blocks along
+/// the way.
 template <typename Effects>
 void IterativeBackwardReachability<Effects>::initialize() {
   assert(stage == Stage::Unstarted);
@@ -454,9 +470,9 @@ void IterativeBackwardReachability<Effects>::initialize() {
       // adjacent successors.
       continue;
     }
-    if (isEffectiveDefBlock(block)) {
-      // If this block is the effective def block, dataflow mustn't propagate
-      // a reachable state through this block to its predecessors.
+    if (stopAtBlock(block)) {
+      // If dataflow is to stop at this block, it mustn't propagate a reachable
+      // state through this block to its predecessors.
       continue;
     }
     for (auto *predecessor : block->getPredecessorBlocks())
@@ -631,9 +647,9 @@ void IterativeBackwardReachability<Effects>::solve() {
 template <typename Effects>
 void IterativeBackwardReachability<Effects>::propagateIntoPredecessors(
     SILBasicBlock *successor) {
-  // State isn't tracked above the def block.  Don't propagate state changes
-  // into its predecessors.
-  if (isEffectiveDefBlock(successor))
+  // State isn't tracked above the blocks dataflow stops at.  Don't propagate
+  // state changes into its predecessors.
+  if (stopAtBlock(successor))
     return;
   assert(result.getBeginStateForBlock(successor) == State::Unreachable() &&
          "propagating unreachability into predecessors of block whose begin is "
@@ -761,7 +777,6 @@ bool IterativeBackwardReachability<Effects>::findBarrier(SILInstruction *from,
     if (!effect)
       continue;
     if (effect == Effect::Gen()) {
-      assert(false && "found gen (before kill) in reachable block");
       continue;
     }
     // effect == Effect::Kill
@@ -777,7 +792,7 @@ bool IterativeBackwardReachability<Effects>::findBarrier(SILInstruction *from,
     }
   }
   assert(result.getEffectForBlock(block) != Effect::Kill());
-  if (isEffectiveDefBlock(block)) {
+  if (stopAtBlock(block)) {
     visitor.visitBarrierBlock(block);
     return true;
   }
@@ -887,6 +902,41 @@ void IterativeBackwardReachability<Effects>::Result::setEffectForBlock(
     return;
   }
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: findBarriersBackward
+//===----------------------------------------------------------------------===//
+
+using llvm::ArrayRef;
+using llvm::function_ref;
+
+struct ReachableBarriers final {
+  /// Instructions which are barriers.
+  llvm::SmallVector<SILInstruction *, 4> instructions;
+
+  /// Blocks one of whose phis is a barrier.
+  llvm::SmallVector<SILBasicBlock *, 4> phis;
+
+  /// Boundary edges; edges such that
+  /// (1) the target block is reachable-at-begin
+  /// (2) at least one adjacent edge's target is not reachable-at-begin.
+  llvm::SmallVector<SILBasicBlock *, 4> edges;
+
+  ReachableBarriers() {}
+  ReachableBarriers(ReachableBarriers const &) = delete;
+  ReachableBarriers &operator=(ReachableBarriers const &) = delete;
+};
+
+/// Walk backwards from the specified \p roots through at the earliest \p
+/// initialBlocks to populate \p barriers by querying \p isBarrier along the
+/// way.
+///
+/// If \p initialBlocks is empty, dataflow continues to the begin of the
+/// function.
+void findBarriersBackward(ArrayRef<SILInstruction *> roots,
+                          ArrayRef<SILBasicBlock *> initialBlocks,
+                          SILFunction &function, ReachableBarriers &barriers,
+                          function_ref<bool(SILInstruction *)> isBarrier);
 
 } // end namespace swift
 

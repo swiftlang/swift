@@ -53,6 +53,7 @@ enum ContextualTypePurpose : uint8_t {
   CTP_YieldByValue,     ///< By-value yield operand.
   CTP_YieldByReference, ///< By-reference yield operand.
   CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
+  CTP_ForgetStmt,        ///< Value specified to a 'forget' statement.
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
 
@@ -311,6 +312,11 @@ public:
   /// Whether this locator identifies a conversion for a SingleValueStmtExpr
   /// branch, and if so, the kind of branch.
   Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
+
+  /// Returns true if \p locator is ending with either of the following
+  ///  - Member
+  ///  - Member -> KeyPathDynamicMember
+  bool isMemberRef() const;
 
   /// Determine whether this locator points directly to a given expression.
   template <typename E> bool directlyAt() const {
@@ -639,6 +645,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == PathElementKind::TupleType;
+  }
+};
+
+class LocatorPathElt::GenericType : public StoredPointerElement<TypeBase> {
+public:
+  GenericType(Type type)
+      : StoredPointerElement(PathElementKind::GenericType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<BoundGenericType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::GenericType;
   }
 };
 

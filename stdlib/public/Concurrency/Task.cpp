@@ -555,18 +555,20 @@ const void *AsyncTask::getResumeFunctionForLogging() {
   return __ptrauth_swift_runtime_function_entry_strip(result);
 }
 
-JobPriority swift::swift_task_currentPriority(AsyncTask *task)
-{
+JobPriority swift::swift_task_currentPriority(AsyncTask *task) {
   // This is racey but this is to be used in an API is inherently racey anyways.
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   return oldStatus.getStoredPriority();
 }
 
-JobPriority swift::swift_task_basePriority(AsyncTask *task)
-{
+JobPriority swift::swift_task_basePriority(AsyncTask *task) {
   JobPriority pri = task->_private().BasePriority;
   SWIFT_TASK_DEBUG_LOG("Task %p has base priority = %zu", task, pri);
   return pri;
+}
+
+JobPriority swift::swift_concurrency_jobPriority(Job *job) {
+  return job->getPriority();
 }
 
 static inline bool isUnspecified(JobPriority priority) {
@@ -1518,7 +1520,7 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  removeStatusRecord(record);
+  removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }
 
@@ -1587,5 +1589,60 @@ static void swift_task_asyncMainDrainQueueImpl() {
 #endif
 }
 
+SWIFT_CC(swift)
+void (*swift::swift_task_asyncMainDrainQueue_hook)(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride) = nullptr;
+
+SWIFT_CC(swift)
+static void swift_task_startOnMainActorImpl(AsyncTask* task) {
+  AsyncTask * originalTask = _swift_task_clearCurrent();
+  ExecutorRef mainExecutor = swift_task_getMainExecutor();
+  if (!swift_task_isCurrentExecutor(mainExecutor))
+    swift_Concurrency_fatalError(0, "Not on the main executor");
+  swift_retain(task);
+  swift_job_run(task, mainExecutor);
+  _swift_task_setCurrent(originalTask);
+}
+
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
+
+#ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+/// The original COMPATIBILITY_OVERRIDE defined in CompatibilityOverride.h
+/// returns the result of the impl function and override function. This results
+/// in a warning emitted for noreturn functions. Overriding the override macro
+/// to not return.
+#define HOOKED_OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace,         \
+                                      typedArgs, namedArgs)                    \
+  attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
+    static Override_##name Override;                                           \
+    static swift_once_t Predicate;                                             \
+    swift_once(                                                                \
+        &Predicate, [](void *) { Override = getOverride_##name(); }, nullptr); \
+    if (swift_##name##_hook) {                                                 \
+      swift_##name##_hook(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)          \
+                              swift_##name##Impl,                              \
+                          Override);                                           \
+      abort();                                                                 \
+    }                                                                          \
+    if (Override != nullptr)                                                   \
+      Override(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)                     \
+                   swift_##name##Impl);                                        \
+    swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                         \
+  }
+
+#else // ifndef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+// Call directly through to the original implementation when we don't support
+// overrides.
+#define HOOKED_OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace,         \
+                                      typedArgs, namedArgs)                    \
+  attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
+    if (swift_##name##_hook) {                                                 \
+      swift_##name##_hook(swift_##name##Impl, nullptr);                        \
+      abort();                                                                 \
+    }                                                                          \
+    swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                         \
+  }
+#endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

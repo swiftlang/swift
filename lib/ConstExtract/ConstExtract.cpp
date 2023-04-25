@@ -12,6 +12,7 @@
 
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -47,6 +48,10 @@ public:
       std::vector<NominalTypeDecl *> &ConformanceDecls)
       : Protocols(Protocols), ConformanceTypeDecls(ConformanceDecls) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
       if (!isa<ProtocolDecl>(NTD))
@@ -69,6 +74,10 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   Type.print(OutputStream, Options);
   OutputStream.flush();
   return TypeNameOutput;
+}
+
+std::string toMangledTypeNameString(const swift::Type &Type) {
+  return Mangle::ASTMangler().mangleTypeWithoutPrefix(Type);
 }
 
 } // namespace
@@ -138,6 +147,8 @@ extractFunctionArguments(const ArgumentList *args) {
       if (decl->hasDefaultExpr()) {
         argExpr = decl->getTypeCheckedDefaultExpr();
       }
+    } else if (auto optionalInject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
+      argExpr = optionalInject->getSubExpr();
     }
     parameters.push_back({label, type, extractCompileTimeValue(argExpr)});
   }
@@ -302,6 +313,35 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::DotSelf: {
       auto dotSelfExpr = cast<DotSelfExpr>(expr);
       return std::make_shared<TypeValue>(dotSelfExpr->getType());
+    }
+
+    case ExprKind::UnderlyingToOpaque: {
+      auto underlyingToOpaque = cast<UnderlyingToOpaqueExpr>(expr);
+      return extractCompileTimeValue(underlyingToOpaque->getSubExpr());
+    }
+
+    case ExprKind::DefaultArgument: {
+      auto defaultArgExpr = cast<DefaultArgumentExpr>(expr);
+      auto *decl = defaultArgExpr->getParamDecl();
+      // If there is a default expr, we should have looked through to it
+      assert(!decl->hasDefaultExpr());
+      switch (decl->getDefaultArgumentKind()) {
+      case DefaultArgumentKind::NilLiteral:
+        return std::make_shared<RawLiteralValue>("nil");
+      case DefaultArgumentKind::EmptyArray:
+        return std::make_shared<ArrayValue>(
+            std::vector<std::shared_ptr<CompileTimeValue>>());
+      case DefaultArgumentKind::EmptyDictionary:
+        return std::make_shared<DictionaryValue>(
+            std::vector<std::shared_ptr<TupleValue>>());
+      default:
+        break;
+      }
+    } break;
+
+    case ExprKind::InjectIntoOptional: {
+      auto injectIntoOptionalExpr = cast<InjectIntoOptionalExpr>(expr);
+      return extractCompileTimeValue(injectIntoOptionalExpr->getSubExpr());
     }
 
     default: {
@@ -593,10 +633,13 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Type: {
     auto typeValue = cast<TypeValue>(value);
+    Type type = typeValue->getType();
     JSON.attribute("valueKind", "Type");
     JSON.attributeObject("value", [&]() {
       JSON.attribute("type",
-                     toFullyQualifiedTypeNameString(typeValue->getType()));
+                     toFullyQualifiedTypeNameString(type));
+      JSON.attribute("mangledName",
+                     toMangledTypeNameString(type));
     });
     break;
   }

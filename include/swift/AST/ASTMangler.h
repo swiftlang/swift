@@ -384,8 +384,11 @@ public:
   static Optional<SpecialContext>
   getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
-  static const clang::NamedDecl *
-  getClangDeclForMangling(const ValueDecl *decl);
+  static bool isCXXCFOptionsDefinition(const ValueDecl *decl);
+  static const clang::TypedefType *
+  getTypeDefForCXXCFOptionsDefinition(const ValueDecl *decl);
+
+  static const clang::NamedDecl *getClangDeclForMangling(const ValueDecl *decl);
 
   void appendExistentialLayout(
       const ExistentialLayout &layout, GenericSignature sig,
@@ -398,7 +401,8 @@ protected:
   void appendType(Type type, GenericSignature sig,
                   const ValueDecl *forDecl = nullptr);
   
-  void appendDeclName(const ValueDecl *decl);
+  void appendDeclName(
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,

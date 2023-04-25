@@ -248,7 +248,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
   CHECK_NAMED_TYPE("OpaquePointer", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
   CHECK_NAMED_TYPE("DarwinBoolean", ctx.UnsignedCharTy);
-  CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
+  CHECK_NAMED_TYPE(swift::getSwiftName(
                      KnownFoundationEntity::NSZone),
                    ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("WindowsBool", ctx.IntTy);

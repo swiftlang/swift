@@ -188,6 +188,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringRepeating
 import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
@@ -379,6 +380,7 @@ register(StringEnum.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
+register(StringRepeating.benchmarks)
 register(StringReplaceSubrange.benchmarks)
 
 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {

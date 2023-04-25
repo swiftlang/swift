@@ -105,6 +105,22 @@ namespace swift {
     TaskToThread,
   };
 
+  /// Describes the code size optimization behavior for code associated with
+  /// declarations that are marked unavailable.
+  enum class UnavailableDeclOptimization : uint8_t {
+    /// No optimization. Unavailable declarations will contribute to the
+    /// resulting binary by default in this mode.
+    None,
+
+    /// Avoid generating any code for unavailable declarations.
+    ///
+    /// NOTE: This optimization can be ABI breaking for a library evolution
+    /// enabled module because existing client binaries built with a
+    /// pre-Swift 5.9 compiler may depend on linkable symbols associated with
+    /// unavailable declarations.
+    Complete,
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -166,13 +182,14 @@ namespace swift {
     version::Version PackageDescriptionVersion;
 
     /// Enable experimental string processing
-    bool EnableExperimentalStringProcessing = false;
+    bool EnableExperimentalStringProcessing = true;
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// Only check the availability of the API, ignore function bodies.
-    bool CheckAPIAvailabilityOnly = false;
+    /// Optimization mode for unavailable declarations.
+    UnavailableDeclOptimization UnavailableDeclOptimizationMode =
+        UnavailableDeclOptimization::None;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.
@@ -352,6 +369,10 @@ namespace swift {
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
 
+    /// Disable the implicit import of the _Backtracing module.
+    bool DisableImplicitBacktracingModuleImport =
+        !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
@@ -395,6 +416,9 @@ namespace swift {
 
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
+
+    /// The name of the package this module belongs to.
+    std::string PackageName;
 
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
@@ -532,8 +556,8 @@ namespace swift {
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
-    /// Allows the explicit 'import Builtin' within Swift modules.
-    bool EnableBuiltinModule = false;
+    /// All block list configuration files to be honored in this compilation.
+    std::vector<std::string> BlocklistConfigFilePaths;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -780,8 +804,19 @@ namespace swift {
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
 
+    /// clang CASOptions.
+    std::string CASPath;
+
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
+
+    /// Don't verify input files for Clang modules if the module has been
+    /// successfully validated or loaded during this build session.
+    bool ValidateModulesOnce = false;
+
+    /// Use the last modification time of this file as the underlying Clang
+    /// build session timestamp.
+    std::string BuildSessionFilePath;
 
     /// \see Mode
     enum class Modes : uint8_t {

@@ -331,7 +331,6 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
-  // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
              weak v1] in v1!.foo() }  // expected-error {{invalid redeclaration of 'v1'}}
   doStuff { [unowned v2] in v2.foo() }
@@ -340,7 +339,6 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 
@@ -618,6 +616,22 @@ class C_56501 {
       }
     }
   }
+  
+  func test7() {
+    doVoidStuff { [self] in
+      func innerFunction() {
+        operation()
+      }
+    }
+  }
+  
+  func test8() {
+    doVoidStuffNonEscaping { [self] in
+      func innerFunction() {
+        operation()
+      }
+    }
+  }
 }
 
 // https://github.com/apple/swift/issues/57029
@@ -814,6 +828,236 @@ public class TestImplicitSelfForWeakSelfCapture {
       guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
+    
+    doVoidStuff { [weak self] in
+      func innerFunction1() {
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self?.method()
+      }
+      
+      guard let self else { return }
+      
+      func innerFunction2() {
+          method()
+          self.method()
+      }
+      
+      subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
+        method()
+        return index
+      }
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      func innerFunction1() {
+          method()
+          self?.method()
+      }
+      
+      guard let self else { return }
+      
+      func innerFunction2() {
+          method()
+          self.method()
+      }
+      
+      subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
+        method()
+        return index
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      
+      func innerFunction1() {
+        doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+        }
+        
+        // This example should probably compile without an error -- seems like a bug in the impl of SE-0269
+        doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.method()
+        }
+        
+        doVoidStuff { [weak self] in
+          method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self?.method()
+        }
+        
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          method()
+          
+          func innerMethod3() {
+            method()
+            self.method()
+          }
+        }
+      }
+    }
+  }
+}
+
+class NoImplicitSelfInInnerClass {
+  func method() { }
+  
+  private init() { // expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}}
+    doVoidStuff {
+      class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
+        init() {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        func functionInsideInnerType() {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        subscript(index: Int) -> Int {
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          return index
+        }
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      method()
+      
+      class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
+        func methodOnInnerType() { }
+        
+        init() {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        func functionInsideInnerType() {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+        }
+        
+        subscript(index: Int) -> Int {
+          methodOnInnerType()
+          method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+          self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+          return index
+        }
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self else { return }
+      
+      func innerMethod() {
+        method()
+        
+        class InnerType { // expected-note {{type declared here}}
+          func methodOnInnerType() { }
+          
+          init() {
+            methodOnInnerType()
+            method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
+            self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+            
+            doVoidStuff { [weak self] in
+              guard let self else { return }
+              self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+              methodOnInnerType()
+            }
+            
+            doVoidStuff { [weak self] in
+              guard let self else { return }
+              method() // expected-error {{value of type 'InnerType' has no member 'method'}}
+              methodOnInnerType()
+            }
+          }
+        }
+      }
+    }
+    
+  }
+  
+  func foo(condition: Bool) {
+    doVoidStuff { [weak self] in
+      guard condition, let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, condition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard condition, let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, condition else { return }
+      method()
+    }
+  }
+
+  func foo(optionalCondition: Bool?) {
+    doVoidStuff { [weak self] in
+      guard let optionalCondition, optionalCondition, let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, let optionalCondition, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let optionalCondition, let self, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let optionalCondition, optionalCondition, let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, let optionalCondition, optionalCondition else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let optionalCondition, let self, optionalCondition else { return }
+      method()
+    }
+  }
+  
+  func foo() {
+    doVoidStuff { [weak self] in
+      guard #available(SwiftStdlib 5.8, *), let self else { return }
+      method()
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self, #available(SwiftStdlib 5.8, *) else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard #available(SwiftStdlib 5.8, *), let self else { return }
+      method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self, #available(SwiftStdlib 5.8, *) else { return }
+      method()
+    }
   }
 }
 
@@ -892,4 +1136,35 @@ func test60781() -> Int {
 
 func test60781_MultiArg() -> Int {
   f60781({ 1 }, { 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
+}
+
+@resultBuilder
+struct VoidBuilder {
+  static func buildBlock() -> Void { }
+  static func buildPartialBlock<T>(first: T) -> Void { }
+  static func buildPartialBlock<T>(accumulated: Void, next: T) -> Void { }
+}
+
+final class EscapingWrapper {
+  static func wrapper(_ closure: @escaping () -> Void) {
+    closure()
+  }
+}
+
+final class TestGithubIssue64757 {
+  var instanceProperty: String = "instance property"
+  
+  @VoidBuilder
+  var void: Void {
+    EscapingWrapper.wrapper { [weak self] in
+      print(instanceProperty) // expected-error {{reference to property 'instanceProperty' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      
+      if let self {
+        print(instanceProperty)
+      }
+      
+      guard let self else { return }
+      print(instanceProperty)
+    }
+  }
 }

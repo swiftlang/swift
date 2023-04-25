@@ -17,6 +17,7 @@
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
+#include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -423,7 +424,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 /******************************* PROPERTIES ***********************************/
 /******************************************************************************/
 
-// TODO(distributed): make use of this after all, but FORCE it?
 static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   assert(derived.Nominal->isDistributedActor());
   auto &C = derived.Context;
@@ -478,15 +478,15 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   // we don't allocate memory after those two fields, so their order is very
   // important. The `hint` below makes sure the system is inserted right after.
   if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
     derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
+    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
   } else {
     // `id` will be synthesized next, and will insert at head,
     // so in order for system to be SECOND (as it must be),
     // we'll insert at head right now and as id gets synthesized we'll get
     // the correct order: id, actorSystem.
-    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
     derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
+    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
   }
 
   return propDecl;
@@ -572,8 +572,290 @@ deriveDistributedActorType_SerializationRequirement(
 }
 
 /******************************************************************************/
+
+
+/// Turn a Builtin.Executor value into an UnownedSerialExecutor.
+static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
+                                            Expr *arg) {
+  auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+  if (!executorDecl) return nullptr;
+
+  for (auto member: executorDecl->getAllMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor) continue;
+    auto params = ctor->getParameters();
+    if (params->size() != 1 ||
+        !params->get(0)->getInterfaceType()->is<BuiltinExecutorType>())
+      continue;
+
+    Type executorType = executorDecl->getDeclaredInterfaceType();
+
+    Type ctorType = ctor->getInterfaceType();
+
+    // We have the right initializer. Build a reference to it of type:
+    //   (UnownedSerialExecutor.Type)
+    //      -> (Builtin.Executor) -> UnownedSerialExecutor
+    auto initRef = new (ctx) DeclRefExpr(ctor, DeclNameLoc(), /*implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         ctorType);
+
+    // Apply the initializer to the metatype, building an expression of type:
+    //   (Builtin.Executor) -> UnownedSerialExecutor
+    auto metatypeRef = TypeExpr::createImplicit(executorType, ctx);
+    Type ctorAppliedType = ctorType->getAs<FunctionType>()->getResult();
+    auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
+                                                    ctorAppliedType);
+    selfApply->setImplicit(true);
+    selfApply->setThrows(false);
+
+    // Call the constructor, building an expression of type
+    // UnownedSerialExecutor.
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    auto call = CallExpr::createImplicit(ctx, selfApply, argList);
+    call->setType(executorType);
+    call->setThrows(false);
+    return call;
+  }
+
+  return nullptr;
+}
+
+static std::pair<BraceStmt *, bool>
+deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
+  // var unownedExecutor: UnownedSerialExecutor {
+  //   get {
+  //     guard __isLocalActor(self) else {
+  //       return buildDefaultDistributedRemoteActorExecutor(self)
+  //     }
+  //     return Builtin.buildDefaultActorExecutorRef(self)
+  //   }
+  // }
+  ASTContext &ctx = getter->getASTContext();
+
+  // Produce an empty brace statement on failure.
+  auto failure = [&]() -> std::pair<BraceStmt *, bool> {
+    auto body = BraceStmt::create(
+        ctx, SourceLoc(), { }, SourceLoc(), /*implicit=*/true);
+    return { body, /*isTypeChecked=*/true };
+  };
+
+  // Build a reference to self.
+  Type selfType = getter->getImplicitSelfDecl()->getType();
+  Expr *selfArg = DerivedConformance::createSelfDeclRef(getter);
+  selfArg->setType(selfType);
+
+  // Prepare the builtin call, we'll use it after the guard, but want to take the type
+  // of its return type earlier, so we prepare it here.
+
+  // The builtin call gives us a Builtin.Executor.
+  auto builtinCall =
+      DerivedConformance::createBuiltinCall(ctx,
+                                            BuiltinValueKind::BuildDefaultActorExecutorRef,
+                                            {selfType}, {}, {selfArg});
+  // Turn that into an UnownedSerialExecutor.
+  auto initCall = constructDistributedUnownedSerialExecutor(ctx, builtinCall);
+  if (!initCall) return failure();
+
+  // guard __isLocalActor(self) else {
+  //   return buildDefaultDistributedRemoteActorExecutor(self)
+  // }
+  auto isLocalActorDecl = ctx.getIsLocalDistributedActor();
+  DeclRefExpr *isLocalActorExpr =
+      new (ctx) DeclRefExpr(ConcreteDeclRef(isLocalActorDecl), DeclNameLoc(), /*implicit=*/true,
+                            AccessSemantics::Ordinary,
+                            FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())},
+                                              ctx.getBoolType()));
+  Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
+  selfForIsLocalArg->setType(selfType);
+  auto *argListForIsLocal =
+      ArgumentList::forImplicitSingle(ctx, Identifier(),
+                                      ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
+  CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
+  isLocalActorCall->setType(ctx.getBoolType());
+  isLocalActorCall->setThrows(false);
+
+  GuardStmt* guardElseRemoteReturnExec;
+  {
+    // Find the buildDefaultDistributedRemoteActorExecutor method
+    auto buildRemoteExecutorDecl =
+        ctx.getBuildDefaultDistributedRemoteActorUnownedExecutor();
+    assert(buildRemoteExecutorDecl && "cannot find buildDefaultDistributedRemoteActorExecutor");
+    auto substitutions = SubstitutionMap::get(
+        buildRemoteExecutorDecl->getGenericSignature(),
+        [&](SubstitutableType *dependentType) {
+          if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+            if (gp->getDepth() == 0 && gp->getIndex() == 0) {
+              return getter->getImplicitSelfDecl()->getType();
+            }
+          }
+
+          return Type();
+        },
+        LookUpConformanceInModule(getter->getParentModule())
+    );
+    DeclRefExpr *buildRemoteExecutorExpr =
+        new (ctx) DeclRefExpr(
+            ConcreteDeclRef(buildRemoteExecutorDecl, substitutions),
+            DeclNameLoc(),/*implicit=*/true,
+            AccessSemantics::Ordinary);
+    buildRemoteExecutorExpr->setType(
+        buildRemoteExecutorDecl->getInterfaceType()
+         .subst(substitutions)
+        );
+
+    Expr *selfForBuildRemoteExecutor = DerivedConformance::createSelfDeclRef(getter);
+    selfForBuildRemoteExecutor->setType(selfType);
+    auto *argListForBuildRemoteExecutor =
+        ArgumentList::forImplicitCallTo(buildRemoteExecutorDecl->getParameters(),
+                                        /*argExprs=*/{selfForBuildRemoteExecutor}, ctx);
+    CallExpr *buildRemoteExecutorCall = CallExpr::createImplicit(ctx, buildRemoteExecutorExpr,
+                                                                 argListForBuildRemoteExecutor);
+    buildRemoteExecutorCall->setType(ctx.getUnownedSerialExecutorType());
+    buildRemoteExecutorCall->setThrows(false);
+
+    SmallVector<ASTNode, 1> statements = {
+        new(ctx) ReturnStmt(SourceLoc(), buildRemoteExecutorCall)
+    };
+
+    SmallVector<StmtConditionElement, 1> conditions = {
+        isLocalActorCall
+    };
+
+    // Build and return the complete guard statement.
+    guardElseRemoteReturnExec =
+        new(ctx) GuardStmt(SourceLoc(), ctx.AllocateCopy(conditions),
+                           BraceStmt::create(ctx, SourceLoc(), statements, SourceLoc()));
+  }
+
+  // Finalize preparing the unowned executor for returning.
+  // auto wrappedCall = new (ctx) InjectIntoOptionalExpr(initCall, initCall->getType());
+  auto returnDefaultExec = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit=*/true);
+
+  auto body = BraceStmt::create(
+      ctx, SourceLoc(), { guardElseRemoteReturnExec, returnDefaultExec }, SourceLoc(), /*implicit=*/true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+/// Derive the declaration of DistributedActor's unownedExecutor property.
+static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &derived) {
+  ASTContext &ctx = derived.Context;
+
+  // Retrieve the types and declarations we'll need to form this operation.
+  auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+  if (!executorDecl) {
+    derived.Nominal->diagnose(
+        diag::concurrency_lib_missing, "UnownedSerialExecutor");
+    return nullptr;
+  }
+  Type executorType = executorDecl->getDeclaredInterfaceType();
+
+  if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
+    if (auto existing = classDecl->getUnownedExecutorProperty()) {
+      if (existing->getInterfaceType()->isEqual(executorType)) {
+        return const_cast<VarDecl *>(existing);
+      } else {
+        // bad type, should be diagnosed elsewhere
+        return nullptr;
+      }
+    }
+  }
+
+  auto propertyPair = derived.declareDerivedProperty(
+      DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
+      executorType, executorType,
+      /*static*/ false, /*final*/ false);
+  auto property = propertyPair.first;
+  property->setSynthesized(true);
+  property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
+                                                   SourceLoc(), SourceRange(),
+                                                   /*implicit*/ true));
+  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+
+  // Make the property implicitly final.
+  property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+  if (property->getFormalAccess() == AccessLevel::Open)
+    property->overwriteAccess(AccessLevel::Public);
+
+  // Infer availability.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(executorDecl);
+  if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
+    asAvailableAs.push_back(enclosingDecl);
+
+  AvailabilityInference::applyInferredAvailableAttrs(
+      property, asAvailableAs, ctx);
+
+  auto getter =
+      derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+  getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
+
+  // IMPORTANT: MUST BE AFTER [id, actorSystem].
+  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
+    if (auto system = derived.Nominal->getDistributedActorSystemProperty()) {
+      // good, we must be after the system; this is the final order
+      derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/system);
+      derived.addMemberToConformanceContext(property, /*hint=*/system);
+    } else {
+      // system was not yet synthesized, it'll insert after id and we'll be okey
+      derived.addMemberToConformanceContext(propertyPair.second, /*hint=*/id);
+      derived.addMemberToConformanceContext(property, /*hint=*/id);
+    }
+  } else {
+    // nor id or system synthesized yet, id will insert first and system will be after it
+    derived.addMemberToConformanceContext(propertyPair.second, /*insertAtHead==*/true);
+    derived.addMemberToConformanceContext(property, /*insertAtHead==*/true);
+  }
+
+  return property;
+}
+
+/******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
+
+/// Asserts that the synthesized fields appear in the expected order.
+///
+/// The `id` and `actorSystem` MUST be the first two fields of a distributed actor,
+/// because we assume their location in IRGen, and also when we allocate a distributed remote actor,
+/// we're able to allocate memory ONLY for those and without allocating any of the storage for the actor's
+/// properties.
+///         [id, actorSystem]
+/// followed by the executor fields for a default distributed actor.
+///
+static void assertRequiredSynthesizedPropertyOrder(DerivedConformance &derived, ValueDecl *derivedValue) {
+#ifndef NDEBUG
+  if (derivedValue) {
+    auto Nominal = derived.Nominal;
+    auto &Context = derived.Context;
+    if (auto id = Nominal->getDistributedActorIDProperty()) {
+      if (auto system = Nominal->getDistributedActorSystemProperty()) {
+        if (auto classDecl = dyn_cast<ClassDecl>(derived.Nominal)) {
+          if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+            int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
+            int idx = 0;
+            for (auto member: Nominal->getMembers()) {
+              if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
+                if (binding->getSingleVar()->getName() == Context.Id_id) {
+                  idIdx = idx;
+                } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
+                  actorSystemIdx = idx;
+                } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
+                  unownedExecutorIdx = idx;
+                }
+                idx += 1;
+              }
+            }
+            if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+              // we have found all the necessary fields, let's assert their order
+              assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
+}
 
 // !!!!!!!!!!!!! IMPORTANT WHEN MAKING CHANGES TO REQUIREMENTS !!!!!!!!!!!!!!!!!
 // !! Remember to update DerivedConformance::getDerivableRequirement          !!
@@ -582,11 +864,17 @@ deriveDistributedActorType_SerializationRequirement(
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
-    if (var->getName() == Context.Id_id)
-      return deriveDistributedActor_id(*this);
+    ValueDecl *derivedValue = nullptr;
+    if (var->getName() == Context.Id_id) {
+      derivedValue = deriveDistributedActor_id(*this);
+    } else if (var->getName() == Context.Id_actorSystem) {
+      derivedValue = deriveDistributedActor_actorSystem(*this);
+    } else if (var->getName() == Context.Id_unownedExecutor) {
+      derivedValue = deriveDistributedActor_unownedExecutor(*this);
+    }
 
-    if (var->getName() == Context.Id_actorSystem)
-      return deriveDistributedActor_actorSystem(*this);
+    assertRequiredSynthesizedPropertyOrder(*this, derivedValue);
+    return derivedValue;
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {

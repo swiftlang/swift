@@ -25,6 +25,7 @@ from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
+from .minimalstdlib import MinimalStdlib
 from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
@@ -45,7 +46,6 @@ from .zlib import Zlib
 __all__ = [
     'BackDeployConcurrency',
     'CMark',
-    'Ninja',
     'Foundation',
     'LibCXX',
     'LibDispatch',
@@ -56,6 +56,7 @@ __all__ = [
     'LLBuild',
     'LLDB',
     'LLVM',
+    'MinimalStdlib',
     'Ninja',
     'PlaygroundSupport',
     'Swift',

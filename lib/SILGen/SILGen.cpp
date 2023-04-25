@@ -91,7 +91,7 @@ SILGenModule::~SILGenModule() {
       f.setLinkage(SILLinkage::PublicExternal);
   }
 
-  M.verify();
+  M.verifyIncompleteOSSA();
 }
 
 static SILDeclRef
@@ -770,6 +770,13 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
   return emittedFunctions.count(constant);
 }
 
+void SILGenModule::visit(Decl *D) {
+  if (Lowering::shouldSkipLowering(D))
+    return;
+
+  ASTVisitor::visit(D);
+}
+
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
@@ -1106,7 +1113,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
     // TODO: Handle main SourceFile emission (currently done by
     // SourceFileScope).
-    auto loc = RegularLocation::getModuleLocation();
+    auto loc = constant.getAsRegularLocation();
     preEmitFunction(constant, f, loc);
     auto *decl = constant.getDecl();
     auto *dc = decl->getDeclContext();
@@ -1223,7 +1230,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
-  F->verify();
+  F->verifyIncompleteOSSA();
 
   emitDifferentiabilityWitnessesForFunction(constant, F);
 }
@@ -1673,7 +1680,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
   emitLazyConformancesForFunction(f);
-  f->verify();
+  f->verifyIncompleteOSSA();
 
   return f;
 }
@@ -1792,8 +1799,7 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 }
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
-  // Expanded declaration macros were already added to the parent decl context
-  // for name lookup to work. Nothing to be done here.
+  // Expansion already visited as auxiliary decls.
 }
 
 bool
@@ -2170,7 +2176,7 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
                  toplevel->print(llvm::dbgs()));
-      toplevel->verify();
+      toplevel->verifyIncompleteOSSA();
       sgm.emitLazyConformancesForFunction(toplevel);
     }
   }
@@ -2190,6 +2196,10 @@ public:
     for (auto *D : sf->getTopLevelDecls()) {
       // Emit auxiliary decls.
       D->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
+        // Skip extensions decls; they are visited below.
+        if (isa<ExtensionDecl>(auxiliaryDecl))
+          return;
+
         FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                         "SILgen-decl", auxiliaryDecl);
         SGM.visit(auxiliaryDecl);
@@ -2198,6 +2208,34 @@ public:
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
       SGM.visit(D);
+    }
+
+    // FIXME: Visit macro-generated extensions separately.
+    //
+    // The code below that visits auxiliary decls of the top-level
+    // decls in the source file does not work for nested types with
+    // attached conformance macros:
+    // ```
+    // struct Outer {
+    //   @AddConformance struct Inner {}
+    // }
+    // ```
+    // Because the attached-to decl is not at the top-level. To fix this,
+    // visit the macro-generated conformances that are recorded in the
+    // synthesized file unit to cover all macro-generated extension decls.
+    if (auto *synthesizedFile = sf->getSynthesizedFile()) {
+      for (auto *D : synthesizedFile->getTopLevelDecls()) {
+        if (!isa<ExtensionDecl>(D))
+          continue;
+
+        auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
+        if (sf->getFulfilledMacroRole() != MacroRole::Conformance)
+          continue;
+
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-decl", D);
+        SGM.visit(D);
+      }
     }
 
     for (Decl *D : sf->getHoistedDecls()) {

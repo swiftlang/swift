@@ -49,6 +49,11 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
+# SWIFTLIBEXEC_DIR is the directory in the build tree where Swift auxiliary
+# executables should be placed.
+set(SWIFTLIBEXEC_DIR
+    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/libexec/swift")
+
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -81,7 +86,7 @@ endfunction()
 function(_add_host_variant_swift_sanitizer_flags target)
   if(LLVM_USE_SANITIZER)
     if(LLVM_USE_SANITIZER STREQUAL "Address")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-Xclang-linker" "-fsanitize=address")
     elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
       # Not supported?
     elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
@@ -90,14 +95,14 @@ function(_add_host_variant_swift_sanitizer_flags target)
         # Not supported
       endif()
     elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined" "-Xclang-linker" "-fsanitize=undefined")
     elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=thread")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=thread" "-Xclang-linker" "-fsanitize=thread")
     elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
       # Not supported
     elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
            LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-sanitize=undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-sanitize=undefined" "-Xclang-linker" "-fsanitize=address" "-Xclang-linker" "-fsanitize=undefined")
     elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
       # Not supported
     else()
@@ -689,6 +694,8 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
+  target_link_directories(${name} PUBLIC ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
   # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
@@ -973,8 +980,8 @@ function(add_swift_fuzzer_host_tool executable)
 endfunction()
 
 macro(add_swift_tool_symlink name dest component)
-  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
-  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+  llvm_add_tool_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
 endmacro()
 
 # Declare that files in this library are built with LLVM's support

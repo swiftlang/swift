@@ -142,8 +142,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool &isFramework,
-                  bool &isSystemModule) override;
+                  bool skipBuildingInterface, bool isTestableDependencyLookup,
+                  bool &isFramework, bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -152,10 +152,12 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool canImportModule(ImportPath::Module named,
-                       ModuleVersionInfo *versionInfo) override;
+                       ModuleVersionInfo *versionInfo,
+                       bool isTestableDependencyLookup = false) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -447,6 +449,7 @@ public:
   bool tryEmitForwardingModule(StringRef moduleName,
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
+                               llvm::vfs::OutputBackend &backend,
                                StringRef outPath) override;
   bool isCached(StringRef DepPath);
 };
@@ -476,7 +479,8 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool skipBuildingInterface, bool IsFramework) override;
+      bool SkipBuildingInterface, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool isCached(StringRef DepPath) override;
 public:
@@ -550,6 +554,7 @@ private:
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
+                                     const ClangImporterOptions &clangImporterOpts,
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,

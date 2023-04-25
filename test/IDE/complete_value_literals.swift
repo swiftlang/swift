@@ -4,7 +4,6 @@
 func testAll0() {
   // Not type context.
   let x = #^NO_CONTEXT_0^#
-// NO_CONTEXT_0-DAG: Begin completions
 // NO_CONTEXT_0-DAG: Literal[Integer]/None:              0[#Int#];
 // NO_CONTEXT_0-DAG: Literal[Boolean]/None:              true[#Bool#];
 // NO_CONTEXT_0-DAG: Literal[Boolean]/None:              false[#Bool#];
@@ -14,7 +13,6 @@ func testAll0() {
 // NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
 // NO_CONTEXT_0-DAG: Literal[_Color]/None:               #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#});
 // NO_CONTEXT_0-DAG: Literal[_Image]/None:               #imageLiteral({#resourceName: String#});
-// NO_CONTEXT_0: End completions
 }
 
 struct MyNil1: ExpressibleByNilLiteral {

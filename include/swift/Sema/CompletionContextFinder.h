@@ -49,6 +49,10 @@ class CompletionContextFinder : public ASTWalker {
   DeclContext *InitialDC;
 
 public:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   /// Finder for completion contexts within the provided initial expression.
   CompletionContextFinder(ASTNode initialNode, DeclContext *DC)
       : InitialExpr(initialNode.dyn_cast<Expr *>()), InitialDC(DC) {

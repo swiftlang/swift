@@ -104,7 +104,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion =
-    10; // Store if decl has an async alternative
+    11; // Added macro roles
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -230,6 +230,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
     auto associatedKind = static_cast<uint8_t>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
+    auto roles = CodeCompletionMacroRoles(*cursor++);
     auto notRecommended =
         static_cast<ContextFreeNotRecommendedReason>(*cursor++);
     auto diagSeverity =
@@ -266,7 +267,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, isAsync,
+            kind, associatedKind, opKind, roles, isSystem, isAsync,
             hasAsyncAlternative, string, moduleName, briefDocComment,
             makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
@@ -423,6 +424,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       } else {
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       }
+      LE.write(static_cast<uint8_t>(R->getMacroRoles().toRaw()));
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));

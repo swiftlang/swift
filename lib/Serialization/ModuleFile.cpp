@@ -17,6 +17,7 @@
 #include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignature.h"
@@ -109,6 +110,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
   allocateBuffer(Conformances, core->Conformances);
+  allocateBuffer(PackConformances, core->PackConformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
   allocateBuffer(ClangTypes, core->ClangTypes);
@@ -120,6 +122,108 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
 
 bool ModuleFile::allowCompilerErrors() const {
   return getContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
+Status
+ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
+                                           SourceLoc diagLoc,
+                                           bool forTestable) {
+  ASTContext &ctx = getContext();
+  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  ModuleDecl *M = file->getParentModule();
+
+  bool missingDependency = false;
+  for (auto &dependency : Dependencies) {
+    if (forTestable && dependency.isLoaded())
+      continue;
+
+    assert(!dependency.isLoaded() && "already loaded?");
+
+    if (dependency.isHeader()) {
+      // The path may be empty if the file being loaded is a partial AST,
+      // and the current compiler invocation is a merge-modules step.
+      if (!dependency.Core.RawPath.empty()) {
+        bool hadError =
+            clangImporter->importHeader(dependency.Core.RawPath,
+                                        file->getParentModule(),
+                                        Core->importedHeaderInfo.fileSize,
+                                        Core->importedHeaderInfo.fileModTime,
+                                        Core->importedHeaderInfo.contents,
+                                        diagLoc);
+        if (hadError)
+          return error(Status::FailedToLoadBridgingHeader);
+      }
+      ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
+      dependency.Import = ImportedModule{ImportPath::Access(),
+                                         importedHeaderModule};
+      continue;
+    }
+
+    ModuleLoadingBehavior transitiveBehavior =
+      getTransitiveLoadingBehavior(dependency, forTestable);
+
+    if (ctx.LangOpts.EnableModuleLoadingRemarks) {
+      ctx.Diags.diagnose(diagLoc,
+                         diag::transitive_dependency_behavior,
+                         dependency.Core.getPrettyPrintedPath(),
+                         M->getName(),
+                         unsigned(transitiveBehavior));
+    }
+
+    // Skip this dependency?
+    if (transitiveBehavior == ModuleLoadingBehavior::Ignored)
+      continue;
+
+    ImportPath::Builder builder(ctx, dependency.Core.RawPath,
+                                /*separator=*/'\0');
+    for (const auto &elem : builder) {
+      assert(!elem.Item.empty() && "invalid import path name");
+    }
+
+    auto importPath = builder.copyTo(ctx);
+    auto modulePath = importPath.getModulePath(dependency.isScoped());
+    auto accessPath = importPath.getAccessPath(dependency.isScoped());
+
+    auto module = getModule(modulePath, /*allowLoading*/true);
+    if (!module || module->failedToLoad()) {
+      // If we're missing the module we're an overlay for, treat that specially.
+      if (modulePath.size() == 1 &&
+          modulePath.front().Item == file->getParentModule()->getName()) {
+        return error(Status::MissingUnderlyingModule);
+      }
+      // Otherwise, continue trying to load dependencies, so that we can list
+      // everything that's missing.
+
+      // Report a missing dependency only when really needed.
+      if (transitiveBehavior == ModuleLoadingBehavior::Required)
+        missingDependency = true;
+
+      continue;
+    }
+
+    dependency.Import = ImportedModule{accessPath, module};
+
+    // SPI
+    StringRef spisStr = dependency.Core.RawSPIs;
+    while (!spisStr.empty()) {
+      StringRef nextComponent;
+      std::tie(nextComponent, spisStr) = spisStr.split('\0');
+      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
+    }
+  }
+
+  if (missingDependency) {
+    return error(Status::MissingDependency);
+  }
+
+  return Status::Valid;
 }
 
 Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
@@ -168,93 +272,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     }
   }
 
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-  bool missingDependency = false;
-  for (auto &dependency : Dependencies) {
-    assert(!dependency.isLoaded() && "already loaded?");
-
-    if (dependency.isHeader()) {
-      // The path may be empty if the file being loaded is a partial AST,
-      // and the current compiler invocation is a merge-modules step.
-      if (!dependency.Core.RawPath.empty()) {
-        bool hadError =
-            clangImporter->importHeader(dependency.Core.RawPath,
-                                        file->getParentModule(),
-                                        Core->importedHeaderInfo.fileSize,
-                                        Core->importedHeaderInfo.fileModTime,
-                                        Core->importedHeaderInfo.contents,
-                                        diagLoc);
-        if (hadError)
-          return error(Status::FailedToLoadBridgingHeader);
-      }
-      ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
-      dependency.Import = ImportedModule{ImportPath::Access(),
-                                         importedHeaderModule};
-      continue;
-    }
-
-    // If this module file is being installed into the main module, it's treated
-    // as a partial module.
-    auto isPartialModule = M->isMainModule();
-
-    if (dependency.isImplementationOnly() &&
-        !(isPartialModule || ctx.LangOpts.DebuggerSupport)) {
-      // When building normally (and not merging partial modules), we don't
-      // want to bring in the implementation-only module, because that might
-      // change the set of visible declarations. However, when debugging we
-      // want to allow getting at the internals of this module when possible,
-      // and so we'll try to reference the implementation-only module if it's
-      // available.
-      continue;
-    }
-
-    ImportPath::Builder builder(ctx, dependency.Core.RawPath,
-                                /*separator=*/'\0');
-    for (const auto &elem : builder) {
-      assert(!elem.Item.empty() && "invalid import path name");
-    }
-
-    auto importPath = builder.copyTo(ctx);
-    auto modulePath = importPath.getModulePath(dependency.isScoped());
-    auto accessPath = importPath.getAccessPath(dependency.isScoped());
-
-    auto module = getModule(modulePath, /*allowLoading*/true);
-    if (!module || module->failedToLoad()) {
-      // If we're missing the module we're an overlay for, treat that specially.
-      if (modulePath.size() == 1 &&
-          modulePath.front().Item == file->getParentModule()->getName()) {
-        return error(Status::MissingUnderlyingModule);
-      }
-
-      // Otherwise, continue trying to load dependencies, so that we can list
-      // everything that's missing.
-      if (!(dependency.isImplementationOnly() && ctx.LangOpts.DebuggerSupport))
-        missingDependency = true;
-      continue;
-    }
-
-    dependency.Import = ImportedModule{accessPath, module};
-
-    // SPI
-    StringRef spisStr = dependency.Core.RawSPIs;
-    while (!spisStr.empty()) {
-      StringRef nextComponent;
-      std::tie(nextComponent, spisStr) = spisStr.split('\0');
-      dependency.spiGroups.push_back(ctx.getIdentifier(nextComponent));
-    }
-
-    if (!module->hasResolvedImports()) {
-      // Notice that we check this condition /after/ recording the module that
-      // caused the problem. Clients need to be able to track down what the
-      // cycle was.
-      return error(Status::CircularDependency);
-    }
-  }
-
-  if (missingDependency) {
-    return error(Status::MissingDependency);
-  }
+  Status res = loadDependenciesForFileContext(file, diagLoc,
+                                            /*forTestable=*/false);
+  if (res != Status::Valid) return res;
 
   if (Core->Bits.HasEntryPoint) {
     FileContext->getParentModule()->registerEntryPointFile(FileContext,
@@ -263,6 +283,23 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   }
 
   return status;
+}
+
+ModuleLoadingBehavior
+ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
+    bool forTestable) const {
+  ASTContext &ctx = getContext();
+  ModuleDecl *mod = FileContext->getParentModule();
+
+  // If this module file is being installed into the main module, it's treated
+  // as a partial module.
+  auto isPartialModule = mod->isMainModule();
+
+  return Core->getTransitiveLoadingBehavior(dependency.Core,
+                                            ctx.LangOpts.DebuggerSupport,
+                                            isPartialModule,
+                                            ctx.LangOpts.PackageName,
+                                            forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -458,6 +495,14 @@ void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
         // load it.
         continue;
       }
+
+    } else if (dep.isInternalOrBelow()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::InternalOrBelow))
+        continue;
+
+    } else if (dep.isPackageOnly()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::PackageOnly))
+        continue;
 
     } else {
       if (!filter.contains(ModuleDecl::ImportFilterKind::Default))
@@ -1276,7 +1321,7 @@ ModuleFile::getGroupNameByUSR(StringRef USR) const {
   return None;
 }
 
-Identifier ModuleFile::getDiscriminatorForPrivateValue(const ValueDecl *D) {
+Identifier ModuleFile::getDiscriminatorForPrivateDecl(const Decl *D) {
   Identifier discriminator = PrivateDiscriminatorsByValue.lookup(D);
   assert(!discriminator.empty() && "no discriminator found for decl");
   return discriminator;

@@ -35,7 +35,6 @@ func test(val: TestForPubP) {
 // PUBLIC-DAG: Decl[InstanceMethod]/CurrNominal:   unavailableP_availableC()[#Void#];
 // PUBLIC-DAG: Decl[InstanceMethod]/Super:         availableP_availableC()[#Void#];
 // PUBLIC-DAG: Decl[InstanceMethod]/Super:         availableP_unavailableC()[#Void#];
-// PUBLIC: End completions
 }
 
 protocol InternalP {}
@@ -71,7 +70,6 @@ func test(val: TestForInternalP) {
 // INTERNAL-DAG: Decl[InstanceMethod]/CurrNominal:   availableP_availableC()[#Void#];
 // INTERNAL-DAG: Decl[InstanceMethod]/CurrNominal:   unavailableP_availableC()[#Void#];
 // INTERNAL-DAG: Decl[InstanceMethod]/Super:         availableP_unavailableC()[#Void#];
-// INTERNAL: End completions
 }
 
 private protocol PrivP {}
@@ -107,5 +105,4 @@ func test(val: TestForPrivP) {
 // PRIVATE-DAG: Decl[InstanceMethod]/CurrNominal:   availableP_availableC()[#Void#];
 // PRIVATE-DAG: Decl[InstanceMethod]/CurrNominal:   unavailableP_availableC()[#Void#];
 // PRIVATE-DAG: Decl[InstanceMethod]/Super:         availableP_unavailableC()[#Void#];
-// PRIVATE-DAG: End completions
 }

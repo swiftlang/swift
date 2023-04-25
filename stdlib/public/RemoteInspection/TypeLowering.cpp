@@ -1683,12 +1683,7 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin,
-                                   /*Size=*/0,
-                                   /*Alignment=*/1,
-                                   /*Stride=*/1,
-                                   /*ExtraInhabitants=*/0,
-                                   /*BitwiseTakable=*/true);
+  EmptyTI = makeTypeInfo<BuiltinTypeInfo>();
   return EmptyTI;
 }
 
@@ -2584,8 +2579,10 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
     return nullptr;
   }
 
+  auto ExternalTypeInfoId =
+      ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
   // See if we already computed the result
-  auto found = Cache.find({TR, ExternalTypeInfo});
+  auto found = Cache.find({TR, ExternalTypeInfoId});
   if (found != Cache.end())
     return found->second;
 
@@ -2598,14 +2595,14 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
 
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
-  Cache.insert({{TR, ExternalTypeInfo}, TI});
+  Cache.insert({{TR, ExternalTypeInfoId}, TI});
 
   RecursionCheck.erase(TR);
 
   return TI;
 }
 
-const TypeInfo *TypeConverter::getClassInstanceTypeInfo(
+const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     const TypeRef *TR, unsigned start,
     remote::TypeInfoProvider *ExternalTypeInfo) {
   auto FD = getBuilder().getFieldTypeInfo(TR);

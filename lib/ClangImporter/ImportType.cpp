@@ -32,8 +32,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
@@ -453,7 +454,7 @@ namespace {
           ModuleDecl *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
           Type wrapperTy = Impl.getNamedSwiftType(
                              objCModule,
-                             Impl.SwiftContext.getSwiftName(
+                             swift::getSwiftName(
                                KnownFoundationEntity::NSZone));
           if (wrapperTy)
             return {wrapperTy, ImportHint::OtherPointer};
@@ -1357,7 +1358,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
 
   // FIXME: Avoid string comparison by caching this identifier.
   if (elementClass->getName().str() !=
-        impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
+        swift::getSwiftName(KnownFoundationEntity::NSError))
     return Type();
 
   if (!impl.canImportFoundationModule() ||
@@ -1368,7 +1369,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (resugarNSErrorPointer)
     return impl.getNamedSwiftType(
       foundationModule,
-        impl.SwiftContext.getSwiftName(
+        swift::getSwiftName(
           KnownFoundationEntity::NSErrorPointer));
 
   // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
@@ -2074,6 +2075,15 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
 }
 
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
+    const clang::FunctionDecl *clangDecl, DeclContext *dc) {
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool allowNSUIntegerAsInt =
+      shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
+  return importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
+}
+
+ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
 
@@ -2137,6 +2147,20 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+        }
+      }
+    }
+  }
+
+  // Import the underlying result type.
+  if (clangDecl) {
+    if (auto recordType = returnType->getAsCXXRecordDecl()) {
+      if (auto *vd = evaluateOrDefault(
+              SwiftContext.evaluator,
+              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
+        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
+          Type t = ClassType::get(cd, Type(), SwiftContext);
+          return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
       }
     }
@@ -2356,6 +2380,21 @@ ClangImporter::Implementation::importParameterType(
 
     isParamTypeImplicitlyUnwrapped =
         optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
+  }
+
+  if (!swiftParamTy) {
+    if (auto recordType = paramTy->getAsCXXRecordDecl()) {
+
+      if (auto *vd = evaluateOrDefault(
+              SwiftContext.evaluator,
+              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
+
+        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
+
+          swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
+        }
+      }
+    }
   }
 
   if (!swiftParamTy) {

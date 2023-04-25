@@ -59,7 +59,7 @@ void bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
 
 llvm::Value *
 emitTypeMetadataPackElementRef(IRGenFunction &IGF, CanPackType packType,
-                               ArrayRef<ProtocolDecl *> protocols,
+                               ArrayRef<ProtocolConformanceRef> conformances,
                                llvm::Value *index,
                                DynamicMetadataRequest request,
                                llvm::SmallVectorImpl<llvm::Value *> &wtables);

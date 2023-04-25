@@ -22,6 +22,7 @@
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -220,17 +221,12 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
   llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
 }
 
-SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
-  const ProtocolConformance *conformance = this;
+SubstitutionMap ProtocolConformance::getSubstitutionMap() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getSubstitutionMap, ())
+}
 
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
-    conformance = inheritedC->getInheritedConformance();
-
-  if (auto *specializedC = dyn_cast<SpecializedProtocolConformance>(conformance))
-    return specializedC->getSubstitutionMap();
-
-  auto *rootC = cast<RootProtocolConformance>(conformance);
-  if (auto genericSig = rootC->getGenericSignature())
+SubstitutionMap RootProtocolConformance::getSubstitutionMap() const {
+  if (auto genericSig = getGenericSignature())
     return genericSig->getIdentitySubstitutionMap();
 
   return SubstitutionMap();
@@ -925,15 +921,20 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 ProtocolConformance *
 ProtocolConformance::subst(SubstitutionMap subMap,
                            SubstOptions options) const {
-  return subst(QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
+  InFlightSubstitutionViaSubMap IFS(subMap, options);
+  return subst(IFS);
 }
 
 ProtocolConformance *
 ProtocolConformance::subst(TypeSubstitutionFn subs,
                            LookupConformanceFn conformances,
                            SubstOptions options) const {
+  InFlightSubstitution IFS(subs, conformances, options);
+  return subst(IFS);
+}
+
+ProtocolConformance *
+ProtocolConformance::subst(InFlightSubstitution &IFS) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
@@ -941,12 +942,11 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
         !origType->hasArchetype())
       return const_cast<ProtocolConformance *>(this);
 
-    auto substType = origType.subst(subs, conformances, options);
+    auto substType = origType.subst(IFS);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
-    auto subMap = SubstitutionMap::get(getGenericSignature(),
-                                       subs, conformances);
+    auto subMap = SubstitutionMap::get(getGenericSignature(), IFS);
 
     auto *mutableThis = const_cast<ProtocolConformance *>(this);
     return substType->getASTContext()
@@ -960,7 +960,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
         !origType->hasArchetype())
       return const_cast<ProtocolConformance *>(this);
 
-    auto substType = origType.subst(subs, conformances, options);
+    auto substType = origType.subst(IFS);
 
     // We do an exact pointer equality check because subst() can
     // change sugar.
@@ -969,7 +969,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     SmallVector<Requirement, 2> requirements;
     for (auto req : getConditionalRequirements()) {
-      requirements.push_back(req.subst(subs, conformances, options));
+      requirements.push_back(req.subst(IFS));
     }
 
     auto kind = cast<BuiltinProtocolConformance>(this)
@@ -997,11 +997,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(subs, conformances,
-                                                         options);
+      inheritedConformance = inheritedConformance->subst(IFS);
     }
 
-    auto substType = origType.subst(subs, conformances, options);
+    auto substType = origType.subst(IFS);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1012,10 +1011,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     auto subMap = spec->getSubstitutionMap();
 
     auto origType = getType();
-    auto substType = origType.subst(subs, conformances, options);
+    auto substType = origType.subst(IFS);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(subs, conformances, options));
+                                 subMap.subst(IFS));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -1241,11 +1240,6 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
-
-    // FIXME(kavon): make sure this conformance doesn't show up in swiftinterfaces
-    // before do this synthesis unconditionally.
-    if (dc->getASTContext().LangOpts.hasFeature(Feature::MoveOnly))
-      trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

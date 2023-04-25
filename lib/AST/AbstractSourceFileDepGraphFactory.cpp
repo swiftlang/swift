@@ -23,6 +23,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
@@ -33,13 +34,13 @@ using namespace fine_grained_dependencies;
 //==============================================================================
 
 AbstractSourceFileDepGraphFactory::AbstractSourceFileDepGraphFactory(
-    bool hadCompilationError, StringRef swiftDeps,
-    Fingerprint fileFingerprint, bool emitDotFileAfterConstruction,
-    DiagnosticEngine &diags)
+    bool hadCompilationError, StringRef swiftDeps, Fingerprint fileFingerprint,
+    bool emitDotFileAfterConstruction, DiagnosticEngine &diags,
+    llvm::vfs::OutputBackend &backend)
     : hadCompilationError(hadCompilationError), swiftDeps(swiftDeps.str()),
       fileFingerprint(fileFingerprint),
-      emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags) {
-}
+      emitDotFileAfterConstruction(emitDotFileAfterConstruction), diags(diags),
+      backend(backend) {}
 
 SourceFileDepGraph AbstractSourceFileDepGraphFactory::construct() {
   addSourceFileNodesToGraph();
@@ -49,7 +50,7 @@ SourceFileDepGraph AbstractSourceFileDepGraphFactory::construct() {
   }
   assert(g.verify());
   if (emitDotFileAfterConstruction)
-    g.emitDotFile(swiftDeps, diags);
+    g.emitDotFile(backend, swiftDeps, diags);
   return std::move(g);
 }
 

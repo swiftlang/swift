@@ -112,15 +112,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
-    bool HasReachedSemanticsProvidingExpr;
 
     ASTContext &Ctx;
     const DeclContext *DC;
 
   public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-        : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
-          Ctx(DC->getASTContext()), DC(DC) {}
+        : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       return Action::SkipChildren(P);
@@ -135,16 +137,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto collection = dyn_cast<CollectionExpr>(E)) {
-        if (collection->isTypeDefaulted()) {
-          // Diagnose type defaulted collection literals in subexpressions as
-          // warnings to preserve source compatibility.
-          diagnoseTypeDefaultedCollectionExpr(
-              collection, Ctx,
-              /*downgradeToWarning=*/HasReachedSemanticsProvidingExpr);
-        }
-      }
-
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -289,15 +281,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
-      if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-        // Diagnose single-element tuple expressions.
-        if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-          if (tupleExpr->getNumElements() == 1) {
-            Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
-                               diag::tuple_single_element)
-              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
-                                tupleExpr->getElement(0)->getStartLoc());
-          }
+      // Diagnose single-element tuple expressions.
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        if (tupleExpr->getNumElements() == 1 &&
+            !isa<PackExpansionExpr>(tupleExpr->getElement(0))) {
+          Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
+                             diag::tuple_single_element)
+            .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                              tupleExpr->getElement(0)->getStartLoc());
         }
       }
 
@@ -330,10 +321,16 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
-      // Diagnose tuple expressions with duplicate element label.
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        // Diagnose tuple expressions with duplicate element label.
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
+                                
+        // Diagnose attempts to form a tuple with any noncopyable elements.
+        if (E->getType()->isPureMoveOnly()
+            && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+          Ctx.Diags.diagnose(E->getLoc(), diag::tuple_move_only_not_supported);
+        }
       }
 
       // Specially diagnose some checked casts that are illegal.
@@ -350,11 +347,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // Diagnose move expression uses where the sub expression is not a declref expr
       if (auto *borrowExpr = dyn_cast<BorrowExpr>(E)) {
         checkBorrowExpr(borrowExpr);
-      }
-
-      if (!HasReachedSemanticsProvidingExpr &&
-          E == E->getSemanticsProvidingExpr()) {
-        HasReachedSemanticsProvidingExpr = true;
       }
 
       return Action::Continue(E);
@@ -424,15 +416,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkMoveExpr(MoveExpr *moveExpr) {
-      // Make sure the MoveOnly feature is set. If not, error.
-      // This should not currently be reached because the parse should ignore
-      // the _move keyword unless the feature flag is set.
-      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
-        auto error =
-          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
-        Ctx.Diags.diagnose(moveExpr->getLoc(), error);
-      }
-
       if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
         Ctx.Diags.diagnose(moveExpr->getLoc(),
                            diag::move_expression_not_passed_lvalue);
@@ -440,15 +423,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkBorrowExpr(BorrowExpr *borrowExpr) {
-      // Make sure the MoveOnly feature is set. If not, error.
-      // This should not currently be reached because the parse should ignore
-      // the _move keyword unless the feature flag is set.
-      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
-        auto error =
-          diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
-        Ctx.Diags.diagnose(borrowExpr->getLoc(), error);
-      }
-
       // Allow for a chain of member_ref exprs that end in a decl_ref expr.
       auto *subExpr = borrowExpr->getSubExpr();
       while (auto *memberRef = dyn_cast<MemberRefExpr>(subExpr))
@@ -522,34 +496,25 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return false;
     }
 
-    /// Diagnose a collection literal with a defaulted type such as \c [Any].
-    static void diagnoseTypeDefaultedCollectionExpr(CollectionExpr *c,
-                                                    ASTContext &ctx,
-                                                    bool downgradeToWarning) {
-      // Produce a diagnostic with a fixit to add the defaulted type as an
-      // explicit annotation.
-      auto &diags = ctx.Diags;
-
-      if (c->getNumElements() == 0) {
-        InFlightDiagnostic inFlight =
-            diags.diagnose(c->getLoc(), diag::collection_literal_empty);
-        inFlight.highlight(c->getSourceRange());
-
-        if (downgradeToWarning) {
-          inFlight.limitBehavior(DiagnosticBehavior::Warning);
-        }
-      } else {
+    /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
+    /// an error if it was inferred to this type in an invalid context, which is
+    /// one in which the parent expression is not itself a collection literal.
+    void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
+      // If the parent is a non-expression, or is not itself a literal, then
+      // produce an error with a fixit to add the type as an explicit
+      // annotation.
+      if (c->getNumElements() == 0)
+        Ctx.Diags.diagnose(c->getLoc(), diag::collection_literal_empty)
+            .highlight(c->getSourceRange());
+      else {
         assert(c->getType()->hasTypeRepr() &&
                "a defaulted type should always be printable");
-        InFlightDiagnostic inFlight = diags.diagnose(
-            c->getLoc(), diag::collection_literal_heterogeneous, c->getType());
-        inFlight.highlight(c->getSourceRange());
-        inFlight.fixItInsertAfter(c->getEndLoc(),
-                                  " as " + c->getType()->getString());
-
-        if (downgradeToWarning) {
-          inFlight.limitBehavior(DiagnosticBehavior::Warning);
-        }
+        Ctx.Diags
+            .diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
+                      c->getType())
+            .highlight(c->getSourceRange())
+            .fixItInsertAfter(c->getEndLoc(),
+                              " as " + c->getType()->getString());
       }
     }
 
@@ -697,15 +662,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      // In Swift < 6 warn about plain type name passed as an
-      // argument to a subscript, dynamic subscript, or ObjC
-      // literal since it used to be accepted.
       DiagnosticBehavior behavior = DiagnosticBehavior::Error;
 
       if (auto *ParentExpr = Parent.getAsExpr()) {
         if (ParentExpr->isValidParentOfTypeExpr(E))
           return;
 
+        // In Swift < 6 warn about
+        // - plain type name passed as an argument to a subscript, dynamic
+        //   subscript, or ObjC literal since it used to be accepted.
+        // - member type expressions rooted on non-identifier types, e.g.
+        //   '[X].Y' since they used to be accepted without the '.self'.
         if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
           if (isa<SubscriptExpr>(ParentExpr) ||
               isa<DynamicSubscriptExpr>(ParentExpr) ||
@@ -714,12 +681,21 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             assert(argList);
             if (argList->isUnlabeledUnary())
               behavior = DiagnosticBehavior::Warning;
+          } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+            if (auto *TR =
+                    dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
+              if (!isa<IdentTypeRepr>(TR->getBaseComponent())) {
+                behavior = DiagnosticBehavior::Warning;
+              }
+            }
           }
         }
       }
 
       // Is this a protocol metatype?
-      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+      Ctx.Diags
+          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
+                    behavior == DiagnosticBehavior::Warning)
           .limitBehavior(behavior);
 
       // Add fix-it to insert '()', only if this is a metatype of
@@ -1424,6 +1400,16 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   DiagnoseWalker Walker(DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
+
+  // Diagnose uses of collection literals with defaulted types at the top
+  // level.
+  if (auto collection =
+          dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+    if (collection->isTypeDefaulted()) {
+      Walker.checkTypeDefaultedCollectionExpr(
+          const_cast<CollectionExpr *>(collection));
+    }
+  }
 }
 
 
@@ -1460,6 +1446,10 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
@@ -1699,23 +1689,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return false;
       }
 
-      // Find the condition that defined the self decl,
-      // and check that both its LHS and RHS are 'self'
-      for (auto cond : conditionalStmt->getCond()) {
-        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
-            continue;
-          }
-
-          if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
-            if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
-              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-            }
-          }
-        }
-      }
-
-      return false;
+      // Require `LoadExpr`s when validating the self binding.
+      // This lets us reject invalid examples like:
+      //
+      //   let `self` = self ?? .somethingElse
+      //   guard let self = self else { return }
+      //   method() // <- implicit self is not allowed
+      //
+      return conditionalStmt->rebindsSelf(Ctx, /*requireLoadExpr*/ true);
     }
 
     /// Return true if this is a closure expression that will require explicit
@@ -2014,6 +1995,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       DC = DC->getParent();
     }
   }
+  
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
@@ -2712,7 +2694,11 @@ public:
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
   void markStoredOrInOutExpr(Expr *E, unsigned Flags);
-  
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   // We generally walk into declarations, other than types and nested functions.
   // FIXME: peek into capture lists of nested functions.
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -3127,6 +3113,10 @@ public:
         conditionalSubstitutions);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
       auto subMap = underlyingToOpaque->substitutions;
@@ -3263,6 +3253,10 @@ public:
       }
       TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
     }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
@@ -3784,6 +3778,10 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
     ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
       : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       // If we see a bound reference to a decl in an inactive #if block, then
       // conservatively mark it read and written.  This will silence "variable
@@ -3832,6 +3830,10 @@ private:
       ValidSingleValueStmtExprs.insert(SVE);
   }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
       // Diagnose a SingleValueStmtExpr in a context that we do not currently
@@ -3856,6 +3858,14 @@ private:
         break;
       case IsSingleValueStmtResult::Kind::UnterminatedBranches: {
         for (auto *branch : mayProduceSingleValue.getUnterminatedBranches()) {
+          if (auto *BS = dyn_cast<BraceStmt>(branch)) {
+            if (BS->empty()) {
+              Diags.diagnose(branch->getStartLoc(),
+                             diag::single_value_stmt_branch_empty,
+                             S->getKind());
+              continue;
+            }
+          }
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_throw,
                          S->getKind());
@@ -4156,6 +4166,10 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
       // Don't walk into an explicit argument list, as trailing closures that
@@ -4281,6 +4295,10 @@ public:
   bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
   bool shouldWalkIntoTapExpression() override { return false; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -5139,6 +5157,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5216,6 +5238,10 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5285,6 +5311,10 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5330,6 +5360,10 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       if (VD->isLazyStorageProperty()) {
         C.Diags.diagnose(MRE->getLoc(), diag::lazy_var_storage_access);
       }
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5461,6 +5495,10 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipChildren(E);
@@ -5495,6 +5533,10 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -5652,6 +5694,10 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
 
     bool shouldWalkIntoTapExpression() override { return false; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
@@ -6102,11 +6148,6 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
 
 void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     NominalTypeDecl *copyableNominalType) {
-  // If we don't have move only enabled, bail early.
-  if (!copyableNominalType->getASTContext().LangOpts.Features.contains(
-          Feature::MoveOnly))
-    return;
-
   // If we already have a move only type, just bail, we have no further work to
   // do.
   if (copyableNominalType->isMoveOnly())

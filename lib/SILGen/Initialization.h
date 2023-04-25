@@ -47,7 +47,7 @@ class ConvertingInitialization;
 /// that cleanup (and any separate cleanup on the boxed value) must be
 /// deactivated, and a cleanup to release the box can be enabled instead.
 ///
-/// This interface supports four ways to receive the initializing value:
+/// This interface supports five ways to receive the initializing value:
 ///
 ///   - If canPerformInPlaceInitialization() return true,
 ///     getAddressForInPlaceInitialization may be called.
@@ -60,6 +60,10 @@ class ConvertingInitialization;
 ///     must be completely initialized (including calling
 ///     finishInitialization) before finishInitialization is called on the
 ///     outer initialization.
+///
+///   - If canPerformPackExpansionInitialization() returns true,
+///     performPackExpansionInitialization can be used.
+///     This is the only way that can be used for pack expansions.
 ///
 ///   - If getAsConversion() returns non-null, the specialized interface
 //      for that subclass can be used.
@@ -101,6 +105,46 @@ public:
   virtual SILValue
   getAddressForInPlaceInitialization(SILGenFunction &SGF, SILLocation loc) {
     llvm_unreachable("Must implement if getAddressForInPlaceInitialization "
+                     "returns true");
+  }
+
+  /// Does this support pack expansion initialization?
+  /// This allows `performPackExpansionInitialization` to be called.
+  virtual bool canPerformPackExpansionInitialization() const {
+    return false;
+  }
+
+  /// Perform this initialization for the active pack expansion.
+  virtual void performPackExpansionInitialization(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                              SILValue indexWithinComponent,
+                       llvm::function_ref<void(Initialization *into)> fn) {
+    llvm_unreachable("Must implement if canPerformPackExpansionInitialization"
+                     "returns true");
+  }
+
+  /// Given that this supports pack expansion initialization, can it
+  /// perform *in place* pack expansion initialization by producing
+  /// a pack element of the given type?
+  ///
+  /// The dominance relationship gets a little screwed up here; only
+  /// return true if it's okay for the address to be written into a
+  /// pack and then initialized later.
+  virtual bool
+  canPerformInPlacePackInitialization(GenericEnvironment *env,
+                                      SILType eltAddrTy) const {
+    return false;
+  }
+
+  /// Given that this supports in-place pack expansion initialization,
+  /// return the address of the storage.
+  ///
+  /// For convenience, the same element type that was accepted before
+  /// is passed again.
+  virtual SILValue getAddressForInPlacePackInitialization(SILGenFunction &SGF,
+                                                          SILLocation loc,
+                                                          SILType eltAddrTy) {
+    llvm_unreachable("Must implement if canPerformInPlacePackInitialization"
                      "returns true");
   }
   
@@ -286,13 +330,16 @@ public:
 /// An initialization which accumulates several other initializations
 /// into a tuple.
 class TupleInitialization : public Initialization {
+  CanTupleType FormalTupleType;
+
 public:
   /// The sub-Initializations aggregated by this tuple initialization.
   /// The TupleInitialization object takes ownership of Initializations pushed
   /// here.
   SmallVector<InitializationPtr, 4> SubInitializations;
-    
-  TupleInitialization() {}
+
+  TupleInitialization(CanTupleType formalTupleType)
+    : FormalTupleType(formalTupleType) {}
 
   bool canSplitIntoTupleElements() const override {
     return true;
@@ -317,6 +364,110 @@ public:
   void finishUninitialized(SILGenFunction &SGF) override;
 };
 
+/// A common base class for the two pack-expansion initializations
+/// below.
+class InPlacePackExpansionInitialization : public Initialization {
+protected:
+  CanPackType FormalPackType;
+  unsigned ComponentIndex;
+  CleanupHandle ExpansionCleanup = CleanupHandle::invalid();
+
+public:
+  InPlacePackExpansionInitialization(CanPackType formalPackType,
+                                     unsigned componentIndex)
+    : FormalPackType(formalPackType), ComponentIndex(componentIndex) {
+  }
+
+  void enterDormantExpansionCleanup(SILGenFunction &SGF);
+
+  CleanupHandle getExpansionCleanup() const {
+    return ExpansionCleanup;
+  }
+
+  bool canPerformPackExpansionInitialization() const override {
+    return true;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                  llvm::function_ref<void(Initialization *into)> fn) override;
+
+  bool canPerformInPlacePackInitialization(GenericEnvironment *env,
+                                           SILType eltAddrTy) const override;
+
+  SILValue getAddressForInPlacePackInitialization(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  SILType eltAddrTy) override;
+
+  virtual CanPackExpansionType getLoweredExpansionType() const = 0;
+  virtual CleanupHandle enterPartialDestroyCleanup(SILGenFunction &SGF,
+                                     SILValue indexWithinComponent) = 0;
+  virtual SILValue getElementAddress(SILGenFunction &SGF, SILLocation loc,
+                                     SILValue packIndex,
+                                     SILType elementAddrTy) = 0;
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue explodedElement,
+                           bool isInit) override {
+    llvm_unreachable("cannot call copyOrInitValueInto on pack initializations");
+  }
+
+  void finishInitialization(SILGenFunction &SGF) override;
+};
+
+/// An initialization that feeds into a pack expansion component of
+/// a pack.  The initialization ultimately has to be used within
+/// an active pack expansion over a pack with the same shape as the
+/// pack expansion; see SGF::InnermostPackExpansion.
+class PackExpansionInitialization final
+    : public InPlacePackExpansionInitialization {
+public:
+  SILValue PackAddr;
+
+  PackExpansionInitialization(SILValue packAddr,
+                              CanPackType formalPackType,
+                              unsigned componentIndex)
+    : InPlacePackExpansionInitialization(formalPackType, componentIndex),
+      PackAddr(packAddr) {}
+
+  static std::unique_ptr<PackExpansionInitialization>
+  create(SILGenFunction &SGF, SILValue packAddr,
+         CanPackType formalPackType, unsigned componentIndex);
+
+  CanPackExpansionType getLoweredExpansionType() const override;
+  CleanupHandle enterPartialDestroyCleanup(SILGenFunction &SGF,
+                                     SILValue indexWithinComponent) override;
+  SILValue getElementAddress(SILGenFunction &SGF, SILLocation loc,
+                             SILValue packIndex, SILType elementAddrTy) override;
+};
+
+/// An initialization that feeds into a pack expansion component of
+/// a tuple.  The initialization ultimately has to be used within
+/// an active pack expansion over a pack with the same shape as the
+/// pack expansion; see SGF::InnermostPackExpansion.
+class TuplePackExpansionInitialization final
+    : public InPlacePackExpansionInitialization {
+public:
+  SILValue TupleAddr;
+
+  TuplePackExpansionInitialization(SILValue tupleAddr,
+                                   CanPackType inducedPackType,
+                                   unsigned componentIndex)
+    : InPlacePackExpansionInitialization(inducedPackType, componentIndex),
+      TupleAddr(tupleAddr) {}
+
+  static std::unique_ptr<TuplePackExpansionInitialization>
+  create(SILGenFunction &SGF, SILValue tupleAddr,
+         CanPackType inducedPackType, unsigned componentIndex);
+
+  CanPackExpansionType getLoweredExpansionType() const override;
+  CleanupHandle enterPartialDestroyCleanup(SILGenFunction &SGF,
+                                     SILValue indexWithinComponent) override;
+  SILValue getElementAddress(SILGenFunction &SGF, SILLocation loc,
+                             SILValue packIndex, SILType elementAddrTy) override;
+};
+
 /// A "null" initialization that indicates that any value being initialized
 /// into this initialization should be discarded. This represents AnyPatterns
 /// (that is, 'var (_)') that bind to values without storing them.
@@ -339,6 +490,15 @@ public:
     }
     return buf;
   }
+
+  bool canPerformPackExpansionInitialization() const override {
+    return true;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                llvm::function_ref<void(Initialization *into)> fn) override;
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;

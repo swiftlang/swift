@@ -1118,6 +1118,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         replacedInReq = syntheticEnv->mapTypeIntoContext(replacedInReq);
       }
 
+      if (auto packType = replacedInReq->getAs<PackType>()) {
+        if (auto unwrapped = packType->unwrapSingletonPackExpansion())
+          replacedInReq = unwrapped->getPatternType();
+      }
+
       cs->addConstraint(ConstraintKind::Bind, replacement.second, replacedInReq,
                         reqLocator);
     }
@@ -1694,7 +1699,23 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
 
   if (match.Witness->getAttrs().isUnavailable(getASTContext()) &&
       !requirement->getAttrs().isUnavailable(getASTContext())) {
-    return CheckKind::WitnessUnavailable;
+    auto nominalOrExtensionIsUnavailable = [&]() {
+      if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
+        if (extension->getAttrs().isUnavailable(getASTContext()))
+          return true;
+      }
+
+      if (auto adoptingNominal = DC->getSelfNominalTypeDecl()) {
+        if (adoptingNominal->getSemanticUnavailableAttr())
+          return true;
+      }
+
+      return false;
+    };
+
+    // Allow unavailable nominals or extension to have unavailable witnesses.
+    if (!nominalOrExtensionIsUnavailable())
+      return CheckKind::WitnessUnavailable;
   }
 
   return CheckKind::Success;
@@ -3390,7 +3411,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         // non-resilient modules.
         Optional<AccessScope> underlyingTypeScope =
             TypeAccessScopeChecker::getAccessScope(type, DC,
-                                                   /*usableFromInline*/false);
+                                                   /*usableFromInline*/false).Scope;
         assert(underlyingTypeScope.has_value() &&
                "the type is already invalid and we shouldn't have gotten here");
 
@@ -3573,10 +3594,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     if (AdopterIsClass || !isa<AbstractStorageDecl>(Requirement))
       Options.ExcludeAttrList.push_back(DAK_NonMutating);
 
-    // FIXME: Once we support move-only types, remove this if the
+    // FIXME: Once we support move-only types in generics, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing
-    //        __consuming on a protocol requirement.
+    //        ownership modifiers on a protocol requirement.
+    Options.ExcludeAttrList.push_back(DAK_LegacyConsuming);
     Options.ExcludeAttrList.push_back(DAK_Consuming);
+    Options.ExcludeAttrList.push_back(DAK_Borrowing);
 
     Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
       Printer << " {";
@@ -4600,7 +4623,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   if (type->isPureMoveOnly()) {
     // describe the failure reason as it not conforming to Copyable
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    assert(copyable && "missing _Copyable from stdlib!");
+    assert(copyable && "missing _Copyable protocol!");
     return CheckTypeWitnessResult(copyable->getDeclaredInterfaceType());
   }
 
@@ -6478,6 +6501,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
       sendableConformanceIsUnchecked = true;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
+      tryDiagnoseExecutorConformance(Context, nominal, proto);
     }
   }
 

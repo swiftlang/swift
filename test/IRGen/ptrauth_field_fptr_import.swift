@@ -15,11 +15,19 @@ import PointerAuth
 // CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo12SecureStructV, %TSo12SecureStructV* %14, i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64*
 // CHECK:   [[PTR:%.*]] = load i64*, i64** [[CAST2]], align 8
+// CHECK:   [[CAST3:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
+// CHECK:   [[COND:%.*]] = icmp ne i64* %16, null
+// CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
+// CHECK: resign-nonnull:                                   ; preds = %12
 // CHECK:   [[SIGNEDINT:%.*]] = ptrtoint i64* [[PTR]] to i64
 // CHECK:   [[DEFAULTSIGNVAL:%.*]] = call i64 @llvm.ptrauth.resign(i64 [[SIGNEDINT]], i32 1, i64 88, i32 0, i64 0)
 // CHECK:   [[AUTHPTR:%.*]] = inttoptr i64 [[DEFAULTSIGNVAL]] to i64*
-// CHECK:   [[TMPCAST1:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
-// CHECK:   store i64* [[AUTHPTR]], i64** [[TMPCAST1]], align 8
+// CHECK:   store i64* [[AUTHPTR]], i64** [[CAST3]], align 8
+// CHECK:   br label %resign-cont
+// CHECK: resign-null:                                      ; preds = %12
+// CHECK:   store i64* [[PTR]], i64** [[CAST3]], align 8
+// CHECK:   br label %resign-cont
+// CHECK: resign-cont:                                      ; preds = %resign-null, %resign-nonnull
 // CHECK:   [[TMPCAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64*
 // CHECK:   [[FUNCPTR:%.*]] = load i64, i64* [[TMPCAST2]], align 8
 func test_field_fn_read() -> Int32 {
@@ -34,13 +42,16 @@ func test_field_fn_read() -> Int32 {
 // CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo12SecureStructV, %TSo12SecureStructV* [[CAST1]], i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64*
 // CHECK:   store i64 ptrtoint ({ i8*, i32, i64, i64 }* @returnInt.ptrauth to i64), i64* [[CAST2]], align 8
+// CHECK:   [[PTR:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
 // CHECK:   [[CAST3:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
 // CHECK:   [[LD:%.*]] = load i64*, i64** [[CAST3]], align 8
+// CHECK:   [[COND:%.*]] = icmp ne i64* [[LD]], null
+// CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
+// CHECK: resign-nonnull:                                   ; preds = %11
 // CHECK:   [[CAST4:%.*]] = ptrtoint i64* [[LD]] to i64
 // CHECK:   [[SIGN:%.*]] = call i64 @llvm.ptrauth.resign(i64 [[CAST4]], i32 0, i64 0, i32 1, i64 88)
 // CHECK:   [[CAST5:%.*]] = inttoptr i64 [[SIGN]] to i64*
-// CHECK:   [[CAST6:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
-// CHECK:   store i64* [[CAST5]], i64** [[CAST6]], align 8
+// CHECK:   store i64* [[CAST5]], i64** [[PTR]], align 8
 func test_field_fn_ptr_modify() {
   ptr_to_secure_struct!.pointee.secure_func_ptr = returnInt
 }
@@ -56,13 +67,18 @@ func test_field_fn_ptr_modify() {
 // CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, %TSo32AddressDiscriminatedSecureStructV* [[CAST1]], i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
 // CHECK:   [[PTR:%.*]] = load i64*, i64** [[CAST2]], align 8
+// CHECK:   [[CAST3:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
+// CHECK:   [[COND:%.*]] = icmp ne i64* [[PTR]], null
+// CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
+// CHECK: resign-nonnull:                                   ; preds = %12
 // CHECK:   [[ADDR:%.*]] = ptrtoint %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64
 // CHECK:   [[BLEND:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 88)
-// CHECK:   [[CAST3:%.*]] = ptrtoint i64* [[PTR]] to i64
-// CHECK:   [[DEFAULTSIGNVAL:%.*]] = call i64 @llvm.ptrauth.resign(i64 [[CAST3]], i32 1, i64 [[BLEND]], i32 0, i64 0)
+// CHECK:   [[CAST4:%.*]] = ptrtoint i64* [[PTR]] to i64
+// CHECK:   [[DEFAULTSIGNVAL:%.*]] = call i64 @llvm.ptrauth.resign(i64 [[CAST4]], i32 1, i64 [[BLEND]], i32 0, i64 0)
 // CHECK:   [[AUTHPTR:%.*]] = inttoptr i64 [[DEFAULTSIGNVAL]] to i64*
-// CHECK:   [[TMPCAST1:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
-// CHECK:   store i64* [[AUTHPTR]], i64** [[TMPCAST1]], align 8
+// CHECK:   store i64* [[AUTHPTR]], i64** [[CAST3]], align 8
+// CHECK:   br label %resign-cont
+// CHECK: resign-cont:                                      ; preds = %resign-null, %resign-nonnull
 // CHECK:   [[TMPCAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64*
 // CHECK:   [[FUNCPTR:%.*]] = load i64, i64* [[TMPCAST2]], align 8
 func test_addr_discriminated_field_fn_read() -> Int32 {
@@ -82,15 +98,18 @@ func test_addr_discriminated_field_fn_read() -> Int32 {
 // CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, %TSo32AddressDiscriminatedSecureStructV* [[CAST1]], i32 0, i32 0
 // CHECK:   [[CAST2:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64*
 // CHECK:   store i64 ptrtoint ({ i8*, i32, i64, i64 }* @returnInt.ptrauth to i64), i64* [[CAST2]], align 8
+// CHECK:   [[PTR:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
 // CHECK:   [[CAST3:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %ptrauth.temp to i64**
 // CHECK:   [[LD:%.*]] = load i64*, i64** [[CAST3]], align 8
+// CHECK:   [[COND:%.*]] = icmp ne i64* [[LD]], null
+// CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
+// CHECK: resign-nonnull:                                   ; preds = %11
 // CHECK:   [[CAST4:%.*]] = ptrtoint %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64
 // CHECK:   [[BLEND:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[CAST4]], i64 88)
 // CHECK:   [[CAST5:%.*]] = ptrtoint i64* [[LD]] to i64
 // CHECK:   [[SIGN:%.*]] = call i64 @llvm.ptrauth.resign(i64 [[CAST5]], i32 0, i64 0, i32 1, i64 [[BLEND]])
-// CHECK:   [[CAST5:%.*]] = inttoptr i64 [[SIGN]] to i64*
-// CHECK:   [[CAST6:%.*]] = bitcast %Ts5Int32VIetCd_Sg* %.secure_func_ptr to i64**
-// CHECK:   store i64* [[CAST5]], i64** [[CAST6]], align 8
+// CHECK:   [[CAST6:%.*]] = inttoptr i64 [[SIGN]] to i64*
+// CHECK:   store i64* [[CAST6]], i64** [[PTR]], align 8
 func test_addr_discriminated_field_fn_ptr_modify() {
   ptr_to_addr_discriminated_secure_struct!.pointee.secure_func_ptr = returnInt
 }

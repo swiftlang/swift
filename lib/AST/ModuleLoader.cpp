@@ -211,8 +211,6 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(ASTContext &ctx,
       break;
     }
     case swift::ModuleDependencyKind::SwiftSource: {
-      auto *swiftSourceDep = getAsSwiftSourceModule();
-      assert(!swiftSourceDep->sourceFiles.empty());
       return result;
     }
     case swift::ModuleDependencyKind::SwiftPlaceholder: {

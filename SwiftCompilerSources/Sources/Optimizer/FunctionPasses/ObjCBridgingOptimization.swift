@@ -246,10 +246,13 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
 }
 
 private func lookThroughOwnershipInsts(_ value: Value) -> Value {
-  // Looks like it's sufficient to support begin_borrow for now.
-  // TODO: add copy_value if needed.
+  // Looks like it's sufficient to support begin_borrow and copy_value for now.
+  // TODO: add move_value if needed.
   if let bbi = value as? BeginBorrowInst {
     return bbi.borrowedValue
+  }
+  if let cvi = value as? CopyValueInst {
+    return cvi.fromValue
   }
   return value
 }

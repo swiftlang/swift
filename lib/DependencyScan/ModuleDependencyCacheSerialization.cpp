@@ -16,6 +16,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include <unordered_map>
 
 using namespace swift;
@@ -319,7 +320,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &mod : *bridgingModuleDeps)
         moduleDep.addBridgingModuleDependency(mod, alreadyAdded);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -385,7 +387,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &mod : *bridgingModuleDeps)
         moduleDep.addBridgingModuleDependency(mod, alreadyAdded);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -419,7 +422,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -451,7 +455,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -494,7 +499,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       for (const auto &moduleName : *currentModuleImports)
         moduleDep.addModuleImport(moduleName);
 
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
+      cache.recordDependency(currentModuleName, std::move(moduleDep),
+                             getContextHash());
       hasCurrentModule = false;
       break;
     }
@@ -987,38 +993,12 @@ unsigned ModuleDependenciesCacheSerializer::getArrayID(ModuleDependencyID module
 
 void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const SwiftDependencyScanningService &cache) {
-  for (auto &moduleID : cache.getAllSourceModules()) {
-    assert(moduleID.second == ModuleDependencyKind::SwiftSource &&
-           "Expected source-based dependency");
-    auto optionalDependencyInfo =
-        cache.findSourceModuleDependency(moduleID.first);
-    assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
-    auto dependencyInfo = optionalDependencyInfo.value();
-    // Add the module's name
-    addIdentifier(moduleID.first);
-    // Add the module's dependencies
-    addStringArray(moduleID, ModuleIdentifierArrayKind::DependencyImports,
-                   dependencyInfo->getModuleImports());
-    addDependencyIDArray(moduleID, ModuleIdentifierArrayKind::QualifiedModuleDependencyIDs,
-                         dependencyInfo->getModuleDependencies());
-    auto swiftSourceDeps = dependencyInfo->getAsSwiftSourceModule();
-    assert(swiftSourceDeps);
-    addStringArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
-                   swiftSourceDeps->textualModuleDetails.extraPCMArgs);
-    if (swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.has_value())
-      addIdentifier(swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.value());
-    addStringArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
-                   swiftSourceDeps->sourceFiles);
-    addStringArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
-                   swiftSourceDeps->textualModuleDetails.bridgingSourceFiles);
-    addStringArray(moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies,
-                   swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies);
-  }
-
   for (auto &contextHash : cache.getAllContextHashes()) {
     addIdentifier(contextHash);
-    for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto optionalDependencyInfo = cache.findDependency(moduleID.first, moduleID.second);
+    for (auto &moduleID : cache.getAllModules(contextHash)) {
+      auto optionalDependencyInfo = cache.findDependency(moduleID.first,
+                                                         moduleID.second,
+                                                         contextHash);
       assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
       auto dependencyInfo = optionalDependencyInfo.value();
       // Add the module's name
@@ -1070,6 +1050,21 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
           addIdentifier(swiftPHDeps->compiledModulePath);
           addIdentifier(swiftPHDeps->moduleDocPath);
           addIdentifier(swiftPHDeps->sourceInfoPath);
+          break;
+        }
+        case swift::ModuleDependencyKind::SwiftSource: {
+          auto swiftSourceDeps = dependencyInfo->getAsSwiftSourceModule();
+          assert(swiftSourceDeps);
+          addStringArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
+                         swiftSourceDeps->textualModuleDetails.extraPCMArgs);
+          if (swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.has_value())
+            addIdentifier(swiftSourceDeps->textualModuleDetails.bridgingHeaderFile.value());
+          addStringArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
+                         swiftSourceDeps->sourceFiles);
+          addStringArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
+                         swiftSourceDeps->textualModuleDetails.bridgingSourceFiles);
+          addStringArray(moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies,
+                         swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies);
           break;
         }
         case swift::ModuleDependencyKind::Clang: {
@@ -1129,18 +1124,11 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   writeArraysOfIdentifiers();
 
   // Write the core graph
-  // First, write the source modules we've encountered
-  for (auto &moduleID : cache.getAllSourceModules()) {
-    auto dependencyInfo = cache.findSourceModuleDependency(moduleID.first);
-    assert(dependencyInfo.has_value() && "Expected dependency info.");
-    writeModuleInfo(moduleID, llvm::Optional<std::string>(), **dependencyInfo);
-  }
-
-  // Write all non-source modules, for each of the context hashes this scanner
-  // has been used with
   for (auto &contextHash : cache.getAllContextHashes()) {
-    for (auto &moduleID : cache.getAllNonSourceModules(contextHash)) {
-      auto dependencyInfo = cache.findDependency(moduleID.first, moduleID.second);
+    for (auto &moduleID : cache.getAllModules(contextHash)) {
+      auto dependencyInfo = cache.findDependency(moduleID.first,
+                                                 moduleID.second,
+                                                 contextHash);
       assert(dependencyInfo.has_value() && "Expected dependency info.");
       writeModuleInfo(moduleID, contextHash, **dependencyInfo);
     }
@@ -1159,11 +1147,11 @@ void swift::dependencies::module_dependency_cache_serialization::
 
 bool swift::dependencies::module_dependency_cache_serialization::
     writeInterModuleDependenciesCache(
-        DiagnosticEngine &diags, StringRef path,
-        const SwiftDependencyScanningService &cache) {
+        DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend,
+        StringRef path, const SwiftDependencyScanningService &cache) {
   PrettyStackTraceStringAction stackTrace(
       "saving inter-module dependency graph", path);
-  return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeInterModuleDependenciesCache(Writer, cache);

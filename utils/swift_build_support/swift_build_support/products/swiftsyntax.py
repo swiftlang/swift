@@ -63,6 +63,12 @@ class SwiftSyntax(product.Product):
         if self.is_release():
             build_cmd.append('--release')
 
+        if self.args.swiftsyntax_enable_rawsyntax_validation:
+            build_cmd.append('--enable-rawsyntax-validation')
+
+        if self.args.swiftsyntax_enable_test_fuzzing:
+            build_cmd.append('--enable-test-fuzzing')
+
         if self.args.verbose_build:
             build_cmd.append('--verbose')
 
@@ -74,23 +80,6 @@ class SwiftSyntax(product.Product):
         return True
 
     def build(self, host_target):
-        if self.args.swiftsyntax_verify_generated_files:
-            build_cmd = [
-                os.path.join(self.source_dir, 'build-script.py'),
-                'verify-source-code',
-                '--toolchain', self.install_toolchain_path(host_target),
-                # Verifying the files generated using SwiftSyntaxBuilder requires
-                # internet access to pull the pinned SwiftSyntaxBuilder version. Since
-                # we don't have internet access in CI, don't verify these files.
-                # This is not a huge deal because only SwiftSyntaxBuilder is generated
-                # in terms of itself and it will most likely fail to compile if it isn't
-                # re-generated after gyb files have been updated.
-                '--gyb-only'
-            ]
-            if self.args.verbose_build:
-                build_cmd.append('--verbose')
-            shell.call(build_cmd)
-
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
 

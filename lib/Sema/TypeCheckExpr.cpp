@@ -615,9 +615,11 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
                                      StringRef name) {
   auto &ctx = dc->getASTContext();
   DeclNameRef nameRef(ctx.getIdentifier(name));
-  auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
-                                               nameRef, SourceLoc(),
-                                               defaultUnqualifiedLookupOptions);
+  auto lookup = TypeChecker::lookupUnqualified(
+      dc->getModuleScopeContext(),
+      nameRef, SourceLoc(),
+      defaultUnqualifiedLookupOptions | NameLookupFlags::ExcludeMacroExpansions
+  );
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
@@ -777,6 +779,10 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
   class FindReturns : public ASTWalker {
     bool FoundResultReturn = false;
     bool FoundNoResultReturn = false;
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       return Action::SkipChildren(expr);

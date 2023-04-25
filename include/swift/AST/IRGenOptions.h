@@ -252,9 +252,6 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
-  /// Should we use the legacy pass manager.
-  unsigned LegacyPassManager : 1;
-
   OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
@@ -321,6 +318,9 @@ public:
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
+  /// Always recompile the output even if the module hash might match.
+  unsigned AlwaysCompile : 1;
+
   /// Whether we should embed the bitcode file.
   IRGenEmbedMode EmbedMode : 2;
 
@@ -382,6 +382,12 @@ public:
   /// Also force structs to be lowered to aligned group TypeLayouts rather than
   /// using TypeInfo entries.
   unsigned ForceStructTypeLayouts : 1;
+
+  /// Enable generation and use of layout string based value witnesses
+  unsigned EnableLayoutStringValueWitnesses : 1;
+
+  /// Enable runtime instantiation of value witness strings for generic types
+  unsigned EnableLayoutStringValueWitnessesInstantiation : 1;
 
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
@@ -474,7 +480,7 @@ public:
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), LegacyPassManager(0), OptMode(OptimizationMode::NotSet),
+        Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false),
@@ -484,7 +490,7 @@ public:
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         Playground(false),
         EmitStackPromotionChecks(false), UseSingleModuleLLVMEmission(false),
-        FunctionSections(false), PrintInlineTree(false),
+        FunctionSections(false), PrintInlineTree(false), AlwaysCompile(false),
         EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
@@ -496,6 +502,8 @@ public:
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
+        EnableLayoutStringValueWitnesses(false),
+        EnableLayoutStringValueWitnessesInstantiation(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
@@ -552,12 +560,18 @@ public:
     return OptMode == OptimizationMode::ForSize;
   }
 
-  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+  std::string getDebugFlags(StringRef PrivateDiscriminator,
+                            bool EnableCXXInterop) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
       if (!Flags.empty())
         Flags += " ";
       Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    if (EnableCXXInterop) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += "-enable-experimental-cxx-interop";
     }
     return Flags;
   }

@@ -55,6 +55,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that adds conformances to the declaration the
   /// macro is attached to.
   Conformance = 0x40,
+  /// A freestanding macro that expands to expressions, statements and
+  /// declarations in a code block.
+  CodeItem = 0x80,
 };
 
 /// The contexts in which a particular macro declaration can be used.
@@ -108,13 +111,13 @@ public:
 
 private:
   Kind kind;
-  Identifier identifier;
+  DeclName name;
 
 public:
-  MacroIntroducedDeclName(Kind kind, Identifier identifier = Identifier())
-      : kind(kind), identifier(identifier) {};
+  MacroIntroducedDeclName(Kind kind, DeclName name = DeclName())
+      : kind(kind), name(name) {};
 
-  static MacroIntroducedDeclName getNamed(Identifier name) {
+  static MacroIntroducedDeclName getNamed(DeclName name) {
     return MacroIntroducedDeclName(Kind::Named, name);
   }
 
@@ -135,7 +138,7 @@ public:
   }
 
   Kind getKind() const { return kind; }
-  Identifier getIdentifier() const { return identifier; }
+  DeclName getName() const { return name; }
 };
 
 }

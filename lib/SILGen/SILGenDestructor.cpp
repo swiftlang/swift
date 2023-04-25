@@ -476,7 +476,6 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       B.emitBlock(finishBB);
 
     if (cd->isRootDefaultActor()) {
-      // TODO(distributed): we may need to call the distributed destroy here instead?
       auto builtinName = getASTContext().getIdentifier(
           getBuiltinName(BuiltinValueKind::DestroyDefaultActor));
       auto resultTy = SGM.Types.getEmptyTupleType();
@@ -491,6 +490,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
                                                    NominalTypeDecl *nom,
                                                    CleanupLocation cleanupLoc,
                                                    SILBasicBlock *finishBB) {
+  selfValue = B.createDropDeinit(cleanupLoc, selfValue);
   if (selfValue->getType().isAddress()) {
     if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
       for (VarDecl *vd : nom->getStoredProperties()) {

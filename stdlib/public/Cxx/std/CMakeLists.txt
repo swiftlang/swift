@@ -127,16 +127,11 @@ add_dependencies(sdk-overlay libstdcxx-modulemap)
 #
 # C++ Standard Library Overlay.
 #
-add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB
+add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     std.swift
     String.swift
 
     SWIFT_MODULE_DEPENDS Cxx
-    SWIFT_MODULE_DEPENDS_OSX Darwin
-    SWIFT_MODULE_DEPENDS_IOS Darwin
-    SWIFT_MODULE_DEPENDS_TVOS Darwin
-    SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-    SWIFT_MODULE_DEPENDS_LINUX Glibc
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -Xfrontend -enable-experimental-cxx-interop
@@ -149,4 +144,4 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB
     TARGET_SDKS ALL_APPLE_PLATFORMS LINUX
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED
-    DEPENDS libstdcxx-modulemap)
+    DEPENDS libstdcxx-modulemap libcxxshim_modulemap)

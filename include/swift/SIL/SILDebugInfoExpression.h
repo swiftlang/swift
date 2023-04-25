@@ -15,8 +15,10 @@
 /// (debug info) operator and operand.
 ///
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_SIL_DEBUGINFOEXPRESSION_H
 #define SWIFT_SIL_DEBUGINFOEXPRESSION_H
+
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -26,6 +28,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
+
 class TailAllocatedDebugVariable;
 
 /// Operator in a debug info expression
@@ -287,4 +290,5 @@ inline llvm::hash_code hash_value(const SILDebugInfoExpression &elt) {
 }
 
 } // end namespace swift
+
 #endif

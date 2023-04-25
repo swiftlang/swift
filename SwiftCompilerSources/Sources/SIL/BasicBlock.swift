@@ -13,14 +13,15 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 final public class BasicBlock : CustomStringConvertible, HasShortDescription {
-  public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
-  public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
+  public var next: BasicBlock? { bridged.getNext().block }
+  public var previous: BasicBlock? { bridged.getPrevious().block }
 
-  public var parentFunction: Function { SILBasicBlock_getFunction(bridged).function }
+  public var parentFunction: Function { bridged.getFunction().function }
 
   public var description: String {
-    let stdString = SILBasicBlock_debugDescription(bridged)
+    let stdString = bridged.getDebugDescription()
     return String(_cxxString: stdString)
   }
   public var shortDescription: String { name }
@@ -28,17 +29,17 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription {
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
   public var instructions: InstructionList {
-    InstructionList(first: SILBasicBlock_firstInst(bridged).instruction)
+    InstructionList(first: bridged.getFirstInst().instruction)
   }
 
   public var terminator: TermInst {
-    SILBasicBlock_lastInst(bridged).instruction as! TermInst
+    bridged.getLastInst().instruction as! TermInst
   }
 
   public var successors: SuccessorArray { terminator.successors }
 
   public var predecessors: PredecessorList {
-    PredecessorList(startAt: SILBasicBlock_getFirstPred(bridged))
+    PredecessorList(startAt: bridged.getFirstPred())
   }
 
   public var singlePredecessor: BasicBlock? {
@@ -97,7 +98,7 @@ public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
 
   public func reversed() -> ReverseInstructionList {
     if let inst = currentInstruction {
-      let lastInst = SILBasicBlock_lastInst(inst.parentBlock.bridged).instruction
+      let lastInst = inst.parentBlock.bridged.getLastInst().instruction
       return ReverseInstructionList(first: lastInst)
     }
     return ReverseInstructionList(first: nil)
@@ -134,27 +135,28 @@ public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILBasicBlock_getNumArguments(block.bridged) }
+  public var endIndex: Int { block.bridged.getNumArguments() }
 
   public subscript(_ index: Int) -> Argument {
-    SILBasicBlock_getArgument(block.bridged, index).argument
+    block.bridged.getArgument(index).argument
   }
 }
 
 public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
-  private let succArray: BridgedArrayRef
+  private let base: OptionalBridgedSuccessor
+  public let count: Int
 
-  init(succArray: BridgedArrayRef) {
-    self.succArray = succArray
+  init(base: OptionalBridgedSuccessor, count: Int) {
+    self.base = base
+    self.count = count
   }
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { return Int(succArray.numElements) }
+  public var endIndex: Int { return count }
 
   public subscript(_ index: Int) -> BasicBlock {
-    assert(index >= 0 && index < endIndex)
-    let s = BridgedSuccessor(succ: succArray.data! + index &* BridgedSuccessorSize);
-    return SILSuccessor_getTargetBlock(s).block
+    assert(index >= startIndex && index < endIndex)
+    return base.advancedBy(index).getTargetBlock().block
   }
 }
 
@@ -164,10 +166,9 @@ public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
   public init(startAt: OptionalBridgedSuccessor) { currentSucc = startAt }
 
   public mutating func next() -> BasicBlock? {
-    if let succPtr = currentSucc.succ {
-      let succ = BridgedSuccessor(succ: succPtr)
-      currentSucc = SILSuccessor_getNext(succ)
-      return SILSuccessor_getContainingInst(succ).instruction.parentBlock
+    if let succ = currentSucc.successor {
+      currentSucc = succ.getNext()
+      return succ.getContainingInst().instruction.parentBlock
     }
     return nil
   }
@@ -193,5 +194,14 @@ extension OptionalBridgedBasicBlock {
 extension Optional where Wrapped == BasicBlock {
   public var bridged: OptionalBridgedBasicBlock {
     OptionalBridgedBasicBlock(obj: self?.bridged.obj)
+  }
+}
+
+extension OptionalBridgedSuccessor {
+  var successor: BridgedSuccessor? {
+    if let succ = succ {
+      return BridgedSuccessor(succ: succ)
+    }
+    return nil
   }
 }

@@ -1,6 +1,6 @@
 set(libcxxshim_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES} ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
 
@@ -15,7 +15,7 @@ foreach(sdk ${SWIFT_SDKS})
     endif()
 
     set(outputs)
-    foreach(source libcxxshim.modulemap libcxxshim.h)
+    foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h)
       add_custom_command(OUTPUT ${module_dir}/${source}
                          DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
                          COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
@@ -41,13 +41,13 @@ foreach(sdk ${SWIFT_SDKS})
     list(APPEND libcxxshim_modulemap_target_list cxxshim-${sdk}-${arch})
 
 
-    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
                                DESTINATION "lib/swift/${arch_subdir}"
-                               COMPONENT sdk-overlay)
+                               COMPONENT compiler)
     if(SWIFT_BUILD_STATIC_STDLIB)
-      swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h
+      swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
                                  DESTINATION "lib/swift_static/${arch_subdir}"
-                                 COMPONENT sdk-overlay)
+                                 COMPONENT compiler)
     endif()
   endforeach()
 endforeach()
@@ -55,3 +55,4 @@ endforeach()
 add_custom_target(libcxxshim_modulemap DEPENDS ${libcxxshim_modulemap_target_list})
 set_property(TARGET libcxxshim_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay libcxxshim_modulemap)
+add_dependencies(compiler libcxxshim_modulemap)

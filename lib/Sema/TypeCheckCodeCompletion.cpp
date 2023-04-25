@@ -116,6 +116,10 @@ public:
   SanitizeExpr(ASTContext &C)
     : C(C) { }
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *argList) override {
     // Return the argument list to the state prior to being rewritten. This will
@@ -327,8 +331,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  SolutionApplicationTarget target(
-      expr, dc, CTP_Unused, Type(), /*isDiscarded=*/false);
+  SyntacticElementTarget target(expr, dc, CTP_Unused, Type(),
+                                /*isDiscarded=*/false);
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     recoverOriginalType();
@@ -557,7 +561,7 @@ void TypeChecker::filterSolutionsForCodeCompletion(
 }
 
 bool TypeChecker::typeCheckForCodeCompletion(
-    SolutionApplicationTarget &target, bool needsPrecheck,
+    SyntacticElementTarget &target, bool needsPrecheck,
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
@@ -609,7 +613,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   enum class CompletionResult { Ok, NotApplicable, Fallback };
 
   auto solveForCodeCompletion =
-      [&](SolutionApplicationTarget &target) -> CompletionResult {
+      [&](SyntacticElementTarget &target) -> CompletionResult {
     ConstraintSystemOptions options;
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
@@ -624,6 +628,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
     // If solve failed to generate constraints or with some other
     // issue, we need to fallback to type-checking a sub-expression.
+    cs.setTargetFor(target.getAsExpr(), target);
     if (!cs.solveForCodeCompletion(target, solutions))
       return CompletionResult::Fallback;
 
@@ -631,23 +636,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // to type-checking a sub-expression in isolation.
     if (solutions.empty())
       return CompletionResult::Fallback;
-
-    // If code completion expression resides inside of multi-statement
-    // closure body it could either be type-checked together with the context
-    // or not, it's impossible to say without checking.
-    if (contextAnalyzer.locatedInMultiStmtClosure()) {
-      if (!hasTypeForCompletion(solutions.front(), contextAnalyzer)) {
-        // At this point we know the code completion node wasn't checked with
-        // the closure's surrounding context, so can defer to regular
-        // type-checking for the current call to typeCheckExpression. If that
-        // succeeds we will get a second call to typeCheckExpression for the
-        // body of the closure later and can gather completions then. If it
-        // doesn't we rely on the fallback typechecking in the subclasses of
-        // TypeCheckCompletionCallback that considers in isolation a
-        // sub-expression of the closure that contains the completion location.
-        return CompletionResult::NotApplicable;
-      }
-    }
 
     // FIXME: instead of filtering, expose the score and viability to clients.
     // Remove solutions that skipped over/ignored the code completion point
@@ -676,10 +664,10 @@ bool TypeChecker::typeCheckForCodeCompletion(
       assert(fallback->E != expr);
       (void)expr;
     }
-    SolutionApplicationTarget completionTarget(fallback->E,
-                                               fallback->DC, CTP_Unused,
-                                               /*contextualType=*/Type(),
-                                               /*isDiscarded=*/true);
+    SyntacticElementTarget completionTarget(fallback->E, fallback->DC,
+                                            CTP_Unused,
+                                            /*contextualType=*/Type(),
+                                            /*isDiscarded=*/true);
     typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
                                callback);
   }

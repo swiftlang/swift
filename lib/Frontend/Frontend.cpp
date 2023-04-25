@@ -38,13 +38,18 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include <llvm/ADT/StringExtras.h>
 
 using namespace swift;
@@ -249,7 +254,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      SourceMgr, Diagnostics));
+      SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -393,11 +398,70 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
+bool CompilerInstance::setupCASIfNeeded() {
+  const auto &Opts = getInvocation().getFrontendOptions();
+  if (!Opts.EnableCAS)
+    return false;
+
+  auto MaybeCache = llvm::cas::createOnDiskUnifiedCASDatabases(Opts.CASPath);
+  if (!MaybeCache) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_create_cas, Opts.CASPath,
+                         toString(MaybeCache.takeError()));
+    return true;
+  }
+  CAS = std::move(MaybeCache->first);
+  ResultCache = std::move(MaybeCache->second);
+
+  // create baseline key.
+  llvm::Optional<llvm::cas::ObjectRef> FSRef;
+  if (!Opts.CASFSRootID.empty()) {
+    auto CASFSID = CAS->parseID(Opts.CASFSRootID);
+    if (!CASFSID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           toString(CASFSID.takeError()));
+      return true;
+    }
+    FSRef = CAS->getReference(*CASFSID);
+    if (!FSRef) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           "-cas-fs value does not exist in CAS");
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void CompilerInstance::setupOutputBackend() {
+  // Skip if output backend is not setup, default to OnDiskOutputBackend.
+  if (OutputBackend)
+    return;
+
+  OutputBackend =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Setup verification backend.
+  // Create a mirroring outputbackend to produce hash for output files.
+  // We cannot skip disk here since swift compiler is expecting to read back
+  // some output file in later stages.
+  if (Invocation.getFrontendOptions().DeterministicCheck) {
+    HashBackend = llvm::makeIntrusiveRefCnt<HashBackendTy>();
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, HashBackend);
+  }
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error) {
   Invocation = Invoke;
 
+  if (setupCASIfNeeded()) {
+    Error = "Setting up CAS failed";
+    return true;
+  }
+
   setupDependencyTrackerIfNeeded();
+  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -441,6 +505,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  if (Invocation.getFrontendOptions().EnableCAS &&
+      !Invocation.getFrontendOptions().CASFSRootID.empty()) {
+    // Set up CASFS as BaseFS.
+    auto RootID = CAS->parseID(Invocation.getFrontendOptions().CASFSRootID);
+    if (!RootID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(RootID.takeError()));
+      return true;
+    }
+    auto FS = llvm::cas::createCASFileSystem(*CAS, *RootID);
+    if (!FS) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(FS.takeError()));
+      return true;
+    }
+    SourceMgr.setFileSystem(std::move(*FS));
+  }
+
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
           SourceMgr.getFileSystem());
@@ -830,6 +914,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
     return true;
   if (target.isOSOpenBSD())
     return true;
+  if (target.isOSFreeBSD())
+    return true;
 #endif
   return false;
 }
@@ -846,6 +932,20 @@ bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
       !getLangOptions().DisableImplicitStringProcessingModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
+}
+
+/// Enable Swift backtracing on a per-target basis
+static bool shouldImportSwiftBacktracingByDefault(const llvm::Triple &target) {
+  if (target.isOSDarwin() || target.isOSWindows() || target.isOSLinux())
+    return true;
+  return false;
+}
+
+bool CompilerInvocation::shouldImportSwiftBacktracing() const {
+  return shouldImportSwiftBacktracingByDefault(getLangOptions().Target) &&
+    !getLangOptions().DisableImplicitBacktracingModuleImport &&
+    getFrontendOptions().InputMode !=
+      FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
@@ -912,6 +1012,21 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   return getASTContext().canImportModule(modulePath);
 }
 
+void CompilerInstance::verifyImplicitBacktracingImport() {
+  if (Invocation.shouldImportSwiftBacktracing() &&
+      !canImportSwiftBacktracing()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_backtracing_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftBacktracing() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
+}
+
 bool CompilerInstance::canImportCxxShim() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(CXX_SHIM_NAME));
@@ -972,6 +1087,19 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftStringProcessing())
         pushImport(SWIFT_STRING_PROCESSING_NAME);
+      break;
+    }
+  }
+
+  if (Invocation.shouldImportSwiftBacktracing()) {
+    switch (imports.StdlibKind) {
+    case ImplicitStdlibKind::Builtin:
+    case ImplicitStdlibKind::None:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      if (canImportSwiftBacktracing())
+        pushImport(SWIFT_BACKTRACING_NAME);
       break;
     }
   }
@@ -1088,9 +1216,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setABIName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().ModuleABIName));
     }
-    if (!Invocation.getFrontendOptions().PackageName.empty()) {
+    if (!Invocation.getLangOptions().PackageName.empty()) {
       MainModule->setPackageName(getASTContext().getIdentifier(
-          Invocation.getFrontendOptions().PackageName));
+          Invocation.getLangOptions().PackageName));
     }
     if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
       MainModule->setExportAsName(getASTContext().getIdentifier(
@@ -1103,6 +1231,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
+    Context->MainModule = MainModule;
 
     // Create and add the module's files.
     SmallVector<FileUnit *, 16> files;
@@ -1125,6 +1254,7 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
   assert(newMod->isMainModule());
   MainModule = newMod;
   Context->addLoadedModule(newMod);
+  Context->MainModule = newMod;
 }
 
 bool CompilerInstance::performParseAndResolveImportsOnly() {
@@ -1322,6 +1452,12 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     // times.
     opts |= SourceFile::ParsingFlags::SuppressWarnings;
   }
+
+  // Dependency scanning does not require an AST, so disable Swift Parser
+  // ASTGen parsing completely.
+  if (frontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::ScanDependencies)
+    opts |= SourceFile::ParsingFlags::DisableSwiftParserASTGen;
 
   // Enable interface hash computation for primaries or emit-module-separately,
   // but not in WMO, as it's only currently needed for incremental mode.

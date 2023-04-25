@@ -17,6 +17,7 @@
 #define SWIFT_CLANG_IMPORTER_H
 
 #include "swift/AST/ClangModuleLoader.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
 #define SWIFT_MAX_IMPORTED_SIMD_ELEMENTS 4
@@ -27,6 +28,7 @@ namespace llvm {
   template<typename Fn> class function_ref;
   namespace vfs {
     class FileSystem;
+    class OutputBackend;
   }
 }
 
@@ -50,7 +52,8 @@ namespace clang {
   class CompilerInvocation;
 namespace tooling {
 namespace dependencies {
-  struct FullDependenciesResult;
+  struct ModuleDeps;
+  using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
 }
 }
@@ -210,7 +213,8 @@ public:
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo) override;
+                               ModuleVersionInfo *versionInfo,
+                               bool isTestableImport = false) override;
 
   /// Import a module with the given module path.
   ///
@@ -392,8 +396,7 @@ public:
   /// replica.
   ///
   /// \sa clang::GeneratePCHAction
-  bool emitBridgingPCH(StringRef headerPath,
-                       StringRef outputPCHPath);
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out
@@ -421,11 +424,12 @@ public:
 
   void recordModuleDependencies(
       ModuleDependenciesCache &cache,
-      const clang::tooling::dependencies::FullDependenciesResult &clangDependencies);
+      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies);
 
   Optional<const ModuleDependencyInfo*> getModuleDependencies(
       StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) override;
+      InterfaceSubContextDelegate &delegate,
+      bool isTestableImport = false) override;
 
   /// Add dependency information for the bridging header.
   ///
@@ -530,6 +534,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isUnsafeCXXMethod(const FuncDecl *func) override;
+
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
@@ -558,6 +564,11 @@ public:
 
   /// Enable the symbolic import experimental feature for the given callback.
   void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
+
+  const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
+      const clang::Decl *candidateDecl) override;
+
+  SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
@@ -578,6 +589,18 @@ namespace importer {
 bool requiresCPlusPlus(const clang::Module *module);
 
 } // namespace importer
+
+struct ClangInvocationFileMapping {
+  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+  SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+};
+
+/// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
+/// We inject modulemaps for those libraries into their include directories
+/// to allow using them from Swift.
+ClangInvocationFileMapping getClangInvocationFileMapping(
+    ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
 
 } // end namespace swift
 

@@ -559,7 +559,7 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
     auto newYield = newYields[i];
     // Insert any end_borrow if the yielded value before the token's uses.
     SmallVector<SILInstruction *, 4> users(
-      makeUserIteratorRange(oldBAI->getTokenResult()->getUses()));
+      makeUserIteratorRange(oldYield->getUses()));
     auto yieldCastRes = castValueToABICompatibleType(
       &builder, loc, newYield, newYield->getType(), oldYield->getType(),
       users);
@@ -894,15 +894,13 @@ std::pair<FullApplySite, bool> swift::tryDevirtualizeClassMethod(
 /// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
 getWitnessMethodSubstitutions(
-    ModuleDecl *mod,
+    ASTContext &ctx,
     ProtocolConformanceRef conformanceRef,
     GenericSignature requirementSig,
     GenericSignature witnessThunkSig,
     SubstitutionMap origSubMap,
     bool isSelfAbstract,
     ClassDecl *classWitness) {
-
-  auto &ctx = mod->getASTContext();
 
   if (witnessThunkSig.isNull())
     return SubstitutionMap();
@@ -917,7 +915,7 @@ getWitnessMethodSubstitutions(
 
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  auto baseSubMap = conformance->getSubstitutions(mod);
+  auto baseSubMap = conformance->getSubstitutionMap();
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
@@ -1023,7 +1021,7 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
 
   SubstitutionMap origSubs = applySite.getSubstitutionMap();
 
-  auto *mod = module.getSwiftModule();
+  auto &ctx = module.getASTContext();
   bool isSelfAbstract =
       witnessFnTy
           ->getSelfInstanceType(
@@ -1032,7 +1030,7 @@ swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
   auto *classWitness = witnessFnTy->getWitnessMethodClass(
       module, applySite.getFunction()->getTypeExpansionContext());
 
-  return ::getWitnessMethodSubstitutions(mod, cRef, requirementSig,
+  return ::getWitnessMethodSubstitutions(ctx, cRef, requirementSig,
                                          witnessThunkSig, origSubs,
                                          isSelfAbstract, classWitness);
 }

@@ -16,49 +16,48 @@ import SILBridging
 public struct Operand : CustomStringConvertible, NoReflectionChildren {
   fileprivate let bridged: BridgedOperand
 
-  init(_ bridged: BridgedOperand) {
+  init(bridged: BridgedOperand) {
     self.bridged = bridged
   }
 
-  public var value: Value {
-    Operand_getValue(bridged).value
-  }
+  public var value: Value { bridged.getValue().value }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
     return lhs.bridged.op == rhs.bridged.op
   }
 
   public var instruction: Instruction {
-    return Operand_getUser(bridged).instruction
+    return bridged.getUser().instruction
   }
   
   public var index: Int { instruction.operands.getIndex(of: self) }
   
   /// True if the operand is used to describe a type dependency, but it's not
   /// used as value.
-  public var isTypeDependent: Bool { Operand_isTypeDependent(bridged) != 0 }
+  public var isTypeDependent: Bool { bridged.isTypeDependent() }
   
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 
 public struct OperandArray : RandomAccessCollection, CustomReflectable {
-  private let opArray: BridgedArrayRef
+  private let base: OptionalBridgedOperand
+  public let count: Int
   
-  init(opArray: BridgedArrayRef) {
-    self.opArray = opArray
+  init(base: OptionalBridgedOperand, count: Int) {
+    self.base = base
+    self.count = count
   }
-  
+
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { return Int(opArray.numElements) }
+  public var endIndex: Int { return count }
   
   public subscript(_ index: Int) -> Operand {
-    assert(index >= 0 && index < endIndex)
-    return Operand(BridgedOperand(op: opArray.data! + index &* BridgedOperandSize))
+    assert(index >= startIndex && index < endIndex)
+    return Operand(bridged: base.advancedBy(index))
   }
   
   public func getIndex(of operand: Operand) -> Int {
-    let idx = (operand.bridged.op - UnsafeRawPointer(opArray.data!)) /
-                BridgedOperandSize
+    let idx = base.distanceTo(operand.bridged)
     assert(self[idx].bridged.op == operand.bridged.op)
     return idx
   }
@@ -72,38 +71,38 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   ///
   /// Note: this does not return a Slice. The first index of the returnd array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
-    assert(bounds.lowerBound >= 0)
-    assert(bounds.upperBound <= endIndex)
-    return OperandArray(opArray: BridgedArrayRef(
-      data: opArray.data! + bounds.lowerBound &* BridgedOperandSize,
-      numElements: bounds.upperBound - bounds.lowerBound))
+    assert(bounds.lowerBound >= startIndex && bounds.upperBound <= endIndex)
+    return OperandArray(
+      base: OptionalBridgedOperand(op: base.advancedBy(bounds.lowerBound).op),
+      count: bounds.upperBound - bounds.lowerBound)
   }
 }
 
 public struct UseList : CollectionLikeSequence {
   public struct Iterator : IteratorProtocol {
-    var currentOpPtr: UnsafeRawPointer?
+    var currentOpPtr: OptionalBridgedOperand
     
     public mutating func next() -> Operand? {
-      if let opPtr = currentOpPtr {
-        let bridged = BridgedOperand(op: opPtr)
-        currentOpPtr = Operand_nextUse(bridged).op
-        return Operand(bridged)
+      if let op = currentOpPtr.operand {
+        currentOpPtr = op.getNextUse()
+        return Operand(bridged: op)
       }
       return nil
     }
   }
 
-  private let firstOpPtr: UnsafeRawPointer?
+  private let firstOpPtr: OptionalBridgedOperand
 
   init(_ firstOpPtr: OptionalBridgedOperand) {
-    self.firstOpPtr = firstOpPtr.op
+    self.firstOpPtr = firstOpPtr
   }
 
   public var singleUse: Operand? {
-    if let opPtr = firstOpPtr {
-      if Operand_nextUse(BridgedOperand(op: opPtr)).op != nil { return nil }
-      return Operand(BridgedOperand(op: opPtr))
+    if let op = firstOpPtr.operand {
+      if op.getNextUse().operand != nil {
+        return nil
+      }
+      return Operand(bridged: op)
     }
     return nil
   }
@@ -112,5 +111,14 @@ public struct UseList : CollectionLikeSequence {
 
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)
+  }
+}
+
+extension OptionalBridgedOperand {
+  var operand: BridgedOperand? {
+    if let op = op {
+      return BridgedOperand(op: op)
+    }
+    return nil
   }
 }

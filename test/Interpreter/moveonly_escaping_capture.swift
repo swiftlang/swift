@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // TODO: SIL optimizations cause a miscompile of deinit rdar://105798769
 // REQUIRES: swift_test_mode_optimize_none
@@ -22,10 +22,6 @@ struct Butt {
     // TODO: work around crash when we export a setter from a move-only type
     // by making this stored property private
     private var _value: C
-
-    // TODO: prevent IRGen from reusing value witnesses or box metadata
-    // for the common single-refcounted layout
-    private var _x: Bool = false
 
     var value: Int { return _value.value }
 

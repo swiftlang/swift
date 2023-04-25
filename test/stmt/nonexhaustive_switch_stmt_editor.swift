@@ -13,14 +13,16 @@ public func testNonExhaustive(_ value: NonExhaustive) {
   case .a: break
   }
 
-  switch value { // expected-warning {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}}
-  // expected-note@-1 {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError()#>\n}}
+  // expected-warning@+2 {{switch covers known cases, but 'NonExhaustive' may have additional unknown values}}
+  // expected-note@+1 {{handle unknown values using "@unknown default"}} {{+3:3-3=@unknown default:\n<#fatalError()#>\n}}
+  switch value {
   case .a: break
   case .b: break
   }
-  
-  switch value { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{do you want to add missing cases?}} {{3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#code#>\n}}
+
+  // expected-error@+2 {{switch must be exhaustive}}
+  // expected-note@+1 {{do you want to add missing cases?}} {{+1:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#code#>\n}}
+  switch value {
   }
 
   switch value {

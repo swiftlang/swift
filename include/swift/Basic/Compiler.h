@@ -81,6 +81,13 @@
 #define SWIFT_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
+// Needed for C++ bridging functions which return types with pointers.
+#if __has_attribute(swift_attr)
+#define SWIFT_IMPORT_UNSAFE __attribute__((swift_attr("import_unsafe")))
+#else
+#define SWIFT_IMPORT_UNSAFE
+#endif
+
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -175,15 +182,6 @@
 #define SWIFT_VFORMAT(fmt) __attribute__((format(printf, fmt, 0)))
 #else
 #define SWIFT_VFORMAT(fmt)
-#endif
-
-// Tells Swift's ClangImporter to import a C++ type as a foreign reference type.
-#if __has_attribute(swift_attr)
-#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_reference"))) \
-  __attribute__((swift_attr("retain:immortal")))                               \
-  __attribute__((swift_attr("release:immortal")))
-#else
-#define SWIFT_IMPORT_REFERENCE
 #endif
 
 #if __has_attribute(enum_extensibility)

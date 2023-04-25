@@ -218,10 +218,12 @@ void LoopRegionFunctionInfo::verify() {
 
       // If R and OtherR are blocks, then OtherR should be a successor of the
       // real block.
-      if (R->isBlock() && OtherR->isBlock())
-        assert(R->getBlock()->isSuccessorBlock(OtherR->getBlock()) &&
+      if (R->isBlock() && OtherR->isBlock()) {
+        auto succs = R->getBlock()->getSuccessors();
+        assert(std::find(succs.begin(), succs.end(), OtherR->getBlock()) != succs.end() &&
                "Expected either R was not a block or OtherR was a CFG level "
                "successor of R.");
+      }
     }
   }
 #endif

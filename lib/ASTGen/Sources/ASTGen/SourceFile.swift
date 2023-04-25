@@ -1,3 +1,4 @@
+import SwiftDiagnostics
 import SwiftParser
 import SwiftSyntax
 import SwiftParserDiagnostics
@@ -77,7 +78,8 @@ extension Syntax {
 public func emitParserDiagnostics(
   diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
-  emitOnlyErrors: CInt
+  emitOnlyErrors: CInt,
+  downgradePlaceholderErrorsToWarnings: CInt
 ) -> CInt {
   return sourceFilePtr.withMemoryRebound(
     to: ExportedSourceFile.self, capacity: 1
@@ -94,7 +96,15 @@ public func emitParserDiagnostics(
       if diag.node.isInIfConfig {
         continue
       }
-      if emitOnlyErrors != 0, diag.diagMessage.severity != .error {
+
+      let diagnosticSeverity: DiagnosticSeverity
+      if downgradePlaceholderErrorsToWarnings == 1 && diag.diagMessage.diagnosticID == StaticTokenError.editorPlaceholder.diagnosticID {
+        diagnosticSeverity = .warning
+      } else {
+        diagnosticSeverity = diag.diagMessage.severity
+      }
+
+      if emitOnlyErrors != 0, diagnosticSeverity != .error {
         continue
       }
 
@@ -102,7 +112,8 @@ public func emitParserDiagnostics(
         diagEnginePtr: diagEnginePtr,
         sourceFileBuffer: UnsafeMutableBufferPointer(
           mutating: sourceFile.pointee.buffer),
-        diagnostic: diag
+        diagnostic: diag,
+        diagnosticSeverity: diagnosticSeverity
       )
       anyDiags = true
     }

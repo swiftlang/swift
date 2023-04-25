@@ -472,7 +472,7 @@ namespace {
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';
-      if (auto m = P->getMatchExpr())
+      if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
         printRec(P->getSubExpr());
@@ -1015,19 +1015,8 @@ namespace {
       }
 
       if (auto specifier = P->getCachedSpecifier()) {
-        switch (*specifier) {
-        case ParamDecl::Specifier::Default:
-          /* nothing */
-          break;
-        case ParamDecl::Specifier::InOut:
-          OS << " inout";
-          break;
-        case ParamDecl::Specifier::Shared:
-          OS << " shared";
-          break;
-        case ParamDecl::Specifier::Owned:
-          OS << " owned";
-          break;
+        if (*specifier != ParamDecl::Specifier::Default) {
+          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
         }
       }
 
@@ -1322,12 +1311,9 @@ namespace {
     void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
       printCommon(MED, "macro_expansion_decl ");
       OS << MED->getMacroName();
-      if (MED->getArgs()) {
-        OS << '\n';
-        OS.indent(Indent + 2);
-        printArgumentList(OS, MED->getArgs(), Indent,
-                          [&](Expr *E) { printRec(E); });
-      }
+      OS << '\n';
+      printArgumentList(OS, MED->getArgs(), Indent,
+                        [&](Expr *E) { printRec(E); });
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };
@@ -1370,6 +1356,10 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
   }
 
   switch (dc->getContextKind()) {
+  case DeclContextKind::Package:
+    printName(os, cast<PackageUnit>(dc)->getName());
+    break;
+
   case DeclContextKind::Module:
     printName(os, cast<ModuleDecl>(dc)->getRealName());
     break;
@@ -1810,6 +1800,12 @@ public:
 
   void visitThrowStmt(ThrowStmt *S) {
     printCommon(S, "throw_stmt") << '\n';
+    printRec(S->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitForgetStmt(ForgetStmt *S) {
+    printCommon(S, "forget_stmt") << '\n';
     printRec(S->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2529,6 +2525,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitMaterializePackExpr(MaterializePackExpr *E) {
+    printCommon(E, "materialize_pack_expr") << "\n";
+    printRec(E->getFromExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';
@@ -3045,7 +3047,7 @@ public:
       printArgumentList(E->getArgs());
     }
     if (auto rewritten = E->getRewritten()) {
-      OS << '\n';
+      OS << " rewritten=\n";
       printRec(rewritten);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3260,24 +3262,15 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitInOutTypeRepr(InOutTypeRepr *T) {
-    printCommon("type_inout") << '\n';
+  void visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
+    printCommon("type_ownership")
+      << ' '
+      << T->getSpecifierSpelling()
+      << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   
-  void visitSharedTypeRepr(SharedTypeRepr *T) {
-    printCommon("type_shared") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
-    printCommon("type_owned") << '\n';
-    printRec(T->getBase());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
     printCommon("isolated") << '\n';
     printRec(T->getBase());
@@ -3810,6 +3803,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinJob, builtin_job)
     TRIVIAL_TYPE_PRINTER(BuiltinExecutor, builtin_executor_ref)
     TRIVIAL_TYPE_PRINTER(BuiltinDefaultActorStorage, builtin_default_actor_storage)
+    TRIVIAL_TYPE_PRINTER(BuiltinNonDefaultDistributedActorStorage, builtin_non_default_distributed_actor_storage)
     TRIVIAL_TYPE_PRINTER(BuiltinPackIndex, builtin_pack_index)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)

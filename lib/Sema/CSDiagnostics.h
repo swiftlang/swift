@@ -224,11 +224,6 @@ protected:
       llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
           [](GenericTypeParamType *, Type) {});
 
-  bool isArrayType(Type type) const {
-    auto &cs = getConstraintSystem();
-    return bool(cs.isArrayType(type));
-  }
-
   bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol) const;
 };
 
@@ -539,9 +534,19 @@ public:
   bool diagnoseAsNote() override;
 };
 
+/// A diagnostic that will be emitted on the base if its locator points to a
+/// member access.
+class MemberReferenceFailure : public FailureDiagnostic {
+public:
+  MemberReferenceFailure(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  ASTNode getAnchor() const override;
+};
+
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
-class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
+class MemberAccessOnOptionalBaseFailure final : public MemberReferenceFailure {
   DeclNameRef Member;
   Type MemberBaseType;
   bool ResultTypeIsOptional;
@@ -549,10 +554,9 @@ class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
 public:
   MemberAccessOnOptionalBaseFailure(const Solution &solution,
                                     ConstraintLocator *locator,
-                                    DeclNameRef memberName,
-                                    Type memberBaseType,
+                                    DeclNameRef memberName, Type memberBaseType,
                                     bool resultOptional)
-      : FailureDiagnostic(solution, locator), Member(memberName),
+      : MemberReferenceFailure(solution, locator), Member(memberName),
         MemberBaseType(resolveType(memberBaseType)),
         ResultTypeIsOptional(resultOptional) {}
 
@@ -1132,6 +1136,8 @@ public:
       : ContextualFailure(solution, base, wrapper, locator), Property(property),
         UsingProjection(usingProjection) {}
 
+  ASTNode getAnchor() const override;
+
   VarDecl *getProperty() const { return Property; }
 
   Identifier getPropertyName() const { return Property->getName(); }
@@ -1206,14 +1212,14 @@ public:
   bool diagnoseAsNote() override;
 };
 
-class InvalidMemberRefFailure : public FailureDiagnostic {
+class InvalidMemberRefFailure : public MemberReferenceFailure {
   Type BaseType;
   DeclNameRef Name;
 
 public:
   InvalidMemberRefFailure(const Solution &solution, Type baseType,
                           DeclNameRef memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+      : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Name(memberName) {}
 
 protected:
@@ -1339,7 +1345,7 @@ public:
 ///
 /// }
 /// ```
-class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
+class AllowTypeOrInstanceMemberFailure final : public MemberReferenceFailure {
   Type BaseType;
   ValueDecl *Member;
   DeclNameRef Name;
@@ -1348,7 +1354,7 @@ public:
   AllowTypeOrInstanceMemberFailure(const Solution &solution, Type baseType,
                                    ValueDecl *member, DeclNameRef name,
                                    ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator),
+      : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
   }
@@ -1843,6 +1849,43 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose \c each applied to an expression that is not a pack type.
+class InvalidPackElement final : public FailureDiagnostic {
+  Type packElementType;
+
+public:
+  InvalidPackElement(const Solution &solution, Type packElementType,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        packElementType(packElementType) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose pack references outside of pack expansion expressions.
+class InvalidPackReference final : public FailureDiagnostic {
+  Type packType;
+
+public:
+  InvalidPackReference(const Solution &solution, Type packType,
+                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        packType(packType) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose pack expansion expressions appearing in contexts that do not
+/// accept a comma-separated list of values.
+class InvalidPackExpansion final : public FailureDiagnostic {
+public:
+  InvalidPackExpansion(const Solution &solution,
+                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:
@@ -2168,6 +2211,8 @@ public:
         UseConditionalCast(useConditionalCast) {}
 
   ASTNode getAnchor() const override;
+
+  SourceLoc getLoc() const override;
 
   bool diagnoseAsError() override;
 };

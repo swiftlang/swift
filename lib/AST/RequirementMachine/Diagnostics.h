@@ -42,6 +42,8 @@ struct RequirementError {
     RecursiveRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
+    /// A not-yet-supported same-element requirement, e.g. each T == Int.
+    UnsupportedSameElement,
   } kind;
 
   /// The invalid requirement.
@@ -99,6 +101,10 @@ public:
   static RequirementError forRecursiveRequirement(Requirement req,
                                                   SourceLoc loc) {
     return {Kind::RecursiveRequirement, req, loc};
+  }
+
+  static RequirementError forSameElement(Requirement req, SourceLoc loc) {
+    return {Kind::UnsupportedSameElement, req, loc};
   }
 };
 

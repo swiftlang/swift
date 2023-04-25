@@ -13,5 +13,5 @@ void test(void *p) {
   getEnumTagi32(p);
 }
 
-// CHECK: declare dso_local noundef i8 @"?getEnumTagi8@@YAEPEAX@Z"(i8* noundef) #1
-// CHECK: declare dso_local noundef i32 @"?getEnumTagi32@@YAIPEAX@Z"(i8* noundef) #1
+// CHECK: declare dso_local noundef i8 @"?getEnumTagi8@@YAEPEAX@Z"(ptr noundef) #1
+// CHECK: declare dso_local noundef i32 @"?getEnumTagi32@@YAIPEAX@Z"(ptr noundef) #1

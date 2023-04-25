@@ -80,8 +80,8 @@
 // RUN: %swift_driver -g -### %s 2>&1 | %FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g
 
-// RUN: not %swift_driver -target abc -### %s 2>&1 | %FileCheck -check-prefix=BAD_TARGET %s
-// BAD_TARGET: error: unknown target 'abc'
+// RUN: not %swiftc_driver_plain -target x86_64-unknown-hurd -### %s 2>&1 | %FileCheck -check-prefix=BAD_TARGET %s
+// BAD_TARGET: error: unknown target 'x86_64-unknown-hurd'
 
 // RUN: %swiftc_driver -incremental %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM %s
 // INCREMENTAL_WITHOUT_OFM: warning: ignoring -incremental (currently requires an output file map)

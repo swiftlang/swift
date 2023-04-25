@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTyExposeOnly.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTyExposeOnly.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -disable-availability-checking
 
 // RUN: %FileCheck %s < %t/UseCxxTyExposeOnly.h
 
@@ -166,7 +166,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 
 // CHECK: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateInt
@@ -192,7 +192,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace UseCxxTy __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("UseCxxTy") {
+// CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
 
 // CHECK: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<int> retNonTrivial() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<int>)) char storage[sizeof(ns::NonTrivialTemplate<int>)];
@@ -205,7 +205,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-EMPTY:
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateTrivial
@@ -231,7 +231,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace UseCxxTy __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("UseCxxTy") {
+// CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
 // CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];

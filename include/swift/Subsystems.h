@@ -35,6 +35,9 @@ namespace llvm {
   class Module;
   class TargetOptions;
   class TargetMachine;
+  namespace vfs {
+    class OutputBackend;
+  }
 }
 
 namespace swift {
@@ -236,10 +239,11 @@ namespace swift {
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
-  /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed, only to be optimized.
+  /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
+  /// if requested (\out is not null).
   void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
-                                llvm::TargetMachine *TargetMachine);
+                                llvm::TargetMachine *TargetMachine,
+                                llvm::raw_pwrite_stream *out);
 
   /// Compiles and writes the given LLVM module into an output stream in the
   /// format specified in the \c IRGenOptions.
@@ -275,6 +279,7 @@ namespace swift {
   /// \param Module LLVM module to code gen, required.
   /// \param TargetMachine target of code gen, required.
   /// \param OutputFilename Filename for output.
+  /// \param Backend OutputBackend for writing output.
   bool performLLVM(const IRGenOptions &Opts,
                    DiagnosticEngine &Diags,
                    llvm::sys::Mutex *DiagMutex,
@@ -282,6 +287,7 @@ namespace swift {
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
                    StringRef OutputFilename,
+                   llvm::vfs::OutputBackend &Backend,
                    UnifiedStatsReporter *Stats);
 
   /// Dump YAML describing all fixed-size types imported from the given module.

@@ -126,6 +126,11 @@ func defaultToAny(i: Int, s: String) {
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: Int = a1  // expected-error{{value of type '[Any]'}}
 
+  let _ = ([1, "a"])
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  let _ = [1, true, []]
+  // expected-error@-1:11 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: Int = a2  // expected-error{{value of type '[Any]'}}
@@ -146,9 +151,7 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any] = [1, [2, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   func f1() -> [Any] {
     []
@@ -157,41 +160,25 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any?] = [1, "a", nil, 3.5]
   let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
   let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, [2, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, nil, [2, nil, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
   
   let a7: some Collection = [1, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}} {{41-41= as [Any]}}
   let _: (any Sequence)? = [1, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: any Sequence = [1, nil, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _ = [1, true, ([], 1)]
-  // expected-error@-1 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  // expected-warning@-2 {{empty collection literal requires an explicit type}}
   let _ = true ? [] : []
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
   let _ = (true, ([1, "Swift"]))
-  //expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _ = ([1, true])
-  //expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   func f2<T>(_: [T]) {}
 
   func f3<T>() -> [T]? {}
 
   f2([])
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
   f2([1, nil, ""])
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
   _ = f3() ?? []
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
 }
 
 func noInferAny(iob: inout B, ioc: inout C) {

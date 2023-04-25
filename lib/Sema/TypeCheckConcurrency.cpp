@@ -182,6 +182,27 @@ bool IsDefaultActorRequest::evaluate(
   if (!classDecl->isActor())
     return false;
 
+  // Distributed actors were not able to have custom executors until Swift 5.9,
+  // so in order to avoid wrongly treating a resilient distributed actor from another
+  // module as not-default we need to handle this case explicitly.
+  if (classDecl->isDistributedActor()) {
+    ASTContext &ctx = classDecl->getASTContext();
+    auto customExecutorAvailability =
+        ctx.getConcurrencyDistributedActorWithCustomExecutorAvailability();
+
+    auto actorAvailability = TypeChecker::overApproximateAvailabilityAtLocation(
+        classDecl->getStartLoc(),
+        classDecl);
+
+    if (!actorAvailability.isContainedIn(customExecutorAvailability)) {
+      // Any 'distributed actor' declared with availability lower than the
+      // introduction of custom executors for distributed actors, must be treated as default actor,
+      // even if it were to declared the unowned executor property, as older compilers
+      // do not have the the logic to handle that case.
+      return true;
+    }
+  }
+
   // If the class is resilient from the perspective of the module
   // module, it's not a default actor.
   if (classDecl->isForeign() || classDecl->isResilient(M, expansion))
@@ -192,9 +213,17 @@ bool IsDefaultActorRequest::evaluate(
   // If we synthesized the unownedExecutor property, we should've
   // added a semantics attribute to it (if it was actually a default
   // actor).
+  bool foundExecutorPropertyImpl = false;
+  bool isDefaultActor = false;
   if (auto executorProperty = classDecl->getUnownedExecutorProperty()) {
-    bool isDefaultActor =
+    foundExecutorPropertyImpl = true;
+    isDefaultActor = isDefaultActor ||
         executorProperty->getAttrs().hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
+  }
+
+  // Only if we found one of the executor properties, do we return the status of default or not,
+  // based on the findings of the semantics attribute of that located property.
+  if (foundExecutorPropertyImpl) {
     if (!isDefaultActor &&
         classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
         !AvailableAttr::isUnavailable(classDecl)) {
@@ -202,9 +231,11 @@ bool IsDefaultActorRequest::evaluate(
           diag::concurrency_task_to_thread_model_custom_executor,
           "task-to-thread concurrency model");
     }
+
     return isDefaultActor;
   }
 
+  // Otherwise, we definitely are a default actor.
   return true;
 }
 
@@ -1225,15 +1256,94 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   }
 }
 
-/// Determine whether this is the main actor type.
-/// FIXME: the diagnostics engine has a copy of this.
-static bool isMainActor(Type type) {
-  if (auto nominal = type->getAnyNominal()) {
-    if (nominal->getName().is("MainActor") &&
-        nominal->getParentModule()->getName() ==
-          nominal->getASTContext().Id_Concurrency)
-      return true;
+void swift::tryDiagnoseExecutorConformance(ASTContext &C,
+                                           const NominalTypeDecl *nominal,
+                                           ProtocolDecl *proto) {
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Executor) ||
+         proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor));
+
+  auto &diags = C.Diags;
+  auto module = nominal->getParentModule();
+  Type nominalTy = nominal->getDeclaredInterfaceType();
+
+  // enqueue(_:)
+  auto enqueueDeclName = DeclName(C, DeclBaseName(C.Id_enqueue), { Identifier() });
+
+  FuncDecl *unownedEnqueueRequirement = nullptr;
+  FuncDecl *moveOnlyEnqueueRequirement = nullptr;
+  for (auto req: proto->getProtocolRequirements()) {
+    auto *funcDecl = dyn_cast<FuncDecl>(req);
+    if (!funcDecl)
+      continue;
+
+    if (funcDecl->getName() != enqueueDeclName)
+      continue;
+
+    // look for the first parameter being a Job or UnownedJob
+    if (funcDecl->getParameters()->size() != 1)
+      continue;
+    if (auto param = funcDecl->getParameters()->front()) {
+      StructDecl* jobDecl;
+      if (auto decl = C.getExecutorJobDecl()) {
+        jobDecl = decl;
+      } else if (auto decl = C.getJobDecl()) {
+        // old standard library, before we introduced the `typealias Job = ExecutorJob`
+        jobDecl = decl;
+      }
+
+      if (jobDecl &&
+          param->getType()->isEqual(jobDecl->getDeclaredInterfaceType())) {
+        assert(moveOnlyEnqueueRequirement == nullptr);
+        moveOnlyEnqueueRequirement = funcDecl;
+      } else if (param->getType()->isEqual(C.getUnownedJobDecl()->getDeclaredInterfaceType())) {
+        assert(unownedEnqueueRequirement == nullptr);
+        unownedEnqueueRequirement = funcDecl;
+      }
+    }
+
+    // if we found both, we're done here and break out of the loop
+    if (unownedEnqueueRequirement && moveOnlyEnqueueRequirement)
+      break; // we're done looking for the requirements
   }
+
+
+  auto conformance = module->lookupConformance(nominalTy, proto);
+  auto concreteConformance = conformance.getConcrete();
+  assert(unownedEnqueueRequirement && "could not find the enqueue(UnownedJob) requirement, which should be always there");
+  ConcreteDeclRef unownedEnqueueWitness = concreteConformance->getWitnessDeclRef(unownedEnqueueRequirement);
+
+  if (auto enqueueUnownedDecl = unownedEnqueueWitness.getDecl()) {
+    // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
+    if (enqueueUnownedDecl->getLoc().isValid()) {
+      diags.diagnose(enqueueUnownedDecl->getLoc(), diag::executor_enqueue_unowned_implementation, nominalTy);
+    }
+  }
+
+  if (auto unownedEnqueueDecl = unownedEnqueueWitness.getDecl()) {
+    if (moveOnlyEnqueueRequirement) {
+      ConcreteDeclRef moveOnlyEnqueueWitness = concreteConformance->getWitnessDeclRef(moveOnlyEnqueueRequirement);
+      if (auto moveOnlyEnqueueDecl = moveOnlyEnqueueWitness.getDecl()) {
+        if (unownedEnqueueDecl && unownedEnqueueDecl->getLoc().isInvalid() &&
+            moveOnlyEnqueueDecl && moveOnlyEnqueueDecl->getLoc().isInvalid()) {
+          // Neither old nor new implementation have been found, but we provide default impls for them
+          // that are mutually recursive, so we must error and suggest implementing the right requirement.
+          auto ownedRequirement = C.getExecutorDecl()->getExecutorOwnedEnqueueFunction();
+          nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
+          ownedRequirement->diagnose(diag::no_witnesses,
+                                     getProtocolRequirementKind(ownedRequirement),
+                                     ownedRequirement->getName(),
+                                     proto->getDeclaredInterfaceType(),
+                                     /*AddFixIt=*/true);
+        }
+      }
+    }
+  }
+}
+
+/// Determine whether this is the main actor type.
+static bool isMainActor(Type type) {
+  if (auto nominal = type->getAnyNominal())
+    return nominal->isMainActor();
 
   return false;
 }
@@ -1939,6 +2049,10 @@ namespace {
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return true; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {

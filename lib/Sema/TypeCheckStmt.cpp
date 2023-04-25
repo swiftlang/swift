@@ -63,6 +63,10 @@ namespace {
   public:
     ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -248,6 +252,10 @@ namespace {
       }
 
       return result;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -550,6 +558,34 @@ static bool isDefer(DeclContext *dc) {
   return false;
 }
 
+/// Climb the context to find the method or accessor we're within. We do not
+/// look past local functions or closures, since those cannot contain a
+/// forget statement.
+/// \param dc the inner decl context containing the forget statement
+/// \return either the type member we reside in, or the offending context that
+///         stopped the search for the type member (e.g. closure).
+static DeclContext *climbContextForForgetStmt(DeclContext *dc) {
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      auto func = dyn_cast<AbstractFunctionDecl>(decl);
+      // If we found a non-func decl, we're done.
+      if (func == nullptr)
+        break;
+
+      // If this function's parent is the type context, our search is done.
+      if (func->getDeclContext()->isTypeContext())
+        break;
+
+      // Only continue if we're in a defer. We want to stop at the first local
+      // function or closure.
+      if (!isDefer(dc))
+        break;
+    }
+  } while ((dc = dc->getParent()));
+
+  return dc;
+}
+
 /// Check that a labeled statement doesn't shadow another statement with the
 /// same label.
 static void checkLabeledStmtShadowing(
@@ -828,8 +864,6 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     return true;
   }
   elt.setPattern(pattern);
-
-  TypeChecker::diagnoseDuplicateBoundVars(pattern);
 
   // Check the pattern, it allows unspecified types because the pattern can
   // provide type information.
@@ -1179,6 +1213,144 @@ public:
     return TS;
   }
 
+  Stmt *visitForgetStmt(ForgetStmt *FS) {
+    // There are a lot of rules about whether a forget statement is even valid.
+    //
+    // The order of the checks below roughly reflects a sort of funneling from
+    // least correct to most correct usage, while aiming to not emit more than
+    // one diagnostic for misuse, since there are so many ways you can write it
+    // in the wrong place.
+
+    constraints::ContextualTypeInfo contextualInfo;
+    auto &ctx = getASTContext();
+    bool diagnosed = false;
+
+    auto *outerDC = climbContextForForgetStmt(DC);
+    AbstractFunctionDecl *fn = nullptr; // the type member we reside in.
+    if (outerDC->getParent()->isTypeContext()) {
+      fn = dyn_cast<AbstractFunctionDecl>(outerDC);
+    }
+
+    // The forget statement must be in some type's member.
+    if (!fn) {
+      // Then we're not in some type's member function; emit diagnostics.
+      if (auto decl = outerDC->getAsDecl()) {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+                           decl->getDescriptiveKind());
+      } else if (auto clos = dyn_cast<AbstractClosureExpr>(outerDC)) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_closure);
+      } else {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_misc);
+      }
+      diagnosed = true;
+    }
+
+    // Member function-like-thing must have a 'self' and not be a destructor.
+    if (!diagnosed) {
+      // Save this for SILGen, since Stmt's don't know their decl context.
+      FS->setInnermostMethodContext(fn);
+
+      if (fn->isStatic() || isa<DestructorDecl>(fn)) {
+        ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      }
+    }
+
+    // This member function/accessor/etc has to be within a noncopyable type.
+    if (!diagnosed) {
+      Type nominalType =
+          fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+      if (!nominalType->isPureMoveOnly()) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_copyable,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      } else {
+        // Set the contextual type for the sub-expression before we typecheck.
+        contextualInfo = {nominalType, CTP_ForgetStmt};
+
+        // Now verify that we're not forgetting a type from another module.
+        //
+        // NOTE: We could do a proper resilience check instead of just asking
+        // if the modules differ, so that you can forget a @frozen type from a
+        // resilient module. But for now the proposal simply says that it has to
+        // be the same module, which is probably better for everyone.
+        auto *typeDecl = nominalType->getAnyNominal();
+        auto *fnModule = fn->getModuleContext();
+        auto *typeModule = typeDecl->getModuleContext();
+        if (fnModule != typeModule) {
+          ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_module,
+                             nominalType);
+          diagnosed = true;
+        } else {
+          assert(
+              !typeDecl->isResilient(fnModule, ResilienceExpansion::Maximal) &&
+              "trying to forget a type resilient to us!");
+        }
+      }
+    }
+
+    {
+      // Typecheck the sub expression unconditionally.
+      auto E = FS->getSubExpr();
+      TypeChecker::typeCheckExpression(E, DC, contextualInfo);
+      FS->setSubExpr(E);
+    }
+
+    // Can only 'forget self'. This check must happen after typechecking.
+    if (!diagnosed) {
+      bool isSelf = false;
+      auto *checkE = FS->getSubExpr();
+
+      // Look through a load. Only expected if we're in an init.
+      if (auto *load = dyn_cast<LoadExpr>(checkE))
+          checkE = load->getSubExpr();
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
+        isSelf = DRE->getDecl()->getName().isSimpleName("self");
+
+      if (!isSelf) {
+        ctx.Diags
+            .diagnose(FS->getStartLoc(), diag::forget_wrong_not_self)
+            .fixItReplace(FS->getSubExpr()->getSourceRange(), "self");
+        diagnosed = true;
+      }
+    }
+
+    // The 'self' parameter must be owned (aka "consuming").
+    if (!diagnosed) {
+      bool isConsuming = false;
+      if (auto *funcDecl = dyn_cast<FuncDecl>(fn)) {
+        switch (funcDecl->getSelfAccessKind()) {
+        case SelfAccessKind::LegacyConsuming:
+        case SelfAccessKind::Consuming:
+          isConsuming = true;
+          break;
+          
+        case SelfAccessKind::Borrowing:
+        case SelfAccessKind::NonMutating:
+        case SelfAccessKind::Mutating:
+          isConsuming = false;
+          break;
+        }
+      } else if (isa<ConstructorDecl>(fn)) {
+        // constructors are implicitly "consuming" of the self instance.
+        isConsuming = true;
+      }
+
+      if (!isConsuming) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_wrong_context_nonconsuming,
+                           fn->getDescriptiveKind());
+        diagnosed = true;
+      }
+    }
+
+    return FS;
+  }
+
   Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
     Expr *C = PA->getCondition();
     TypeChecker::typeCheckCondition(C, DC);
@@ -1263,8 +1435,6 @@ public:
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
 
-    TypeChecker::diagnoseDuplicateBoundVars(S->getPattern());
-
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
@@ -1331,13 +1501,11 @@ public:
     }
     labelItem.setPattern(pattern, /*resolved=*/true);
 
-    TypeChecker::diagnoseDuplicateBoundVars(pattern);
-
     // Otherwise for each variable in the pattern, make sure its type is
     // identical to the initial case decl and stash the previous case decl as
     // the parent of the decl.
     pattern->forEachVariable([&](VarDecl *vd) {
-      if (!vd->hasName())
+      if (!vd->hasName() || vd->isInvalid())
         return;
 
       // We know that prev var decls matches the initial var decl. So if we can
@@ -1656,6 +1824,16 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         }
       } else {
         break;
+      }
+    }
+  }
+
+  // Check for macro expressions whose macros are marked as
+  // @discardableResult.
+  if (auto expansion = dyn_cast<MacroExpansionExpr>(valueE)) {
+    if (auto macro = expansion->getMacroRef().getDecl()) {
+      if (macro->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+        return;
       }
     }
   }
@@ -2115,6 +2293,10 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   public:
     ApplyExpr *Found = nullptr;
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto apply = dyn_cast<ApplyExpr>(E)) {
         if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
@@ -2171,7 +2353,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
             typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/true);
+                                    /*LeaveClosureBodyUnchecked=*/false);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
@@ -2236,6 +2418,10 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       return *FoundNode;
     }
     DeclContext *getDeclContext() const { return DC; }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *brace = dyn_cast<BraceStmt>(S)) {
@@ -2372,7 +2558,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto optBody = TypeChecker::applyResultBuilderBodyTransform(
           func, builderType,
           /*ClosuresInResultBuilderDontParticipateInInference=*/
-              ctx.CompletionCallback == nullptr);
+              ctx.CompletionCallback == nullptr && ctx.SolutionCallback == nullptr);
       if (optBody && *optBody) {
         // Wire up the function body now.
         func->setBody(*optBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -2392,8 +2578,6 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       func->getBody()->setLastElement(func->getSingleExpressionBody());
     }
   }
-
-  bool LeaveBodyUnchecked = !ctx.CompletionCallback;
 
   // The enclosing closure might be a single expression closure or a function
   // builder closure. In such cases, the body elements are type checked with
@@ -2418,17 +2602,13 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       auto ActorIsolation = determineClosureActorIsolation(
           CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
       CE->setActorIsolation(ActorIsolation);
-      if (!LeaveBodyUnchecked) {
-        // Type checking the parent closure also type checked this node.
-        // Nothing to do anymore.
-        return false;
-      }
-      if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
-        return false;
+      // Type checking the parent closure also type checked this node.
+      // Nothing to do anymore.
+      return false;
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC, LeaveBodyUnchecked);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC, /*LeaveBodyUnchecked=*/false);
   return false;
 }
 
@@ -2478,23 +2658,26 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
         body->walk(ContextualizeClosuresAndMacros(AFD));
       }
-    } else if (func->hasSingleExpressionBody() &&
-               func->getResultInterfaceType()->isVoid()) {
-      // The function returns void.  We don't need an explicit return, no matter
-      // what the type of the expression is. Take the inserted return back out.
-      body->setLastElement(func->getSingleExpressionBody());
-    } else if (func->getBody()->getNumElements() == 1 &&
-               !func->getResultInterfaceType()->isVoid()) {
+    } else {
+      if (func->hasSingleExpressionBody() &&
+          func->getResultInterfaceType()->isVoid()) {
+        // The function returns void.  We don't need an explicit return, no
+        // matter what the type of the expression is. Take the inserted return
+        // back out.
+        body->setLastElement(func->getSingleExpressionBody());
+      }
       // If there is a single statement in the body that can be turned into a
       // single expression return, do so now.
-      if (auto *S = func->getBody()->getLastElement().dyn_cast<Stmt *>()) {
-        if (S->mayProduceSingleValue(evaluator)) {
-          auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-              ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-          body->setLastElement(RS);
-          func->setHasSingleExpressionBody();
-          func->setSingleExpressionBody(SVE);
+      if (!func->getResultInterfaceType()->isVoid()) {
+        if (auto *S = body->getSingleActiveStatement()) {
+          if (S->mayProduceSingleValue(evaluator)) {
+            auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+                ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
+            auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
+            body->setLastElement(RS);
+            func->setHasSingleExpressionBody();
+            func->setSingleExpressionBody(SVE);
+          }
         }
       }
     }
@@ -2632,6 +2815,10 @@ class JumpOutOfContextFinder : public ASTWalker {
 public:
   JumpOutOfContextFinder(TinyPtrVector<Stmt *> &jumps) : Jumps(jumps) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *LS = dyn_cast<LabeledStmt>(S))
       ParentLabeledStmts.insert(LS);
@@ -2688,20 +2875,17 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    if (BS->getSingleExpressionElement()) {
+    if (BS->getSingleActiveExpression()) {
       hadSingleExpr = true;
       continue;
     }
 
     // We also allow single value statement branches, which we can wrap in
     // a SingleValueStmtExpr.
-    auto elts = BS->getElements();
-    if (elts.size() == 1) {
-      if (auto *S = elts.back().dyn_cast<Stmt *>()) {
-        if (S->mayProduceSingleValue(eval)) {
-          hadSingleExpr = true;
-          continue;
-        }
+    if (auto *S = BS->getSingleActiveStatement()) {
+      if (S->mayProduceSingleValue(eval)) {
+        hadSingleExpr = true;
+        continue;
       }
     }
     if (!doesBraceEndWithThrow(BS))

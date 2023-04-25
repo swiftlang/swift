@@ -79,11 +79,21 @@ static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
   if (!conformanceRef.isConcrete())
     return false;
   auto conformance = conformanceRef.getConcrete();
-  auto subMap = conformance->getSubstitutions(module);
+  auto subMap = conformance->getSubstitutionMap();
   return llvm::all_of(subMap.getConformances(),
                       [&](ProtocolConformanceRef each) -> bool {
                         return isConcreteAndValid(each, module);
                       });
+}
+
+static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
+                      llvm::ArrayRef<StringRef> names) {
+  if (!clangDecl->isInStdNamespace())
+    return false;
+  if (!clangDecl->getIdentifier())
+    return false;
+  StringRef name = clangDecl->getName();
+  return llvm::is_contained(names, name);
 }
 
 static clang::TypeDecl *
@@ -231,7 +241,8 @@ static void instantiateTemplatedOperator(
       clang::BinaryOperator::getOverloadedOperator(operatorKind);
   clang::OverloadCandidateSet candidateSet(
       classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
-      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind, false));
+      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
+                                              clang::SourceLocation(), false));
   clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, {arg, arg}, true);
 
   clang::OverloadCandidateSet::iterator best;
@@ -380,6 +391,38 @@ void swift::conformToCxxIteratorIfNeeded(
       decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
 }
 
+void swift::conformToCxxOptionalIfNeeded(
+    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxOptional", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  if (!isStdDecl(clangDecl, {"optional"}))
+    return;
+
+  ProtocolDecl *cxxOptionalProto =
+      ctx.getProtocol(KnownProtocolKind::CxxOptional);
+  // If the Cxx module is missing, or does not include one of the necessary
+  // protocol, bail.
+  if (!cxxOptionalProto)
+    return;
+
+  auto pointeeId = ctx.getIdentifier("pointee");
+  auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
+  if (pointees.size() != 1)
+    return;
+  auto pointee = dyn_cast<VarDecl>(pointees.front());
+  if (!pointee)
+    return;
+  auto pointeeTy = pointee->getInterfaceType();
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
+}
+
 void swift::conformToCxxSequenceIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl) {
@@ -520,16 +563,6 @@ void swift::conformToCxxSequenceIfNeeded(
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::CxxConvertibleToCollection});
   }
-}
-
-static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
-                      llvm::ArrayRef<StringRef> names) {
-  if (!clangDecl->isInStdNamespace())
-    return false;
-  if (!clangDecl->getIdentifier())
-    return false;
-  StringRef name = clangDecl->getName();
-  return llvm::is_contained(names, name);
 }
 
 void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,

@@ -263,28 +263,31 @@ void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// existentialRequiresAny computation.
+// hasSelfOrAssociatedTypeRequirementsRequest computation.
 //----------------------------------------------------------------------------//
 
-void ExistentialRequiresAnyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
 }
 
-void ExistentialRequiresAnyRequest::noteCycleStep(DiagnosticEngine &diags) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
   auto requirement = std::get<0>(getStorage());
   diags.diagnose(requirement, diag::kind_declname_declared_here,
                  DescriptiveDeclKind::Protocol, requirement->getName());
 }
 
-Optional<bool> ExistentialRequiresAnyRequest::getCachedResult() const {
+Optional<bool>
+HasSelfOrAssociatedTypeRequirementsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  return decl->getCachedExistentialRequiresAny();
+  return decl->getCachedHasSelfOrAssociatedTypeRequirements();
 }
 
-void ExistentialRequiresAnyRequest::cacheResult(bool value) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->setCachedExistentialRequiresAny(value);
+  decl->setCachedHasSelfOrAssociatedTypeRequirements(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -1009,6 +1012,25 @@ Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
 void NamingPatternRequest::cacheResult(NamedPattern *value) const {
   auto *VD = std::get<0>(getStorage());
   VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// ExprPatternMatchRequest caching.
+//----------------------------------------------------------------------------//
+
+Optional<ExprPatternMatchResult>
+ExprPatternMatchRequest::getCachedResult() const {
+  auto *EP = std::get<0>(getStorage());
+  if (!EP->MatchVar)
+    return None;
+
+  return ExprPatternMatchResult(EP->MatchVar, EP->MatchExpr);
+}
+
+void ExprPatternMatchRequest::cacheResult(ExprPatternMatchResult result) const {
+  auto *EP = std::get<0>(getStorage());
+  EP->MatchVar = result.getMatchVar();
+  EP->MatchExpr = result.getMatchExpr();
 }
 
 //----------------------------------------------------------------------------//
@@ -1743,10 +1765,7 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
 }
 
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
-  if (pointer.is<MacroExpansionExpr *>())
-    return MacroRole::Expression;
-
-  if (pointer.is<MacroExpansionDecl *>())
+  if (pointer.is<MacroExpansionExpr *>() || pointer.is<MacroExpansionDecl *>())
     return getFreestandingMacroRoles();
 
   if (pointer.is<CustomAttr *>())
