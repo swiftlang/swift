@@ -3258,7 +3258,7 @@ void simple_display(llvm::raw_ostream &out,
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
                            ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                                           const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3268,7 +3268,7 @@ private:
 
   ConcreteDeclRef
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
-           DeclContext *dc) const;
+           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
