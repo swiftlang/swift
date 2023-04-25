@@ -159,8 +159,6 @@ class Target {
       exit(1)
     }
 
-    crashingThreadNdx = 0
-
     threads.append(TargetThread(id: TargetThread.ThreadID(t.tid),
                                 context: context,
                                 name: getThreadName(tid: t.tid),
@@ -190,6 +188,20 @@ class Target {
                                   context: context,
                                   name: getThreadName(tid: t.tid),
                                   backtrace: symbolicated))
+    }
+
+    // Sort the threads by thread ID; the main thread always sorts
+    // lower than any other.
+    threads.sort {
+      return $0.id == pid || ($1.id != pid && $0.id < $1.id)
+    }
+
+    // Find the crashing thread index
+    if let ndx = threads.firstIndex(where: { $0.id == crashingThread }) {
+      crashingThreadNdx = ndx
+    } else {
+      print("unable to find the crashing thread")
+      exit(1)
     }
   }
 
