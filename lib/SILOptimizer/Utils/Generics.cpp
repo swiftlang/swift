@@ -67,6 +67,9 @@ llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
         "Verify functions after they are specialized "
         "'PrettyStackTraceFunction'-ing the original function if we fail."));
 
+llvm::cl::opt<bool> DumpFunctionsAfterSpecialization(
+    "sil-generic-dump-functions-after-specialization", llvm::cl::init(false));
+
 static bool OptimizeGenericSubstitutions = false;
 
 /// Max depth of a type which can be processed by the generic
@@ -2113,6 +2116,13 @@ GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
             ". Specialized Function: " + SpecializedF->getName(),
         GenericFunc);
     SpecializedF->verify();
+  }
+
+  if (DumpFunctionsAfterSpecialization) {
+    llvm::dbgs() << llvm::Twine("Generic function: ") + GenericFunc->getName() +
+                        ". Specialized Function: " + SpecializedF->getName();
+    GenericFunc->dump();
+    SpecializedF->dump();
   }
 
   return SpecializedF;

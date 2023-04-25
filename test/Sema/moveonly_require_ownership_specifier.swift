@@ -62,7 +62,7 @@ func caller() {
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}{{15-15=consuming }}
 
   let _: Box<(inout MO) -> ()>? = nil
-  let _: Box<(__shared MO) -> ()>? = nil
+  let _: Box<(borrowing MO) -> ()>? = nil
 
   let _: Box<(MO) -> ()>? = nil
   // expected-error@-1 {{noncopyable parameter must specify its ownership}}

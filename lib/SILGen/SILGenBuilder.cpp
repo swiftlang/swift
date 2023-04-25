@@ -323,6 +323,18 @@ ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
   return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
 }
 
+ManagedValue SILGenBuilder::createFormalAccessLoadCopy(SILLocation loc,
+                                                       ManagedValue base) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  SILValue baseValue = base.getValue();
+  auto i = emitLoadValueOperation(loc, baseValue, LoadOwnershipQualifier::Copy);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
+}
+
 ManagedValue
 SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
