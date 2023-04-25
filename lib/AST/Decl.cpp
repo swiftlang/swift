@@ -445,7 +445,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
 MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
   auto declRef = evaluateOrDefault(
       getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, getDeclContext()},
+      ResolveMacroRequest{customAttr, this},
       ConcreteDeclRef());
 
   return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
