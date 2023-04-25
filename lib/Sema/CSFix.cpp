@@ -2745,7 +2745,9 @@ AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
 
 bool DestructureTupleToMatchPackExpansionParameter::diagnose(
     const Solution &solution, bool asNote) const {
-  return false;
+  DestructureTupleToUseWithPackExpansionParameter failure(solution, ParamShape,
+                                                          getLocator());
+  return failure.diagnose(asNote);
 }
 
 DestructureTupleToMatchPackExpansionParameter *
