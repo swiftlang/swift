@@ -143,7 +143,7 @@ class Target {
   /// uninterruptible wait, we won't have a ucontext for it.
   func fetchThreads(threadListHead: Address,
                     limit: Int?, top: Int, cache: Bool) throws {
-    let t = try reader.fetch(from: threadListHead, as: thread.self)
+    var t = try reader.fetch(from: threadListHead, as: thread.self)
 
     let context = HostContext.fromHostMContext(
       try reader.fetch(from: t.uctx, as: ucontext_t.self).uc_mcontext)
@@ -166,7 +166,7 @@ class Target {
                                 name: getThreadName(tid: t.tid),
                                 backtrace: symbolicated))
     while t.next != 0 {
-      let t = try reader.fetch(from: t.next, as: thread.self)
+      t = try reader.fetch(from: t.next, as: thread.self)
 
       guard let ucontext
               = try? reader.fetch(from: t.uctx, as: ucontext_t.self) else {

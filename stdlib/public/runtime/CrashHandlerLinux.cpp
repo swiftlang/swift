@@ -388,7 +388,7 @@ take_thread_lock()
                                     __ATOMIC_ACQUIRE,
                                     __ATOMIC_RELAXED))
       return;
-  } while (!futex(&thread_lock, FUTEX_WAIT, 0, NULL, NULL, 0)
+  } while (!futex(&thread_lock, FUTEX_WAIT, 1, NULL, NULL, 0)
            || errno == EAGAIN);
 }
 
