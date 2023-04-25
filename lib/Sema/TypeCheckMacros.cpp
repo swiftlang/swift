@@ -458,7 +458,7 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
     return { };
 
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
-  if (!parentDecl)
+  if (!parentDecl || !isa<IterableDeclContext>(parentDecl))
     return { };
 
   if (isa<PatternBindingDecl>(decl))
