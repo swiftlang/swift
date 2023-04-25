@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=scudo -o %t_scudo-binary
+// RUN: %target-swiftc_driver %s -g -sanitize=scudo -o %t_scudo-binary
 // RUN: not %target-run %t_scudo-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu

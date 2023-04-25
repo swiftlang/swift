@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -sanitize=address -g -target %sanitizers-target-triple -o %t
+// RUN: %target-build-swift %s -sanitize=address -g -o %t
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0                           not %target-run %t 2>&1 | %FileCheck %s -check-prefix=OOP
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0,external_symbolizer_path= not %target-run %t 2>&1 | %FileCheck %s -check-prefix=IP
 // REQUIRES: executable_test
