@@ -14773,6 +14773,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
+  case FixKind::DestructureTupleToMatchPackExpansionParameter:
     llvm_unreachable("handled elsewhere");
   }
 

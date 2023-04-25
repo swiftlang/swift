@@ -2742,3 +2742,15 @@ AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
   return new (cs.getAllocator())
       AllowGlobalActorMismatch(cs, fromType, toType, locator);
 }
+
+bool DestructureTupleToMatchPackExpansionParameter::diagnose(
+    const Solution &solution, bool asNote) const {
+  return false;
+}
+
+DestructureTupleToMatchPackExpansionParameter *
+DestructureTupleToMatchPackExpansionParameter::create(
+    ConstraintSystem &cs, PackType *paramShapeTy, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DestructureTupleToMatchPackExpansionParameter(cs, paramShapeTy, locator);
+}
