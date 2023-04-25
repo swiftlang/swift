@@ -601,6 +601,9 @@ public:
   /// Is this the 'Any' type?
   bool isAny();
 
+  /// Is this an existential containing only marker protocols?
+  bool isMarkerExistential();
+
   bool isPlaceholder();
 
   /// Returns true if this is a move-only type.
