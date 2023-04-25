@@ -70,7 +70,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // enabled
 #if TARGET_OS_OSX
   OnOffTty::TTY,
-#elif 0 // defined(__linux__) || defined(_WIN32)
+#elif defined(__linux__) // || defined(_WIN32)
   OnOffTty::On,
 #else
   OnOffTty::Off,
@@ -80,7 +80,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // interactive
-#if TARGET_OS_OSX // || defined(__linux__) || defined(_WIN32)
+#if TARGET_OS_OSX || defined(__linux__) // || defined(_WIN32)
   OnOffTty::TTY,
 #else
   OnOffTty::Off,
@@ -775,6 +775,54 @@ _swift_backtraceSetupEnvironment()
 
 #endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
+#ifdef __linux__
+struct spawn_info {
+  const char *path;
+  char * const *argv;
+  char * const *envp;
+  int memserver;
+};
+
+uint8_t spawn_stack[4096];
+
+int
+do_spawn(void *ptr) {
+  struct spawn_info *pinfo = (struct spawn_info *)ptr;
+
+  /* Ensure that the memory server is always on fd 4 */
+  if (pinfo->memserver != 4) {
+    dup2(pinfo->memserver, 4);
+    close(pinfo->memserver);
+  }
+
+  /* Clear the signal mask */
+  sigset_t mask;
+  sigfillset(&mask);
+  sigprocmask(SIG_UNBLOCK, &mask, NULL);
+
+  return execvpe(pinfo->path, pinfo->argv, pinfo->envp);
+}
+
+int
+safe_spawn(pid_t *ppid, const char *path, int memserver,
+           char * const argv[], char * const envp[])
+{
+  struct spawn_info info = { path, argv, envp, memserver };
+
+  /* The CLONE_VFORK is *required* because info is on the stack; we don't
+     want to return until *after* the subprocess has called execvpe(). */
+  int ret = clone(do_spawn, spawn_stack + sizeof(spawn_stack),
+                  CLONE_VFORK|CLONE_VM, &info);
+  if (ret < 0)
+    return ret;
+
+  close(memserver);
+
+  *ppid = ret;
+  return 0;
+}
+#endif // defined(__linux__)
+
 } // namespace
 
 namespace swift {
@@ -800,9 +848,13 @@ _swift_isThunkFunction(const char *mangledName) {
 // and macOS, that means it must be async-signal-safe.  On Windows, there
 // isn't an equivalent notion but a similar restriction applies.
 SWIFT_RUNTIME_STDLIB_INTERNAL bool
+#ifdef __linux__
+_swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd)
+#else
 _swift_spawnBacktracer(const ArgChar * const *argv)
+#endif
 {
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   pid_t child;
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -817,10 +869,16 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
 
   // SUSv3 says argv and envp are "completely constant" and that the reason
   // posix_spawn() et al use char * const * is for compatibility.
+#ifdef __linux__
+  int ret = safe_spawn(&child, swiftBacktracePath, memserver_fd,
+                       const_cast<char * const *>(argv),
+                       const_cast<char * const *>(env));
+#else
   int ret = posix_spawn(&child, swiftBacktracePath,
                         &backtraceFileActions, &backtraceSpawnAttrs,
                         const_cast<char * const *>(argv),
                         const_cast<char * const *>(env));
+#endif
   if (ret < 0)
     return false;
 
@@ -835,7 +893,6 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
 
   return false;
 
-  // ###TODO: Linux
   // ###TODO: Windows
 #else
   return false;

@@ -17,7 +17,9 @@
 
 import Swift
 
-@_implementationOnly import _SwiftBacktracingShims
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_implementationOnly import OS.Darwin
+#endif
 
 @_silgen_name("_swift_isThunkFunction")
 func _swift_isThunkFunction(
@@ -246,8 +248,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   /// Convert a build ID to a CFUUIDBytes.
   private static func uuidBytesFromBuildID(_ buildID: [UInt8])
-    -> __swift_backtrace_CFUUIDBytes {
-    return withUnsafeTemporaryAllocation(of: __swift_backtrace_CFUUIDBytes.self,
+    -> CFUUIDBytes {
+    return withUnsafeTemporaryAllocation(of: CFUUIDBytes.self,
                                          capacity: 1) { buf in
       buf.withMemoryRebound(to: UInt8.self) {
         _ = $0.initialize(from: buildID)
@@ -263,15 +265,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
       BinaryImageInformation(
-        base: __swift_vm_address_t(image.baseAddress),
-        extent: __swift_vm_address_t(image.endOfText),
+        base: vm_address_t(image.baseAddress),
+        extent: vm_address_t(image.endOfText),
         uuid: uuidBytesFromBuildID(image.buildID!),
         arch: HostContext.coreSymbolicationArchitecture,
         path: image.path,
         relocations: [
           BinaryRelocationInformation(
-            base: __swift_vm_address_t(image.baseAddress),
-            extent: __swift_vm_address_t(image.endOfText),
+            base: vm_address_t(image.baseAddress),
+            extent: vm_address_t(image.endOfText),
             name: "__TEXT"
           )
         ],
@@ -381,7 +383,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
           case .omittedFrames(_), .truncated:
             frames.append(Frame(captured: frame, symbol: nil))
           default:
-            let address = __swift_vm_address_t(frame.adjustedProgramCounter)
+            let address = vm_address_t(frame.adjustedProgramCounter)
             let owner
               = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
                                                               address,

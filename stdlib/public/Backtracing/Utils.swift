@@ -16,6 +16,8 @@
 
 import Swift
 
+@_implementationOnly import OS.Libc
+
 internal func hex<T: FixedWidthInteger>(_ value: T,
                                         withPrefix: Bool = true) -> String {
   let digits = String(value, radix: 16)
@@ -29,4 +31,41 @@ internal func hex<T: FixedWidthInteger>(_ value: T,
 
 internal func hex(_ bytes: [UInt8]) -> String {
   return bytes.map{ hex($0, withPrefix: false) }.joined(separator: "")
+}
+
+@_spi(Utils)
+public func readString(from file: String) -> String? {
+  let fd = _swift_open(file, O_RDONLY, 0)
+  if fd < 0 {
+    return nil
+  }
+  defer { close(fd) }
+
+  // Files in /proc are awkward; you can't get their length and then
+  // read the data in one chunk, because they have zero length and don't
+  // support seeking.
+  var bytes: [UInt8] = []
+  withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 4096) { buffer in
+    while true {
+      let bytesRead = read(fd, buffer.baseAddress, buffer.count)
+      if bytesRead <= 0 {
+        break
+      }
+
+      bytes.append(contentsOf: buffer[0..<bytesRead])
+    }
+  }
+
+  return String(decoding: bytes, as: UTF8.self)
+}
+
+@_spi(Utils)
+public func stripWhitespace<S: StringProtocol>(_ s: S)
+    -> S.SubSequence {
+  guard let firstNonWhitespace = s.firstIndex(where: { !$0.isWhitespace })
+  else {
+    return ""
+  }
+  let lastNonWhitespace = s.lastIndex(where: { !$0.isWhitespace })!
+  return s[firstNonWhitespace...lastNonWhitespace]
 }

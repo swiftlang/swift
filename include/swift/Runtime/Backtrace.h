@@ -17,10 +17,17 @@
 #ifndef SWIFT_RUNTIME_BACKTRACE_H
 #define SWIFT_RUNTIME_BACKTRACE_H
 
+#ifdef __linux__
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#include <signal.h>
+#endif // defined(__linux__)
+
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/CrashInfo.h"
 
 #include "swift/shims/Visibility.h"
-#include "swift/shims/CrashInfo.h"
 
 #include <inttypes.h>
 
@@ -50,7 +57,11 @@ typedef int ErrorCode;
 
 SWIFT_RUNTIME_STDLIB_INTERNAL ErrorCode _swift_installCrashHandler();
 
+#ifdef __linux__
+SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd);
+#else
 SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv);
+#endif
 
 enum class UnwindAlgorithm {
   Auto = 0,

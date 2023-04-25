@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
 
 #if canImport(Darwin)
 import Darwin.C
@@ -524,7 +524,7 @@ Generate a backtrace for the parent process.
     tcgetattr(0, &oldAttrs)
 
     var newAttrs = oldAttrs
-    newAttrs.c_lflag &= ~(UInt(ICANON) | UInt(ECHO))
+    newAttrs.c_lflag &= ~(UInt32(ICANON) | UInt32(ECHO))
     tcsetattr(0, TCSANOW, &newAttrs)
 
     return oldAttrs
@@ -581,7 +581,7 @@ Generate a backtrace for the parent process.
   static func backtraceFormatter() -> BacktraceFormatter {
     var terminalSize = winsize(ws_row: 24, ws_col: 80,
                                ws_xpixel: 1024, ws_ypixel: 768)
-    _ = ioctl(0, TIOCGWINSZ, &terminalSize)
+    _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)
 
     return BacktraceFormatter(formattingOptions
                               .theme(theme)

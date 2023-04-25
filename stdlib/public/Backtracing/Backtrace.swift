@@ -16,10 +16,16 @@
 
 import Swift
 
+@_implementationOnly import _StringProcessing
+
+@_implementationOnly import OS.Libc
+
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_implementationOnly import OS.Darwin
+#endif
 
-@_implementationOnly import _SwiftBacktracingShims
-
+#if os(Linux)
+@_implementationOnly import ImageFormats.Elf
 #endif
 
 /// Holds a backtrace.
@@ -219,6 +225,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///
   /// @returns A new `Backtrace` struct.
   @inline(never)
+  @_semantics("use_frame_pointer")
   public static func capture(algorithm: UnwindAlgorithm = .auto,
                              limit: Int? = 64,
                              offset: Int = 0,
@@ -326,20 +333,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// @returns A list of `Image`s.
   public static func captureImages() -> [Image] {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    return captureImages(for: _swift_backtrace_task_self())
+    return captureImages(for: mach_task_self())
     #else
-    return []
+    return captureImages(using: UnsafeLocalMemoryReader())
     #endif
   }
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  private static func withDyldProcessInfo<T>(for task: __swift_task_t,
+  private static func withDyldProcessInfo<T>(for task: task_t,
                                              fn: (OpaquePointer?) throws -> T)
     rethrows -> T {
-    var kret = __swift_kern_return_t(_SWIFT_KERN_SUCCESS)
+    var kret = kern_return_t(KERN_SUCCESS)
     let dyldInfo = _dyld_process_info_create(task, 0, &kret)
 
-    if kret != _SWIFT_KERN_SUCCESS {
+    if kret != KERN_SUCCESS {
       fatalError("error: cannot create dyld process info")
     }
 
@@ -351,12 +358,11 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   }
   #endif
 
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   @_spi(Internal)
   public static func captureImages(for process: Any) -> [Image] {
     var images: [Image] = []
-
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    let task = process as! __swift_task_t
+    let task = process as! task_t
 
     withDyldProcessInfo(for: task) { dyldInfo in
       _dyld_process_info_for_each_image(dyldInfo) {
@@ -365,7 +371,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
         if let path = path, let uuid = uuid {
           let pathString = String(cString: path)
           let theUUID = Array(UnsafeBufferPointer(start: uuid,
-                                                  count: MemoryLayout<__swift_uuid_t>.size))
+                                                  count: MemoryLayout<uuid_t>.size))
           let name: String
           if let slashIndex = pathString.lastIndex(of: "/") {
             name = String(pathString.suffix(from:
@@ -393,17 +399,144 @@ public struct Backtrace: CustomStringConvertible, Sendable {
         }
       }
     }
-    #endif // os(macOS) || os(iOS) || os(watchOS)
 
     return images.sorted(by: { $0.baseAddress < $1.baseAddress })
   }
+  #else // !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+  private struct AddressRange {
+    var low: Address = 0
+    var high: Address = 0
+  }
+
+  @_spi(Internal)
+  public static func captureImages<M: MemoryReader>(using reader: M,
+                                                    forProcess pid: Int? = nil) -> [Image] {
+    var images: [Image] = []
+
+    #if os(Linux)
+    let path: String
+    if let pid = pid {
+      path = "/proc/\(pid)/maps"
+    } else {
+      path = "/proc/self/maps"
+    }
+
+    guard let procMaps = readString(from: path) else {
+      return []
+    }
+
+    let mapRegex = #/
+    ^(?<start>[A-Fa-f0-9]+)-(?<end>[A-Fa-f0-9]+)\s+
+    (?<perms>[-rwxsp]{4})\s+
+    (?<offset>[A-Fa-f0-9]+)\s+
+    (?<major>[A-Fa-f0-9]{2}):(?<minor>[A-Fa-f0-9]{2})\s+
+    (?<inode>\d+)\s+
+    (?<pathname>.*)\s*$
+    /#
+    let lines = procMaps.split(separator: "\n")
+
+    // Find all the mapped files and get high/low ranges
+    var mappedFiles: [Substring:AddressRange] = [:]
+    for line in lines {
+      if let match = try? mapRegex.wholeMatch(in: line) {
+        let path = stripWhitespace(match.pathname)
+        if match.inode == "0" || path == "" {
+          continue
+        }
+        guard let start = Address(match.start, radix: 16),
+              let end = Address(match.end, radix: 16) else {
+          continue
+        }
+
+        if let range = mappedFiles[path] {
+          mappedFiles[path] = AddressRange(low: min(start, range.low),
+                                           high: max(end, range.high))
+        } else {
+          mappedFiles[path] = AddressRange(low: start,
+                                           high: end)
+        }
+      }
+    }
+
+    // Look for ELF headers in the process' memory
+    typealias Source = MemoryImageSource<M>
+    let source = Source(with: reader)
+    for line in lines {
+      if let match = try? mapRegex.wholeMatch(in: line) {
+        let path = stripWhitespace(match.pathname)
+        if match.inode == "0" || path == "" {
+          continue
+        }
+
+        guard let start = Address(match.start, radix: 16),
+              let end = Address(match.end, radix: 16),
+              let offset = Address(match.offset, radix: 16) else {
+          continue
+        }
+
+        if offset != 0 || end - start < EI_NIDENT {
+          continue
+        }
+
+        // Extract the filename from path
+        let name: Substring
+        if let slashIndex = path.lastIndex(of: "/") {
+          name = path.suffix(from: path.index(after: slashIndex))
+        } else {
+          name = path
+        }
+
+        // Inspect the image and extract the UUID and end of text
+        let range = mappedFiles[path]!
+        let subSource = SubImageSource(parent: source,
+                                       baseAddress: Source.Address(range.low),
+                                       length: Source.Size(range.high
+                                                             - range.low))
+        var theUUID: [UInt8]? = nil
+        var endOfText: Address = range.low
+
+        if let image = try? Elf32Image(source: subSource) {
+          theUUID = image.uuid
+
+          for hdr in image.programHeaders {
+            if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
+              endOfText = max(endOfText, Address(hdr.p_vaddr + hdr.p_memsz))
+            }
+          }
+        } else if let image = try? Elf64Image(source: subSource) {
+          theUUID = image.uuid
+
+          for hdr in image.programHeaders {
+            if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
+              endOfText = max(endOfText, Address(hdr.p_vaddr + hdr.p_memsz))
+            }
+          }
+        } else {
+          // Not a valid ELF image
+          continue
+        }
+
+        let image = Image(name: String(name),
+                          path: String(path),
+                          buildID: theUUID,
+                          baseAddress: range.low,
+                          endOfText: endOfText)
+
+        images.append(image)
+      }
+    }
+    #endif
+
+    return images.sorted(by: { $0.baseAddress < $1.baseAddress })
+  }
+  #endif
 
   /// Capture shared cache information.
   ///
   /// @returns A `SharedCacheInfo`.
   public static func captureSharedCacheInfo() -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    return captureSharedCacheInfo(for: _swift_backtrace_task_self())
+    return captureSharedCacheInfo(for: mach_task_self())
     #else
     return nil
     #endif
@@ -412,13 +545,13 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   @_spi(Internal)
   public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    let task = t as! __swift_task_t
+    let task = t as! task_t
     return withDyldProcessInfo(for: task) { dyldInfo in
       var cacheInfo = dyld_process_cache_info()
       _dyld_process_info_get_cache(dyldInfo, &cacheInfo)
       let theUUID = withUnsafePointer(to: cacheInfo.cacheUUID) {
         Array(UnsafeRawBufferPointer(start: $0,
-                                     count: MemoryLayout<__swift_uuid_t>.size))
+                                     count: MemoryLayout<uuid_t>.size))
       }
       return SharedCacheInfo(uuid: theUUID,
                              baseAddress: Address(cacheInfo.cacheBaseAddress),

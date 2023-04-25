@@ -19,7 +19,13 @@
 
 import Swift
 
-@_implementationOnly import _SwiftBacktracingShims
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_implementationOnly import OS.Darwin
+#elseif os(Linux)
+@_implementationOnly import OS.Linux
+#endif
+
+@_implementationOnly import FixedLayout
 
 @_spi(Contexts) public enum ContextError: Error {
   case unableToFormTLSAddress
@@ -216,12 +222,12 @@ extension arm_gprs {
   public static var registerCount: Int { return 56 }
 
   #if os(macOS) && arch(x86_64)
-  init?(from thread: __swift_thread_t) {
+  init?(from thread: thread_t) {
     var state = darwin_x86_64_thread_state()
     let kr = thread_get_state(thread,
-                              _SWIFT_X86_THREAD_STATE64,
+                              X86_THREAD_STATE64,
                               &state)
-    if kr != _SWIFT_KERN_SUCCESS {
+    if kr != KERN_SUCCESS {
       return nil
     }
 
@@ -258,11 +264,40 @@ extension arm_gprs {
   }
 
   public static func fromHostThread(_ thread: Any) -> HostContext? {
-    return X86_64Context(from: thread as! __swift_thread_t)
+    return X86_64Context(from: thread as! thread_t)
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return X86_64Context(with: mcontext as! darwin_x86_64_mcontext)
+  }
+  #elseif os(Linux)
+  init(with mctx: mcontext_t) {
+    gprs.setR(X86_64Register.rax.rawValue, to: UInt64(mctx.gregs.13))
+    gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(mctx.gregs.12))
+    gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(mctx.gregs.14))
+    gprs.setR(X86_64Register.rdx.rawValue, to: UInt64(mctx.gregs.11))
+    gprs.setR(X86_64Register.rdi.rawValue, to: UInt64(mctx.gregs.9))
+    gprs.setR(X86_64Register.rsi.rawValue, to: UInt64(mctx.gregs.8))
+    gprs.setR(X86_64Register.rbp.rawValue, to: UInt64(mctx.gregs.10))
+    gprs.setR(X86_64Register.rsp.rawValue, to: UInt64(mctx.gregs.15))
+    gprs.setR(X86_64Register.r8.rawValue, to: UInt64(mctx.gregs.0))
+    gprs.setR(X86_64Register.r9.rawValue, to: UInt64(mctx.gregs.1))
+    gprs.setR(X86_64Register.r10.rawValue, to: UInt64(mctx.gregs.2))
+    gprs.setR(X86_64Register.r11.rawValue, to: UInt64(mctx.gregs.3))
+    gprs.setR(X86_64Register.r12.rawValue, to: UInt64(mctx.gregs.4))
+    gprs.setR(X86_64Register.r13.rawValue, to: UInt64(mctx.gregs.5))
+    gprs.setR(X86_64Register.r14.rawValue, to: UInt64(mctx.gregs.6))
+    gprs.setR(X86_64Register.r15.rawValue, to: UInt64(mctx.gregs.7))
+    gprs.rip = UInt64(mctx.gregs.16)
+    gprs.rflags = UInt64(mctx.gregs.17)
+    gprs.cs = UInt16(mctx.gregs.18 & 0xffff)
+    gprs.fs = UInt16((mctx.gregs.18 >> 16) & 0xffff)
+    gprs.gs = UInt16((mctx.gregs.18 >> 32) & 0xffff)
+    gprs.valid = 0x1fffff
+  }
+
+  public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    return X86_64Context(with: mcontext as! mcontext_t)
   }
   #endif
 
@@ -583,12 +618,12 @@ extension arm_gprs {
   public static var registerCount: Int { return 40 }
 
   #if os(macOS) && arch(arm64)
-  init?(from thread: __swift_thread_t) {
+  init?(from thread: thread_t) {
     var state = darwin_arm64_thread_state()
     let kr = thread_get_state(thread,
-                              _SWIFT_ARM_THREAD_STATE64,
+                              ARM_THREAD_STATE64,
                               &state)
-    if kr != _SWIFT_KERN_SUCCESS {
+    if kr != KERN_SUCCESS {
       return nil
     }
 
@@ -620,7 +655,7 @@ extension arm_gprs {
   }
 
   public static func fromHostThread(_ thread: Any) -> HostContext? {
-    return ARM64Context(from: thread as! __swift_thread_t)
+    return ARM64Context(from: thread as! thread_t)
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
@@ -860,20 +895,20 @@ extension arm_gprs {
 // .. Darwin specifics .........................................................
 
 #if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
-private func thread_get_state<T>(_ thread: __swift_thread_t,
+private func thread_get_state<T>(_ thread: thread_t,
                                  _ flavor: CInt,
-                                 _ result: inout T) -> __swift_kern_return_t {
-  var count: __swift_msg_type_number_t
-    = __swift_msg_type_number_t(MemoryLayout<T>.stride
-                                / MemoryLayout<__swift_natural_t>.stride)
+                                 _ result: inout T) -> kern_return_t {
+  var count: msg_type_number_t
+    = msg_type_number_t(MemoryLayout<T>.stride
+                          / MemoryLayout<natural_t>.stride)
 
   return withUnsafeMutablePointer(to: &result) { ptr in
-    ptr.withMemoryRebound(to: __swift_natural_t.self,
+    ptr.withMemoryRebound(to: natural_t.self,
                           capacity: Int(count)) { intPtr in
-      return _swift_backtrace_thread_get_state(thread,
-                                               __swift_thread_state_flavor_t(flavor),
-                                               intPtr,
-                                               &count)
+      return thread_get_state(thread,
+                              thread_state_flavor_t(flavor),
+                              intPtr,
+                              &count)
     }
   }
 }

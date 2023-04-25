@@ -1,4 +1,4 @@
-//===--- Target.swift - Represents a process we are inspecting ------------===//
+//===--- TargetMacOS.swift - Represents a process we are inspecting -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  Defines `Target`, which represents the process we are inspecting.
-//  There are a lot of system specifics in this file!
+//  This is the macOS version.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +25,7 @@ import _Backtracing
 @_spi(Contexts) import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 
-import _SwiftBacktracingShims
+@_implementationOnly import Runtime
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext

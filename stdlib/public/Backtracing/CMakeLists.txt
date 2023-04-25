@@ -23,19 +23,31 @@ endif()
 set(BACKTRACING_SOURCES
   Backtrace.swift
   BacktraceFormatter.swift
+  ByteSwapping.swift
   Context.swift
   CoreSymbolication.swift
+  Dwarf.swift
+  Elf.swift
+  FileImageSource.swift
   FramePointerUnwinder.swift
+  Image.swift
+  ImageSource.swift
+  MemoryImageSource.swift
   MemoryReader.swift
   Registers.swift
   SymbolicatedBacktrace.swift
+  UnwindInfo.swift
   Utils.swift
-  Shims.cpp
+  Win32Extras.cpp
 
   get-cpu-context.${SWIFT_ASM_EXT}
 )
 
-set(BACKTRACING_COMPILE_FLAGS)
+set(BACKTRACING_COMPILE_FLAGS
+  "-Xcc;-fno-implicit-module-maps"
+  "-Xcc;-fbuiltin-module-map"
+  "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/SwiftShims/swift/shims/module.modulemap"
+  "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules/module.modulemap")
 
 if(SWIFT_ASM_AVAILABLE)
   list(APPEND BACKTRACING_SOURCES get-cpu-context.${SWIFT_ASM_EXT})
@@ -52,7 +64,10 @@ set(LLVM_OPTIONAL_SOURCES
 add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${BACKTRACING_SOURCES}
 
-  SWIFT_MODULE_DEPENDS ${concurrency}
+  ### Need to fix this so _StringProcessing is used for Linux
+  ### Either that, or don't use regexes to parse things
+
+  SWIFT_MODULE_DEPENDS ${concurrency} _StringProcessing
 
   LINK_LIBRARIES ${swift_backtracing_link_libraries}
 
@@ -67,5 +82,5 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX
+  TARGET_SDKS OSX LINUX
 )
