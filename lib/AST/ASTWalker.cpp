@@ -425,7 +425,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto def = MD->definition) {
       // Don't walk into unchecked definitions.
       if (auto expansion = dyn_cast<MacroExpansionExpr>(def)) {
-        if (!expansion->getType().isNull()) {
+        if (!expansion->getType().isNull() ||
+            Walker.shouldWalkIntoUncheckedMacroDefinitions()) {
           if (auto newDef = doIt(def))
             MD->definition = newDef;
           else
