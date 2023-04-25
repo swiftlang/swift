@@ -1793,7 +1793,13 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         auto *argPack = PackType::get(cs.getASTContext(), argTypes);
         auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
 
-        cs.addConstraint(subKind, argPackExpansion, paramTy, loc);
+        auto firstArgIdx =
+            argTypes.empty() ? paramIdx : parameterBindings[paramIdx].front();
+
+        cs.addConstraint(
+            subKind, argPackExpansion, paramTy,
+            locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+                firstArgIdx, paramIdx, param.getParameterFlags())));
         continue;
       }
     }
@@ -5661,6 +5667,18 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(loc, FixKind::RemoveExtraneousArguments))
       return true;
 
+    // If parameter is a pack, let's see if we have already recorded
+    // either synthesized or extraneous argument fixes.
+    if (rhs->is<PackType>()) {
+      ArrayRef tmpPath(path);
+
+      // Path would end with `ApplyArgument`.
+      auto *argsLoc = getConstraintLocator(anchor, tmpPath.drop_back());
+      if (hasFixFor(argsLoc, FixKind::RemoveExtraneousArguments) ||
+          hasFixFor(argsLoc, FixKind::AddMissingArguments))
+        return true;
+    }
+
     // If the argument couldn't be found, this could be a default value
     // type mismatch.
     if (!simplifyLocatorToAnchor(loc)) {
@@ -7275,9 +7293,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
-      return matchPackTypes(cast<PackType>(desugar1),
-                            cast<PackType>(desugar2),
-                            kind, subflags, packLoc);
+
+      auto result =
+          matchPackTypes(cast<PackType>(desugar1), cast<PackType>(desugar2),
+                         kind, subflags, packLoc);
+
+      // Let `repairFailures` attempt to "fix" this.
+      if (shouldAttemptFixes() && result.isFailure())
+        break;
+
+      return result;
     }
     case TypeKind::PackExpansion: {
       auto expansion1 = cast<PackExpansionType>(desugar1);
@@ -13278,16 +13303,87 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
     return SolutionKind::Solved;
 
   if (shouldAttemptFixes()) {
+    // If there are placeholders involved shape mismatches are most
+    // likely just a symptom of some other issue i.e. type mismatch.
     if (type1->hasPlaceholder() || type2->hasPlaceholder())
       return SolutionKind::Solved;
+
+    auto recordShapeFix = [&](ConstraintFix *fix,
+                              unsigned impact) -> SolutionKind {
+      return recordFix(fix, impact) ? SolutionKind::Error
+                                    : SolutionKind::Solved;
+    };
+
+    // Let's check whether we can produce a tailored fix for argument/parameter
+    // mismatches.
+    if (locator.endsWith<LocatorPathElt::PackShape>()) {
+      SmallVector<LocatorPathElt> path;
+      auto anchor = locator.getLocatorParts(path);
+
+      // Drop `PackShape`
+      path.pop_back();
+
+      // Tailed diagnostics for argument/parameter mismatches - there
+      // are either missing or extra arguments.
+      if (path.size() > 0 &&
+          path[path.size() - 1].is<LocatorPathElt::ApplyArgToParam>()) {
+        auto &ctx = getASTContext();
+
+        auto *loc = getConstraintLocator(anchor, path);
+        auto argLoc =
+            loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+
+        auto numArgs = shape1->castTo<PackType>()->getNumElements();
+        auto numParams = shape2->castTo<PackType>()->getNumElements();
+
+        // Drops `ApplyArgToParam` and left with `ApplyArgument`.
+        path.pop_back();
+
+        auto *argListLoc = getConstraintLocator(anchor, path);
+
+        // Missing arguments.
+        if (numParams > numArgs) {
+          SmallVector<SynthesizedArg> synthesizedArgs;
+          for (unsigned i = 0, n = numParams - numArgs; i != n; ++i) {
+            auto eltTy = shape2->castTo<PackType>()->getElementType(i);
+            synthesizedArgs.push_back(SynthesizedArg{
+                argLoc.getParamIdx(), AnyFunctionType::Param(eltTy)});
+          }
+
+          return recordShapeFix(
+              AddMissingArguments::create(*this, synthesizedArgs, argListLoc),
+              /*impact=*/2 * synthesizedArgs.size());
+        } else {
+          auto argIdx = argLoc.getArgIdx() + numParams;
+          SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4>
+              extraneousArgs;
+
+          for (unsigned i = 0, n = numArgs - numParams; i != n; ++i) {
+            extraneousArgs.push_back(
+                {argIdx + i, AnyFunctionType::Param(ctx.TheEmptyTupleType)});
+          }
+
+          auto overload = findSelectedOverloadFor(getCalleeLocator(argListLoc));
+          if (!overload)
+            return SolutionKind::Error;
+
+          return recordShapeFix(
+              RemoveExtraneousArguments::create(
+                  *this, overload->openedType->castTo<FunctionType>(),
+                  extraneousArgs, argListLoc),
+              /*impact=*/2 * extraneousArgs.size());
+        }
+      }
+    }
 
     unsigned impact = 1;
     if (locator.endsWith<LocatorPathElt::AnyRequirement>())
       impact = assessRequirementFailureImpact(*this, shape1, locator);
 
-    auto *fix = SkipSameShapeRequirement::create(*this, type1, type2,
-                                                 getConstraintLocator(locator));
-    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
+    return recordShapeFix(
+        SkipSameShapeRequirement::create(*this, type1, type2,
+                                         getConstraintLocator(locator)),
+        impact);
   }
 
   return SolutionKind::Error;
