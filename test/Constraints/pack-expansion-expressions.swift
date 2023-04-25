@@ -329,10 +329,11 @@ func test_pack_expansions_with_closures() {
 }
 
 // rdar://107151854 - crash on invalid due to specialized pack expansion
-func test_pack_expansion_specialization() {
+func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
-    init(_: repeat each T) {} // expected-note 3 {{'init(_:)' declared here}}
+    init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
     init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
@@ -340,11 +341,28 @@ func test_pack_expansion_specialization() {
   _ = Data<Int, String>(42, "") // Ok
   _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
-  // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{38-39=}} {{48-49=}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
+  _ = Data<Int, String, Float>(tuple)
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}} {{39-40=}} {{49-50=}}
+
+  struct Ambiguity<each T> {
+    func test(_: repeat each T) -> Int { 42 }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+    func test(_: repeat each T) -> String { "" }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  }
+
+  _ = Ambiguity<Int, String, Float>().test(tuple) // expected-error {{no exact matches in call to instance method 'test'}}
 }
 
 // Make sure that in-exact matches (that require any sort of conversion or load) on arguments are handled correctly.

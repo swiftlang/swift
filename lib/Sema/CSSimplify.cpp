@@ -5672,6 +5672,12 @@ bool ConstraintSystem::repairFailures(
     if (rhs->is<PackType>()) {
       ArrayRef tmpPath(path);
 
+      // Ignore argument/parameter type conversion mismatch if we already
+      // detected a tuple splat issue.
+      if (hasFixFor(loc,
+                    FixKind::DestructureTupleToMatchPackExpansionParameter))
+        return true;
+
       // Path would end with `ApplyArgument`.
       auto *argsLoc = getConstraintLocator(anchor, tmpPath.drop_back());
       if (hasFixFor(argsLoc, FixKind::RemoveExtraneousArguments) ||
@@ -13332,6 +13338,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
         auto *loc = getConstraintLocator(anchor, path);
         auto argLoc =
             loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+
+        auto argPack = type1->castTo<PackType>();
+        auto paramPack = type2->castTo<PackType>();
+
+        // Tailed diagnostic to explode tuples.
+        if (argPack->getNumElements() == 1) {
+          if (auto *tuple = argPack->getElementType(0)->getAs<TupleType>()) {
+            if (tuple->getNumElements() == paramPack->getNumElements()) {
+              return recordShapeFix(
+                  DestructureTupleToMatchPackExpansionParameter::create(
+                      *this, paramPack, loc),
+                  /*impact=*/2 * paramPack->getNumElements());
+            }
+          }
+        }
 
         auto numArgs = shape1->castTo<PackType>()->getNumElements();
         auto numParams = shape2->castTo<PackType>()->getNumElements();
