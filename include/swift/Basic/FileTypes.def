@@ -98,5 +98,8 @@ TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
 TYPE("abi-baseline-json",   SwiftABIDescriptor,        "abi.json",        "")
+TYPE("fixit",               SwiftFixIt,                "",                "")
+TYPE("module-semantic-info", ModuleSemanticInfo,       "",                "")
+TYPE("cached-diagnostics",  CachedDiagnostics,         "",                "")
 
 #undef TYPE

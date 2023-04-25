@@ -1814,6 +1814,10 @@ def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
 
+def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
+  Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
+  HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 def enable_cas: Flag<["-"], "enable-cas">,
