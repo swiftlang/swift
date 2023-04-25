@@ -19,5 +19,5 @@ import _Concurrency
 // This is a regression test for that situation
 
 final class FakeExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'FakeExecutor' to 'Executor' by implementing 'func enqueue(Job)' instead}}
+  func enqueue(_ job: UnownedJob) {}
 }
