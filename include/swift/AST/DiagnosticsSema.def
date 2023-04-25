@@ -2908,6 +2908,9 @@ ERROR(override_unavailable, none,
 NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
+ERROR(unavailable_override, none,
+      "override of %0 cannot be marked unavailable with '@available'",
+      (DeclName))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",

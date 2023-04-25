@@ -35,7 +35,7 @@ class A {
   func bar() {}
   func bas() {}
   func qux() {}
-  func flux() {}
+  @available(*, unavailable) func flux() {}
 }
 
 // CHECK: sil_vtable A {

@@ -1835,6 +1835,58 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
   return true;
 }
 
+enum class OverrideUnavailabilityStatus {
+  /// The effective unavailability of the base decl and override decl match.
+  Match,
+  /// The base decl is unavailable but the override decl is not.
+  BaseUnavailable,
+  /// The override decl is unavailable but the base decl is not.
+  OverrideUnavailable,
+  /// Do not diagnose the unavailability of these decls.
+  Ignored,
+};
+
+static std::pair<OverrideUnavailabilityStatus, const AvailableAttr *>
+checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
+  if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
+    // If the parent of the override is unavailable, then the unavailability of
+    // the override decl is irrelevant.
+    if (overrideParent->getSemanticUnavailableAttr())
+      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+  }
+
+  if (auto *baseAccessor = dyn_cast<AccessorDecl>(base)) {
+    // Ignore implicit accessors since the diagnostics are likely to duplicate
+    // the diagnostics for the explicit accessors that availability was inferred
+    // from.
+    if (baseAccessor->isImplicit())
+      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+
+    if (auto *overrideAccessor = dyn_cast<AccessorDecl>(override)) {
+      // If base and override are accessors, check whether the unavailability of
+      // their storage matches. Diagnosing accessors with invalid storage
+      // produces redundant diagnostics.
+      auto storageStatusAndAttr = checkOverrideUnavailability(
+          overrideAccessor->getStorage(), baseAccessor->getStorage());
+      if (storageStatusAndAttr.first != OverrideUnavailabilityStatus::Match)
+        return {OverrideUnavailabilityStatus::Ignored, nullptr};
+    }
+  }
+
+  auto &ctx = override->getASTContext();
+  auto *baseUnavailableAttr = base->getAttrs().getUnavailable(ctx);
+  auto *overrideUnavailableAttr = override->getAttrs().getUnavailable(ctx);
+
+  if (baseUnavailableAttr && !overrideUnavailableAttr)
+    return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
+
+  if (!baseUnavailableAttr && overrideUnavailableAttr)
+    return {OverrideUnavailabilityStatus::OverrideUnavailable,
+            overrideUnavailableAttr};
+
+  return {OverrideUnavailabilityStatus::Match, nullptr};
+}
+
 static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // This can happen with circular inheritance.
   // FIXME: This shouldn't be possible once name lookup goes through the
@@ -2066,17 +2118,33 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   }
 
   // FIXME: Possibly should extend to more availability checking.
-  if (auto *attr = base->getAttrs().getUnavailable(ctx)) {
-    diagnoseUnavailableOverride(override, base, attr);
+  auto unavailabilityStatusAndAttr =
+      checkOverrideUnavailability(override, base);
+  auto *unavailableAttr = unavailabilityStatusAndAttr.second;
+
+  switch (unavailabilityStatusAndAttr.first) {
+  case OverrideUnavailabilityStatus::BaseUnavailable: {
+    diagnoseOverrideOfUnavailableDecl(override, base, unavailableAttr);
 
     if (isUnavailableInAllVersions(base)) {
       auto modifier = override->getAttrs().getAttribute<OverrideAttr>();
       if (modifier && modifier->isValid()) {
-        diags.diagnose(override, diag::suggest_removing_override,
-                       override->getBaseName())
-          .fixItRemove(modifier->getRange());
+        diags
+            .diagnose(override, diag::suggest_removing_override,
+                      override->getBaseName())
+            .fixItRemove(modifier->getRange());
       }
     }
+    break;
+  }
+  case OverrideUnavailabilityStatus::OverrideUnavailable: {
+    diags.diagnose(unavailableAttr->getLocation(), diag::unavailable_override,
+                   override->getName());
+    break;
+  }
+  case OverrideUnavailabilityStatus::Match:
+  case OverrideUnavailabilityStatus::Ignored:
+    break;
   }
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
