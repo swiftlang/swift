@@ -557,8 +557,9 @@ public:
   //
   // The above logic generalizes the following important cases:
   // * A payload with XIs will generally have enough to
-  //   encode all payloadcases.  It will have no discriminator
-  //   case, so everything is effectively on "page zero."
+  //   encode all payload cases.  If so, then it will have
+  //   no discriminator allocated, so the discriminator is
+  //   always treated as zero.
   // * If the payload has no XIs but is not zero-sized, then
   //   we'll need a page one.  That page will usually be
   //   large enough to encode all non-payload cases.
@@ -586,13 +587,14 @@ public:
     unsigned nonPayloadCasesUsingXIs = PayloadCase.TI.getNumExtraInhabitants();
     int ComputedCase = 0;
     if (discriminator == 0) {
-      // Discriminator is for a page that encodes payload (and maybe tag data too)
+      // This is Page 0, which encodes payload case and some additional cases in Xis
       int XITag;
       if (!PayloadCase.TI.readExtraInhabitantIndex(reader, address, &XITag)) {
         return false;
       }
       ComputedCase = XITag < 0 ? 0 : XITag + 1;
     } else {
+      // This is some other page, so the entire payload area is just a case index
       unsigned payloadTag;
       if (!reader.readInteger(address, PayloadSize, &payloadTag)) {
         return false;
@@ -602,10 +604,9 @@ public:
          ? ValueWitnessFlags::MaxNumExtraInhabitants
          : (1UL << (PayloadSize * 8UL));
       ComputedCase =
-        1
-        + nonPayloadCasesUsingXIs
-        + (discriminator - 1) * casesPerNonPayloadPage
-        + payloadTag;
+        1 + nonPayloadCasesUsingXIs // Cases on page 0
+        + (discriminator - 1) * casesPerNonPayloadPage // Cases on other pages
+        + payloadTag; // Cases on this page
     }
     if (static_cast<unsigned>(ComputedCase) < getNumCases()) {
       *CaseIndex = ComputedCase;

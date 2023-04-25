@@ -237,6 +237,29 @@ reflect(enum: Outer2.E<S2>.Inner.F<S3>??.none)
 //CHECK: Enum value:
 //CHECK-NEXT: (enum_value name=none index=1)
 
+struct S4: P { var a: Bool = true }
+
+reflect(enum: Outer2.E<S3>.Inner.F<S4>.b)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type reference:
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+//CHECK-NEXT:   (case name=u index=0 offset=0
+//CHECK-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
+//CHECK-NEXT:       (field name=a offset=0
+//CHECK-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
+//CHECK-NEXT:           (field name=_value offset=0
+//CHECK-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1))))))
+//CHECK-NEXT:   (case name=a index=1)
+//CHECK-NEXT:   (case name=b index=2))
+
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S3V_AA2S4VG
+//CHECK: Demangled name: reflect_nested_generic.Outer2.E<reflect_nested_generic.S3>.F<reflect_nested_generic.S4>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=b index=2)
+
 reflect(enum: Outer2.E<S1>.Inner.F<S2>.Innerer?.none)
 
 //CHECK: Reflecting an enum.
