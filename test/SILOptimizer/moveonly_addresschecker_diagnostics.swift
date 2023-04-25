@@ -3609,6 +3609,29 @@ func inoutCaptureTest() -> (() -> ()) {
     return f
 }
 
+func inoutCaptureTestAddressOnlyGeneric<T : P>(_ t: T.Type) -> (() -> ()) {
+    var x = AddressOnlyGeneric<T>()
+    x = AddressOnlyGeneric<T>()
+
+    func useInOut(_ x: inout AddressOnlyGeneric<T>) {}
+    let f = {
+        useInOut(&x)
+    }
+
+    borrowVal(x)
+    consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    x = AddressOnlyGeneric<T>()
+
+    let g = {
+        x = AddressOnlyGeneric<T>()
+        useInOut(&x)
+        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    }
+    g()
+
+    return f
+}
+
 ////////////////
 // Misc Tests //
 ////////////////
