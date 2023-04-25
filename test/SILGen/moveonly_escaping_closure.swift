@@ -258,10 +258,9 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingNoEscapeClosureCaptureVaryyyyXEnF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] :
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @noescape @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
@@ -325,10 +324,9 @@ func testConsumingNoEscapeClosureCaptureVar(_ f: consuming () -> ()) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
@@ -584,8 +582,7 @@ func testInOutVarClosureCaptureLet(_ f: inout () -> ()) {
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingNoEscapeClosureCaptureLetyyyyXEnF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @noescape @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
@@ -617,10 +614,9 @@ func testConsumingNoEscapeClosureCaptureLet(_ f: consuming () -> ()) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
@@ -874,10 +870,9 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure40testConsumingNoEscapeClosureCaptureInOutyyyyXEn_AA9SingleEltVztF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (), @inout SingleElt) -> () {
-// CHECK: bb0([[OWNED_F:%.*]] : @owned $@noescape @callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
+// CHECK: bb0([[OWNED_F:%.*]] : @_eagerMove @owned $@noescape @callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @noescape @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[OWNED_F]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[MARKED_PROJECT:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
@@ -933,10 +928,9 @@ func testConsumingNoEscapeClosureCaptureInOut(_ f: consuming () -> (), _ x: inou
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF : $@convention(thin) (@owned @callee_guaranteed () -> (), @inout SingleElt) -> () {
-// CHECK: bb0([[FUNC_ARG:%.*]] : @owned $@callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
+// CHECK: bb0([[FUNC_ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (), [[PROJECT:%.*]] : $*SingleElt):
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[FUNC_ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[CHECK:%.*]] = mark_must_check [consumable_and_assignable] [[PROJECT]]
@@ -1166,10 +1160,9 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure035testConsumingNoEscapeClosureCaptureD0yyyyXEn_AA9SingleEltVntF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[F:%.*]] : @owned $@noescape @callee_guaranteed () -> (),
+// CHECK: bb0([[F:%.*]] : @_eagerMove @owned $@noescape @callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @noescape @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[F]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
@@ -1232,10 +1225,9 @@ func testConsumingNoEscapeClosureCaptureConsuming(_ f: consuming () -> (),
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $@callee_guaranteed () -> (),
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SingleElt }
@@ -1483,10 +1475,9 @@ func testInOutVarClosureCaptureOwned(_ f: inout () -> (), _ x: __owned SingleElt
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure40testConsumingNoEscapeClosureCaptureOwnedyyyyXEn_AA9SingleEltVntF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_guaranteed () -> (),
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned $@noescape @callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @noescape @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
@@ -1519,10 +1510,9 @@ func testConsumingNoEscapeClosureCaptureOwned(_ f: consuming () -> (),
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntF : $@convention(thin) (@owned @callee_guaranteed () -> (), @owned SingleElt) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $@callee_guaranteed () -> (),
+// CHECK: bb0([[ARG:%.*]] : @_eagerMove @owned $@callee_guaranteed () -> (),
 // CHECK:   [[FUNC_BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
-// CHECK:   [[BORROW_FUNC_BOX:%.*]] = begin_borrow [lexical] [[FUNC_BOX]]
-// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[BORROW_FUNC_BOX]]
+// CHECK:   [[FUNC_PROJECT:%.*]] = project_box [[FUNC_BOX]]
 // CHECK:   store [[ARG]] to [init] [[FUNC_PROJECT]]
 //
 // CHECK:   [[BOX:%.*]] = alloc_box ${ let SingleElt }
