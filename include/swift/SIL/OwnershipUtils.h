@@ -1063,6 +1063,9 @@ public:
     /// memory location.
     LoadTake,
 
+    /// An owned value produced by moving from another owned value.
+    Move,
+
     /// An owned value that is a result of a true phi argument.
     ///
     /// A true phi argument here is defined as an SIL phi argument that only has
@@ -1137,6 +1140,8 @@ public:
         return Kind::LoadCopy;
       return Kind::Invalid;
     }
+    case ValueKind::MoveValueInst:
+      return Kind::Move;
     case ValueKind::PartialApplyInst:
       return Kind::PartialApplyInit;
     case ValueKind::AllocBoxInst:
@@ -1209,6 +1214,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::BeginApply:
     case OwnedValueIntroducerKind::TryApply:
     case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::Move:
     case OwnedValueIntroducerKind::Phi:
     case OwnedValueIntroducerKind::Struct:
     case OwnedValueIntroducerKind::Tuple:
@@ -1239,6 +1245,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::BeginApply:
     case OwnedValueIntroducerKind::TryApply:
     case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::Move:
     case OwnedValueIntroducerKind::FunctionArgument:
     case OwnedValueIntroducerKind::PartialApplyInit:
     case OwnedValueIntroducerKind::AllocBoxInit:
