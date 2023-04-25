@@ -305,7 +305,7 @@ suspend_other_threads(struct thread *self)
   sigaction(SIGUSR1, &sa, &sa_old);
 
   /* Now scan /proc/self/task to get the tids of the threads in this
-     process.  We need to ignore out own thread. */
+     process.  We need to ignore our own thread. */
   int fd = open("/proc/self/task",
                 O_RDONLY|O_NDELAY|O_DIRECTORY|O_LARGEFILE|O_CLOEXEC);
   int our_pid = getpid();

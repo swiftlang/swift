@@ -500,7 +500,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
           for hdr in image.programHeaders {
             if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
-              endOfText = max(endOfText, Address(hdr.p_vaddr + hdr.p_memsz))
+              endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
+                                                               + hdr.p_memsz))
             }
           }
         } else if let image = try? Elf64Image(source: subSource) {
@@ -508,7 +509,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
           for hdr in image.programHeaders {
             if hdr.p_type == .PT_LOAD && (hdr.p_flags & PF_X) != 0 {
-              endOfText = max(endOfText, Address(hdr.p_vaddr + hdr.p_memsz))
+              endOfText = max(endOfText, range.low + Address(hdr.p_vaddr
+                                                               + hdr.p_memsz))
             }
           }
         } else {
