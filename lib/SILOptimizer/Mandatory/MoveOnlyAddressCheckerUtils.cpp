@@ -1511,6 +1511,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
+
+    // If we have a non-move only type, just treat this as a liveness use.
+    if (!copyAddr->getSrc()->getType().isMoveOnly()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found copy of copyable type. Treating as liveness use! "
+                 << *user);
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+
     if (markedValue->getCheckKind() ==
         MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1520,16 +1533,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
-      return false;
-
     // TODO: Add borrow checking here like below.
 
     // TODO: Add destructure deinit checking here once address only checking is
     // completely brought up.
-
-    // TODO: Add check here that we don't error on trivial/copyable types.
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);

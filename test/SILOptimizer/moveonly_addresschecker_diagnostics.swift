@@ -2278,13 +2278,10 @@ public func addressOnlyGenericAssignToVar5Arg2<T>(_ x: borrowing AddressOnlyGene
 // remove them when I fix it in the next commit.
 public func addressOnlyGenericAccessAccessField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
-    // expected-error @-2 {{'x2' consumed more than once}}
     x2 = AddressOnlyGeneric<T>()
-    borrowVal(x2.copyable) // expected-note {{consuming use here}}
+    borrowVal(x2.copyable)
     for _ in 0..<1024 {
-        borrowVal(x2.copyable) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        borrowVal(x2.copyable)
     }
 }
 
@@ -2298,11 +2295,9 @@ public func addressOnlyGenericAccessAccessField2<T>(_ x: borrowing AddressOnlyGe
 }
 
 public func addressOnlyGenericAccessAccessFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
-    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-    borrowVal(x2.copyable) // expected-note {{consuming use here}}
+    borrowVal(x2.copyable)
     for _ in 0..<1024 {
-        borrowVal(x2.copyable) // expected-note {{consuming use here}}
+        borrowVal(x2.copyable)
     }
 }
 
@@ -2314,12 +2309,9 @@ public func addressOnlyGenericAccessAccessFieldArg2<T>(_ x2: inout AddressOnlyGe
 }
 
 public func addressOnlyGenericAccessAccessFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
-    // expected-error @-2 {{'x2' consumed more than once}}
-    borrowVal(x2.copyable) // expected-note {{consuming use here}}
+    borrowVal(x2.copyable)
     for _ in 0..<1024 {
-        borrowVal(x2.copyable) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        borrowVal(x2.copyable)
     }
 }
 
@@ -2332,14 +2324,11 @@ public func addressOnlyGenericAccessAccessFieldArg4<T>(_ x2: consuming AddressOn
 
 public func addressOnlyGenericAccessConsumeField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x2 = x // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
-    // expected-error @-2 {{'x2' consumed more than once}}
     x2 = AddressOnlyGeneric<T>()
 
-    consumeVal(x2.copyable) // expected-note {{consuming use here}}
+    consumeVal(x2.copyable)
     for _ in 0..<1024 {
-        consumeVal(x2.copyable) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.copyable)
     }
 }
 
@@ -2357,13 +2346,9 @@ public func addressOnlyGenericAccessConsumeField2<T>(_ x: borrowing AddressOnlyG
 }
 
 public func addressOnlyGenericAccessConsumeFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
-    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
-
-    consumeVal(x2.copyable) // expected-note {{consuming use here}}
-
+    consumeVal(x2.copyable)
     for _ in 0..<1024 {
-        consumeVal(x2.copyable) // expected-note {{consuming use here}}
+        consumeVal(x2.copyable)
     }
 }
 
@@ -2378,14 +2363,10 @@ public func addressOnlyGenericAccessConsumeFieldArg2<T>(_ x2: inout AddressOnlyG
 }
 
 public func addressOnlyGenericAccessConsumeFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
-    // expected-error @-1 {{'x2' consumed by a use in a loop}}
-    // expected-error @-2 {{'x2' consumed more than once}}
-
-    consumeVal(x2.copyable) // expected-note {{consuming use here}}
+    consumeVal(x2.copyable)
 
     for _ in 0..<1024 {
-        consumeVal(x2.copyable) // expected-note {{consuming use here}}
-        // expected-note @-1 {{consuming use here}}
+        consumeVal(x2.copyable)
     }
 }
 
