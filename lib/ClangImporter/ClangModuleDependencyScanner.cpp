@@ -200,19 +200,15 @@ void ClangImporter::recordModuleDependencies(
   }
 }
 
-Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
-    StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate, bool isTestableImport) {
-  auto &ctx = Impl.SwiftContext;
-  // Determine the command-line arguments for dependency scanning.
-  std::vector<std::string> commandLineArgs =
-      getClangDepScanningInvocationArguments(ctx);
-  // The Swift compiler does not have a concept of a working directory.
-  // It is instead handled by the Swift driver by resolving relative paths
-  // according to the driver's notion of a working directory. On the other hand,
-  // Clang does have a concept working directory which may be specified on this
-  // Clang invocation with '-working-directory'. If so, it is crucial that we
-  // use this directory as an argument to the Clang scanner invocation below.
+// The Swift compiler does not have a concept of a working directory.
+// It is instead handled by the Swift driver by resolving relative paths
+// according to the driver's notion of a working directory. On the other hand,
+// Clang does have a concept working directory which may be specified on this
+// Clang invocation with '-working-directory'. If so, it is crucial that we
+// use this directory as an argument to the Clang scanner invocation below.
+static Optional<std::string>
+computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
+                             const ASTContext &ctx) {
   std::string workingDir;
   auto clangWorkingDirPos = std::find(
       commandLineArgs.rbegin(), commandLineArgs.rend(), "-working-directory");
@@ -227,6 +223,23 @@ Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
     }
     workingDir = *(clangWorkingDirPos - 1);
   }
+  return workingDir;
+}
+
+Optional<const ModuleDependencyInfo*> ClangImporter::getModuleDependencies(
+    StringRef moduleName, ModuleDependenciesCache &cache,
+    InterfaceSubContextDelegate &delegate, bool isTestableImport) {
+  auto &ctx = Impl.SwiftContext;
+  // Determine the command-line arguments for dependency scanning.
+  std::vector<std::string> commandLineArgs =
+      getClangDepScanningInvocationArguments(ctx);
+  auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
+  if (!optionalWorkingDir.hasValue()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                       "Missing '-working-directory' argument");
+    return None;
+  }
+  std::string workingDir = optionalWorkingDir.getValue();
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
@@ -285,8 +298,13 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
       getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
-  std::string workingDir =
-      ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
+  if (!optionalWorkingDir.hasValue()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                       "Missing '-working-directory' argument");
+    return true;
+  }
+  std::string workingDir = optionalWorkingDir.getValue();
 
   auto moduleCachePath = getModuleCachePathFromClang(getClangInstance());
   auto lookupModuleOutput =
