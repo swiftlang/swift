@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
@@ -114,6 +115,9 @@ void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {
   INITIALIZE_LLVM();
+  // We must initialize the swift modules responsible for parsing functionality,
+  // such as parsing regex.
+  initializeSwiftParseModules();
   return wrap(new DependencyScanningTool());
 }
 

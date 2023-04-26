@@ -185,3 +185,7 @@ struct MyStruct<T: MyProto> {
 
 @freestanding(expression) macro myMacro<T : MyProto>(_ value: MyStruct<T>) -> MyStruct<T> = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
+
+#undefinedMacro { definitelyNotDefined }
+// expected-error@-1{{cannot find 'definitelyNotDefined' in scope}}
+// expected-error@-2{{no macro named 'undefinedMacro'}}
