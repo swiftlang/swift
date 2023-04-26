@@ -473,7 +473,7 @@ public:
 
 private:
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    return MacroWalking::Arguments;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
