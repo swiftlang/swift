@@ -4168,6 +4168,45 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieve the raw documentation comment of a declaration.
+class RawCommentRequest
+    : public SimpleRequest<RawCommentRequest,
+                           RawComment(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  RawComment evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the brief portion of a declaration's document comment, potentially
+/// walking to find the comment providing decl if needed.
+class SemanticBriefCommentRequest
+    : public SimpleRequest<SemanticBriefCommentRequest,
+                           StringRef(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  StringRef evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 /// Checks that all of a class's \c \@objcImplementation extensions provide
 /// complete and correct implementations for their corresponding interfaces.
 /// This is done on all of a class's implementations at once to improve diagnostics.
