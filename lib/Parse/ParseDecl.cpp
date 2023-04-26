@@ -507,8 +507,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       diagnose(ArgumentLoc, diag::attr_availability_expected_option, AttrName)
           .highlight(SourceRange(ArgumentLoc));
       if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeDeclAttrParam(DAK_Available,
-                                                       ParamIndex);
+        CodeCompletionCallbacks->completeDeclAttrParam(
+            CustomSyntaxAttributeKind::Available, ParamIndex);
         consumeToken(tok::code_complete);
       } else {
         consumeIf(tok::identifier);
@@ -940,7 +940,8 @@ bool Parser::parseAvailability(
   if (!Tok.is(tok::identifier) &&
       !(Tok.isAnyOperator() && Tok.getText() == "*")) {
     if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeDeclAttrParam(DAK_Available, 0);
+      CodeCompletionCallbacks->completeDeclAttrParam(
+          CustomSyntaxAttributeKind::Available, 0);
       consumeToken(tok::code_complete);
     }
     diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -2219,6 +2220,24 @@ Parser::parseMacroRoleAttribute(
                                    diag::expected_rparen_expr_list,
                                    [&] {
     ParserStatus status;
+
+    if (Tok.is(tok::code_complete)) {
+      consumeIf(tok::code_complete);
+      status.setHasCodeCompletionAndIsError();
+      CustomSyntaxAttributeKind attributeKind =
+          isAttached ? CustomSyntaxAttributeKind::AttachedMacro
+                     : CustomSyntaxAttributeKind::FreestandingMacro;
+      if (!sawRole) {
+        sawRole = true;
+        if (this->CodeCompletionCallbacks) {
+          this->CodeCompletionCallbacks->completeDeclAttrParam(attributeKind, 0);
+        }
+      } else if (!sawNames) {
+        if (this->CodeCompletionCallbacks) {
+          this->CodeCompletionCallbacks->completeDeclAttrParam(attributeKind, 1);
+        }
+      }
+    }
 
     // Parse the argment label, if there is one.
     Identifier fieldName;
