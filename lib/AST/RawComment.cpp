@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -130,37 +131,28 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   return Result;
 }
 
-RawComment Decl::getRawComment() const {
-  if (!this->canHaveComment())
-    return RawComment();
-
-  // Check the cache in ASTContext.
-  auto &Context = getASTContext();
-  if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
-    return RC.value().first;
-  }
+RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
+  auto *DC = D->getDeclContext();
+  auto &ctx = DC->getASTContext();
 
   // Check the declaration itself.
-  if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
-    RawComment Result = toRawComment(Context, Attr->getCommentRange());
-    Context.setRawComment(this, Result, true);
-    return Result;
-  }
+  if (auto *Attr = D->getAttrs().getAttribute<RawDocCommentAttr>())
+    return toRawComment(ctx, Attr->getCommentRange());
 
-  if (!getDeclContext())
-    return RawComment();
-  auto *Unit = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  auto *Unit = dyn_cast<FileUnit>(DC->getModuleScopeContext());
   if (!Unit)
     return RawComment();
 
   switch (Unit->getKind()) {
   case FileUnitKind::SerializedAST: {
-    auto *CachedLocs = getSerializedLocs();
+    // First check to see if we have the comment location available in the
+    // swiftsourceinfo, allowing us to grab it from the original file.
+    auto *CachedLocs = D->getSerializedLocs();
     if (!CachedLocs->DocRanges.empty()) {
       SmallVector<SingleRawComment, 4> SRCs;
       for (const auto &Range : CachedLocs->DocRanges) {
         if (Range.isValid()) {
-          SRCs.push_back({Range, Context.SourceMgr});
+          SRCs.push_back({Range, ctx.SourceMgr});
         } else {
           // if we've run into an invalid range, don't bother trying to load
           // any of the other comments
@@ -169,17 +161,13 @@ RawComment Decl::getRawComment() const {
         }
       }
 
-      if (!SRCs.empty()) {
-        auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
-        Context.setRawComment(this, RC, true);
-        return RC;
-      }
+      if (!SRCs.empty())
+        return RawComment(ctx.AllocateCopy(llvm::makeArrayRef(SRCs)));
     }
 
-    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setRawComment(this, C->Raw, false);
+    // Otherwise check to see if we have a comment available in the swiftdoc.
+    if (auto C = Unit->getCommentForDecl(D))
       return C->Raw;
-    }
 
     return RawComment();
   }
@@ -191,6 +179,14 @@ RawComment Decl::getRawComment() const {
     return RawComment();
   }
   llvm_unreachable("invalid file kind");
+}
+
+RawComment Decl::getRawComment() const {
+  if (!this->canHaveComment())
+    return RawComment();
+
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RawCommentRequest{this}, RawComment());
 }
 
 Optional<StringRef> Decl::getGroupName() const {
