@@ -4181,14 +4181,21 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  // Do not allow unsuppressed uses of Copyable anywhere.
+  // Do not allow unsuppressed uses of Copyable.
   if (!options.contains(TypeResolutionFlags::IsSuppressed)) {
     if (auto protoTy = result->getAs<ProtocolType>()) {
       if (auto protoDecl = protoTy->getDecl()) {
         if (protoDecl->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-          diagnose(repr->getLoc(), diag::copyable_only_suppression);
-          repr->setInvalid();
-          return ErrorType::get(getASTContext());
+          auto diag = diagnose(repr->getLoc(), diag::copyable_only_suppression);
+          // Make a special exception for the stdlib in the form of a warning
+          // rather than an error. We need this temporarily to help with the
+          // transition of _Copyable to Copyable.
+          if (resolution.getDeclContext()->getParentModule()->isStdlibModule()) {
+            diag.limitBehavior(DiagnosticBehavior::Warning);
+          } else {
+            repr->setInvalid();
+            return ErrorType::get(getASTContext());
+          }
         }
       }
     }
