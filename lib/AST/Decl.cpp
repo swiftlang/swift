@@ -10132,6 +10132,21 @@ MacroRoles swift::getAttachedMacroRoles() {
   return attachedMacroRoles;
 }
 
+bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
+  switch (role) {
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+  case MacroRole::Accessor:
+  case MacroRole::MemberAttribute:
+  case MacroRole::Member:
+  case MacroRole::Peer:
+  case MacroRole::Conformance:
+    return true;
+  case MacroRole::CodeItem:
+    return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
+  }
+}
+
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
   auto macroRef = unexpandedMacro.macroRef;
   auto *baseDecl = unexpandedMacro.baseDecl;

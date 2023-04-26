@@ -2257,6 +2257,11 @@ Parser::parseMacroRoleAttribute(
         status.setIsParseError();
         return status;
       }
+      if (!isMacroSupported(*role, Context)) {
+        diagnose(roleNameLoc, diag::macro_experimental, roleName.str(), "");
+        status.setIsParseError();
+        return status;
+      }
 
       // Check that the role makes sense.
       if (isAttached == !isAttachedMacro(*role)) {
