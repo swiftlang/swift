@@ -2237,9 +2237,44 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                 return;
               }
             }
-          } else if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(ty->getAsTagDecl())) {
-            importNameImpl(namedArg, version, clang::DeclarationName()).getDeclName().print(buffer);
-            return;
+          } else {
+            // FIXME: Generalize this to cover pointer to
+            // builtin type too.
+            // Check if this a struct/class
+            // or a pointer/reference to a struct/class.
+            auto *tagDecl = ty->getAsTagDecl();
+            enum class TagTypeDecorator {
+              None,
+              UnsafePointer,
+              UnsafeMutablePointer
+            };
+            TagTypeDecorator decorator = TagTypeDecorator::None;
+            if (!tagDecl && ty->isPointerType()) {
+              tagDecl = ty->getPointeeType()->getAsTagDecl();
+              if (tagDecl) {
+                bool isReferenceType = false;
+                if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
+                  isReferenceType = ClangImporter::Implementation::
+                      recordHasReferenceSemantics(rd, swiftCtx);
+                if (!isReferenceType)
+                  decorator = ty->getPointeeType().isConstQualified()
+                                  ? TagTypeDecorator::UnsafePointer
+                                  : TagTypeDecorator::UnsafeMutablePointer;
+              }
+            }
+            if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
+              if (decorator != TagTypeDecorator::None)
+                buffer << (decorator == TagTypeDecorator::UnsafePointer
+                               ? "UnsafePointer"
+                               : "UnsafeMutablePointer")
+                       << '<';
+              importNameImpl(namedArg, version, clang::DeclarationName())
+                  .getDeclName()
+                  .print(buffer);
+              if (decorator != TagTypeDecorator::None)
+                buffer << '>';
+              return;
+            }
           }
         }
         buffer << "_";
