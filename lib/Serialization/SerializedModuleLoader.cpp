@@ -1617,6 +1617,10 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
+bool SerializedASTFile::hasLoadedSwiftDoc() const {
+  return File.hasLoadedSwiftDoc();
+}
+
 Optional<ExternalSourceLocs::RawLocs>
 SerializedASTFile::getExternalRawLocsForDecl(const Decl *D) const {
   return File.getExternalRawLocsForDecl(D);

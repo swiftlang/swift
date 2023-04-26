@@ -236,3 +236,78 @@ CharSourceRange RawComment::getCharSourceRange() {
                 static_cast<const char *>(Start.getOpaquePointerValue());
   return CharSourceRange(Start, Length);
 }
+
+static bool hasDoubleUnderscore(const Decl *D) {
+  // Exclude decls with double-underscored names, either in arguments or
+  // base names.
+  static StringRef Prefix = "__";
+
+  // If it's a function or subscript with a parameter with leading
+  // double underscore, it's a private function or subscript.
+  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
+    auto *params = getParameterList(cast<ValueDecl>(const_cast<Decl *>(D)));
+    if (params->hasInternalParameter(Prefix))
+      return true;
+  }
+
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    auto Name = VD->getBaseName();
+    if (!Name.isSpecial() && Name.getIdentifier().str().startswith(Prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static DocCommentSerializationTarget
+getDocCommentSerializationTargetImpl(const Decl *D) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    auto *extended = ED->getExtendedNominal();
+    if (!extended)
+      return DocCommentSerializationTarget::None;
+
+    return getDocCommentSerializationTargetFor(extended);
+  }
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return DocCommentSerializationTarget::None;
+
+  // The use of getEffectiveAccess is unusual here; we want to take the
+  // testability state into account and emit documentation if and only if they
+  // are visible to clients (which means public ordinarily, but public+internal
+  // when testing enabled).
+  switch (VD->getEffectiveAccess()) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Internal:
+    // There's no point serializing anything internal or below, as they are not
+    // accessible outside their defining module.
+    return DocCommentSerializationTarget::None;
+  case AccessLevel::Package:
+    // Package doc comments can be referenced outside their module, but only
+    // locally, so can't be included in swiftdoc.
+    return DocCommentSerializationTarget::SourceInfoOnly;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    return DocCommentSerializationTarget::SwiftDocAndSourceInfo;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+DocCommentSerializationTarget
+swift::getDocCommentSerializationTargetFor(const Decl *D) {
+  auto Limit = DocCommentSerializationTarget::SwiftDocAndSourceInfo;
+
+  // We can't include SPI decls in swiftdoc.
+  if (D->isSPI())
+    Limit = DocCommentSerializationTarget::SourceInfoOnly;
+
+  // .swiftdoc doesn't include comments for double underscored symbols, but
+  // for .swiftsourceinfo, having the source location for these symbols isn't
+  // a concern because these symbols are in .swiftinterface anyway.
+  if (hasDoubleUnderscore(D))
+    Limit = DocCommentSerializationTarget::SourceInfoOnly;
+
+  auto Result = getDocCommentSerializationTargetImpl(D);
+  return std::min(Result, Limit);
+}

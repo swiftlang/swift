@@ -15,6 +15,7 @@
 #include "SourceInfoFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -309,66 +310,15 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
   GroupNames.emit(Scratch, BlobStream.str());
 }
 
-static bool hasDoubleUnderscore(Decl *D) {
-  // Exclude decls with double-underscored names, either in arguments or
-  // base names.
-  static StringRef Prefix = "__";
-
-  // If it's a function or subscript with a parameter with leading
-  // double underscore, it's a private function or subscript.
-  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
-    if (getParameterList(cast<ValueDecl>(D))->hasInternalParameter(Prefix))
-      return true;
-  }
-
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    auto Name = VD->getBaseName();
-    if (!Name.isSpecial() &&
-        Name.getIdentifier().str().startswith(Prefix)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static bool shouldIncludeDecl(Decl *D, bool ForSourceInfo) {
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    // When emitting for .swiftsourceinfo, we can include package decls.
-    // Otherwise, the decl must be public.
-    auto MinAccess = ForSourceInfo ? swift::AccessLevel::Package
-                                   : swift::AccessLevel::Public;
-
-    // Skip the decl if it's not visible to clients. The use of
-    // getEffectiveAccess is unusual here; we want to take the testability
-    // state into account and emit documentation if and only if they are
-    // visible to clients (which means public ordinarily, but
-    // public+internal when testing enabled).
-    if (VD->getEffectiveAccess() < MinAccess)
-      return false;
+  switch (getDocCommentSerializationTargetFor(D)) {
+  case DocCommentSerializationTarget::None:
+    return false;
+  case DocCommentSerializationTarget::SourceInfoOnly:
+    return ForSourceInfo;
+  case DocCommentSerializationTarget::SwiftDocAndSourceInfo:
+    return true;
   }
-
-  // Apply some extra filters, unless we're emitting .swiftsourceinfo, where
-  // we can be more relaxed with what we emit.
-  if (!ForSourceInfo) {
-    // Skip SPI decls, unless we're generating a symbol graph with SPI
-    // information.
-    if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
-      return false;
-
-    // .swiftdoc doesn't include comments for double underscored symbols, but
-    // for .swiftsourceinfo, having the source location for these symbols isn't
-    // a concern because these symbols are in .swiftinterface anyway.
-    if (hasDoubleUnderscore(D))
-      return false;
-  }
-
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    auto *extended = ED->getExtendedNominal();
-    if (!extended)
-      return false;
-    return shouldIncludeDecl(extended, ForSourceInfo);
-  }
-  return true;
 }
 
 static void writeDeclCommentTable(
@@ -432,8 +382,11 @@ static void writeDeclCommentTable(
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      if (!shouldIncludeDecl(D, /*ForSourceInfo*/false))
-        return Action::SkipChildren();
+      if (!shouldIncludeDecl(D, /*ForSourceInfo*/false)) {
+        // Pattern binding decls don't have comments to serialize, but we should
+        // still visit their vars.
+        return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      }
       if (!shouldSerializeDoc(D))
         return Action::Continue();
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -744,8 +697,11 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (!shouldIncludeDecl(D, /*ForSourceInfo*/true))
-      return Action::SkipChildren();
+    if (!shouldIncludeDecl(D, /*ForSourceInfo*/true)) {
+      // Pattern binding decls don't have comments to serialize, but we should
+      // still visit their vars.
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    }
     if (!shouldSerializeSourceLoc(D))
       return Action::Continue();
 

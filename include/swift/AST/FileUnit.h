@@ -167,6 +167,10 @@ public:
     return None;
   }
 
+  /// For a serialized AST file, returns \c true if an adjacent swiftdoc has been
+  /// loaded. Otherwise, returns \c false.
+  virtual bool hasLoadedSwiftDoc() const { return false; }
+
   virtual Optional<StringRef>
   getGroupNameForDecl(const Decl *D) const {
     return None;
