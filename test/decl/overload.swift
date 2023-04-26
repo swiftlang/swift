@@ -204,9 +204,9 @@ struct X5<t, u, v> {
   static func u() {}
   typealias v = String
 
-  func foo<t>(_ t: t) {
-    let t = t
-    _ = t
+  func foo<w>(_ w: w) {
+    let w = w
+    _ = w
   }
 }
 

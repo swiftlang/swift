@@ -23,7 +23,7 @@ extension X<Int, Double, String> {
   // expected-error@-1 {{extensions must not contain stored properties}}
   static let x = 0
   func f() -> Int {}
-  class C<T> {}
+  class C<W> {}
 }
 
 typealias GGG = X<Int, Double, String>
