@@ -10091,6 +10091,14 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+std::vector<MacroRole> swift::getAllMacroRoles() {
+  return {
+      MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
+      MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
+      MacroRole::Conformance,     MacroRole::CodeItem,
+  };
+}
+
 StringRef swift::getMacroRoleString(MacroRole role) {
   switch (role) {
   case MacroRole::Expression:

@@ -585,7 +585,8 @@ public:
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex);
+  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+                                        int ParamIndex);
 
   void getTypeAttributeKeywordCompletions();
 

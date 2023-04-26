@@ -29,6 +29,15 @@ enum class ObjCSelectorContext {
   SetterSelector
 };
 
+/// Attributes that have syntax which can't be modelled using a function call.
+/// This can't be \c DeclAttrKind because '@freestandig' and '@attached' have
+/// the same attribute kind but take different macro roles as arguemnts.
+enum class CustomSyntaxAttributeKind {
+  Available,
+  FreestandingMacro,
+  AttachedMacro,
+};
+
 /// Parser's interface to code completion.
 class CodeCompletionCallbacks {
 protected:
@@ -185,7 +194,7 @@ public:
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
-  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) {};
+  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index){};
 
   /// Complete 'async' and 'throws' at effects specifier position.
   virtual void completeEffectsSpecifier(bool hasAsync, bool hasThrows) {};
