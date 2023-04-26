@@ -10307,6 +10307,15 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
     switch (expandedName.getKind()) {
     case MacroIntroducedDeclNameKind::Named: {
       names.push_back(DeclName(expandedName.getName()));
+
+      // Temporary hack: we previously allowed named(`init`) to mean the same
+      // thing as named(init), before the latter was supported. Smooth over the
+      // difference by treating the former as the latter, for a short time.
+      if (expandedName.getName().isSimpleName() &&
+          !expandedName.getName().getBaseName().isSpecial() &&
+          expandedName.getName().getBaseIdentifier().is("init"))
+        names.push_back(DeclName(DeclBaseName::createConstructor()));
+
       break;
     }
 

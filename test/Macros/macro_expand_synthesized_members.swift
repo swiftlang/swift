@@ -13,6 +13,12 @@
 )
 macro addMembers() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
 
+@attached(
+  member,
+  names: named(`init`), named(Storage), named(storage), named(getStorage()), named(method)
+)
+macro addMembersQuotedInit() = #externalMacro(module: "MacroDefinition", type: "AddMembers")
+
 @addMembers
 struct S {
   func useSynthesized() {
@@ -89,3 +95,11 @@ enum ElementType {
 }
 
 print(ElementType.paper.unknown())
+
+@addMembersQuotedInit
+struct S2 {
+  func useSynthesized() {
+    S.method()
+    print(type(of: getStorage()))
+  }
+}
