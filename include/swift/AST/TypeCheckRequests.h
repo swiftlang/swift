@@ -3930,6 +3930,26 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Expand a 'MacroExpansionExpr',
+class ExpandMacroExpansionExprRequest
+    : public SimpleRequest<ExpandMacroExpansionExprRequest,
+                           Optional<unsigned>(MacroExpansionExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Optional<unsigned>
+  evaluate(Evaluator &evaluator, MacroExpansionExpr *mee) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Expand all accessor macros attached to the given declaration.
 ///
 /// Produces the set of macro expansion buffer IDs.
