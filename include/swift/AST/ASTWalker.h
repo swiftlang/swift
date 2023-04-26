@@ -591,6 +591,10 @@ public:
   /// TODO: Consider changing this to false by default.
   virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
 
+  /// Whether to walk into the definition of a \c MacroDecl if it hasn't been
+  /// type-checked yet.
+  virtual bool shouldWalkIntoUncheckedMacroDefinitions() { return false; }
+
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.
   ///
