@@ -357,7 +357,9 @@ static void writeDeclCommentTable(
       if (!D->canHaveComment())
         return false;
 
-      // Skip the decl if it does not have a comment.
+      // Skip the decl if it does not have a comment. Note this means
+      // we'll only serialize "direct" brief comments, but that's okay
+      // because clients can compute the semantic brief comment themselves.
       if (D->getRawComment().Comments.empty())
         return false;
       return true;
@@ -372,9 +374,8 @@ static void writeDeclCommentTable(
           return;
       }
       generator.insert(copyString(USRBuffer.str()),
-                       { ED->getBriefComment(), ED->getRawComment(),
-                         GroupContext.getGroupSequence(ED),
-                         SourceOrder++ });
+                       {ED->getSemanticBriefComment(), ED->getRawComment(),
+                        GroupContext.getGroupSequence(ED), SourceOrder++});
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -407,9 +408,8 @@ static void writeDeclCommentTable(
       }
 
       generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), D->getRawComment(),
-                         GroupContext.getGroupSequence(VD),
-                         SourceOrder++ });
+                       {VD->getSemanticBriefComment(), D->getRawComment(),
+                        GroupContext.getGroupSequence(VD), SourceOrder++});
       return Action::Continue();
     }
 

@@ -573,8 +573,8 @@ static Optional<StringRef> getDirectBriefComment(const Decl *D) {
   return Ctx.AllocateCopy(BriefStr.str());
 }
 
-StringRef BriefCommentRequest::evaluate(Evaluator &evaluator,
-                                        const Decl *D) const {
+StringRef SemanticBriefCommentRequest::evaluate(Evaluator &evaluator,
+                                                const Decl *D) const {
   // Perform a walk over the potential providers of the brief comment,
   // retrieving the first one we come across.
   CommentProviderFinder finder(getDirectBriefComment);
@@ -582,10 +582,11 @@ StringRef BriefCommentRequest::evaluate(Evaluator &evaluator,
   return result ? result->first : StringRef();
 }
 
-StringRef Decl::getBriefComment() const {
+StringRef Decl::getSemanticBriefComment() const {
   if (!this->canHaveComment())
     return StringRef();
 
   auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, BriefCommentRequest{this}, StringRef());
+  return evaluateOrDefault(eval, SemanticBriefCommentRequest{this},
+                           StringRef());
 }

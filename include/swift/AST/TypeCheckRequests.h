@@ -4207,9 +4207,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Retrieve the brief portion of a declaration's document comment.
-class BriefCommentRequest
-    : public SimpleRequest<BriefCommentRequest,
+/// Retrieve the brief portion of a declaration's document comment, potentially
+/// walking to find the comment providing decl if needed.
+class SemanticBriefCommentRequest
+    : public SimpleRequest<SemanticBriefCommentRequest,
                            StringRef(const Decl *),
                            RequestFlags::Cached> {
 public:
