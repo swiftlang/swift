@@ -22,6 +22,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
@@ -288,6 +289,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   if (setUpModuleLoaders())
     return true;
+  if (setUpPluginLoader())
+    return true;
 
   return false;
 }
@@ -393,11 +396,6 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     return;
 
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
-
-  // Collect compiler plugin dependencies.
-  auto &searchPathOpts = Invocation.getSearchPathOptions();
-  for (auto &path : searchPathOpts.getCompilerPluginLibraryPaths())
-    DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
@@ -750,6 +748,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(PSMS));
   }
 
+  return false;
+}
+
+bool CompilerInstance::setUpPluginLoader() {
+  /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
+  auto loader =
+      std::make_unique<PluginLoader>(*Context, getDependencyTracker());
+  Context->setPluginLoader(std::move(loader));
   return false;
 }
 
