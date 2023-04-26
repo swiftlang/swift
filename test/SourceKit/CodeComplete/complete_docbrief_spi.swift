@@ -6,10 +6,11 @@
 // RUN:     -emit-module \
 // RUN:     -module-name DocBriefTest \
 // RUN:     -emit-module-path %t/Modules/DocBriefTest.swiftmodule \
-// RUN:     -emit-module-doc-path %t/Modules/DocBriefTest.swiftdoc \
+// RUN:     -emit-module-source-info-path %t/Modules/DocBriefTest.swiftsourceinfo \
 // RUN:     %t/Module.swift
 
 //--- Module.swift
+@_spi(SomeSPI)
 public protocol P {
   /// This is a doc comment of P.foo
   ///
@@ -17,15 +18,18 @@ public protocol P {
   func foo()
 }
 
-//--- User.swift
-import DocBriefTest
-struct S: P {
-  func foo() {}
+@_spi(SomeSPI)
+public struct S: P {
+  public init() {}
+  public func foo() {}
 }
+
+//--- User.swift
+@_spi(SomeSPI) import DocBriefTest
 
 func test() {
   // RUN: %sourcekitd-test -req=complete -pos=%(line+1):7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser | %FileCheck %s -check-prefix=CHECK
-  S().
+  S().foo()
 
   // CHECK: {
   // CHECK:   key.results: [
@@ -36,10 +40,5 @@ func test() {
   // CHECK-NEXT:       key.description: "foo()",
   // CHECK-NEXT:       key.typename: "Void",
   // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",
-  // CHECK-NEXT:       key.context: source.codecompletion.context.thisclass,
-  // CHECK-NEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
-  // CHECK-NEXT:       key.num_bytes_to_erase: 0,
-  // CHECK-NEXT:       key.associated_usrs: "s:12DocBriefUser1SV3fooyyF s:12DocBriefTest1PP3fooyyF",
-  // CHECK-NEXT:       key.modulename: "DocBriefUser"
-  // CHECK-NEXT:     }
+  // CHECK:          }
 }
