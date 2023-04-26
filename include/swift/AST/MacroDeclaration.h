@@ -83,6 +83,9 @@ bool isAttachedMacro(MacroRoles contexts);
 
 MacroRoles getAttachedMacroRoles();
 
+/// Checks if the macro is supported or guarded behind an experimental flag.
+bool isMacroSupported(MacroRole role, ASTContext &ctx);
+
 enum class MacroIntroducedDeclNameKind {
   Named,
   Overloaded,
