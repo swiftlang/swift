@@ -396,3 +396,14 @@ do {
     return G<repeat each T>() // Ok
   }
 }
+
+// rdar://108064941 - unused result diagnostic is unaware of Void packs
+func test_no_unused_result_warning(arr: inout [Any]) {
+  func test1<each T>(_ value: (repeat each T)) {
+    repeat arr.append(each value.element) // no warning
+  }
+
+  func test2<each T>(_ value: repeat each T) {
+    ((repeat arr.append(each value))) // no warning
+  }
+}
