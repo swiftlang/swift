@@ -1283,19 +1283,21 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (funcDecl->getParameters()->size() != 1)
       continue;
     if (auto param = funcDecl->getParameters()->front()) {
-      StructDecl* jobDecl;
-      if (auto decl = C.getExecutorJobDecl()) {
-        jobDecl = decl;
-      } else if (auto decl = C.getJobDecl()) {
+      StructDecl *unownedJobDecl = C.getUnownedJobDecl();
+      StructDecl *jobDecl = nullptr;
+      if (auto executorJobDecl = C.getExecutorJobDecl()) {
+        jobDecl = executorJobDecl;
+      } else if (auto plainJobDecl = C.getJobDecl()) {
         // old standard library, before we introduced the `typealias Job = ExecutorJob`
-        jobDecl = decl;
+        jobDecl = plainJobDecl;
       }
 
       if (jobDecl &&
           param->getType()->isEqual(jobDecl->getDeclaredInterfaceType())) {
         assert(moveOnlyEnqueueRequirement == nullptr);
         moveOnlyEnqueueRequirement = funcDecl;
-      } else if (param->getType()->isEqual(C.getUnownedJobDecl()->getDeclaredInterfaceType())) {
+      } else if (unownedJobDecl &&
+                 param->getType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
         assert(unownedEnqueueRequirement == nullptr);
         unownedEnqueueRequirement = funcDecl;
       }
@@ -1305,7 +1307,6 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     if (unownedEnqueueRequirement && moveOnlyEnqueueRequirement)
       break; // we're done looking for the requirements
   }
-
 
   auto conformance = module->lookupConformance(nominalTy, proto);
   auto concreteConformance = conformance.getConcrete();
