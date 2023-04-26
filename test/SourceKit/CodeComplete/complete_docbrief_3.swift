@@ -1,4 +1,15 @@
-// BEGIN Module.swift
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/Modules)
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend \
+// RUN:     -emit-module \
+// RUN:     -module-name DocBriefTest \
+// RUN:     -emit-module-path %t/Modules/DocBriefTest.swiftmodule \
+// RUN:     -emit-module-doc-path %t/Modules/DocBriefTest.swiftdoc \
+// RUN:     %t/Module.swift
+
+//--- Module.swift
 public protocol P {
   /// This is a doc comment of P.foo
   ///
@@ -11,22 +22,11 @@ public struct S: P {
   public func foo() {}
 }
 
-// BEGIN User.swift
+//--- User.swift
 import DocBriefTest
 func test() {
   S().foo()
 }
-
-// RUN: %empty-directory(%t)
-// RUN: %empty-directory(%t/Modules)
-// RUN: %{python} %utils/split_file.py -o %t %s
-
-// RUN: %target-swift-frontend \
-// RUN:     -emit-module \
-// RUN:     -module-name DocBriefTest \
-// RUN:     -emit-module-path %t/Modules/DocBriefTest.swiftmodule \
-// RUN:     -emit-module-doc-path %t/Modules/DocBriefTest.swiftdoc \
-// RUN:     %t/Module.swift
 
 // RUN: %sourcekitd-test -req=complete -pos=3:7 %t/User.swift -- %t/User.swift -I %t/Modules -target %target-triple -module-name DocBriefUser | %FileCheck %s -check-prefix=CHECK
 
