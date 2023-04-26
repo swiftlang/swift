@@ -469,7 +469,7 @@ SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
 SWIFT_REQUEST(TypeChecker, RawCommentRequest,
               RawComment(const Decl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, BriefCommentRequest,
+SWIFT_REQUEST(TypeChecker, SemanticBriefCommentRequest,
               StringRef(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
