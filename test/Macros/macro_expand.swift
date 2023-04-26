@@ -71,10 +71,12 @@ struct Bad {}
 // CHECK-DIAGS: import Swift
 // CHECK-DIAGS: precedencegroup MyPrecedence {}
 // CHECK-DIAGS: @attached(member) macro myMacro()
-// CHECK-DIAGS: extension Int {}
+// CHECK-DIAGS: extension Int {
+// CHECK-DIAGS: }
 // CHECK-DIAGS: @main
 // CHECK-DIAGS: struct MyMain {
-// CHECK-DIAGS:   static func main() {}
+// CHECK-DIAGS:   static func main() {
+// CHECK-DIAGS:   }
 // CHECK-DIAGS: }
 // CHECK-DIAGS: typealias Array = Void
 // CHECK-DIAGS: typealias Dictionary = Void
@@ -259,7 +261,7 @@ func testNestedDeclInExpr() {
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
 // Freestanding macros are not in inlined scopes.
-// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift":9:14 {{.*}} -> Int }
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift"{{.*}} -> Int }
 
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
