@@ -454,11 +454,10 @@ static void diagnoseDuplicateDecls(T &&decls) {
         other->diagnose(diag::invalid_redecl_prev, other->getName());
       });
 
-      // Mark the decl as invalid, unless it's a GenericTypeParamDecl, which is
-      // expected to maintain its type of GenericTypeParamType.
-      // This is needed to avoid emitting a duplicate diagnostic when running
-      // redeclaration checking in the case where the VarDecl is part of the
-      // enclosing context, e.g `let (x, x) = (0, 0)`.
+      // Mark the decl as invalid. This is needed to avoid emitting a
+      // duplicate diagnostic when running redeclaration checking in
+      // the case where the VarDecl is part of the enclosing context,
+      // e.g `let (x, x) = (0, 0)`.
       if (!isa<GenericTypeParamDecl>(current))
         current->setInvalid();
     }
@@ -492,7 +491,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
                          [](Requirement, RequirementRepr *) { return false; });
 
   // Check for duplicate generic parameter names.
-  diagnoseDuplicateDecls(*genericParams);
+  TypeChecker::checkShadowedGenericParams(ownerCtx);
 }
 
 template <typename T>

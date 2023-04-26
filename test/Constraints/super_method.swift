@@ -43,7 +43,7 @@ class X<T> {
 }
 
 class Y<U> : X<Int> {
-  func otherMethod<U>(_ x: Int, y: U) {
+  func otherMethod<V>(_ x: Int, y: V) {
     super.method(x, y: y)
   }
 }

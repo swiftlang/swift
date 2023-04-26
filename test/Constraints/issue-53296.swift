@@ -20,7 +20,7 @@ final class ViewController<T> {
 
 extension ViewController: ViewDataSource where T == String {
 // expected-note@-1 {{requirement from conditional conformance of 'ViewController<T>' to 'ViewDataSource'}}
-  func foo<T>() -> [T] {
+  func foo<U>() -> [U] {
     return []
   }
 }
