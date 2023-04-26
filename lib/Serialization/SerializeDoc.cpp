@@ -331,29 +331,42 @@ static bool hasDoubleUnderscore(Decl *D) {
   return false;
 }
 
-static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
+static bool shouldIncludeDecl(Decl *D, bool ForSourceInfo) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    // When emitting for .swiftsourceinfo, we can include package decls.
+    // Otherwise, the decl must be public.
+    auto MinAccess = ForSourceInfo ? swift::AccessLevel::Package
+                                   : swift::AccessLevel::Public;
+
     // Skip the decl if it's not visible to clients. The use of
     // getEffectiveAccess is unusual here; we want to take the testability
     // state into account and emit documentation if and only if they are
     // visible to clients (which means public ordinarily, but
     // public+internal when testing enabled).
-    if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
+    if (VD->getEffectiveAccess() < MinAccess)
       return false;
   }
 
-  // Skip SPI decls, unless we're generating a symbol graph with SPI information.
-  if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
-    return false;
+  // Apply some extra filters, unless we're emitting .swiftsourceinfo, where
+  // we can be more relaxed with what we emit.
+  if (!ForSourceInfo) {
+    // Skip SPI decls, unless we're generating a symbol graph with SPI
+    // information.
+    if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
+      return false;
+
+    // .swiftdoc doesn't include comments for double underscored symbols, but
+    // for .swiftsourceinfo, having the source location for these symbols isn't
+    // a concern because these symbols are in .swiftinterface anyway.
+    if (hasDoubleUnderscore(D))
+      return false;
+  }
 
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     auto *extended = ED->getExtendedNominal();
     if (!extended)
       return false;
-    return shouldIncludeDecl(extended, ExcludeDoubleUnderscore);
-  }
-  if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
-    return false;
+    return shouldIncludeDecl(extended, ForSourceInfo);
   }
   return true;
 }
@@ -419,7 +432,7 @@ static void writeDeclCommentTable(
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
+      if (!shouldIncludeDecl(D, /*ForSourceInfo*/false))
         return Action::SkipChildren();
       if (!shouldSerializeDoc(D))
         return Action::Continue();
@@ -731,10 +744,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    // .swiftdoc doesn't include comments for double underscored symbols, but
-    // for .swiftsourceinfo, having the source location for these symbols isn't
-    // a concern because these symbols are in .swiftinterface anyway.
-    if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
+    if (!shouldIncludeDecl(D, /*ForSourceInfo*/true))
       return Action::SkipChildren();
     if (!shouldSerializeSourceLoc(D))
       return Action::Continue();
