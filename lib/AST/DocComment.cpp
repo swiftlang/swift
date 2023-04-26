@@ -20,6 +20,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
@@ -498,39 +499,37 @@ DocComment *swift::getCascadingDocComment(swift::markup::MarkupContext &MC,
   return doc;
 }
 
+StringRef
+BriefCommentRequest::evaluate(Evaluator &evaluator, const Decl *D) const {
+  auto *DC = D->getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  // Check if the brief comment is available in the swiftdoc.
+  if (auto *Unit = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
+    if (auto C = Unit->getCommentForDecl(D))
+      return C->Brief;
+  }
+
+  // Otherwise, parse the brief from the raw comment itself. This will look into the
+  // swiftsourceinfo if needed.
+  auto RC = D->getRawComment();
+  if (RC.isEmpty()) {
+    if (auto *docD = getDocCommentProvidingDecl(D))
+      RC = docD->getRawComment();
+  }
+  if (RC.isEmpty())
+    return StringRef();
+
+  SmallString<256> BriefStr;
+  llvm::raw_svector_ostream OS(BriefStr);
+  printBriefComment(RC, OS);
+  return ctx.AllocateCopy(BriefStr.str());
+}
+
 StringRef Decl::getBriefComment() const {
   if (!this->canHaveComment())
     return StringRef();
 
-  // Check the cache in ASTContext.
-  auto &Context = getASTContext();
-  if (Optional<StringRef> Comment = Context.getBriefComment(this))
-    return Comment.value();
-
-  // Check if the serialized module may have the brief comment available.
-  if (auto *Unit =
-          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
-    if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setBriefComment(this, C->Brief);
-      return C->Brief;
-    }
-  }
-
-  // Otherwise, parse the brief from the raw comment itself.
-  auto RC = getRawComment();
-
-  StringRef Result;
-  if (RC.isEmpty())
-    if (auto *docD = getDocCommentProvidingDecl(this))
-      RC = docD->getRawComment();
-  if (!RC.isEmpty()) {
-    SmallString<256> BriefStr;
-    llvm::raw_svector_ostream OS(BriefStr);
-    printBriefComment(RC, OS);
-    Result = Context.AllocateCopy(BriefStr.str());
-  }
-
-  // Cache it.
-  Context.setBriefComment(this, Result);
-  return Result;
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, BriefCommentRequest{this}, StringRef());
 }

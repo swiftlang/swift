@@ -747,6 +747,7 @@ protected:
   friend class IterableDeclContext;
   friend class MemberLookupTable;
   friend class DeclDeserializer;
+  friend class RawCommentRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
