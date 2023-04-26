@@ -13269,6 +13269,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
       return formUnsolved();
   }
 
+  if (type1->hasPlaceholder()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    recordTypeVariablesAsHoles(type2);
+    return SolutionKind::Solved;
+  }
+
   auto shape = type1->getReducedShape();
   addConstraint(ConstraintKind::Bind, shape, type2, locator);
   return SolutionKind::Solved;
