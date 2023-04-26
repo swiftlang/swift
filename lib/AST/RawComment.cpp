@@ -130,16 +130,14 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   return Result;
 }
 
-RawComment Decl::getRawComment(bool SerializedOK) const {
+RawComment Decl::getRawComment() const {
   if (!this->canHaveComment())
     return RawComment();
 
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
-    auto P = RC.value();
-    if (!SerializedOK || P.second)
-      return P.first;
+    return RC.value().first;
   }
 
   // Check the declaration itself.
@@ -157,26 +155,24 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
 
   switch (Unit->getKind()) {
   case FileUnitKind::SerializedAST: {
-    if (SerializedOK) {
-      auto *CachedLocs = getSerializedLocs();
-      if (!CachedLocs->DocRanges.empty()) {
-        SmallVector<SingleRawComment, 4> SRCs;
-        for (const auto &Range : CachedLocs->DocRanges) {
-          if (Range.isValid()) {
-            SRCs.push_back({Range, Context.SourceMgr});
-          } else {
-            // if we've run into an invalid range, don't bother trying to load
-            // any of the other comments
-            SRCs.clear();
-            break;
-          }
+    auto *CachedLocs = getSerializedLocs();
+    if (!CachedLocs->DocRanges.empty()) {
+      SmallVector<SingleRawComment, 4> SRCs;
+      for (const auto &Range : CachedLocs->DocRanges) {
+        if (Range.isValid()) {
+          SRCs.push_back({Range, Context.SourceMgr});
+        } else {
+          // if we've run into an invalid range, don't bother trying to load
+          // any of the other comments
+          SRCs.clear();
+          break;
         }
+      }
 
-        if (!SRCs.empty()) {
-          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
-          Context.setRawComment(this, RC, true);
-          return RC;
-        }
+      if (!SRCs.empty()) {
+        auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        Context.setRawComment(this, RC, true);
+        return RC;
       }
     }
 

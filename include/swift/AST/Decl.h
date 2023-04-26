@@ -1015,7 +1015,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment(bool SerializedOK = false) const;
+  RawComment getRawComment() const;
 
   Optional<StringRef> getGroupName() const;
 

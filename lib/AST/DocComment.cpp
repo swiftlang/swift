@@ -381,24 +381,23 @@ void DocComment::addInheritanceNote(swift::markup::MarkupContext &MC,
 }
 
 DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,
-                                       const Decl *D, bool AllowSerialized) {
+                                       const Decl *D) {
   PrettyStackTraceDecl StackTrace("parsing comment for", D);
 
-  auto RC = D->getRawComment(AllowSerialized);
+  auto RC = D->getRawComment();
   if (RC.isEmpty())
     return nullptr;
   return DocComment::create(D, MC, RC);
 }
 
 namespace {
-const ValueDecl *findOverriddenDeclWithDocComment(const ValueDecl *VD,
-                                                  bool AllowSerialized = true) {
+const ValueDecl *findOverriddenDeclWithDocComment(const ValueDecl *VD) {
   // Only applies to class member.
   if (!VD->getDeclContext()->getSelfClassDecl())
     return nullptr;
 
   while (auto *baseDecl = VD->getOverriddenDecl()) {
-    if (!baseDecl->getRawComment(AllowSerialized).isEmpty())
+    if (!baseDecl->getRawComment().isEmpty())
       return baseDecl;
     VD = baseDecl;
   }
@@ -406,8 +405,7 @@ const ValueDecl *findOverriddenDeclWithDocComment(const ValueDecl *VD,
   return nullptr;
 }
 
-const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD,
-                                                       bool AllowSerialized = false) {
+const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD) {
   auto protocol = VD->getDeclContext()->getExtendedProtocolDecl();
   // Only applies to protocol extension member.
   if (!protocol)
@@ -423,8 +421,7 @@ const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD,
 
   for (auto *member : members) {
     if (!isa<ProtocolDecl>(member->getDeclContext()) ||
-        !member->isProtocolRequirement() ||
-        member->getRawComment(AllowSerialized).isEmpty())
+        !member->isProtocolRequirement() || member->getRawComment().isEmpty())
       continue;
     if (requirement)
       // Found two or more decls with doc-comment.
@@ -435,12 +432,11 @@ const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD,
   return requirement;
 }
 
-const ValueDecl *findRequirementDeclWithDocComment(const ValueDecl *VD,
-                                                   bool AllowSerialized = false) {
+const ValueDecl *findRequirementDeclWithDocComment(const ValueDecl *VD) {
   std::queue<const ValueDecl *> requirements;
   while (true) {
     for (auto *req : VD->getSatisfiedProtocolRequirements()) {
-      if (!req->getRawComment(AllowSerialized).isEmpty())
+      if (!req->getRawComment().isEmpty())
         return req;
       else
         requirements.push(req);
@@ -453,38 +449,36 @@ const ValueDecl *findRequirementDeclWithDocComment(const ValueDecl *VD,
 }
 } // namespace
 
-const Decl *swift::getDocCommentProvidingDecl(const Decl *D,
-                                              bool AllowSerialized) {
+const Decl *swift::getDocCommentProvidingDecl(const Decl *D) {
   if (!D->canHaveComment())
     return nullptr;
 
-  if (!D->getRawComment(AllowSerialized).isEmpty())
+  if (!D->getRawComment().isEmpty())
     return D;
 
   auto *VD = dyn_cast<ValueDecl>(D);
   if (!VD)
     return nullptr;
 
-  if (auto *overridden = findOverriddenDeclWithDocComment(VD, AllowSerialized))
+  if (auto *overridden = findOverriddenDeclWithDocComment(VD))
     return overridden;
 
-  if (auto *requirement = findDefaultProvidedDeclWithDocComment(VD, AllowSerialized))
+  if (auto *requirement = findDefaultProvidedDeclWithDocComment(VD))
     return requirement;
 
-  if (auto *requirement = findRequirementDeclWithDocComment(VD, AllowSerialized))
+  if (auto *requirement = findRequirementDeclWithDocComment(VD))
     return requirement;
 
   return nullptr;
 }
 
-DocComment *
-swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D,
-                              bool AllowSerialized) {
-  auto *docD = getDocCommentProvidingDecl(D, AllowSerialized);
+DocComment *swift::getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                          const Decl *D) {
+  auto *docD = getDocCommentProvidingDecl(D);
   if (!docD)
     return nullptr;
 
-  auto *doc = getSingleDocComment(MC, docD, AllowSerialized);
+  auto *doc = getSingleDocComment(MC, docD);
   assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
 
   // If the doc-comment is inherited from other decl, add a note about it.
