@@ -139,6 +139,8 @@ internal func spawn(_ path: String, args: [String]) throws {
   }
 }
 
+#endif // os(macOS)
+
 struct CFileStream: TextOutputStream {
   var fp: UnsafeMutablePointer<FILE>
 
@@ -153,5 +155,3 @@ struct CFileStream: TextOutputStream {
 
 var standardOutput = CFileStream(fp: stdout)
 var standardError = CFileStream(fp: stderr)
-
-#endif // os(macOS)

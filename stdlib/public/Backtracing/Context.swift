@@ -270,7 +270,7 @@ extension arm_gprs {
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return X86_64Context(with: mcontext as! darwin_x86_64_mcontext)
   }
-  #elseif os(Linux)
+  #elseif os(Linux) && arch(x86_64)
   init(with mctx: mcontext_t) {
     gprs.setR(X86_64Register.rax.rawValue, to: UInt64(bitPattern: mctx.gregs.13))
     gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(bitPattern: mctx.gregs.12))
@@ -457,6 +457,32 @@ extension arm_gprs {
   }
 
   public static var registerCount: Int { return 50 }
+
+  #if os(Linux) && arch(i386)
+  init(with mctx: mcontext_t) {
+    gprs.setR(I386Register.eax.rawValue, to: UInt32(bitPattern: mctx.gregs.11))
+    gprs.setR(I386Register.ecx.rawValue, to: UInt32(bitPattern: mctx.gregs.10))
+    gprs.setR(I386Register.edx.rawValue, to: UInt32(bitPattern: mctx.gregs.9))
+    gprs.setR(I386Register.ebx.rawValue, to: UInt32(bitPattern: mctx.gregs.8))
+    gprs.setR(I386Register.esp.rawValue, to: UInt32(bitPattern: mctx.gregs.7))
+    gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.6))
+    gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.5))
+    gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.4))
+    gprs.eip = UInt32(bitPattern: mctx.gregs.14)
+    gprs.eflags = UInt32(bitPattern: mctx.gregs.16)
+    gprs.segreg.0 = UInt16(bitPattern: mctx.gregs.2 & 0xffff)  // es
+    gprs.segreg.1 = UInt16(bitPattern: mctx.gregs.15 & 0xffff) // cs
+    gprs.segreg.2 = UInt16(bitPattern: mctx.gregs.18 & 0xffff) // ss
+    gprs.segreg.3 = UInt16(bitPattern: mctx.gregs.3 & 0xffff)  // ds
+    gprs.segreg.4 = UInt16(bitPattern: mctx.gregs.1 & 0xffff)  // fs
+    gprs.segreg.5 = UInt16(bitPattern: mctx.gregs.0 & 0xffff)  // gs
+    gprs.valid = 0x7fff
+  }
+
+  public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    return I386Context(with: mcontext as! mcontext_t)
+  }
+  #endif
 
   #if os(Windows) || !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
@@ -661,7 +687,29 @@ extension arm_gprs {
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return ARM64Context(with: mcontext as! darwin_arm64_mcontext)
   }
-#endif
+  #elseif os(Linux) && arch(arm64)
+  init(with mctx: mcontext_t) {
+    withUnsafeMutablePointer(to: &gprs._x) {
+      $0.withMemoryRebound(to: UInt64.self, capacity: 32){ to in
+        withUnsafePointer(to: mctx.regs) {
+          $0.withMemoryRebound(to: UInt64.self, capacity: 31) { from in
+            for n in 0..<31 {
+              to[n] = from[n]
+            }
+          }
+        }
+
+	to[31] = mctx.sp
+      }
+    }
+    gprs.pc = mctx.pc
+    gprs.valid = 0x1ffffffff
+  }
+
+  public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    return ARM64Context(with: mcontext as! mcontext_t)
+  }
+  #endif
 
   #if os(Windows) || !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
@@ -803,6 +851,27 @@ extension arm_gprs {
   }
 
   public static var registerCount: Int { return 16 }
+
+  #if os(Linux) && arch(arm)
+  init(with mctx: mcontext_t) {
+    withUnsafeMutablePointer(to: &gprs._r) {
+      $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
+        withUnsafePointer(to: &mctx.arm_r0) {
+          $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
+            for n in 0..<16 {
+              to[n] = from[n]
+            }
+          }
+        }
+      }
+    }
+    gprs.valid = 0xffff
+  }
+
+  public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    return ARMContext(with: mcontext as! mcontext_t)
+  }
+  #endif
 
   #if os(Windows) || !SWIFT_ASM_AVAILABLE
   struct NotImplemented: Error {}
