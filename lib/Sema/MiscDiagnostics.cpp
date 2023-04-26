@@ -2575,9 +2575,9 @@ static bool fixItOverrideDeclarationTypesImpl(
       });
     }
 
-    auto resultType = subscript->getDeclContext()->mapTypeIntoContext(
-        subscript->getElementInterfaceType());
-    auto baseResultType = baseSubscript->getDeclContext()->mapTypeIntoContext(
+    auto resultType =
+        subscript->mapTypeIntoContext(subscript->getElementInterfaceType());
+    auto baseResultType = baseSubscript->mapTypeIntoContext(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
