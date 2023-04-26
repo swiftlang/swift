@@ -50,7 +50,14 @@ protocol P {
   var value: A { get }
 
   func f(_ self: Self) -> Self
+
+  func makeA() -> A
 }
+
+extension P {
+  func makeA() -> [Self] { return [self] }
+}
+
 
 func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
   let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
@@ -437,4 +444,16 @@ func test_partually_flattened_expansions() {
 
   _ = S().fn(t: 1, "hi", u: false, 1.0) // Ok
   _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
+}
+
+// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
+do {
+  func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat (each value).makeA()) // Ok
+  }
+
+  func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat each value.makeA())
+    // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
+  }
 }
