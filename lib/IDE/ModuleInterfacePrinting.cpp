@@ -829,7 +829,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
   for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
-      auto RawComment = D->getRawComment(/*SerializedOK=*/false);
+      auto RawComment = D->getRawComment();
       if (!RawComment.isEmpty())
         tryUpdateStart(RawComment.Comments.front().Range.getStart());
     }
