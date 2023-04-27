@@ -3845,6 +3845,8 @@ std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC
 ) {
+  origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
+
   if (loc.isInvalid())
     return appendContext(origDC, StringRef());
 
