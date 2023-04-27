@@ -15,6 +15,8 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NoDiscard.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -760,19 +762,65 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
-enum class AddressUseKind { NonEscaping, PointerEscape, Unknown };
-
-inline AddressUseKind meet(AddressUseKind lhs, AddressUseKind rhs) {
-  return (lhs > rhs) ? lhs : rhs;
-}
-
 /// The algorithm that is used to determine what the verifier will consider to
 /// be transitive uses of the given address. Used to implement \see
 /// findTransitiveUses.
-AddressUseKind
-findTransitiveUsesForAddress(SILValue address,
-                             SmallVectorImpl<Operand *> *foundUses = nullptr,
-                             std::function<void(Operand *)> *onError = nullptr);
+///
+/// NOTE: Rather than return load_borrow as uses, this returns all of the
+/// transitive uses of the load_borrow as uses. This is important when working
+/// with this in OSSA. If one wishes to avoid this behavior, call find
+/// transitive uses for address with ones own visitor.
+inline AddressUseKind findTransitiveUsesForAddress(
+    SILValue address, SmallVectorImpl<Operand *> *foundUses = nullptr,
+    std::function<void(Operand *)> *onError = nullptr) {
+  // This is a version of TransitiveUseVisitor that visits inner transitive
+  // guaranteed uses to determine if a load_borrow is an escape in OSSA. This
+  // is OSSA specific behavior and we should probably create a different API
+  // for that. But for now, this lets this APIs users stay the same.
+  struct BasicTransitiveAddressVisitor final : TransitiveAddressWalker {
+    SmallVectorImpl<Operand *> *foundUses;
+    std::function<void(Operand *)> *onErrorFunc;
+
+    BasicTransitiveAddressVisitor(SmallVectorImpl<Operand *> *foundUses,
+                                  std::function<void(Operand *)> *onErrorFunc)
+        : foundUses(foundUses), onErrorFunc(onErrorFunc) {}
+
+    bool visitUse(Operand *use) override {
+      if (!foundUses)
+        return true;
+
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(use->getUser())) {
+        if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
+          meet(AddressUseKind::PointerEscape);
+        }
+        return true;
+      }
+
+      // If we have a begin_apply, we want to use the token results if we have
+      // any. If it doesn't have any token results, we just make our use the
+      // begin_apply use itself below.
+      if (auto *bai = dyn_cast<BeginApplyInst>(use->getUser())) {
+        if (!bai->getTokenResult()->use_empty()) {
+          for (auto *use : bai->getTokenResult()->getUses()) {
+            foundUses->push_back(use);
+          }
+          return true;
+        }
+      }
+
+      foundUses->push_back(use);
+      return true;
+    }
+
+    void onError(Operand *use) override {
+      if (onErrorFunc)
+        (*onErrorFunc)(use);
+    }
+  };
+
+  BasicTransitiveAddressVisitor visitor(foundUses, onError);
+  return std::move(visitor).walk(address);
+}
 
 class InteriorPointerOperandKind {
 public:

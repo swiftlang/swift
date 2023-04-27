@@ -23,7 +23,7 @@ public struct BufferView<T> {
 }
 
 extension Array {
-    public mutating func withBufferView<U>(_ f: (__shared BufferView<Element>) -> U) -> U {
+    public mutating func withBufferView<U>(_ f: (borrowing BufferView<Element>) -> U) -> U {
         return withUnsafeBufferPointer {
             return f(BufferView(ptr: $0))
         }

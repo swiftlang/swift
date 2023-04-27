@@ -17,22 +17,22 @@ struct M {
 #endif
 }
 
-func borrow(_: __shared M) {}
+func borrow(_: borrowing M) {}
 func consume(_: __owned M) {}
 func mutate(_: inout M) {}
 
-func borrow(_: __shared M, consume _: __owned M) {}
+func borrow(_: borrowing M, consume _: __owned M) {}
 
 #if REABSTRACT
 func clodger<T>(_: () -> T) {}
-func clodger<T>(_: () -> T, borrow _: __shared M) {}
+func clodger<T>(_: () -> T, borrow _: borrowing M) {}
 func clodger<T>(_: () -> T, consume _: __owned M) {}
 func clodger<T>(_: () -> T, mutate _: inout M) {}
 func clodger<T>(_: () -> T, and _: () -> T) {}
 func clodger<T>(_: () -> T, and _: () -> T, consume _: __owned M) {}
 #else
 func clodger(_: () -> ()) {}
-func clodger(_: () -> (), borrow _: __shared M) {}
+func clodger(_: () -> (), borrow _: borrowing M) {}
 func clodger(_: () -> (), consume _: __owned M) {}
 func clodger(_: () -> (), mutate _: inout M) {}
 func clodger(_: () -> (), and _: () -> ()) {}
@@ -41,7 +41,7 @@ func clodger(_: () -> (), and _: () -> (), consume _: __owned M) {}
 
 func reabstractClodger<T>(_: (T) -> T) {}
 
-func a(x: __shared M) {
+func a(x: borrowing M) {
     clodger({ borrow(x) })
     borrow(x)
 }
@@ -71,7 +71,7 @@ func e(x: inout M) {
     x = M()
 }
 
-func f(x: __shared M) {
+func f(x: borrowing M) {
     clodger({ borrow(x) }, borrow: x)
 }
 
@@ -94,7 +94,7 @@ func j(x: inout M) {
     clodger({ mutate(&x) }, and: { mutate(&x) })
 }
 
-func k(x: __shared M) {
+func k(x: borrowing M) {
     clodger({ borrow(x) }, and: { borrow(x) })
     borrow(x)
 }
