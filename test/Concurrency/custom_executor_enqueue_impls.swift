@@ -12,7 +12,7 @@
 //
 // We keep support for them, but also log a deprecation warning that they should move to the new signature.
 final class OldExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'OldExecutor' to 'Executor' by implementing 'func enqueue(Job)' instead}}
+  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'OldExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
@@ -24,7 +24,23 @@ final class OldExecutor: SerialExecutor {
 ///
 /// That's why we do log the deprecation warning, people should use the move-only version.
 final class BothExecutor: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'BothExecutor' to 'Executor' by implementing 'func enqueue(Job)' instead}}
+  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'BothExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+
+  func enqueue(_ job: __owned ExecutorJob) {}
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+}
+
+/// For now we must keep all 3 implementation kinds and warn about deprecated ones
+final class TripleExecutor: SerialExecutor {
+  func enqueue(_ job: UnownedJob) {} // expected-warning{{'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+
+  // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
+  // expected-note@+1{{use 'ExecutorJob' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+
   func enqueue(_ job: __owned ExecutorJob) {}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
@@ -37,6 +53,17 @@ final class BothExecutor: SerialExecutor {
 ///
 /// We do so because we implement them recursively, so one of them must be implemented basically.
 final class NoneExecutor: SerialExecutor { // expected-error{{type 'NoneExecutor' does not conform to protocol 'Executor'}}
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+}
+
+/// Job still is deprecated
+final class StillDeprecated: SerialExecutor {
+  // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
+  // expected-note@+1{{use 'ExecutorJob' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'StillDeprecated' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
