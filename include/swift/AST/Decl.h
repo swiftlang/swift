@@ -1117,6 +1117,13 @@ public:
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
+  /// Determines whether this Decl has any suppressed entries in its inheritance
+  /// clause, or within its generic context (e.g., its generic parameters).
+  ///
+  /// IMPLEMENTATION NOTE: as of today this does _not_ look into 'where' clauses
+  /// but it probably should.
+  bool hasSuppressedConformance() const;
+
   AvailabilityContext getAvailabilityForLinkage() const;
 
   /// Whether this declaration or one of its outer contexts has the

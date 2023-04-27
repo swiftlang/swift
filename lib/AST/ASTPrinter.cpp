@@ -3276,6 +3276,34 @@ static bool usesFeatureMoveOnly(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSuppressedConformances(Decl *decl) {
+  // first check the decl itself.
+  if (decl->hasSuppressedConformance())
+    return true;
+
+  // for extensions, check the type it extends.
+  if (auto *extnDecl = dyn_cast<ExtensionDecl>(decl))
+    if (auto *nom = extnDecl->getSelfNominalTypeDecl())
+      if (nom->hasSuppressedConformance())
+        return true;
+
+  // otherwise, search the decl's interface for a type with suppressed entries
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      return type.findIf([&](Type t) {
+        auto canType = t->getCanonicalType();
+
+        if (auto *decl = canType->getAnyNominal())
+          return decl->hasSuppressedConformance();
+
+        return false;
+      });
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }

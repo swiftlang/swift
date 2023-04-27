@@ -1,27 +1,30 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %t
-// RUN: %FileCheck %s < %t/Library.swiftinterface
+// RUN: %FileCheck --implicit-check-not SuppressedConformances %s < %t/Library.swiftinterface
 
 // this test makes sure that decls containing a move-only type are guarded by the $MoveOnly feature flag
 
-// CHECK:       #if compiler(>=5.3) && $MoveOnly
+// CHECK:       #if compiler(>=5.3) && $MoveOnly && $SuppressedConformances
 // CHECK-NEXT:    public struct MoveOnlyStruct : ~Swift.Copyable {
 
 // CHECK:       #if compiler(>=5.3) && $MoveOnly
 // CHECK-NEXT:    @_moveOnly public struct OldAttr_MoveOnlyStruct {
 
-// CHECK:      #if compiler(>=5.3) && $MoveOnly
+// CHECK:      #if compiler(>=5.3) && $MoveOnly && $SuppressedConformances
 // CHECK-NEXT:   public enum MoveOnlyEnum : ~Swift.Copyable {
 
-// CHECK:      #if compiler(>=5.3) && $MoveOnly
+// CHECK:      #if compiler(>=5.3) && $MoveOnly && $SuppressedConformances
 // CHECK-NEXT:   public func someFn() -> Library.MoveOnlyEnum
 
+// CHECK:      #if compiler(>=5.3) && $MoveOnly
+// CHECK-NEXT:   public func oldFn() -> Library.OldAttr_MoveOnlyStruct
+
 // CHECK:     public class What {
-// CHECK:       #if compiler(>=5.3) && $MoveOnly
+// CHECK:       #if compiler(>=5.3) && $MoveOnly && $SuppressedConformances
 // CHECK-NEXT:    public func diamonds(_ f: (borrowing Library.MoveOnlyStruct) -> Swift.Int)
 
-// CHECK: #if compiler(>=5.3) && $MoveOnly
+// CHECK: #if compiler(>=5.3) && $MoveOnly && $SuppressedConformances
 // CHECK-NEXT:  extension Library.MoveOnlyStruct {
 
 public struct MoveOnlyStruct : ~Copyable {
@@ -37,6 +40,8 @@ public enum MoveOnlyEnum : ~Copyable {
 }
 
 public func someFn() -> MoveOnlyEnum { return .depth }
+
+public func oldFn() -> OldAttr_MoveOnlyStruct { return OldAttr_MoveOnlyStruct() }
 
 public class What {
   public func diamonds(_ f: (borrowing MoveOnlyStruct) -> Int) {}

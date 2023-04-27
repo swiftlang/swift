@@ -10573,3 +10573,45 @@ MacroDiscriminatorContext::getParentOf(MacroExpansionDecl *expansion) {
   return getParentOf(
       expansion->getLoc(), expansion->getDeclContext());
 }
+
+bool Decl::hasSuppressedConformance() const {
+  if (auto typeDecl = dyn_cast<TypeDecl>(this))
+    if (!typeDecl->getSuppressed().empty())
+      return true;
+
+  if (auto *gc = getAsGenericContext()) {
+    if (auto *genericParams = gc->getGenericParams()) {
+      auto suppressedParam =
+          llvm::any_of(genericParams->getParams(),
+                       [](GenericTypeParamDecl const *param) {
+                         return param->hasSuppressedConformance();
+                       });
+
+      if (suppressedParam)
+        return true;
+
+      // TODO: eventually once where clauses support suppression, this ought to
+      //  look for their corresponding requirements.
+    }
+  }
+
+  if (auto extnDecl = dyn_cast<ExtensionDecl>(this)) {
+    // NOTE: The presence of suppressed entries in extensions creates some
+    // difficulty in determining whether there is a suppressed conformance
+    // purely from looking at suppressed entries, as both the nominal and its
+    // extension has space for these entries. We'd need a form of lookup
+    // similar to conformance lookups that merges together all information
+    // from extensions and the original declaration to determine whether there
+    // was a suppressed entry anywhere. That's why the previous check for the
+    // TypeDecl is so simple, and doesn't search its extensions.
+    //
+    // Extensions with suppressed entries should have been rejected in
+    // type checking, so crash if there is one here.
+    if (!extnDecl->getSuppressed().empty())
+      llvm_unreachable("unexpected suppression in extension");
+
+    return false;
+  }
+
+  return false;
+}
