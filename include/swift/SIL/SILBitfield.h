@@ -186,8 +186,9 @@ template <typename BitfieldContainer> struct BitfieldRef {
     BitfieldRef &ref;
     BitfieldContainer container;
 
-    StackState(BitfieldRef &ref, SILFunction *function)
-        : ref(ref), container(function) {
+    template <typename... ArgTypes>
+    StackState(BitfieldRef &ref, ArgTypes &&...Args)
+        : ref(ref), container(std::forward<ArgTypes>(Args)...) {
       ref.ref = &container;
     }
 
