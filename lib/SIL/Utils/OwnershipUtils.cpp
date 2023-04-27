@@ -1073,6 +1073,9 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
   case OwnedValueIntroducerKind::LoadTake:
     os << "LoadTake";
     return;
+  case OwnedValueIntroducerKind::Move:
+    os << "Move";
+    return;
   case OwnedValueIntroducerKind::Phi:
     os << "Phi";
     return;
