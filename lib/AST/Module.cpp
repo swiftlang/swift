@@ -3852,11 +3852,7 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
-Identifier
-SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
-  assert(D->getDeclContext()->getModuleScopeContext() == this ||
-         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
-
+Identifier SourceFile::getPrivateDiscriminator() const {
   if (!PrivateDiscriminator.empty())
     return PrivateDiscriminator;
 
@@ -3892,6 +3888,13 @@ SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
   buffer += hashString;
   PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
+}
+
+Identifier
+SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
+  assert(D->getDeclContext()->getModuleScopeContext() == this ||
+         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
+  return getPrivateDiscriminator();
 }
 
 SynthesizedFileUnit *FileUnit::getSynthesizedFile() const {

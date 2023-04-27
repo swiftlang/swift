@@ -71,5 +71,5 @@ func testArbitraryAtGlobal() {
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
-// DIAG_BUFFERS: @__swiftmacro_9MacroUser9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
-// DIAG_BUFFERS: @__swiftmacro_9MacroUser9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
+// DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
+// DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
