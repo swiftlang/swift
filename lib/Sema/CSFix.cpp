@@ -2759,7 +2759,8 @@ DestructureTupleToMatchPackExpansionParameter::create(
 
 bool AllowValueExpansionWithoutPackReferences::diagnose(
     const Solution &solution, bool asNote) const {
-  return false;
+  ValuePackExpansionWithoutPackReferences failure(solution, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowValueExpansionWithoutPackReferences *

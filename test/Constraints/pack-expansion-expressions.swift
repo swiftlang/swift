@@ -458,3 +458,26 @@ do {
     // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
   }
 }
+
+// rdar://107835215 - failed to produce a diagnostic for invalid pack expansion expression
+do {
+  func test1(x: Int) {
+    repeat x
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  func test2<T: Numeric>(_ x: T) {
+    repeat print(x * 2)
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  struct S<T> {
+    init(_: T) {}
+  }
+
+  func test<each T>(x: repeat each T, y: Int) {
+    func f<each A, each B>(_: repeat each A, y: repeat each B) {}
+    f(repeat each x, y: repeat [S(y)])
+    // expected-error@-1:25 {{value pack expansion must contain at least one pack reference}}
+  }
+}
