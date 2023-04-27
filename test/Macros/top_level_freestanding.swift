@@ -64,3 +64,5 @@ struct HasInnerClosure {
 func testArbitraryAtGlobal() {
   _ = MyIntGlobal16()
 }
+
+@freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
