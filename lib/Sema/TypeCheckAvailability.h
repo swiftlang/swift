@@ -245,9 +245,11 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &where,
                               DeclAvailabilityFlags flags = None);
 
-void diagnoseUnavailableOverride(ValueDecl *override,
-                                 const ValueDecl *base,
-                                 const AvailableAttr *attr);
+/// Emit a diagnostic for an available declaration that overrides an
+/// unavailable declaration.
+void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
+                                       const ValueDecl *base,
+                                       const AvailableAttr *attr);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
