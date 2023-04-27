@@ -638,7 +638,9 @@ protected:
     assert(succeed && "should be filtered by FindBorrowScopeUses");
 
     auto iter = innerToOuterMap.find(innerValue);
-    assert(iter != innerToOuterMap.end());
+    if (iter == innerToOuterMap.end()) {
+      return SILValue();
+    }
     SILValue outerValue = iter->second;
     cleanupOuterValue(outerValue);
     return outerValue;
