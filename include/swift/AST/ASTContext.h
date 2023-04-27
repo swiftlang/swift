@@ -80,6 +80,7 @@ namespace swift {
   class ExtensionDecl;
   struct ExternalSourceLocs;
   class LoadedExecutablePlugin;
+  class LoadedLibraryPlugin;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -92,7 +93,7 @@ namespace swift {
   class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
-  class PluginRegistry;
+  class PluginLoader;
   class SourceFile;
   class SourceLoc;
   class Type;
@@ -1476,6 +1477,12 @@ public:
 
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
+  /// Set the plugin loader.
+  void setPluginLoader(std::unique_ptr<PluginLoader> loader);
+
+  /// Get the plugin loader.
+  PluginLoader &getPluginLoader();
+
   /// Lookup a library plugin that can handle \p moduleName and return the path
   /// to it.
   /// The path is valid within the VFS, use `FS.getRealPath()` for the
@@ -1487,7 +1494,7 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  void *loadLibraryPlugin(StringRef path);
+  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
 
   /// Lookup an executable plugin that is declared to handle \p moduleName
   /// module by '-load-plugin-executable'.
@@ -1509,15 +1516,6 @@ public:
   /// instance is simply returned.
   LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
 
-  /// Get the plugin registry this ASTContext is using.
-  PluginRegistry *getPluginRegistry() const;
-
-  /// Set the plugin registory this ASTContext should use.
-  /// This should be called before any plugin is loaded.
-  void setPluginRegistry(PluginRegistry *newValue);
-
-  const llvm::StringSet<> &getLoadedPluginLibraryPaths() const;
-
 private:
   friend Decl;
 
@@ -1529,8 +1527,6 @@ private:
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
-
-  void createModuleToExecutablePluginMap();
 
   friend TypeBase;
   friend ArchetypeType;
