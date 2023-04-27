@@ -4422,6 +4422,12 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     std::tie(GP, loc) = conflict.first;
     auto conflictingArguments = conflict.second;
 
+    // If there are any substitutions that are not fully resolved
+    // solutions cannot be considered conflicting for the given parameter.
+    if (llvm::any_of(conflictingArguments,
+                     [](const auto &arg) { return arg->hasPlaceholder(); }))
+      continue;
+
     llvm::SmallString<64> arguments;
     llvm::raw_svector_ostream OS(arguments);
 
