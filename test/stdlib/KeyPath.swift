@@ -5,6 +5,9 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
 
+@_spi(ObservableRerootKeyPath)
+import Swift
+
 import StdlibUnittest
 
 var keyPath = TestSuite("key paths")
@@ -1083,6 +1086,46 @@ if #available(SwiftStdlib 5.9, *) {
     let sparky = Dog(name: "Sparky", age: 7)
 
     expectEqual(sparky[keyPath: dogAgeKp!], 7)
+  }
+}
+
+class RerootedSuper {
+  var x = "hello world"
+}
+
+class RerootedSub0: RerootedSuper {}
+class RerootedSub1: RerootedSub0 {}
+
+if #available(SwiftStdlib 5.9, *) {
+  keyPath.test("_rerootKeyPath") {
+    let x = \RerootedSub1.x
+
+    let superValue = RerootedSuper()
+    let sub0 = RerootedSub0()
+    let sub1 = RerootedSub1()
+
+    let sub0Kp = _rerootKeyPath(x, to: RerootedSub0.self)
+
+    expectTrue(type(of: sub0Kp) == ReferenceWritableKeyPath<RerootedSub0, String>.self)
+
+    let superKp = _rerootKeyPath(x, to: RerootedSuper.self)
+
+    expectTrue(type(of: superKp) == ReferenceWritableKeyPath<RerootedSuper, String>.self)
+
+    let x0 = sub1[keyPath: sub0Kp] as! String
+    expectEqual(x0, "hello world")
+
+    let x1 = sub1[keyPath: superKp] as! String
+    expectEqual(x1, "hello world")
+
+    let x2 = sub0[keyPath: sub0Kp] as! String
+    expectEqual(x2, "hello world")
+
+    let x3 = sub0[keyPath: superKp] as! String
+    expectEqual(x3, "hello world")
+
+    let x4 = superValue[keyPath: superKp] as! String
+    expectEqual(x4, "hello world")
   }
 }
 

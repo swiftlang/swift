@@ -1102,18 +1102,16 @@ namespace {
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
                                     takeActorIsolation());
-          // LValue accesses to a `let` box are only ever going to make through
-          // definite initialization if they are initializations, which don't
-          // require checking since there's no former value to potentially
-          // misuse yet.
-          if (!box || box->getOperand()->getType().castTo<SILBoxType>()
-                ->getLayout()->isMutable()) {
-            addr = SGF.B.createMarkMustCheckInst(
-                loc, addr,
-                isReadAccess(getAccessKind())
+          // Mark all move only as having mark_must_check.
+          //
+          // DISCUSSION: LValue access to let boxes must have a mark_must_check
+          // to allow for DI to properly handle delayed initialization of the
+          // boxes and convert those to initable_but_not_consumable.
+          addr = SGF.B.createMarkMustCheckInst(
+              loc, addr,
+              isReadAccess(getAccessKind())
                   ? MarkMustCheckInst::CheckKind::NoConsumeOrAssign
                   : MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-          }
           return ManagedValue::forLValue(addr);
         }
       }
@@ -4526,28 +4524,6 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   // also handle address only lets.
   if (rvalue->getType().isMoveOnlyWrapped() && rvalue->getType().isObject()) {
     rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
-  }
-
-  // See if our rvalue is a box whose boxed type matches the destTL type. In
-  // that case, emit a project_box eagerly. This can happen for escaping
-  // captured move only arguments.
-  if (auto boxType = rvalue->getType().getAs<SILBoxType>()) {
-    auto fieldType = rvalue->getType().getSILBoxFieldType(&F, 0);
-    assert(fieldType.isMoveOnly());
-    if (fieldType.getObjectType() == destTL.getLoweredType()) {
-      SILValue box = rvalue;
-      rvalue = B.createProjectBox(loc, rvalue, 0);
-      // If we have a let, we rely on the typechecker to error if we attempt to
-      // assign to it.
-      bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
-      if (isMutable)
-        rvalue = B.createMarkMustCheckInst(
-            loc, rvalue,
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-      B.emitCopyAddrOperation(loc, rvalue, dest, IsNotTake, isInit);
-      B.emitDestroyValueOperation(loc, box);
-      return;
-    }
   }
 
   // Easy case: the types match.

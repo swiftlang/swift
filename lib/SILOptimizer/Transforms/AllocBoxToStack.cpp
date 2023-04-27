@@ -254,10 +254,11 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
     auto *User = Op->getUser();
 
-    // If we have a copy_value, the copy value does not cause an escape, but its
-    // uses might do so... so add the copy_value's uses to the worklist and
-    // continue.
-    if (isa<CopyValueInst>(User) || isa<BeginBorrowInst>(User)) {
+    // If we have a copy_value, begin_borrow, or move_value, that instruction
+    // does not cause an escape, but its uses might do so... so add the
+    // its uses to the worklist and continue.
+    if (isa<CopyValueInst>(User) || isa<BeginBorrowInst>(User) ||
+        isa<MoveValueInst>(User)) {
       llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
                  std::back_inserter(Worklist));
       continue;

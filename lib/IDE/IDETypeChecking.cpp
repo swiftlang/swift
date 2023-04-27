@@ -294,8 +294,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                ExtensionDecl *EnablingExt, NormalProtocolConformance *Conf) {
     SynthesizedExtensionInfo Result(IsSynthesized, EnablingExt);
     ExtensionMergeInfo MergeInfo;
-    MergeInfo.Unmergable = !Ext->getRawComment(/*SerializedOK=*/false).isEmpty() || // With comments
-                           Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
+    MergeInfo.Unmergable =
+        !Ext->getRawComment().isEmpty() ||             // With comments
+        Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
     MergeInfo.InheritsCount = countInherits(Ext);
 
     // There's (up to) two extensions here: the extension with the items that we

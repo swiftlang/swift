@@ -4,6 +4,12 @@ import Builtin
 
 typealias AnyObject = Builtin.AnyObject
 
+class C {}
+class D : C {}
+
+sil @getD : $() -> (@owned D)
+sil @takeC : $(@owned C) -> ()
+
 struct Unmanaged<Instance> where Instance : AnyObject {
   unowned(unsafe) var _value: @sil_unmanaged Instance
 }
@@ -56,4 +62,38 @@ bb0(%instance : @guaranteed $Instance):
   destroy_value %copy_1 : $Instance
   %retval = struct $Unmanaged<Instance> (%unmanaged : $@sil_unmanaged Instance)
   return %retval : $Unmanaged<Instance>
+}
+
+// CHECK-LABEL: begin running test {{.*}} on dont_rewrite_inner_forwarding_user: canonicalize-borrow-scope
+// CHECK-LABEL: sil [ossa] @dont_rewrite_inner_forwarding_user : {{.*}} {
+// CHECK:         [[GET_C:%[^,]+]] = function_ref @getD
+// CHECK:         [[TAKE_C:%[^,]+]] = function_ref @takeC
+// CHECK:         [[C:%[^,]+]] = apply [[GET_C]]()
+// CHECK:         [[OUTER_COPY:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[OUTER_UPCAST:%[^,]+]] = upcast [[OUTER_COPY]]
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         [[DEAD_INNER_COPY:%[^,]+]] = copy_value [[B]]
+// CHECK:         destroy_value [[DEAD_INNER_COPY]]
+// CHECK:         [[U:%[^,]+]] = upcast [[B]]
+// CHECK:         [[C1:%[^,]+]] = copy_value [[U]]
+// CHECK:         apply [[TAKE_C]]([[C1]])
+// CHECK:         end_borrow [[B]]
+// CHECK:         destroy_value [[C]]
+// CHECK:         return [[OUTER_UPCAST]]
+// CHECK-LABEL: } // end sil function 'dont_rewrite_inner_forwarding_user'
+// CHECK-LABEL: end running test {{.*}} on dont_rewrite_inner_forwarding_user: canonicalize-borrow-scope
+sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owned C) {
+    %getD = function_ref @getD : $@convention(thin) () -> (@owned D)
+    %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
+    %d = apply %getD() : $@convention(thin) () -> (@owned D)
+    test_specification "canonicalize-borrow-scope @instruction"
+    %b = begin_borrow %d : $D
+    %c2 = copy_value %b : $D
+    %u2 = upcast %c2 : $D to $C
+    %c1 = copy_value %b : $D
+    %u1 = upcast %c1 : $D to $C
+    apply %takeC(%u1) : $@convention(thin) (@owned C) -> ()
+    end_borrow %b : $D
+    destroy_value %d : $D
+    return %u2 : $C
 }

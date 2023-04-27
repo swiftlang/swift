@@ -1183,10 +1183,10 @@ static int printTypeContextInfo(
             VD->getName().print(llvm::outs());
             llvm::outs() << "\n";
 
-            StringRef BriefDoc = VD->getBriefComment();
+            StringRef BriefDoc = VD->getSemanticBriefComment();
             if (!BriefDoc.empty()) {
               llvm::outs() << "     DocBrief: \"";
-              llvm::outs() << VD->getBriefComment();
+              llvm::outs() << VD->getSemanticBriefComment();
               llvm::outs() << "\"\n";
             }
           }
@@ -1251,10 +1251,10 @@ static int printConformingMethodList(
           resultTy.print(llvm::outs());
           llvm::outs() << "\n";
 
-          StringRef BriefDoc = VD->getBriefComment();
+          StringRef BriefDoc = VD->getSemanticBriefComment();
           if (!BriefDoc.empty()) {
             llvm::outs() << "     DocBrief: \"";
-            llvm::outs() << VD->getBriefComment();
+            llvm::outs() << VD->getSemanticBriefComment();
             llvm::outs() << "\"\n";
           }
         }
@@ -3528,7 +3528,7 @@ public:
       OS << " ";
       printRawComment(D->getRawComment());
       OS << " ";
-      printBriefComment(D->getBriefComment());
+      printBriefComment(D->getSemanticBriefComment());
       OS << " ";
       printDocComment(D);
       OS << "\n";
@@ -3543,7 +3543,7 @@ public:
       OS << " ";
       printRawComment(D->getRawComment());
       OS << " ";
-      printBriefComment(D->getBriefComment());
+      printBriefComment(D->getSemanticBriefComment());
       OS << " ";
       printDocComment(D);
       OS << "\n";

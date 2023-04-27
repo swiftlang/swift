@@ -883,6 +883,7 @@ public:
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  bool hasLoadedSwiftDoc() const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<ExternalSourceLocs::RawLocs>

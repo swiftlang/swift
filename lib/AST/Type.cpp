@@ -166,6 +166,28 @@ bool TypeBase::isAny() {
   return constraint->isEqual(getASTContext().TheAnyType);
 }
 
+bool TypeBase::isMarkerExistential() {
+  Type constraint = this;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
+  if (!constraint->isConstraintType())
+    return false;
+
+  auto layout = constraint->getExistentialLayout();
+  if (layout.hasExplicitAnyObject ||
+      layout.explicitSuperclass) {
+    return false;
+  }
+
+  for (auto *proto : layout.getProtocols()) {
+    if (!proto->isMarkerProtocol())
+      return false;
+  }
+
+  return true;
+}
+
 bool TypeBase::isPureMoveOnly() {
   if (auto *nom = getNominalOrBoundGenericNominal())
     return nom->isMoveOnly();
@@ -2914,8 +2936,8 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
       return ForeignRepresentableKind::Object;
   }
 
-  // Any can be bridged to id.
-  if (type->isAny()) {
+  // Existentials consisting of only marker protocols can be bridged to id.
+  if (type->isMarkerExistential()) {
     return ForeignRepresentableKind::Bridged;
   }
 

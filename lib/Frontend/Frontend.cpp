@@ -22,10 +22,13 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Frontend/CachingUtils.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -286,6 +289,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   if (setUpModuleLoaders())
     return true;
+  if (setUpPluginLoader())
+    return true;
 
   return false;
 }
@@ -391,14 +396,9 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     return;
 
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
-
-  // Collect compiler plugin dependencies.
-  auto &searchPathOpts = Invocation.getSearchPathOptions();
-  for (auto &path : searchPathOpts.getCompilerPluginLibraryPaths())
-    DepTracker->addDependency(path, /*isSystem=*/false);
 }
 
-bool CompilerInstance::setupCASIfNeeded() {
+bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
   if (!Opts.EnableCAS)
     return false;
@@ -429,6 +429,13 @@ bool CompilerInstance::setupCASIfNeeded() {
     }
   }
 
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  if (!BaseKey) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         toString(BaseKey.takeError()));
+    return true;
+  }
+  CompileJobBaseKey = *BaseKey;
   return false;
 }
 
@@ -439,6 +446,15 @@ void CompilerInstance::setupOutputBackend() {
 
   OutputBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Mirror the output into CAS.
+  if (supportCaching()) {
+    auto CASOutputBackend = createSwiftCachingOutputBackend(
+        *CAS, *ResultCache, *CompileJobBaseKey,
+        Invocation.getFrontendOptions().InputsAndOutputs);
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
+  }
 
   // Setup verification backend.
   // Create a mirroring outputbackend to produce hash for output files.
@@ -452,10 +468,10 @@ void CompilerInstance::setupOutputBackend() {
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
-                             std::string &Error) {
+                             std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
 
-  if (setupCASIfNeeded()) {
+  if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";
     return true;
   }
@@ -732,6 +748,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(PSMS));
   }
 
+  return false;
+}
+
+bool CompilerInstance::setUpPluginLoader() {
+  /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
+  auto loader =
+      std::make_unique<PluginLoader>(*Context, getDependencyTracker());
+  Context->setPluginLoader(std::move(loader));
   return false;
 }
 
@@ -1033,6 +1057,14 @@ bool CompilerInstance::canImportCxxShim() const {
   auto modulePath = builder.get();
   return getASTContext().canImportModule(modulePath) &&
          !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+}
+
+bool CompilerInstance::supportCaching() const {
+  if (!Invocation.getFrontendOptions().EnableCAS)
+    return false;
+
+  return FrontendOptions::supportCompilationCaching(
+      Invocation.getFrontendOptions().RequestedAction);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {

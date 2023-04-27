@@ -10,7 +10,7 @@ func getC() -> C
 func takeC(_ c: __owned C)
 
 @_silgen_name("borrowC")
-func borrowC(_ c: __shared C)
+func borrowC(_ c: borrowing C)
 
 @_silgen_name("something")
 func something()

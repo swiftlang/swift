@@ -820,9 +820,10 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   if (isa<ConvertEscapeToNoEscapeInst>(inst))
     return true;
 
-  // Look through copy_value, begin_borrow. They are inert for our purposes, but
-  // we need to look through it.
-  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst);
+  // Look through copy_value, begin_borrow, move_value. They are inert for our
+  // purposes, but we need to look through it.
+  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst) ||
+         isa<MoveValueInst>(inst);
 }
 
 static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,

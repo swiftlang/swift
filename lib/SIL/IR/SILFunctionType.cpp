@@ -855,7 +855,7 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
       original->getExtInfo(), original->getCoroutineKind(),
       original->getCalleeConvention(), newParameters, original->getYields(),
       newResults, original->getOptionalErrorResult(),
-      /*patternSubstitutions*/ SubstitutionMap(),
+      original->getPatternSubstitutions(),
       /*invocationSubstitutions*/ SubstitutionMap(), original->getASTContext(),
       original->getWitnessMethodConformanceOrInvalid());
 }
@@ -945,12 +945,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Put everything together to get the derivative function type. Then, store in
   // cache and return.
   cachedResult = SILFunctionType::get(
-      constrainedOriginalFnTy->getSubstGenericSignature(), extInfo,
+      constrainedOriginalFnTy->getInvocationGenericSignature(), extInfo,
       constrainedOriginalFnTy->getCoroutineKind(),
       constrainedOriginalFnTy->getCalleeConvention(), newParameters,
       constrainedOriginalFnTy->getYields(), newResults,
       constrainedOriginalFnTy->getOptionalErrorResult(),
-      /*patternSubstitutions*/ SubstitutionMap(),
+      constrainedOriginalFnTy->getPatternSubstitutions(),
       /*invocationSubstitutions*/ SubstitutionMap(),
       constrainedOriginalFnTy->getASTContext(),
       constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());

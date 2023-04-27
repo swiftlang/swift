@@ -54,6 +54,10 @@ final class Klass {
   let baseLet: Klass
 }
 
+class C {}
+
+sil @getC : $@convention(thin) () -> (@owned C)
+
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
 }
@@ -1551,4 +1555,49 @@ bb2(%7 : @owned $NonTrivialStruct):
 
 bb3:
  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @promote_moved_from_load_copy : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
+// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC
+// CHECK:         [[STORED:%[^,]+]] = apply [[GET_C]]()
+// CHECK:         store [[STORED]] to [init] [[ADDR]]
+// CHECK:         [[LOADED:%[^,]+]] = load_borrow [[ADDR]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[LOADED]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         end_borrow [[LOADED]]
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'promote_moved_from_load_copy'
+sil [ossa] @promote_moved_from_load_copy : $@convention(thin) () -> () {
+bb0:
+  %addr = alloc_stack $C
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %stored = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %stored to [init] %addr : $*C
+  %loaded = load [copy] %addr : $*C
+  %lifetime = move_value [lexical] %loaded : $C
+  destroy_value %lifetime : $C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_moved_from_load_copy_with_destroy_addr_above_range : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_promote_moved_from_load_copy_with_destroy_addr_above_range'
+sil [ossa] @dont_promote_moved_from_load_copy_with_destroy_addr_above_range : $@convention(thin) () -> () {
+bb0:
+  %addr = alloc_stack $C
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %stored = apply %getC() : $@convention(thin) () -> (@owned C)
+  store %stored to [init] %addr : $*C
+  %loaded = load [copy] %addr : $*C
+  destroy_addr %addr : $*C
+  %lifetime = move_value [lexical] %loaded : $C
+  destroy_value %lifetime : $C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
 }

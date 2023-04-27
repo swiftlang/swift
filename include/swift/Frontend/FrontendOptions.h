@@ -445,6 +445,9 @@ public:
   /// \return true if the given action requires input files to be provided.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
+  /// \return true if the given action supports caching.
+  static bool supportCompilationCaching(ActionType action);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
@@ -454,7 +457,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return llvm::hash_value(0);
+    return hash_combine(ModuleName,
+                        ModuleABIName,
+                        ModuleLinkName,
+                        ImplicitObjCHeaderPath,
+                        PrebuiltModuleCachePath,
+                        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;

@@ -91,6 +91,41 @@ swift_create_post_build_symlink(swift-frontend
 
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-opt${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-func-extractor${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-nm${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-llvm-gen${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "sil-passpipeline-dumper${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-dependency-tool${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-llvm-opt${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
@@ -114,6 +149,11 @@ swift_create_post_build_symlink(swift-frontend
   DESTINATION "swift-api-digester${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-cache-tool${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
 add_swift_tool_symlink(swift swift-frontend compiler)
 add_swift_tool_symlink(swiftc swift-frontend compiler)
 add_swift_tool_symlink(swift-symbolgraph-extract swift-frontend compiler)
@@ -121,6 +161,7 @@ add_swift_tool_symlink(swift-api-extract swift-frontend compiler)
 add_swift_tool_symlink(swift-autolink-extract swift-frontend autolink-driver)
 add_swift_tool_symlink(swift-indent swift-frontend editor-integration)
 add_swift_tool_symlink(swift-api-digester swift-frontend compiler)
+add_swift_tool_symlink(swift-cache-tool swift-frontend compiler)
 
 add_dependencies(compiler swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift${CMAKE_EXECUTABLE_SUFFIX}"
@@ -136,6 +177,9 @@ swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-extra
                            DESTINATION "bin"
                            COMPONENT compiler)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-digester${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT compiler)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-cache-tool${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT compiler)
 add_dependencies(autolink-driver swift-frontend)

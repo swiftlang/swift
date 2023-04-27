@@ -367,8 +367,10 @@ public:
   using ASTScopeTy = ast_scope::ASTScopeImpl;
   const ASTScopeTy *FnASTScope = nullptr;
   /// Caches one SILDebugScope for each ASTScope.
-  llvm::SmallDenseMap<const ASTScopeTy *, const SILDebugScope *, 16> ScopeMap;
-  /// Caches one inline SILDebugScope for each macro BufferID.
+  llvm::SmallDenseMap<std::pair<const ASTScopeTy *, const SILDebugScope *>,
+                      const SILDebugScope *, 16>
+      ScopeMap;
+  /// Caches one toplevel inline SILDebugScope for each macro BufferID.
   llvm::SmallDenseMap<unsigned, const SILDebugScope *, 16> InlinedScopeMap;
 
   /// The cleanup depth and BB for when the operand of a
@@ -720,7 +722,9 @@ private:
   const SILDebugScope *getOrCreateScope(SourceLoc SLoc);
   const SILDebugScope *getMacroScope(SourceLoc SLoc);
   const SILDebugScope *
-  getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope);
+  getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
+                   const SILDebugScope *FnScope,
+                   const SILDebugScope *InlinedAt = nullptr);
 
 public:
   /// Enter the debug scope for \p Loc, creating it if necessary.

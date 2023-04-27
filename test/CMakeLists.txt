@@ -52,17 +52,10 @@ function(get_test_dependencies SDK result_var_name)
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
       lldb-moduleimport-test
-      sil-func-extractor
-      sil-llvm-gen
-      sil-nm
-      sil-opt
-      sil-passpipeline-dumper
       swift-frontend
       swift-demangle
       swift-demangle-yamldump
-      swift-dependency-tool
       swift-ide-test
-      swift-llvm-opt
       swift-refactor
       swift-reflection-dump
       swift-remoteast-test)

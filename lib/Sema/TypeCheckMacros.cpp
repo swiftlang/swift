@@ -462,7 +462,7 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
     return { };
 
   auto *parentDecl = decl->getDeclContext()->getAsDecl();
-  if (!parentDecl)
+  if (!parentDecl || !isa<IterableDeclContext>(parentDecl))
     return { };
 
   if (isa<PatternBindingDecl>(decl))
@@ -1467,7 +1467,9 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
 ConcreteDeclRef
 ResolveMacroRequest::evaluate(Evaluator &evaluator,
                               UnresolvedMacroReference macroRef,
-                              DeclContext *dc) const {
+                              const Decl *decl) const {
+  auto dc = decl->getDeclContext();
+
   // Macro expressions and declarations have their own stored macro
   // reference. Use it if it's there.
   if (auto *expr = macroRef.getExpr()) {
@@ -1480,10 +1482,15 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = dc->getASTContext();
   auto roles = macroRef.getMacroRoles();
-  auto foundMacros = TypeChecker::lookupMacros(
-      dc, macroRef.getMacroName(), SourceLoc(), roles);
-  if (foundMacros.empty())
-    return ConcreteDeclRef();
+
+  // When a macro is not found for a custom attribute, it may be a non-macro.
+  // So bail out to prevent diagnostics from the contraint system.
+  if (macroRef.getAttr()) {
+    auto foundMacros = TypeChecker::lookupMacros(
+        dc, macroRef.getMacroName(), SourceLoc(), roles);
+    if (foundMacros.empty())
+      return ConcreteDeclRef();
+  }
 
   // If we already have a MacroExpansionExpr, use that. Otherwise,
   // create one.

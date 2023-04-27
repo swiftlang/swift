@@ -20,6 +20,7 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Tracing.h"
 
+#include "swift/AST/PluginLoader.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -1077,7 +1078,8 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     }
     return nullptr;
   }
-  CompIns.getASTContext().setPluginRegistry(ASTManager->Impl.Plugins.get());
+  CompIns.getASTContext().getPluginLoader().setRegistry(
+      ASTManager->Impl.Plugins.get());
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {

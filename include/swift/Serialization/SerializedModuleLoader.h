@@ -430,6 +430,8 @@ public:
 
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
+  bool hasLoadedSwiftDoc() const override;
+
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const override;
 
 

@@ -1065,6 +1065,10 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
+bool ModuleFile::hasLoadedSwiftDoc() const {
+  return Core->DeclCommentTable != nullptr;
+}
+
 void ModuleFile::collectSerializedSearchPath(
     llvm::function_ref<void(StringRef)> callback) const {
   for (auto path: Core->SearchPaths) {

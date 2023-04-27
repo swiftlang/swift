@@ -1194,3 +1194,35 @@ bb4:
   %v = tuple ()
   return %v : $()
 }
+
+
+sil [ossa] @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%box : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %13 = integer_literal $Builtin.Int32, 13
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  store %13 to [trivial] %addr : $*Builtin.Int32
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @move_closure : {{.*}} {
+// CHECK:         [[SPECIALIZED_CLOSURE:%[^,]+]] = function_ref @$s19move_closure_calleeTf0s_n : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+// CHECK:         partial_apply [callee_guaranteed] [[SPECIALIZED_CLOSURE]]
+// CHECK-LABEL: } // end sil function 'move_closure'
+sil [ossa] @move_closure : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %callee = function_ref @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %box_copy = copy_value %box : ${ var Builtin.Int32 }
+  mark_function_escape %addr : $*Builtin.Int32
+  %closure = partial_apply [callee_guaranteed] %callee(%box_copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %closure_move = move_value %closure : $@callee_guaranteed () -> ()
+  apply %closure_move() : $@callee_guaranteed () -> ()
+  destroy_value %closure_move : $@callee_guaranteed () -> ()
+  %value = load [trivial] %addr : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  return %value : $Builtin.Int32
+}

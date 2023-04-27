@@ -747,6 +747,7 @@ protected:
   friend class IterableDeclContext;
   friend class MemberLookupTable;
   friend class DeclDeserializer;
+  friend class RawCommentRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -1015,7 +1016,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment(bool SerializedOK = false) const;
+  RawComment getRawComment() const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -1023,8 +1024,9 @@ public:
 
   Optional<unsigned> getSourceOrder() const;
 
-  /// \returns the brief comment attached to this declaration.
-  StringRef getBriefComment() const;
+  /// \returns The brief comment attached to this declaration, or the brief
+  /// comment attached to the comment providing decl.
+  StringRef getSemanticBriefComment() const;
 
   /// Returns true if there is a Clang AST node associated
   /// with self.
@@ -1099,14 +1101,19 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<NoEagerMoveAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
+  /// The effective lifetime resulting from the decorations on the declaration.
+  ///
+  /// Usually, this, not getLifetimeAnnotationFromAttributes should be used.
+  LifetimeAnnotation getLifetimeAnnotation() const;
+
+  /// The source-level lifetime attribute, either @_eagerMove or @_noEagerMove
+  /// that the declaration bears.
+  ///
+  /// Usually getLifetimeAnnotation should be used.
+  ///
+  /// Needed to access the attributes before the AST has been fully formed, such
+  /// as when printing.
+  LifetimeAnnotation getLifetimeAnnotationFromAttributes() const;
 
   bool isNoImplicitCopy() const {
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
@@ -6327,6 +6334,8 @@ public:
   Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
 
+  LifetimeAnnotation getLifetimeAnnotation() const;
+
   /// Is the type of this parameter 'inout'?
   bool isInOut() const { return getSpecifier() == Specifier::InOut; }
 
@@ -7337,6 +7346,8 @@ public:
   bool isMainTypeMainMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);

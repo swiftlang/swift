@@ -3037,11 +3037,26 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
+// This gets called if we fail during copyGenericClassObjcName().  Its job is
+// to generate a unique name, even though the name won't be very helpful if
+// we end up looking at it in a debugger.
+#define EMERGENCY_PREFIX "$SwiftEmergencyPlaceholderClassName"
+static char *copyEmergencyName(ClassMetadata *theClass) {
+  char *nameBuf = nullptr;
+  asprintf(&nameBuf,
+           EMERGENCY_PREFIX "%016" PRIxPTR,
+           (uintptr_t)theClass);
+  return nameBuf;
+}
+
 static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
 
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
+  if (!demangling) {
+    return copyEmergencyName(theClass);
+  }
 
   // Remangle that into a new type mangling string.
   auto typeNode = Dem.createNode(Demangle::Node::Kind::TypeMangling);
@@ -3051,7 +3066,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
 
   auto mangling = Demangle::mangleNodeOld(globalNode, Dem);
   if (!mangling.isSuccess()) {
-    return nullptr;
+    return copyEmergencyName(theClass);
   }
   llvm::StringRef string = mangling.result();
 
@@ -3064,7 +3079,7 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   size_t allocationSize = string.size() + 1;
   if (addSuffix)
     allocationSize += 1;
-  
+
   auto fullNameBuf = (char*)swift_slowAlloc(allocationSize, 0);
   memcpy(fullNameBuf, string.data(), string.size());
 

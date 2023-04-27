@@ -455,6 +455,7 @@ class CompilerInstance {
   /// the file buffer provided by CAS needs to outlive the SourceMgr.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+  Optional<llvm::cas::ObjectRef> CompileJobBaseKey;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -544,6 +545,9 @@ public:
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
   }
+  Optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
+    return CompileJobBaseKey;
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -629,6 +633,9 @@ public:
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
 
+  /// Whether this compiler instance supports caching.
+  bool supportCaching() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
@@ -646,7 +653,8 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation, std::string &Error);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error,
+             ArrayRef<const char *> Args = {});
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -663,11 +671,12 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
+  bool setUpPluginLoader();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
-  bool setupCASIfNeeded();
+  bool setupCASIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
 
   /// \return false if successful, true on error.
