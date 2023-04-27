@@ -10490,9 +10490,50 @@ ArrayRef<CustomAttr *> Decl::getRuntimeDiscoverableAttrs() const {
                            nullptr);
 }
 
+/// Adjust the declaration context to find a point in the context hierarchy
+/// that the macro can be anchored on.
+DeclContext *
+MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
+  switch (dc->getContextKind()) {
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Package:
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::MacroDecl:
+    // These contexts are always fine
+    return dc;
+
+  case DeclContextKind::TopLevelCodeDecl:
+    // For top-level code, use the enclosing source file as the context.
+    return getInnermostMacroContext(dc->getParent());
+
+  case DeclContextKind::AbstractClosureExpr: {
+    // For closures, we can mangle the closure if we're in a context we can
+    // mangle. Check that context.
+    auto adjustedParentDC = getInnermostMacroContext(dc->getParent());
+    if (adjustedParentDC == dc->getParent())
+      return dc;
+
+    return adjustedParentDC;
+  }
+
+  case DeclContextKind::Initializer:
+    // Initializers can be part of inferring types for variables, so we need
+    // their context.
+    return getInnermostMacroContext(dc->getParent());
+  }
+}
+
 /// Retrieve the parent discriminator context for the given macro.
 MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
     SourceLoc loc, DeclContext *origDC) {
+  origDC = getInnermostMacroContext(origDC);
+
   if (loc.isInvalid())
     return origDC;
 
