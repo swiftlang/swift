@@ -8899,3 +8899,8 @@ bool DestructureTupleToUseWithPackExpansionParameter::diagnoseAsNote() {
       argLoc.getParamIdx(), ParamShape->getNumElements());
   return true;
 }
+
+bool ValuePackExpansionWithoutPackReferences::diagnoseAsError() {
+  emitDiagnostic(diag::value_expansion_not_variadic);
+  return true;
+}
