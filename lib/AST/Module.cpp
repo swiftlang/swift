@@ -3852,8 +3852,8 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
-Identifier SourceFile::getPrivateDiscriminator() const {
-  if (!PrivateDiscriminator.empty())
+Identifier SourceFile::getPrivateDiscriminator(bool createIfMissing) const {
+  if (!PrivateDiscriminator.empty() || !createIfMissing)
     return PrivateDiscriminator;
 
   StringRef name = getFilename();
@@ -3894,7 +3894,7 @@ Identifier
 SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this ||
          D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
-  return getPrivateDiscriminator();
+  return getPrivateDiscriminator(/*createIfMissing=*/true);
 }
 
 SynthesizedFileUnit *FileUnit::getSynthesizedFile() const {

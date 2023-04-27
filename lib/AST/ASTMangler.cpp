@@ -4009,7 +4009,8 @@ static StringRef getPrivateDiscriminatorIfNecessary(
   if (!sf)
     return StringRef();
 
-  Identifier discriminator = sf->getPrivateDiscriminator();
+  Identifier discriminator =
+      sf->getPrivateDiscriminator(/*createIfMissing=*/true);
   assert(!discriminator.empty());
   assert(!isNonAscii(discriminator.str()) &&
          "discriminator contains non-ASCII characters");
