@@ -473,7 +473,7 @@ public:
 
 private:
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    return MacroWalking::Arguments;
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -1232,8 +1232,13 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, Context);
-  for (auto D : SF.getTopLevelDecls()) {
-    Builder.build(D);
+  for (auto item : SF.getTopLevelItems()) {
+    if (auto decl = item.dyn_cast<Decl *>())
+      Builder.build(decl);
+    else if (auto expr = item.dyn_cast<Expr *>())
+      Builder.build(expr);
+    else if (auto stmt = item.dyn_cast<Stmt *>())
+      Builder.build(stmt);
   }
 }
 
@@ -1272,7 +1277,11 @@ AvailabilityContext
 TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
                                                    const DeclContext *DC,
                                                    const TypeRefinementContext **MostRefined) {
-  SourceFile *SF = DC->getParentSourceFile();
+  SourceFile *SF;
+  if (loc.isValid())
+    SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
+  else
+    SF = DC->getParentSourceFile();
   auto &Context = DC->getASTContext();
 
   // If our source location is invalid (this may be synthesized code), climb
