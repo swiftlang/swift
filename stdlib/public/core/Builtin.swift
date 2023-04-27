@@ -406,19 +406,18 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if _pointerBitWidth(_32)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
-    @inline(__always) get { return 0x0000_0002 }
-}
-#elseif _pointerBitWidth(_64)
-@inlinable
-internal var _objectPointerIsObjCBit: UInt {
-  @inline(__always) get { return 0x4000_0000_0000_0000 }
-}
+  @inline(__always) get {
+#if _pointerBitWidth(_64)
+    return 0x4000_0000_0000_0000
+#elseif _pointerBitWidth(_32)
+    return 0x0000_0002
 #else
 #error("Unknown platform")
 #endif
+  }
+}
 
 /// Extract the raw bits of `x`.
 @inlinable

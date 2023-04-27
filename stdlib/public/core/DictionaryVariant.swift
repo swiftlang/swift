@@ -46,10 +46,10 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(dummy: Void) {
-#if _pointerBitWidth(_32)
-      self.init(native: _NativeDictionary())
-#elseif _pointerBitWidth(_64)
+#if _pointerBitWidth(_64)
       self.object = _BridgeStorage(taggedPayload: 0)
+#elseif _pointerBitWidth(_32)
+      self.init(native: _NativeDictionary())
 #else
 #error("Unknown platform")
 #endif

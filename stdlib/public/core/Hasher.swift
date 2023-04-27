@@ -160,10 +160,10 @@ extension Hasher {
 
     @inline(__always)
     internal mutating func combine(_ value: UInt) {
-#if _pointerBitWidth(_32)
-      combine(UInt32(truncatingIfNeeded: value))
-#elseif _pointerBitWidth(_64)
+#if _pointerBitWidth(_64)
       combine(UInt64(truncatingIfNeeded: value))
+#elseif _pointerBitWidth(_32)
+      combine(UInt32(truncatingIfNeeded: value))
 #else
 #error("Unknown platform")
 #endif
@@ -425,15 +425,15 @@ public struct Hasher {
   @usableFromInline
   internal static func _hash(seed: Int, _ value: UInt) -> Int {
     var state = _State(seed: seed)
-#if _pointerBitWidth(_32)
+#if _pointerBitWidth(_64)
+    _internalInvariant(UInt.bitWidth == UInt64.bitWidth)
+    state.compress(UInt64(truncatingIfNeeded: value))
+    let tbc = _TailBuffer(tail: 0, byteCount: 8)
+#elseif _pointerBitWidth(_32)
     _internalInvariant(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _TailBuffer(
       tail: UInt64(truncatingIfNeeded: value),
       byteCount: UInt.bitWidth &>> 3)
-#elseif _pointerBitWidth(_64)
-    _internalInvariant(UInt.bitWidth == UInt64.bitWidth)
-    state.compress(UInt64(truncatingIfNeeded: value))
-    let tbc = _TailBuffer(tail: 0, byteCount: 8)
 #else
 #error("Unknown platform")
 #endif
