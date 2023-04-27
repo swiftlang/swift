@@ -1760,6 +1760,11 @@ public:
       return *SinglePCHImport;
     return StringRef();
   }
+
+  /// Returns true if the given C/C++ record should be imported as a reference
+  /// type into Swift.
+  static bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
+                                          ASTContext &ctx);
 };
 
 class ImportDiagnosticAdder {
