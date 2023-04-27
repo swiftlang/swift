@@ -373,14 +373,15 @@ bool TypeRefBuilder::getFieldTypeRefs(
     if (!Unsubstituted)
       return false;
 
-    auto Substituted = Unsubstituted->subst(*this, *Subs);
+    // We need this for enums; an enum case "is generic" if any generic type
+    // parameter substitutions occurred on the payload.  E.g.,
+    // `case a([T?])` is generic, but `case a([Int?])` is not.
+    bool IsGeneric = false;
+    auto Substituted = Unsubstituted->subst(*this, *Subs, IsGeneric);
+    bool IsIndirect = FD->isEnum() && Field->isIndirectCase();
 
-    if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(), FieldValue, Substituted));
-      continue;
-    }
-
-    Fields.push_back(FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
+    auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted, IsIndirect, IsGeneric);
+    Fields.push_back(FieldTI);
   }
   return true;
 }
