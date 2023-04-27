@@ -1359,14 +1359,13 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
 
   // Pruned liveness used to validate that load [take]/load [copy] can be
   // converted to load_borrow without violating exclusivity.
-  SSAPrunedLiveness &liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   GatherUsesVisitor(MoveOnlyAddressCheckerPImpl &moveChecker,
                     UseState &useState, MarkMustCheckInst *markedValue,
-                    DiagnosticEmitter &diagnosticEmitter,
-                    SSAPrunedLiveness &gatherUsesLiveness)
+                    DiagnosticEmitter &diagnosticEmitter)
       : moveChecker(moveChecker), useState(useState), markedValue(markedValue),
-        diagnosticEmitter(diagnosticEmitter), liveness(gatherUsesLiveness) {}
+        diagnosticEmitter(diagnosticEmitter) {}
 
   bool visitUse(Operand *op) override;
   void reset(MarkMustCheckInst *address) { useState.address = address; }
@@ -1383,7 +1382,8 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
-    SWIFT_DEFER { liveness.invalidate(); };
+    BitfieldRef<SSAPrunedLiveness>::StackState state(liveness,
+                                                     li->getFunction());
 
     LLVM_DEBUG(llvm::dbgs() << "Checking for exclusivity hazards for: " << *li);
 
@@ -1404,10 +1404,10 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
     }
 
     bool emittedError = false;
-    liveness.initializeDef(bai);
-    liveness.computeSimple();
+    liveness->initializeDef(bai);
+    liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness.isWithinBoundary(consumingUse->getUser())) {
+      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -2415,10 +2415,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // Then gather all uses of our address by walking from def->uses. We use this
   // to categorize the uses of this address into their ownership behavior (e.x.:
   // init, reinit, take, destroy, etc.).
-  SmallVector<SILBasicBlock *, 32> gatherUsesDiscoveredBlocks;
-  SSAPrunedLiveness gatherUsesLiveness(fn, &gatherUsesDiscoveredBlocks);
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
-                            diagnosticEmitter, gatherUsesLiveness);
+                            diagnosticEmitter);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(markedAddress);
   if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
