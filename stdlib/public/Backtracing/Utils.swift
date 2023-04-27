@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @_implementationOnly import OS.Libc
 
 internal func hex<T: FixedWidthInteger>(_ value: T,

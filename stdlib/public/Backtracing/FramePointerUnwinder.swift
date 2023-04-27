@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @_spi(Unwinders)
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C

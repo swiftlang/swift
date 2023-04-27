@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 @_implementationOnly import OS.Darwin
 #endif

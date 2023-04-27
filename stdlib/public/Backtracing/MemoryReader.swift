@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
-
 @_implementationOnly import OS.Libc
 #if os(macOS)
 @_implementationOnly import OS.Darwin
