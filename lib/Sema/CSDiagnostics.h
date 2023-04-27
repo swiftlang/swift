@@ -3000,6 +3000,23 @@ public:
   bool diagnoseAsNote() override;
 };
 
+/// Diagnose situations when value pack expansion doesn't have any pack
+/// references i.e.:
+///
+/// ```swift
+/// func test(x: Int) {
+///   repeat x
+/// }
+/// ```
+class ValuePackExpansionWithoutPackReferences final : public FailureDiagnostic {
+public:
+  ValuePackExpansionWithoutPackReferences(const Solution &solution,
+                                          ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
