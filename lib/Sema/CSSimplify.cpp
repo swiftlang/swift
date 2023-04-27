@@ -6159,12 +6159,7 @@ bool ConstraintSystem::repairFailures(
     // unrelated fixes, let's proactively bind all of the pattern
     // elemnts to holes here.
     if (lhs->isAny()) {
-      rhs.visit([&](Type type) {
-        if (auto *typeVar = type->getAs<TypeVariableType>()) {
-          assignFixedType(typeVar,
-                          PlaceholderType::get(getASTContext(), typeVar));
-        }
-      });
+      recordTypeVariablesAsHoles(rhs);
     }
 
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
@@ -10402,8 +10397,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // equality instead of argument application constraint, so allowing
             // them to bind member could mean missing valid hole positions in
             // the pattern.
-            assignFixedType(memberTypeVar, PlaceholderType::get(getASTContext(),
-                                                                memberTypeVar));
+            recordTypeVariablesAsHoles(memberTypeVar);
           } else {
             recordPotentialHole(memberTypeVar);
           }
@@ -14008,8 +14002,24 @@ void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
     return;
 
   type.visit([&](Type type) {
-    if (auto *typeVar = type->getAs<TypeVariableType>())
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
       typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+    }
+  });
+}
+
+void ConstraintSystem::recordTypeVariablesAsHoles(Type type) {
+  type.visit([&](Type componentTy) {
+    if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+      // Ignore bound type variables. This can happen if a type variable
+      // occurs in multiple positions and/or  if type hasn't been fully
+      // simplified before this call.
+      if (typeVar->getImpl().hasRepresentativeOrFixed())
+        return;
+
+      assignFixedType(typeVar,
+                      PlaceholderType::get(getASTContext(), typeVar));
+    }
   });
 }
 

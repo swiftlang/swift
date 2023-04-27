@@ -319,8 +319,6 @@ static bool isWrittenTo(Context &ctx, LoadInst *load,
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-// Convert a load [copy] from unique storage [read] that has all uses that can
-// accept a guaranteed parameter to a load_borrow.
 bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // This optimization can use more complex analysis. We should do some
   // experiments before enabling this by default as a guaranteed optimization.
@@ -334,14 +332,36 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
-  // Ok, we have our load [copy]. Make sure its value is truly a dead live range
-  // implying it is only ever consumed by destroy_value instructions. If it is
-  // consumed, we need to pass off a +1 value, so bail.
+  // Ok, we have our load [copy].  Try to optimize considering its live range.
+  if (performLoadCopyToLoadBorrowOptimization(li, li))
+    return true;
+  // Check whether the load [copy]'s only use is as an operand to a move_value.
+  auto *use = li->getSingleUse();
+  if (!use)
+    return false;
+  auto *mvi = dyn_cast<MoveValueInst>(use->getUser());
+  if (!mvi)
+    return false;
+  // Try to optimize considering the move_value's live range.
+  return performLoadCopyToLoadBorrowOptimization(li, mvi);
+}
+
+// Convert a load [copy] from unique storage [read] whose representative
+// (either the load [copy] itself or a move from it) has all uses that can
+// accept a guaranteed parameter to a load_borrow.
+bool SemanticARCOptVisitor::performLoadCopyToLoadBorrowOptimization(
+    LoadInst *li, SILValue original) {
+  assert(li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
+  assert(li == original || li->getSingleUse()->getUser() ==
+                               cast<SingleValueInstruction>(original));
+  // Make sure its value is truly a dead live range implying it is only ever
+  // consumed by destroy_value instructions. If it is consumed, we need to pass
+  // off a +1 value, so bail.
   //
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
-  OwnershipLiveRange lr(li);
+  OwnershipLiveRange lr(original);
   if (bool(lr.hasUnknownConsumingUse()))
     return false;
 
@@ -355,8 +375,17 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // load_borrow.
   auto *lbi =
       SILBuilderWithScope(li).createLoadBorrow(li->getLoc(), li->getOperand());
-
   lr.insertEndBorrowsAtDestroys(lbi, getDeadEndBlocks(), ctx.lifetimeFrontier);
-  std::move(lr).convertToGuaranteedAndRAUW(lbi, getCallbacks());
+  SILValue replacement = lbi;
+  if (original != li) {
+    getCallbacks().eraseAndRAUWSingleValueInst(li, lbi);
+    auto *bbi =
+        SILBuilderWithScope(cast<SingleValueInstruction>(original))
+            .createBeginBorrow(li->getLoc(), lbi, original->isLexical());
+    replacement = bbi;
+    lr.insertEndBorrowsAtDestroys(bbi, getDeadEndBlocks(),
+                                  ctx.lifetimeFrontier);
+  }
+  std::move(lr).convertToGuaranteedAndRAUW(replacement, getCallbacks());
   return true;
 }

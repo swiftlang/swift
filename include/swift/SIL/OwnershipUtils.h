@@ -15,6 +15,8 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NoDiscard.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -440,8 +442,8 @@ struct BorrowingOperand {
   /// values do not themselves introduce a borrow scope. In other words, they
   /// cannot be reborrowed.
   ///
-  /// If true, the visitBorrowIntroducingUserResults() can be called to acquire
-  /// each BorrowedValue that introduces a new borrow scopes.
+  /// If true, getBorrowIntroducingUserResult() can be called to acquire the
+  /// BorrowedValue that introduces a new borrow scope.
   bool hasBorrowIntroducingUser() const {
     // TODO: Can we derive this by running a borrow introducer check ourselves?
     switch (kind) {
@@ -461,19 +463,9 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Visit all of the "results" of the user of this operand that are borrow
-  /// scope introducers for the specific scope that this borrow scope operand
-  /// summarizes.
-  ///
-  /// Precondition: hasBorrowIntroducingUser() is true
-  ///
-  /// Returns false and early exits if \p visitor returns false.
-  bool visitBorrowIntroducingUserResults(
-      function_ref<bool(BorrowedValue)> visitor) const;
-
-  /// If this operand's user has a single borrowed value result return a
-  /// valid BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult();
+  /// If this operand's user has a borrowed value result return a valid
+  /// BorrowedValue instance.
+  BorrowedValue getBorrowIntroducingUserResult() const;
 
   /// Return the borrowing operand's value.
   SILValue getScopeIntroducingUserResult();
@@ -763,19 +755,65 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
-enum class AddressUseKind { NonEscaping, PointerEscape, Unknown };
-
-inline AddressUseKind meet(AddressUseKind lhs, AddressUseKind rhs) {
-  return (lhs > rhs) ? lhs : rhs;
-}
-
 /// The algorithm that is used to determine what the verifier will consider to
 /// be transitive uses of the given address. Used to implement \see
 /// findTransitiveUses.
-AddressUseKind
-findTransitiveUsesForAddress(SILValue address,
-                             SmallVectorImpl<Operand *> *foundUses = nullptr,
-                             std::function<void(Operand *)> *onError = nullptr);
+///
+/// NOTE: Rather than return load_borrow as uses, this returns all of the
+/// transitive uses of the load_borrow as uses. This is important when working
+/// with this in OSSA. If one wishes to avoid this behavior, call find
+/// transitive uses for address with ones own visitor.
+inline AddressUseKind findTransitiveUsesForAddress(
+    SILValue address, SmallVectorImpl<Operand *> *foundUses = nullptr,
+    std::function<void(Operand *)> *onError = nullptr) {
+  // This is a version of TransitiveUseVisitor that visits inner transitive
+  // guaranteed uses to determine if a load_borrow is an escape in OSSA. This
+  // is OSSA specific behavior and we should probably create a different API
+  // for that. But for now, this lets this APIs users stay the same.
+  struct BasicTransitiveAddressVisitor final : TransitiveAddressWalker {
+    SmallVectorImpl<Operand *> *foundUses;
+    std::function<void(Operand *)> *onErrorFunc;
+
+    BasicTransitiveAddressVisitor(SmallVectorImpl<Operand *> *foundUses,
+                                  std::function<void(Operand *)> *onErrorFunc)
+        : foundUses(foundUses), onErrorFunc(onErrorFunc) {}
+
+    bool visitUse(Operand *use) override {
+      if (!foundUses)
+        return true;
+
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(use->getUser())) {
+        if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
+          meet(AddressUseKind::PointerEscape);
+        }
+        return true;
+      }
+
+      // If we have a begin_apply, we want to use the token results if we have
+      // any. If it doesn't have any token results, we just make our use the
+      // begin_apply use itself below.
+      if (auto *bai = dyn_cast<BeginApplyInst>(use->getUser())) {
+        if (!bai->getTokenResult()->use_empty()) {
+          for (auto *use : bai->getTokenResult()->getUses()) {
+            foundUses->push_back(use);
+          }
+          return true;
+        }
+      }
+
+      foundUses->push_back(use);
+      return true;
+    }
+
+    void onError(Operand *use) override {
+      if (onErrorFunc)
+        (*onErrorFunc)(use);
+    }
+  };
+
+  BasicTransitiveAddressVisitor visitor(foundUses, onError);
+  return std::move(visitor).walk(address);
+}
 
 class InteriorPointerOperandKind {
 public:
@@ -1066,6 +1104,9 @@ public:
     /// memory location.
     LoadTake,
 
+    /// An owned value produced by moving from another owned value.
+    Move,
+
     /// An owned value that is a result of a true phi argument.
     ///
     /// A true phi argument here is defined as an SIL phi argument that only has
@@ -1140,6 +1181,8 @@ public:
         return Kind::LoadCopy;
       return Kind::Invalid;
     }
+    case ValueKind::MoveValueInst:
+      return Kind::Move;
     case ValueKind::PartialApplyInst:
       return Kind::PartialApplyInit;
     case ValueKind::AllocBoxInst:
@@ -1212,6 +1255,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::BeginApply:
     case OwnedValueIntroducerKind::TryApply:
     case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::Move:
     case OwnedValueIntroducerKind::Phi:
     case OwnedValueIntroducerKind::Struct:
     case OwnedValueIntroducerKind::Tuple:
@@ -1242,6 +1286,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::BeginApply:
     case OwnedValueIntroducerKind::TryApply:
     case OwnedValueIntroducerKind::LoadTake:
+    case OwnedValueIntroducerKind::Move:
     case OwnedValueIntroducerKind::FunctionArgument:
     case OwnedValueIntroducerKind::PartialApplyInit:
     case OwnedValueIntroducerKind::AllocBoxInit:

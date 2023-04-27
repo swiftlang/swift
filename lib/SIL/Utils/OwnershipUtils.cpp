@@ -693,43 +693,13 @@ bool BorrowingOperand::visitExtendedScopeEndingUses(
     function_ref<bool(Operand *)> visitor) const {
 
   if (hasBorrowIntroducingUser()) {
-    return visitBorrowIntroducingUserResults(
-        [visitor](BorrowedValue borrowedValue) {
-          return borrowedValue.visitExtendedScopeEndingUses(visitor);
-        });
+    auto borrowedValue = getBorrowIntroducingUserResult();
+    return borrowedValue.visitExtendedScopeEndingUses(visitor);
   }
   return visitScopeEndingUses(visitor);
 }
 
-bool BorrowingOperand::visitBorrowIntroducingUserResults(
-    function_ref<bool(BorrowedValue)> visitor) const {
-  switch (kind) {
-  case BorrowingOperandKind::Invalid:
-    llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::Apply:
-  case BorrowingOperandKind::TryApply:
-  case BorrowingOperandKind::BeginApply:
-  case BorrowingOperandKind::Yield:
-  case BorrowingOperandKind::PartialApplyStack:
-  case BorrowingOperandKind::BeginAsyncLet:
-    llvm_unreachable("Never has borrow introducer results!");
-  case BorrowingOperandKind::BeginBorrow: {
-    auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
-    assert(value);
-    return visitor(value);
-  }
-  case BorrowingOperandKind::Branch: {
-    auto *bi = cast<BranchInst>(op->getUser());
-    auto value = BorrowedValue(
-        bi->getDestBB()->getArgument(op->getOperandNumber()));
-    assert(value && "guaranteed-to-unowned conversion not allowed on branches");
-    return visitor(value);
-  }
-  }
-  llvm_unreachable("Covered switch isn't covered?!");
-}
-
-BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
+BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
   case BorrowingOperandKind::Apply:
@@ -740,12 +710,17 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
   case BorrowingOperandKind::BeginAsyncLet:
     return BorrowedValue();
 
-  case BorrowingOperandKind::BeginBorrow:
-    return BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
-
+  case BorrowingOperandKind::BeginBorrow: {
+    auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
+    assert(value);
+    return value;
+  }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
-    return BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
+    auto value =
+        BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
+    assert(value && "guaranteed-to-unowned conversion not allowed on branches");
+    return value;
   }
   }
   llvm_unreachable("covered switch");
@@ -919,11 +894,9 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      BorrowingOperand(scopeEndingUse).visitBorrowIntroducingUserResults(
-        [&](BorrowedValue borrowedValue) {
-          reborrows.insert(borrowedValue.value);
-          return true;
-        });
+      auto borrowedValue =
+          BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
+      reborrows.insert(borrowedValue.value);
       return true;
     }
     return visitor(scopeEndingUse);
@@ -948,11 +921,9 @@ bool BorrowedValue::visitTransitiveLifetimeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      BorrowingOperand(scopeEndingUse)
-          .visitBorrowIntroducingUserResults([&](BorrowedValue borrowedValue) {
-            reborrows.insert(borrowedValue.value);
-            return true;
-          });
+      auto borrowedValue =
+          BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
+      reborrows.insert(borrowedValue.value);
       // visitor on the reborrow
       return visitor(scopeEndingUse);
     }
@@ -1003,16 +974,14 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
         break;
       }
 
-      borrowingOperand.visitBorrowIntroducingUserResults([&](auto bv) {
-        for (auto *use : bv->getUses()) {
-          if (auto intPtrOperand = InteriorPointerOperand(use)) {
-            func(intPtrOperand);
-            continue;
-          }
-          worklist.push_back(use);
+      auto bv = borrowingOperand.getBorrowIntroducingUserResult();
+      for (auto *use : bv->getUses()) {
+        if (auto intPtrOperand = InteriorPointerOperand(use)) {
+          func(intPtrOperand);
+          continue;
         }
-        return true;
-      });
+        worklist.push_back(use);
+      }
       continue;
     }
 
@@ -1046,163 +1015,6 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
   }
 
   return true;
-}
-
-// FIXME: This does not yet assume complete lifetimes. Therefore, it currently
-// recursively looks through scoped uses, such as load_borrow. We should
-// separate the logic for lifetime completion from the logic that can assume
-// complete lifetimes.
-AddressUseKind
-swift::findTransitiveUsesForAddress(SILValue projectedAddress,
-                                    SmallVectorImpl<Operand *> *foundUses,
-                                    std::function<void(Operand *)> *onError) {
-  // If the projectedAddress is dead, it is itself a leaf use. Since we don't
-  // have an operand for it, simply bail. Dead projectedAddress is unexpected.
-  //
-  // TODO: store_borrow is currently an InteriorPointer with no uses, so we end
-  // up bailing. It should be in a dependence scope instead. It's not clear why
-  // it produces an address at all.
-  if (projectedAddress->use_empty())
-    return AddressUseKind::PointerEscape;
-
-  SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
-
-  AddressUseKind result = AddressUseKind::NonEscaping;
-
-  // Record all uses that aren't transitively followed. These are either
-  // instanteneous uses of the addres, or cause a pointer escape.
-  auto leafUse = [foundUses](Operand *use) {
-    if (foundUses)
-      foundUses->push_back(use);
-  };
-  auto transitiveResultUses = [&](Operand *use) {
-    auto *svi = cast<SingleValueInstruction>(use->getUser());
-    if (svi->use_empty()) {
-      leafUse(use);
-    } else {
-      worklist.append(svi->use_begin(), svi->use_end());
-    }
-  };
-
-  while (!worklist.empty()) {
-    auto *op = worklist.pop_back_val();
-
-    // Skip type dependent operands.
-    if (op->isTypeDependent())
-      continue;
-
-    // Then update the worklist with new things to find if we recognize this
-    // inst and then continue. If we fail, we emit an error at the bottom of the
-    // loop that we didn't recognize the user.
-    auto *user = op->getUser();
-
-    // TODO: Partial apply should be NonEscaping, but then we need to consider
-    // the apply to be a use point.
-    if (isa<PartialApplyInst>(user) || isa<AddressToPointerInst>(user)) {
-      result = meet(result, AddressUseKind::PointerEscape);
-      leafUse(op);
-      continue;
-    }
-    // First, eliminate "end point uses" that we just need to check liveness at
-    // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
-        isa<MarkUnresolvedMoveAddrInst>(user) || isIncidentalUse(user) ||
-        isa<StoreInst>(user) || isa<DestroyAddrInst>(user) ||
-        isa<AssignInst>(user) || isa<YieldInst>(user) ||
-        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
-        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
-        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
-        isa<BeginUnpairedAccessInst>(user) ||
-        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
-        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
-        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user) ||
-        isa<ExplicitCopyAddrInst>(user)) {
-      leafUse(op);
-      continue;
-    }
-
-    if (isa<UnconditionalCheckedCastAddrInst>(user)
-        || isa<MarkFunctionEscapeInst>(user)) {
-      assert(!user->hasResults());
-      leafUse(op);
-      continue;
-    }
-
-    // Then handle users that we need to look at transitive uses of.
-    if (Projection::isAddressProjection(user) ||
-        isa<ProjectBlockStorageInst>(user) ||
-        isa<OpenExistentialAddrInst>(user) ||
-        isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
-        isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
-        isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<UncheckedAddrCastInst>(user) || isa<MarkMustCheckInst>(user)) {
-      transitiveResultUses(op);
-      continue;
-    }
-
-    if (auto *builtin = dyn_cast<BuiltinInst>(user)) {
-      if (auto kind = builtin->getBuiltinKind()) {
-        if (*kind == BuiltinValueKind::TSanInoutAccess) {
-          leafUse(op);
-          continue;
-        }
-      }
-    }
-
-    // If we have a load_borrow, add it's end scope to the liveness requirement.
-    if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
-      // FIXME: if we can assume complete lifetimes, then this should be
-      // as simple as:
-      //   for (Operand *use : lbi->getUses()) {
-      //     if (use->endsLocalBorrowScope()) {
-      if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
-        result = meet(result, AddressUseKind::PointerEscape);
-      }
-      continue;
-    }
-
-    // TODO: Merge this into the full apply site code below.
-    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
-      if (foundUses) {
-        // TODO: the empty check should not be needed when dead begin_apply is
-        // disallowed.
-        if (beginApply->getTokenResult()->use_empty()) {
-          leafUse(op);
-        } else {
-          llvm::copy(beginApply->getTokenResult()->getUses(),
-                     std::back_inserter(*foundUses));
-        }
-      }
-      continue;
-    }
-
-    if (auto fas = FullApplySite::isa(user)) {
-      leafUse(op);
-      continue;
-    }
-
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-      // If this is the base, just treat it as a liveness use.
-      if (op->get() == mdi->getBase()) {
-        leafUse(op);
-        continue;
-      }
-
-      // If we are the value use, look through it.
-      transitiveResultUses(op);
-      continue;
-    }
-
-    // We were unable to recognize this user, so return true that we failed.
-    if (onError) {
-      (*onError)(op);
-    }
-    result = meet(result, AddressUseKind::Unknown);
-    leafUse(op);
-  }
-  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1260,6 +1072,9 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
     return;
   case OwnedValueIntroducerKind::LoadTake:
     os << "LoadTake";
+    return;
+  case OwnedValueIntroducerKind::Move:
+    os << "Move";
     return;
   case OwnedValueIntroducerKind::Phi:
     os << "Phi";

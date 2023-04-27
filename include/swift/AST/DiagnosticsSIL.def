@@ -88,6 +88,17 @@ ERROR(exclusivity_access_required_unknown_decl,none,
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
 
+ERROR(exclusivity_access_required_moveonly,none,
+      "overlapping accesses to %0, but "
+      "%select{initialization|read|modification|deinitialization}1 requires "
+      "exclusive access",
+      (StringRef, unsigned))
+
+ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
+        "overlapping accesses, but "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+        "exclusive access", (unsigned))
+
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())
 

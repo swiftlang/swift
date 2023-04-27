@@ -219,8 +219,8 @@ do {
     }
 
     do {
-      func testRef<each T>() -> (repeat each T, String) { fatalError() }
-      func testResult<each T>() -> (repeat each T) { fatalError() }
+      func testRef<each U>() -> (repeat each U, String) { fatalError() }
+      func testResult<each U>() -> (repeat each U) { fatalError() }
 
       func experiment1<each U>() -> (repeat each U, String) {
         testResult() // Ok

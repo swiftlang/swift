@@ -11,13 +11,13 @@ public struct NonTrivialStruct {
     var i: Int = 0
 }
 
-public func borrowVal(_ x: __shared Int) {}
-public func borrowVal(_ x: __shared MoveOnlyInt) {}
-public func borrowVal(_ x: __shared NonTrivialStruct) {}
-public func borrowVal(_ x: __shared AggStruct) {}
-public func borrowVal(_ x: __shared AggGenericStruct<String>) {}
-public func borrowVal<T>(_ x: __shared AggGenericStruct<T>) {}
-public func borrowVal(_ x: __shared EnumTy) {}
+public func borrowVal(_ x: borrowing Int) {}
+public func borrowVal(_ x: borrowing MoveOnlyInt) {}
+public func borrowVal(_ x: borrowing NonTrivialStruct) {}
+public func borrowVal(_ x: borrowing AggStruct) {}
+public func borrowVal(_ x: borrowing AggGenericStruct<String>) {}
+public func borrowVal<T>(_ x: borrowing AggGenericStruct<T>) {}
+public func borrowVal(_ x: borrowing EnumTy) {}
 
 public func consumeVal(_ x: __owned Int) {}
 public func consumeVal(_ x: __owned MoveOnlyInt) {}

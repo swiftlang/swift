@@ -96,16 +96,16 @@ public:
   /// Discared the collection of diagnostics encountered so far.
   void resetDiagnostics();
 
+  /// Using the specified invocation command, instantiate a CompilerInstance
+  /// that will be used for this scan.
+  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+  initCompilerInstanceForScan(ArrayRef<const char *> Command);
+
 private:
   /// Using the specified invocation command, initialize the scanner instance
   /// for this scan. Returns the `CompilerInstance` that will be used.
   llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
   initScannerForAction(ArrayRef<const char *> Command);
-
-  /// Using the specified invocation command, instantiate a CompilerInstance
-  /// that will be used for this scan.
-  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
-  initCompilerInstanceForScan(ArrayRef<const char *> Command);
 
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.

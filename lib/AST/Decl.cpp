@@ -372,12 +372,10 @@ OrigDeclAttributes Decl::getOriginalAttrs() const {
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
-  if (!getASTContext().evaluator.hasActiveResolveMacroRequest()) {
-    auto mutableThis = const_cast<Decl *>(this);
-    (void)evaluateOrDefault(getASTContext().evaluator,
-                            ExpandMemberAttributeMacros{mutableThis},
-                            { });
-  }
+  auto mutableThis = const_cast<Decl *>(this);
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ExpandMemberAttributeMacros{mutableThis},
+                          { });
 
   return getAttrs();
 }
@@ -447,7 +445,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
 MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
   auto declRef = evaluateOrDefault(
       getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, getDeclContext()},
+      ResolveMacroRequest{customAttr, this},
       ConcreteDeclRef());
 
   return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
@@ -1092,6 +1090,25 @@ bool Decl::isStdlibDecl() const {
   DeclContext *DC = getDeclContext();
   return DC->isModuleScopeContext() &&
          DC->getParentModule()->isStdlibModule();
+}
+
+LifetimeAnnotation Decl::getLifetimeAnnotationFromAttributes() const {
+  auto &attrs = getAttrs();
+  if (attrs.hasAttribute<EagerMoveAttr>())
+    return LifetimeAnnotation::EagerMove;
+  if (attrs.hasAttribute<NoEagerMoveAttr>())
+    return LifetimeAnnotation::Lexical;
+  return LifetimeAnnotation::None;
+}
+
+LifetimeAnnotation Decl::getLifetimeAnnotation() const {
+  if (auto *pd = dyn_cast<ParamDecl>(this)) {
+    return pd->getLifetimeAnnotation();
+  }
+  if (auto *fd = dyn_cast<FuncDecl>(this)) {
+    return fd->getLifetimeAnnotation();
+  }
+  return getLifetimeAnnotationFromAttributes();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -7040,6 +7057,18 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
+  auto specifier = getSpecifier();
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (specifier == ParamDecl::Specifier::Consuming &&
+      !getType()->isPureMoveOnly()) {
+    if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::EagerMove;
+  }
+  return getLifetimeAnnotationFromAttributes();
+}
+
 StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
   switch (specifier) {
   case ParamSpecifier::Default:
@@ -9225,6 +9254,19 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
                            SelfAccessKind::NonMutating);
 }
 
+LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (getSelfAccessKind() == SelfAccessKind::Consuming) {
+    auto *selfDecl = getImplicitSelfDecl();
+    if (selfDecl && !selfDecl->getType()->isPureMoveOnly()) {
+      if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+        return LifetimeAnnotation::Lexical;
+      return LifetimeAnnotation::EagerMove;
+    }
+  }
+  return getLifetimeAnnotationFromAttributes();
+}
+
 bool FuncDecl::isCallAsFunctionMethod() const {
   return getBaseIdentifier() == getASTContext().Id_callAsFunction &&
          isInstanceMember();
@@ -10265,6 +10307,15 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
     switch (expandedName.getKind()) {
     case MacroIntroducedDeclNameKind::Named: {
       names.push_back(DeclName(expandedName.getName()));
+
+      // Temporary hack: we previously allowed named(`init`) to mean the same
+      // thing as named(init), before the latter was supported. Smooth over the
+      // difference by treating the former as the latter, for a short time.
+      if (expandedName.getName().isSimpleName() &&
+          !expandedName.getName().getBaseName().isSpecial() &&
+          expandedName.getName().getBaseIdentifier().is("init"))
+        names.push_back(DeclName(DeclBaseName::createConstructor()));
+
       break;
     }
 

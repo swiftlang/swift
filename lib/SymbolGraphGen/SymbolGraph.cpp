@@ -276,15 +276,21 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
 
 bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
     const NominalTypeDecl *Owner) const {
-  const auto *FD = dyn_cast<FuncDecl>(VD);
-  if (!FD) {
+  DeclName Name;
+  if (const auto *FD = dyn_cast<FuncDecl>(VD)) {
+    Name = FD->getEffectiveFullName();
+  } else {
+    Name = VD->getName();
+  }
+
+  if (!Name) {
     return true;
   }
+
   auto *DC = const_cast<DeclContext*>(Owner->getDeclContext());
 
   ResolvedMemberResult Result =
-    resolveValueMember(*DC, Owner->getSelfTypeInContext(),
-                       FD->getEffectiveFullName());
+    resolveValueMember(*DC, Owner->getSelfTypeInContext(), Name);
 
   const auto ViableCandidates =
     Result.getMemberDecls(InterestedMemberKind::All);
@@ -705,8 +711,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     // If we've been asked to skip protocol implementations, filter them out here.
     if (Walker.Options.SkipProtocolImplementations && getProtocolRequirement(VD)) {
       // Allow them to stay if they have their own doc comment
-      const auto *DocCommentProvidingDecl =
-        getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true);
+      const auto *DocCommentProvidingDecl = getDocCommentProvidingDecl(VD);
       if (DocCommentProvidingDecl != VD)
         return true;
     }

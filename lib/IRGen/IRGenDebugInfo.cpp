@@ -2171,6 +2171,14 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DILocation::get(IGM.getLLVMContext(), L.line, L.column, Scope,
                                   InlinedAt);
+#ifndef NDEBUG
+  {
+    llvm::DILocalScope *Scope = DL->getInlinedAtScope();
+    llvm::DISubprogram *SP = Scope->getSubprogram();
+    llvm::Function *F = Builder.GetInsertBlock()->getParent();
+    assert((!F || SP->describes(F)) && "location points to different function");
+  }
+#endif
   Builder.SetCurrentDebugLocation(DL);
 }
 

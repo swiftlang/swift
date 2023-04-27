@@ -119,7 +119,7 @@ deliverResults(SourceKit::ConformingMethodListConsumer &SKConsumer,
             memberElem.BriefComment = RC->getBriefText(ClangContext);
         }
       } else {
-        memberElem.BriefComment = member->getBriefComment();
+        memberElem.BriefComment = member->getSemanticBriefComment();
       }
     }
 

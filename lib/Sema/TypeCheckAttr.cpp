@@ -6676,9 +6676,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // The synthesized "id" and "actorSystem" are the only exceptions,
         // because the implementation mirrors them.
         if (nominal->isDistributedActor() &&
-            !(var->isImplicit() &&
-              (var->getName() == Ctx.Id_id ||
-               var->getName() == Ctx.Id_actorSystem))) {
+            !(var->getName() == Ctx.Id_id ||
+              var->getName() == Ctx.Id_actorSystem)) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
@@ -6897,6 +6896,25 @@ bool AttributeChecker::visitLifetimeAttr(DeclAttribute *attr) {
 void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
   if (visitLifetimeAttr(attr))
     return;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (nominal->getDeclaredInterfaceType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
+  if (auto *func = dyn_cast<FuncDecl>(D)) {
+    auto *self = func->getImplicitSelfDecl();
+    if (self && self->getType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
+  if (auto *pd = dyn_cast<ParamDecl>(D)) {
+    if (pd->getType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitNoEagerMoveAttr(NoEagerMoveAttr *attr) {

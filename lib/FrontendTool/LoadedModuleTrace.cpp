@@ -759,10 +759,6 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
         std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
   }
 
-  // Add compiler plugin libraries as dependencies.
-  for (auto &pluginEntry : ctxt.getLoadedPluginLibraryPaths())
-    depTracker->addDependency(pluginEntry.getKey(), /*IsSystem*/ false);
-
   std::vector<SwiftModuleTraceInfo> swiftModules;
   computeSwiftModuleTraceInfo(ctxt, abiDependencies, pathToModuleDecl,
                               *depTracker, opts.PrebuiltModuleCachePath,

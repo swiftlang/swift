@@ -175,7 +175,7 @@ struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosu
     try t.source()
   }
 
-  func doIt2<T : Empty>(_: T) rethrows {}
+  func doIt2<U : Empty>(_: U) rethrows {}
   // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
 }
 
