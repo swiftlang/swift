@@ -438,6 +438,9 @@ enum class FixKind : uint8_t {
   /// Allow a pack expansion parameter of N elements to be matched
   /// with a single tuple literal argument of the same arity.
   DestructureTupleToMatchPackExpansionParameter,
+
+  /// Allow value pack expansion without pack references.
+  AllowValueExpansionWithoutPackReferences,
 };
 
 class ConstraintFix {
@@ -3450,6 +3453,31 @@ public:
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() ==
            FixKind::DestructureTupleToMatchPackExpansionParameter;
+  }
+};
+
+class AllowValueExpansionWithoutPackReferences final : public ConstraintFix {
+  AllowValueExpansionWithoutPackReferences(ConstraintSystem &cs,
+                                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowValueExpansionWithoutPackReferences,
+                      locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow value pack expansion without pack references";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowValueExpansionWithoutPackReferences *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowValueExpansionWithoutPackReferences;
   }
 };
 

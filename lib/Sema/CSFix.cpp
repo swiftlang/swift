@@ -2756,3 +2756,15 @@ DestructureTupleToMatchPackExpansionParameter::create(
   return new (cs.getAllocator())
       DestructureTupleToMatchPackExpansionParameter(cs, paramShapeTy, locator);
 }
+
+bool AllowValueExpansionWithoutPackReferences::diagnose(
+    const Solution &solution, bool asNote) const {
+  return false;
+}
+
+AllowValueExpansionWithoutPackReferences *
+AllowValueExpansionWithoutPackReferences::create(ConstraintSystem &cs,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowValueExpansionWithoutPackReferences(cs, locator);
+}

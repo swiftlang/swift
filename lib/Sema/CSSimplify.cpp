@@ -14803,6 +14803,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
   case FixKind::DestructureTupleToMatchPackExpansionParameter:
+  case FixKind::AllowValueExpansionWithoutPackReferences:
     llvm_unreachable("handled elsewhere");
   }
 
