@@ -138,6 +138,7 @@ private:
   void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                           SourceFile &SF);
   void validateAllowableClient(ModuleDecl *topLevelModule, SourceFile &SF);
+  void validateInterfaceWithPackageName(ModuleDecl *topLevelModule, SourceFile &SF);
 
   /// Diagnoses an inability to import \p modulePath in this situation and, if
   /// \p attrs is provided and has an \p attrKind, invalidates the attribute and
@@ -652,8 +653,8 @@ void UnboundImport::validateOptions(NullablePtr<ModuleDecl> topLevelModule,
     validateTestable(top);
     validatePrivate(top);
     validateAllowableClient(top, SF);
+    validateInterfaceWithPackageName(top, SF);
   }
-
   validateResilience(topLevelModule, SF);
 }
 
@@ -753,6 +754,28 @@ void UnboundImport::validateAllowableClient(ModuleDecl *importee,
                        diag::module_allowable_client_violation,
                        importee->getName(),
                        importer->getName());
+  }
+}
+
+void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
+                                        SourceFile &SF) {
+  assert(topLevelModule);
+
+  // If current source file is interface, don't throw an error
+  if (SF.Kind == SourceFileKind::Interface)
+    return;
+
+  // If source file is .swift or non-interface, show diags when importing an interface file
+  ASTContext &ctx = topLevelModule->getASTContext();
+  if (!topLevelModule->getPackageName().empty() &&
+      topLevelModule->getPackageName().str() == ctx.LangOpts.PackageName &&
+      topLevelModule->isBuiltFromInterface()) {
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::in_package_module_not_compiled_from_source,
+                         topLevelModule->getBaseIdentifier(),
+                         ctx.LangOpts.PackageName,
+                         topLevelModule->getModuleSourceFilename()
+                         );
   }
 }
 
