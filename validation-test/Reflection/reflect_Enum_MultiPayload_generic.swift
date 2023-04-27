@@ -25,6 +25,15 @@ class ClassWithEnumDepth0<T> {
   var e: E?
 }
 
+/*
+print("ClassWithEnumDepth0:  ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.size,
+  " ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.alignment,
+  " ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.stride)
+*/
+
 reflect(object: ClassWithEnumDepth0<S>())
 
 // CHECK: Reflecting an object.
@@ -33,7 +42,8 @@ reflect(object: ClassWithEnumDepth0<S>())
 // CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth0
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
-// X64: Type info:
+// CHECK: Type info:
+
 // X64-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // X64-NEXT:   (field name=e offset=16
 // X64-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
@@ -59,7 +69,6 @@ reflect(object: ClassWithEnumDepth0<S>())
 // X64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X64-NEXT:       (case name=none index=1))))
 
-// X32: Type info:
 // X32-NEXT: (class_instance size=21 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // X32-NEXT:   (field name=e offset=8
 // X32-NEXT:     (single_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=253 bitwise_takable=1
@@ -85,7 +94,6 @@ reflect(object: ClassWithEnumDepth0<S>())
 // X32-NEXT:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X32-NEXT:       (case name=none index=1))))
 
-
 class ClassWithEnumDepth1<T> {
   enum E<T> {
   case t(T)
@@ -102,7 +110,8 @@ reflect(object: ClassWithEnumDepth1<S>())
 // CHECK-NEXT: (bound_generic_class reflect_Enum_MultiPayload_generic.ClassWithEnumDepth1
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic.S))
 
-// X64: Type info:
+// CHECK: Type info:
+
 // X64-NEXT: (class_instance size=41 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // X64-NEXT:   (field name=e offset=16
 // X64-NEXT:     (single_payload_enum size=25 alignment=8 stride=32 num_extra_inhabitants=253 bitwise_takable=1
@@ -128,7 +137,6 @@ reflect(object: ClassWithEnumDepth1<S>())
 // X64-NEXT:                 (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X64-NEXT:       (case name=none index=1))))
 
-// X32: Type info:
 // X32-NEXT: (class_instance size=21 alignment=4 stride=24 num_extra_inhabitants=0 bitwise_takable=1
 // X32-NEXT:   (field name=e offset=8
 // X32-NEXT:     (single_payload_enum size=13 alignment=4 stride=16 num_extra_inhabitants=253 bitwise_takable=1
