@@ -5176,6 +5176,10 @@ public:
     if (T->isInvalid())
       return;
 
+    if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+      return;
+    }
+
     // Compute the type repr to attach 'any' to.
     TypeRepr *replaceRepr = T;
     // Insert parens in expression context for '(any P).self'
@@ -5208,7 +5212,7 @@ public:
       OS << ")";
 
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(T->getBoundDecl())) {
-      if (proto->existentialRequiresAny() && !Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+      if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(T->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -5226,7 +5230,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!protoDecl->existentialRequiresAny() || Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
+          if (!protoDecl->existentialRequiresAny())
             continue;
 
           Ctx.Diags.diagnose(T->getNameLoc(),

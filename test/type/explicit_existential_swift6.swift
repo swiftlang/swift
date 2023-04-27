@@ -229,17 +229,9 @@ extension MyError {
   }
 }
 
-struct Wrapper {
-  typealias E = Error
-}
-
-func typealiasMemberReferences(metatype: Wrapper.Type) {
-  let _: Wrapper.E.Protocol = metatype.E.self
-  let _: (any Wrapper.E).Type = metatype.E.self
-}
-
 func testAnyTypeExpr() {
   let _: (any P).Type = (any P).self
+  let _: (any P1 & P2).Type = (any P1 & P2).self
 
   func test(_: (any P).Type) {}
   test((any P).self)
@@ -311,6 +303,13 @@ enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not
   case hack
 }
 
+// Protocols from a serialized module (the standard library).
+do {
+  // expected-error@+1 {{use of protocol 'Decodable' as a type must be written 'any Decodable'}}
+  let _: Decodable
+  // expected-error@+1 2 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable')}}
+  let _: Codable
+}
 
 func testAnyFixIt() {
   struct ConformingType : HasAssoc {
@@ -333,6 +332,19 @@ func testAnyFixIt() {
   // expected-error@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{30-38=(any HasAssoc)}}
   let _: HasAssoc.Protocol = HasAssoc.self
+  do {
+    struct Wrapper {
+      typealias HasAssocAlias = HasAssoc
+    }
+    let wrapperMeta: Wrapper.Type
+    // FIXME: Both of these fix-its are wrong.
+    // 1. 'any' is attached to 'HasAssocAlias' instead of 'Wrapper.HasAssocAlias'
+    // 2. What is the correct fix-it for the initializer?
+    //
+    // expected-error@+2:20 {{use of 'Wrapper.HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any Wrapper.HasAssocAlias' (aka 'any HasAssoc')}}{{20-33=(any HasAssocAlias)}}
+    // expected-error@+1:57 {{use of 'Wrapper.HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any Wrapper.HasAssocAlias' (aka 'any HasAssoc')}}{{57-70=(any HasAssocAlias)}}
+    let _: Wrapper.HasAssocAlias.Protocol = wrapperMeta.HasAssocAlias.self
+  }
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{11-19=any HasAssoc}}
   let _: (HasAssoc).Protocol = (any HasAssoc).self
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}

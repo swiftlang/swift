@@ -711,13 +711,8 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool
-ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
-                                        ProtocolDecl *decl) const {
-  auto &ctx = decl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::ExistentialAny))
-    return true;
-
+bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
+    Evaluator &evaluator, ProtocolDecl *decl) const {
   // ObjC protocols do not require `any`.
   if (decl->isObjC())
     return false;
@@ -740,7 +735,7 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
 
   // Check whether any of the inherited protocols require `any`.
   for (auto proto : decl->getInheritedProtocols()) {
-    if (proto->existentialRequiresAny())
+    if (proto->hasSelfOrAssociatedTypeRequirements())
       return true;
   }
 
