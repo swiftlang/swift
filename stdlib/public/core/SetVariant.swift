@@ -36,10 +36,12 @@ extension Set {
     @inlinable
     @inline(__always)
     init(dummy: ()) {
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_32)
       self.init(native: _NativeSet())
-#else
+#elseif _pointerBitWidth(_64)
       self.object = _BridgeStorage(taggedPayload: 0)
+#else
+#error("Unknown platform")
 #endif
     }
 

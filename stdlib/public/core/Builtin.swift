@@ -406,17 +406,18 @@ internal var _objectPointerLowSpareBitShift: UInt {
     }
 }
 
-#if arch(i386) || arch(arm) || arch(wasm32) || arch(powerpc) || arch(powerpc64) || arch(
-  powerpc64le) || arch(s390x) || arch(arm64_32)
+#if _pointerBitWidth(_32)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
 }
-#else
+#elseif _pointerBitWidth(_64)
 @inlinable
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
+#else
+#error("Unknown platform")
 #endif
 
 /// Extract the raw bits of `x`.
