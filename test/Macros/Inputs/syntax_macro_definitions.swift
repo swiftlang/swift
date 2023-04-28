@@ -26,7 +26,7 @@ public struct ColorLiteralMacro: ExpressionMacro {
       of: macro.argumentList, with: "_colorLiteralRed"
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
-    return initSyntax.with(\.leadingTrivia, macro.leadingTrivia)
+    return initSyntax
   }
 }
 
@@ -43,7 +43,7 @@ public struct FileIDMacro: ExpressionMacro {
     }
 
     let fileLiteral: ExprSyntax = "\(sourceLoc.file)"
-    return fileLiteral.with(\.leadingTrivia, macro.leadingTrivia)
+    return fileLiteral
   }
 }
 
@@ -644,7 +644,6 @@ public struct WrapStoredPropertiesMacro: MemberAttributeMacro {
           name: .identifier(wrapperName.content.text)
         )
       )
-      .with(\.leadingTrivia, [.newlines(1), .spaces(2)])
     ]
   }
 }
@@ -764,7 +763,7 @@ public struct AddCompletionHandler: PeerMacro {
     let completionHandlerParam =
       FunctionParameterSyntax(
         firstName: .identifier("completionHandler"),
-        colon: .colonToken(trailingTrivia: .space),
+        colon: .colonToken(),
         type: "@escaping (\(resultType ?? "")) -> Void" as TypeSyntax
       )
 
@@ -777,7 +776,7 @@ public struct AddCompletionHandler: PeerMacro {
         .appending(
           lastParam.with(
             \.trailingComma,
-            .commaToken(trailingTrivia: .space)
+            .commaToken()
           )
         )
         .appending(completionHandlerParam)
@@ -802,11 +801,9 @@ public struct AddCompletionHandler: PeerMacro {
     // so that the full body could go here.
     let newBody: ExprSyntax =
       """
-
         Task {
           completionHandler(await \(call))
         }
-
       """
 
     // Drop the @addCompletionHandler attribute from the new declaration.
@@ -842,15 +839,14 @@ public struct AddCompletionHandler: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(newBody))]
           ),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
-      .with(\.leadingTrivia, .newlines(2))
 
     return [DeclSyntax(newFunc)]
   }
@@ -952,12 +948,11 @@ public struct WrapInType: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(call))]
-          )
-          .with(\.leadingTrivia, [.newlines(1), .spaces(2)]),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          ),
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
