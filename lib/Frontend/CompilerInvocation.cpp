@@ -426,8 +426,11 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     return;
   ArgStringList RenderedArgs;
   ArgStringList RenderedArgsIgnorable;
+  ArgStringList RenderedArgsIgnorablePrivate;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
+    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorablePrivate)) {
+      A->render(Args, RenderedArgsIgnorablePrivate);
+    } else if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
       A->render(Args, RenderedArgsIgnorable);
     } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
       A->render(Args, RenderedArgs);
@@ -445,6 +448,12 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     // with older availability.
     if (FOpts.ModuleName == "_Concurrency")
       OS << " -disable-availability-checking";
+  }
+  {
+    llvm::raw_string_ostream OS(Opts.IgnorablePrivateFlags);
+    interleave(RenderedArgsIgnorablePrivate,
+               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+               [&] { OS << " "; });
   }
   {
     llvm::raw_string_ostream OS(Opts.IgnorableFlags);

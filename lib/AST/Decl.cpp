@@ -3972,11 +3972,17 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      // No package context was found; show diagnostics
-      auto &d = VD->getASTContext().Diags;
-      d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
-      // Instead of reporting and failing early, return the scope of
-      // resultDC to allow continuation (should still non-zero exit later)
+      auto srcFile = resultDC->getParentSourceFile();
+      // Check if the file containing package decls is an interface file; if a public
+      // interface contains package decls, they must be inlinable and do not need a
+      // package-name, so don't show diagnostics in that case.
+      if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
+        // No package context was found; show diagnostics
+        auto &d = VD->getASTContext().Diags;
+        d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
+      }
+      // Instead of reporting and failing early, return the scope of resultDC to
+      // allow continuation (should still non-zero exit later if in script mode)
       return AccessScope(resultDC);
     } else {
       return AccessScope(pkg);
@@ -4168,9 +4174,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-    return usePkg->isSamePackageAs(srcPkg);
+    auto srcFile = sourceDC->getParentSourceFile();
+    if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
+      auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+      auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+      return usePkg->isSamePackageAs(srcPkg);
+    } else {
+      // If source file is interface, package decls must be inlinable,
+      // essentially treated public so return true (see AccessLevel::Public)
+      return true;
+    }
   }
   case AccessLevel::Public:
   case AccessLevel::Open:

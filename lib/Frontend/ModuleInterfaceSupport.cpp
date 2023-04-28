@@ -98,6 +98,12 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
     out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
         << Opts.IgnorableFlags << "\n";
   }
+
+  auto hasPrivateIgnorableFlags = Opts.PrintPrivateInterfaceContent && !Opts.IgnorablePrivateFlags.empty();
+  if (hasPrivateIgnorableFlags) {
+    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY ": "
+        << Opts.IgnorablePrivateFlags << "\n";
+  }
 }
 
 std::string
