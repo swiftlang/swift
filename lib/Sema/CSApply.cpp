@@ -2937,13 +2937,14 @@ namespace {
 
         auto macro = cast<MacroDecl>(overload.choice.getDecl());
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
-        if (auto newExpr = expandMacroExpr(dc, expr, macroRef, expandedType)) {
-          auto expansion = new (ctx) MacroExpansionExpr(
-              dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
-              DeclNameLoc(expr->getLoc()), SourceLoc(), { }, SourceLoc(),
-              nullptr, MacroRole::Expression, /*isImplicit=*/true, expandedType);
-          expansion->setMacroRef(macroRef);
-          expansion->setRewritten(newExpr);
+        auto expansion = new (ctx) MacroExpansionExpr(
+            dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
+            DeclNameLoc(expr->getLoc()), SourceLoc(), {}, SourceLoc(), nullptr,
+            MacroRole::Expression, /*isImplicit=*/true, expandedType);
+        expansion->setMacroRef(macroRef);
+        (void)evaluateOrDefault(
+            ctx.evaluator, ExpandMacroExpansionExprRequest{expansion}, None);
+        if (expansion->getRewritten()) {
           cs.cacheExprTypes(expansion);
           return expansion;
         }
@@ -5386,23 +5387,11 @@ namespace {
       auto macro = cast<MacroDecl>(overload.choice.getDecl());
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
+      E->setType(expandedType);
 
       if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
-        if (macro->getMacroRoles().contains(MacroRole::Expression)) {
-          if (auto newExpr = expandMacroExpr(dc, E, macroRef, expandedType)) {
-            E->setRewritten(newExpr);
-          }
-        }
-        // For a non-expression macro, expand it as a declaration.
-        else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
-                 macro->getMacroRoles().contains(MacroRole::CodeItem)) {
-          if (!E->getSubstituteDecl()) {
-            auto *med = E->createSubstituteDecl();
-            TypeChecker::typeCheckDecl(med);
-          }
-        }
-        // Other macro roles may also be encountered here, as they use
-        // `MacroExpansionExpr` for resolution. In those cases, do not expand.
+        (void)evaluateOrDefault(cs.getASTContext().evaluator,
+                                ExpandMacroExpansionExprRequest{E}, None);
       }
 
       cs.cacheExprTypes(E);
