@@ -406,7 +406,6 @@ private:
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
 
-    // FIXME: Print enum's availability
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
     ClangSyntaxPrinter syntaxPrinter(os);
@@ -2793,12 +2792,43 @@ static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
   return exposedModules.count(mc->getName().str());
 }
 
+static bool isEnumExposableToCxx(const ValueDecl *VD,
+                                 DeclAndTypePrinter &printer) {
+  auto *enumDecl = dyn_cast<EnumDecl>(VD);
+  if (!enumDecl)
+    return true;
+  // The supported set of enum elements is restricted by
+  // the types that can be represented in C++. We already
+  // check for different type categories in `getDeclRepresentation`, however,
+  // we also need to perform additional check on whether the type can be
+  // emitted here as well, to ensure that we don't emit types from dependent
+  // modules that do not have a C++ representation.
+  for (const auto *enumCase : enumDecl->getAllCases()) {
+    for (const auto *elementDecl : enumCase->getElements()) {
+      if (!elementDecl->hasAssociatedValues())
+        continue;
+      if (auto *params = elementDecl->getParameterList()) {
+        for (const auto *param : *params) {
+          auto paramType = param->getInterfaceType();
+          if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                  printer.getTypeMapping(), printer.getInteropContext(),
+                  printer, enumDecl->getModuleContext(), paramType)
+                  .isUnsupported())
+            return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
                     isExposedToThisModule(M, VD, exposedModules) &&
-                    cxx_translation::isExposableToCxx(VD)
+                    cxx_translation::isExposableToCxx(VD) &&
+                    isEnumExposableToCxx(VD, *this)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
          !isAsyncAlternativeOfOtherDecl(VD) &&

@@ -669,6 +669,13 @@ public:
       // Two overloaded functions can have the same name when emitting C++.
       if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs))
         return result;
+      // A function and a global variable can have the same name in C++,
+      // even when the variable might not actually be emitted by the emitter.
+      // In that case, order the function before the variable.
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<VarDecl>(*lhs))
+        return 1;
+      if (isa<AbstractFunctionDecl>(*lhs) && isa<VarDecl>(*rhs))
+        return -1;
 
       // Prefer value decls to extensions.
       assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
