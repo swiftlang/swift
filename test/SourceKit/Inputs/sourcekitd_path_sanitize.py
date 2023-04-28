@@ -40,7 +40,7 @@ RE = re.compile(
 try:
     for line in sys.stdin.readlines():
         # We substitute in both the key and the matched filename.
-        line = re.sub(RE, r'\1\2', line)
+        # line = re.sub(RE, r'\1\2', line)
         sys.stdout.write(line)
 except KeyboardInterrupt:
     sys.stdout.flush()
