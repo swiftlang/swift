@@ -6,7 +6,10 @@
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
 // RUN: %swift-dependency-tool --from-yaml --input-filename=%t/main.swiftdeps.yaml --output-filename=%t/main.swiftdeps
 // RUN: %swift-dependency-tool --from-yaml --input-filename=%t/other.swiftdeps.yaml --output-filename=%t/other.swiftdeps
-// RUN: %swift-dependency-tool --from-yaml --input-filename=%t/yet-another.swiftdeps.yaml --output-filename=%t/yet-another.swiftdeps
+
+// Use this testfile to check if the `swift-frontend -swift-dependency-tool` option works.
+// RUN: %swift_frontend_plain -swift-dependency-tool --from-yaml --input-filename=%t/yet-another.swiftdeps.yaml --output-filename=%t/yet-another.swiftdeps
+
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -driver-show-incremental -output-file-map %t/output.json 2>&1 |%FileCheck %s -check-prefix=MUST-EXEC
