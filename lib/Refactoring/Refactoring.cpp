@@ -8622,11 +8622,9 @@ bool RefactoringActionAddAsyncWrapper::performChange() {
 /// expression.
 static Optional<unsigned> getMacroExpansionBuffer(
     SourceManager &sourceMgr, MacroExpansionExpr *expansion) {
-  if (auto rewritten = expansion->getRewritten()) {
-    return sourceMgr.findBufferContainingLoc(rewritten->getStartLoc());
-  }
-
-  return None;
+  return evaluateOrDefault(
+      expansion->getDeclContext()->getASTContext().evaluator,
+      ExpandMacroExpansionExprRequest{expansion}, {});
 }
 
 /// Retrieve the macro expansion buffer for the given macro expansion
