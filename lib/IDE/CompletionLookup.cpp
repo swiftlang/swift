@@ -2966,7 +2966,8 @@ void CompletionLookup::getGenericRequirementCompletions(
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                              bool IsConcurrencyEnabled,
-                                             Optional<DeclKind> DK) {
+                                             Optional<DeclKind> DK,
+                                             StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
   if (DeclAttribute::isDeclModifier(DAK))
@@ -2979,6 +2980,11 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!DK.has_value())
     return true;
+  // Hide underscored attributes even if they are not marked as user
+  // inaccessible. This can happen for attributes that are an underscored
+  // variant of a user-accessible attribute (like @_backDeployed)
+  if (Name.empty() || Name[0] == '_')
+    return false;
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
@@ -2997,9 +3003,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
   }
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
+#define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
-                            DK))                         \
+  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK,     \
+                            #KEYWORD))                                         \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
 }
