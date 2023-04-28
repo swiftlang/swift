@@ -1311,7 +1311,6 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
 Optional<unsigned> swift::expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 ) {
-  (void)storage->getInterfaceType();
   // Evaluate the macro.
   auto macroSourceFile = evaluateAttachedMacro(macro, storage, attr,
                                                /*passParentContext*/false,
