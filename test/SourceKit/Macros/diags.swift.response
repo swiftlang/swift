@@ -97,20 +97,6 @@
               key.length: 29
             }
           ]
-        },
-        {
-          key.line: 17,
-          key.column: 11,
-          key.filepath: diags.swift,
-          key.severity: source.diagnostic.severity.note,
-          key.id: "in_macro_expansion",
-          key.description: "in expansion of macro 'stringify' here",
-          key.ranges: [
-            {
-              key.offset: 674,
-              key.length: 29
-            }
-          ]
         }
       ]
     },
