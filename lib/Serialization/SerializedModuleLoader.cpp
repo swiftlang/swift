@@ -1171,12 +1171,25 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
   // Cherry-pick supported options from the ignorable list.
   auto IgnFlagRe = llvm::Regex("^// swift-module-flags-ignorable:(.*)$",
                                llvm::Regex::Newline);
-  // It's OK the interface doesn't have the ignorable list, we just ignore them
-  // all.
-  if (!IgnFlagRe.match(buffer, &IgnFlagMatches))
+  auto hasIgnorableFlags = IgnFlagRe.match(buffer, &IgnFlagMatches);
+
+  // Check for ignorable-private flags
+  SmallVector<StringRef, 1> IgnPrivateFlagMatches;
+  auto IgnPrivateFlagRe = llvm::Regex("^// swift-module-flags-ignorable-private:(.*)$",
+                               llvm::Regex::Newline);
+  auto hasIgnorablePrivateFlags = IgnPrivateFlagRe.match(buffer, &IgnPrivateFlagMatches);
+
+  // It's OK the interface doesn't have the ignorable list (private or not), we just
+  // ignore them all.
+  if (!hasIgnorableFlags && !hasIgnorablePrivateFlags)
     return false;
+
   SmallVector<const char *, 8> IgnSubArgs;
-  llvm::cl::TokenizeGNUCommandLine(IgnFlagMatches[1], ArgSaver, IgnSubArgs);
+  if (hasIgnorableFlags)
+    llvm::cl::TokenizeGNUCommandLine(IgnFlagMatches[1], ArgSaver, IgnSubArgs);
+  if (hasIgnorablePrivateFlags)
+    llvm::cl::TokenizeGNUCommandLine(IgnPrivateFlagMatches[1], ArgSaver, IgnSubArgs);
+
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
   unsigned missingArgIdx = 0;
   unsigned missingArgCount = 0;
