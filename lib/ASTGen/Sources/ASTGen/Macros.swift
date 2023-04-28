@@ -566,10 +566,11 @@ func expandFreestandingMacroInProcess(
   }
 
   let macroPtr = macroPtr.bindMemory(to: ExportedMacro.self, capacity: 1)
+  let macro = macroPtr.pointee.macro
 
   let evaluatedSyntax: Syntax
   do {
-    switch macroPtr.pointee.macro {
+    switch macro {
     // Handle expression macro.
     case let exprMacro as ExpressionMacro.Type:
       func expandExpressionMacro<Node: FreestandingMacroExpansionSyntax>(
@@ -630,7 +631,7 @@ func expandFreestandingMacroInProcess(
     return nil
   }
 
-  return evaluatedSyntax.trimmedDescription
+  return evaluatedSyntax.formattedExpansion(macro.formatMode)
 }
 
 /// Retrieve a syntax node in the given source file, with the given type.
@@ -936,7 +937,7 @@ func expandAttachedMacroInProcess(
 
       // Form a buffer of accessor declarations to return to the caller.
       expandedSources = accessors.map {
-        $0.trimmedDescription
+        $0.formattedExpansion(macro.formatMode)
       }
 
     case (let attachedMacro as MemberAttributeMacro.Type, .MemberAttribute):
@@ -970,7 +971,7 @@ func expandAttachedMacroInProcess(
 
       // Form a buffer containing an attribute list to return to the caller.
       expandedSources = attributes.map {
-        $0.trimmedDescription
+        $0.formattedExpansion(macro.formatMode)
       }
 
     case (let attachedMacro as MemberMacro.Type, .Member):
@@ -998,7 +999,7 @@ func expandAttachedMacroInProcess(
 
       // Form a buffer of member declarations to return to the caller.
       expandedSources = members.map {
-        $0.trimmedDescription
+        $0.formattedExpansion(macro.formatMode)
       }
 
     case (let attachedMacro as PeerMacro.Type, .Peer):
@@ -1016,7 +1017,7 @@ func expandAttachedMacroInProcess(
 
       // Form a buffer of peer declarations to return to the caller.
       expandedSources = peers.map {
-        $0.trimmedDescription
+        $0.formattedExpansion(macro.formatMode)
       }
 
     case (let attachedMacro as ConformanceMacro.Type, .Conformance):
@@ -1064,43 +1065,68 @@ func expandAttachedMacroInProcess(
   return expandedSources
 }
 
+fileprivate extension SyntaxProtocol {
+  /// Perform a format if required and then trim any leading/trailing
+  /// whitespace.
+  func formattedExpansion(_ mode: FormatMode) -> String {
+    let formatted: Syntax
+    switch mode {
+    case .auto:
+      formatted = self.formatted()
+    case .disabled:
+      formatted = Syntax(self)
+    }
+    return formatted.trimmedDescription(matching: { $0.isWhitespace })
+  }
+}
+
 fileprivate func collapse<Node: SyntaxProtocol>(
   expansions: [String],
   for role: MacroRole,
   attachedTo declarationNode: Node
 ) -> String {
+  if expansions.isEmpty {
+    return ""
+  }
+
+  var expansions = expansions
   var separator: String = "\n\n"
-  var prefix: String = ""
-  var suffix: String = ""
 
-  switch role {
-  case .Accessor:
-    if let varDecl = declarationNode.as(VariableDeclSyntax.self),
-       let binding = varDecl.bindings.first,
-       binding.accessor == nil {
-      prefix = "{\n"
-      suffix = "\n}"
-    }
-  case .Member:
-    prefix = "\n\n"
-    suffix = "\n"
-  case .MemberAttribute:
+  if role == .Accessor,
+     let varDecl = declarationNode.as(VariableDeclSyntax.self),
+     let binding = varDecl.bindings.first,
+     binding.accessor == nil {
+    let indentation = String(repeating: " ", count: 4)
+
+    expansions = expansions.map({ indent($0, with: indentation) })
+    expansions[0] = "{\n" + expansions[0]
+    expansions[expansions.count - 1] += "\n}"
+  } else if role == .MemberAttribute {
     separator = " "
-    suffix = " "
-  case .Peer:
-    prefix = "\n\n"
-    suffix = "\n"
-  case .Conformance:
-    prefix = "\n\n"
-    suffix = "\n"
-  case .Expression,
-      .FreestandingDeclaration:
-    fatalError("unreachable")
   }
 
-  let separated = expansions.joined(separator: separator)
-  if separated.isEmpty {
-    return separated
+  return expansions.joined(separator: separator)
+}
+
+fileprivate func indent(_ source: String, with indentation: String) -> String {
+  if source.isEmpty || indentation.isEmpty {
+    return source
   }
-  return prefix + separated + suffix
+
+  var indented = ""
+  var remaining = source[...]
+  while let nextNewline = remaining.firstIndex(where: { $0.isNewline }) {
+    if nextNewline != remaining.startIndex {
+      indented += indentation
+    }
+    indented += remaining[...nextNewline]
+    remaining = remaining[remaining.index(after: nextNewline)...]
+  }
+
+  if !remaining.isEmpty {
+    indented += indentation
+    indented += remaining
+  }
+
+  return indented
 }
