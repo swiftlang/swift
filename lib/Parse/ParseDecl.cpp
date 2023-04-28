@@ -4559,6 +4559,17 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
     if (fixityAttrs.empty()) {
       P.diagnose(OD->getOperatorLoc(), diag::operator_decl_no_fixity);
     }
+    for (auto it = Attrs.begin(); it != Attrs.end(); ++it) {
+      if (isFixityAttr(*it) || (*it)->getKind() == DAK_RawDocComment) {
+        continue;
+      }
+      auto *attr = *it;
+      P.diagnose(attr->getLocation(),
+                 diag::operator_decl_should_not_contain_other_attributes,
+                 attr->getAttrName())
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
   }
   // Infix operator is only allowed on operator declarations, not on func.
   else if (isa<FuncDecl>(D)) {
