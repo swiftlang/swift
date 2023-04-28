@@ -75,6 +75,8 @@ public:
         requiresExposedAttribute(requiresExposedAttribute),
         exposedModules(exposedModules), outputLang(outputLang) {}
 
+  PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
+
   SwiftToClangInteropContext &getInteropContext() { return interopContext; }
 
   /// Returns true if \p VD should be included in a compatibility header for
