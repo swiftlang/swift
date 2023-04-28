@@ -2413,9 +2413,9 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       return;
     }
 
-    // If client doesn't need any information, we doesn't need to parse it.
     EditorDoc->resetSyntaxInfo(Snapshot, *this);
 
+    // If client doesn't need any information, we doesn't need to parse it.
     if (!Consumer.documentStructureEnabled() &&
         !Consumer.syntaxMapEnabled() &&
         !Consumer.diagnosticsEnabled()) {
