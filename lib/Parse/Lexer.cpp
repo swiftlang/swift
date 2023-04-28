@@ -2661,8 +2661,16 @@ void Lexer::lexImpl() {
   case 0:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::CodeCompletion:
-      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
-        ;
+      if (CurPtr == BufferEnd + 1) {
+        // This is also the real end of the buffer.
+        // Put CurPtr back into buffer bounds.
+        --CurPtr;
+        // Next time report the EOF at the same position
+        CodeCompletionPtr = nullptr;
+      } else {
+        while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+          ;
+      }
       return formToken(tok::code_complete, TokStart);
 
     case NulCharacterKind::BufferEnd:
