@@ -169,14 +169,23 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
 static void enumerateStoredPropertiesAndMissing(
     NominalTypeDecl *decl,
     IterableDeclContext *implDecl,
-    llvm::function_ref<void(VarDecl *)> addStoredProperty,
+    llvm::function_ref<void(VarDecl *)> _addStoredProperty,
     llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
+  // Add a variable as a stored properties.
+  llvm::SmallSet<VarDecl *, 8> knownStoredProperties;
+  auto addStoredProperty = [&](VarDecl *var) {
+    if (!var->isStatic() && var->hasStorage()) {
+      if (knownStoredProperties.insert(var).second)
+        _addStoredProperty(var);
+    }
+  };
+
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
-  VarDecl *distributedActorId = nullptr;
-  VarDecl *distributedActorSystem = nullptr;
   if (decl->isDistributedActor()) {
+    VarDecl *distributedActorId = nullptr;
+    VarDecl *distributedActorSystem = nullptr;
     ASTContext &ctx = decl->getASTContext();
     for (auto *member : implDecl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
@@ -201,16 +210,13 @@ static void enumerateStoredPropertiesAndMissing(
 
   for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
-      if (!var->isStatic() && var->hasStorage()) {
-        // Skip any properties that we already emitted explicitly
-        if (var == distributedActorId)
-          continue;
-        if (var == distributedActorSystem)
-          continue;
-
-        addStoredProperty(var);
-      }
+      addStoredProperty(var);
     }
+
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
+        addStoredProperty(auxVar);
+    });
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
