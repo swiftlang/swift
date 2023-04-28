@@ -825,15 +825,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
     if (!loadedModuleFile->getModulePackageName().empty()) {
-      if (loadedModuleFile->isBuiltFromInterface() &&
-          loadedModuleFile->getModulePackageName().str() == Ctx.LangOpts.PackageName) {
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::in_package_module_not_compiled_from_source,
-                           M.getBaseIdentifier(),
-                           Ctx.LangOpts.PackageName,
-                           loadedModuleFile->getModuleSourceFilename()
-                           );
-      }
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
