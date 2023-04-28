@@ -1,0 +1,3 @@
+module HeaderWithMacro {
+    header "Header.h"
+}
