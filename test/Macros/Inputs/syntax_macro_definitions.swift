@@ -406,6 +406,29 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
   }
 }
 
+extension PropertyWrapperMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil,
+      let type = binding.typeAnnotation?.type
+    else {
+      return []
+    }
+
+    return [
+      """
+      var _\(raw: identifier.trimmedDescription): MyWrapperThingy<\(type)>
+      """
+    ]
+  }
+}
+
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
