@@ -2257,6 +2257,13 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     }
   }
 
+  if (srcLocator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+    auto *baseExpr = castToExpr<UnresolvedMemberExpr>(srcLocator->getAnchor());
+    ConstraintFix *fix = SpecifyBaseTypeForContextualMember::create(
+        cs, baseExpr->getName(), srcLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
   return None;
 }
 
