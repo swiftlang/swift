@@ -1619,20 +1619,20 @@ public:
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
 
-  /// Retrieve the list of all protocols that this type either inherits from
+  /// Retrieve the list of all protocols this extension either inherits from
   /// (i.e, explicitly conforms to) or is suppressing implicit conformance to.
   ArrayRef<InheritedEntry> getAllInheritedEntries() const { return Inherited; }
 
   void setAllInheritedEntries(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
-  /// Retrieve an iterator range of protocols that this type is suppressing
+  /// Retrieve an iterator range of protocols that this extension is suppressing
   /// implicit conformances to.
   InheritedEntryRange getSuppressed() const {
     return llvm::make_filter_range(getAllInheritedEntries(),
                                    InheritedEntryFilter(/*wantSuppressed*/true));
   }
 
-  /// Retrieve an iterator range of protocols that this type inherits (i.e,
+  /// Retrieve an iterator range of protocols that this extension inherits (i.e,
   /// explicitly conforms to).
   InheritedEntryRange getInherited() const {
     return llvm::make_filter_range(getAllInheritedEntries(),
