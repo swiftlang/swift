@@ -1850,11 +1850,12 @@ void CompletionLookup::addKeyword(StringRef Name, StringRef TypeAnnotation,
 }
 
 void CompletionLookup::addDeclAttrParamKeyword(StringRef Name,
+                                               ArrayRef<StringRef> Parameters,
                                                StringRef Annotation,
                                                bool NeedSpecify) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None);
-  Builder.addDeclAttrParamKeyword(Name, Annotation, NeedSpecify);
+  Builder.addDeclAttrParamKeyword(Name, Parameters, Annotation, NeedSpecify);
 }
 
 void CompletionLookup::addDeclAttrKeyword(StringRef Name,
@@ -3012,23 +3013,27 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(
-    CustomSyntaxAttributeKind AttrKind, int ParamIndex) {
+    CustomSyntaxAttributeKind AttrKind, int ParamIndex, bool HasLabel) {
   switch (AttrKind) {
   case CustomSyntaxAttributeKind::Available:
     if (ParamIndex == 0) {
-      addDeclAttrParamKeyword("*", "Platform", false);
+      addDeclAttrParamKeyword("*", /*Parameters=*/{}, "Platform", false);
 
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  addDeclAttrParamKeyword(swift::platformString(PlatformKind::X), "Platform",  \
-                          false);
+  addDeclAttrParamKeyword(swift::platformString(PlatformKind::X),              \
+                          /*Parameters=*/{}, "Platform", false);
 #include "swift/AST/PlatformKinds.def"
 
     } else {
-      addDeclAttrParamKeyword("unavailable", "", false);
-      addDeclAttrParamKeyword("message", "Specify message", true);
-      addDeclAttrParamKeyword("renamed", "Specify replacing name", true);
-      addDeclAttrParamKeyword("introduced", "Specify version number", true);
-      addDeclAttrParamKeyword("deprecated", "Specify version number", true);
+      addDeclAttrParamKeyword("unavailable", /*Parameters=*/{}, "", false);
+      addDeclAttrParamKeyword("message", /*Parameters=*/{}, "Specify message",
+                              true);
+      addDeclAttrParamKeyword("renamed", /*Parameters=*/{},
+                              "Specify replacing name", true);
+      addDeclAttrParamKeyword("introduced", /*Parameters=*/{},
+                              "Specify version number", true);
+      addDeclAttrParamKeyword("deprecated", /*Parameters=*/{},
+                              "Specify version number", true);
     }
     break;
   case CustomSyntaxAttributeKind::FreestandingMacro:
@@ -3043,12 +3048,27 @@ void CompletionLookup::getAttributeDeclParamCompletions(
           isRoleSupported &= isAttachedMacro(role);
         }
         if (isRoleSupported) {
-          addDeclAttrParamKeyword(getMacroRoleString(role), "", false);
+          addDeclAttrParamKeyword(getMacroRoleString(role), /*Parameters=*/{},
+                                  /*Annotation=*/"", /*NeedsSpecify=*/false);
         }
       }
       break;
     case 1:
-      addDeclAttrParamKeyword("names", "Specify declared names", true);
+      if (HasLabel) {
+        for (auto kind : getAllMacroIntroducedDeclNameKinds()) {
+          auto name = getMacroIntroducedDeclNameString(kind);
+          SmallVector<StringRef, 1> Parameters;
+          if (macroIntroducedNameRequiresArgument(kind)) {
+            Parameters = {"name"};
+          }
+          addDeclAttrParamKeyword(name, Parameters, /*Annotation=*/"",
+                                  /*NeedsSpecify=*/false);
+        }
+      } else {
+        addDeclAttrParamKeyword("names", /*Parameters=*/{},
+                                "Specify declared names",
+                                /*NeedsSpecify=*/true);
+      }
       break;
     }
     break;
@@ -3126,7 +3146,8 @@ void CompletionLookup::getPrecedenceGroupCompletions(
 void CompletionLookup::getPoundAvailablePlatformCompletions() {
 
   // The platform names should be identical to those in @available.
-  getAttributeDeclParamCompletions(CustomSyntaxAttributeKind::Available, 0);
+  getAttributeDeclParamCompletions(CustomSyntaxAttributeKind::Available, 0,
+                                   /*HasLabel=*/false);
 }
 
 void CompletionLookup::getSelfTypeCompletionInDeclContext(

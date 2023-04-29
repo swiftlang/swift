@@ -10137,6 +10137,17 @@ StringRef swift::getMacroRoleString(MacroRole role) {
   }
 }
 
+std::vector<MacroIntroducedDeclNameKind>
+swift::getAllMacroIntroducedDeclNameKinds() {
+  return {
+      MacroIntroducedDeclNameKind::Named,
+      MacroIntroducedDeclNameKind::Overloaded,
+      MacroIntroducedDeclNameKind::Prefixed,
+      MacroIntroducedDeclNameKind::Suffixed,
+      MacroIntroducedDeclNameKind::Arbitrary,
+  };
+}
+
 bool swift::macroIntroducedNameRequiresArgument(
   MacroIntroducedDeclNameKind kind
 ) {
