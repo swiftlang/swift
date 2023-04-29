@@ -193,6 +193,13 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     free(replacements);
   };
 
+  if (checkResult < 0 && ctx.CompletionCallback) {
+    // If the macro failed to check and we are in code completion mode, pretend
+    // it's an arbitrary macro. This allows us to get call argument completions
+    // inside `#externalMacro`.
+    checkResult = BridgedMacroDefinitionKind::BridgedExpandedMacro;
+  }
+
   if (checkResult < 0)
     return MacroDefinition::forInvalid();
 
