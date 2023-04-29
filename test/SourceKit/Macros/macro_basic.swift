@@ -277,4 +277,4 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 
 //##-- Expansion on "fails to typecheck" macro expression
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=61:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ERRONEOUS_EXPAND %s
-// ERRONEOUS_EXPAND: 61:1-61:18 (@__swiftmacro_9MacroUser6assertfMf_.swift) "assert("foobar")"
+// ERRONEOUS_EXPAND: 61:1-61:18 (@__swiftmacro_{{.+}}.swift) "assert("foobar")"
