@@ -127,6 +127,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
+  bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
@@ -270,7 +271,8 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
-  void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index) override;
+  void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+                             bool HasLabel) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
       CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
@@ -457,10 +459,11 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
 }
 
 void CodeCompletionCallbacksImpl::completeDeclAttrParam(
-    CustomSyntaxAttributeKind DK, int Index) {
+    CustomSyntaxAttributeKind DK, int Index, bool HasLabel) {
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
+  AttrParamHasLabel = HasLabel;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -1844,7 +1847,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
   case CompletionKind::AttributeDeclParen: {
-    Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex);
+    Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex,
+                                            AttrParamHasLabel);
     break;
   }
   case CompletionKind::PoundAvailablePlatform: {
