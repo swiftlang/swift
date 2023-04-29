@@ -58,7 +58,12 @@ enum class MacroRole: uint32_t {
   /// A freestanding macro that expands to expressions, statements and
   /// declarations in a code block.
   CodeItem = 0x80,
+
+  // NOTE: When adding a new macro role, also add it to `getAllMacroRoles`.
 };
+
+/// Returns an enumeratable list of all macro roles.
+std::vector<MacroRole> getAllMacroRoles();
 
 /// The contexts in which a particular macro declaration can be used.
 using MacroRoles = OptionSet<MacroRole>;
@@ -82,6 +87,9 @@ MacroRoles getFreestandingMacroRoles();
 bool isAttachedMacro(MacroRoles contexts);
 
 MacroRoles getAttachedMacroRoles();
+
+/// Checks if the macro is supported or guarded behind an experimental flag.
+bool isMacroSupported(MacroRole role, ASTContext &ctx);
 
 enum class MacroIntroducedDeclNameKind {
   Named,

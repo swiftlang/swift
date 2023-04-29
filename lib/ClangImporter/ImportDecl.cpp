@@ -7693,9 +7693,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       } else {
         SourceLoc staticLoc;
         StaticSpellingKind staticSpelling;
-        hadError = parser.parseDeclModifierList(
-            MappedDecl->getAttrs(), staticLoc, staticSpelling,
-            /*isFromClangAttribute=*/true);
+        hadError = parser
+                       .parseDeclModifierList(MappedDecl->getAttrs(), staticLoc,
+                                              staticSpelling,
+                                              /*isFromClangAttribute=*/true)
+                       .isError();
       }
 
       if (hadError) {
