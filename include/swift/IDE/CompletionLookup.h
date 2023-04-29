@@ -581,11 +581,12 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    Optional<DeclKind> DK);
+                                    Optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex);
+  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+                                        int ParamIndex);
 
   void getTypeAttributeKeywordCompletions();
 

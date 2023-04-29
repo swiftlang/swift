@@ -3126,6 +3126,36 @@ namespace {
       if (decl->isDeleted())
         return nullptr;
 
+      if (Impl.SwiftContext.LangOpts.EnableCXXInterop &&
+          !isa<clang::CXXMethodDecl>(decl)) {
+        // Do not import math functions from the C++ standard library, as
+        // they're also imported from the Darwin/Glibc module, and their
+        // presence in the C++ standard library will cause overloading
+        // ambiguities or other type checking errors in Swift.
+        auto isAlternativeCStdlibFunctionFromTextualHeader =
+            [](const clang::FunctionDecl *d) -> bool {
+          // stdlib.h might be a textual header in libc++'s module map.
+          // in this case, check for known ambiguous functions by their name
+          // instead of checking if they come from the `std` module.
+          if (!d->getDeclName().isIdentifier())
+            return false;
+          return d->getName() == "abs" || d->getName() == "div";
+        };
+        if (decl->getOwningModule() &&
+            (decl->getOwningModule()
+                     ->getTopLevelModule()
+                     ->getFullModuleName() == "std" ||
+             isAlternativeCStdlibFunctionFromTextualHeader(decl))) {
+          auto filename =
+              Impl.getClangPreprocessor().getSourceManager().getFilename(
+                  decl->getLocation());
+          if (filename.endswith("cmath") || filename.endswith("math.h") ||
+              filename.endswith("stdlib.h") || filename.endswith("cstdlib")) {
+            return nullptr;
+          }
+        }
+      }
+
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
@@ -7663,9 +7693,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       } else {
         SourceLoc staticLoc;
         StaticSpellingKind staticSpelling;
-        hadError = parser.parseDeclModifierList(
-            MappedDecl->getAttrs(), staticLoc, staticSpelling,
-            /*isFromClangAttribute=*/true);
+        hadError = parser
+                       .parseDeclModifierList(MappedDecl->getAttrs(), staticLoc,
+                                              staticSpelling,
+                                              /*isFromClangAttribute=*/true)
+                       .isError();
       }
 
       if (hadError) {

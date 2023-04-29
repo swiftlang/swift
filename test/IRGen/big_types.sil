@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -loadable-address -enable-sil-verify-all %s | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 
 sil_stage canonical
@@ -19,8 +19,23 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
+public struct ContainsClosure {
+  let c: () -> BigStruct
+}
+
 sil @make_big_struct : $@convention(thin) () -> BigStruct
 sil @use_big_struct : $@convention(thin) (BigStruct) -> ()
+
+// CHECK-LABEL: sil_global @globalWithClosureInStruct : $ContainsClosure = {
+// CHECK:         %0 = function_ref @make_big_struct : $@convention(thin) () -> @out BigStruct
+// CHECK-NEXT:    %1 = thin_to_thick_function %0 : $@convention(thin) () -> @out BigStruct to $@callee_guaranteed () -> @out BigStruct
+// CHECK-NEXT:    %initval = struct $ContainsClosure (%1 : $@callee_guaranteed () -> @out BigStruct)
+// CHECK-NEXT:  } 
+sil_global @globalWithClosureInStruct : $ContainsClosure = {
+  %0 = function_ref @make_big_struct : $@convention(thin) () -> BigStruct
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> BigStruct to $@callee_guaranteed () -> BigStruct
+  %initval = struct $ContainsClosure (%1 : $@callee_guaranteed () -> BigStruct)
+}
 
 // CHECK-LABEL: sil @test_yield_big : $@yield_once @convention(thin) () -> @yields @in BigStruct {
 // CHECK:       bb0:

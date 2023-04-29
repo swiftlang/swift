@@ -2764,9 +2764,9 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   return true;
 }
 
-void swift::diagnoseUnavailableOverride(ValueDecl *override,
-                                        const ValueDecl *base,
-                                        const AvailableAttr *attr) {
+void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
+                                              const ValueDecl *base,
+                                              const AvailableAttr *attr) {
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
   if (attr->Rename.empty()) {

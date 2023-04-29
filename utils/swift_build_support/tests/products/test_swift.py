@@ -55,6 +55,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_stdlibcore_exclusivity_checking=False,
             enable_experimental_differentiable_programming=False,
             enable_experimental_concurrency=False,
+            enable_experimental_cxx_interop=False,
             enable_experimental_distributed=False,
             enable_experimental_observation=False,
             swift_enable_backtracing=False,
@@ -96,6 +97,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
@@ -121,6 +123,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
@@ -354,6 +357,18 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY' in x])
+
+    def test_experimental_cxx_interop_flags(self):
+        self.args.enable_experimental_cxx_interop = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=TRUE'],
+            [option for option in swift.cmake_options
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP' in option])
 
     def test_experimental_distributed_flags(self):
         self.args.enable_experimental_distributed = True

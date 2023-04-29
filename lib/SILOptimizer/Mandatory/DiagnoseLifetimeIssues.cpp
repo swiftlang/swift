@@ -66,7 +66,7 @@ class DiagnoseLifetimeIssues {
   SILFunction *function = nullptr;
 
   /// The liveness of the object in question, computed in visitUses.
-  SSAPrunedLiveness liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   /// All weak stores of the object, which are found in visitUses.
   llvm::SmallVector<SILInstruction *, 8> weakStores;
@@ -86,8 +86,7 @@ class DiagnoseLifetimeIssues {
   void reportDeadStore(SILInstruction *allocationInst);
 
 public:
-  DiagnoseLifetimeIssues(SILFunction *function)
-    : function(function), liveness(function) {}
+  DiagnoseLifetimeIssues(SILFunction *function) : function(function) {}
 
   void diagnose();
 };
@@ -215,7 +214,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
         if (updateLivenessAndWeakStores)
-          liveness.updateForUse(user, /*lifetimeEnding*/ false);
+          liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
@@ -241,9 +240,9 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           return CanEscape;
         break;
       case OperandOwnership::Borrow: {
-        if (updateLivenessAndWeakStores
-            && (liveness.updateForBorrowingOperand(use)
-                != InnerBorrowKind::Contained)) {
+        if (updateLivenessAndWeakStores &&
+            (liveness->updateForBorrowingOperand(use) !=
+             InnerBorrowKind::Contained)) {
           return CanEscape;
         }
         BorrowingOperand borrowOper(use);
@@ -326,11 +325,12 @@ static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
 /// Reports a warning if the stored object \p storedObj is never loaded within
 /// the lifetime of the stored object.
 void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
-  liveness.invalidate();
+  BitfieldRef<SSAPrunedLiveness>::StackState livenessBitfieldContainer(
+      liveness, allocationInst->getFunction());
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
-  liveness.initializeDef(storedDef);
+  liveness->initializeDef(storedDef);
 
   // Compute the canonical lifetime of storedDef, like the copy-propagation pass
   // would do.
@@ -346,7 +346,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
   assert((state == IsStoredWeakly) == !weakStores.empty());
 
   for (SILInstruction *storeInst : weakStores) {
-    if (isOutOfLifetime(storeInst, liveness)) {
+    if (isOutOfLifetime(storeInst, *liveness)) {
       // Issue the warning.
       storeInst->getModule().getASTContext().Diags.diagnose(
         storeInst->getLoc().getSourceLoc(), diag::warn_dead_weak_store);

@@ -456,6 +456,35 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   return result;
 }
 
+Optional<unsigned>
+ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
+                                          MacroExpansionExpr *mee) const {
+  ConcreteDeclRef macroRef = mee->getMacroRef();
+  assert(macroRef && isa<MacroDecl>(macroRef.getDecl()) &&
+         "MacroRef should be set before expansion");
+
+  auto *macro = cast<MacroDecl>(macroRef.getDecl());
+  if (macro->getMacroRoles().contains(MacroRole::Expression)) {
+    return expandMacroExpr(mee);
+  }
+  // For a non-expression macro, expand it as a declaration.
+  else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
+           macro->getMacroRoles().contains(MacroRole::CodeItem)) {
+    if (!mee->getSubstituteDecl()) {
+      auto *med = mee->createSubstituteDecl();
+      TypeChecker::typeCheckDecl(med);
+    }
+    // Return the expanded buffer ID.
+    return evaluateOrDefault(
+        evaluator, ExpandMacroExpansionDeclRequest(mee->getSubstituteDecl()),
+        None);
+  }
+
+  // Other macro roles may also be encountered here, as they use
+  // `MacroExpansionExpr` for resolution. In those cases, do not expand.
+  return None;
+}
+
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                                          Decl *decl) const {
   if (decl->isImplicit())
@@ -666,22 +695,24 @@ static std::string expandMacroDefinition(
   return expandedResult;
 }
 
-Expr *swift::expandMacroExpr(
-    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
-) {
+Optional<unsigned>
+swift::expandMacroExpr(MacroExpansionExpr *mee) {
+  DeclContext *dc = mee->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
+  ConcreteDeclRef macroRef = mee->getMacroRef();
+  Type expandedType = mee->getType();
 
   auto moduleDecl = dc->getParentModule();
-  auto sourceFile = moduleDecl->getSourceFileContainingLocation(expr->getLoc());
+  auto sourceFile = moduleDecl->getSourceFileContainingLocation(mee->getLoc());
   if (!sourceFile)
-    return nullptr;
+    return None;
 
   MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
 
   if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression)) {
-    ctx.Diags.diagnose(expr->getLoc(), diag::macro_recursive, macro->getName());
-    return nullptr;
+    ctx.Diags.diagnose(mee->getLoc(), diag::macro_recursive, macro->getName());
+    return None;
   }
 
   // Evaluate the macro.
@@ -690,12 +721,11 @@ Expr *swift::expandMacroExpr(
   /// The discriminator used for the macro.
   LazyValue<std::string> discriminator([&]() -> std::string {
 #if SWIFT_SWIFT_PARSER
-    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
-      Mangle::ASTMangler mangler;
-      return mangler.mangleMacroExpansion(expansionExpr);
-    }
-#endif
+    Mangle::ASTMangler mangler;
+    return mangler.mangleMacroExpansion(mee);
+#else
     return "";
+#endif
   });
 
   auto macroDef = macro->getDefinition();
@@ -703,21 +733,21 @@ Expr *swift::expandMacroExpr(
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
-    return nullptr;
+    return None;
 
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
       ctx.Diags.diagnose(
-          expr->getLoc(), diag::external_macro_outside_macro_definition);
-      return nullptr;
+          mee->getLoc(), diag::external_macro_outside_macro_definition);
+      return None;
     }
   }
 
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
-        macroDef.getExpanded(), macro, expr->getArgs());
+        macroDef.getExpanded(), macro, mee->getArgs());
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
     break;
@@ -732,22 +762,22 @@ Expr *swift::expandMacroExpr(
     auto externalDef = evaluateOrDefault(ctx.evaluator, request, None);
     if (!externalDef) {
       ctx.Diags.diagnose(
-          expr->getLoc(), diag::external_macro_not_found,
+          mee->getLoc(), diag::external_macro_not_found,
           external.moduleName.str(),
           external.macroTypeName.str(),
           macro->getName()
       );
       macro->diagnose(diag::decl_declared_here, macro->getName());
-      return nullptr;
+      return None;
     }
 
 #if SWIFT_SWIFT_PARSER
-    PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
+    PrettyStackTraceExpr debugStack(ctx, "expanding macro", mee);
 
     // Builtin macros are handled via ASTGen.
     auto astGenSourceFile = sourceFile->exportedSourceFile;
     if (!astGenSourceFile)
-      return nullptr;
+      return None;
 
     const char *evaluatedSourceAddress;
     ptrdiff_t evaluatedSourceLength;
@@ -755,18 +785,18 @@ Expr *swift::expandMacroExpr(
         &ctx.Diags, externalDef->opaqueHandle,
         static_cast<uint32_t>(externalDef->kind), discriminator->data(),
         discriminator->size(), astGenSourceFile,
-        expr->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
+        mee->getStartLoc().getOpaquePointerValue(), &evaluatedSourceAddress,
         &evaluatedSourceLength);
     if (!evaluatedSourceAddress)
-      return nullptr;
+      return None;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
         adjustMacroExpansionBufferName(*discriminator));
     free((void *)evaluatedSourceAddress);
     break;
 #else
-    ctx.Diags.diagnose(expr->getLoc(), diag::macro_unsupported);
-    return nullptr;
+    ctx.Diags.diagnose(mee->getLoc(), diag::macro_unsupported);
+    return None;
 #endif
   }
   }
@@ -787,9 +817,9 @@ Expr *swift::expandMacroExpr(
   GeneratedSourceInfo sourceInfo{
     GeneratedSourceInfo::ExpressionMacroExpansion,
     Lexer::getCharSourceRangeFromSourceRange(
-      sourceMgr, expr->getSourceRange()),
+      sourceMgr, mee->getSourceRange()),
     macroBufferRange,
-    ASTNode(expr).getOpaqueValue(),
+    ASTNode(mee).getOpaqueValue(),
     dc
   };
   sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
@@ -807,7 +837,7 @@ Expr *swift::expandMacroExpr(
   if (topLevelItems.size() != 1) {
     ctx.Diags.diagnose(
         macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
-    return nullptr;
+    return macroBufferID;
   }
 
   auto codeItem = topLevelItems.front();
@@ -817,7 +847,7 @@ Expr *swift::expandMacroExpr(
   if (!expandedExpr) {
     ctx.Diags.diagnose(
         macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
-    return nullptr;
+    return macroBufferID;
   }
 
   // Type-check the expanded expression.
@@ -834,12 +864,15 @@ Expr *swift::expandMacroExpr(
   Type realExpandedType = TypeChecker::typeCheckExpression(
       expandedExpr, dc, contextualType);
   if (!realExpandedType)
-    return nullptr;
+    return macroBufferID;
 
   assert((expandedType->isEqual(realExpandedType) ||
           realExpandedType->hasError()) &&
          "Type checking changed the result type?");
-  return expandedExpr;
+
+  mee->setRewritten(expandedExpr);
+
+  return macroBufferID;
 }
 
 /// Expands the given macro expansion declaration.
@@ -1303,7 +1336,6 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
 Optional<unsigned> swift::expandAccessors(
     AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
 ) {
-  (void)storage->getInterfaceType();
   // Evaluate the macro.
   auto macroSourceFile = evaluateAttachedMacro(macro, storage, attr,
                                                /*passParentContext*/false,
@@ -1325,12 +1357,12 @@ Optional<unsigned> swift::expandAccessors(
     if (accessor->isObservingAccessor())
       continue;
 
-    // If any non-observing accessor was added, remove the initializer if
-    // there is one.
+    // If any non-observing accessor was added, mark the initializer as
+    // subsumed.
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (auto binding = var->getParentPatternBinding()) {
         unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-        binding->setInit(index, nullptr);
+        binding->setInitializerSubsumed(index);
         break;
       }
     }

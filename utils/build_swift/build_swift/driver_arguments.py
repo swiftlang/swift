@@ -1321,9 +1321,12 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift differentiable programming.')
 
-    option('--enable-experimental-concurrency', toggle_true,
-           default=True,
+    option('--enable-experimental-concurrency', toggle_true, default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-cxx-interop', toggle_true,
+           default=True,
+           help='Enable experimental C++ interop.')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,

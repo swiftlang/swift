@@ -208,6 +208,15 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
   return false;
 }
 
+static llvm::SmallVector<const char *, 32> eraseFirstArg(ArrayRef<const char *> argv){
+  llvm::SmallVector<const char *, 32> newArgv;
+  newArgv.push_back(argv[0]);
+  for (const char *arg : argv.slice(2)) {
+    newArgv.push_back(arg);
+  }
+  return newArgv;
+}
+
 static int run_driver(StringRef ExecName,
                        ArrayRef<const char *> argv,
                        const ArrayRef<const char *> originalArgv) {
@@ -231,6 +240,34 @@ static int run_driver(StringRef ExecName,
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-sil-opt") {
+      return sil_opt_main(eraseFirstArg(argv),
+                          (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-sil-func-extractor") {
+      return sil_func_extractor_main(eraseFirstArg(argv),
+                                     (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-sil-nm") {
+      return sil_nm_main(eraseFirstArg(argv),
+                         (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-sil-llvm-gen") {
+      return sil_llvm_gen_main(eraseFirstArg(argv),
+                               (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-sil-passpipeline-dumper") {
+      return sil_passpipeline_dumper_main(eraseFirstArg(argv),
+                                          (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-swift-dependency-tool") {
+      return swift_dependency_tool_main(eraseFirstArg(argv),
+                                        (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-swift-llvm-opt") {
+      return swift_llvm_opt_main(eraseFirstArg(argv),
+                                 (void *)(intptr_t)getExecutablePath);
     }
 
     // Run the integrated Swift frontend when called as "swift-frontend" but

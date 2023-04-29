@@ -3845,6 +3845,8 @@ std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC
 ) {
+  origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
+
   if (loc.isInvalid())
     return appendContext(origDC, StringRef());
 
@@ -3992,10 +3994,41 @@ void ASTMangler::appendMacroExpansionOperator(
   }
 }
 
+static StringRef getPrivateDiscriminatorIfNecessary(
+      const MacroExpansionExpr *expansion) {
+  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
+      expansion->getDeclContext());
+  auto decl = dc->getAsDecl();
+  if (decl && !decl->isOutermostPrivateOrFilePrivateScope())
+    return StringRef();
+
+  // Mangle non-local private declarations with a textual discriminator
+  // based on their enclosing file.
+  auto topLevelSubcontext = dc->getModuleScopeContext();
+  SourceFile *sf = dyn_cast<SourceFile>(topLevelSubcontext);
+  if (!sf)
+    return StringRef();
+
+  Identifier discriminator =
+      sf->getPrivateDiscriminator(/*createIfMissing=*/true);
+  assert(!discriminator.empty());
+  assert(!isNonAscii(discriminator.str()) &&
+         "discriminator contains non-ASCII characters");
+  (void)&isNonAscii;
+  assert(!clang::isDigit(discriminator.str().front()) &&
+         "not a valid identifier");
+  return discriminator.str();
+}
+
 std::string ASTMangler::mangleMacroExpansion(
     const MacroExpansionExpr *expansion) {
   beginMangling();
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
   appendMacroExpansionOperator(
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Expression,

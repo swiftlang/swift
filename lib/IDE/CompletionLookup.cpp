@@ -2966,7 +2966,8 @@ void CompletionLookup::getGenericRequirementCompletions(
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                              bool IsConcurrencyEnabled,
-                                             Optional<DeclKind> DK) {
+                                             Optional<DeclKind> DK,
+                                             StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
   if (DeclAttribute::isDeclModifier(DAK))
@@ -2979,6 +2980,11 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!DK.has_value())
     return true;
+  // Hide underscored attributes even if they are not marked as user
+  // inaccessible. This can happen for attributes that are an underscored
+  // variant of a user-accessible attribute (like @_backDeployed)
+  if (Name.empty() || Name[0] == '_')
+    return false;
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
@@ -2997,16 +3003,18 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
   }
   bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
+#define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled,         \
-                            DK))                         \
+  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK,     \
+                            #KEYWORD))                                         \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
 }
 
-void CompletionLookup::getAttributeDeclParamCompletions(DeclAttrKind AttrKind,
-                                                        int ParamIndex) {
-  if (AttrKind == DAK_Available) {
+void CompletionLookup::getAttributeDeclParamCompletions(
+    CustomSyntaxAttributeKind AttrKind, int ParamIndex) {
+  switch (AttrKind) {
+  case CustomSyntaxAttributeKind::Available:
     if (ParamIndex == 0) {
       addDeclAttrParamKeyword("*", "Platform", false);
 
@@ -3022,6 +3030,28 @@ void CompletionLookup::getAttributeDeclParamCompletions(DeclAttrKind AttrKind,
       addDeclAttrParamKeyword("introduced", "Specify version number", true);
       addDeclAttrParamKeyword("deprecated", "Specify version number", true);
     }
+    break;
+  case CustomSyntaxAttributeKind::FreestandingMacro:
+  case CustomSyntaxAttributeKind::AttachedMacro:
+    switch (ParamIndex) {
+    case 0:
+      for (auto role : getAllMacroRoles()) {
+        bool isRoleSupported = isMacroSupported(role, Ctx);
+        if (AttrKind == CustomSyntaxAttributeKind::FreestandingMacro) {
+          isRoleSupported &= isFreestandingMacro(role);
+        } else if (AttrKind == CustomSyntaxAttributeKind::AttachedMacro) {
+          isRoleSupported &= isAttachedMacro(role);
+        }
+        if (isRoleSupported) {
+          addDeclAttrParamKeyword(getMacroRoleString(role), "", false);
+        }
+      }
+      break;
+    case 1:
+      addDeclAttrParamKeyword("names", "Specify declared names", true);
+      break;
+    }
+    break;
   }
 }
 
@@ -3096,7 +3126,7 @@ void CompletionLookup::getPrecedenceGroupCompletions(
 void CompletionLookup::getPoundAvailablePlatformCompletions() {
 
   // The platform names should be identical to those in @available.
-  getAttributeDeclParamCompletions(DAK_Available, 0);
+  getAttributeDeclParamCompletions(CustomSyntaxAttributeKind::Available, 0);
 }
 
 void CompletionLookup::getSelfTypeCompletionInDeclContext(

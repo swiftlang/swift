@@ -249,9 +249,11 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
             return {Unsupported, UnrepresentableEnumCaseTuple};
           for (const auto *param : *params) {
             auto paramType = param->getInterfaceType();
-            if (!paramType->is<GenericTypeParamType>() &&
-                !paramType->getNominalOrBoundGenericNominal())
-              return {Unsupported, UnrepresentableEnumCaseType};
+            if (!paramType->is<GenericTypeParamType>()) {
+              auto *nominal = paramType->getNominalOrBoundGenericNominal();
+              if (!nominal || isa<ProtocolDecl>(nominal))
+                return {Unsupported, UnrepresentableEnumCaseType};
+            }
           }
         }
       }

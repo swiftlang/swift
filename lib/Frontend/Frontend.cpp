@@ -1249,8 +1249,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
           Invocation.getFrontendOptions().ModuleABIName));
     }
     if (!Invocation.getLangOptions().PackageName.empty()) {
-      MainModule->setPackageName(getASTContext().getIdentifier(
-          Invocation.getLangOptions().PackageName));
+      auto pkgName = Invocation.getLangOptions().PackageName;
+      MainModule->setPackageName(getASTContext().getIdentifier(pkgName));
     }
     if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
       MainModule->setExportAsName(getASTContext().getIdentifier(

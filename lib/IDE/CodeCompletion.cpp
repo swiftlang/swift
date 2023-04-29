@@ -113,7 +113,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   SourceLoc DotLoc;
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
-  DeclAttrKind AttrKind;
+  CustomSyntaxAttributeKind AttrKind;
 
   /// When the code completion token occurs in a custom attribute, the attribute
   /// it occurs in. Used so we can complete inside the attribute even if it's
@@ -270,7 +270,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
-  void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
       CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
@@ -456,8 +456,8 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
-                                                        int Index) {
+void CodeCompletionCallbacksImpl::completeDeclAttrParam(
+    CustomSyntaxAttributeKind DK, int Index) {
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
