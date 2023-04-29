@@ -30,7 +30,7 @@ class D3 : Any, A { } // expected-error{{superclass 'A' must appear first in the
 class D4 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}
 
 // Struct inheriting a class
-struct S : A { } // expected-error{{ 'A'}}
+struct S : A { } // expected-error{{class can only inherit from protocol in extension declaration 'A'}}
 
 // Protocol inheriting a class
 protocol Q : A { }
