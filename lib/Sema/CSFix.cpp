@@ -1934,18 +1934,10 @@ bool AllowNonClassTypeToConvertToAnyObject::diagnose(const Solution &solution,
                                                      bool asNote) const {
   auto *locator = getLocator();
 
-  if (locator->isForContextualType()) {
-    ContextualFailure failure(solution, getFromType(), getToType(), locator);
-    return failure.diagnose(asNote);
-  }
+  NonClassTypeToAnyObjectConversionFailure failure(solution, getFromType(),
+                                                   getToType(), locator);
 
-  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
-                                    locator);
-    return failure.diagnose(asNote);
-  }
-
-  return false;
+  return failure.diagnose(asNote);
 }
 
 AllowNonClassTypeToConvertToAnyObject *
