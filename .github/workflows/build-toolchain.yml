@@ -117,7 +117,7 @@ jobs:
       - name: Prepare sccache timestamp
         id: cache_key
         run: |
-          echo "SCCACHE_KEY=${{ matrix.target }}-sccache-v13-$(date +'%Y-%m-%d-%I-%M-%S')" >> $GITHUB_OUTPUT
+          echo "SCCACHE_KEY=${{ matrix.target }}-${{ env.TOOLCHAIN_CHANNEL }}-sccache-v13-$(date +'%Y-%m-%d-%I-%M-%S')" >> $GITHUB_OUTPUT
 
       - name: Check Xcode version
         if: ${{ startsWith(matrix.build_os, 'macos-') }}
