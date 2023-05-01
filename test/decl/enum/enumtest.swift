@@ -446,7 +446,7 @@ class C {}
 protocol P {}
 
 enum E : C & P {}
-// expected-error@-1 {{Cannot inherit from class-constrained protocol composition type 'C & P'}}
+// expected-error@-1 {{cannot inherit from class-constrained protocol composition type 'C & P'}}
 
 // https://github.com/apple/swift/issues/53923
 
