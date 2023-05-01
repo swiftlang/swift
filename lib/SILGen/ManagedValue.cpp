@@ -293,17 +293,18 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
   if (isa<SILUndef>(getValue()))
     return true;
 
-  // Ignore trivial values since for our purposes they are always at +1 since
-  // they can always be passed to +1 APIs.
-  if (getType().isTrivial(SGF.F))
-    return true;
-
-  // If we have an object and the object has any ownership, the same
-  // property applies.
+  // A value without ownership can always be passed to +1 APIs.
+  //
+  // This is not true for address types because deinitializing an in-memory
+  // value invalidates the storage.
   if (getType().isObject() && getOwnershipKind() == OwnershipKind::None)
     return true;
 
   return hasCleanup();
+}
+
+bool ManagedValue::isPlusOneOrTrivial(SILGenFunction &SGF) const {
+  return getType().isTrivial(SGF.F) || isPlusOne(SGF);
 }
 
 bool ManagedValue::isPlusZero() const {
