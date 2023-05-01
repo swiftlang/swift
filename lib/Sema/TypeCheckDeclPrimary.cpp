@@ -2754,10 +2754,14 @@ public:
   /// check to see if a move-only type can ever conform to the given type.
   /// \returns true iff a diagnostic was emitted because it was not compatible
   static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
-                                                 NominalTypeDecl *moveonlyType,
-                                                 Type type) {
+                                                   NominalTypeDecl *moveonlyType,
+                                                   Type type) {
     assert(type && "got an empty type?");
     assert(moveonlyType->isMoveOnly());
+
+    // no need to emit a diagnostic if the type itself is already problematic.
+    if (type->hasError())
+      return false;
 
     auto canType = type->getCanonicalType();
     if (auto prot = canType->getAs<ProtocolType>()) {
