@@ -362,7 +362,7 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
-                               llvm::Twine("\01l_OBJC_LABEL_PROTOCOL_$_")
+                               llvm::Twine("_OBJC_LABEL_PROTOCOL_$_")
                                  + protocolName);
   protocolLabel->setAlignment(
       llvm::MaybeAlign(getPointerAlignment().getValue()));
