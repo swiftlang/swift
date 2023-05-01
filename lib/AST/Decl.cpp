@@ -10529,6 +10529,9 @@ DeclContext *
 MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::SubscriptDecl:
+    // For a subscript, return its parent context.
+    return getInnermostMacroContext(dc->getParent());
+
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SerializedLocal:
