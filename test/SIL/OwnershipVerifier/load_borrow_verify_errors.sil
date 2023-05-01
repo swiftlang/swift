@@ -100,3 +100,15 @@ bb0(%0 : $*MyArray<MyStruct>):
   return %t : $()
 }
 
+// CHECK: Found load_borrow invalidated by local write in function:
+// CHECK: sil [ossa] @test_verbose_error : $@convention(thin) (Builtin.Int32, @in Klass) -> () {
+sil [ossa] @test_verbose_error : $@convention(thin) (Builtin.Int32, @in Klass) -> () {
+entry(%int : $Builtin.Int32, %addr : $*Klass):
+  %val = load_borrow %addr : $*Klass
+  %val2 = load [take] %addr : $*Klass
+  store %val2 to [init] %addr : $*Klass
+  end_borrow %val : $Klass
+  destroy_addr %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}

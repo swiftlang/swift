@@ -2293,7 +2293,13 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
+    auto immutable = loadBorrowImmutabilityAnalysis.isImmutable(LBI);
+    if (!immutable) {
+      llvm::errs()
+          << "Found load_borrow invalidated by local write in function:\n";
+      F.dump();
+    }
+    require(immutable,
             "Found load borrow that is invalidated by a local write?!");
   }
 
