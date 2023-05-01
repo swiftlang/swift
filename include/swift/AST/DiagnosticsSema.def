@@ -3056,7 +3056,7 @@ ERROR(duplicate_inheritance,none,
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
-  "Cannot inherit from class-constrained protocol composition type %0", (Type))
+  "cannot inherit from class-constrained protocol composition type %0", (Type))
 WARNING(anyobject_class_inheritance_deprecated,Deprecation,
   "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
