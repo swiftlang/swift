@@ -1195,9 +1195,18 @@ public:
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
+
+  /// Parse an inheritance clause into a vector of InheritedEntry's.
+  ///
+  /// \param allowClassRequirement whether to permit parsing of 'class'
+  /// \param allowAnyObject whether to permit parsing of 'AnyObject'
+  /// \param parseTildeCopyable if non-null, permits parsing of `~Copyable`
+  ///   and writes out a valid source location if it was parsed. If null, then a
+  ///   parsing error will be emitted upon the appearance of `~` in the clause.
   ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
                                 bool allowClassRequirement,
-                                bool allowAnyObject);
+                                bool allowAnyObject,
+                                SourceLoc *parseTildeCopyable = nullptr);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
