@@ -61,7 +61,7 @@ public let benchmarks = [
       }}, tags: t, setUpFunction: { blackHole(c) }),
   BenchmarkInfo(name: "Sequence.reversed.Range", runFunction: { for _ in 0..<$0 {
       benchmarkReversed(s: r, n: r.count)
-    }}, tags: t, legacyFactor: 10),
+      }}, tags: t),
   BenchmarkInfo(name: "Sequence.reversed.UnfoldSequence",
     runFunction: { for _ in 0..<$0 {
         benchmarkReversed(s: s, n: n)
