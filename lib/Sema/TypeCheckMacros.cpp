@@ -1144,7 +1144,6 @@ evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo, CustomAttr *attr,
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
         macroDef.getExpanded(), macro, attr->getArgs());
-    llvm::MallocAllocator allocator;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
     break;
