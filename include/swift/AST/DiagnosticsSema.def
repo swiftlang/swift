@@ -1382,7 +1382,7 @@ ERROR(member_shadows_global_function,none,
       (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(instance_member_use_on_type,none,
-      "instance member %1 cannot be used on type %0; "
+      "instance member %1 cannot be called from static context type %0; "
       "did you mean to use a value of this type instead?", (Type, DeclNameRef))
 ERROR(instance_member_in_initializer,none,
       "cannot use instance member %0 within property initializer; "
