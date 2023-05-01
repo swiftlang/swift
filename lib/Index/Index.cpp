@@ -880,8 +880,9 @@ private:
       }
     } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
       TypeLoc TL(TAD->getUnderlyingTypeRepr(), TAD->getUnderlyingType());
-      if (!reportRelatedTypeRef(TL, (SymbolRoleSet)SymbolRole::Reference, D, /*isImplicit=*/true, Loc))
-        return false;
+      if (CurrentBufferContainsLoc(TL.getLoc()))
+        if (!reportRelatedTypeRef(TL, (SymbolRoleSet)SymbolRole::Reference, D, /*isImplicit=*/true, Loc))
+          return false;
     }
 
     return true;
@@ -1018,6 +1019,22 @@ private:
                               IndexSymbol &Info, Optional<AccessKind> AccKind);
 
   bool indexComment(const Decl *D);
+
+  bool CurrentBufferContainsLoc(SourceLoc Loc) {
+    if (Loc.isInvalid())
+      return false;
+
+    bool inGeneratedBuffer =
+        !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(BufferID), Loc);
+    if (inGeneratedBuffer) {
+      unsigned bufferID = CurrentModule->getOriginalLocation(Loc).first;
+      if (BufferID != bufferID) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   // Return the line and column of \p loc, as well as whether it was from a
   // generated buffer or not. 0:0 if indexing a module and \p loc is invalid.
