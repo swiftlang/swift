@@ -280,6 +280,7 @@ FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
 FORWARDING_OWNERSHIP_INST(LinearFunction)
 FORWARDING_OWNERSHIP_INST(MarkMustCheck)
+FORWARDING_OWNERSHIP_INST(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
 #undef FORWARDING_OWNERSHIP_INST
@@ -351,6 +352,10 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   }
 
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDropDeinitInst(DropDeinitInst *ddi) {
+  return ddi->getType().isAddress() ? OwnershipKind::None : OwnershipKind::Owned;
 }
 
 ValueOwnershipKind
@@ -557,6 +562,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDistributedRemoteActor)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeNonDefaultDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
@@ -565,6 +571,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)

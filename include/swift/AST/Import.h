@@ -584,14 +584,24 @@ struct AttributedImport {
   /// attribute, this is the given access level.
   Optional<AccessLevel> docVisibility;
 
+  /// Access level limiting how imported types can be exported.
+  AccessLevel accessLevel;
+
+  /// Location of the attribute that defined \c accessLevel. Also indicates
+  /// if the access level was implicit or explicit.
+  SourceLoc accessLevelLoc;
+
   AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
                    ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
                    SourceRange preconcurrencyRange = {},
-                   Optional<AccessLevel> docVisibility = None)
+                   Optional<AccessLevel> docVisibility = None,
+                   AccessLevel accessLevel = AccessLevel::Public,
+                   SourceLoc accessLevelLoc = SourceLoc())
       : module(module), importLoc(importLoc), options(options),
         sourceFileArg(filename), spiGroups(spiGroups),
-        preconcurrencyRange(preconcurrencyRange), docVisibility(docVisibility) {
+        preconcurrencyRange(preconcurrencyRange), docVisibility(docVisibility),
+        accessLevel(accessLevel), accessLevelLoc(accessLevelLoc) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -601,7 +611,8 @@ struct AttributedImport {
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
     : AttributedImport(module, other.importLoc, other.options,
                        other.sourceFileArg, other.spiGroups,
-                       other.preconcurrencyRange, other.docVisibility) { }
+                       other.preconcurrencyRange, other.docVisibility,
+                       other.accessLevel, other.accessLevelLoc) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -609,7 +620,9 @@ struct AttributedImport {
            lhs.options.toRaw() == rhs.options.toRaw() &&
            lhs.sourceFileArg == rhs.sourceFileArg &&
            lhs.spiGroups == rhs.spiGroups &&
-           lhs.docVisibility == rhs.docVisibility;
+           lhs.docVisibility == rhs.docVisibility &&
+           lhs.accessLevel == rhs.accessLevel &&
+           lhs.accessLevelLoc == rhs.accessLevelLoc;
   }
 
   AttributedImport<ImportedModule> getLoaded(ModuleDecl *loadedModule) const {
@@ -761,14 +774,16 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
-                            {}, {}, None);
+                            {}, {}, None,
+                            swift::AccessLevel::Public, {});
   }
   static inline AttributedImport getTombstoneKey() {
     return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
-                            {}, {}, None);
+                            {}, {}, None,
+                            swift::AccessLevel::Public, {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(
@@ -783,7 +798,9 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
            ImportOptionsDMI::isEqual(a.options, b.options) &&
            StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg) &&
            a.spiGroups == b.spiGroups &&
-           a.docVisibility == b.docVisibility;
+           a.docVisibility == b.docVisibility &&
+           a.accessLevel == b.accessLevel &&
+           a.accessLevelLoc == b.accessLevelLoc;
   }
 };
 }

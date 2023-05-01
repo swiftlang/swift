@@ -1865,7 +1865,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         destExistentialShape->getRequirementSignature().getRequirements(),
         allGenericArgsVec,
         [&substitutions](unsigned depth, unsigned index) {
-          return substitutions.getMetadata(depth, index);
+          // FIXME: Variadic generics
+          return substitutions.getMetadata(depth, index).getMetadata();
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");

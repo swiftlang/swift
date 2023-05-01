@@ -103,7 +103,8 @@ std::string swift::ide::removeCodeCompletionTokens(
 
 namespace {
 
-class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
+                                    public DoneParsingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -112,7 +113,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   SourceLoc DotLoc;
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
-  DeclAttrKind AttrKind;
+  CustomSyntaxAttributeKind AttrKind;
 
   /// When the code completion token occurs in a custom attribute, the attribute
   /// it occurs in. Used so we can complete inside the attribute even if it's
@@ -123,7 +124,7 @@ class CodeCompletionCallbacksImpl : public IDEInspectionCallbacks {
   /// In situations when \c SyntaxKind hints or determines
   /// completions, i.e. a precedence group attribute, this
   /// can be set and used to control the code completion scenario.
-  IDEInspectionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
+  CodeCompletionCallbacks::PrecedenceGroupCompletionKind SyntxKind;
 
   int AttrParamIndex;
   bool IsInSil = false;
@@ -233,9 +234,8 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : IDEInspectionCallbacks(P), CompletionContext(CompletionContext),
-        Consumer(Consumer) {
-  }
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        CompletionContext(CompletionContext), Consumer(Consumer) {}
 
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
@@ -270,10 +270,10 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
-  void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index) override;
   void completeEffectsSpecifier(bool hasAsync, bool hasThrows) override;
   void completeInPrecedenceGroup(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) override;
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
@@ -456,8 +456,8 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
-                                                        int Index) {
+void CodeCompletionCallbacksImpl::completeDeclAttrParam(
+    CustomSyntaxAttributeKind DK, int Index) {
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
@@ -484,7 +484,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(
-    IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK) {
+    CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK) {
   assert(P.Tok.is(tok::code_complete));
 
   SyntxKind = SK;
@@ -1130,6 +1130,8 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addSimpleTypedParameter("Int");
     Builder.addRightParen();
   });
+
+#ifndef SWIFT_SWIFT_PARSER
   addWithName("warning", CodeCompletionKeywordKind::pound_warning,
               [&] (CodeCompletionResultBuilder &Builder) {
     Builder.addLeftParen();
@@ -1146,6 +1148,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addTextChunk("\"");
     Builder.addRightParen();
   });
+#endif
 
   addWithName("if ", CodeCompletionKeywordKind::pound_if,
               [&] (CodeCompletionResultBuilder &Builder) {
@@ -1284,9 +1287,7 @@ void swift::ide::deliverCompletionResults(
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
-    SF.getImportedModules(directImport,
-                          {ModuleDecl::ImportFilterKind::Default,
-                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    SF.getImportedModules(directImport, ModuleDecl::getImportFilterLocal());
     for (auto import : directImport)
       explictlyImportedModules.insert(import.importedModule);
 
@@ -1354,11 +1355,10 @@ void swift::ide::deliverCompletionResults(
         std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
-        RequestedModules.push_back({std::move(K), TheModule,
-          Request.OnlyTypes, Request.OnlyPrecedenceGroups, Request.OnlyMacros});
+        RequestedModules.push_back({std::move(K), TheModule, Request.Filter});
 
         auto TheModuleName = TheModule->getName();
-        if (Request.IncludeModuleQualifier &&
+        if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
             (!Lookup.isHiddenModuleName(TheModuleName) ||
              explictlyImportedModules.contains(TheModule)) &&
             seenModuleNames.insert(TheModuleName).second)
@@ -1373,23 +1373,17 @@ void swift::ide::deliverCompletionResults(
       }
     } else {
       // Add results from current module.
-      Lookup.getToplevelCompletions(Request.OnlyTypes, Request.OnlyMacros);
+      Lookup.getToplevelCompletions(Request.Filter);
 
       // Add the qualifying module name
       auto curModule = SF.getParentModule();
-      if (Request.IncludeModuleQualifier &&
+      if (Request.Filter.contains(CodeCompletionFilterFlag::Module) &&
           seenModuleNames.insert(curModule->getName()).second)
         Lookup.addModuleName(curModule);
 
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
-      SF.getImportedModules(
-          Imports, {
-                       ModuleDecl::ImportFilterKind::Exported,
-                       ModuleDecl::ImportFilterKind::Default,
-                       ModuleDecl::ImportFilterKind::ImplementationOnly,
-                       ModuleDecl::ImportFilterKind::SPIAccessControl,
-                   });
+      SF.getImportedModules(Imports, ModuleDecl::getImportFilterLocal());
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))
@@ -1441,8 +1435,12 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     // switch case where there control expression is invalid). Having normal
     // typechecking still resolve even these cases would be beneficial for
     // tooling in general though.
-    if (!Lookup.gotCallback())
+    if (!Lookup.gotCallback()) {
+      if (Context.TypeCheckerOpts.DebugConstraintSolver) {
+        llvm::errs() << "--- Fallback typecheck for code completion ---\n";
+      }
       Lookup.fallbackTypeCheck(CurDeclContext);
+    }
   };
 
   switch (Kind) {
@@ -1475,7 +1473,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
   case CompletionKind::KeyPathExprSwift: {
     assert(CurDeclContext);
 
-    // IDEInspectionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
+    // CodeCompletionCallbacks::completeExprKeyPath takes a \c KeyPathExpr,
     // so we can safely cast the \c ParsedExpr back to a \c KeyPathExpr.
     auto KeyPath = cast<KeyPathExpr>(ParsedExpr);
     KeyPathTypeCheckCompletionCallback Lookup(KeyPath);
@@ -1794,14 +1792,36 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       default:
         break;
       }
-    }
-    if (!ExpectedCustomAttributeKinds) {
+
+      switch (*AttTargetDK) {
+      case DeclKind::Var:
+      case DeclKind::Subscript:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+        break;
+      case DeclKind::Struct:
+      case DeclKind::Class:
+      case DeclKind::Protocol:
+      case DeclKind::Enum:
+      case DeclKind::Extension:
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+        break;
+      default:
+        break;
+      }
+      if (*AttTargetDK != DeclKind::Param) {
+        ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
+      }
+    } else {
       // If we don't know on which decl kind we are completing, suggest all
       // attribute kinds.
       ExpectedCustomAttributeKinds |= CustomAttributeKind::PropertyWrapper;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::ResultBuilder;
       ExpectedCustomAttributeKinds |= CustomAttributeKind::GlobalActor;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::VarMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::ContextMacro;
+      ExpectedCustomAttributeKinds |= CustomAttributeKind::DeclMacro;
     }
+
     Lookup.setExpectedTypes(/*Types=*/{},
                             /*isImplicitSingleExpressionReturn=*/false,
                             /*preferNonVoid=*/false,
@@ -1809,11 +1829,18 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
-    // - ParamDecl/VarDecl/FuncDecl: Function Builders.
+    // - ParamDecl/VarDecl/FuncDecl: Result Builders.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
         *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getIDEInspectionTargetLoc());
+
+    // Macro name at attribute position after '@'.
+    CodeCompletionMacroRoles macroRoles =
+        getCompletionMacroRoles(ExpectedCustomAttributeKinds);
+    if (macroRoles) {
+      Lookup.getMacroCompletions(macroRoles);
+    }
     break;
   }
   case CompletionKind::AttributeDeclParen: {
@@ -1966,6 +1993,15 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   case CompletionKind::AfterPoundDirective: {
     addPoundDirectives(CompletionContext.getResultSink());
+
+    CodeCompletionMacroRoles roles;
+    if (!CurDeclContext || !CurDeclContext->isTypeContext()) {
+      roles |= CodeCompletionMacroRole::Expression;
+      roles |= CodeCompletionMacroRole::CodeItem;
+    }
+    roles |= CodeCompletionMacroRole::Declaration;
+    Lookup.getMacroCompletions(roles);
+
     // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
     // position.
     break;
@@ -2029,8 +2065,10 @@ public:
                                      CodeCompletionConsumer &Consumer)
       : CompletionContext(CompletionContext), Consumer(Consumer) {}
 
-      IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-    return new CodeCompletionCallbacksImpl(P, CompletionContext, Consumer);
+  Callbacks createCallbacks(Parser &P) override {
+    auto callbacks = std::make_shared<CodeCompletionCallbacksImpl>(
+        P, CompletionContext, Consumer);
+    return {callbacks, callbacks};
   }
 };
 } // end anonymous namespace

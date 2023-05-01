@@ -28,8 +28,10 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -209,6 +211,12 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
+  InFlightSubstitution IFS(subs, lookupConformance, None);
+  return get(genericSig, IFS);
+}
+
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
+                                     InFlightSubstitution &IFS) {
   if (!genericSig) {
     return SubstitutionMap();
   }
@@ -225,7 +233,12 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     }
 
     // Record the replacement.
-    Type replacement = Type(gp).subst(subs, lookupConformance);
+    Type replacement = Type(gp).subst(IFS);
+
+    assert((!replacement || replacement->hasError() ||
+            gp->isParameterPack() == replacement->is<PackType>()) &&
+           "replacement for pack parameter must be a pack type");
+
     replacementTypes.push_back(replacement);
   });
 
@@ -235,9 +248,9 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     CanType depTy = req.getFirstType()->getCanonicalType();
-    auto replacement = depTy.subst(subs, lookupConformance);
+    auto replacement = depTy.subst(IFS);
     auto *proto = req.getProtocolDecl();
-    auto conformance = lookupConformance(depTy, replacement, proto);
+    auto conformance = IFS.lookupConformance(depTy, replacement, proto);
     conformances.push_back(conformance);
   }
 
@@ -435,14 +448,18 @@ SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
 
 SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap,
                                        SubstOptions options) const {
-  return subst(QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap),
-               options);
+  InFlightSubstitutionViaSubMap IFS(subMap, options);
+  return subst(IFS);
 }
 
 SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances,
                                        SubstOptions options) const {
+  InFlightSubstitution IFS(subs, conformances, options);
+  return subst(IFS);
+}
+
+SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
   if (empty()) return SubstitutionMap();
 
   SmallVector<Type, 4> newSubs;
@@ -452,7 +469,9 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
       newSubs.push_back(Type());
       continue;
     }
-    newSubs.push_back(type.subst(subs, conformances, options));
+    newSubs.push_back(type.subst(IFS));
+    assert(type->is<PackType>() == newSubs.back()->is<PackType>() &&
+           "substitution changed the pack-ness of a replacement type");
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
@@ -467,16 +486,14 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
     // Fast path for concrete case -- we don't need to compute substType
     // at all.
     if (conformance.isConcrete() &&
-        !options.contains(SubstFlags::SubstituteOpaqueArchetypes)) {
+        !IFS.shouldSubstituteOpaqueArchetypes()) {
       newConformances.push_back(
-        ProtocolConformanceRef(
-          conformance.getConcrete()->subst(subs, conformances, options)));
+        ProtocolConformanceRef(conformance.getConcrete()->subst(IFS)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this, options);
+      auto substType = origType.subst(*this, IFS.getOptions());
 
-      newConformances.push_back(
-        conformance.subst(substType, subs, conformances, options));
+      newConformances.push_back(conformance.subst(substType, IFS));
     }
     
     oldConformances = oldConformances.slice(1);
@@ -776,13 +793,29 @@ bool SubstitutionMap::isIdentity() const {
   if (empty())
     return true;
 
+  for (auto conf : getConformances()) {
+    if (conf.isAbstract())
+      continue;
+
+    if (conf.isPack()) {
+      auto patternConfs = conf.getPack()->getPatternConformances();
+      if (patternConfs.size() == 1 && patternConfs[0].isAbstract())
+        continue;
+    }
+
+    return false;
+  }
+
   GenericSignature sig = getGenericSignature();
   bool hasNonIdentityReplacement = false;
   auto replacements = getReplacementTypesBuffer();
 
   sig->forEachParam([&](GenericTypeParamType *paramTy, bool isCanonical) {
     if (isCanonical) {
-      if (!paramTy->isEqual(replacements[0]))
+      Type wrappedParamTy = paramTy;
+      if (paramTy->isParameterPack())
+        wrappedParamTy = PackType::getSingletonPackExpansion(paramTy);
+      if (!wrappedParamTy->isEqual(replacements[0]))
         hasNonIdentityReplacement = true;
     }
 

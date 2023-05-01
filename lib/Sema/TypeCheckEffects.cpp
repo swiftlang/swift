@@ -155,7 +155,7 @@ static bool classifyWitness(ModuleDecl *module,
     case PolymorphicEffectKind::ByConformance: {
       // Witness has the effect if the concrete type's conformances
       // recursively have the effect.
-      auto substitutions = conformance->getSubstitutions(module);
+      auto substitutions = conformance->getSubstitutionMap();
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.hasEffect(kind)) {
           return true;
@@ -399,6 +399,11 @@ template <class Impl>
 class EffectsHandlingWalker : public ASTWalker {
   Impl &asImpl() { return *static_cast<Impl*>(this); }
 public:
+  /// Only look at the expansions for effects checking.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     ShouldRecurse_t recurse = ShouldRecurse;
     // Skip the implementations of all local declarations... except
@@ -408,6 +413,8 @@ public:
     } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
       if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
+    } else if (auto macroExpansionDecl = dyn_cast<MacroExpansionDecl>(D)) {
+      recurse = ShouldRecurse;
     } else {
       recurse = ShouldNotRecurse;
     }
@@ -439,6 +446,8 @@ public:
       recurse = asImpl().checkDeclRef(declRef);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
+    } else if (auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(E)) {
+      recurse = ShouldRecurse;
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -2596,7 +2605,11 @@ private:
     struct ConservativeThrowChecker : public ASTWalker {
       CheckEffectsCoverage &CEC;
       ConservativeThrowChecker(CheckEffectsCoverage &CEC) : CEC(CEC) {}
-      
+
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::Arguments;
+      }
+
       PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (isa<TryExpr>(E))
           CEC.Flags.set(ContextFlags::HasAnyThrowSite);
@@ -2932,6 +2945,10 @@ private:
 
 // Find nested functions and perform effects checking on them.
 struct LocalFunctionEffectsChecker : ASTWalker {
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
       if (func->getDeclContext()->isLocalContext())

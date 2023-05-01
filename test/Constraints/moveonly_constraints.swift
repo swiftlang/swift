@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift
 
 // a concrete move-only type
 @_moveOnly struct MO {
@@ -42,7 +42,7 @@ enum Maybe<T> {
   case just(T)
 }
 
-func takeConcrete(_ m: __shared MO) {}
+func takeConcrete(_ m: borrowing MO) {}
 func takeGeneric<T>(_ t: T) {}
 func takeGenericSendable<T>(_ t: T) where T: Sendable {}
 func takeMaybe<T>(_ m: Maybe<T>) {}
@@ -71,7 +71,7 @@ func testAny() {
   takeAny(MO()) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func testBasic(_ mo: __shared MO) {
+func testBasic(_ mo: borrowing MO) {
   takeConcrete(globalMO)
   takeConcrete(MO())
 
@@ -101,7 +101,7 @@ func testBasic(_ mo: __shared MO) {
 func checkBasicBoxes() {
   let mo = MO()
 
-  let vb = ValBox(_move mo) // expected-error 2{{move-only type 'MO' cannot be used with generics yet}}
+  let vb = ValBox(consume mo) // expected-error 2{{move-only type 'MO' cannot be used with generics yet}}
   _ = vb.get()
   _ = vb.val
 
@@ -139,7 +139,7 @@ func checkMethodCalls() {
   takeMaybe(true ? .none : .just(MO())) // expected-error 3{{move-only type 'MO' cannot be used with generics yet}}
 }
 
-func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
+func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
   let box = b as! ValBox<MO> // expected-error {{move-only type 'MO' cannot be used with generics yet}}
@@ -150,7 +150,8 @@ func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{move-only type '(MO, MO)' cannot be used with generics yet}}
   let _: Sendable = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-  let _: _Copyable = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  let _: _Copyable = mo // expected-error {{'_Copyable' is unavailable}}
+                        // expected-error@-1 {{move-only type 'MO' cannot be used with generics yet}}
   let _: AnyObject = MO() // expected-error {{move-only type 'MO' cannot be used with generics yet}}
   let _: Any = mo // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 
@@ -162,8 +163,6 @@ func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
-
-  // FIXME(kavon): make sure at runtime these casts actually fail, or just make them errors? (rdar://104900293)
 
   _ = MO() is AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
   // expected-error@-1 {{move-only types cannot be conditionally cast}}
@@ -221,13 +220,13 @@ func checkCasting(_ b: any Box, _ mo: __shared MO, _ a: Any) {
 
 }
 
-func checkStdlibTypes(_ mo: __shared MO) {
+func checkStdlibTypes(_ mo: borrowing MO) {
   let _: [MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
       [MO(), MO()]
   let _: [MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
       []
   let _: [String: MO] = // expected-error {{move-only type 'MO' cannot be used with generics yet}}
-      ["hello" : MO()]
+      ["hello" : MO()]  // expected-error{{tuples with noncopyable elements are not supported}}
 
   // i think this one's only caught b/c of the 'Any' change
   _ = [MO()] // expected-error {{move-only type 'MO' cannot be used with generics yet}}

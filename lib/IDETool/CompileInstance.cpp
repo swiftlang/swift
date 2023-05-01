@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
@@ -261,10 +262,14 @@ bool CompileInstance::setupCI(
                DiagnosticDocumentationPath.c_str()});
   args.append(origArgs.begin(), origArgs.end());
 
+  SmallString<256> driverPath(SwiftExecutablePath);
+  llvm::sys::path::remove_filename(driverPath);
+  llvm::sys::path::append(driverPath, "swiftc");
+
   CompilerInvocation invocation;
   bool invocationCreationFailed =
       driver::getSingleFrontendInvocationFromDriverArguments(
-          args, Diags,
+          driverPath, args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
             return invocation.parseArgs(FrontendArgs, Diags);
           },
@@ -299,6 +304,7 @@ bool CompileInstance::setupCI(
     assert(Diags.hadAnyError());
     return false;
   }
+  CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
 
   return true;
 }

@@ -88,6 +88,13 @@ public:
                                LookupConformanceFn conformances,
                                SubstOptions options=None) const;
 
+  /// Apply an in-flight substitution to the conformances in this
+  /// protocol conformance ref.
+  ///
+  /// This function should generally not be used outside of the
+  /// substitution subsystem.
+  ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 };

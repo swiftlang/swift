@@ -829,7 +829,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
   for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
-      auto RawComment = D->getRawComment(/*SerializedOK=*/false);
+      auto RawComment = D->getRawComment();
       if (!RawComment.isEmpty())
         tryUpdateStart(RawComment.Comments.front().Range.getStart());
     }
@@ -1149,6 +1149,7 @@ void swift::ide::printSymbolicSwiftClangModuleInterface(
       PrintOptions::printModuleInterface(/*printFullConvention=*/false);
   popts.PrintDocumentationComments = false;
   popts.PrintRegularClangComments = false;
+  popts.SkipInlineCXXNamespace = true;
 
   auto &SwiftContext = M->getTopLevelModule()->getASTContext();
   auto &Importer =

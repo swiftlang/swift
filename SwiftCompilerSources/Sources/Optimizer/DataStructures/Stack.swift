@@ -27,22 +27,22 @@ import SIL
 struct Stack<Element> : CollectionLikeSequence {
 
   private let bridgedContext: BridgedPassContext
-  private var firstSlab = BridgedSlab(data: nil)
-  private var lastSlab = BridgedSlab(data: nil)
+  private var firstSlab = BridgedPassContext.Slab(nil)
+  private var lastSlab = BridgedPassContext.Slab(nil)
   private var endIndex: Int = 0
 
   private static var slabCapacity: Int {
-    BridgedSlabCapacity / MemoryLayout<Element>.stride
+    BridgedPassContext.Slab.getCapacity() / MemoryLayout<Element>.stride
   }
 
-  private static func bind(_ slab: BridgedSlab) -> UnsafeMutablePointer<Element> {
-    return slab.data!.bindMemory(to: Element.self, capacity: Stack.slabCapacity)
+  private static func bind(_ slab: BridgedPassContext.Slab) -> UnsafeMutablePointer<Element> {
+    return UnsafeMutableRawPointer(slab.data!).bindMemory(to: Element.self, capacity: Stack.slabCapacity)
   }
 
   struct Iterator : IteratorProtocol {
-    var slab: BridgedSlab
+    var slab: BridgedPassContext.Slab
     var index: Int
-    let lastSlab: BridgedSlab
+    let lastSlab: BridgedPassContext.Slab
     let endIndex: Int
     
     mutating func next() -> Element? {
@@ -52,7 +52,7 @@ struct Stack<Element> : CollectionLikeSequence {
         index += 1
 
         if index >= end && slab.data != lastSlab.data {
-          slab = PassContext_getNextSlab(slab)
+          slab = slab.getNext()
           index = 0
         }
         return elem
@@ -77,11 +77,11 @@ struct Stack<Element> : CollectionLikeSequence {
 
   mutating func push(_ element: Element) {
     if endIndex >= Stack.slabCapacity {
-      lastSlab = PassContext_allocSlab(bridgedContext, lastSlab)
+      lastSlab = bridgedContext.allocSlab(lastSlab)
       endIndex = 0
     } else if firstSlab.data == nil {
       assert(endIndex == 0)
-      firstSlab = PassContext_allocSlab(bridgedContext, lastSlab)
+      firstSlab = bridgedContext.allocSlab(lastSlab)
       lastSlab = firstSlab
     }
     (Stack.bind(lastSlab) + endIndex).initialize(to: element)
@@ -109,12 +109,12 @@ struct Stack<Element> : CollectionLikeSequence {
     
     if endIndex == 0 {
       if lastSlab.data == firstSlab.data {
-        _ = PassContext_freeSlab(bridgedContext, lastSlab)
+        _ = bridgedContext.freeSlab(lastSlab)
         firstSlab.data = nil
         lastSlab.data = nil
         endIndex = 0
       } else {
-        lastSlab = PassContext_freeSlab(bridgedContext, lastSlab)
+        lastSlab = bridgedContext.freeSlab(lastSlab)
         endIndex = Stack.slabCapacity
       }
     }

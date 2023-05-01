@@ -33,6 +33,7 @@ public:
   /// DWARFimporterDelegate.
   virtual void
   lookupValue(DeclName name, NLKind lookupKind,
+              OptionSet<ModuleLookupFlags> Flags,
               SmallVectorImpl<ValueDecl *> &results) const override {
     Owner.lookupValueDWARF(name, lookupKind,
                            getParentModule()->getName(), results);
@@ -77,7 +78,7 @@ public:
       ModuleDecl::LinkLibraryCallback callback) const override {};
 
   Identifier
-  getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
+  getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private decls in Clang modules");
   }
 

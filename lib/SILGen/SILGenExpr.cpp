@@ -446,6 +446,7 @@ namespace {
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
+    RValue visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -1052,23 +1053,30 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
                                                  bool hasDynamicLifetime,
-                                                 bool isLexical) {
+                                                 bool isLexical,
+                                                 bool generateDebugInfo) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
-  if (auto *VD = loc.getAsASTNode<VarDecl>())
-    DbgVar = SILDebugVariable(VD->isLet(), 0);
-  // Recognize "catch let errorvar" bindings.
-  if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
-    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
-      if (!isa<ParamDecl>(VD) && VD->isImplicit() &&
-          VD->getType()->isExistentialType() &&
-          VD->getType()->getExistentialLayout().isErrorExistential()) {
-        DbgVar = SILDebugVariable(VD->isLet(), 0);
-        loc = SILLocation(VD);
-      }
+  if (generateDebugInfo)
+    if (auto *VD = loc.getAsASTNode<VarDecl>())
+      DbgVar = SILDebugVariable(VD->isLet(), 0);
   auto *alloc =
-      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical);
+      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical, false
+#ifndef NDEBUG
+                         ,
+                         !generateDebugInfo
+#endif
+      );
   enterDeallocStackCleanup(alloc);
+  return alloc;
+}
+
+SILValue
+SILGenFunction::emitTemporaryPackAllocation(SILLocation loc, SILType ty) {
+  assert(ty.is<SILPackType>());
+  ty = ty.getObjectType();
+  auto *alloc = B.createAllocPack(loc, ty);
+  enterDeallocPackCleanup(alloc);
   return alloc;
 }
 
@@ -1516,12 +1524,50 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
 RValue
 RValueEmitter::visitPackExpansionExpr(PackExpansionExpr *E,
                                       SGFContext C) {
-  llvm_unreachable("not implemented for PackExpansionExpr");
+  // The contexts where PackExpansionExpr can occur are expected to
+  // set up for pack-expansion emission by either recognizing them
+  // and treating them specially or setting up an appropriate context
+  // to emit into.
+  auto init = C.getEmitInto();
+  assert(init && init->canPerformPackExpansionInitialization() &&
+         "cannot emit a PackExpansionExpr without an appropriate context");
+
+  auto type = E->getType()->getCanonicalType();
+  assert(isa<PackExpansionType>(type));
+  auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
+
+  SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
+                          E->getGenericEnvironment(),
+                          [&](SILValue indexWithinComponent,
+                              SILValue packExpansionIndex,
+                              SILValue packIndex) {
+    init->performPackExpansionInitialization(SGF, E, indexWithinComponent,
+                                             [&](Initialization *eltInit) {
+      SGF.emitExprInto(E->getPatternExpr(), eltInit);
+    });
+  });
+
+  init->finishInitialization(SGF);
+
+  return RValue::forInContext();
 }
 
 RValue
 RValueEmitter::visitPackElementExpr(PackElementExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented for PackElementExpr");
+  FormalEvaluationScope scope(SGF);
+
+  LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
+
+  // Otherwise, we can't load at +0 without further analysis, since the formal
+  // access into the lvalue will end immediately.
+  return SGF.emitLoadOfLValue(E, std::move(lv),
+                              C.withFollowingSideEffects());
+}
+
+RValue
+RValueEmitter::visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C) {
+  // Always emitted through `visitPackElementExpr`.
+  llvm_unreachable("materialized pack outside of PackElementExpr");
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -2317,6 +2363,19 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
     }
   }
 
+  // If the tuple has a pack expansion in it, initialize an object in
+  // memory (and recurse; this pattern should reliably enter the above,
+  // though).
+  if (type.containsPackExpansionType()) {
+    auto &tupleTL = SGF.getTypeLowering(type);
+    auto initialization = SGF.emitTemporary(E, tupleTL);
+    {
+      RValue result = visitTupleExpr(E, SGFContext(initialization.get()));
+      assert(result.isInContext()); (void) result;
+    }
+    return RValue(SGF, E, type, initialization->getManagedAddress());
+  }
+
   llvm::SmallVector<RValue, 8> tupleElts;
   bool hasAtleastOnePlusOneValue = false;
   for (Expr *elt : E->getElements()) {
@@ -2602,9 +2661,11 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
-  // CaptureListExprs evaluate their bound variables.
+  // CaptureListExprs evaluate their bound variables, but they don't introduce
+  // new ones that should be described in the debug info.
+  bool generateDebugInfo = false;
   for (auto capture : E->getCaptureList())
-    SGF.visit(capture.PBD);
+    SGF.visitPatternBindingDecl(capture.PBD, generateDebugInfo);
 
   // Then they evaluate to their body.
   return visit(E->getClosureBody(), C);
@@ -3238,6 +3299,15 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         strategy, propertyType,
                         std::move(subscriptIndices),
                         /*index for diags*/ nullptr);
+
+  // If the assigned value will need to be reabstracted, add a reabstraction
+  // component.
+  const auto loweredSubstType = subSGF.getLoweredType(lv.getSubstFormalType());
+  if (lv.getTypeOfRValue() != loweredSubstType.getObjectType()) {
+    // Logical components always re-abstract back to the substituted type.
+    assert(lv.isLastComponentPhysical());
+    lv.addOrigToSubstComponent(loweredSubstType);
+  }
 
   subSGF.emitAssignToLValue(loc,
     RValue(subSGF, loc, propertyType, valueSubst),
@@ -3969,7 +4039,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
 
       auto subscript = cast<SubscriptDecl>(decl);
       auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
-          subscript, component.getDeclRef().getSubstitutions(),
+          E, subscript,
+          component.getDeclRef().getSubstitutions(),
           component.getSubscriptArgs());
 
       for (auto &arg : loweredArgs) {
@@ -4086,34 +4157,30 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     SILModule &M = SGF.SGM.M;
     SILBuilder &B = SGF.B;
 
-    StructInst *S = nullptr;
+    GlobalAddrInst *ModuleBase = nullptr;
+
     if (M.getASTContext().LangOpts.Target.isOSWindows()) {
       auto ImageBase = M.lookUpGlobalVariable("__ImageBase");
       if (!ImageBase)
         ImageBase =
-            SILGlobalVariable::create(M, SILLinkage::Public, IsNotSerialized,
-                                      "__ImageBase", BuiltinRawPtrTy);
-
-      auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
-      auto ImageBasePointer =
-          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy,
-              /*needsStackProtection=*/ false);
-      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
-    } else {
-      auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
-      if (!DSOGlobal)
-        DSOGlobal =
-            SILGlobalVariable::create(M, SILLinkage::PublicExternal,
-                                      IsNotSerialized, "__dso_handle",
+            SILGlobalVariable::create(M, SILLinkage::DefaultForDeclaration,
+                                      IsNotSerialized, "__ImageBase",
                                       BuiltinRawPtrTy);
-
-      auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
-      auto DSOPointer =
-          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy,
-              /*needsStackProtection=*/ false);
-      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
+      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase);
+    } else {
+      auto DSOHandle = M.lookUpGlobalVariable("__dso_handle");
+      if (!DSOHandle)
+        DSOHandle = SILGlobalVariable::create(M, SILLinkage::PublicExternal,
+                                              IsNotSerialized, "__dso_handle",
+                                              BuiltinRawPtrTy);
+      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle);
     }
 
+    auto ModuleBasePointer =
+        B.createAddressToPointer(SILLoc, ModuleBase, BuiltinRawPtrTy,
+                                 /*needsStackProtection=*/ false);
+    StructInst *S =
+        B.createStruct(SILLoc, UnsafeRawPtrTy, { ModuleBasePointer });
     return RValue(SGF, E, ManagedValue::forUnmanaged(S));
   }
   }
@@ -5691,11 +5758,65 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   return RValue(SGF, E, ptr);
 }
 
+/// Implicit conversion from a nontrivial inout type to a raw pointer are
+/// dangerous. For example:
+///
+///   func bar(_ p: UnsafeRawPointer) { ... }
+///   func foo(object: inout AnyObject) {
+///       bar(&object)
+///   }
+///
+/// These conversions should be done explicitly.
+///
+static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
+                                          SILLocation loc,
+                                          SILGenFunction &SGF) {
+  // Array conversion does not always go down the ArrayConverter
+  // path. Recognize the Array source type here both for ArrayToPointer and
+  // InoutToPointer cases and diagnose on the element type.
+  Type eltTy = sourceTy->isArrayType();
+  if (!eltTy)
+    eltTy = sourceTy;
+
+  if (SGF.getLoweredType(eltTy).isTrivial(SGF.F))
+    return;
+
+  auto *SM = SGF.getModule().getSwiftModule();
+  if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
+          KnownProtocolKind::FixedWidthInteger)) {
+    if (SM->conformsToProtocol(eltTy, fixedWidthIntegerDecl))
+      return;
+  }
+
+  PointerTypeKind kindOfPtr;
+  auto pointerElt = pointerTy->getAnyPointerElementType(kindOfPtr);
+  assert(!pointerElt.isNull() && "expected an unsafe pointer type");
+
+  // The element type may contain a reference. Disallow conversion to a "raw"
+  // pointer type. Consider Int8/UInt8 to be raw pointers. Trivial element types
+  // are filtered out above, so Int8/UInt8 pointers can't match the source
+  // type. But the type checker may have allowed these for direct C calls, in
+  // which Int8/UInt8 are equivalent to raw pointers..
+  if (!(pointerElt->isVoid() || pointerElt->isInt8() || pointerElt->isUInt8()))
+    return;
+
+  if (sourceTy->isString()) {
+    SGF.SGM.diagnose(loc, diag::nontrivial_string_to_rawpointer_conversion,
+                     pointerTy);
+  } else {
+    SGF.SGM.diagnose(loc, diag::nontrivial_to_rawpointer_conversion, sourceTy,
+                     pointerTy, eltTy);
+  }
+}
+
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
 ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
                                                 PointerAccessInfo pointerInfo) {
   assert(pointerInfo.AccessKind == lv.getAccessKind());
+
+  diagnoseImplicitRawConversion(lv.getSubstFormalType(),
+                                pointerInfo.PointerType, loc, *this);
 
   // The incoming lvalue should be at the abstraction level of T in
   // Unsafe*Pointer<T>. Reabstract it if necessary.
@@ -5704,6 +5825,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   if (lv.getTypeOfRValue().getASTType() != loweredTy.getASTType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
+
   switch (pointerInfo.PointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
@@ -5816,6 +5938,9 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
       firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
       genericSig);
+
+  diagnoseImplicitRawConversion(accessInfo.ArrayType, accessInfo.PointerType,
+                                loc, *this);
 
   SmallVector<ManagedValue, 2> resultScalars;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
@@ -6033,14 +6158,20 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
                                               SGFContext C) {
-  auto *rewritten = E->getRewritten();
-  assert(rewritten && "Macro should have been rewritten by SILGen");
-  Mangle::ASTMangler mangler;
-  auto name =
-      SGF.getASTContext().getIdentifier(mangler.mangleMacroExpansion(E));
-  MacroScope scope(SGF, CleanupLocation(rewritten), E, name.str(),
-                   E->getMacroRef().getDecl());
-  return visit(rewritten, C);
+  if (auto *rewritten = E->getRewritten()) {
+    return visit(rewritten, C);
+  }
+  else if (auto *MED = E->getSubstituteDecl()) {
+    Mangle::ASTMangler mangler;
+    MED->forEachExpandedExprOrStmt([&](ASTNode node) {
+      if (auto *expr = node.dyn_cast<Expr *>())
+        visit(expr, C);
+      else if (auto *stmt = node.dyn_cast<Stmt *>())
+        SGF.emitStmt(stmt);
+    });
+    return RValue();
+  }
+  return RValue();
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
@@ -6067,6 +6198,21 @@ RValue SILGenFunction::emitPlusZeroRValue(Expr *E) {
   return emitPlusOneRValue(E).borrow(*this, SILLocation(E));
 }
 
+static void emitIgnoredPackExpansion(SILGenFunction &SGF,
+                                     PackExpansionExpr *E) {
+  auto expansionType =
+    cast<PackExpansionType>(E->getType()->getCanonicalType());
+  auto formalPackType = CanPackType::get(SGF.getASTContext(), expansionType);
+  auto openedElementEnv = E->getGenericEnvironment();
+  SGF.emitDynamicPackLoop(E, formalPackType, /*component index*/ 0,
+                          openedElementEnv,
+                          [&](SILValue indexWithinComponent,
+                              SILValue packExpansionIndex,
+                              SILValue packIndex) {
+    SGF.emitIgnoredExpr(E->getPatternExpr());
+  });
+}
+
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
 void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // If this is a tuple expression, recursively ignore its elements.
@@ -6075,6 +6221,12 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     for (auto *elt : TE->getElements())
       emitIgnoredExpr(elt);
     return;
+  }
+
+  // Pack expansions can come up in tuples, and potentially elsewhere
+  // if we ever emit e.g. ignored call arguments with a builtin.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    return emitIgnoredPackExpansion(*this, expansion);
   }
   
   // TODO: Could look through arbitrary implicit conversions that don't have

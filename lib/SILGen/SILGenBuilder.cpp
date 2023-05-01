@@ -40,11 +40,24 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
+    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {
+  auto FirstInsn = insertBB->begin();
+  if (FirstInsn != insertBB->end())
+    setCurrentDebugScope(FirstInsn->getDebugScope());
+}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILBuilder(insertBB, insertInst), SGF(SGF) {}
+    : SILBuilder(insertBB, insertInst), SGF(SGF) {
+  if (insertInst != insertBB->end())
+    setCurrentDebugScope(insertInst->getDebugScope());
+}
+
+SILDebugLocation SILGenBuilder::getSILDebugLocation(SILLocation Loc,
+                                                    bool ForMetaInstruction) {
+  return SGF.getSILDebugLocation(*this, Loc, getCurrentDebugLocOverride(),
+                                 ForMetaInstruction);
+}
 
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs
@@ -310,6 +323,18 @@ ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
   return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
 }
 
+ManagedValue SILGenBuilder::createFormalAccessLoadCopy(SILLocation loc,
+                                                       ManagedValue base) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  SILValue baseValue = base.getValue();
+  auto i = emitLoadValueOperation(loc, baseValue, LoadOwnershipQualifier::Copy);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
+}
+
 ManagedValue
 SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
@@ -451,15 +476,17 @@ static ManagedValue createInputFunctionArgument(
     SILGenBuilder &B, SILType type, SILLocation loc, ValueDecl *decl = nullptr,
     bool isNoImplicitCopy = false,
     LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-    bool isClosureCapture = false) {
+    bool isClosureCapture = false,
+    bool isFormalParameterPack = false) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
-  assert((F.isBare() || decl) &&
+  assert((F.isBare() || isFormalParameterPack || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   arg->setNoImplicitCopy(isNoImplicitCopy);
   arg->setClosureCapture(isClosureCapture);
   arg->setLifetimeAnnotation(lifetimeAnnotation);
+  arg->setFormalParameterPack(isFormalParameterPack);
   switch (arg->getArgumentConvention()) {
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
@@ -475,8 +502,10 @@ static ManagedValue createInputFunctionArgument(
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
-  case SILArgumentConvention::Pack_Owned:
     return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Pack_Owned:
+    return SGF.emitManagedPackWithCleanup(arg);
 
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
@@ -497,10 +526,12 @@ static ManagedValue createInputFunctionArgument(
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(
     SILType type, ValueDecl *decl, bool isNoImplicitCopy,
-    LifetimeAnnotation lifetimeAnnotation, bool isClosureCapture) {
+    LifetimeAnnotation lifetimeAnnotation, bool isClosureCapture,
+    bool isFormalParameterPack) {
   return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
                                        isNoImplicitCopy, lifetimeAnnotation,
-                                       isClosureCapture);
+                                       isClosureCapture,
+                                       isFormalParameterPack);
 }
 
 ManagedValue

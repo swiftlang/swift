@@ -1,13 +1,11 @@
-// REQUIRES: rdar104716322
-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics
 
 // REQUIRES: asserts
 
 // Parsing an UnresolvedSpecializeExpr containing a PackExpansionType
-struct G<T...> {}
+struct G<each T> {}
 
-func f<T...>(_: repeat each T) {
+func f<each T>(_: repeat each T) {
   _ = G< >.self
   _ = G<Int>.self
   _ = G<Int, String>.self
@@ -16,11 +14,13 @@ func f<T...>(_: repeat each T) {
 }
 
 // Forming PackExpansionTypeReprs in simplifyTypeExpr()
-func g<T...>(_: repeat each T) {
+func g<each T>(_: repeat each T) {
   _ = (repeat each T).self
   _ = (Int, repeat each T).self
   _ = ((repeat each T) -> ()).self
   _ = ((Int, repeat Array<each T>) -> ()).self
 
-  _ = (repeat each Int).self // expected-error {{variadic expansion 'Int' must contain at least one variadic generic parameter}}
+  _ = (repeat each Int).self
+  // expected-error@-1 {{pack expansion 'Int' must contain at least one pack reference}}
+  // expected-error@-2 {{'each' cannot be applied to non-pack type 'Int'}}{{15-19=}}
 }

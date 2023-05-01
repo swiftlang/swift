@@ -67,6 +67,9 @@ llvm::cl::opt<bool> VerifyFunctionsAfterSpecialization(
         "Verify functions after they are specialized "
         "'PrettyStackTraceFunction'-ing the original function if we fail."));
 
+llvm::cl::opt<bool> DumpFunctionsAfterSpecialization(
+    "sil-generic-dump-functions-after-specialization", llvm::cl::init(false));
+
 static bool OptimizeGenericSubstitutions = false;
 
 /// Max depth of a type which can be processed by the generic
@@ -2115,6 +2118,13 @@ GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
     SpecializedF->verify();
   }
 
+  if (DumpFunctionsAfterSpecialization) {
+    llvm::dbgs() << llvm::Twine("Generic function: ") + GenericFunc->getName() +
+                        ". Specialized Function: " + SpecializedF->getName();
+    GenericFunc->dump();
+    SpecializedF->dump();
+  }
+
   return SpecializedF;
 }
 
@@ -3119,6 +3129,12 @@ void swift::trySpecializeApplyOfGeneric(
                             << SpecializedF->getLoweredFunctionType() << "\n");
     NewFunctions.push_back(SpecializedF.getFunction());
   }
+  if (replacePartialApplyWithoutReabstraction &&
+      SpecializedF.getFunction()->isExternalDeclaration()) {
+    // Cannot create a tunk without having the body of the function.
+    return;
+  }
+
   if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
     // If the specialized function already exists as a "IsNotSerialized" function,
     // but now it's called from a "IsSerialized" function, we need to mark it as

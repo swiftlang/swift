@@ -45,6 +45,9 @@ enum class RestrictedImportKind {
   None // No restriction, i.e. the module is imported publicly.
 };
 
+/// Import that limits the access level of imported entities.
+using ImportAccessLevel = Optional<AttributedImport<ImportedModule>>;
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -87,6 +90,10 @@ public:
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
     SuppressWarnings = 1 << 4,
+
+    /// Whether to disable the Swift Parser ASTGen
+    /// e.g. in dependency scanning, where an AST is not needed.
+    DisableSwiftParserASTGen = 1 << 5,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -382,6 +389,10 @@ public:
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
 
+  /// Return the import of \p targetModule from this file with the most
+  /// permissive access level.
+  ImportAccessLevel getImportAccessLevel(const ModuleDecl *targetModule) const;
+
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.
   virtual void
@@ -435,6 +446,7 @@ public:
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ImportPath::Access accessPath,
@@ -483,8 +495,8 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
-  Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
+  Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 

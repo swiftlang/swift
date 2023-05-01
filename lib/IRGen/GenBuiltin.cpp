@@ -120,6 +120,12 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
   return {lowered, IGM.getTypeInfo(lowered)};
 }
 
+static std::pair<SILType, const TypeInfo &>
+getMaximallyAbstractedLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
+  auto lowered = IGM.getLoweredType(AbstractionPattern::getOpaque(), unloweredType);
+  return {lowered, IGM.getTypeInfo(lowered)};
+}
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             BuiltinInst *Inst, ArrayRef<SILType> argTypes,
@@ -144,7 +150,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getSize(IGF, valueTy.first));
     return;
@@ -152,7 +158,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getStride(IGF, valueTy.first));
     return;
@@ -160,7 +166,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     // The alignof value is one greater than the alignment mask.
     out.add(IGF.Builder.CreateAdd(
@@ -173,7 +179,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
+    out.add(valueTy.second.getIsTriviallyDestroyable(IGF, valueTy.first));
     return;
   }
 
@@ -347,10 +353,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
+      Builtin.ID == BuiltinValueKind::InitializeNonDefaultDistributedActor ||
       Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
-    auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor
-                  ? IGF.IGM.getDefaultActorInitializeFunctionPointer()
-                  : IGF.IGM.getDefaultActorDestroyFunctionPointer();
+    irgen::FunctionPointer fn;
+    switch (Builtin.ID) {
+      case BuiltinValueKind::InitializeDefaultActor:
+        fn = IGF.IGM.getDefaultActorInitializeFunctionPointer();
+        break;
+      case BuiltinValueKind::InitializeNonDefaultDistributedActor:
+        fn = IGF.IGM.getNonDefaultDistributedActorInitializeFunctionPointer();
+        break;
+      case BuiltinValueKind::DestroyDefaultActor:
+        fn = IGF.IGM.getDefaultActorDestroyFunctionPointer();
+        break;
+      default:
+        llvm_unreachable("unhandled builtin id!");
+    }
     auto actor = args.claimNext();
     actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
     auto call = IGF.Builder.CreateCall(fn, {actor});
@@ -394,6 +412,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
     auto conf = substitutions.getConformances()[0];
     emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
+    return;
+  }
+  if (Builtin.ID == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildComplexEqualitySerialExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 

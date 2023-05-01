@@ -1,8 +1,4 @@
-// RUN: %target-run-stdlib-swift(-Xllvm -sil-disable-pass=DestroyHoisting -Xfrontend -enable-experimental-move-only)
-//
-// NOTE ON ABOVE: I am disabling destroy hoisting on this test since we are
-// going to move it out of the mandatory pipeline eventually and it causes the
-// test to fail only when optimizations are enabled.
+// RUN: %target-run-stdlib-swift(-O -enable-experimental-feature MoveOnly)
 
 // REQUIRES: executable_test
 
@@ -53,7 +49,7 @@ extension Class {
         do {
             x = self.k2
         }
-        switch (_move x)[userHandle] {
+        switch (consume x)[userHandle] {
         case .foo:
             expectTrue(_isUnique(&self.k2))
         }
@@ -76,7 +72,7 @@ extension Class {
         do {
             x = self.array
         }
-        switch (_move x)[userHandle] {
+        switch (x)[userHandle] {
         case .foo:
             expectTrue(self.array._buffer.isUniquelyReferenced())
         }
@@ -90,27 +86,27 @@ tests.test("readArraySwitchLetTest") {
     }
 }
 
-tests.test("simpleArrayVarTest") {
-    var x: [Enum] = Array(repeating: .foo, count: 10_000)
-    expectTrue(x._buffer.isUniquelyReferenced())
+tests.test("simpleVarTest") {
+    var x = Klass()
+    expectTrue(_isUnique_native(&x))
 
     var y = x
-    expectFalse(x._buffer.isUniquelyReferenced())
-    let _ = _move y
-    expectTrue(x._buffer.isUniquelyReferenced())
-    y = []
-    expectTrue(x._buffer.isUniquelyReferenced())
+    expectFalse(_isUnique_native(&x))
+    let _ = consume y
+    expectTrue(_isUnique_native(&x))
+    y = Klass()
+    expectTrue(_isUnique_native(&x))
 }
 
-tests.test("simpleArrayInoutVarTest") {
-    func inOutTest(_ x: inout [Enum]) {
+tests.test("simpleInoutVarTest") {
+    func inOutTest(_ x: inout Klass) {
         var y = x
-        expectFalse(x._buffer.isUniquelyReferenced())
-        let _ = _move y
-        expectTrue(x._buffer.isUniquelyReferenced())
-        y = []
-        expectTrue(x._buffer.isUniquelyReferenced())
+        expectFalse(_isUnique_native(&x))
+        let _ = consume y
+        expectTrue(_isUnique_native(&x))
+        y = Klass()
+        expectTrue(_isUnique_native(&x))
     }
-    var outerX: [Enum] = Array(repeating: .foo, count: 10_000)
+    var outerX = Klass()
     inOutTest(&outerX)
 }

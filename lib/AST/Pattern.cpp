@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
@@ -31,33 +32,29 @@ using namespace swift;
                 "Patterns are BumpPtrAllocated; the d'tor is never called");
 #include "swift/AST/PatternNodes.def"
 
-/// Diagnostic printing of PatternKinds.
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
-  switch (kind) {
-  case PatternKind::Paren:
-    return OS << "parenthesized pattern";
-  case PatternKind::Tuple:
-    return OS << "tuple pattern";
-  case PatternKind::Named:
-    return OS << "pattern variable binding";
-  case PatternKind::Any:
-    return OS << "'_' pattern";
-  case PatternKind::Typed:
-    return OS << "pattern type annotation";
-  case PatternKind::Is:
-    return OS << "prefix 'is' pattern";
-  case PatternKind::Expr:
-    return OS << "expression pattern";
+DescriptivePatternKind Pattern::getDescriptiveKind() const {
+#define TRIVIAL_PATTERN_KIND(Kind)                                             \
+  case PatternKind::Kind:                                                      \
+    return DescriptivePatternKind::Kind
+
+  switch (getKind()) {
+    TRIVIAL_PATTERN_KIND(Paren);
+    TRIVIAL_PATTERN_KIND(Tuple);
+    TRIVIAL_PATTERN_KIND(Named);
+    TRIVIAL_PATTERN_KIND(Any);
+    TRIVIAL_PATTERN_KIND(Typed);
+    TRIVIAL_PATTERN_KIND(Is);
+    TRIVIAL_PATTERN_KIND(EnumElement);
+    TRIVIAL_PATTERN_KIND(OptionalSome);
+    TRIVIAL_PATTERN_KIND(Bool);
+    TRIVIAL_PATTERN_KIND(Expr);
+
   case PatternKind::Binding:
-    return OS << "'var' binding pattern";
-  case PatternKind::EnumElement:
-    return OS << "enum case matching pattern";
-  case PatternKind::OptionalSome:
-    return OS << "optional .Some matching pattern";
-  case PatternKind::Bool:
-    return OS << "bool matching pattern";
+    return cast<BindingPattern>(this)->isLet() ? DescriptivePatternKind::Let
+                                               : DescriptivePatternKind::Var;
   }
-  llvm_unreachable("bad PatternKind");
+#undef TRIVIAL_PATTERN_KIND
+  llvm_unreachable("bad DescriptivePatternKind");
 }
 
 StringRef Pattern::getKindName(PatternKind K) {
@@ -66,6 +63,28 @@ StringRef Pattern::getKindName(PatternKind K) {
 #include "swift/AST/PatternNodes.def"
   }
   llvm_unreachable("bad PatternKind");
+}
+
+StringRef Pattern::getDescriptivePatternKindName(DescriptivePatternKind K) {
+#define ENTRY(Kind, String)                                                    \
+  case DescriptivePatternKind::Kind:                                           \
+    return String
+  switch (K) {
+    ENTRY(Paren, "parenthesized pattern");
+    ENTRY(Tuple, "tuple pattern");
+    ENTRY(Named, "pattern variable binding");
+    ENTRY(Any, "'_' pattern");
+    ENTRY(Typed, "pattern type annotation");
+    ENTRY(Is, "prefix 'is' pattern");
+    ENTRY(EnumElement, "enum case matching pattern");
+    ENTRY(OptionalSome, "optional pattern");
+    ENTRY(Bool, "bool matching pattern");
+    ENTRY(Expr, "expression pattern");
+    ENTRY(Var, "'var' binding pattern");
+    ENTRY(Let, "'let' binding pattern");
+  }
+#undef ENTRY
+  llvm_unreachable("bad DescriptivePatternKind");
 }
 
 // Metaprogram to verify that every concrete class implements
@@ -166,6 +185,12 @@ namespace {
     
     WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
     : fn(fn) {}
+
+    /// Walk everything that's available; there shouldn't be macro expansions
+    /// that matter anyway.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
 
     PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
       // Handle vars.
@@ -327,9 +352,8 @@ EnumElementDecl *OptionalSomePattern::getElementDecl() const {
 /// Return true if this is a non-resolved ExprPattern which is syntactically
 /// irrefutable.
 static bool isIrrefutableExprPattern(const ExprPattern *EP) {
-  // If the pattern has a registered match expression, it's
-  // a type-checked ExprPattern.
-  if (EP->getMatchExpr()) return false;
+  // If the pattern is resolved, it must be irrefutable.
+  if (EP->isResolved()) return false;
 
   auto expr = EP->getSubExpr();
   while (true) {
@@ -495,12 +519,33 @@ void IsPattern::setCastType(Type type) {
 
 TypeRepr *IsPattern::getCastTypeRepr() const { return CastType->getTypeRepr(); }
 
-/// Construct an ExprPattern.
-ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
-                         VarDecl *matchVar)
-  : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
-    MatchExpr(matchExpr), MatchVar(matchVar) {
-  assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
+ExprPattern *ExprPattern::createParsed(ASTContext &ctx, Expr *E,
+                                       DeclContext *DC) {
+  return new (ctx) ExprPattern(E, DC, /*isResolved*/ false);
+}
+
+ExprPattern *ExprPattern::createResolved(ASTContext &ctx, Expr *E,
+                                         DeclContext *DC) {
+  return new (ctx) ExprPattern(E, DC, /*isResolved*/ true);
+}
+
+ExprPattern *ExprPattern::createImplicit(ASTContext &ctx, Expr *E,
+                                         DeclContext *DC) {
+  auto *EP = ExprPattern::createResolved(ctx, E, DC);
+  EP->setImplicit();
+  return EP;
+}
+
+Expr *ExprPattern::getMatchExpr() const {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, None)
+      .getMatchExpr();
+}
+
+VarDecl *ExprPattern::getMatchVar() const {
+  auto &eval = DC->getASTContext().evaluator;
+  return evaluateOrDefault(eval, ExprPatternMatchRequest{this}, None)
+      .getMatchVar();
 }
 
 SourceLoc EnumElementPattern::getStartLoc() const {
@@ -604,5 +649,13 @@ bool ContextualPattern::allowsInference() const {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ContextualPattern &pattern) {
-  out << "(pattern @ " << pattern.getPattern() << ")";
+  simple_display(out, pattern.getPattern());
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const Pattern *pattern) {
+  out << "(pattern @ " << pattern << ")";
+}
+
+SourceLoc swift::extractNearestSourceLoc(const Pattern *pattern) {
+  return pattern->getLoc();
 }

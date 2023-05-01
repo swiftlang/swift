@@ -63,7 +63,7 @@ SWIFT_INLINE_THUNK String::operator std::string() const {
   using IndexType = decltype(u.getStartIndex());
   for (auto s = u.getStartIndex().getEncodedOffset(),
             e = u.getEndIndex().getEncodedOffset();
-       s != e; s = u.index(IndexType::init(s), 1).getEncodedOffset()) {
+       s != e; s = u.indexOffsetBy(IndexType::init(s), 1).getEncodedOffset()) {
     result.push_back(u[IndexType::init(s)]);
   }
   return result;
@@ -81,23 +81,28 @@ public:
   using Index =
       decltype(reinterpret_cast<Collection *>(0x123)->getStartIndex());
 
-  SWIFT_INLINE_THUNK CollectionIterator(const Collection &c) : collection(c) {
+  SWIFT_INLINE_THUNK CollectionIterator(const Collection &c) noexcept(
+      noexcept(c.getStartIndex()) &&noexcept(c.getEndIndex()))
+      : collection(c) {
     index = collection.getStartIndex();
     endIndex = collection.getEndIndex();
     // FIXME: Begin read access.
   }
 
-  SWIFT_INLINE_THUNK ~CollectionIterator() {
+  SWIFT_INLINE_THUNK ~CollectionIterator() noexcept {
     // FIXME: End read access.
   }
 
-  SWIFT_INLINE_THUNK T operator*() const { return collection[index]; }
-  SWIFT_INLINE_THUNK void operator++() {
+  SWIFT_INLINE_THUNK T operator*() const noexcept {
+    return collection[index];
+  }
+  SWIFT_INLINE_THUNK void operator++() noexcept {
     ++index;
     // FIXME: assert(index <= endIndex); // No need to go past the end.
   }
 
-  SWIFT_INLINE_THUNK bool operator!=(const IterationEndSentinel &) const {
+  SWIFT_INLINE_THUNK bool
+  operator!=(const IterationEndSentinel &) const noexcept {
     return index != endIndex;
   }
 
@@ -124,6 +129,8 @@ SWIFT_INLINE_THUNK cxxOverlay::IterationEndSentinel end(const Array<T> &) {
   return {};
 }
 
+#ifdef SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+
 extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
 
 extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
@@ -147,7 +154,7 @@ struct SymbolicP {
   uint8_t _4;
 } __attribute__((packed));
 
-inline const void *_Nullable getErrorMetadata() {
+SWIFT_INLINE_THUNK const void *_Nullable getErrorMetadata() {
   static SymbolicP errorSymbol;
   static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
   errorSymbol._1 = 2;
@@ -169,24 +176,27 @@ inline const void *_Nullable getErrorMetadata() {
 
 class Error {
 public:
-  Error() {}
-  Error(void *_Nonnull swiftError) { opaqueValue = swiftError; }
-  ~Error() {
+  SWIFT_INLINE_THUNK Error() {}
+  SWIFT_INLINE_THUNK Error(void *_Nonnull swiftError) {
+    opaqueValue = swiftError;
+  }
+  SWIFT_INLINE_THUNK ~Error() {
     if (opaqueValue)
       swift_errorRelease(opaqueValue);
   }
-  void *_Nonnull getPointerToOpaquePointer() { return opaqueValue; }
-  Error(Error &&other) : opaqueValue(other.opaqueValue) {
+  SWIFT_INLINE_THUNK void *_Nonnull getPointerToOpaquePointer() {
+    return opaqueValue;
+  }
+  SWIFT_INLINE_THUNK Error(Error &&other) : opaqueValue(other.opaqueValue) {
     other.opaqueValue = nullptr;
   }
-  Error(const Error &other) {
+  SWIFT_INLINE_THUNK Error(const Error &other) {
     if (other.opaqueValue)
       swift_errorRetain(other.opaqueValue);
     opaqueValue = other.opaqueValue;
   }
 
-  template <class T>
-  Swift::Optional<T> as() {
+  template <class T> SWIFT_INLINE_THUNK swift::Optional<T> as() {
     alignas(alignof(T)) char buffer[sizeof(T)];
     const void *em = getErrorMetadata();
     void *ep = getPointerToOpaquePointer();
@@ -204,10 +214,10 @@ public:
             swift::_impl::implClassFor<T>::type::initializeWithTake(dest,
                                                                     buffer);
           });
-      return Swift::Optional<T>::init(result);
+      return swift::Optional<T>::init(result);
     }
 
-    return  Swift::Optional<T>::none();
+    return swift::Optional<T>::none();
   }
 
 private:
@@ -233,7 +243,7 @@ public:
     has_val = false;
   }
 
-  constexpr Expected(const Swift::Error& error_val) noexcept {
+  constexpr Expected(const swift::Error &error_val) noexcept {
     new (&buffer) Error(error_val);
     has_val = false;
   }
@@ -261,7 +271,7 @@ public:
     if (has_value())
       reinterpret_cast<const T *>(buffer)->~T();
     else
-      reinterpret_cast<Swift::Error *>(buffer)->~Error();
+      reinterpret_cast<swift::Error *>(buffer)->~Error();
   }
 
   /// assignment
@@ -310,22 +320,23 @@ public:
   }
 
   // Get error
-  constexpr Swift::Error const& error() const& {
+  constexpr swift::Error const &error() const & {
     if (has_value())
       abort();
-    return reinterpret_cast<const Swift::Error&>(buffer);
+    return reinterpret_cast<const swift::Error &>(buffer);
   }
 
-  constexpr Swift::Error& error() & {
+  constexpr swift::Error &error() & {
     if (has_value())
       abort();
-    return reinterpret_cast<Swift::Error&>(buffer);
+    return reinterpret_cast<swift::Error &>(buffer);
   }
 
   constexpr bool has_value() const noexcept { return has_val; }
 
 private:
-  alignas(_impl::max(alignof(T), alignof(Swift::Error))) char buffer[_impl::max(sizeof(T), sizeof(Swift::Error))];
+  alignas(_impl::max(alignof(T), alignof(swift::Error))) char buffer[_impl::max(
+      sizeof(T), sizeof(swift::Error))];
   bool has_val;
 };
 
@@ -338,11 +349,10 @@ public:
     has_val = false;
   }
 
-  Expected(const Swift::Error& error_val) noexcept {
+  Expected(const swift::Error &error_val) noexcept {
     new (&buffer) Error(error_val);
     has_val = false;
   }
-
 
   /// Copy
   Expected(Expected const& other) noexcept {
@@ -358,9 +368,7 @@ public:
   // FIXME: Implement move semantics when move swift values is possible
   [[noreturn]] Expected(Expected&&) noexcept { abort(); }
 
-  ~Expected() noexcept {
-    reinterpret_cast<Swift::Error *>(buffer)->~Error();
-  }
+  ~Expected() noexcept { reinterpret_cast<swift::Error *>(buffer)->~Error(); }
 
   /// assignment
   constexpr auto operator=(Expected&& other) noexcept = delete;
@@ -370,21 +378,21 @@ public:
   constexpr explicit operator bool() const noexcept { return has_value(); }
 
   // Get error
-  constexpr Swift::Error const& error() const& {
+  constexpr swift::Error const &error() const & {
     if (has_value())
       abort();
-    return reinterpret_cast<const Swift::Error&>(buffer);
+    return reinterpret_cast<const swift::Error &>(buffer);
   }
 
-  constexpr Swift::Error& error() & {
+  constexpr swift::Error &error() & {
     if (has_value())
       abort();
-    return reinterpret_cast<Swift::Error&>(buffer);
+    return reinterpret_cast<swift::Error &>(buffer);
   }
 
   constexpr bool has_value() const noexcept { return has_val; }
 private:
-  alignas(alignof(Swift::Error)) char buffer[sizeof(Swift::Error)];
+  alignas(alignof(swift::Error)) char buffer[sizeof(swift::Error)];
   bool has_val;
 };
 
@@ -397,13 +405,13 @@ using ThrowingResult = T;
 
 #else
 
-template<class T>
-using ThrowingResult = Swift::Expected<T>;
+template <class T> using ThrowingResult = swift::Expected<T>;
 
-#define SWIFT_RETURN_THUNK(T, v) Swift::Expected<T>(v)
+#define SWIFT_RETURN_THUNK(T, v) swift::Expected<T>(v)
 
 #endif
 
 #endif // SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
+#endif // SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
 
 #endif

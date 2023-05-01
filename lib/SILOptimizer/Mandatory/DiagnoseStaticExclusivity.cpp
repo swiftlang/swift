@@ -541,13 +541,19 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
+  SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
+  SILModule &M = FirstAccess.getInstruction()->getModule();
+  TypeExpansionContext TypeExpansionCtx(
+      *FirstAccess.getInstruction()->getFunction());
+  SILType firstAccessType = AccessSummaryAnalysis::getSubPathType(
+      BaseType, MainAccess.getSubPath(), M, TypeExpansionCtx);
+  bool isMoveOnly = firstAccessType.isMoveOnly();
+
   if (const ValueDecl *VD = Storage.getDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
-    SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
-    SILModule &M = FirstAccess.getInstruction()->getModule();
-    std::string PathDescription = getPathDescription(
-        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M,
-        TypeExpansionContext(*FirstAccess.getInstruction()->getFunction()));
+    std::string PathDescription =
+        getPathDescription(VD->getBaseName(), BaseType, MainAccess.getSubPath(),
+                           M, TypeExpansionCtx);
 
     // Determine whether we can safely suggest replacing the violation with
     // a call to MutableCollection.swapAt().
@@ -562,18 +568,35 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
             CallsToSwap, Ctx, CallToReplace, Base, SwapIndex1, SwapIndex2);
     }
 
-    auto D =
-        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
-                 diag::exclusivity_access_required,
-                 PathDescription, AccessKindForMain, SuggestSwapAt);
-    D.highlight(RangeForMain);
-    if (SuggestSwapAt)
-      addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
-                     Ctx.SourceMgr);
+    if (isMoveOnly) {
+        auto D = diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                          diag::exclusivity_access_required_moveonly,
+                          PathDescription, AccessKindForMain);
+        D.highlight(RangeForMain);
+        if (SuggestSwapAt)
+        addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
+                       Ctx.SourceMgr);
+    } else {
+        auto D = diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                          diag::exclusivity_access_required, PathDescription,
+                          AccessKindForMain, SuggestSwapAt);
+        D.highlight(RangeForMain);
+        if (SuggestSwapAt)
+        addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
+                       Ctx.SourceMgr);
+    }
   } else {
-    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
-             diag::exclusivity_access_required_unknown_decl, AccessKindForMain)
-        .highlight(RangeForMain);
+    if (isMoveOnly) {
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required_unknown_decl_moveonly,
+                 AccessKindForMain)
+            .highlight(RangeForMain);
+    } else {
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required_unknown_decl,
+                 AccessKindForMain)
+            .highlight(RangeForMain);
+    }
   }
   diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
            diag::exclusivity_conflicting_access)

@@ -405,6 +405,7 @@ namespace {
   class SignatureExpansion {
     IRGenModule &IGM;
     CanSILFunctionType FnType;
+    bool forStaticCall = false; // Used for objc_method (direct call or not).
   public:
     SmallVector<llvm::Type*, 8> ParamIRTypes;
     llvm::Type *ResultIRType = nullptr;
@@ -419,8 +420,8 @@ namespace {
     FunctionPointerKind FnKind;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       FunctionPointerKind fnKind)
-        : IGM(IGM), FnType(fnType), FnKind(fnKind) {}
+                       FunctionPointerKind fnKind, bool forStaticCall = false)
+        : IGM(IGM), FnType(fnType), forStaticCall(forStaticCall), FnKind(fnKind) {}
 
     /// Expand the components of the primary entrypoint of the function type.
     void expandFunctionType(
@@ -1356,7 +1357,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     auto &self = params.back();
     auto clangTy = IGM.getClangType(self, FnType);
     paramTys.push_back(clangTy);
-    paramTys.push_back(clangCtx.VoidPtrTy);
+    if (!forStaticCall) // objc_direct methods don't have the _cmd argumment.
+      paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.drop_back();
     break;
   }
@@ -2006,9 +2008,10 @@ Signature SignatureExpansion::getSignature() {
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType,
-                                 FunctionPointerKind fpKind) {
+                                 FunctionPointerKind fpKind,
+                                 bool forStaticCall) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType, fpKind);
+  SignatureExpansion expansion(IGM, formalType, fpKind, forStaticCall);
   expansion.expandFunctionType();
   return expansion.getSignature();
 }
@@ -2312,7 +2315,8 @@ public:
     switch (getCallee().getRepresentation()) {
     case SILFunctionTypeRepresentation::ObjCMethod:
       adjusted.add(getCallee().getObjCMethodReceiver());
-      adjusted.add(getCallee().getObjCMethodSelector());
+      if (!getCallee().isDirectObjCMethod())
+        adjusted.add(getCallee().getObjCMethodSelector());
       externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
                            isOutlined);
       break;
@@ -3310,7 +3314,7 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   // We should have the right data values for the representation.
   switch (Info.OrigFnType->getRepresentation()) {
   case SILFunctionTypeRepresentation::ObjCMethod:
-    assert(FirstData && SecondData);
+    assert(FirstData);
     break;
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -3387,6 +3391,11 @@ llvm::Value *Callee::getObjCMethodSelector() const {
          "not a method");
   assert(SecondData && "no selector set on callee");
   return SecondData;
+}
+
+bool Callee::isDirectObjCMethod() const {
+  return Info.OrigFnType->getRepresentation() ==
+           SILFunctionTypeRepresentation::ObjCMethod && SecondData == nullptr;
 }
 
 /// Set up this emitter afresh from the current callee specs.
@@ -3473,7 +3482,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
   Alignment coercionTyAlignment =
       Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
-  if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
+  if (alloca->getAlign() < coercionTyAlignment.getValue()) {
     alloca->setAlignment(
         llvm::MaybeAlign(coercionTyAlignment.getValue()).valueOrOne());
     temporary = Address(temporary.getAddress(), temporary.getElementType(),
@@ -3691,8 +3700,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   // Handle the ObjC prefix.
   if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     // Ignore both the logical and the physical parameters associated
-    // with self and _cmd.
-    firstParam += 2;
+    // with self and (if not objc_direct) _cmd.
+    firstParam += callee.isDirectObjCMethod() ? 1 :  2;
     params = params.drop_back();
 
   // Or the block prefix.
@@ -4662,7 +4671,7 @@ static void adjustAllocaAlignment(const llvm::DataLayout &DL,
   auto layout = DL.getStructLayout(type);
   Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
-  if (alloca->getAlignment() < layoutAlignment.getValue()) {
+  if (alloca->getAlign() < layoutAlignment.getValue()) {
     alloca->setAlignment(
         llvm::MaybeAlign(layoutAlignment.getValue()).valueOrOne());
     allocaAddr = Address(allocaAddr.getAddress(), allocaAddr.getElementType(),

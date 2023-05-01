@@ -67,6 +67,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
   case ConstraintLocator::TupleType:
+  case ConstraintLocator::GenericType:
   case ConstraintLocator::NamedTupleElement:
   case ConstraintLocator::TupleElement:
   case ConstraintLocator::ProtocolRequirement:
@@ -104,6 +105,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::SingleValueStmtBranch:
   case ConstraintLocator::AnyPatternDecl:
   case ConstraintLocator::GlobalActorType:
+  case ConstraintLocator::CoercionOperand:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -239,6 +241,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   case ConstraintLocator::TupleType: {
     auto tupleElt = elt.castTo<LocatorPathElt::TupleType>();
     out << "tuple type '" << tupleElt.getType()->getString(PO) << "'";
+    break;
+  }
+
+  case ConstraintLocator::GenericType: {
+    auto genericTyElt = elt.castTo<LocatorPathElt::GenericType>();
+    out << "generic type '" << genericTyElt.getType()->getString(PO) << "'";
     break;
   }
 
@@ -489,6 +497,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "global actor type";
     break;
   }
+
+  case ConstraintLocator::CoercionOperand: {
+    out << "coercion operand";
+    break;
+  }
   }
 }
 
@@ -594,7 +607,7 @@ bool ConstraintLocator::isForAssignment() const {
 }
 
 bool ConstraintLocator::isForCoercion() const {
-  return directlyAt<CoerceExpr>();
+  return isLastElement<LocatorPathElt::CoercionOperand>();
 }
 
 bool ConstraintLocator::isForOptionalTry() const {
@@ -649,6 +662,19 @@ ConstraintLocator::isForSingleValueStmtBranch() const {
   return SingleValueStmtBranchKind::Regular;
 }
 
+bool ConstraintLocator::isMemberRef() const {
+  if (isLastElement<LocatorPathElt::Member>()) {
+    return true;
+  } else if (isLastElement<LocatorPathElt::KeyPathDynamicMember>()) {
+    auto path = getPath();
+    if (path.size() >= 2 &&
+        path[path.size() - 2].is<LocatorPathElt::Member>()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
@@ -681,7 +707,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   constraints::dumpAnchor(anchor, sm, out);
 
   for (auto elt : getPath()) {
-    out << " -> ";
+    out << " → ";
     elt.dump(out);
   }
   out << ']';

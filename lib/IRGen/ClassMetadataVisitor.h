@@ -65,8 +65,11 @@ protected:
 
 public:
   void layout() {
-    static_assert(MetadataAdjustmentIndex::Class == 2,
+    static_assert(MetadataAdjustmentIndex::Class == 3,
                   "Adjustment index must be synchronized with this layout");
+
+    // Pointer to layout string
+    asImpl().addLayoutStringPointer();
 
     // HeapMetadata header.
     asImpl().addDestructorFunction();
@@ -204,6 +207,9 @@ private:
     case Field::DefaultActorStorage:
       asImpl().addDefaultActorStorageFieldOffset();
       return;
+    case Field::NonDefaultDistributedActorStorage:
+      asImpl().addNonDefaultDistributedActorStorageFieldOffset();
+      return;
     }
   }
 };
@@ -225,6 +231,7 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }
   void addClassFlags() { addInt32(); }
@@ -241,6 +248,7 @@ public:
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addDefaultActorStorageFieldOffset() { addPointer(); }
+  void addNonDefaultDistributedActorStorageFieldOffset() { addPointer(); }
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
     for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();

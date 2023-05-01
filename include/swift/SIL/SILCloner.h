@@ -279,34 +279,22 @@ public:
     if (type->getNumElements() == 0) return false;
 
     // Do a first pass over the tuple elements to check out the
-    // non-expansions.  If there's more than one of them, or any of them
-    // is labeled, we definitely stay a tuple and don't need to substitute
-    // any of the expansions.
-    unsigned numScalarElements = 0;
-    for (auto index : indices(type->getElements())) {
-      auto eltType = type.getElementType(index);
-      // Ignore pack expansions in this pass.
-      if (isa<PackExpansionType>(eltType)) continue;
-
-      // If there's a labeled scalar element, we'll stay a tuple.
-      if (type->getElement(index).hasName()) return false;
-
-      // If there are multiple scalar elements, we'll stay a tuple.
-      if (++numScalarElements > 1) return false;
-    }
-
-    assert(numScalarElements <= 1);
-
-    // We must have expansions if we got here: if all the elements were
-    // scalar, and none of them were labelled, and there wasn't more than
-    // one of them, and there was at least one of them, then somehow
-    // we had a tuple with a single unlabeled element.
+    // non-expansions.  If there's more than one of them we definitely
+    // stay a tuple and don't need to substitute any of the expansions.
+    unsigned numScalarElements = type->getNumScalarElements();
+    if (numScalarElements > 1)
+      return false;
 
     // Okay, we need to substitute the count types for the expansions.
     for (auto index : indices(type->getElements())) {
       // Ignore non-expansions because we've already counted them.
       auto expansion = dyn_cast<PackExpansionType>(type.getElementType(index));
-      if (!expansion) continue;
+      if (!expansion) {
+        // If we have a non-expansion with a label, we stay a tuple.
+        if (type->getElement(index).hasName())
+          return false;
+        continue;
+      }
 
       // Substitute the shape class of the expansion.
       auto newShapeClass = getOpASTType(expansion.getCountType());
@@ -893,7 +881,12 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->getWasMoved());
+      Inst->hasDynamicLifetime(), Inst->isLexical(),
+      Inst->getUsesMoveableValueDebugInfo()
+#ifndef NDEBUG
+    , true
+#endif
+  );
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -961,7 +954,12 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
       Inst,
       getBuilder().createAllocBox(
           Loc, this->getOpType(Inst->getType()).template castTo<SILBoxType>(),
-          VarInfo));
+          VarInfo, false, false, false
+#ifndef NDEBUG
+          ,
+          true
+#endif
+          ));
 }
 
 template<typename ImplClass>
@@ -1380,7 +1378,8 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
-      Inst->poisonRefs(), Inst->getWasMoved(), Inst->hasTrace());
+      Inst->poisonRefs(), Inst->getUsesMoveableValueDebugInfo(),
+      Inst->hasTrace());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1484,11 +1483,20 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitExplicitCopyAddrInst(
     ExplicitCopyAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createExplicitCopyAddr(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
-                getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
-                Inst->isInitializationOfDest()));
+  if (!getBuilder().hasOwnership()) {
+    recordClonedInstruction(
+        Inst, getBuilder().createCopyAddr(
+                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                  getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                  Inst->isInitializationOfDest()));
+  } else {
+    // preserve the explicit_*
+    recordClonedInstruction(
+        Inst, getBuilder().createExplicitCopyAddr(
+                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+                  getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
+                  Inst->isInitializationOfDest()));
+  }
 }
 
 template <typename ImplClass>
@@ -1870,10 +1878,24 @@ void SILCloner<ImplClass>::visitExplicitCopyValueInst(
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
+  }
   auto *MVI = getBuilder().createMoveValue(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand()),
                                            Inst->isLexical());
   MVI->setAllowsDiagnostics(Inst->getAllowDiagnostics());
+  recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDropDeinitInst(DropDeinitInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
+  }
+  auto *MVI = getBuilder().createDropDeinit(getOpLocation(Inst->getLoc()),
+                                            getOpValue(Inst->getOperand()));
   recordClonedInstruction(Inst, MVI);
 }
 
@@ -1883,6 +1905,16 @@ void SILCloner<ImplClass>::visitMarkMustCheckInst(MarkMustCheckInst *Inst) {
   auto *MVI = getBuilder().createMarkMustCheckInst(
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
       Inst->getCheckKind());
+  recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMarkUnresolvedReferenceBindingInst(
+    MarkUnresolvedReferenceBindingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *MVI = getBuilder().createMarkUnresolvedReferenceBindingInst(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      Inst->getKind());
   recordClonedInstruction(Inst, MVI);
 }
 

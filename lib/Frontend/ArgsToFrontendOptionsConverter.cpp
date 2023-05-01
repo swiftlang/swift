@@ -23,6 +23,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -256,11 +257,6 @@ bool ArgsToFrontendOptionsConverter::convert(
       Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
       return true;
     }
-
-    if (Args.hasArg(OPT_check_api_availability_only)) {
-      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_checking_api_availability_only);
-      return true;
-    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
@@ -268,16 +264,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
-
-  if (const Arg *A = Args.getLastArg(OPT_package_name)) {
-    auto pkgName = A->getValue();
-    if (!Lexer::isIdentifier(pkgName))
-      Diags.diagnose(SourceLoc(), diag::error_bad_package_name, pkgName);
-    else if (pkgName == STDLIB_NAME)
-      Diags.diagnose(SourceLoc(), diag::error_stdlib_package_name, pkgName);
-    else
-      Opts.PackageName = pkgName;
-  }
 
   if (const Arg *A = Args.getLastArg(OPT_export_as)) {
     auto exportAs = A->getValue();
@@ -310,15 +296,29 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
-      Opts.ClangHeaderExposedDecls =
-          llvm::StringSwitch<llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(A->getValue())
-              .Case("all-public", FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
-              .Case("has-expose-attr", FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
-              .Default(llvm::None);
+    Opts.ClangHeaderExposedDecls =
+        llvm::StringSwitch<
+            llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(
+            A->getValue())
+            .Case("all-public",
+                  FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
+            .Case("has-expose-attr",
+                  FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
+            .Case("has-expose-attr-or-stdlib",
+                  FrontendOptions::ClangHeaderExposeBehavior::
+                      HasExposeAttrOrImplicitDeps)
+            .Default(llvm::None);
   }
-  Opts.EnableExperimentalCxxInteropInClangHeader =
-      Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
-  
+  for (const auto &arg :
+       Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
+    auto splitArg = StringRef(arg).split('=');
+    if (splitArg.second.empty()) {
+      continue;
+    }
+    Opts.clangHeaderExposedImports.push_back(
+        {splitArg.first.str(), splitArg.second.str()});
+  }
+
   Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
                                                  OPT_no_strict_implicit_module_context,
                                                  false);
@@ -346,6 +346,23 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
   }
   Opts.emptyABIDescriptor = Args.hasArg(OPT_empty_abi_descriptor);
+  Opts.DeterministicCheck = Args.hasArg(OPT_enable_deterministic_check);
+  for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
+    Opts.BlocklistConfigFilePaths.push_back(A);
+  }
+
+  Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
+  Opts.CASPath =
+      Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
+  Opts.CASFSRootID = Args.getLastArgValue(OPT_cas_fs);
+  if (Opts.EnableCAS && Opts.CASFSRootID.empty() &&
+      FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
+    if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
+        Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+        return true;
+    }
+  }
+
   return false;
 }
 
@@ -398,8 +415,9 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
 
 void ArgsToFrontendOptionsConverter::computeTBDOptions() {
   using namespace options;
+  using Mode = FrontendOptions::TBDValidationMode;
+
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
-    using Mode = FrontendOptions::TBDValidationMode;
     StringRef value = A->getValue();
     if (value == "none") {
       Opts.ValidateTBDAgainstIR = Mode::None;
@@ -411,6 +429,16 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                      A->getOption().getPrefixedName(), value);
     }
+  } else if (Args.hasArg(OPT_enable_experimental_cxx_interop) ||
+             Args.hasArg(OPT_cxx_interoperability_mode)) {
+    // TBD validation currently emits diagnostics when C++ interop is enabled,
+    // which is likely caused by IRGen incorrectly applying attributes to
+    // symbols, forcing the user to pass `-validate-tbd-against-ir=none`.
+    // If no explicit TBD validation mode was specified, disable it if C++
+    // interop is enabled.
+    // See https://github.com/apple/swift/issues/56458.
+    // FIXME: the TBD validation diagnostics are correct and should be enabled.
+    Opts.ValidateTBDAgainstIR = Mode::None;
   }
 }
 
@@ -654,6 +682,12 @@ bool ArgsToFrontendOptionsConverter::
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
                                                        supplementaryOutputs,
                                                        mainOutputForIndexUnits);
+  // set output type.
+  const file_types::ID outputType =
+      FrontendOptions::formatForPrincipalOutputFileForAction(
+          Opts.RequestedAction);
+  Opts.InputsAndOutputs.setPrincipalOutputType(outputType);
+
   return false;
 }
 

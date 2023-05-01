@@ -63,7 +63,8 @@ size_t GenericEnvironment::numTrailingObjects(
 }
 
 size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
-  return getGenericParams().size();
+  return getGenericParams().size()
+       + (getKind() == Kind::OpenedElement ? getNumOpenedPackParams() : 0);
 }
 
 /// Retrieve the array containing the context types associated with the
@@ -80,6 +81,21 @@ MutableArrayRef<Type> GenericEnvironment::getContextTypes() {
 ArrayRef<Type> GenericEnvironment::getContextTypes() const {
   return ArrayRef<Type>(getTrailingObjects<Type>(),
                         getGenericParams().size());
+}
+
+unsigned GenericEnvironment::getNumOpenedPackParams() const {
+  assert(getKind() == Kind::OpenedElement);
+  return getGenericSignature().getInnermostGenericParams().size();
+}
+
+MutableArrayRef<Type> GenericEnvironment::getOpenedPackParams() {
+  auto begin = getTrailingObjects<Type>() + getGenericParams().size();
+  return MutableArrayRef<Type>(begin, getNumOpenedPackParams());
+}
+
+ArrayRef<Type> GenericEnvironment::getOpenedPackParams() const {
+  auto begin = getTrailingObjects<Type>() + getGenericParams().size();
+  return ArrayRef<Type>(begin, getNumOpenedPackParams());
 }
 
 TypeArrayView<GenericTypeParamType>
@@ -104,7 +120,8 @@ GenericEnvironment::getPackElementContextSubstitutions() const {
   return environmentData->outerSubstitutions;
 }
 
-CanType GenericEnvironment::getOpenedElementShapeClass() const {
+CanGenericTypeParamType
+GenericEnvironment::getOpenedElementShapeClass() const {
   assert(getKind() == Kind::OpenedElement);
   auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
   return environmentData->shapeClass;
@@ -129,6 +146,53 @@ GenericEnvironment::getOpenedExistentialParentSignature() const {
 UUID GenericEnvironment::getOpenedElementUUID() const {
   assert(getKind() == Kind::OpenedElement);
   return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
+}
+
+namespace {
+
+struct FindOpenedElementParam {
+  ArrayRef<Type> openedPacks;
+  TypeArrayView<GenericTypeParamType> packElementParams;
+
+  FindOpenedElementParam(const GenericEnvironment *env,
+                         ArrayRef<Type> openedPacks)
+    : openedPacks(openedPacks),
+      packElementParams(
+        env->getGenericSignature().getInnermostGenericParams()) {
+    assert(openedPacks.size() == packElementParams.size());
+  }
+
+  GenericTypeParamType *operator()(Type packParam) {
+    for (auto i : indices(openedPacks)) {
+      if (openedPacks[i]->isEqual(packParam))
+        return packElementParams[i];
+    }
+    llvm_unreachable("parameter was not an opened pack parameter");
+  }
+};
+
+struct FindElementArchetypeForOpenedPackParam {
+  FindOpenedElementParam findElementParam;
+  QueryInterfaceTypeSubstitutions getElementArchetype;
+
+  FindElementArchetypeForOpenedPackParam(const GenericEnvironment *env,
+                                         ArrayRef<Type> openedPacks)
+    : findElementParam(env, openedPacks), getElementArchetype(env) {}
+
+
+  ElementArchetypeType *operator()(Type interfaceType) {
+    assert(interfaceType->isTypeParameter());
+    if (auto member = interfaceType->getAs<DependentMemberType>()) {
+      auto baseArchetype = (*this)(member->getBase());
+      return baseArchetype->getNestedType(member->getAssocType())
+               ->castTo<ElementArchetypeType>();
+    }
+    assert(interfaceType->is<GenericTypeParamType>());
+    return getElementArchetype(findElementParam(interfaceType))
+             ->castTo<ElementArchetypeType>();
+  }
+};
+
 }
 
 void GenericEnvironment::forEachPackElementArchetype(
@@ -160,7 +224,7 @@ void GenericEnvironment::forEachPackElementGenericTypeParam(
 
     // Only include opened element parameters for packs in the given
     // shape equivalence class.
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+    if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
     function(genericParam);
@@ -177,7 +241,7 @@ void GenericEnvironment::forEachPackElementBinding(
     auto *elementArchetype =
         mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
     auto *packSubstitution = maybeApplyOuterContextSubstitutions(genericParam)
-                                 ->template castTo<PackType>();
+      ->getPackSubstitutionAsPackType();
     function(elementArchetype, packSubstitution);
   });
 
@@ -218,7 +282,8 @@ GenericEnvironment::GenericEnvironment(
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature,
-                                       UUID uuid, CanType shapeClass,
+                                       UUID uuid,
+                                       CanGenericTypeParamType shapeClass,
                                        SubstitutionMap outerSubs)
   : SignatureAndKind(signature, Kind::OpenedElement)
 {
@@ -228,6 +293,16 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature,
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
+
+  // Fill in the array of opened pack parameters.
+  auto openedPacksBuffer = getOpenedPackParams();
+  unsigned i = 0;
+  for (auto param : signature.getGenericParams()) {
+    if (!param->isParameterPack()) continue;
+    if (!signature->haveSameShape(param, shapeClass)) continue;
+    openedPacksBuffer[i++] = param;
+  }
+  assert(i == openedPacksBuffer.size());
 }
 
 void GenericEnvironment::addMapping(GenericParamKey key,
@@ -584,46 +659,89 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
 }
 
 Type
+GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
+  assert(getKind() == Kind::OpenedElement);
+  assert(!type->hasTypeParameter() && "expected contextual type");
+
+  if (!type->hasArchetype()) return type;
+
+  auto sig = getGenericSignature();
+  auto shapeClass = getOpenedElementShapeClass();
+
+  FindElementArchetypeForOpenedPackParam
+    findElementArchetype(this, getOpenedPackParams());
+
+  return type.transformRec([&](TypeBase *ty) -> Optional<Type> {
+    // We're only directly substituting pack archetypes.
+    auto archetype = ty->getAs<PackArchetypeType>();
+    if (!archetype) {
+      // Don't recurse into nested pack expansions.
+      if (ty->is<PackExpansionType>())
+        return Type(ty);
+
+      // Recurse into any other type.
+      return None;
+    }
+
+    auto rootArchetype = cast<PackArchetypeType>(archetype->getRoot());
+
+    // TODO: assert that the generic environment of the pack archetype
+    // matches the signature that was originally opened to make this
+    // environment.  Unfortunately, that isn't a trivial check because of
+    // the extra opened-element parameters.
+
+    // If the archetype isn't the shape that was opened by this
+    // environment, ignore it.
+    auto rootParam = cast<GenericTypeParamType>(
+      rootArchetype->getInterfaceType().getPointer());
+    assert(rootParam->isParameterPack());
+    if (!sig->haveSameShape(rootParam, shapeClass))
+      return Type(ty);
+
+    return Type(findElementArchetype(archetype->getInterfaceType()));
+  });
+}
+
+CanType
+GenericEnvironment::mapContextualPackTypeIntoElementContext(CanType type) const {
+  return CanType(mapContextualPackTypeIntoElementContext(Type(type)));
+}
+
+Type
 GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   assert(getKind() == Kind::OpenedElement);
   assert(!type->hasArchetype());
 
   auto sig = getGenericSignature();
   auto shapeClass = getOpenedElementShapeClass();
-  QueryInterfaceTypeSubstitutions substitutions(this);
 
-  llvm::SmallDenseMap<GenericParamKey,
-                      GenericTypeParamType *> elementParamForPack;
-  auto packElements = sig.getInnermostGenericParams();
-  auto elementDepth = packElements.front()->getDepth();
-
-  for (auto *genericParam : sig.getGenericParams()) {
-    if (genericParam->getDepth() == elementDepth)
-      break;
-
-    if (!genericParam->isParameterPack())
-      continue;
-
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
-      continue;
-
-    auto elementIndex = elementParamForPack.size();
-    elementParamForPack[{genericParam}] = packElements[elementIndex];
-  }
+  FindElementArchetypeForOpenedPackParam
+    findElementArchetype(this, getOpenedPackParams());
 
   // Map the interface type to the element type by stripping
   // away the isParameterPack bit before mapping type parameters
   // to archetypes.
-  return type.subst([&](SubstitutableType *type) {
-    auto *genericParam = type->getAs<GenericTypeParamType>();
-    if (!genericParam)
-      return Type();
+  return type.transformRec([&](TypeBase *ty) -> Optional<Type> {
+    // We're only directly substituting pack parameters.
+    if (!ty->isTypeParameter()) {
+      // Don't recurse into nested pack expansions; just map it into
+      // context.
+      if (ty->is<PackExpansionType>())
+        return mapTypeIntoContext(ty);
 
-    if (auto *elementParam = elementParamForPack[{genericParam}])
-      return substitutions(elementParam);
+      // Recurse into any other type.
+      return None;
+    }
 
-    return substitutions(genericParam);
-  }, LookUpConformanceInSignature(sig.getPointer()));
+    // Just do normal mapping for types that are not rooted in
+    // opened type parameters.
+    auto rootParam = ty->getRootGenericParam();
+    if (!rootParam->isParameterPack() ||
+        !sig->haveSameShape(rootParam, shapeClass))
+      return mapTypeIntoContext(ty);
+
+    return Type(findElementArchetype(ty));
+  });
 }
 
 Type
@@ -657,7 +775,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     if (!genericParam->isParameterPack())
       continue;
 
-    if (!sig->haveSameShape(genericParam, shapeClass->mapTypeOutOfContext()))
+    if (!sig->haveSameShape(genericParam, shapeClass))
       continue;
 
     GenericParamKey elementKey(/*isParameterPack*/false,
@@ -681,10 +799,37 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
   }, LookUpConformanceInSignature(sig.getPointer()));
 }
 
+namespace {
+/// A function suitable for use as a \c TypeSubstitutionFn that produces
+/// correct forwarding substitutions for a generic environment.
+///
+/// This differs from QueryInterfaceTypeSubstitutions only in that it
+/// always produces PackTypes for pack parameters.
+class BuildForwardingSubstitutions {
+  QueryInterfaceTypeSubstitutions Query;
+
+public:
+  BuildForwardingSubstitutions(const GenericEnvironment *self)
+    : Query(self) { }
+
+  Type operator()(SubstitutableType *type) const;
+};
+} // end anonymous namespace
+
+Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
+  if (auto resultType = Query(type)) {
+    auto param = type->castTo<GenericTypeParamType>();
+    if (!param->isParameterPack())
+      return resultType;
+    return PackType::getSingletonPackExpansion(resultType);
+  }
+  return Type();
+}
+
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
-                              QueryInterfaceTypeSubstitutions(this),
+                              BuildForwardingSubstitutions(this),
                               MakeAbstractConformanceForGenericType());
 }
 
@@ -708,4 +853,28 @@ GenericEnvironment::mapConformanceRefIntoContext(
   
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};
+}
+
+OpenedElementContext
+OpenedElementContext::createForContextualExpansion(ASTContext &ctx,
+                                       CanPackExpansionType expansionType) {
+  assert(!expansionType->hasTypeParameter() &&
+         "must be given a contextual type");
+
+  // Get the outer generic signature and environment.
+  auto countArchetype = cast<ArchetypeType>(expansionType.getCountType());
+  auto *genericEnv = countArchetype->getGenericEnvironment();
+  auto subMap = genericEnv->getForwardingSubstitutionMap();
+
+  auto countType = cast<GenericTypeParamType>(
+      countArchetype->getInterfaceType()->getCanonicalType());
+
+  auto genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
+  // Create an opened element signature and environment.
+  auto elementSig = ctx.getOpenedElementSignature(
+      genericSig, countType);
+  auto *elementEnv = GenericEnvironment::forOpenedElement(
+      elementSig, UUID::fromTime(), countType, subMap);
+
+  return {elementEnv, elementSig};
 }

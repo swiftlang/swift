@@ -3,7 +3,7 @@ import SwiftSyntax
 import SwiftSyntaxMacros
 
 /// A C++ source location.
-typealias CxxSourceLoc = UnsafeMutablePointer<UInt8>
+public typealias CxxSourceLoc = UnsafePointer<UInt8>
 
 /// A source manager that keeps track of the source files in the program.
 class SourceManager {
@@ -128,6 +128,6 @@ extension SourceManager {
       return nil
     }
     let address = bufferBaseAddress.advanced(by: offsetFromSourceFile)
-    return CxxSourceLoc(mutating: address)
+    return address
   }
 }

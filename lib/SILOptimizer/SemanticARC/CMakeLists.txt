@@ -8,4 +8,5 @@ target_sources(swiftSILOptimizer PRIVATE
   Context.cpp
   SemanticARCOptVisitor.cpp
   OwnershipConversionElimination.cpp
+  RedundantMoveValueElimination.cpp
   )

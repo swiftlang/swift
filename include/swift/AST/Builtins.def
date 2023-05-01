@@ -774,7 +774,11 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
-/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
+/// Initialize the extra storage state of a non-default distributed actor object.
+BUILTIN_MISC_OPERATION(InitializeNonDefaultDistributedActor,
+                       "initializeNonDefaultDistributedActor", "", Special)
+
+/// Allocate a "proxy" for a distributed remote actor.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
 
@@ -994,6 +998,11 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocate
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
                                    "buildOrdinarySerialExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value from an "complex equality" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildComplexEqualitySerialExecutorRef,
+                                   "buildComplexEqualitySerialExecutorRef", "n", Special)
 
 /// Build a Builtin.Executor value from a default actor reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,

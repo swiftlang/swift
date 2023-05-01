@@ -1,10 +1,19 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature MoveOnlyClasses
+
+// REQUIRES: concurrency
 
 class CopyableKlass {}
+
 @_moveOnly
-class MoveOnlyKlass {}
+class MoveOnlyKlass {
+    init?() {} // expected-error {{move-only types cannot have failable initializers yet}}
+}
+
 @_moveOnly
-class MoveOnlyStruct {}
+class MoveOnlyStruct {
+    init?(one: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
+    init!(two: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
+}
 
 class C {
     var copyable: CopyableKlass? = nil
@@ -57,6 +66,16 @@ enum E { // expected-error {{enum 'E' cannot contain a move-only type without al
 enum EMoveOnly {
     case lhs(CopyableKlass)
     case rhs(MoveOnlyKlass)
+
+    init?() {} // expected-error {{move-only types cannot have failable initializers yet}}
+}
+
+extension EMoveOnly {
+    init!(three: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
+}
+
+extension MoveOnlyStruct {
+    convenience init?(three: Bool) {} // expected-error {{move-only types cannot have failable initializers yet}}
 }
 
 func foo() {
@@ -191,7 +210,7 @@ enum Color {
     case green
     case blue
 
-    static func same(_ c1: __shared Color, c2: __shared Color) -> Bool {
+    static func same(_ c1: borrowing Color, c2: borrowing Color) -> Bool {
         return c1 == c2
         // expected-error@-1 {{binary operator '==' cannot be applied to two 'Color' operands}}
     }
@@ -209,6 +228,19 @@ enum StrengthLevel: Int { // ensure move-only raw enums do not conform to RawRep
     }
 }
 
+public class Holder {
+    var one: MoveOnlyStruct {
+        get async {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+    var two: MoveOnlyKlass {
+        get throws {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+}
 
+struct StructHolder {
+    var three: EMoveOnly {
+        get async throws {  } // expected-error {{getter of move-only type cannot be 'async' or 'throws'}}
+    }
+}
 
 

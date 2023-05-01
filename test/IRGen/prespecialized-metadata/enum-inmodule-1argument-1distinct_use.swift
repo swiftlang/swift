@@ -50,7 +50,7 @@ func consume<T>(_ t: T) {
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
 // CHECK-SAME:   %swift.opaque* noalias nocapture %{{[0-9]+}}, 
-// CHECK-SAME:   %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i64 }>* @"$s4main5ValueOySiGMf" to %swift.full_type*), i32 0, i32 1)
+// CHECK-SAME:   %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8*, i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i64 }>* @"$s4main5ValueOySiGMf" to %swift.full_type*), i32 0, i32 2)
 // CHECK-SAME: )
 // CHECK: }
 func doit() {

@@ -221,15 +221,15 @@ extension ProjectedValue {
   /// `%s`.canAddressAlias(with: `%2`) -> true
   /// `%1`.canAddressAlias(with: `%2`) -> false
   ///
-  func canAddressAlias(with rhs: ProjectedValue, _ context: some Context) -> Bool {
+  func canAddressAlias(with rhs: ProjectedValue, complexityBudget: Int = Int.max, _ context: some Context) -> Bool {
     // self -> rhs will succeed (= return false) if self is a non-escaping "local" object,
     // but not necessarily rhs.
-    if !isEscaping(using: EscapesToValueVisitor(target: rhs), context) {
+    if !isEscaping(using: EscapesToValueVisitor(target: rhs), complexityBudget: complexityBudget, context) {
       return false
     }
     // The other way round: rhs -> self will succeed if rhs is a non-escaping "local" object,
     // but not necessarily self.
-    if !rhs.isEscaping(using: EscapesToValueVisitor(target: self), context) {
+    if !rhs.isEscaping(using: EscapesToValueVisitor(target: self), complexityBudget: complexityBudget, context) {
       return false
     }
     return true

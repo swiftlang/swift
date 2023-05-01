@@ -73,6 +73,10 @@ public:
         DebuggerTestingCheckExpectName(
             Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
 
@@ -180,7 +184,7 @@ private:
 
     // Don't capture variables which aren't default-initialized.
     if (auto *VD = dyn_cast<VarDecl>(DstDecl))
-      if (!VD->isParentInitialized() &&
+      if (!VD->isParentExecutabledInitialized() &&
           !(isa<ParamDecl>(VD) &&
             cast<ParamDecl>(VD)->isInOut()))
         return Action::Continue(OriginalExpr);

@@ -138,11 +138,9 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
     // indirectly referenced in memory owned by the context object. The payload
     // is just a raw pointer.
     if (loopInfo->getLoopFor(predBB)) {
-      blocksInLoop.insert(predBB);
+      heapAllocatedContext = true;
       decl->setInterfaceType(astCtx.TheRawPointerType);
-    }
-    // Otherwise the payload is the linear map tuple.
-    else {
+    } else { // Otherwise the payload is the linear map tuple.
       auto linearMapStructTy = getLinearMapTupleType(predBB)->getCanonicalType();
       decl->setInterfaceType(
           linearMapStructTy->hasArchetype()

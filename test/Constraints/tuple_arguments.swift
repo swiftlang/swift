@@ -1500,9 +1500,9 @@ let r31892961_1 = [1: 1, 2: 2]
 r31892961_1.forEach { (k, v) in print(k + v) }
 
 let r31892961_2 = [1, 2, 3]
+// expected-error@+2 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{+1:3-3=\n  let (index, val) = arg0\n  }}
+// expected-warning@+1 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
-  // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
-  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
   val + 1
   // expected-error@-1 {{cannot find 'val' in scope}}
 }
@@ -1798,4 +1798,10 @@ func variadicSplat() {
   takesFnWithVarg { x, y in
     _ = y.count
   }
+}
+
+func tuple_splat_with_a_label() {
+  func test(vals: Int, _: String, _: Float) {} // expected-note 2 {{'test(vals:_:_:)' declared here}}
+  test(vals: (23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  test((vals: 23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
 }

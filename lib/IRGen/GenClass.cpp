@@ -388,8 +388,12 @@ namespace {
       };
 
       auto classDecl = dyn_cast<ClassDecl>(theClass);
-      if (classDecl && classDecl->isRootDefaultActor()) {
-        fn(Field::DefaultActorStorage);
+      if (classDecl) {
+        if (classDecl->isRootDefaultActor()) {
+          fn(Field::DefaultActorStorage);
+        } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+          fn(Field::NonDefaultDistributedActorStorage);
+        }
       }
 
       for (auto decl :
@@ -1090,7 +1094,7 @@ namespace {
     TaggedUnion<ClassUnion, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
     const ClassLayout *FieldLayout;
-    
+
     ClassDecl *getClass() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
@@ -1194,7 +1198,7 @@ namespace {
     SmallVector<ProtocolDecl*, 4> Protocols;
     SmallVector<VarDecl*, 8> InstanceProperties;
     SmallVector<VarDecl*, 8> ClassProperties;
-    
+
     llvm::Constant *Name = nullptr;
 
     SmallVectorImpl<MethodDescriptor> &getMethodList(ValueDecl *decl) {
@@ -1226,8 +1230,11 @@ namespace {
           FieldLayout(&fieldLayout) {
       visitConformances(getClass()->getImplementationContext());
 
-      if (getClass()->isRootDefaultActor())
+      if (getClass()->isRootDefaultActor()) {
         Ivars.push_back(Field::DefaultActorStorage);
+      } else if (getClass()->isNonDefaultExplicitDistributedActor()) {
+        Ivars.push_back(Field::NonDefaultDistributedActorStorage);
+      }
       visitImplementationMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
@@ -2020,6 +2027,9 @@ namespace {
         if (field.getKind() == Field::DefaultActorStorage) {
           offsetPtr = nullptr;
           break;
+        } else if (field.getKind() == Field::NonDefaultDistributedActorStorage) {
+          offsetPtr = nullptr;
+          break;
         }
 
         // Otherwise, we should have a normal stored property.
@@ -2436,6 +2446,9 @@ namespace {
           case Field::Kind::DefaultActorStorage:
             os << "default_actor_storage";
             break;
+          case Field::Kind::NonDefaultDistributedActorStorage:
+            os << "non_default_distributed_actor_storage";
+            break;
         }
         os << ")";
       }
@@ -2706,7 +2719,17 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
-  if (llvm::Triple(IGM.Module.getTargetTriple()).isOSDarwin()) {
+
+  // The linker on older deployment targets does not gracefully handle the
+  // situation when both an objective c object and a swift object define the
+  // protocol under the same symbol name.
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(IGM.Context);
+  bool canUseClangEmission = deploymentAvailability.isContainedIn(
+    IGM.Context.getSwift58Availability());
+
+  if (llvm::Triple(IGM.Module.getTargetTriple()).isOSDarwin() &&
+      canUseClangEmission) {
     // Use the clang to generate the protocol metadata if there is a clang node.
     if (auto clangDecl = proto->getClangDecl()) {
       if (auto objcMethodDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {

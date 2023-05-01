@@ -38,6 +38,7 @@ class DeclContext;
 class Evaluator;
 class Expr;
 class FuncDecl;
+class AbstractFunctionDecl;
 class Pattern;
 class PatternBindingDecl;
 class VarDecl;
@@ -211,9 +212,20 @@ public:
 
   ASTNode findAsyncNode();
 
-  /// If this brace is wrapping a single expression, returns it. Otherwise
-  /// returns \c nullptr.
-  Expr *getSingleExpressionElement() const;
+  /// If this brace contains a single ASTNode, or a \c #if that has a single active
+  /// element, returns it. This will always be the last element of the brace.
+  /// Otherwise returns \c nullptr.
+  ASTNode getSingleActiveElement() const;
+
+  /// If this brace is wrapping a single active expression, returns it. This
+  /// includes both a single expression element, or a single expression in an
+  /// active \c #if. Otherwise returns \c nullptr.
+  Expr *getSingleActiveExpression() const;
+
+  /// If this brace is wrapping a single active statement, returns it. This
+  /// includes both a single statement element, or a single statement in an
+  /// active \c #if. Otherwise returns \c nullptr.
+  Stmt *getSingleActiveStatement() const;
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
@@ -544,11 +556,17 @@ public:
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     ThePattern = P;
   }
+  
+  /// Pattern Binding Accessors.
+  Expr *getInitializerOrNull() const {
+    return getKind() == CK_PatternBinding ? Condition.get<Expr *>() : nullptr;
+  }
 
   Expr *getInitializer() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     return Condition.get<Expr *>();
   }
+  
   void setInitializer(Expr *E) {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     Condition = E;
@@ -575,6 +593,11 @@ public:
     assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
     Condition = Info;
   }
+
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -678,6 +701,11 @@ public:
   /// FIXME: Find a better way to implement this. Allows conditions to be
   ///        stored in \c ASTNode.
   StmtCondition *getCondPointer() { return &Cond; }
+
+  /// Whether or not this conditional stmt rebinds self with a `let self`
+  /// or `let self = self` condition. If `requireLoadExpr` is `true`,
+  /// additionally requires that the RHS of the self condition is a `LoadExpr`.
+  bool rebindsSelf(ASTContext &Ctx, bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
@@ -1479,6 +1507,44 @@ public:
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Throw;
+  }
+};
+
+/// ForgetStmt - Consumes a noncopyable value and performs memberwise
+/// destruction of unconsumed fields, without invoking its deinit. Only
+/// supported form is "forget self".
+class ForgetStmt : public Stmt {
+  Expr *SubExpr;
+  SourceLoc ForgetLoc;
+  AbstractFunctionDecl *InnermostMethod;
+
+public:
+  explicit ForgetStmt(SourceLoc forgetLoc, Expr *subExpr)
+      : Stmt(StmtKind::Forget, /*Implicit=*/false),
+        SubExpr(subExpr), ForgetLoc(forgetLoc), InnermostMethod(nullptr) {}
+
+  SourceLoc getForgetLoc() const { return ForgetLoc; }
+
+  SourceLoc getStartLoc() const { return ForgetLoc; }
+  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const {
+    return SourceRange(ForgetLoc, getEndLoc());
+  }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  /// Retrieves the saved innermost method / accessor decl in which this Stmt
+  /// resides. Corresponds to \c DeclContext::getInnermostMethodContext.
+  /// Must be saved with \c setInnermostMethodContext during typechecking.
+  AbstractFunctionDecl *getInnermostMethodContext() { return InnermostMethod; }
+  void setInnermostMethodContext(AbstractFunctionDecl *afd) {
+    assert(afd); // shouldn't be clearing this
+    InnermostMethod = afd;
+  }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Forget;
   }
 };
 

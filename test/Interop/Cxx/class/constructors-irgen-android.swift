@@ -1,6 +1,6 @@
 // Target-specific tests for C++ constructor call code generation.
 
-// RUN: %swift -module-name MySwift -target aarch64-unknown-linux-android -dump-clang-diagnostics -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s -parse-stdlib -parse-as-library -disable-legacy-type-info | %FileCheck %s -check-prefix=ITANIUM_ARM
+// RUN: %swift -module-name MySwift -target aarch64-unknown-linux-android -dump-clang-diagnostics -I %S/Inputs -enable-experimental-cxx-interop -emit-ir %s -parse-stdlib -parse-as-library -disable-legacy-type-info -Xcc -fignore-exceptions | %FileCheck %s -check-prefix=ITANIUM_ARM
 
 // REQUIRES: OS=linux-android
 // REQUIRES: CPU=aarch64

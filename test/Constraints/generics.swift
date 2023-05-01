@@ -508,11 +508,12 @@ public struct S5 {
 
 // rdar://problem/24329052 - QoI: call argument archetypes not lining up leads to ambiguity errors
 
-struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}}
+struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}} expected-note {{'T' previously declared here}}
   var foo: (T) -> Void
   // expected-note@+1 {{generic parameter 'T' of instance method 'bar(_:)' declared here}}
   func bar<T>(_ v: T) { foo(v) }
   // expected-error@-1 {{cannot convert value of type 'T' (generic parameter of instance method 'bar(_:)') to expected argument type 'T' (generic parameter of generic struct 'S_24329052')}}
+  // expected-warning@-2 {{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
 }
 
 extension Sequence {
@@ -943,7 +944,7 @@ do {
   struct Outer<T: P_eaf0300ff7a> {
     struct Inner<U> {}
 
-    func container<T>() -> Inner<T> {
+    func container<V>() -> Inner<V> {
       return Inner()
     }
   }
@@ -1030,4 +1031,28 @@ func test_requirement_failures_in_ambiguous_context() {
   // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'U' : 'Q_56173')}}
 
   f3(A()) // expected-error {{no exact matches in call to local function 'f3'}}
+}
+
+// rdar://106054263 - failed to produce a diagnostic upon generic argument mismatch
+func test_mismatches_with_dependent_member_generic_arguments() {
+  struct Binding<T, U> {}
+  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+
+  struct Data : SomeProtocol {
+    typealias SomeAssociated = String
+  }
+
+  func test1<T: SomeProtocol>(_: Binding<T.SomeAssociated, T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  func test2<T: SomeProtocol>(_: Optional<T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  test1(Binding<Double?, Int>(), Data())
+  // expected-error@-1 {{cannot convert value of type 'Binding<Double?, Int>' to expected argument type 'Binding<Data.SomeAssociated, Data.SomeAssociated>'}}
+
+  test2(Optional<Int>(nil), Data())
+  // expected-error@-1 {{cannot convert value of type 'Optional<Int>' to expected argument type 'Optional<Data.SomeAssociated>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
 }

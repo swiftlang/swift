@@ -115,8 +115,8 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 // should be in the -Onone pass pipeline and the prepare optimizations pipeline.
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
-  P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
+  P.addReferenceBindingTransform();
   P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
   P.addCapturePromotion();
@@ -176,8 +176,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() && EnableDestroyHoisting) {
-    P.addDestroyHoisting();
+  if (Options.shouldOptimize()) {
+    if (EnableDestroyHoisting) {
+      P.addDestroyHoisting();
+    } else if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
+      P.addDestroyAddrHoisting();
+    }
   }
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
@@ -235,12 +239,21 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
+SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
+  P.startPipeline("SILGen Passes");
+
+  P.addSILGenCleanup();
 
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
   }
+  return P;
+}
+
+SILPassPipelinePlan
+SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
 
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
@@ -373,7 +386,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addAllocBoxToStack();
 
   if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
-    P.addSSADestroyHoisting();
+    P.addDestroyAddrHoisting();
   }
 
   // Propagate copies through stack locations.  Should run after
@@ -585,6 +598,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
   if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
+    P.addComputeSideEffects();
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();

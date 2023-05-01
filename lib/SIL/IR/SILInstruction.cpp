@@ -881,6 +881,22 @@ namespace {
       return true;
     }
 
+    bool visitScalarPackIndexInst(const ScalarPackIndexInst *RHS) {
+      auto *X = cast<ScalarPackIndexInst>(LHS);
+      return (X->getIndexedPackType() == RHS->getIndexedPackType() &&
+              X->getComponentIndex() == RHS->getComponentIndex());
+    }
+
+    bool visitDynamicPackIndexInst(const DynamicPackIndexInst *RHS) {
+      auto *X = cast<DynamicPackIndexInst>(LHS);
+      return X->getIndexedPackType() == RHS->getIndexedPackType();
+    }
+
+    bool visitTuplePackElementAddrInst(const TuplePackElementAddrInst *RHS) {
+      auto *X = cast<TuplePackElementAddrInst>(LHS);
+      return X->getElementType() == RHS->getElementType();
+    }
+
   private:
     const SILInstruction *LHS;
   };
@@ -973,7 +989,7 @@ unsigned Operand::getOperandNumber() const {
   return this - &cast<SILInstruction>(getUser())->getAllOperands()[0];
 }
 
-SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
+MemoryBehavior SILInstruction::getMemoryBehavior() const {
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1374,17 +1390,17 @@ unsigned SILInstruction::getCachedCaseIndex(EnumElementDecl *enumElement) {
 //===----------------------------------------------------------------------===//
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
-                                     SILInstruction::MemoryBehavior B) {
+                                     MemoryBehavior B) {
   switch (B) {
-    case SILInstruction::MemoryBehavior::None:
+    case MemoryBehavior::None:
       return OS << "None";
-    case SILInstruction::MemoryBehavior::MayRead:
+    case MemoryBehavior::MayRead:
       return OS << "MayRead";
-    case SILInstruction::MemoryBehavior::MayWrite:
+    case MemoryBehavior::MayWrite:
       return OS << "MayWrite";
-    case SILInstruction::MemoryBehavior::MayReadWrite:
+    case MemoryBehavior::MayReadWrite:
       return OS << "MayReadWrite";
-    case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+    case MemoryBehavior::MayHaveSideEffects:
       return OS << "MayHaveSideEffects";
   }
 

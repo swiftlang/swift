@@ -169,14 +169,23 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl,
 static void enumerateStoredPropertiesAndMissing(
     NominalTypeDecl *decl,
     IterableDeclContext *implDecl,
-    llvm::function_ref<void(VarDecl *)> addStoredProperty,
+    llvm::function_ref<void(VarDecl *)> _addStoredProperty,
     llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
+  // Add a variable as a stored properties.
+  llvm::SmallSet<VarDecl *, 8> knownStoredProperties;
+  auto addStoredProperty = [&](VarDecl *var) {
+    if (!var->isStatic() && var->hasStorage()) {
+      if (knownStoredProperties.insert(var).second)
+        _addStoredProperty(var);
+    }
+  };
+
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
-  VarDecl *distributedActorId = nullptr;
-  VarDecl *distributedActorSystem = nullptr;
   if (decl->isDistributedActor()) {
+    VarDecl *distributedActorId = nullptr;
+    VarDecl *distributedActorSystem = nullptr;
     ASTContext &ctx = decl->getASTContext();
     for (auto *member : implDecl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
@@ -201,16 +210,13 @@ static void enumerateStoredPropertiesAndMissing(
 
   for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
-      if (!var->isStatic() && var->hasStorage()) {
-        // Skip any properties that we already emitted explicitly
-        if (var == distributedActorId)
-          continue;
-        if (var == distributedActorSystem)
-          continue;
-
-        addStoredProperty(var);
-      }
+      addStoredProperty(var);
     }
+
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
+        addStoredProperty(auxVar);
+    });
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
@@ -282,10 +288,20 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 /// This query is careful not to trigger accessor macro expansion, which
 /// creates a cycle. It conservatively assumes that all accessor macros
 /// produce computed properties, which is... incorrect.
+///
+/// The query also avoids triggering a `StorageImplInfoRequest` for patterns
+/// involved in a ProtocolDecl, because we know they can never contain storage.
+/// For background, vars of noncopyable type have their OpaqueReadOwnership
+/// determined by the type of the var decl, but that type hasn't always been
+/// determined when this query is made.
 static bool mayHaveStorage(Pattern *pattern) {
-  // Check whether there are any accessor macros.
+  // Check whether there are any accessor macros, or it's a protocol member.
   bool hasAccessorMacros = false;
+  bool inProtocolDecl = false;
   pattern->forEachVariable([&](VarDecl *VD) {
+    if (isa<ProtocolDecl>(VD->getDeclContext()))
+      inProtocolDecl = true;
+
     VD->forEachAttachedMacro(MacroRole::Accessor,
       [&](CustomAttr *customAttr, MacroDecl *macro) {
         hasAccessorMacros = true;
@@ -293,6 +309,10 @@ static bool mayHaveStorage(Pattern *pattern) {
   });
 
   if (hasAccessorMacros)
+    return false;
+
+  // protocol members can never contain storage; avoid triggering request.
+  if (inProtocolDecl)
     return false;
 
   return pattern->hasStorage();
@@ -596,12 +616,49 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
+/*
+ // An accessor that uses borrowed ownership cannot have effects, as the
+   // coroutine accessor doesn't support `async` or `throws`
+   if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+     if (accessor->hasThrows() || accessor->hasAsync())
+       if (accessor->)
+       if (accessor->getResultInterfaceType()->isPureMoveOnly())
+         accessor->diagnose(diag::moveonly_effectful_getter);
+   }
+ */
+
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
-  return (storage->getAttrs().hasAttribute<BorrowedAttr>()
-          ? OpaqueReadOwnership::Borrowed
-          : OpaqueReadOwnership::Owned);
+  enum class DiagKind {
+    BorrowedAttr,
+    NoncopyableType
+  };
+
+  auto usesBorrowed = [&](DiagKind kind) -> OpaqueReadOwnership {
+    // Check for effects on the getter.
+    if (auto *getter = storage->getEffectfulGetAccessor()) {
+      switch (kind) {
+      case DiagKind::NoncopyableType:
+        getter->diagnose(diag::moveonly_effectful_getter,
+                         getter->getDescriptiveKind());
+        break;
+      case DiagKind::BorrowedAttr:
+        getter->diagnose(diag::borrowed_with_effect,
+                         getter->getDescriptiveKind());
+        break;
+      }
+    }
+    return OpaqueReadOwnership::Borrowed;
+  };
+
+  if (storage->getAttrs().hasAttribute<BorrowedAttr>())
+    return usesBorrowed(DiagKind::BorrowedAttr);
+
+  if (storage->getValueInterfaceType()->isPureMoveOnly())
+    return usesBorrowed(DiagKind::NoncopyableType);
+
+  return OpaqueReadOwnership::Owned;
 }
 
 /// Insert the specified decl into the DeclContext's member list.  If the hint
@@ -1369,6 +1426,10 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
@@ -1430,9 +1491,9 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
   Tmp1VD->setImplicit();
 
-  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD);
-  Named->setType(Tmp1VD->getType());
-  auto *Let = BindingPattern::createImplicit(Ctx, /*let*/ true, Named);
+  auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD, Tmp1VD->getType());
+  auto *Let =
+      BindingPattern::createImplicit(Ctx, VarDecl::Introducer::Let, Named);
   Let->setType(Named->getType());
   auto *Some = OptionalSomePattern::createImplicit(Ctx, Let);
   Some->setType(OptionalType::get(Let->getType()));
@@ -1495,7 +1556,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   InitValue = new (Ctx) LazyInitializerExpr(InitValue);
   InitValue->setType(initType);
 
-  Pattern *Tmp2PBDPattern = NamedPattern::createImplicit(Ctx, Tmp2VD);
+  Pattern *Tmp2PBDPattern =
+      NamedPattern::createImplicit(Ctx, Tmp2VD, Tmp2VD->getType());
   Tmp2PBDPattern =
     TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
@@ -1738,7 +1800,8 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
                                    SourceLoc(), Ctx.getIdentifier("tmp"), Set);
       OldValue->setImplicit();
       OldValue->setInterfaceType(VD->getValueInterfaceType());
-      auto *tmpPattern = NamedPattern::createImplicit(Ctx, OldValue);
+      auto *tmpPattern =
+          NamedPattern::createImplicit(Ctx, OldValue, OldValue->getType());
       auto *tmpPBD = PatternBindingDecl::createImplicit(
           Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
       SetterBody.push_back(tmpPBD);
@@ -2563,8 +2626,8 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
-  Pattern *PBDPattern = NamedPattern::createImplicit(Context, Storage);
-  PBDPattern->setType(StorageTy);
+  Pattern *PBDPattern =
+      NamedPattern::createImplicit(Context, Storage, StorageTy);
   PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
   InitExpr->setType(Storage->getType());
@@ -2713,7 +2776,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
 
   // Type-check the initialization.
   using namespace constraints;
-  auto target = SolutionApplicationTarget::forPropertyWrapperInitializer(
+  auto target = SyntacticElementTarget::forPropertyWrapperInitializer(
       wrappedVar, initContext, initializer);
   auto result = TypeChecker::typeCheckExpression(target);
   if (!result)
@@ -2976,8 +3039,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
 
   auto createPBD = [&](VarDecl *singleVar) -> PatternBindingDecl * {
-    Pattern *pattern = NamedPattern::createImplicit(ctx, singleVar);
-    pattern->setType(singleVar->getType());
+    Pattern *pattern =
+        NamedPattern::createImplicit(ctx, singleVar, singleVar->getType());
     pattern = TypedPattern::createImplicit(ctx, pattern, singleVar->getType());
     PatternBindingDecl *pbd = PatternBindingDecl::createImplicit(
         ctx, var->getCorrectStaticSpelling(), pattern, /*init*/nullptr,
@@ -3236,10 +3299,10 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (info.isSimpleStored()) {
     // @NSManaged properties end up being computed; complain if there is
     // an initializer.
-    if (var->getParentInitializer()) {
+    if (var->getParentExecutableInitializer()) {
       auto &Diags = var->getASTContext().Diags;
       Diags.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
-           .highlight(var->getParentInitializer()->getSourceRange());
+           .highlight(var->getParentExecutableInitializer()->getSourceRange());
     }
 
     // Otherwise, ok.
@@ -3256,13 +3319,22 @@ static void finishNSManagedImplInfo(VarDecl *var,
   }
 }
 
+static Expr *getParentExecutableInitializer(VarDecl *var) {
+  if (auto *PBD = var->getParentPatternBinding()) {
+    const auto i = PBD->getPatternEntryIndexForVarDecl(var);
+    return PBD->getExecutableInit(i);
+  }
+
+  return nullptr;
+}
+
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
   auto dc = storage->getDeclContext();
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (!info.hasStorage()) {
-      if (auto *init = var->getParentInitializer()) {
+      if (auto *init = var->getParentExecutableInitializer()) {
         auto &Diags = var->getASTContext().Diags;
         Diags.diagnose(init->getLoc(), diag::getset_init)
              .highlight(init->getSourceRange());
@@ -3358,9 +3430,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
-      param->isInOut()
-      ? StorageIsMutable
-      : StorageIsNotMutable);
+      param->isImmutableInFunctionBody()
+        ? StorageIsNotMutable
+        : StorageIsMutable);
   }
 
   if (auto *var = dyn_cast<VarDecl>(storage)) {
@@ -3523,6 +3595,11 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
 
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
 
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)

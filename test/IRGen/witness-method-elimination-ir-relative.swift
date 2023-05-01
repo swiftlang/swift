@@ -3,7 +3,7 @@
 
 // RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-wme \
 // RUN:    -Xfrontend -enable-relative-protocol-witness-tables \
-// RUN:    %s -emit-ir -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN:    %s -emit-ir -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 // REQUIRES: PTRSIZE=64
 
@@ -39,6 +39,9 @@ func test2() {
   let x: TheProtocol = MyStruct()
   x.func1_live()
   // CHECK: [[TBL:%.*]] = phi i8**
+  // CHECK-arm64e: [[T0:%.*]] = ptrtoint i8** [[TBL]] to i64
+  // CHECK-arm64e: [[T1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T0]], i32 2, i64 47152)
+  // CHECK-arm64e: [[TBL:%.*]] = inttoptr i64 [[T1]] to i8**
   // CHECK: [[TBL2:%.*]] = bitcast i8** [[TBL]] to i32*
   // CHECK: [[ENTRY:%.*]] = getelementptr inbounds i32, i32* [[TBL2]], i32 1
   // CHECK: [[ENTRY2:%.*]] = bitcast i32* [[ENTRY]] to i8*

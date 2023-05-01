@@ -43,7 +43,7 @@ public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                                  IsPOD, IsFixedSize) {}
+                            IsTriviallyDestroyable, IsCopyable, IsFixedSize) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -52,13 +52,15 @@ public:
     return ".data";
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {

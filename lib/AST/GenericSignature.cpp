@@ -405,10 +405,24 @@ bool GenericSignatureImpl::isRequirementSatisfied(
         LookUpConformanceInSignature(this));
   }
 
-  // FIXME: Need to check conditional requirements here.
-  ArrayRef<Requirement> conditionalRequirements;
+  SmallVector<Requirement, 2> subReqs;
+  switch (requirement.checkRequirement(subReqs, allowMissing)) {
+  case CheckRequirementResult::Success:
+    return true;
 
-  return requirement.isSatisfied(conditionalRequirements, allowMissing);
+  case CheckRequirementResult::ConditionalConformance:
+    // FIXME: Need to check conditional requirements here.
+    return true;
+
+  case CheckRequirementResult::PackRequirement:
+    // FIXME
+    assert(false && "Refactor this");
+    return true;
+
+  case CheckRequirementResult::RequirementFailure:
+  case CheckRequirementResult::SubstitutionFailure:
+    return false;
+  }
 }
 
 SmallVector<Requirement, 4>
@@ -536,12 +550,25 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
 
 Type
 GenericSignatureImpl::getReducedShape(Type type) const {
-  return getRequirementMachine()->getReducedShape(type);
+  return getRequirementMachine()->getReducedShape(type, getGenericParams());
 }
 
 bool
 GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
   return getRequirementMachine()->haveSameShape(type1, type2);
+}
+
+SmallVector<CanType, 2> GenericSignatureImpl::getShapeClasses() const {
+  SmallSetVector<CanType, 2> result;
+
+  forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (!canonical || !gp->isParameterPack())
+      return;
+
+    result.insert(getReducedShape(gp)->getCanonicalType());
+  });
+
+  return result.takeVector();
 }
 
 unsigned GenericParamKey::findIndexIn(
@@ -566,10 +593,13 @@ unsigned GenericParamKey::findIndexIn(
 
 SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
   return SubstitutionMap::get(const_cast<GenericSignatureImpl *>(this),
-                              [](SubstitutableType *t) -> Type {
-                                return Type(cast<GenericTypeParamType>(t));
-                              },
-                              MakeAbstractConformanceForGenericType());
+    [](SubstitutableType *t) -> Type {
+      auto param = cast<GenericTypeParamType>(t);
+      if (!param->isParameterPack())
+        return param;
+      return PackType::getSingletonPackExpansion(param);
+    },
+    MakeAbstractConformanceForGenericType());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(

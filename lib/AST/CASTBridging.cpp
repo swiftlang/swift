@@ -20,7 +20,7 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), size_t(bridged.numElements)};
 }
 
-static SourceLoc getSourceLocFromPointer(void *loc) {
+static SourceLoc getSourceLocFromPointer(const void *loc) {
   auto smLoc = llvm::SMLoc::getFromPointer((const char *)loc);
   return SourceLoc(smLoc);
 }
@@ -44,11 +44,11 @@ namespace {
   };
 }
 
-BridgedDiagnostic SwiftDiagnostic_create(
-    void *diagnosticEngine, BridgedDiagnosticSeverity severity,
-    void *sourceLocPtr,
-    const uint8_t *textPtr, long textLen
-) {
+BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
+                                         BridgedDiagnosticSeverity severity,
+                                         const void *sourceLocPtr,
+                                         const unsigned char *textPtr,
+                                         long textLen) {
   StringRef origText{
     reinterpret_cast<const char *>(textPtr), size_t(textLen)};
   llvm::MallocAllocator mallocAlloc;
@@ -81,7 +81,7 @@ BridgedDiagnostic SwiftDiagnostic_create(
 
 /// Highlight a source range as part of the diagnostic.
 void SwiftDiagnostic_highlight(
-    BridgedDiagnostic diagPtr, void *startLocPtr, void *endLocPtr
+    BridgedDiagnostic diagPtr, const void *startLocPtr, const void *endLocPtr
 ) {
   SourceLoc startLoc = getSourceLocFromPointer(startLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(endLocPtr);
@@ -91,9 +91,11 @@ void SwiftDiagnostic_highlight(
 }
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
-void SwiftDiagnostic_fixItReplace(
-    BridgedDiagnostic diagPtr, void *replaceStartLocPtr, void *replaceEndLocPtr,
-    const uint8_t *newTextPtr, long newTextLen) {
+void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diagPtr,
+                                  const void *replaceStartLocPtr,
+                                  const void *replaceEndLocPtr,
+                                  const unsigned char *newTextPtr,
+                                  long newTextLen) {
 
   SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(replaceEndLocPtr);
@@ -114,9 +116,9 @@ void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
   delete impl;
 }
 
-BridgedIdentifier SwiftASTContext_getIdentifier(void *ctx,
-                                                const uint8_t *_Nullable str,
-                                                long len) {
+BridgedIdentifier
+SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
+                              long len) {
   return const_cast<void *>(
       static_cast<ASTContext *>(ctx)
           ->getIdentifier(
@@ -212,7 +214,8 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
   return E;
 }
 
-void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
+void *SwiftStringLiteralExpr_create(void *ctx,
+                                    const unsigned char *_Nullable string,
                                     long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
@@ -221,7 +224,8 @@ void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
       StringLiteralExpr(stringRef, getSourceLocFromPointer(TokenLoc));
 }
 
-void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
+void *SwiftIntegerLiteralExpr_create(void *ctx,
+                                     const unsigned char *_Nullable string,
                                      long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
@@ -558,12 +562,12 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
     case BridgedRequirementReprKindTypeConstraint:
       requirements.push_back(RequirementRepr::getTypeConstraint(
           (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
+          (TypeRepr *)req.SecondType, /*isExpansionPattern*/false));
       break;
     case BridgedRequirementReprKindSameType:
       requirements.push_back(RequirementRepr::getSameType(
           (TypeRepr *)req.FirstType, getSourceLocFromPointer(req.SeparatorLoc),
-          (TypeRepr *)req.SecondType));
+          (TypeRepr *)req.SecondType, /*isExpansionPattern*/false));
       break;
     case BridgedRequirementReprKindLayoutConstraint:
       llvm_unreachable("cannot handle layout constraints!");
@@ -578,12 +582,12 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
 
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable ellipsisLoc, long index,
+                                  void *_Nullable eachLoc, long index,
                                   bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(
       static_cast<DeclContext *>(declContext),
       Identifier::getFromOpaquePointer(name), getSourceLocFromPointer(nameLoc),
-      getSourceLocFromPointer(ellipsisLoc),
+      getSourceLocFromPointer(eachLoc),
       /*index*/ index, isParameterPack);
 }
 
@@ -648,25 +652,44 @@ void Plugin_unlock(PluginHandle handle) {
   plugin->unlock();
 }
 
+bool Plugin_spawnIfNeeded(PluginHandle handle) {
+  auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
+  auto error = plugin->spawnIfNeeded();
+  bool hadError(error);
+  llvm::consumeError(std::move(error));
+  return hadError;
+}
+
 bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   StringRef message(data.baseAddress, data.size);
   auto error = plugin->sendMessage(message);
-  bool hadError = bool(error);
-  llvm::consumeError(std::move(error));
-  return hadError;
+  if (error) {
+    // FIXME: Pass the error message back to the caller.
+    llvm::consumeError(std::move(error));
+//    llvm::handleAllErrors(std::move(error), [](const llvm::ErrorInfoBase &err) {
+//      llvm::errs() << err.message() << "\n";
+//    });
+    return true;
+  }
+  return false;
 }
 
 bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   auto result = plugin->waitForNextMessage();
   if (!result) {
+    // FIXME: Pass the error message back to the caller.
+    llvm::consumeError(result.takeError());
+//    llvm::handleAllErrors(result.takeError(), [](const llvm::ErrorInfoBase &err) {
+//      llvm::errs() << err.message() << "\n";
+//    });
     return true;
   }
   auto &message = result.get();
   auto size = message.size();
   auto outPtr = malloc(size);
   memcpy(outPtr, message.data(), size);
-  *out = BridgedData{(const char *)outPtr, size};
+  *out = BridgedData{(const char *)outPtr, (unsigned long)size};
   return false;
 }

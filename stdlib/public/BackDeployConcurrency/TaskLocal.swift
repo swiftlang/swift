@@ -141,18 +141,41 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @_backDeploy(before: SwiftStdlib 5.8)
   public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
                            file: String = #file, line: UInt = #line) async rethrows -> R {
+    return try await withValueImpl(valueDuringOperation, operation: operation, file: file, line: line)
+  }
+
+  /// Implementation for withValue that consumes valueDuringOperation.
+  ///
+  /// Because _taskLocalValuePush and _taskLocalValuePop involve calls to
+  /// swift_task_alloc/swift_task_dealloc respectively unbeknownst to the
+  /// compiler, compiler-emitted calls to swift_task_de/alloc must be avoided
+  /// in a function that calls them.
+  ///
+  /// A copy of valueDuringOperation is required because withValue borrows its
+  /// argument but _taskLocalValuePush consumes its.  Because
+  /// valueDuringOperation is of generic type, its size is not generally known,
+  /// so such a copy entails a stack allocation and a copy to that allocation.
+  /// That stack traffic gets lowered to calls to
+  /// swift_task_alloc/swift_task_deallloc.
+  ///
+  /// Split the calls _taskLocalValuePush/Pop from the compiler-emitted calls
+  /// to swift_task_de/alloc for the copy as follows:
+  /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
+  /// - withValueImpl contains the calls to _taskLocalValuePush/Pop
+  @inlinable
+  @discardableResult
+  @_unsafeInheritExecutor
+  @available(SwiftStdlib 5.1, *) // back deploy requires we declare the availability explicitly on this method
+  @_backDeploy(before: SwiftStdlib 5.9)
+  internal func withValueImpl<R>(_ valueDuringOperation: __owned Value, operation: () async throws -> R,
+                                 file: String = #fileID, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
-    _taskLocalValuePush(key: key, value: valueDuringOperation)
-    do {
-      let result = try await operation()
-      _taskLocalValuePop()
-      return result
-    } catch {
-      _taskLocalValuePop()
-      throw error
-    }
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+
+    return try await operation()
   }
 
   /// Binds the task-local to the specific value for the duration of the

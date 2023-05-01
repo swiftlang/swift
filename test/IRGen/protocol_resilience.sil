@@ -340,7 +340,7 @@ bb0(%0 : $*ResilientConformingType):
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23ResilientConformingTypeV* %0 to %swift.opaque*
   // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"()
-  // CHECK-NEXT: call swiftcc void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23ResilientConformingTypeVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: call swiftcc void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23ResilientConformingTypeVMf", i32 0, i32 2) to %swift.type*), i8** [[WTABLE]])
 
   %fn = function_ref @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
   %ignore = apply %fn<ResilientConformingType>(%0) : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
@@ -398,7 +398,7 @@ bb0(%0 : $*AnotherConformingStruct):
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23AnotherConformingStructV* %0 to %swift.opaque*
   // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience23AnotherConformingStructVAcA29RefinesOtherResilientProtocolAAWl"()
-  // CHECK-NEXT: call swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23AnotherConformingStructVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: call swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23AnotherConformingStructVMf", i32 0, i32 2) to %swift.type*), i8** [[WTABLE]])
 
   %fn = function_ref @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
   %ignore = apply %fn<AnotherConformingStruct>(%0) : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
@@ -442,7 +442,7 @@ bb0(%0 : $*ConformsWithResilientAssoc):
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience26ConformsWithResilientAssocV* %0 to %swift.opaque*
   // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience26ConformsWithResilientAssocVAcA03HaseF0AAWl
-  // CHECK-NEXT: call swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience26ConformsWithResilientAssocVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: call swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience26ConformsWithResilientAssocVMf", i32 0, i32 2) to %swift.type*), i8** [[WTABLE]])
 
   %fn = function_ref @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
   %ignore = apply %fn<ConformsWithResilientAssoc>(%0) : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()

@@ -107,7 +107,7 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
 }
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
-  { { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
+  { { nullptr }, { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
 

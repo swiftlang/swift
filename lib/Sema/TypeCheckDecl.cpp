@@ -499,6 +499,10 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
       return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));
@@ -707,13 +711,8 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool
-ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
-                                        ProtocolDecl *decl) const {
-  auto &ctx = decl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::ExistentialAny))
-    return true;
-
+bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
+    Evaluator &evaluator, ProtocolDecl *decl) const {
   // ObjC protocols do not require `any`.
   if (decl->isObjC())
     return false;
@@ -736,7 +735,7 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
 
   // Check whether any of the inherited protocols require `any`.
   for (auto proto : decl->getInheritedProtocols()) {
-    if (proto->existentialRequiresAny())
+    if (proto->hasSelfOrAssociatedTypeRequirements())
       return true;
   }
 
@@ -914,8 +913,14 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
 bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // For now only do this for nominal type decls.
-  if (isa<NominalTypeDecl>(decl))
-    return decl->getAttrs().hasAttribute<MoveOnlyAttr>();
+  if (isa<NominalTypeDecl>(decl)) {
+      if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+        if (!decl->getASTContext().supportsMoveOnlyTypes())
+            decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+        return true;
+      }
+  }
   return false;
 }
 
@@ -1147,7 +1152,9 @@ static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
     }
 
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-      APInt nextVal = intLit->getRawValue().sextOrSelf(128) + 1;
+      APInt raw = intLit->getRawValue();
+      APInt sext = (raw.getBitWidth() < 128 ? raw.sext(128) : raw);
+      APInt nextVal = sext + 1;
       bool negative = nextVal.slt(0);
       if (negative)
         nextVal = -nextVal;
@@ -1336,9 +1343,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     // Diagnose the duplicate value.
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-    assert(lastExplicitValueElt &&
-           "should not be able to have non-unique raw values when "
-           "relying on autoincrement");
+    
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
@@ -1350,6 +1355,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
         ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
+    
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
@@ -1611,9 +1617,12 @@ TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
       ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
   for (const auto &found : lookup.allResults()) {
     if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
-      auto foundRoles = macro->getMacroRoles();
-      if (foundRoles && roles.contains(foundRoles))
+      auto candidateRoles = macro->getMacroRoles();
+      if ((candidateRoles && roles.contains(candidateRoles)) ||
+          // FIXME: `externalMacro` should have all roles.
+          macro->getBaseIdentifier().str() == "externalMacro") {
         choices.push_back(macro);
+      }
     }
   }
   return choices;
@@ -1666,8 +1675,12 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     return SelfAccessKind::Mutating;
   } else if (FD->getAttrs().hasAttribute<NonMutatingAttr>()) {
     return SelfAccessKind::NonMutating;
+  } else if (FD->getAttrs().hasAttribute<LegacyConsumingAttr>()) {
+    return SelfAccessKind::LegacyConsuming;
   } else if (FD->getAttrs().hasAttribute<ConsumingAttr>()) {
     return SelfAccessKind::Consuming;
+  } else if (FD->getAttrs().hasAttribute<BorrowingAttr>()) {
+    return SelfAccessKind::Borrowing;
   }
 
   if (auto *AD = dyn_cast<AccessorDecl>(FD)) {
@@ -2163,12 +2176,29 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   auto *dc = param->getDeclContext();
 
   if (param->isSelfParameter()) {
-    auto selfParam = computeSelfParam(cast<AbstractFunctionDecl>(dc),
+    auto afd = cast<AbstractFunctionDecl>(dc);
+    auto selfParam = computeSelfParam(afd,
                                       /*isInitializingCtor*/true,
                                       /*wantDynamicSelf*/false);
-    return (selfParam.getParameterFlags().isInOut()
-            ? ParamSpecifier::InOut
-            : ParamSpecifier::Default);
+    if (auto fd = dyn_cast<FuncDecl>(afd)) {
+      switch (fd->getSelfAccessKind()) {
+      case SelfAccessKind::LegacyConsuming:
+        return ParamSpecifier::LegacyOwned;
+      case SelfAccessKind::Consuming:
+        return ParamSpecifier::Consuming;
+      case SelfAccessKind::Borrowing:
+        return ParamSpecifier::Borrowing;
+      case SelfAccessKind::Mutating:
+        return ParamSpecifier::InOut;
+      case SelfAccessKind::NonMutating:
+        return ParamSpecifier::Default;
+      }
+      llvm_unreachable("nonexhaustive switch");
+    } else {
+      return (selfParam.getParameterFlags().isInOut()
+              ? ParamSpecifier::InOut
+              : ParamSpecifier::Default);
+    }
   }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(dc)) {
@@ -2198,6 +2228,11 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
+  // Look through top-level pack expansions.  These specifiers are
+  // part of what's repeated.
+  if (auto expansion = dyn_cast<PackExpansionTypeRepr>(typeRepr))
+    typeRepr = expansion->getPatternType();
+
   // Look through parens here; other than parens, specifiers
   // must appear at the top level of a parameter type.
   auto *nestedRepr = typeRepr->getWithoutParens();
@@ -2205,23 +2240,18 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
     nestedRepr = isolated->getBase();
   
-  if (isa<InOutTypeRepr>(nestedRepr) &&
-      param->isDefaultArgument()) {
-    auto &ctx = param->getASTContext();
-    ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
-                       swift::diag::cannot_provide_default_value_inout,
-                       param->getName());
-    return ParamSpecifier::Default;
+  if (auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(nestedRepr)) {
+    if (ownershipRepr->getSpecifier() == ParamSpecifier::InOut
+        && param->isDefaultArgument()) {
+      auto &ctx = param->getASTContext();
+      ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
+                         swift::diag::cannot_provide_default_value_inout,
+                         param->getName());
+      return ParamSpecifier::Default;
+    }
+    return ownershipRepr->getSpecifier();
   }
-
-  if (isa<InOutTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::InOut;
-  } else if (isa<SharedTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::Shared;
-  } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-    return ParamSpecifier::Owned;
-  }
-
+  
   return ParamSpecifier::Default;
 }
 
@@ -2568,8 +2598,15 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     SmallVector<AnyFunctionType::Param, 4> paramTypes;
     macro->parameterList->getParams(paramTypes);
-    FunctionType::ExtInfo info;
-    return FunctionType::get(paramTypes, resultType, info);
+
+    if (auto genericSig = macro->getGenericSignature()) {
+      GenericFunctionType::ExtInfo info;
+      return GenericFunctionType::get(
+          genericSig, paramTypes, resultType, info);
+    } else {
+      FunctionType::ExtInfo info;
+      return FunctionType::get(paramTypes, resultType, info);
+    }
   }
   }
   llvm_unreachable("invalid decl kind");
@@ -2802,12 +2839,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       nullptr);
 
   for (auto *member : idc->getMembers()) {
-    // Expand peer macros.
-    (void)evaluateOrDefault(
-        ctx.evaluator,
-        ExpandPeerMacroRequest{member},
-        {});
-
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have
       // dynamically-dispatched accessors, so force them to be synthesized.
@@ -2820,17 +2851,22 @@ static ArrayRef<Decl *> evaluateMembersRequest(
 
   SortedDeclList synthesizedMembers;
 
-  for (auto *member : idc->getMembers()) {
+  std::function<void(Decl *)> addResult;
+  addResult = [&](Decl *member) {
+    member->visitAuxiliaryDecls(addResult);
     if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
       if (vd->isSynthesized()) {
         synthesizedMembers.add(vd);
-        continue;
+        return;
       }
     }
-
     result.push_back(member);
+  };
+
+  for (auto *member : idc->getMembers()) {
+    addResult(member);
   }
 
   if (!synthesizedMembers.empty()) {

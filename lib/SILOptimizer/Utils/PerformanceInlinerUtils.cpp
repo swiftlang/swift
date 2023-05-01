@@ -883,7 +883,7 @@ static bool hasInterestingSideEffect(SILInstruction *I) {
     case swift::SILInstructionKind::DeallocRefInst:
       return false;
     default:
-      return I->getMemoryBehavior() != SILInstruction::MemoryBehavior::None;
+      return I->getMemoryBehavior() != MemoryBehavior::None;
   }
 }
 
@@ -937,7 +937,7 @@ bool swift::isPureCall(FullApplySite AI, BasicCalleeAnalysis *BCA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  if (BCA->getMemoryBehavior(AI, /*observeRetains*/ true) != SILInstruction::MemoryBehavior::None)
+  if (BCA->getMemoryBehavior(AI, /*observeRetains*/ true) != MemoryBehavior::None)
     return false;
   // Check if all parameters are constant.
   auto Args = AI.getArgumentOperands().slice(AI.getNumIndirectSILResults());

@@ -86,6 +86,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
   }
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
     // If it's DynamicMemberLookup, we don't know which function is being
     // called, so we can't extract any information from it.
     // TupleIndex isn't a function call and is not relevant for argument

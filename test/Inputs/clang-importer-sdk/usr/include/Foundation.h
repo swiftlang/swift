@@ -7,6 +7,7 @@
 #import <CoreFoundation.h>
 #import <CoreGraphics.h>
 #endif
+#import <stdbool.h>
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
@@ -262,6 +263,7 @@ __attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 @property (nonnull) NSDictionary<id <NSCopying>, Bee *> *anythingToBees;
 
 @property(getter=isMakingHoney) BOOL makingHoney;
+@property(readonly,getter=isEmpty) bool empty;
 @property(setter=assignGuard:) id guard;
 
 + (instancetype)hiveWithQueen:(Bee *)queen;

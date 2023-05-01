@@ -380,9 +380,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " (isolated)";
 
     if (Locator) {
-      Out << " [[";
+      Out << " @ ";
       Locator->dump(sm, Out);
-      Out << "]]";
     }
     Out << ":\n";
     
@@ -479,7 +478,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -487,7 +486,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -525,6 +524,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       break;
     case OverloadChoiceKind::TupleIndex:
       Out << "tuple index " << overload.getTupleIndex();
+      break;
+    case OverloadChoiceKind::MaterializePack:
+      Out << "materialize pack";
       break;
     case OverloadChoiceKind::KeyPathApplication:
       Out << "key path application";
@@ -605,9 +607,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   }
 
   if (Locator && !skipLocator) {
-    Out << " [[";
+    Out << " @ ";
     Locator->dump(sm, Out);
-    Out << "]];";
   }
 }
 
@@ -653,6 +654,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[protocol-metatype-to-object]";
   case ConversionRestrictionKind::ArrayToPointer:
     return "[array-to-pointer]";
+  case ConversionRestrictionKind::ArrayToCPointer:
+    return "[array-to-c-pointer]";
   case ConversionRestrictionKind::StringToPointer:
     return "[string-to-pointer]";
   case ConversionRestrictionKind::InoutToPointer:

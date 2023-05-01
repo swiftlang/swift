@@ -142,7 +142,7 @@ void ClangSyntaxPrinter::printModuleNamespaceStart(
     const ModuleDecl &moduleContext) const {
   os << "namespace ";
   printBaseName(&moduleContext);
-  os << " __attribute__((swift_private))";
+  os << " SWIFT_PRIVATE_ATTR";
   printSymbolUSRAttribute(&moduleContext);
   os << " {\n";
 }
@@ -155,7 +155,7 @@ void ClangSyntaxPrinter::printNamespace(
   os << "namespace ";
   namePrinter(os);
   if (trivia == NamespaceTrivia::AttributeSwiftPrivate)
-    os << " __attribute__((swift_private))";
+    os << " SWIFT_PRIVATE_ATTR";
   if (moduleContext)
     printSymbolUSRAttribute(moduleContext);
   os << " {\n\n";
@@ -194,9 +194,11 @@ void ClangSyntaxPrinter::printSwiftImplQualifier() const {
 }
 
 void ClangSyntaxPrinter::printInlineForThunk() const {
-  // FIXME: make a macro and add 'nodebug', and
-  // migrate all other 'inline' uses.
-  os << "inline __attribute__((always_inline)) ";
+  os << "SWIFT_INLINE_THUNK ";
+}
+
+void ClangSyntaxPrinter::printInlineForHelperFunction() const {
+  os << "SWIFT_INLINE_PRIVATE_HELPER ";
 }
 
 void ClangSyntaxPrinter::printNullability(
@@ -348,7 +350,8 @@ void ClangSyntaxPrinter::printGenericSignatureParams(
 
 void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
     const GenericRequirement &requirement) {
-  assert(requirement.isMetadata() && "protocol requirements not supported yet!");
+  assert(requirement.isAnyMetadata() &&
+         "protocol requirements not supported yet!");
   auto *gtpt = requirement.getTypeParameter()->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
   os << "swift::TypeMetadataTrait<";
@@ -375,24 +378,29 @@ void ClangSyntaxPrinter::printPrimaryCxxTypeName(
 }
 
 void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
-  os << "// Look for the C++ interop support header relative to clang's "
-        "resource dir:\n";
-  os << "//  "
-        "'<toolchain>/usr/lib/clang/<version>/include/../../../swift/"
-        "swiftToCxx'.\n";
-  os << "#if __has_include(<../../../swift/swiftToCxx/" << headerName << ">)\n";
-  os << "#include <../../../swift/swiftToCxx/" << headerName << ">\n";
-  os << "#elif __has_include(<../../../../../lib/swift/swiftToCxx/"
-     << headerName << ">)\n";
-  os << "//  "
-        "'<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/"
-        "swift/swiftToCxx'.\n";
-  os << "#include <../../../../../lib/swift/swiftToCxx/" << headerName << ">\n";
-  os << "// Alternatively, allow user to find the header using additional "
-        "include path into '<toolchain>/lib/swift'.\n";
-  os << "#elif __has_include(<swiftToCxx/" << headerName << ">)\n";
-  os << "#include <swiftToCxx/" << headerName << ">\n";
-  os << "#endif\n";
+  printIgnoredDiagnosticBlock("non-modular-include-in-framework-module", [&] {
+    os << "// Look for the C++ interop support header relative to clang's "
+          "resource dir:\n";
+    os << "//  "
+          "'<toolchain>/usr/lib/clang/<version>/include/../../../swift/"
+          "swiftToCxx'.\n";
+    os << "#if __has_include(<../../../swift/swiftToCxx/" << headerName
+       << ">)\n";
+    os << "#include <../../../swift/swiftToCxx/" << headerName << ">\n";
+    os << "#elif __has_include(<../../../../../lib/swift/swiftToCxx/"
+       << headerName << ">)\n";
+    os << "//  "
+          "'<toolchain>/usr/local/lib/clang/<version>/include/../../../../../"
+          "lib/"
+          "swift/swiftToCxx'.\n";
+    os << "#include <../../../../../lib/swift/swiftToCxx/" << headerName
+       << ">\n";
+    os << "// Alternatively, allow user to find the header using additional "
+          "include path into '<toolchain>/lib/swift'.\n";
+    os << "#elif __has_include(<swiftToCxx/" << headerName << ">)\n";
+    os << "#include <swiftToCxx/" << headerName << ">\n";
+    os << "#endif\n";
+  });
 }
 
 void ClangSyntaxPrinter::printDefine(StringRef macroName) {
@@ -434,4 +442,21 @@ void ClangSyntaxPrinter::printKnownCType(
   os << info->name;
   if (info->canBeNullable)
     os << " _Null_unspecified";
+}
+
+void ClangSyntaxPrinter::printSwiftMangledNameForDebugger(
+    const NominalTypeDecl *typeDecl) {
+  printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
+    auto mangled_name = mangler.mangleTypeForDebugger(
+        typeDecl->getDeclaredInterfaceType(), nullptr);
+    if (!mangled_name.empty()) {
+      os << "  typedef char " << mangled_name << ";\n";
+      os << "  static inline constexpr " << mangled_name
+         << " __swift_mangled_name = 0;\n";
+    }
+  });
+  os << "#pragma clang diagnostic pop\n";
 }

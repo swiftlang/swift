@@ -140,12 +140,13 @@ public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                SwiftToClangInteropContext &interopContext, AccessLevel access,
-               bool requiresExposedAttribute, OutputLanguageMode outputLang)
+               bool requiresExposedAttribute, llvm::StringSet<> &exposedModules,
+               OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
         printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
                 typeMapping, interopContext, access, requiresExposedAttribute,
-                outputLang),
+                exposedModules, outputLang),
         outputLangMode(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
@@ -190,11 +191,15 @@ public:
     }
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      // Only add C++ imports in C++ mode for now.
-      if (!D->hasClangNode())
-        return true;
+      // Do not expose compiler private '_ObjC' module.
       if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
         return true;
+      // Add C++ module imports in C++ mode explicitly, to ensure that their
+      // import is always emitted in the header.
+      if (D->hasClangNode()) {
+        if (auto *clangMod = otherModule->findUnderlyingClangModule())
+          imports.insert(clangMod);
+      }
     }
 
     imports.insert(otherModule);
@@ -289,12 +294,14 @@ public:
       return;
     auto it = seenClangTypes.insert(clangType.getTypePtr());
     if (it.second)
-      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M,
+                                                              printer);
   }
 
   void forwardDeclareCxxValueTypeIfNeeded(const NominalTypeDecl *NTD) {
-    forwardDeclare(NTD,
-                   [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+    forwardDeclare(NTD, [&]() {
+      ClangValueTypePrinter::forwardDeclType(os, NTD, printer);
+    });
   }
 
   void forwardDeclareType(const TypeDecl *TD) {
@@ -659,6 +666,16 @@ public:
       int result = getSortName(*rhs).compare(getSortName(*lhs));
       if (result != 0)
         return result;
+      // Two overloaded functions can have the same name when emitting C++.
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs))
+        return result;
+      // A function and a global variable can have the same name in C++,
+      // even when the variable might not actually be emitted by the emitter.
+      // In that case, order the function before the variable.
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<VarDecl>(*lhs))
+        return 1;
+      if (isa<AbstractFunctionDecl>(*lhs) && isa<VarDecl>(*rhs))
+        return -1;
 
       // Prefer value decls to extensions.
       assert(!(isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs)));
@@ -773,15 +790,16 @@ void swift::printModuleContentsAsObjC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
+  llvm::StringSet<> exposedModules;
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
-               /*requiresExposedAttribute=*/false, OutputLanguageMode::ObjC)
+               /*requiresExposedAttribute=*/false, exposedModules,
+               OutputLanguageMode::ObjC)
       .write();
 }
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
-    raw_ostream &os,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
-    bool requiresExposedAttribute) {
+    raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    bool requiresExposedAttribute, llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -799,7 +817,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
                       AccessLevel::Public, requiresExposedAttribute,
-                      OutputLanguageMode::Cxx);
+                      exposedModules, OutputLanguageMode::Cxx);
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
@@ -830,8 +848,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    M.ValueDecl::getName().print(os);
-    os << " __attribute__((swift_private))";
+    ClangSyntaxPrinter(os).printBaseName(&M);
+    os << " SWIFT_PRIVATE_ATTR";
     ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
@@ -849,7 +867,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   // Construct a C++ namespace for the module.
   ClangSyntaxPrinter(os).printNamespace(
-      [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
+      [&](raw_ostream &os) { ClangSyntaxPrinter(os).printBaseName(&M); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
 

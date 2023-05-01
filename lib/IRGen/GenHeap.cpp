@@ -34,6 +34,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -56,9 +57,11 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                        SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -70,7 +73,7 @@ namespace {
                                     SpareBitVector &&spareBits, \
                                     bool isOptional) \
       : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize), \
+                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
@@ -145,12 +148,16 @@ namespace {
                                               SpareBitVector &&spareBits, \
                                               bool isOptional) \
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
-                             alignment, IsNotPOD, IsFixedSize), \
+                             alignment, IsNotTriviallyDestroyable, \
+                             IsCopyable, \
+                             IsFixedSize), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
-    enum { IsScalarPOD = false }; \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    enum { IsScalarTriviallyDestroyable = false }; \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -448,7 +455,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   for (unsigned i : indices(layout.getElements())) {
     auto &field = layout.getElement(i);
     auto fieldTy = layout.getElementTypes()[i];
-    if (field.isPOD())
+    if (field.isTriviallyDestroyable())
       continue;
 
     field.getType().destroy(
@@ -1647,7 +1654,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   }
 
   // We can share box info for all similarly-shaped POD types.
-  if (fixedTI.isPOD(ResilienceExpansion::Maximal)) {
+  if (fixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)
+      && fixedTI.isCopyable(ResilienceExpansion::Maximal)) {
     auto stride = fixedTI.getFixedStride();
     auto align = fixedTI.getFixedAlignment();
     auto foundPOD = PODBoxTI.find({stride.getValue(),align.getValue()});

@@ -41,7 +41,6 @@ foo1.bar = 2
 // CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2 
 // CHECK-NEXT:  [[GETTER:%.*]] = class_method [[FOO]] : $Foo, #Foo.bar!getter : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> Int
-// CHECK-NEXT:  debug_value [[OLDVALUE]] : $Int, let, name "tmp"
 // CHECK-NEXT:  // function_ref Foo.bar.willset
 // CHECK-NEXT:  [[WILLSET:%.*]] = function_ref @$s28lazy_property_with_observers3FooC3barSivw : $@convention(method) (Int, @guaranteed Foo) -> ()
 // CHECK-NEXT:  [[WILLSET_RESULT:%.*]] = apply [[WILLSET]]([[VALUE]], [[FOO]]) : $@convention(method) (Int, @guaranteed Foo) -> ()
@@ -86,7 +85,6 @@ foo1.bar = 2
 // CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2 
 // CHECK-NEXT:  [[GETTER:%.*]] = class_method [[FOO]] : $Foo, #Foo.observable1!getter : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> Int
-// CHECK-NEXT:  debug_value [[OLDVALUE]] : $Int, let, name "tmp"
 // CHECK-NEXT:  [[ENUM:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[VALUE]] : $Int
 // CHECK-NEXT:  [[REF_ELEM:%.*]] = ref_element_addr [[FOO]] : $Foo, #Foo.$__lazy_storage_$_observable1
 // CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ELEM]] : $*Optional<Int>
@@ -145,7 +143,6 @@ foo1.bar = 2
 // CHECK-NEXT: // function_ref Foo1.bar.getter
 // CHECK-NEXT:  [[GETTER:%.*]] = function_ref @$s28lazy_property_with_observers4Foo1V3barSivg : $@convention(method) (@inout Foo1) -> Int
 // CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[BEGIN_ACCESS]]) : $@convention(method) (@inout Foo1) -> Int
-// CHECK-NEXT:  debug_value [[OLDVALUE]] : $Int, let, name "tmp"
 // CHECK-NEXT:  end_access [[BEGIN_ACCESS]] : $*Foo1
 // CHECK-NEXT:  [[ENUM:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[VALUE]] : $Int
 // CHECK-NEXT:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] [[FOO1]] : $*Foo1

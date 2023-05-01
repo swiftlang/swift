@@ -140,6 +140,7 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
     case DeclContextKind::AbstractClosureExpr:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Package:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
     case DeclContextKind::MacroDecl:
@@ -471,6 +472,10 @@ public:
   }
 
 private:
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
@@ -1227,8 +1232,13 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
   TypeRefinementContextBuilder Builder(RootTRC, Context);
-  for (auto D : SF.getTopLevelDecls()) {
-    Builder.build(D);
+  for (auto item : SF.getTopLevelItems()) {
+    if (auto decl = item.dyn_cast<Decl *>())
+      Builder.build(decl);
+    else if (auto expr = item.dyn_cast<Expr *>())
+      Builder.build(expr);
+    else if (auto stmt = item.dyn_cast<Stmt *>())
+      Builder.build(stmt);
   }
 }
 
@@ -1267,7 +1277,11 @@ AvailabilityContext
 TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
                                                    const DeclContext *DC,
                                                    const TypeRefinementContext **MostRefined) {
-  SourceFile *SF = DC->getParentSourceFile();
+  SourceFile *SF;
+  if (loc.isValid())
+    SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
+  else
+    SF = DC->getParentSourceFile();
   auto &Context = DC->getASTContext();
 
   // If our source location is invalid (this may be synthesized code), climb
@@ -1414,6 +1428,10 @@ public:
   /// Returns the innermost node containing the target range that matches
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     return getPreWalkActionFor(E);
@@ -2042,9 +2060,6 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
-    return;
-  
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
@@ -2502,11 +2517,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   auto I = argumentLabelIDs.begin();
 
   auto updateLabelsForArg = [&](Expr *expr) -> bool {
+    if (I == argumentLabelIDs.end())
+      return true;
+
     if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
-      if (I == argumentLabelIDs.end())
-        return true;
-
       I = argumentLabelIDs.erase(I);
       return false;
     }
@@ -2533,9 +2548,6 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     }
 
     // Normal: Just advance.
-    if (I == argumentLabelIDs.end())
-      return true;
-
     ++I;
     return false;
   };
@@ -2752,9 +2764,9 @@ bool TypeChecker::diagnoseIfDeprecated(SourceLoc loc,
   return true;
 }
 
-void swift::diagnoseUnavailableOverride(ValueDecl *override,
-                                        const ValueDecl *base,
-                                        const AvailableAttr *attr) {
+void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
+                                              const ValueDecl *base,
+                                              const AvailableAttr *attr) {
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
   if (attr->Rename.empty()) {
@@ -3013,9 +3025,6 @@ bool swift::diagnoseParameterizedProtocolAvailability(
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
 
-  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
-    return false;
-
   auto runningOS = TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
   auto availability = ctx.getParameterizedExistentialRuntimeAvailability();
@@ -3224,6 +3233,10 @@ public:
   }
 
   bool shouldWalkIntoTapExpression() override { return false; }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     auto *DC = Where.getDeclContext();
@@ -3963,6 +3976,10 @@ public:
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR)
@@ -4202,8 +4219,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   }
 
   // Now, check associated conformances.
-  SubstitutionMap subConformanceSubs =
-      concreteConf->getSubstitutions(DC->getParentModule());
+  SubstitutionMap subConformanceSubs = concreteConf->getSubstitutionMap();
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
                                           depTy, replacementTy,
                                           useConformanceAvailabilityErrorsOption))

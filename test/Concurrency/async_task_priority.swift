@@ -16,8 +16,7 @@
 // rdar://101077408 – Temporarily disable on watchOS & iOS simulator
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
-
-// REQUIRES: rdar105396748
+// UNSUPPORTED: DARWIN_SIMULATOR=tvos
 
 import Darwin
 @preconcurrency import Dispatch
@@ -40,7 +39,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
   print("Testing basePri matching expected pri - \(basePri) == \(priority)")
   expectEqual(basePri, priority)
-  Task.withUnsafeCurrentTask { unsafeTask in
+  withUnsafeCurrentTask { unsafeTask in
     guard let unsafeTask else {
       fatalError("Expected to be able to get current task, but could not!")
     }
@@ -67,6 +66,29 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 func childTaskWaitingForEscalation(sem: DispatchSemaphore, basePri: TaskPriority, curPri : TaskPriority) async {
     sem.wait() /* Wait to be escalated */
     let _ = await testNestedTaskPriority(basePri: basePri, curPri: curPri)
+}
+
+actor Test {
+  private var value = 0
+  init() { }
+
+  func increment() -> Int {
+    let cur = value
+    value = value + 1
+    return cur
+  }
+
+  func blockActorThenIncrement(semToSignal: DispatchSemaphore, semToWait : DispatchSemaphore, priExpected: TaskPriority) -> Int {
+    semToSignal.signal()
+
+    semToWait.wait();
+
+    sleep(1)
+    // TODO: insert a test to verify that thread priority has actually escalated
+    // to match priExpected
+    return increment()
+  }
+
 }
 
 
@@ -266,6 +288,33 @@ func childTaskWaitingForEscalation(sem: DispatchSemaphore, basePri: TaskPriority
 
             sleep(1) // Wait for task2 to start running
             await task2.value
+        }
+
+        tests.test("Task escalation of a task enqueued on an actor") {
+          let task1Pri: TaskPriority = .background
+          let task2Pri: TaskPriority = .background
+          let parentPri: TaskPriority =  Task.currentPriority
+
+          let sem1 = DispatchSemaphore(value: 0) // to unblock enqueue of task2
+          let sem2 = DispatchSemaphore(value: 0)
+          let testActor = Test()
+
+          let task1 = Task(priority: task1Pri) {
+            expectedBasePri(priority: task1Pri);
+            await testActor.blockActorThenIncrement(semToSignal: sem1, semToWait: sem2, priExpected: parentPri);
+          }
+
+          sem1.wait() // Wait until task1 is on the actor
+
+          let task2 = Task(priority: task2Pri) {
+            expectedBasePri(priority: task2Pri);
+            await testActor.increment()
+          }
+
+          sleep(1)
+          sem2.signal() // task2 is probably enqueued on the actor at this point, unblock task1
+
+          await task2.value // Escalate task2 which should be queued behind task1 on the actor
         }
 
       }

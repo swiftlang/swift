@@ -263,28 +263,31 @@ void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// existentialRequiresAny computation.
+// hasSelfOrAssociatedTypeRequirementsRequest computation.
 //----------------------------------------------------------------------------//
 
-void ExistentialRequiresAnyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
 }
 
-void ExistentialRequiresAnyRequest::noteCycleStep(DiagnosticEngine &diags) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
   auto requirement = std::get<0>(getStorage());
   diags.diagnose(requirement, diag::kind_declname_declared_here,
                  DescriptiveDeclKind::Protocol, requirement->getName());
 }
 
-Optional<bool> ExistentialRequiresAnyRequest::getCachedResult() const {
+Optional<bool>
+HasSelfOrAssociatedTypeRequirementsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  return decl->getCachedExistentialRequiresAny();
+  return decl->getCachedHasSelfOrAssociatedTypeRequirements();
 }
 
-void ExistentialRequiresAnyRequest::cacheResult(bool value) const {
+void HasSelfOrAssociatedTypeRequirementsRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->setCachedExistentialRequiresAny(value);
+  decl->setCachedHasSelfOrAssociatedTypeRequirements(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -1009,6 +1012,25 @@ Optional<NamedPattern *> NamingPatternRequest::getCachedResult() const {
 void NamingPatternRequest::cacheResult(NamedPattern *value) const {
   auto *VD = std::get<0>(getStorage());
   VD->NamingPattern = value;
+}
+
+//----------------------------------------------------------------------------//
+// ExprPatternMatchRequest caching.
+//----------------------------------------------------------------------------//
+
+Optional<ExprPatternMatchResult>
+ExprPatternMatchRequest::getCachedResult() const {
+  auto *EP = std::get<0>(getStorage());
+  if (!EP->MatchVar)
+    return None;
+
+  return ExprPatternMatchResult(EP->MatchVar, EP->MatchExpr);
+}
+
+void ExprPatternMatchRequest::cacheResult(ExprPatternMatchResult result) const {
+  auto *EP = std::get<0>(getStorage());
+  EP->MatchVar = result.getMatchVar();
+  EP->MatchExpr = result.getMatchExpr();
 }
 
 //----------------------------------------------------------------------------//
@@ -1743,10 +1765,7 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
 }
 
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
-  if (pointer.is<MacroExpansionExpr *>())
-    return MacroRole::Expression;
-
-  if (pointer.is<MacroExpansionDecl *>())
+  if (pointer.is<MacroExpansionExpr *>() || pointer.is<MacroExpansionDecl *>())
     return getFreestandingMacroRoles();
 
   if (pointer.is<CustomAttr *>())
@@ -1775,4 +1794,173 @@ bool swift::operator==(MacroRoles lhs, MacroRoles rhs) {
 
 llvm::hash_code swift::hash_value(MacroRoles roles) {
   return roles.toRaw();
+}
+
+static bool isAttachedSyntax(const UnresolvedMacroReference &ref) {
+  return ref.getAttr() != nullptr;
+}
+
+void ResolveMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto macroRef = std::get<0>(storage);
+  diags.diagnose(macroRef.getSigilLoc(), diag::macro_resolve_circular_reference,
+                 isAttachedSyntax(macroRef),
+                 macroRef.getMacroName().getFullName());
+}
+
+void ResolveMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto macroRef = std::get<0>(storage);
+  diags.diagnose(macroRef.getSigilLoc(),
+                 diag::macro_resolve_circular_reference_through,
+                 isAttachedSyntax(macroRef),
+                 macroRef.getMacroName().getFullName());
+}
+
+void ExpandMacroExpansionDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getPoundLoc(),
+                 diag::macro_expand_circular_reference,
+                 "freestanding",
+                 decl->getMacroName().getFullName());
+}
+
+void ExpandMacroExpansionDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getPoundLoc(),
+                 diag::macro_expand_circular_reference_through,
+                 "freestanding",
+                 decl->getMacroName().getFullName());
+}
+
+void ExpandMacroExpansionExprRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto expr = std::get<0>(getStorage());
+  diags.diagnose(expr->getStartLoc(),
+                 diag::macro_expand_circular_reference,
+                 "freestanding",
+                 expr->getMacroName().getFullName());
+}
+
+void ExpandMacroExpansionExprRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto expr = std::get<0>(getStorage());
+  diags.diagnose(expr->getStartLoc(),
+                 diag::macro_expand_circular_reference_through,
+                 "freestanding",
+                 expr->getMacroName().getFullName());
+}
+
+void ExpandAccessorMacros::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "accessor",
+                 decl->getName());
+}
+
+void ExpandAccessorMacros::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "accessor",
+                 decl->getName());
+}
+
+void ExpandConformanceMacros::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "conformance",
+                 decl->getName());
+}
+
+void ExpandConformanceMacros::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "conformance",
+                 decl->getName());
+}
+
+void ExpandMemberAttributeMacros::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity,
+                   "member attribute",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed,
+                   "member attribute");
+  }
+}
+
+void ExpandMemberAttributeMacros::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity_through,
+                   "member attribute",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed_through,
+                   "member attribute");
+  }
+}
+
+void ExpandSynthesizedMemberMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity,
+                   "member",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed,
+                   "member");
+  }
+}
+
+void ExpandSynthesizedMemberMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity_through,
+                   "member",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed_through,
+                   "member");
+  }
+}
+
+void ExpandPeerMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity,
+                   "peer",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed,
+                   "peer");
+  }
+}
+
+void ExpandPeerMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity_through,
+                   "peer",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed_through,
+                   "peer");
+  }
 }

@@ -32,6 +32,10 @@
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
+namespace ast_scope {
+class ASTScopeImpl;
+}
+
 namespace Lowering {
 
 class SILGenFunction;
@@ -50,15 +54,19 @@ public:
   SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
 
-  // Create a new builder, inheriting the given builder's context and debug
-  // scope.
+  /// Create a new builder, inheriting the given builder's context and debug
+  /// scope.
   SILGenBuilder(SILGenBuilder &builder, SILBasicBlock *insertBB)
-      : SILBuilder(insertBB, builder.getCurrentDebugScope(),
-                   builder.getBuilderContext()),
+      : SILBuilder(insertBB, builder.getBuilderContext(),
+                   builder.getCurrentDebugScope()),
         SGF(builder.SGF) {}
 
   SILGenModule &getSILGenModule() const;
   SILGenFunction &getSILGenFunction() const { return SGF; }
+
+  SILDebugLocation
+  getSILDebugLocation(SILLocation Loc,
+                      bool ForMetaInstruction = false) override;
 
   using SILBuilder::createInitExistentialValue;
   ManagedValue
@@ -189,6 +197,7 @@ public:
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadTake(SILLocation loc, ManagedValue base);
+  ManagedValue createFormalAccessLoadCopy(SILLocation loc, ManagedValue base);
 
   using SILBuilder::createStoreBorrow;
   ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
@@ -230,7 +239,7 @@ public:
   ManagedValue createInputFunctionArgument(
       SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isClosureCapture = false);
+      bool isClosureCapture = false, bool isFormalParameterPack = false);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out

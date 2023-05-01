@@ -186,6 +186,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   if (!Context)
     return;
   switch (Context->getContextKind()) {
+  case swift::DeclContextKind::Package:
+    return;
   case DeclContextKind::Module:
     if (Context == cast<ModuleDecl>(Context)->getASTContext().TheBuiltinModule)
       Buffer << cast<ModuleDecl>(Context)->getName() << ".";
@@ -1391,8 +1393,8 @@ public:
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
       *this << "[lexical] ";
-    if (AVI->getWasMoved())
-      *this << "[moved] ";
+    if (AVI->getUsesMoveableValueDebugInfo() && !AVI->getType().isMoveOnly())
+      *this << "[moveable_value_debuginfo] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
@@ -1432,6 +1434,12 @@ public:
     if (ABI->emitReflectionMetadata()) {
       *this << "[reflection] ";
     }
+
+    if (ABI->getUsesMoveableValueDebugInfo() &&
+        !ABI->getAddressType().isMoveOnly()) {
+      *this << "[moveable_value_debuginfo] ";
+    }
+
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo(),
                   &ABI->getModule().getASTContext().SourceMgr);
@@ -1762,8 +1770,9 @@ public:
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->poisonRefs())
       *this << "[poison] ";
-    if (DVI->getWasMoved())
-      *this << "[moved] ";
+    if (DVI->getUsesMoveableValueDebugInfo() &&
+        !DVI->getOperand()->getType().isMoveOnly())
+      *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
       *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
@@ -1987,6 +1996,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitDropDeinitInst(DropDeinitInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitMarkMustCheckInst(MarkMustCheckInst *I) {
     using CheckKind = MarkMustCheckInst::CheckKind;
     switch (I->getCheckKind()) {
@@ -2000,6 +2013,22 @@ public:
       break;
     case CheckKind::AssignableButNotConsumable:
       *this << "[assignable_but_not_consumable] ";
+      break;
+    case CheckKind::InitableButNotConsumable:
+      *this << "[initable_but_not_consumable] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMarkUnresolvedReferenceBindingInst(
+      MarkUnresolvedReferenceBindingInst *I) {
+    using Kind = MarkUnresolvedReferenceBindingInst::Kind;
+    switch (I->getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::InOut:
+      *this << "[inout] ";
       break;
     }
     *this << getIDAndType(I->getOperand());
@@ -2297,7 +2326,13 @@ public:
           << " of " << subs.getGenericSignature()
           << " at ";
     printSubstitutions(subs);
-    *this << ", shape $" << env->getOpenedElementShapeClass()
+    // The shape class in the opened environment is a canonical interface
+    // type, which won't resolve in the generic signature we just printed.
+    // Map it back to the sugared generic parameter.
+    auto sugaredShapeClass =
+      subs.getGenericSignature()->getSugaredType(
+        env->getOpenedElementShapeClass());
+    *this << ", shape $" << sugaredShapeClass
           << ", uuid \"" << env->getOpenedElementUUID() << "\"";
   }
   void visitPackElementGetInst(PackElementGetInst *I) {

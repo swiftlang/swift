@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
@@ -482,6 +483,7 @@ void IDEInspectionInstance::performNewOperation(
           InstanceSetupError));
       return;
     }
+    CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
@@ -827,7 +829,7 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
         : ReusingASTContext(ReusingASTContext),
           CancellationFlag(CancellationFlag), Callback(Callback) {}
 
-    void handleResults(ResolvedCursorInfoPtr result) override {
+    void handleResults(std::vector<ResolvedCursorInfoPtr> result) override {
       HandleResultsCalled = true;
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
@@ -852,8 +854,8 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
                   ide::makeCursorInfoCallbacksFactory(Consumer, RequestedLoc));
 
               if (!Result.DidFindIDEInspectionTarget) {
-                return DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
+                return DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
 
               performIDEInspectionSecondPass(
@@ -863,8 +865,8 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
                 // pass, we didn't receive any results. To make sure Callback
                 // gets called exactly once, call it manually with no results
                 // here.
-                DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
             },
             Callback);

@@ -300,6 +300,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
     prefix = "default assoc type ";
     break;
 
+  case MangledTypeRefRole::FieldMetadata:
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
     prefix = "symbolic ";

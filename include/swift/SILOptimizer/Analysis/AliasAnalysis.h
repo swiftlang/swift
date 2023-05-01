@@ -85,7 +85,7 @@ private:
   /// The alias() method uses this map to cache queries.
   llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
 
-  using MemoryBehavior = SILInstruction::MemoryBehavior;
+  using MemoryBehavior = MemoryBehavior;
 
   /// MemoryBehavior value cache.
   ///
@@ -104,6 +104,12 @@ private:
   /// Contains the begin-scope instructions (e.g. begin_access) of all computed
   /// scopes.
   llvm::SmallPtrSet<SILInstruction *, 16> immutableScopeComputed;
+
+  /// Used to limit complexity.
+  /// The side is computed lazily. Therefore the actual value depends on what
+  /// SIL modifications an optimization pass already performed when the size
+  /// is requested.
+  int estimatedFunctionSize = -1;
 
   AliasResult aliasAddressProjection(SILValue V1, SILValue V2,
                                      SILValue O1, SILValue O2);
@@ -163,7 +169,7 @@ public:
 
   /// Returns true if \p Inst may read from memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayRead.
+  /// For details see MemoryBehavior::MayRead.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayRead ||
@@ -174,7 +180,7 @@ public:
   /// Returns true if \p Inst may write to memory or deinitialize memory at
   /// address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior::MayWrite.
+  /// For details see MemoryBehavior::MayWrite.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return B == MemoryBehavior::MayWrite ||
@@ -185,7 +191,7 @@ public:
   /// Returns true if \p Inst may read from memory, write to memory or
   /// deinitialize memory at address \p V.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
     auto B = computeMemoryBehavior(Inst, V);
     return MemoryBehavior::None != B;
@@ -209,6 +215,8 @@ public:
 
   /// Returns true if `lhs` can reference the same field as `rhs`.
   bool canReferenceSameField(SILValue lhs, SILValue rhs);
+
+  int getEstimatedFunctionSize(SILValue valueInFunction);
 };
 
 

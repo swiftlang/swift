@@ -31,7 +31,7 @@ func main() -> Void
             {
             // Ensure the two local_vars are in different lexical scopes.
             // CHECK-DAG: !DILocalVariable(name: "local_var", scope: ![[THENSCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]],
-            // CHECK-DAG: ![[THENSCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-3]]
+            // CHECK-DAG: ![[THENSCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE+1]]
                 var local_var : Int64 = 10
                 print("I have an int here \(local_var).\n", terminator: "")
                 return false
@@ -39,7 +39,7 @@ func main() -> Void
             else
             {
             // CHECK-DAG: !DILocalVariable(name: "local_var", scope: ![[ELSESCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]]
-            // CHECK-DAG: ![[ELSESCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-2]],
+            // CHECK-DAG: ![[ELSESCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE+1]],
                 var local_var : String = "g"
                 print("I have another string here \(local_var).\n", terminator: "")
                 // Assign to all the captured variables to inhibit capture promotion.

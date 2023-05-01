@@ -1538,12 +1538,18 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     case SelfAccessKind::Mutating:
       FuncSelfKind = "Mutating";
       break;
-    case SelfAccessKind::Consuming:
+    case SelfAccessKind::LegacyConsuming:
       // FIXME: Stay consistent with earlier digests that had underscores here.
       FuncSelfKind = "__Consuming";
       break;
     case SelfAccessKind::NonMutating:
       FuncSelfKind = "NonMutating";
+      break;
+    case SelfAccessKind::Consuming:
+      FuncSelfKind = "Consuming";
+      break;
+    case SelfAccessKind::Borrowing:
+      FuncSelfKind = "Borrowing";
       break;
     }
   }
@@ -2405,6 +2411,11 @@ class ConstExtractor: public ASTWalker {
     }
     return false;
   }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
@@ -2459,11 +2470,10 @@ void SwiftDeclCollector::deSerialize(StringRef Filename) {
 }
 
 // Serialize the content of all roots to a given file using JSON format.
-void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root,
+void SwiftDeclCollector::serialize(llvm::raw_ostream &os, SDKNode *Root,
                                    PayLoad OtherInfo) {
   std::error_code EC;
-  llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::OF_None);
-  json::Output yout(fs);
+  json::Output yout(os);
   assert(Root->getKind() == SDKNodeKind::Root);
   SDKNodeRoot &root = *static_cast<SDKNodeRoot*>(Root);
   yout.beginObject();
@@ -2475,8 +2485,8 @@ void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root,
 }
 
 // Serialize the content of all roots to a given file using JSON format.
-void SwiftDeclCollector::serialize(StringRef Filename) {
-  SwiftDeclCollector::serialize(Filename, RootNode, PayLoad());
+void SwiftDeclCollector::serialize(llvm::raw_ostream &os) {
+  SwiftDeclCollector::serialize(os, RootNode, PayLoad());
 }
 
 SDKNodeRoot *
@@ -2539,28 +2549,26 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
 }
 
 void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, PayLoad load,
-                                  StringRef OutputFile) {
+                                  llvm::raw_ostream &os) {
   assert(Root);
   auto Opts = Root->getSDKContext().getOpts();
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
-  SwiftDeclCollector::serialize(OutputFile, Root, load);
-  if (Opts.Verbose)
-    llvm::errs() << "Dumped to "<< OutputFile << "\n";
+  SwiftDeclCollector::serialize(os, Root, load);
 }
 
-void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
-  dumpSDKRoot(Root, PayLoad(), OutputFile);
+void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, llvm::raw_ostream &os) {
+  dumpSDKRoot(Root, PayLoad(), os);
 }
 
 int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvoke,
                                     const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
+                                    llvm::raw_ostream &os, CheckerOptions Opts) {
   SDKContext SDKCtx(Opts);
   SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvoke, ModuleNames);
   if (!Root)
     return 1;
-  dumpSDKRoot(Root, OutputFile);
+  dumpSDKRoot(Root, os);
   return 0;
 }
 
@@ -2578,11 +2586,11 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
 
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
-  Collector.serialize(OutputPath);
+  Collector.serialize(FS);
   return 0;
 }
 
-void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
+void swift::ide::api::dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os,
                                         bool ABI, bool Empty) {
   CheckerOptions opts;
   opts.ABI = ABI;
@@ -2599,7 +2607,7 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, StringRef OutputFile,
   PayLoad payload;
   SWIFT_DEFER {
     payload.allContsValues = &extractor.getAllConstValues();
-    dumpSDKRoot(collector.getSDKRoot(), payload, OutputFile);
+    dumpSDKRoot(collector.getSDKRoot(), payload, os);
   };
   if (Empty) {
     return;

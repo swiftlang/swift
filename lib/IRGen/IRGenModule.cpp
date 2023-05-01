@@ -96,8 +96,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
-  if (CGO.OpaquePointers)
+  if (CGO.OpaquePointers) {
     LLVMContext.setOpaquePointers(true);
+  } else {
+    LLVMContext.setOpaquePointers(false);
+  }
 
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
@@ -121,13 +124,15 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
+    CGO.DwarfDebugFlags =
+        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;
   }
   if (!Opts.TrapFuncName.empty()) {
@@ -348,24 +353,36 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
-  static_assert(MetadataAdjustmentIndex::ValueType == 1,
+  static_assert(MetadataAdjustmentIndex::ValueType == 2,
                 "Adjustment index must be synchronized with this layout");
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
+    Int8PtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
   });
   FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
+  FullForeignTypeMetadataStructTy = createStructType(*this, "swift.full_foreign_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
+
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
+
+  FullExistentialTypeMetadataStructTy = createStructType(*this, "swift.full_existential_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
 
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
-  static_assert(MetadataAdjustmentIndex::Class == 2,
+  static_assert(MetadataAdjustmentIndex::Class == 3,
                 "Adjustment index must be synchronized with this layout");
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
+    Int8PtrTy,
     dtorPtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
@@ -1135,7 +1152,7 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
   llvm::Constant *IRGenModule::get##NAME() {                                   \
     if (NAME)                                                                  \
       return NAME;                                                             \
-    NAME = Module.getOrInsertGlobal(SYM, FullTypeMetadataStructTy);            \
+    NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy);            \
     if (useDllStorage() && !isStandardLibrary())                               \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
@@ -1558,8 +1575,7 @@ void AutolinkKind::collectEntriesFromLibraries(
   llvm::LLVMContext &ctx = IGM.getLLVMContext();
 
   switch (Value) {
-  case AutolinkKind::LLVMLinkerOptions:
-  case AutolinkKind::SwiftAutoLinkExtract: {
+  case AutolinkKind::LLVMLinkerOptions: {
     // On platforms that support autolinking, continue to use the metadata.
     for (LinkLibrary linkLib : AutolinkEntries) {
       switch (linkLib.getKind()) {
@@ -1575,6 +1591,24 @@ void AutolinkKind::collectEntriesFromLibraries(
         Entries.insert(llvm::MDNode::get(ctx, args));
         continue;
       }
+      }
+      llvm_unreachable("Unhandled LibraryKind in switch.");
+    }
+    return;
+  }
+  case AutolinkKind::SwiftAutoLinkExtract: {
+    // On platforms that support autolinking, continue to use the metadata.
+    for (LinkLibrary linkLib : AutolinkEntries) {
+      switch (linkLib.getKind()) {
+      case LibraryKind::Library: {
+        llvm::SmallString<32> opt =
+            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+        Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
+        continue;
+      }
+      case LibraryKind::Framework:
+        // Frameworks are not supported with Swift Autolink Extract.
+        continue;
       }
       llvm_unreachable("Unhandled LibraryKind in switch.");
     }
@@ -1967,8 +2001,9 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
                                        getSILModule().isWholeModule());
 }
 
-const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
-  return Types.getTypeLayoutEntry(T);
+const TypeLayoutEntry
+&IRGenModule::getTypeLayoutEntry(SILType T, bool useStructLayouts) {
+  return Types.getTypeLayoutEntry(T, useStructLayouts);
 }
 
 
@@ -2018,7 +2053,6 @@ bool swift::writeEmptyOutputFilesFor(
   const ASTContext &Context,
   std::vector<std::string>& ParallelOutputFilenames,
   const IRGenOptions &IRGenOpts) {
-
   for (auto fileName : ParallelOutputFilenames) {
     // The first output file, was use for genuine output.
     if (fileName == ParallelOutputFilenames[0])

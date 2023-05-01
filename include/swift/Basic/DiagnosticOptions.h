@@ -32,7 +32,7 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
-  enum FormattingStyle { LLVM, Swift, SwiftSyntax };
+  enum FormattingStyle { LLVM, Swift };
 
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.

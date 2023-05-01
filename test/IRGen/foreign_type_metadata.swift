@@ -8,7 +8,7 @@ import Foundation
 // metadata is not required by this TU. Another TU could require it and the
 // linker could choose the less defined one of the two.
 
-// CHECK: @"$sSo8_NSRangeVMn" = linkonce_odr hidden constant <{ {{.*}}sSo8_NSRangeVMa{{.*}} }>, section "__TEXT,__const"
+// CHECK: @"$sSo8_NSRangeVMn" = linkonce_odr hidden constant <{ {{.*}}sSo8_NSRangeVMa{{.*}} }>, section "__TEXT,__constg_swiftt"
 
 func use(_ closure: @escaping (Int) -> ()) {}
 

@@ -259,13 +259,12 @@ void DiagnosticEmitter::emitObjectOwnedDiagnostic(
   // not be identified as part of the boundary and instead we will identify a
   // boundary edge which does not provide us with something that we want to
   // error upon.
-  for (auto *user :
-       getCanonicalizer().canonicalizer->getLifetimeEndingUsers()) {
+  for (auto *user : getCanonicalizer().canonicalizer.getLifetimeEndingUsers()) {
     consumingUserSet.insert(user);
     consumingBlockToUserMap.try_emplace(user->getParent(), user);
   }
   for (auto *user :
-       getCanonicalizer().canonicalizer->getNonLifetimeEndingUsers()) {
+       getCanonicalizer().canonicalizer.getNonLifetimeEndingUsers()) {
     nonConsumingUserSet.insert(user);
     nonConsumingBlockToUserMap.try_emplace(user->getParent(), user);
   }
@@ -671,12 +670,7 @@ void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
                    sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let);
   Optional<DiagType> diag;
 
-  if (markedValue->getCheckKind() ==
-      MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
-    // We only use no consume or assign if we have a promoted let box.
-    diag = diag::
-        sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let;
-  } else if (auto *reai = dyn_cast<RefElementAddrInst>(operand)) {
+  if (auto *reai = dyn_cast<RefElementAddrInst>(operand)) {
     auto *field = reai->getField();
     if (field->isLet()) {
       diag = diag::
@@ -755,4 +749,31 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
     diagnose(astContext, user, diag::sil_moveonlychecker_consuming_use_here);
   }
+}
+
+void DiagnosticEmitter::emitCannotDestructureDeinitNominalError(
+    MarkMustCheckInst *markedValue, StringRef pathString,
+    NominalTypeDecl *deinitedNominal, SILInstruction *consumingUser) {
+  auto &astContext = fn->getASTContext();
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+
+  registerDiagnosticEmitted(markedValue);
+
+  if (pathString.empty()) {
+    diagnose(
+        astContext, markedValue,
+        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self,
+        varName);
+  } else {
+    diagnose(
+        astContext, markedValue,
+        diag::sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field,
+        varName, varName, pathString.drop_front(),
+        deinitedNominal->getBaseName());
+  }
+  diagnose(astContext, consumingUser,
+           diag::sil_moveonlychecker_consuming_use_here);
+  astContext.Diags.diagnose(deinitedNominal->getValueTypeDestructor(),
+                            diag::sil_moveonlychecker_deinit_here);
 }

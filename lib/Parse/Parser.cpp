@@ -126,9 +126,9 @@ bool IDEInspectionSecondPassRequest::evaluate(
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
   Parser TheParser(BufferID, *SF, nullptr, parserState);
 
-  std::unique_ptr<IDEInspectionCallbacks> IDECallbacks(
-      Factory->createIDEInspectionCallbacks(TheParser));
-  TheParser.setIDECallbacks(IDECallbacks.get());
+  auto Callbacks = Factory->createCallbacks(TheParser);
+  TheParser.setCodeCompletionCallbacks(Callbacks.CompletionCallbacks.get());
+  TheParser.setDoneParsingCallback(Callbacks.DoneParsingCallback.get());
 
   TheParser.performIDEInspectionSecondPassImpl(*state);
   return true;
@@ -203,7 +203,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   assert(!State->hasIDEInspectionDelayedDeclState() &&
          "Second pass should not set any code completion info");
 
-  IDECallbacks->doneParsing(DC->getParentSourceFile());
+  DoneParsingCallback->doneParsing(DC->getParentSourceFile());
 
   State->restoreIDEInspectionDelayedDeclState(info);
 }
@@ -504,8 +504,8 @@ Parser::~Parser() {
 bool Parser::isInSILMode() const { return SF.Kind == SourceFileKind::SIL; }
 
 bool Parser::isDelayedParsingEnabled() const {
-  // Do not delay parsing during code completion's second pass.
-  if (IDECallbacks)
+  // Do not delay parsing during IDE inspection's second pass.
+  if (DoneParsingCallback)
     return false;
 
   return SF.hasDelayedBodyParsing();
@@ -747,7 +747,9 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
       
       // Could have encountered something like `_ var:` 
       // or `let foo:` or `var:`
-      if (Tok.isAny(tok::kw_var, tok::kw_let)) {
+      if (Tok.isAny(tok::kw_var, tok::kw_let) ||
+          (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&
+           Tok.isAny(tok::kw_inout))) {
         if (possibleDeclStartsLine && !hasDelimiter) {
           break;
         }
@@ -1092,31 +1094,6 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 
   return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
                                                Segments.front().Length));
-}
-
-bool Parser::shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body) {
-  // If the body consists of an #if declaration with a single
-  // expression active clause, find a single expression.
-  if (Body.size() == 2) {
-    if (auto *D = Body.front().dyn_cast<Decl *>()) {
-      // Step into nested active clause.
-      while (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        auto ACE = ICD->getActiveClauseElements();
-        if (ACE.size() == 1) {
-          assert(Body.back() == ACE.back() &&
-                 "active clause not found in body");
-          return true;
-        } else if (ACE.size() == 2) {
-          if (auto *ND = ACE.front().dyn_cast<Decl *>()) {
-            D = ND;
-            continue;
-          }
-        }
-        break;
-      }
-    }
-  }
-  return Body.size() == 1;
 }
 
 struct ParserUnit::Implementation {

@@ -120,62 +120,56 @@ using namespace irgen;
 namespace {
   /// Information about the IR-level signature of a function type.
   class FuncSignatureInfo {
-  private:
+  protected:
     /// The SIL function type being represented.
     const CanSILFunctionType FormalType;
-    
+
     mutable Signature TheSignature;
-    
+
   public:
     FuncSignatureInfo(CanSILFunctionType formalType)
       : FormalType(formalType) {}
-    
+
     Signature getSignature(IRGenModule &IGM) const;
   };
 
+  class ObjCFuncSignatureInfo : public FuncSignatureInfo {
+  private:
+    mutable Signature TheDirectSignature;
+
+  public:
+    ObjCFuncSignatureInfo(CanSILFunctionType formalType)
+      : FuncSignatureInfo(formalType) {}
+
+    Signature getDirectSignature(IRGenModule &IGM) const;
+  };
+
   /// The @thin function type-info class.
-  class ThinFuncTypeInfo : public PODSingleScalarTypeInfo<ThinFuncTypeInfo,
-                                                          LoadableTypeInfo>,
-                           public FuncSignatureInfo {
-    ThinFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+  template <class Derived>
+  class ThinFuncTypeInfoImpl :
+    public PODSingleScalarTypeInfo<Derived, LoadableTypeInfo> {
+
+  protected:
+    const Derived &asDerived() const {
+      return static_cast<const Derived &>(*this);
+    }
+
+    ThinFuncTypeInfoImpl(CanSILFunctionType formalType, llvm::Type *storageType,
                      Size size, Alignment align,
                      const SpareBitVector &spareBits)
-      : PODSingleScalarTypeInfo(storageType, size, spareBits, align),
-        FuncSignatureInfo(formalType)
+      : PODSingleScalarTypeInfo<Derived, LoadableTypeInfo>(storageType, size, spareBits, align)
     {
     }
 
   public:
-    static const ThinFuncTypeInfo *create(CanSILFunctionType formalType,
-                                          llvm::Type *storageType,
-                                          Size size, Alignment align,
-                                          const SpareBitVector &spareBits) {
-      return new ThinFuncTypeInfo(formalType, storageType, size, align,
-                                  spareBits);
-    }
-    void initialize(IRGenFunction &IGF, Explosion &src, Address addr,
-                    bool isOutlined) const override {
-      auto *fn = src.claimNext();
-
-      // We might be presented with a value of the more precise pointer to
-      // function type "void(*)*" rather than the generic "i8*". Downcast to the
-      // more general expected type.
-      if (fn->getContext().supportsTypedPointers() &&
-          fn->getType()->getNonOpaquePointerElementType()->isFunctionTy())
-        fn = IGF.Builder.CreateBitCast(fn, getStorageType());
-
-      Explosion tmp;
-      tmp.add(fn);
-      PODSingleScalarTypeInfo<ThinFuncTypeInfo,LoadableTypeInfo>::initialize(IGF, tmp, addr, isOutlined);
-    }
-
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+                                          SILType T,
+                                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(asDerived(), T);
       }
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,
+                                                        ScalarKind::TriviallyDestroyable);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -208,6 +202,64 @@ namespace {
     }
   };
 
+  /// The @thin function type-info class.
+  class ThinFuncTypeInfo : public ThinFuncTypeInfoImpl<ThinFuncTypeInfo>,
+                           public FuncSignatureInfo {
+  public:
+
+    ThinFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                     Size size, Alignment align,
+                     const SpareBitVector &spareBits) :
+      ThinFuncTypeInfoImpl(formalType, storageType, size, align, spareBits),
+      FuncSignatureInfo(formalType) {}
+
+
+    static const ThinFuncTypeInfo *create(CanSILFunctionType formalType,
+                                          llvm::Type *storageType,
+                                          Size size, Alignment align,
+                                          const SpareBitVector &spareBits) {
+      return new ThinFuncTypeInfo(formalType, storageType, size, align,
+                                  spareBits);
+    }
+    void initialize(IRGenFunction &IGF, Explosion &src, Address addr,
+                    bool isOutlined) const override {
+      auto *fn = src.claimNext();
+
+      // We might be presented with a value of the more precise pointer to
+      // function type "void(*)*" rather than the generic "i8*". Downcast to the
+      // more general expected type.
+      if (fn->getContext().supportsTypedPointers() &&
+          fn->getType()->getNonOpaquePointerElementType()->isFunctionTy())
+        fn = IGF.Builder.CreateBitCast(fn, getStorageType());
+
+      Explosion tmp;
+      tmp.add(fn);
+      PODSingleScalarTypeInfo<ThinFuncTypeInfo,LoadableTypeInfo>::initialize(IGF, tmp, addr, isOutlined);
+    }
+  };
+
+  /// The (objc_method) function type-info class.
+  class ObjCFuncTypeInfo : public ThinFuncTypeInfoImpl<ThinFuncTypeInfo>,
+                           public ObjCFuncSignatureInfo {
+  public:
+
+    ObjCFuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
+                     Size size, Alignment align,
+                     const SpareBitVector &spareBits) :
+      ThinFuncTypeInfoImpl(formalType, storageType, size, align, spareBits),
+      ObjCFuncSignatureInfo(formalType) {}
+
+
+    static const ObjCFuncTypeInfo *create(CanSILFunctionType formalType,
+                                          llvm::Type *storageType,
+                                          Size size, Alignment align,
+                                          const SpareBitVector &spareBits) {
+      return new ObjCFuncTypeInfo(formalType, storageType, size, align,
+                                  spareBits);
+    }
+  };
+
+
   /// The @thick function type-info class.
   class FuncTypeInfo :
       public ScalarPairTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
@@ -215,7 +267,7 @@ namespace {
   protected:
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits,
-                 IsPOD_t pod)
+                 IsTriviallyDestroyable_t pod)
       : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align, pod),
         FuncSignatureInfo(formalType)
     {
@@ -226,7 +278,7 @@ namespace {
                                       llvm::StructType *storageType,
                                       Size size, Alignment align,
                                       SpareBitVector &&spareBits,
-                                      IsPOD_t pod) {
+                                      IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
     }
@@ -240,13 +292,15 @@ namespace {
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      } else if (isPOD(ResilienceExpansion::Maximal)) {
+      } else if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                           ScalarKind::POD);
+                                                           ScalarKind::TriviallyDestroyable);
       } else {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(
             *this, T, ScalarKind::ThickFunc);
@@ -281,25 +335,25 @@ namespace {
       return ".data";
     }
     bool isSecondElementTrivial() const {
-      return isPOD(ResilienceExpansion::Maximal);
+      return isTriviallyDestroyable(ResilienceExpansion::Maximal);
     }
     void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
                                  Optional<Atomicity> atomicity = None) const {
-      if (!isPOD(ResilienceExpansion::Maximal)) {
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
     }
     void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
                                   Optional<Atomicity> atomicity = None) const {
-      if (!isPOD(ResilienceExpansion::Maximal)) {
+      if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
-      if (isPOD(ResilienceExpansion::Maximal))
+      if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
         IGF.Builder.CreateStore(context, dataAddr);
       else
         IGF.emitNativeStrongAssign(context, dataAddr);
@@ -422,9 +476,11 @@ namespace {
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(
@@ -442,15 +498,18 @@ namespace {
   public:
     BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
                          SpareBitVector &&spareBits,
-                         IsPOD_t pod, IsBitwiseTakable_t bt, Size captureOffset)
+                         IsTriviallyDestroyable_t pod, IsBitwiseTakable_t bt, Size captureOffset)
       : IndirectTypeInfo(type, size, std::move(spareBits), align, pod, bt,
+                         IsCopyable,
                          IsFixedSize),
         CaptureOffset(captureOffset)
     {}
     
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       return IGM.typeLayoutCache.getOrCreateScalarEntry(
@@ -503,7 +562,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   spareBits.appendClearBits(captureOffset.getValueInBits());
 
   Size size = captureOffset;
-  IsPOD_t pod = IsNotPOD;
+  IsTriviallyDestroyable_t pod = IsNotTriviallyDestroyable;
   IsBitwiseTakable_t bt = IsNotBitwiseTakable;
   if (!fixedCapture) {
     IGM.unimplemented(SourceLoc(), "dynamic @block_storage capture");
@@ -516,7 +575,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     spareBits.append(fixedCapture->getSpareBits());
 
     size = captureOffset + fixedCapture->getFixedSize();
-    pod = fixedCapture->isPOD(ResilienceExpansion::Maximal);
+    pod = fixedCapture->isTriviallyDestroyable(ResilienceExpansion::Maximal);
     bt = fixedCapture->isBitwiseTakable(ResilienceExpansion::Maximal);
   }
 
@@ -564,10 +623,15 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
-  case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Closure:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
+                                    IGM.FunctionPtrTy,
+                                    IGM.getPointerSize(),
+                                    IGM.getPointerAlignment(),
+                                    IGM.getFunctionPointerSpareBits());
+  case SILFunctionType::Representation::ObjCMethod:
+    return ObjCFuncTypeInfo::create(CanSILFunctionType(T),
                                     IGM.FunctionPtrTy,
                                     IGM.getPointerSize(),
                                     IGM.getPointerAlignment(),
@@ -587,11 +651,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       return FuncTypeInfo::create(
           CanSILFunctionType(T), IGM.NoEscapeFunctionPairTy,
           IGM.getPointerSize() * 2, IGM.getPointerAlignment(),
-          std::move(spareBits), IsPOD);
+          std::move(spareBits), IsTriviallyDestroyable);
     }
     return FuncTypeInfo::create(
         CanSILFunctionType(T), IGM.FunctionPairTy, IGM.getPointerSize() * 2,
-        IGM.getPointerAlignment(), std::move(spareBits), IsNotPOD);
+        IGM.getPointerAlignment(), std::move(spareBits), IsNotTriviallyDestroyable);
   }
   }
   llvm_unreachable("bad function type representation");
@@ -609,6 +673,19 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
   return TheSignature;
 }
 
+Signature ObjCFuncSignatureInfo::getDirectSignature(IRGenModule &IGM) const {
+  // If it's already been filled in, we're done.
+  if (TheDirectSignature.isValid())
+    return TheDirectSignature;
+
+  // Update the cache and return.
+  TheDirectSignature = Signature::getUncached(IGM, FormalType,
+                                        FunctionPointerKind(FormalType),
+                                        /*forStaticCall*/ true);
+  assert(TheDirectSignature.isValid());
+  return TheDirectSignature;
+}
+
 static const FuncSignatureInfo &
 getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   auto &ti = IGM.getTypeInfoForLowered(type);
@@ -620,9 +697,10 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
-  case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Closure:
     return ti.as<ThinFuncTypeInfo>();
+  case SILFunctionType::Representation::ObjCMethod:
+    return static_cast<const FuncSignatureInfo &>(ti.as<ObjCFuncTypeInfo>());
   case SILFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
   }
@@ -634,12 +712,19 @@ Signature IRGenModule::getSignature(CanSILFunctionType type) {
 }
 
 Signature IRGenModule::getSignature(CanSILFunctionType type,
-                                    FunctionPointerKind kind) {
+                                    FunctionPointerKind kind,
+                                    bool forStaticCall) {
   // Don't bother caching if we're working with a special kind.
   if (kind.isSpecial())
     return Signature::getUncached(*this, type, kind);
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
+
+  if (forStaticCall &&
+      type->getRepresentation() == SILFunctionType::Representation::ObjCMethod) {
+    auto &objcSigInfo = static_cast<const ObjCFuncSignatureInfo &>(sigInfo);
+    return objcSigInfo.getDirectSignature(*this);
+  }
   return sigInfo.getSignature(*this);
 }
 
@@ -1624,7 +1709,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
       case ParameterConvention::Direct_Unowned:
         // If the type is nontrivial, keep the context alive since the field
         // depends on the context to not be deallocated.
-        if (!fieldTI.isPOD(ResilienceExpansion::Maximal))
+        if (!fieldTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
           dependsOnContextLifetime = true;
 
         // Load these parameters directly. We can "take" since the parameter is
@@ -1864,7 +1949,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // Reserve space for polymorphic bindings.
   auto bindings = NecessaryBindings::forPartialApplyForwarder(
-      IGF.IGM, origType, subs, considerParameterSources);
+      IGF.IGM, origType, subs, outType->isNoEscape(),
+      considerParameterSources);
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
@@ -2270,8 +2356,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   uint32_t flags = 0;
   auto &captureTL
     = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
-  bool isPOD = captureTL.isPOD(ResilienceExpansion::Maximal);
-  if (!isPOD)
+  bool isTriviallyDestroyable = captureTL.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+  if (!isTriviallyDestroyable)
     flags |= 1 << 25;
   
   // - HAS_STRET, if the invoke function is sret
@@ -2301,7 +2387,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
   
-  if (!isPOD) {
+  if (!isTriviallyDestroyable) {
     // Define the copy and dispose helpers.
     descriptorFields.addSignedPointer(
                        emitBlockCopyHelper(IGF.IGM, blockTy, storageTL),

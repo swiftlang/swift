@@ -857,6 +857,8 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
     Buffer << 'j';
   } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
     Buffer << 'D';
+  } else if (text == BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE) {
+    Buffer << 'd';
   } else if (text == BUILTIN_TYPE_NAME_EXECUTOR) {
     Buffer << 'e';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
@@ -1160,6 +1162,15 @@ ManglingError Remangler::mangleDependentGenericSignature(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDependentGenericParamPackMarker(Node *node,
+                                                      unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
+  Buffer << "Rv";
+  mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentGenericType(Node *node,
                                                     unsigned depth) {
   RETURN_IF_ERROR(
@@ -1201,8 +1212,7 @@ ManglingError Remangler::mangleDependentMemberType(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleDependentPseudogenericSignature(Node *node,
                                                                unsigned depth) {
-  // handled inline
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  return mangleDependentGenericSignature(node, depth + 1);
 }
 
 ManglingError Remangler::mangleDestructor(Node *node, unsigned depth) {
@@ -2887,6 +2897,8 @@ ManglingError Remangler::mangleMacro(Node *node, unsigned depth) {
 ManglingError Remangler::mangleFreestandingMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  if (auto privateDiscriminator = node->getChild(3))
+    RETURN_IF_ERROR(mangle(privateDiscriminator, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   Buffer << "fMf";
   return mangleChildNode(node, 2, depth + 1);
@@ -2896,45 +2908,52 @@ ManglingError Remangler::mangleAccessorAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   Buffer << "fMa";
-  return mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 3, depth + 1);
 }
 
 ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   Buffer << "fMA";
-  return mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 3, depth + 1);
 }
 
 ManglingError Remangler::mangleMemberAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   Buffer << "fMm";
-  return mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 3, depth + 1);
 }
 
 ManglingError Remangler::manglePeerAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   Buffer << "fMp";
-  return mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 3, depth + 1);
 }
 
 ManglingError Remangler::mangleConformanceAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
   Buffer << "fMc";
-  return mangleChildNode(node, 2, depth + 1);
+  return mangleChildNode(node, 3, depth + 1);
 }
 
 ManglingError Remangler::mangleMacroExpansionUniqueName(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  if (auto privateDiscriminator = node->getChild(3))
+    RETURN_IF_ERROR(mangle(privateDiscriminator, depth + 1));
   RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
   Buffer << "fMu";
   return mangleChildNode(node, 2, depth + 1);

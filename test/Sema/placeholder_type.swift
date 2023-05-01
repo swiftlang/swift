@@ -270,3 +270,16 @@ func deferredInit(_ c: Bool) {
 // https://github.com/apple/swift/issues/63130
 let _: _  = nil // expected-error{{'nil' requires a contextual type}}
 let _: _? = nil // expected-error{{'nil' requires a contextual type}}
+
+// rdar://106621760 - failed to produce a diagnostic when placeholder type appears in editor placeholder
+do {
+  struct X<T> {
+    init(content: () -> T) {}
+  }
+
+  func test(_: () -> Void) {}
+
+  test {
+    _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
+  }
+}

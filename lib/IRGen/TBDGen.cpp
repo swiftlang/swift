@@ -414,6 +414,9 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
 }
 
 bool TBDGenVisitor::willVisitDecl(Decl *D) {
+  if (Lowering::shouldSkipLowering(D))
+    return false;
+
   // A @_silgen_name("...") function without a body only exists to
   // forward-declare a symbol from another library.
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
@@ -469,9 +472,16 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
                                             ValueDecl *requirementDecl) {
   Mangle::ASTMangler Mangler;
 
+  std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
-  addSymbol(Mangler.mangleWitnessThunk(C, requirementDecl),
-            SymbolSource::forUnknown());
+  addSymbol(decorated, SymbolSource::forUnknown());
+
+  if (requirementDecl->isProtocolRequirement()) {
+    ValueDecl *PWT = C->getWitness(requirementDecl).getDecl();
+    if (const auto *AFD = dyn_cast<AbstractFunctionDecl>(PWT))
+      if (AFD->hasAsync())
+        addSymbol(decorated + "Tu", SymbolSource::forUnknown());
+  }
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
@@ -583,7 +593,6 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   file.setInstallName(opts.InstallName);
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
-  file.setInstallAPI(opts.IsInstallAPI);
 
   if (auto packed = parsePackedVersion(CurrentVersion,
                                        opts.CurrentVersion, ctx)) {

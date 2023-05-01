@@ -726,3 +726,36 @@ bb0:
   return %t : $()
 
 }
+
+sil shared @closure : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @getExistingExternalSpecialization : $@convention(thin) <T> (@in_guaranteed T) -> @owned @callee_owned () -> () {
+bb0(%0 : $*T):
+  %2 = function_ref @closure : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = partial_apply %2<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  return %5 : $@callee_owned () -> ()
+}
+
+// Make sure we don't crash here
+// CHECK-LABEL: sil @testExistingExternalSpecialization :
+// CHECK:         function_ref @$s33getExistingExternalSpecializations5UInt8V_Tg5
+// CHECK:       } // end sil function 'testExistingExternalSpecialization'
+sil @testExistingExternalSpecialization : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $UInt8
+  %1 = integer_literal $Builtin.Int8, 5
+  %2 = struct $UInt8 (%1 : $Builtin.Int8)
+  store %2 to %0 : $*UInt8
+  %5 = function_ref @getExistingExternalSpecialization : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> ()
+  %8 = apply %5<UInt8>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> ()
+  dealloc_stack %0 : $*UInt8
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @$s7closures5UInt8V_Tg5 : $@convention(thin) (UInt8) -> ()
+

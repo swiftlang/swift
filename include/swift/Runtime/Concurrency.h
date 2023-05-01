@@ -560,6 +560,11 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_basePriority(AsyncTask *task);
 
+/// Returns the priority of the job.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority
+swift_concurrency_jobPriority(Job *job);
+
 /// Create and add an cancellation record to the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 CancellationNotificationStatusRecord*
@@ -710,6 +715,14 @@ bool swift_task_isOnExecutor(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_executor_isComplexEquality(ExecutorRef ref);
+
+/// Return the 64bit TaskID (if the job is an AsyncTask),
+/// or the 32bits of the job Id otherwise.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getJobTaskId(Job *job);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
@@ -765,6 +778,19 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original);
 
+/// A hook to override the entrypoint to the main runloop used to drive the
+/// concurrency runtime and drain the main queue. This function must not return.
+/// Note: If the hook is wrapping the original function and the `compatOverride`
+///       is passed in, the `original` function pointer must be passed into the
+///       compatibility override function as the original function.
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
+typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
+    swift_task_asyncMainDrainQueue_original original);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride);
+
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_initialize(DefaultActor *actor);
@@ -781,7 +807,11 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
-/// Initialize the runtime storage for a distributed remote actor.
+/// Initialize the runtime storage for a non-default distributed actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
+
+/// Create and initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
@@ -803,7 +833,7 @@ void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
 /// Check if the actor is a distributed 'remote' actor instance.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_distributed_actor_is_remote(DefaultActor *actor);
+bool swift_distributed_actor_is_remote(HeapObject *actor);
 
 /// Do a primitive suspension of the current task, as if part of
 /// a continuation, although this does not provide any of the
@@ -880,6 +910,9 @@ void swift_task_reportUnexpectedExecutor(
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_startOnMainActor(AsyncTask* job);
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 

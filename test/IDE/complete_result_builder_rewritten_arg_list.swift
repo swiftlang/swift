@@ -25,9 +25,7 @@ struct R {
       // when doing a fallback type-check. Make sure we can continue to correctly
       // recover the MemberRefExpr from DeclRefExpr for .e
       S(E.#^CC^#).foo(y: .e)
-      // CHECK: Begin completions
       // CHECK: Decl[EnumElement]/CurrNominal: e[#E#]; name=e
-      // CHECK: End completions
     }
 }
 

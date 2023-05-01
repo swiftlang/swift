@@ -121,7 +121,8 @@ class ReflectionContext
   using super::readMetadata;
   using super::readObjCClassName;
   using super::readResolvedPointerValue;
-  std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
+  std::unordered_map<typename super::StoredPointer, const RecordTypeInfo *>
+      Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
   /// when this object is destroyed.
@@ -873,7 +874,7 @@ public:
 
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
-  const TypeInfo *
+  const RecordTypeInfo *
   getMetadataTypeInfo(StoredPointer MetadataAddress,
                       remote::TypeInfoProvider *ExternalTypeInfo) {
     // See if we cached the layout already
@@ -883,7 +884,7 @@ public:
 
     auto &TC = getBuilder().getTypeConverter();
 
-    const TypeInfo *TI = nullptr;
+    const RecordTypeInfo *TI = nullptr;
 
     auto TR = readTypeFromMetadata(MetadataAddress);
     auto kind = this->readKindFromMetadata(MetadataAddress);

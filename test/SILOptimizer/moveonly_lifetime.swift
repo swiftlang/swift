@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-feature MoveOnlyClasses %s 2>&1 | %FileCheck %s
 
 @_moveOnly
 class C {}
@@ -10,7 +10,7 @@ func getC() -> C
 func takeC(_ c: __owned C)
 
 @_silgen_name("borrowC")
-func borrowC(_ c: __shared C)
+func borrowC(_ c: borrowing C)
 
 @_silgen_name("something")
 func something()

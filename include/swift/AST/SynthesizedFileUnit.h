@@ -44,13 +44,14 @@ public:
   void addTopLevelDecl(Decl *D) { TopLevelDecls.push_back(D); }
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl *> &result) const override;
 
   void lookupObjCMethods(
       ObjCSelector selector,
       SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
 
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 

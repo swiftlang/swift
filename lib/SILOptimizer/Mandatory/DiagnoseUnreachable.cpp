@@ -647,16 +647,8 @@ static bool isUserCode(const SILInstruction *I) {
   
   // If the instruction corresponds to user-written return or some other
   // statement, we know it corresponds to user code.
-  if (Loc.is<RegularLocation>() || Loc.is<ReturnLocation>()) {
-    if (auto *E = Loc.getAsASTNode<Expr>())
-      return !E->isImplicit();
-    if (auto *D = Loc.getAsASTNode<Decl>())
-      return !D->isImplicit();
-    if (auto *S = Loc.getAsASTNode<Stmt>())
-      return !S->isImplicit();
-    if (auto *P = Loc.getAsASTNode<Pattern>())
-      return !P->isImplicit();
-  }
+  if (Loc.is<RegularLocation>() || Loc.is<ReturnLocation>())
+    return !Loc.isImplicit();
   return false;
 }
 
@@ -918,7 +910,8 @@ static bool diagnoseUnreachableBlock(
       case (UnreachableKind::NoreturnCall): {
         // Specialcase when we are warning about unreachable code after a call
         // to a noreturn function.
-        if (!BrInfo.Loc.isASTNode<ExplicitCastExpr>()) {
+        if (!BrInfo.Loc.isASTNode<ExplicitCastExpr>() &&
+            !BrInfo.Loc.isSILFile()) {
           assert(BrInfo.Loc.isASTNode<ApplyExpr>());
           diagnose(M.getASTContext(), Loc.getSourceLoc(),
                    diag::unreachable_code);

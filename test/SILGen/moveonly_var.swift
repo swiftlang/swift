@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -24,7 +24,7 @@ public class Klass {
     }
 }
 
-public func nonConsumingUseKlass(_ k: __shared Klass) {}
+public func nonConsumingUseKlass(_ k: borrowing Klass) {}
 
 ///////////
 // Tests //

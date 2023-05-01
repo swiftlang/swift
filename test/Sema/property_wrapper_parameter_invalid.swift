@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
 
 @propertyWrapper
 struct NonMutatingWrapper<T> {
@@ -36,11 +36,23 @@ struct NoProjection<T> {
 // expected-note@+1 {{property wrapper type 'NoProjection<String>' does not support initialization from a projected value}}
 func takesNoProjectionWrapper(@NoProjection value: String) {}
 
+// expected-note@+1 {{property wrapper type 'NoProjection<String>' does not support initialization from a projected value}}
+func takesNoProjectionWrapperWithDefault(_: Int? = nil, @NoProjection value: String) {}
+
+// expected-note@+1 {{property wrapper type 'NoProjection<String>' does not support initialization from a projected value}}
+func takesNoProjectionWrapperWithVariadic(_: Int..., @NoProjection value: String) {}
+
 func testNoProjection(message: String) {
   takesNoProjectionWrapper(value: message) // okay
 
   // expected-error@+1 {{cannot use property wrapper projection argument}}
   takesNoProjectionWrapper($value: message)
+
+  // expected-error@+1 {{cannot use property wrapper projection argument}}
+  takesNoProjectionWrapperWithDefault($value: message)
+
+  // expected-error@+1 {{cannot use property wrapper projection argument}}
+  takesNoProjectionWrapperWithVariadic(1, 2, 3, $value: message)
 
   // expected-error@+2 {{cannot use property wrapper projection parameter}}
   // expected-note@+1 {{property wrapper type 'NoProjection<Int>' does not support initialization from a projected value}}
@@ -140,6 +152,15 @@ public struct PublicWrapper<T> {
   public var projectedValue: PublicWrapper<T> { self }
 }
 
+// expected-note@+2 2 {{generic struct 'PackageWrapper' is not '@usableFromInline' or public}}
+@propertyWrapper
+package struct PackageWrapper<T> { // expected-note 3 {{type declared here}}
+  package var wrappedValue: T
+
+  // expected-note@+1 2 {{initializer 'init(wrappedValue:)' is not '@usableFromInline' or public}}
+  package init(wrappedValue: T) { self.wrappedValue = wrappedValue }
+}
+
 // expected-note@+2 2 {{generic struct 'InternalWrapper' is not '@usableFromInline' or public}}
 @propertyWrapper
 struct InternalWrapper<T> { // expected-note 3 {{type declared here}}
@@ -167,6 +188,18 @@ public func testComposition2(@InternalWrapper @PublicWrapper value: Int) {}
 // Okay because `InternalWrapper` is implementation-detail.
 @usableFromInline func testComposition4(@InternalWrapper @PublicWrapper value: Int) {}
 
+// expected-error@+1 {{function cannot be declared public because its parameter uses a package API wrapper type}}
+public func testComposition1pkg(@PublicWrapper @PackageWrapper value: Int) {}
+
+// Okay because `PackageWrapper` is implementation-detail.
+public func testComposition2pkg(@PackageWrapper @PublicWrapper value: Int) {}
+
+// expected-error@+1 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+@usableFromInline func testComposition3pkg(@PublicWrapper @PackageWrapper value: Int) {}
+
+// Okay because `PackageWrapper` is implementation-detail.
+@usableFromInline func testComposition4pkg(@PackageWrapper @PublicWrapper value: Int) {}
+
 // expected-error@+3 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
@@ -175,6 +208,15 @@ public func testComposition2(@InternalWrapper @PublicWrapper value: Int) {}
 // expected-error@+2 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition6(@InternalWrapper @PublicWrapper value: Int) {}
+
+// expected-error@+3 {{generic struct 'PackageWrapper' is package and cannot be referenced from an '@inlinable' function}}
+// expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+// expected-error@+1 {{initializer 'init(wrappedValue:)' is package and cannot be referenced from an '@inlinable' function}}
+@inlinable func testComposition5pkg(@PublicWrapper @PackageWrapper value: Int) {}
+
+// expected-error@+2 {{generic struct 'PackageWrapper' is package and cannot be referenced from an '@inlinable' function}}
+// expected-error@+1 {{initializer 'init(wrappedValue:)' is package and cannot be referenced from an '@inlinable' function}}
+@inlinable func testComposition6pkg(@PackageWrapper @PublicWrapper value: Int) {}
 
 protocol Q {
   associatedtype A

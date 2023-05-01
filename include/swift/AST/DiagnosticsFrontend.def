@@ -128,6 +128,9 @@ ERROR(error_invalid_source_location_str,none,
 ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
+ERROR(error_load_plugin_executable,none,
+      "invalid value '%0' in '-load-plugin-executable'; "
+      "make sure to use format '<plugin path>#<module names>'", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
@@ -161,9 +164,6 @@ ERROR(error_mode_cannot_emit_module_semantic_info,none,
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
-ERROR(cannot_emit_ir_checking_api_availability_only,none,
-      "the flag -check-api-availability-only does not support "
-      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -172,6 +172,8 @@ WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
 REMARK(warn_implicit_string_processing_import_failed,none,
        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
+REMARK(warn_implicit_backtracing_import_failed,none,
+       "unable to perform implicit import of \"_Backtracing\" module: no such module found", ())
 
 ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
@@ -187,12 +189,9 @@ ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
       (StringRef))
 
-ERROR(error_bad_package_name,none,
-      "package name \"%0\" is not a valid identifier",
-      (StringRef))
-ERROR(error_stdlib_package_name,none,
-      "package name \"%0\" is reserved for the standard library",
-      (StringRef))
+ERROR(error_empty_package_name,none,
+      "package-name is empty",
+      ())
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_module_alias_invalid_format,none,
@@ -219,6 +218,10 @@ ERROR(error_mode_requires_an_input_file,none,
       "this mode requires at least one input file", ())
 ERROR(error_mode_requires_one_sil_multi_sib,none,
       "this mode requires .sil for primary-file and only .sib for other inputs",
+      ())
+
+ERROR(error_clang_validate_once_requires_session_file,none,
+      "'-validate-clang-modules-once' also requires a '-clang-build-session-file' argument",
       ())
 
 ERROR(error_no_output_filename_specified,none,
@@ -472,6 +475,25 @@ REMARK(interface_file_backup_used,none,
 
 WARNING(warn_flag_deprecated,none, "flag '%0' is deprecated", (StringRef))
 
+// Output deterministic check
+ERROR(error_nondeterministic_output,none,
+      "output file '%0' is not deterministic: hash value '%1' vs '%2' between two compilations",
+      (StringRef, StringRef, StringRef))
+ERROR(error_output_missing,none,
+      "output file '%0' is missing from %select{first|second}1 compilation for deterministic check",
+      (StringRef, /*SecondRun=*/bool))
+REMARK(matching_output_produced,none,
+      "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
+
+// Caching related diagnostics
+ERROR(error_caching_no_cas_fs, none,
+    "caching is enabled without -cas-fs option, input is not immutable", ())
+
+// CAS related diagnostics
+ERROR(error_create_cas, none, "failed to create CAS '%0' (%1)", (StringRef, StringRef))
+ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
+ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "
@@ -507,6 +529,24 @@ REMARK(warning_in_access_notes_file,none,
 
 WARNING(compiler_plugin_not_loaded,none,
         "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
+        
+ERROR(dont_enable_interop_and_compat,none,
+      "do not pass both '-enable-experimental-cxx-interop' and "
+      "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
+
+NOTE(valid_cxx_interop_modes,none,
+      "valid arguments to '-cxx-interoperability-mode=' are %0", (StringRef))
+NOTE(swift_will_maintain_compat,none,
+     "Swift will maintain source compatibility for imported APIs based on the "
+     "selected compatibility mode, so updating the Swift compiler will not "
+     "change how APIs are imported", ())
+WARNING(enable_interop_flag_deprecated,none,
+        "the '-enable-experimental-cxx-interop' flag is deprecated; please pass "
+        "'-cxx-interoperability-mode=' instead", ())
+
+ERROR(layout_string_instantiation_without_layout_strings,none,
+      "-enable-layout-string-value-witnesses-instantiation can not be enabled "
+      "without -enable-layout-string-value-witnesses.", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

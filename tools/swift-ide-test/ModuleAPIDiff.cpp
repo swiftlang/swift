@@ -896,7 +896,8 @@ std::shared_ptr<sma::Module> createSMAModel(ModuleDecl *M) {
 
 } // unnamed namespace
 
-int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
+int swift::doGenerateModuleAPIDescription(StringRef DriverPath,
+                                          StringRef MainExecutablePath,
                                           ArrayRef<std::string> Args) {
   std::vector<const char *> CStringArgs;
   for (auto &S : Args) {
@@ -910,9 +911,10 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   CompilerInvocation Invocation;
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
-      CStringArgs, Diags, [&](ArrayRef<const char *> FrontendArgs) {
-    return Invocation.parseArgs(FrontendArgs, Diags);
-  });
+      MainExecutablePath, CStringArgs, Diags,
+      [&](ArrayRef<const char *> FrontendArgs) {
+        return Invocation.parseArgs(FrontendArgs, Diags);
+      });
 
   if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
@@ -941,4 +943,3 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   return 0;
 }
-

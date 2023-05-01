@@ -30,10 +30,6 @@
 #include <memory>
 #include <string>
 
-namespace llvm {
-  class raw_ostream;
-}
-
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
@@ -526,7 +522,7 @@ enum class OperatorKind {
 };
 
 /// A mangling error, which consists of an error code and a Node pointer
-struct LLVM_NODISCARD ManglingError {
+struct [[nodiscard]] ManglingError {
   enum Code {
     Success = 0,
     AssertionFailed,
@@ -568,7 +564,7 @@ struct LLVM_NODISCARD ManglingError {
 
 /// Used as a return type for mangling functions that may fail
 template <typename T>
-class LLVM_NODISCARD ManglingErrorOr {
+class [[nodiscard]] ManglingErrorOr {
 private:
   ManglingError err_;
   T             value_;
@@ -728,6 +724,12 @@ bool isFunctionAttr(Node::Kind kind);
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.
 llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
+
+/// Produce the mangled name for the nominal type descriptor of a type
+/// referenced by its module and type name.
+std::string mangledNameForTypeMetadataAccessor(llvm::StringRef moduleName,
+                                               llvm::StringRef typeName,
+                                               Node::Kind typeKind);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

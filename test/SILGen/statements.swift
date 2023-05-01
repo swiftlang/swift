@@ -603,8 +603,8 @@ func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
-  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
-  // CHECK-NEXT:   debug_value [[BORROWED_STR]] : $String, let, name "t"
+  // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
+  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String

@@ -44,8 +44,10 @@ protected:
 
 public:
   void layout() {
-    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+    static_assert(MetadataAdjustmentIndex::ValueType == 2,
                   "Adjustment index must be synchronized with this layout");
+
+    asImpl().addLayoutStringPointer();
 
     // Metadata header.
     super::layout();
@@ -91,6 +93,7 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addGenericRequirement(GenericRequirement requirement) { addPointer(); }

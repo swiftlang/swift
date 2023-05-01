@@ -22,6 +22,12 @@ struct LargeCodesizeStruct {
   var s5: SmallCodesizeStruct
 }
 
+struct EmptyStruct {}
+struct Pair<T, U> {
+  var t: T
+  var u: U
+}
+
 ///////////
 // Tests //
 ///////////
@@ -491,4 +497,24 @@ bb2:
 bb3:
   %11 = tuple ()
   return %11 : $()
+}
+
+// CHECK-LABEL: sil @load_from_uninitialized_empty : {{.*}} {
+// CHECK:         [[V_3_0:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_3_1:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_2_0:%[^,]+]] = struct $Pair{{.*}} ([[V_3_0]]{{.*}}, [[V_3_1]]
+// CHECK:         [[V_2_1:%[^,]+]] = struct $EmptyStruct ()
+// CHECK:         [[V_1_0:%[^,]+]] = struct $Pair{{.*}} ([[V_2_0]]{{.*}}, [[V_2_1]]
+// CHECK:         [[V_2_2:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_2_3:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_1_1:%[^,]+]] = tuple ([[V_2_2]]{{.*}}, [[V_2_3]]
+// CHECK:         [[V_1_2:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_0:%[^,]+]] = tuple ([[V_1_0]]{{.*}}, [[V_1_1]]{{.*}}, [[V_1_2]]{{.*}})
+// CHECK:         return [[V_0]]
+// CHECK-LABEL: } // end sil function 'load_from_uninitialized_empty'
+sil @load_from_uninitialized_empty : $@convention(thin) () -> (Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct) {
+  %addr = alloc_stack $(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  %value = load %addr : $*(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  dealloc_stack %addr : $*(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  return %value : $(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
 }

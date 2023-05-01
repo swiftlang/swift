@@ -3,7 +3,7 @@
 // REQUIRES: asserts
 
 func bindAll() {
-  struct Bind<U...> {}
+  struct Bind<each U> {}
 
   typealias Zero = Bind< > // OK
   typealias One = Bind<Int> // OK
@@ -12,7 +12,7 @@ func bindAll() {
 }
 
 func bindPrefix() {
-  struct Bind<Prefix, U...> {} // expected-note {{generic type 'Bind' declared here}}
+  struct Bind<Prefix, each U> {} // expected-note {{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
   typealias One = Bind<Int> // OK
@@ -21,7 +21,7 @@ func bindPrefix() {
 }
 
 func bindSuffix() {
-  struct Bind<U..., Suffix> {} // expected-note {{generic type 'Bind' declared here}}
+  struct Bind<each U, Suffix> {} // expected-note {{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
   typealias One = Bind<Int> // OK
@@ -30,7 +30,7 @@ func bindSuffix() {
 }
 
 func bindPrefixAndSuffix() {
-  struct Bind<Prefix, U..., Suffix> {} // expected-note 2{{generic type 'Bind' declared here}}
+  struct Bind<Prefix, each U, Suffix> {} // expected-note 2{{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 2)}}
   typealias One = Bind<Int> // expected-error {{generic type 'Bind' specialized with too few type parameters (got 1, but expected at least 2)}}
@@ -40,7 +40,7 @@ func bindPrefixAndSuffix() {
 }
 
 func bindAliasAll() {
-  typealias Bind<U...> = (repeat each U)
+  typealias Bind<each U> = (repeat each U)
 
   typealias Zero = Bind< > // OK
   typealias One = Bind<Int> // OK
@@ -49,7 +49,7 @@ func bindAliasAll() {
 }
 
 func bindAliasPrefix() {
-  typealias Bind<Prefix, U...> = (Prefix, repeat each U) // expected-note {{generic type 'Bind' declared here}}
+  typealias Bind<Prefix, each U> = (Prefix, repeat each U) // expected-note {{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
   typealias One = Bind<Int> // OK
@@ -58,7 +58,7 @@ func bindAliasPrefix() {
 }
 
 func bindAliasSuffix() {
-  typealias Bind<U..., Suffix> = (repeat each U, Suffix) // expected-note {{generic type 'Bind' declared here}}
+  typealias Bind<each U, Suffix> = (repeat each U, Suffix) // expected-note {{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 1)}}
   typealias One = Bind<Int> // OK
@@ -67,7 +67,7 @@ func bindAliasSuffix() {
 }
 
 func bindAliasPrefixAndSuffix() {
-  typealias Bind<Prefix, U..., Suffix> = (Prefix, repeat each U, Suffix) // expected-note 2{{generic type 'Bind' declared here}}
+  typealias Bind<Prefix, each U, Suffix> = (Prefix, repeat each U, Suffix) // expected-note 2{{generic type 'Bind' declared here}}
 
   typealias Zero = Bind< > // expected-error {{generic type 'Bind' specialized with too few type parameters (got 0, but expected at least 2)}}
   typealias One = Bind<Int> // expected-error {{generic type 'Bind' specialized with too few type parameters (got 1, but expected at least 2)}}

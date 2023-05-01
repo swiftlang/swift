@@ -141,7 +141,8 @@ public:
   Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
       : context(context), uses(uses), barriers(barriers),
         result(&context.function),
-        reachability(&context.function, context.defBlock, *this, result) {}
+        reachability(Reachability::untilInitialBlock(
+            &context.function, context.defBlock, *this, result)) {}
   Dataflow(Dataflow const &) = delete;
   Dataflow &operator=(Dataflow const &) = delete;
 

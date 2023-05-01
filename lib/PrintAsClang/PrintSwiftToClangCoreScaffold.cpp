@@ -186,7 +186,9 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
        << typeInfo.name << "> = true;\n\n";
 
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
-       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "  static ";
+    ClangSyntaxPrinter(os).printInlineForThunk();
+    os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"
        << "  }\n};\n\n";
@@ -198,24 +200,27 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
   ClangSyntaxPrinter printer(os);
-  printer.printNamespace("swift", [&](raw_ostream &) {
-    printer.printNamespace(
-        cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &) {
-          printer.printExternC([&](raw_ostream &os) {
-            printTypeMetadataResponseType(ctx, typeMapping, os);
-            os << "\n";
-            printValueWitnessTable(os);
-            os << "\n";
-            printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                            /*isCForwardDefinition=*/true);
-          });
-          os << "\n";
+  printer.printNamespace(
+      cxx_synthesis::getCxxSwiftNamespaceName(),
+      [&](raw_ostream &) {
+        printer.printNamespace(
+            cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &) {
+              printer.printExternC([&](raw_ostream &os) {
+                printTypeMetadataResponseType(ctx, typeMapping, os);
+                os << "\n";
+                printValueWitnessTable(os);
+                os << "\n";
+                printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                                /*isCForwardDefinition=*/true);
+              });
+              os << "\n";
+            });
+        os << "\n";
+        // C++ only supports inline variables from C++17.
+        ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+          printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                          /*isCForwardDefinition=*/false);
         });
-    os << "\n";
-    // C++ only supports inline variables from C++17.
-    ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
-      printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                      /*isCForwardDefinition=*/false);
-    });
-  });
+      },
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
 }

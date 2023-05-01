@@ -211,6 +211,24 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_root)) {
+    arguments.push_back("-windows-sdk-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_windows_sdk_version)) {
+    arguments.push_back("-windows-sdk-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_root)) {
+    arguments.push_back("-visualc-tools-root");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_visualc_tools_version)) {
+    arguments.push_back("-visualc-tools-version");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
+
+
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
   }
@@ -219,6 +237,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
   inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
+  inputArgs.AddAllArgs(arguments, options::OPT_external_plugin_path);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
@@ -305,6 +324,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
+  inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_load_plugin_library);
   inputArgs.AddLastArg(arguments, options::OPT_load_plugin_executable);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
@@ -354,6 +374,32 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
     // TODO: Should we support -fcoverage-compilation-dir?
     inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
+  }
+
+  // Add plugin path options.
+  inputArgs.AddAllArgs(arguments, options::OPT_plugin_path);
+
+  {
+    SmallString<64> pluginPath;
+    auto programPath = getDriver().getSwiftProgramPath();
+    CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+        programPath, /*shared=*/true, pluginPath);
+
+    auto defaultPluginPath = pluginPath;
+    llvm::sys::path::append(defaultPluginPath, "host", "plugins");
+
+    // Default plugin path.
+    arguments.push_back("-plugin-path");
+    arguments.push_back(inputArgs.MakeArgString(defaultPluginPath));
+
+    // Local plugin path.
+    llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
+    llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
+    llvm::sys::path::append(pluginPath, "local", "lib");
+    llvm::sys::path::append(pluginPath, "swift");
+    llvm::sys::path::append(pluginPath, "host", "plugins");
+    arguments.push_back("-plugin-path");
+    arguments.push_back(inputArgs.MakeArgString(pluginPath));
   }
 
   // Pass through any subsystem flags.
@@ -707,6 +753,9 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_ConstValues:
+  case file_types::TY_SwiftFixIt:
+  case file_types::TY_ModuleSemanticInfo:
+  case file_types::TY_CachedDiagnostics:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -968,6 +1017,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_IndexUnitOutputPath:
     case file_types::TY_SwiftABIDescriptor:
     case file_types::TY_ConstValues:
+    case file_types::TY_SwiftFixIt:
+    case file_types::TY_ModuleSemanticInfo:
+    case file_types::TY_CachedDiagnostics:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

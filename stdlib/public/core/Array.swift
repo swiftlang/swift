@@ -297,6 +297,7 @@
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
 @frozen
+@_eagerMove
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline

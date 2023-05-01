@@ -10,7 +10,6 @@ func testGlobalPrivate(val: GlobalPrivateE) {
 // GLOBALPRIVATE-DAG: Keyword[self]/CurrNominal:          self[#GlobalPrivateE#];
 // GLOBALPRIVATE-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
 // GLOBALPRIVATE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#into: &Hasher#})[#Void#];
-// GLOBALPRIVATE: End completions
 }
 
 func testLocal() {
@@ -23,5 +22,4 @@ func testLocal() {
 // LOCAL-DAG: Keyword[self]/CurrNominal:          self[#LocalE#];
 // LOCAL-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
 // LOCAL-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#into: &Hasher#})[#Void#];
-// LOCAL: End completions
 }

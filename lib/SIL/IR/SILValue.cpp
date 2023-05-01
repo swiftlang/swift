@@ -115,9 +115,38 @@ ValueBase::getDefiningInstructionResult() {
   return None;
 }
 
+bool SILPhiArgument::isLexical() const {
+  if (!isPhi())
+    return false;
+
+  // FIXME: Cache this on the node.
+
+  // Does there exist an incoming value which is lexical?
+  //
+  // Invert the condition to "is every incoming value non-lexical?" in order to
+  // stop visiting incoming values once one lexical value is
+  // found--visitTransitiveIncomingPhiOperands stops once false is returned
+  // from it.
+  auto isEveryIncomingValueNonLexical =
+      visitTransitiveIncomingPhiOperands([&](auto *, auto *operand) {
+        auto value = operand->get();
+        SILPhiArgument *phi = dyn_cast<SILPhiArgument>(value);
+        if (phi && phi->isPhi()) {
+          return true;
+        }
+        // If this non-phi incoming value is lexical, then there is one at least
+        // one lexical value incoming to this phi, to it's lexical.
+        return !value->isLexical();
+      });
+  return !isEveryIncomingValueNonLexical;
+}
+
 bool ValueBase::isLexical() const {
   if (auto *argument = dyn_cast<SILFunctionArgument>(this))
     return argument->getLifetime().isLexical();
+  auto *phi = dyn_cast<SILPhiArgument>(this);
+  if (phi && phi->isPhi())
+    return phi->isLexical();
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))

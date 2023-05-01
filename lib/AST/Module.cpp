@@ -160,6 +160,7 @@ class swift::SourceLookupCache {
   ValueDeclMap TopLevelValues;
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+  DeclName UniqueMacroNamePlaceholder;
 
   template<typename T>
   using OperatorMap = llvm::DenseMap<Identifier, TinyPtrVector<T *>>;
@@ -170,6 +171,18 @@ class swift::SourceLookupCache {
   void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
   template<typename Range>
   void addToMemberCache(Range decls);
+
+  using AuxiliaryDeclMap = llvm::DenseMap<DeclName, TinyPtrVector<MissingDecl *>>;
+  AuxiliaryDeclMap TopLevelAuxiliaryDecls;
+
+  /// Top-level macros that produce arbitrary names.
+  SmallVector<MissingDecl *, 4> TopLevelArbitraryMacros;
+
+  SmallVector<Decl *, 4> MayHaveAuxiliaryDecls;
+  void populateAuxiliaryDeclCache();
+
+  SourceLookupCache(ASTContext &ctx);
+
 public:
   SourceLookupCache(const SourceFile &SF);
   SourceLookupCache(const ModuleDecl &Mod);
@@ -178,6 +191,7 @@ public:
   void invalidate();
 
   void lookupValue(DeclName Name, NLKind LookupKind,
+                   OptionSet<ModuleLookupFlags> Flags,
                    SmallVectorImpl<ValueDecl*> &Result);
 
   /// Retrieves all the operator decls. The order of the results is not
@@ -234,6 +248,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
+
+        if (VD->getAttrs().hasAttribute<CustomAttr>()) {
+          MayHaveAuxiliaryDecls.push_back(VD);
+        }
       }
     }
 
@@ -247,6 +265,10 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
       // a malformed context.
       if (ED->isInvalid()) continue;
 
+      if (ED->getAttrs().hasAttribute<CustomAttr>()) {
+        MayHaveAuxiliaryDecls.push_back(ED);
+      }
+
       if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
         addToUnqualifiedLookupCache(ED->getMembers(), true);
     }
@@ -254,8 +276,11 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range decls,
     if (auto *OD = dyn_cast<OperatorDecl>(D))
       Operators[OD->getName()].push_back(OD);
 
-    if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
+    else if (auto *PG = dyn_cast<PrecedenceGroupDecl>(D))
       PrecedenceGroups[PG->getName()].push_back(PG);
+
+    else if (auto *MED = dyn_cast<MacroExpansionDecl>(D))
+      MayHaveAuxiliaryDecls.push_back(MED);
   }
 }
 
@@ -309,15 +334,100 @@ void SourceLookupCache::addToMemberCache(Range decls) {
   }
 }
 
+void SourceLookupCache::populateAuxiliaryDeclCache() {
+  using MacroRef = llvm::PointerUnion<MacroExpansionDecl *, CustomAttr *>;
+  for (auto *decl : MayHaveAuxiliaryDecls) {
+    // Gather macro-introduced peer names.
+    llvm::SmallDenseMap<MacroRef, llvm::SmallVector<DeclName, 2>>
+        introducedNames;
+
+    // This code deliberately avoids `forEachAttachedMacro`, because it
+    // will perform overload resolution and possibly invoke unqualified
+    // lookup for macro arguments, which will recursively populate the
+    // auxiliary decl cache and cause request cycles.
+    //
+    // We do not need a fully resolved macro until expansion. Instead, we
+    // conservatively consider peer names for all macro declarations with a
+    // custom attribute name. Unqualified lookup for that name will later
+    // invoke expansion of the macro, and will yield no results if the resolved
+    // macro does not produce the requested name, so the only impact is possibly
+    // expanding earlier than needed / unnecessarily looking in the top-level
+    // auxiliary decl cache.
+    for (auto attrConst : decl->getAttrs().getAttributes<CustomAttr>()) {
+      auto *attr = const_cast<CustomAttr *>(attrConst);
+      UnresolvedMacroReference macroRef(attr);
+      bool introducesArbitraryNames = false;
+      namelookup::forEachPotentialResolvedMacro(
+          decl->getDeclContext()->getModuleScopeContext(),
+          macroRef.getMacroName(), MacroRole::Peer,
+          [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            // First check for arbitrary names.
+            if (roleAttr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+              introducesArbitraryNames = true;
+            }
+
+            macro->getIntroducedNames(MacroRole::Peer,
+                                      dyn_cast<ValueDecl>(decl),
+                                      introducedNames[attr]);
+          });
+
+      // Record this macro where appropriate.
+      if (introducesArbitraryNames)
+        TopLevelArbitraryMacros.push_back(MissingDecl::forUnexpandedMacro(attr, decl));
+    }
+
+    if (auto *med = dyn_cast<MacroExpansionDecl>(decl)) {
+      UnresolvedMacroReference macroRef(med);
+      bool introducesArbitraryNames = false;
+      namelookup::forEachPotentialResolvedMacro(
+          decl->getDeclContext()->getModuleScopeContext(),
+          macroRef.getMacroName(), MacroRole::Declaration,
+          [&](MacroDecl *macro, const MacroRoleAttr *roleAttr) {
+            // First check for arbitrary names.
+            if (roleAttr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+              introducesArbitraryNames = true;
+            }
+
+            macro->getIntroducedNames(MacroRole::Declaration,
+                                      /*attachedTo*/ nullptr,
+                                      introducedNames[med]);
+          });
+
+      // Record this macro where appropriate.
+      if (introducesArbitraryNames)
+        TopLevelArbitraryMacros.push_back(MissingDecl::forUnexpandedMacro(med, decl));
+    }
+
+    // Add macro-introduced names to the top-level auxiliary decl cache as
+    // unexpanded decls represented by a MissingDecl.
+    for (auto macroNames : introducedNames) {
+      auto macroRef = macroNames.getFirst();
+      for (auto name : macroNames.getSecond()) {
+        auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, decl);
+        name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
+      }
+    }
+  }
+
+  MayHaveAuxiliaryDecls.clear();
+}
+
+SourceLookupCache::SourceLookupCache(ASTContext &ctx)
+  : UniqueMacroNamePlaceholder(MacroDecl::getUniqueNamePlaceholder(ctx)) { }
+
 /// Populate our cache on the first name lookup.
-SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
+SourceLookupCache::SourceLookupCache(const SourceFile &SF)
+    : SourceLookupCache(SF.getASTContext())
+{
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
   addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   addToUnqualifiedLookupCache(SF.getHoistedDecls(), false);
 }
 
-SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
+SourceLookupCache::SourceLookupCache(const ModuleDecl &M)
+  : SourceLookupCache(M.getASTContext())
+{
   FrontendStatsTracer tracer(M.getASTContext().Stats,
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
@@ -332,13 +442,55 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
 }
 
 void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
+                                    OptionSet<ModuleLookupFlags> Flags,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   auto I = TopLevelValues.find(Name);
-  if (I == TopLevelValues.end()) return;
+  if (I != TopLevelValues.end()) {
+    Result.reserve(I->second.size());
+    for (ValueDecl *Elt : I->second)
+      Result.push_back(Elt);
+  }
 
-  Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second)
-    Result.push_back(Elt);
+  // If we aren't supposed to find names introduced by macros, we're done.
+  if (Flags.contains(ModuleLookupFlags::ExcludeMacroExpansions))
+    return;
+
+  // Add top-level auxiliary decls to the result.
+  //
+  // FIXME: We need to not consider auxiliary decls if we're doing lookup
+  // from inside a macro argument at module scope.
+  populateAuxiliaryDeclCache();
+  DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
+    ? UniqueMacroNamePlaceholder
+    : Name;
+  auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
+
+  // Check macro expansions that could produce this name.
+  SmallVector<MissingDecl *, 4> unexpandedDecls;
+  if (auxDecls != TopLevelAuxiliaryDecls.end()) {
+    unexpandedDecls.insert(
+      unexpandedDecls.end(), auxDecls->second.begin(), auxDecls->second.end());
+  }
+
+  // Check macro expansions that can produce arbitrary names.
+  unexpandedDecls.insert(
+      unexpandedDecls.end(),
+      TopLevelArbitraryMacros.begin(), TopLevelArbitraryMacros.end());
+
+  if (unexpandedDecls.empty())
+    return;
+
+  // Add matching expanded peers and freestanding declarations to the results.
+  SmallPtrSet<ValueDecl *, 4> macroExpandedDecls;
+  for (auto *unexpandedDecl : unexpandedDecls) {
+    unexpandedDecl->forEachMacroExpandedDecl(
+        [&](ValueDecl *decl) {
+          if (decl->getName().matchesRef(Name)) {
+            if (macroExpandedDecls.insert(decl).second)
+              Result.push_back(decl);
+          }
+        });
+  }
 }
 
 void SourceLookupCache::getPrecedenceGroups(
@@ -491,6 +643,20 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.HasIncrementalInfo = 0;
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
+  Bits.ModuleDecl.ObjCNameLookupCachePopulated = 0;
+}
+
+void ModuleDecl::setIsSystemModule(bool flag) {
+  Bits.ModuleDecl.IsSystemModule = flag;
+}
+
+bool ModuleDecl::isNonUserModule() const {
+  // For clang submodules, retrieve their top level module (submodules have no
+  // source path, so we'd always return false for them).
+  ModuleDecl *mod = const_cast<ModuleDecl *>(this)->getTopLevelModule();
+
+  auto &evaluator = getASTContext().evaluator;
+  return evaluateOrDefault(evaluator, IsNonUserModuleRequest{mod}, false);
 }
 
 ImplicitImportList ModuleDecl::getImplicitImports() const {
@@ -640,7 +806,9 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
 
   auto foundSourceFile = *found;
   auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
-  if (!foundRange.contains(adjustedLoc))
+  // Positions inside an empty file or at EOF should still be considered within
+  // this file.
+  if (!foundRange.contains(adjustedLoc) && adjustedLoc != foundRange.getEnd())
     return nullptr;
 
   // Update the last source file.
@@ -648,11 +816,47 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return foundSourceFile;
 }
 
-bool ModuleDecl::isInGeneratedBuffer(SourceLoc loc) {
-  SourceFile *file = getSourceFileContainingLocation(loc);
-  if (!file)
-    return false;
-  return file->Kind == SourceFileKind::MacroExpansion;
+std::pair<unsigned, SourceLoc>
+ModuleDecl::getOriginalLocation(SourceLoc loc) const {
+  assert(loc.isValid());
+
+  SourceManager &SM = getASTContext().SourceMgr;
+  unsigned bufferID = SM.findBufferContainingLoc(loc);
+
+  SourceLoc startLoc = loc;
+  unsigned startBufferID = bufferID;
+  while (Optional<GeneratedSourceInfo> info =
+             SM.getGeneratedSourceInfo(bufferID)) {
+    switch (info->kind) {
+    case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::AccessorMacroExpansion:
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::MemberMacroExpansion:
+    case GeneratedSourceInfo::PeerMacroExpansion:
+    case GeneratedSourceInfo::ConformanceMacroExpansion: {
+      // Location was within a macro expansion, return the expansion site, not
+      // the insertion location.
+      if (info->attachedMacroCustomAttr) {
+        loc = info->attachedMacroCustomAttr->getLocation();
+      } else {
+        ASTNode expansionNode = ASTNode::getFromOpaqueValue(info->astNode);
+        loc = expansionNode.getStartLoc();
+      }
+      bufferID = SM.findBufferContainingLoc(loc);
+      break;
+    }
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+      // There's not really any "original" location for locations within
+      // replaced function bodies. The body is actually different code to the
+      // original file.
+    case GeneratedSourceInfo::PrettyPrinted:
+      // No original location, return the original buffer/location
+      return {startBufferID, startLoc};
+    }
+  }
+
+  return {bufferID, loc};
 }
 
 ArrayRef<SourceFile *>
@@ -734,17 +938,18 @@ static bool isParsedModule(const ModuleDecl *mod) {
 }
 
 void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
+                             OptionSet<ModuleLookupFlags> Flags,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
     ++stats->getFrontendCounters().NumModuleLookupValue;
 
   if (isParsedModule(this)) {
-    getSourceLookupCache().lookupValue(Name, LookupKind, Result);
+    getSourceLookupCache().lookupValue(Name, LookupKind, Flags, Result);
     return;
   }
 
-  FORWARD(lookupValue, (Name, LookupKind, Result));
+  FORWARD(lookupValue, (Name, LookupKind, Flags, Result));
 }
 
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
@@ -818,7 +1023,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
         return true;
       auto enclosingFile =
         cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());
-      auto discriminator = enclosingFile->getDiscriminatorForPrivateValue(VD);
+      auto discriminator = enclosingFile->getDiscriminatorForPrivateDecl(VD);
       return discriminator != privateDiscriminator;
     });
     results.erase(newEnd, results.end());
@@ -838,6 +1043,7 @@ void ModuleDecl::lookupImportedSPIGroups(
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
+                              OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
@@ -849,8 +1055,9 @@ void BuiltinUnit::lookupObjCMethods(
 }
 
 void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
+                             OptionSet<ModuleLookupFlags> flags,
                              SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name, lookupKind, result);
+  getCache().lookupValue(name, lookupKind, flags, result);
 }
 
 void ModuleDecl::lookupVisibleDecls(ImportPath::Access AccessPath,
@@ -1068,6 +1275,60 @@ void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
   FORWARD(getTopLevelDeclsWhereAttributesMatch, (Results, matchAttributes));
 }
 
+void ModuleDecl::lookupTopLevelDeclsByObjCName(SmallVectorImpl<Decl *> &Results,
+                                               DeclName name) {
+  if (!isObjCNameLookupCachePopulated())
+    populateObjCNameLookupCache();
+
+  // A top level decl can't be special anyways
+  if (name.isSpecial())
+    return;
+
+  auto resultsForFileUnit = ObjCNameLookupCache.find(name.getBaseIdentifier());
+  if (resultsForFileUnit == ObjCNameLookupCache.end())
+    return;
+
+  Results.append(resultsForFileUnit->second.begin(),
+                 resultsForFileUnit->second.end());
+}
+
+void ModuleDecl::populateObjCNameLookupCache() {
+  SmallVector<Decl *> topLevelObjCExposedDeclsInFileUnit;
+  auto hasObjCAttrNamePredicate = [](const DeclAttributes &attrs) -> bool {
+    return attrs.hasAttribute<ObjCAttr>();
+  };
+
+  for (FileUnit *file : getFiles()) {
+    file->getTopLevelDeclsWhereAttributesMatch(
+        topLevelObjCExposedDeclsInFileUnit, hasObjCAttrNamePredicate);
+    if (auto *synth = file->getSynthesizedFile()) {
+      synth->getTopLevelDeclsWhereAttributesMatch(
+          topLevelObjCExposedDeclsInFileUnit, hasObjCAttrNamePredicate);
+    }
+  }
+
+  for (Decl *decl : topLevelObjCExposedDeclsInFileUnit) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(decl); VD && VD->hasName()) {
+      const auto &declObjCAttribute = VD->getAttrs().getAttribute<ObjCAttr>();
+      // No top level decl (class, protocol, extension etc.) is allowed to have a
+      // compound name, @objc provided or otherwise. Global functions are allowed to
+      // have compound names, but not allowed to have @objc attributes. Thus we
+      // are sure to not hit asserts getting the simple name.
+      //
+      // Similarly, init, dealloc and subscript (the special names) can't be top 
+      // level decls, so we won't hit asserts getting the base identifier out of the
+      // value decl.
+      const Identifier &declObjCName =
+          declObjCAttribute->hasName()
+              ? declObjCAttribute->getName()->getSimpleName()
+              : VD->getName().getBaseIdentifier();
+      ObjCNameLookupCache[declObjCName].push_back(decl);
+    }
+  }
+
+  setIsObjCNameLookupCachePopulated(true);
+}
+
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   auto decls = getTopLevelDecls();
   Results.append(decls.begin(), decls.end());
@@ -1138,14 +1399,24 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
     return None;
   }
 
-  SourceLoc Loc = D->getLoc(/*SerializedOK=*/false);
-  if (Loc.isInvalid())
+  SourceLoc MainLoc = D->getLoc(/*SerializedOK=*/false);
+  if (MainLoc.isInvalid())
     return None;
 
+  // TODO: Rather than grabbing the location of the macro expansion, we should
+  // instead add the generated buffer tree - that would need to include source
+  // if we want to be able to retrieve documentation within generated buffers.
   SourceManager &SM = getASTContext().SourceMgr;
-  auto BufferID = SM.findBufferContainingLoc(Loc);
+  bool InGeneratedBuffer =
+      !SM.rangeContainsTokenLoc(SM.getRangeForBuffer(BufferID), MainLoc);
+  if (InGeneratedBuffer) {
+    int UnderlyingBufferID;
+    std::tie(UnderlyingBufferID, MainLoc) =
+        D->getModuleContext()->getOriginalLocation(MainLoc);
+    if (BufferID != UnderlyingBufferID)
+      return None;
+  }
 
-  ExternalSourceLocs::RawLocs Result;
   auto setLoc = [&](ExternalSourceLocs::RawLoc &RawLoc, SourceLoc Loc) {
     if (!Loc.isValid())
       return;
@@ -1164,15 +1435,20 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
     RawLoc.Directive.Name = StringRef(VF->Name);
   };
 
+  ExternalSourceLocs::RawLocs Result;
+
   Result.SourceFilePath = SM.getIdentifierForBuffer(BufferID);
-  for (const auto &SRC : D->getRawComment(/*SerializedOK=*/false).Comments) {
-    Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(),
-                                  SRC.Range.getByteLength());
-    setLoc(Result.DocRanges.back().first, SRC.Range.getStart());
+  setLoc(Result.Loc, MainLoc);
+  if (!InGeneratedBuffer) {
+    for (const auto &SRC : D->getRawComment().Comments) {
+      Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(),
+                                    SRC.Range.getByteLength());
+      setLoc(Result.DocRanges.back().first, SRC.Range.getStart());
+    }
+    setLoc(Result.StartLoc, D->getStartLoc());
+    setLoc(Result.EndLoc, D->getEndLoc());
   }
-  setLoc(Result.Loc, D->getLoc(/*SerializedOK=*/false));
-  setLoc(Result.StartLoc, D->getStartLoc());
-  setLoc(Result.EndLoc, D->getEndLoc());
+
   return Result;
 }
 
@@ -1182,6 +1458,9 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive
     llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
     collectParsedExportedImports(this, Modules, QualifiedImports);
     for (const auto &QI : QualifiedImports) {
+      auto Module = QI.getFirst();
+      if (Modules.contains(Module)) continue;
+
       auto &Decls = QI.getSecond();
       Results.append(Decls.begin(), Decls.end());
     }
@@ -1636,6 +1915,16 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
 
+  // Specific handling of Copyable for pack expansions.
+  if (auto packExpansion = type->getAs<PackExpansionType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      auto patternType = packExpansion->getPatternType();
+      return (patternType->isTypeParameter()
+               ? ProtocolConformanceRef(protocol)
+               : mod->lookupConformance(patternType, protocol));
+    }
+  }
+
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
@@ -1680,9 +1969,12 @@ LookupConformanceInModuleRequest::evaluate(
       if (nominal->isMoveOnly()) {
         return ProtocolConformanceRef::forInvalid();
       } else {
-        // FIXME: this should probably follow the Sendable case in that
-        // we should synthesize and append a ProtocolConformance to the `conformances` list.
-       return ProtocolConformanceRef(protocol);
+        // Specifically do not create a concrete conformance to Copyable. At
+        // this stage, we don't even want Copyable to appear in swiftinterface
+        // files, which will happen for a marker protocol that's registered
+        // in a nominal type's conformance table. We can reconsider this
+        // decision later once there's a clearer picture of noncopyable generics
+        return ProtocolConformanceRef(protocol);
       }
     } else {
       // Was unable to infer the missing conformance.
@@ -1893,10 +2185,12 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
     else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.accessLevel <= AccessLevel::Internal)
+      requiredFilter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+    else if (desc.accessLevel <= AccessLevel::Package)
+      requiredFilter |= ModuleDecl::ImportFilterKind::PackageOnly;
     else if (desc.options.contains(ImportFlags::SPIOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
-    else if (desc.options.contains(ImportFlags::SPIAccessControl))
-      requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
       requiredFilter |= ModuleDecl::ImportFilterKind::Default;
 
@@ -2092,23 +2386,6 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
   return StringRef();
 }
 
-bool ModuleDecl::isSDKModule() const {
-  auto sdkPath = getASTContext().SearchPathOpts.getSDKPath();
-  if (sdkPath.empty())
-    return false;
-
-  auto modulePath = getModuleSourceFilename();
-  auto si = llvm::sys::path::begin(sdkPath),
-       se = llvm::sys::path::end(sdkPath);
-  for (auto mi = llvm::sys::path::begin(modulePath),
-       me = llvm::sys::path::end(modulePath);
-       si != se && mi != me; ++si, ++mi) {
-    if (*si != *mi)
-      return false;
-  }
-  return si == se;
-}
-
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
@@ -2260,13 +2537,14 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter filter = {
       ModuleDecl::ImportFilterKind::Exported,
-      ModuleDecl::ImportFilterKind::Default,
-      ModuleDecl::ImportFilterKind::SPIAccessControl};
+      ModuleDecl::ImportFilterKind::Default};
 
   auto *topLevel = getParentModule();
 
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::PackageOnly,
   topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   topLevel->getImportedModules(stack, topLevelFilter);
 
@@ -2923,22 +3201,34 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
 
-  if (importKind == RestrictedImportKind::MissingImport &&
-      (module->getLibraryLevel() == LibraryLevel::API ||
-       getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
-    // Hack to fix swiftinterfaces in case of missing imports.
-    // We can get rid of this logic when we don't leak the use of non-locally
-    // imported things in API.
-    ImportPath::Element pathElement = {module->getName(), SourceLoc()};
-    auto pathArray = getASTContext().AllocateCopy(
-                       llvm::makeArrayRef(pathElement));
-    auto missingImport = ImportedModule(
-                           ImportPath::Access(pathArray),
-                           const_cast<ModuleDecl *>(module));
-    addMissingImportedModule(missingImport);
+  return importKind;
+}
+
+ImportAccessLevel
+SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
+  assert(Imports.hasValue());
+
+  // Leave it to the caller to avoid calling this service for a self import.
+  // We want to return AccessLevel::Public, but there's no import site to return.
+  assert(targetModule != getParentModule() &&
+         "getImportAccessLevel doesn't support checking for a self-import");
+
+  auto &imports = getASTContext().getImportCache();
+  ImportAccessLevel restrictiveImport = None;
+
+  for (auto &import : *Imports) {
+    if ((!restrictiveImport.has_value() ||
+         import.accessLevel > restrictiveImport->accessLevel) &&
+        imports.isImportedBy(targetModule, import.module.importedModule)) {
+      restrictiveImport = import;
+    }
   }
 
-  return importKind;
+  return restrictiveImport;
+}
+
+void ModuleDecl::setPackageName(Identifier name) {
+  Package = PackageUnit::create(name, *this, getASTContext());
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
@@ -2951,7 +3241,8 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::Exported,
     ModuleDecl::ImportFilterKind::Default,
-    ModuleDecl::ImportFilterKind::SPIAccessControl,
+    ModuleDecl::ImportFilterKind::PackageOnly,
+    ModuleDecl::ImportFilterKind::SPIOnly,
     ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
@@ -2974,11 +3265,11 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
     return true;
 
   // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly or @_spi.
+  // @_implementationOnly, `package import` or @_spiOnly.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::SPIOnly,
-    ModuleDecl::ImportFilterKind::SPIAccessControl
+    ModuleDecl::ImportFilterKind::PackageOnly,
+    ModuleDecl::ImportFilterKind::SPIOnly
   };
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
@@ -3198,6 +3489,9 @@ bool SourceFile::shouldCrossImport() const {
 
 void ModuleDecl::clearLookupCache() {
   getASTContext().getImportCache().clear();
+
+  setIsObjCNameLookupCachePopulated(false);
+  ObjCNameLookupCache.clear();
 
   if (!Cache)
     return;
@@ -3558,12 +3852,8 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
-Identifier
-SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
-  assert(D->getDeclContext()->getModuleScopeContext() == this ||
-         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
-
-  if (!PrivateDiscriminator.empty())
+Identifier SourceFile::getPrivateDiscriminator(bool createIfMissing) const {
+  if (!PrivateDiscriminator.empty() || !createIfMissing)
     return PrivateDiscriminator;
 
   StringRef name = getFilename();
@@ -3598,6 +3888,13 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   buffer += hashString;
   PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
+}
+
+Identifier
+SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
+  assert(D->getDeclContext()->getModuleScopeContext() == this ||
+         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
+  return getPrivateDiscriminator(/*createIfMissing=*/true);
 }
 
 SynthesizedFileUnit *FileUnit::getSynthesizedFile() const {
@@ -3688,7 +3985,7 @@ SynthesizedFileUnit::SynthesizedFileUnit(FileUnit &FU)
 }
 
 Identifier
-SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
+SynthesizedFileUnit::getDiscriminatorForPrivateDecl(const Decl *D) const {
   assert(D->getDeclContext()->getModuleScopeContext() == this);
 
   // Use cached primitive discriminator if it exists.
@@ -3696,7 +3993,7 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
     return PrivateDiscriminator;
 
   // Start with the discriminator that the file we belong to would use.
-  auto ownerDiscriminator = getFileUnit().getDiscriminatorForPrivateValue(D);
+  auto ownerDiscriminator = getFileUnit().getDiscriminatorForPrivateDecl(D);
 
   // Hash that with a special string to produce a different value that preserves
   // the entropy of the original.
@@ -3721,6 +4018,7 @@ SynthesizedFileUnit::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 
 void SynthesizedFileUnit::lookupValue(
     DeclName name, NLKind lookupKind,
+    OptionSet<ModuleLookupFlags> Flags,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
@@ -3761,6 +4059,20 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
       return !matchAttributes(D->getAttrs());
     });
   Results.erase(newEnd, Results.end());
+}
+
+void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
+    SmallVectorImpl<Decl*> &results) const {
+  SmallVector<Decl *, 32> nonExpandedDecls;
+  nonExpandedDecls.reserve(results.capacity());
+  getTopLevelDecls(nonExpandedDecls);
+  for (auto *decl : nonExpandedDecls) {
+    decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (!isa<ExtensionDecl>(auxDecl))
+        results.push_back(auxDecl);
+    });
+    results.push_back(decl);
+  }
 }
 
 void FileUnit::dumpDisplayDecls() const {
@@ -3834,6 +4146,14 @@ bool ModuleEntity::isSystemModule() const {
   return getClangModule(Mod)->IsSystem;
 }
 
+bool ModuleEntity::isNonUserModule() const {
+  assert(!Mod.isNull());
+  if (auto *SwiftMod = Mod.dyn_cast<const ModuleDecl *>())
+    return SwiftMod->isNonUserModule();
+  // TODO: Should handle clang modules as well
+  return getClangModule(Mod)->IsSystem;
+}
+
 bool ModuleEntity::isBuiltinModule() const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
@@ -3878,4 +4198,46 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
   return &TF;
+}
+
+static bool prefixMatches(StringRef prefix, StringRef path) {
+  auto prefixIt = llvm::sys::path::begin(prefix),
+       prefixEnd = llvm::sys::path::end(prefix);
+  for (auto pathIt = llvm::sys::path::begin(path),
+            pathEnd = llvm::sys::path::end(path);
+       prefixIt != prefixEnd && pathIt != pathEnd; ++prefixIt, ++pathIt) {
+    if (*prefixIt != *pathIt)
+      return false;
+  }
+  return prefixIt == prefixEnd;
+}
+
+bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
+  // stdlib is non-user by definition
+  if (mod->isStdlibModule())
+    return true;
+  
+  // If there's no SDK path, fallback to checking whether the module was
+  // in the system search path or a clang system module
+  SearchPathOptions &searchPathOpts = mod->getASTContext().SearchPathOpts;
+  StringRef sdkPath = searchPathOpts.getSDKPath();
+  if (sdkPath.empty() && mod->isSystemModule())
+    return true;
+
+  // Some temporary module's get created with no module name and they have no
+  // files. Avoid running `getFiles` on them (which will assert if there
+  // aren't any).
+  if (!mod->hasName() || mod->getFiles().empty())
+    return false;
+  
+  auto *LF = dyn_cast_or_null<LoadedFile>(mod->getFiles().front());
+  if (!LF)
+    return false;
+  
+  StringRef modulePath = LF->getSourceFilename();
+  if (modulePath.empty())
+    return false;
+
+  StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
+  return (!runtimePath.empty() && prefixMatches(runtimePath, modulePath)) || (!sdkPath.empty() && prefixMatches(sdkPath, modulePath));
 }

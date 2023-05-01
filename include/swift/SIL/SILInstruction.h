@@ -135,6 +135,28 @@ class SILPrintContext;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+enum class MemoryBehavior {
+  None,
+  /// The instruction may read memory.
+  MayRead,
+  /// The instruction may write to memory.
+  /// This includes destroying or taking from memory (e.g. destroy_addr,
+  /// copy_addr [take], load [take]).
+  /// Although, physically, destroying or taking does not modify the memory,
+  /// it is important to model it is a write. Optimizations must not assume
+  /// that the value stored in memory is still available for loading after
+  /// the memory is destroyed or taken.
+  MayWrite,
+  /// The instruction may read or write memory.
+  MayReadWrite,
+  /// The instruction may have side effects not captured
+  ///        solely by its users. Specifically, it can return,
+  ///        release memory, or store. Note, alloc is not considered
+  ///        to have side effects because its result/users represent
+  ///        its effect.
+  MayHaveSideEffects,
+};
+
 // An enum class for SILInstructions that enables exhaustive switches over
 // instructions.
 enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type {
@@ -445,28 +467,6 @@ public:
   /// scheduled to be deleted.
   bool isDeleted() const { return asSILNode()->isMarkedAsDeleted(); }
 
-  enum class MemoryBehavior {
-    None,
-    /// The instruction may read memory.
-    MayRead,
-    /// The instruction may write to memory.
-    /// This includes destroying or taking from memory (e.g. destroy_addr,
-    /// copy_addr [take], load [take]).
-    /// Although, physically, destroying or taking does not modify the memory,
-    /// it is important to model it is a write. Optimizations must not assume
-    /// that the value stored in memory is still available for loading after
-    /// the memory is destroyed or taken.
-    MayWrite,
-    /// The instruction may read or write memory.
-    MayReadWrite,
-    /// The instruction may have side effects not captured
-    ///        solely by its users. Specifically, it can return,
-    ///        release memory, or store. Note, alloc is not considered
-    ///        to have side effects because its result/users represent
-    ///        its effect.
-    MayHaveSideEffects,
-  };
-
   /// Enumeration representing whether the execution of an instruction can
   /// result in memory being released.
   enum class ReleasingBehavior {
@@ -776,7 +776,7 @@ public:
   /// Returns true if the instruction may write to memory, deinitialize memory,
   /// or have other unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayWriteToMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayWrite ||
@@ -787,7 +787,7 @@ public:
   /// Returns true if the instruction may read from memory, or have other
   /// unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadFromMemory() const {
     MemoryBehavior B = getMemoryBehavior();
     return B == MemoryBehavior::MayRead ||
@@ -798,7 +798,7 @@ public:
   /// Returns true if the instruction may read from memory, write to memory,
   /// deinitialize memory, or have other unknown side effects.
   ///
-  /// For details see SILInstruction::MemoryBehavior.
+  /// For details see MemoryBehavior.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
   }
@@ -1061,23 +1061,23 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 }
 
 /// Returns the combined behavior of \p B1 and \p B2.
-inline SILInstruction::MemoryBehavior
-combineMemoryBehavior(SILInstruction::MemoryBehavior B1,
-                  SILInstruction::MemoryBehavior B2) {
+inline MemoryBehavior
+combineMemoryBehavior(MemoryBehavior B1,
+                  MemoryBehavior B2) {
   // Basically the combined behavior is the maximum of both operands.
   auto Result = std::max(B1, B2);
 
   // With one exception: MayRead, MayWrite -> MayReadWrite.
-  if (Result == SILInstruction::MemoryBehavior::MayWrite &&
-        (B1 == SILInstruction::MemoryBehavior::MayRead ||
-         B2 == SILInstruction::MemoryBehavior::MayRead))
-    return SILInstruction::MemoryBehavior::MayReadWrite;
+  if (Result == MemoryBehavior::MayWrite &&
+        (B1 == MemoryBehavior::MayRead ||
+         B2 == MemoryBehavior::MayRead))
+    return MemoryBehavior::MayReadWrite;
   return Result;
 }
 
 /// Pretty-print the MemoryBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              SILInstruction::MemoryBehavior B);
+                              MemoryBehavior B);
 /// Pretty-print the ReleasingBehavior.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               SILInstruction::ReleasingBehavior B);
@@ -2094,12 +2094,12 @@ class AllocStackInst final
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical, bool wasMoved);
+                 bool isLexical, bool usesMoveableValueDebugInfo);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F, Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime, bool isLexical,
-                                bool wasMoved);
+                                bool usesMoveableValueDebugInfo);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -2116,11 +2116,15 @@ public:
     }
   }
 
-  void markAsMoved() { sharedUInt8().AllocStackInst.wasMoved = true; }
+  void markUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// Set to true if this alloc_stack's memory location was passed to _move at
   /// any point of the program.
-  bool getWasMoved() const { return sharedUInt8().AllocStackInst.wasMoved; }
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo;
+  }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
   /// be ascertained from uses.
@@ -2452,32 +2456,38 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
-  unsigned HasDynamicLifetime : 1;
-  unsigned Reflection : 1;
+  USE_SHARED_UINT8;
 
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-               bool reflection = false);
+               bool reflection = false,
+               bool usesMoveableValueDebugInfo = false);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
-                              SILFunction &F,
-                              Optional<SILDebugVariable> Var,
-                              bool hasDynamicLifetime,
-                              bool reflection = false);
+                              SILFunction &F, Optional<SILDebugVariable> Var,
+                              bool hasDynamicLifetime, bool reflection = false,
+                              bool usesMoveableValueDebugInfo = false);
 
 public:
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
 
-  void setDynamicLifetime() { HasDynamicLifetime = true; }
-  bool hasDynamicLifetime() const { return HasDynamicLifetime; }
+  void setDynamicLifetime() {
+    sharedUInt8().AllocBoxInst.dynamicLifetime = true;
+  }
+
+  bool hasDynamicLifetime() const {
+    return sharedUInt8().AllocBoxInst.dynamicLifetime;
+  }
 
   /// True if the box should be emitted with reflection metadata for its
   /// contents.
-  bool emitReflectionMetadata() const { return Reflection; }
-  
+  bool emitReflectionMetadata() const {
+    return sharedUInt8().AllocBoxInst.reflection;
+  }
+
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
 
@@ -2485,6 +2495,14 @@ public:
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
   };
+
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo = true;
+  }
+
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo;
+  }
 };
 
 /// This represents the allocation of a heap box for an existential container.
@@ -5012,14 +5030,17 @@ class DebugValueInst final
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
 public:
-  void markAsMoved() { sharedUInt8().DebugValueInst.operandWasMoved = true; }
+  /// Sets a bool that states this debug_value is supposed to use the
+  void setUsesMoveableValueDebugInfo() {
+    sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo = true;
+  }
 
   /// True if this debug_value is on an SSA value that was moved.
   ///
   /// IRGen uses this information to determine if we should use llvm.dbg.addr or
   /// llvm.dbg.declare.
-  bool getWasMoved() const {
-    return sharedUInt8().DebugValueInst.operandWasMoved;
+  bool getUsesMoveableValueDebugInfo() const {
+    return sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo;
   }
 
   /// Return the underlying variable declaration that this denotes,
@@ -8244,6 +8265,16 @@ public:
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
 
   bool isLexical() const { return lexical; };
+  void removeIsLexical() { lexical = false; }
+};
+
+class DropDeinitInst
+    : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+
+  DropDeinitInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
@@ -8297,8 +8328,8 @@ public:
     ConsumableAndAssignable,
 
     /// A signal to the move only checker to perform no consume or assign
-    /// checking. This forces the result of this instruction owned value to never
-    /// be consumed (for let/var semantics) or assigned over (for var
+    /// checking. This forces the result of this instruction owned value to
+    /// never be consumed (for let/var semantics) or assigned over (for var
     /// semantics). Of course, we still allow for non-consuming uses.
     NoConsumeOrAssign,
 
@@ -8309,6 +8340,11 @@ public:
     /// uninitialized state), but we are ok with the user assigning a new value,
     /// completely assigning over the value at once.
     AssignableButNotConsumable,
+
+    /// A signal to the move checker that the given value cannot be consumed or
+    /// assigned, but is allowed to be initialized. This is used for situations
+    /// like class initializers.
+    InitableButNotConsumable,
   };
 
 private:
@@ -8327,6 +8363,8 @@ private:
 public:
   CheckKind getCheckKind() const { return kind; }
 
+  void setCheckKind(CheckKind newKind) { kind = newKind; }
+
   bool hasMoveCheckerKind() const {
     switch (kind) {
     case CheckKind::Invalid:
@@ -8334,9 +8372,41 @@ public:
     case CheckKind::ConsumableAndAssignable:
     case CheckKind::NoConsumeOrAssign:
     case CheckKind::AssignableButNotConsumable:
+    case CheckKind::InitableButNotConsumable:
       return true;
     }
   }
+};
+
+/// A marker instruction that states a given alloc_box or alloc_stack is a
+/// reference binding that must be transformed.
+class MarkUnresolvedReferenceBindingInst
+    : public UnaryInstructionBase<
+          SILInstructionKind::MarkUnresolvedReferenceBindingInst,
+          SingleValueInstruction>,
+      public OwnershipForwardingMixin {
+  friend class SILBuilder;
+
+public:
+  enum class Kind : unsigned {
+    Invalid = 0,
+
+    InOut = 1,
+  };
+
+private:
+  Kind kind;
+
+  MarkUnresolvedReferenceBindingInst(SILDebugLocation debugLoc,
+                                     SILValue operand, Kind kind)
+      : UnaryInstructionBase(debugLoc, operand, operand->getType()),
+        OwnershipForwardingMixin(
+            SILInstructionKind::MarkUnresolvedReferenceBindingInst,
+            operand->getOwnershipKind()),
+        kind(kind) {}
+
+public:
+  Kind getKind() const { return kind; }
 };
 
 /// Convert from a non-trivial copyable type to an `@moveOnly` wrapper type.
@@ -8907,14 +8977,6 @@ public:
 
   const SILBasicBlock *getSingleSuccessorBlock() const {
     return const_cast<TermInst *>(this)->getSingleSuccessorBlock();
-  }
-
-  /// Returns true if \p BB is a successor of this block.
-  bool isSuccessorBlock(SILBasicBlock *BB) const {
-    auto Range = getSuccessorBlocks();
-    return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
-      return BB == SuccBB;
-    });
   }
 
   using SuccessorBlockArgumentListTy =
@@ -10693,7 +10755,8 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
          OwnershipForwardingMultipleValueInstruction::classof(kind) ||
-         kind == SILInstructionKind::MarkMustCheckInst;
+         kind == SILInstructionKind::MarkMustCheckInst ||
+         kind == SILInstructionKind::MarkUnresolvedReferenceBindingInst;
 }
 
 inline OwnershipForwardingMixin *
@@ -10716,6 +10779,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
     return result;
   if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
+    return result;
+  if (auto *result = dyn_cast<MarkUnresolvedReferenceBindingInst>(inst))
     return result;
   if (auto *result = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(inst))
     return result;

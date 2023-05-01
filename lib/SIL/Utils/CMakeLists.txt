@@ -1,4 +1,5 @@
 target_sources(swiftSIL PRIVATE
+  AddressWalker.cpp
   BasicBlockUtils.cpp
   BitDataflow.cpp
   DebugUtils.cpp
@@ -11,6 +12,7 @@ target_sources(swiftSIL PRIVATE
   MemAccessUtils.cpp
   MemoryLocations.cpp
   OptimizationRemark.cpp
+  OSSALifetimeCompletion.cpp
   OwnershipLiveness.cpp
   OwnershipUtils.cpp
   PrettyStackTrace.cpp

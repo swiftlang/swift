@@ -377,6 +377,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
 
   case MangledTypeRefRole::Metadata:
   case MangledTypeRefRole::Reflection:
+  case MangledTypeRefRole::FieldMetadata:
     break;
   }
 
@@ -1166,17 +1167,17 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
     llvm::ConstantInt::get(IGM.Int32Ty, 1)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      IGM.FullTypeMetadataStructTy, fullMetadata, indices);
+      IGM.FullExistentialTypeMetadataStructTy, fullMetadata, indices);
 }
 
 static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
                                                         CanTupleType type,
                                                         DynamicMetadataRequest request) {
-  SmallVector<Type, 2> types;
+  SmallVector<CanType, 2> types;
   types.append(type.getElementTypes().begin(),
                type.getElementTypes().end());
 
-  CanPackType packType = CanPackType(PackType::get(IGF.IGM.Context, types));
+  CanPackType packType = CanPackType::get(IGF.IGM.Context, types);
 
   auto *shapeExpression = IGF.emitPackShapeExpression(packType);
   auto addr = emitTypeMetadataPack(IGF, packType, MetadataState::Abstract);
@@ -1288,7 +1289,7 @@ static Address createGenericArgumentsArray(IRGenFunction &IGF,
   for (unsigned i : indices(args)) {
     Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
                                               IGF.IGM.getPointerSize() * i);
-    auto *arg = IGF.Builder.CreateBitCast(args[i], IGF.IGM.Int8PtrTy);
+    auto *arg = IGF.Builder.CreateBitOrPointerCast(args[i], IGF.IGM.Int8PtrTy);
     IGF.Builder.CreateStore(arg, elt);
   }
 
@@ -1790,7 +1791,7 @@ namespace {
       };
       return MetadataResponse::forComplete(
           llvm::ConstantExpr::getInBoundsGetElementPtr(
-              IGF.IGM.FullTypeMetadataStructTy, singletonMetadata, indices));
+              IGF.IGM.FullExistentialTypeMetadataStructTy, singletonMetadata, indices));
     }
 
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
@@ -1995,6 +1996,7 @@ namespace {
     }
     INTERNAL_ONLY_TYPE(SILBlockStorage)
     INTERNAL_ONLY_TYPE(BuiltinDefaultActorStorage)
+    INTERNAL_ONLY_TYPE(BuiltinNonDefaultDistributedActorStorage)
 #undef INTERNAL_ONLY_TYPE
 
     MetadataResponse visitSILBoxType(CanSILBoxType type,
@@ -2488,10 +2490,10 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   auto substitutions =
       theType->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), nominal);
   for (auto requirement : requirements.getRequirements()) {
-    if (requirement.isWitnessTable()) {
+    if (requirement.isAnyWitnessTable()) {
       continue;
     }
-    assert(requirement.isMetadata());
+    assert(requirement.isMetadata()); // FIXME: packs and counts
     auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
@@ -3198,7 +3200,7 @@ public:
   }
 
   CanType visitPackExpansionType(CanPackExpansionType ty) {
-    llvm_unreachable("");
+    return ty;
   }
 
   CanType visitTupleType(CanTupleType ty) {
@@ -3533,6 +3535,10 @@ namespace {
 
     llvm::Value *visitTupleType(CanTupleType type,
                                 DynamicMetadataRequest request) {
+      // Tuples containing pack expansion types are completely dynamic.
+      if (type->containsPackExpansionType())
+        return emitFromTypeMetadata(type, request);
+
       // Single-element tuples have exactly the same layout as their elements.
       if (type->getNumElements() == 1) {
         return visit(type.getElementType(0), request);

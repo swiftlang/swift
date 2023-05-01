@@ -35,6 +35,7 @@ namespace swift {
 class CompilerInstance;
 class CompilerInvocation;
 class DiagnosticConsumer;
+class PluginRegistry;
 
 namespace ide {
 
@@ -81,8 +82,8 @@ struct ConformingMethodListResults {
 
 /// The results returned from \c IDEInspectionInstance::cursorInfo.
 struct CursorInfoResults {
-  /// The actual results. If \c nullptr, no results were found.
-  ResolvedCursorInfoPtr Result;
+  /// The actual results.
+  std::vector<ResolvedCursorInfoPtr> ResolvedCursorInfos;
   /// Whether an AST was reused to produce the results.
   bool DidReuseAST;
 };
@@ -95,6 +96,8 @@ class IDEInspectionInstance {
   } Opts;
 
   std::mutex mtx;
+
+  std::shared_ptr<PluginRegistry> Plugins;
 
   std::shared_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
@@ -167,7 +170,8 @@ class IDEInspectionInstance {
           Callback);
 
 public:
-  IDEInspectionInstance() : CachedCIShouldBeInvalidated(false) {}
+  IDEInspectionInstance(std::shared_ptr<PluginRegistry> Plugins = nullptr)
+      : Plugins(Plugins), CachedCIShouldBeInvalidated(false) {}
 
   // Mark the cached compiler instance "should be invalidated". In the next
   // completion, new compiler instance will be used. (Thread safe.)

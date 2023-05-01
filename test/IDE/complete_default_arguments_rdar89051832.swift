@@ -44,7 +44,6 @@ extension MyObj {
 //--- test.swift
 func test(value: MyObj) {
   value.#^COMPLETE^#
-// COMPLETE: Begin completions
 // COMPLETE-NOT: name=addOptions()
 // COMPLETE-NOT: name=addAttributes()
 
@@ -64,6 +63,5 @@ func test(value: MyObj) {
 
 // COMPLETE-NOT: name=addOptions()
 // COMPLETE-NOT: name=addAttributes()
-// COMPLETE: End completions
 }
 

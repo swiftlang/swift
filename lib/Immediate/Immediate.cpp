@@ -248,7 +248,8 @@ int swift::RunImmediately(CompilerInstance &CI,
 
   performLLVM(IRGenOpts, Context.Diags, /*diagMutex*/ nullptr, /*hash*/ nullptr,
               GenModule.getModule(), GenModule.getTargetMachine(),
-              PSPs.OutputFilename, Context.Stats);
+              PSPs.OutputFilename, CI.getOutputBackend(),
+              Context.Stats);
 
   if (Context.hadError())
     return -1;
@@ -383,7 +384,7 @@ int swift::RunImmediately(CompilerInstance &CI,
 
   MainFnTy JITMain = nullptr;
   if (auto MainFnOrErr = JIT->lookup("main"))
-    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getAddress());
+    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getValue());
   else {
     logAllUnhandledErrors(MainFnOrErr.takeError(), llvm::errs(), "");
     return -1;

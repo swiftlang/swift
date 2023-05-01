@@ -113,29 +113,33 @@ void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
 std::pair<CanType, CanGenericSignature>
 irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
   auto loweredType = type.getASTType();
-  if (loweredType->hasArchetype()) {
-    GenericEnvironment *env = nullptr;
-    loweredType.findIf([&env](Type t) -> bool {
-        if (auto arch = t->getAs<ArchetypeType>()) {
-          if (!isa<PrimaryArchetypeType>(arch) &&
-              !isa<VariadicSequenceType>(arch))
-            return false;
-          env = arch->getGenericEnvironment();
-          return true;
-        }
-        return false;
-      });
-    assert(env && "has archetype but no archetype?!");
-    return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
-            env->getGenericSignature().getCanonicalSignature()};
-  }
-  return {loweredType, nullptr};
+  if (!loweredType->hasArchetype()) return {loweredType, nullptr};
+
+  // Find a non-local, non-opaque archetype in the type and pull out
+  // its generic environment.
+  // TODO: we ought to be able to usefully minimize this
+
+  GenericEnvironment *env = nullptr;
+  loweredType.findIf([&env](CanType t) -> bool {
+      if (auto arch = dyn_cast<ArchetypeType>(t)) {
+        if (!isa<PrimaryArchetypeType>(arch) &&
+            !isa<PackArchetypeType>(arch))
+          return false;
+        env = arch->getGenericEnvironment();
+        return true;
+      }
+      return false;
+    });
+  assert(env && "has archetype but no archetype?!");
+  return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
+          env->getGenericSignature().getCanonicalSignature()};
 }
 
 void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+  if (!T.hasLocalArchetype() &&
+      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
@@ -337,7 +341,8 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+  if (!T.hasLocalArchetype() &&
+      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);

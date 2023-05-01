@@ -149,15 +149,7 @@ public:
     return visit(T->getTypeRepr());
   }
 
-  FoundResult visitInOutTypeRepr(InOutTypeRepr *T) {
-    return visit(T->getBase());
-  }
-
-  FoundResult visitSharedTypeRepr(SharedTypeRepr *T) {
-    return visit(T->getBase());
-  }
-
-  FoundResult visitOwnedTypeRepr(OwnedTypeRepr *T) {
+  FoundResult visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
     return visit(T->getBase());
   }
 
@@ -1368,6 +1360,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     llvm::StringSet<> &USRs;
     SuperRemoval(EditorAdapter &Editor, llvm::StringSet<> &USRs):
       Editor(Editor), USRs(USRs) {}
+
+    /// Walk everything in a macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     bool isSuperExpr(Expr *E) {
       if (E->isImplicit())
         return false;

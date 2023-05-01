@@ -35,17 +35,13 @@ let MyConstantBool = true
 func testGlobalLookup() {
   @TupleBuilder<String> var x1 {
     #^GLOBAL_LOOKUP^#
-    // GLOBAL_LOOKUP: Begin completions
     // GLOBAL_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]:         MyConstantString[#String#]; name=MyConstantString
-    // GLOBAL_LOOKUP: End completions
   }
 
   @TupleBuilder<String> var x2 {
     if true {
       #^GLOBAL_LOOKUP_IN_IF_BODY?check=GLOBAL_LOOKUP_NO_TYPE_RELATION^#
-// GLOBAL_LOOKUP_NO_TYPE_RELATION: Begin completions
 // GLOBAL_LOOKUP_NO_TYPE_RELATION: Decl[GlobalVar]/CurrModule:         MyConstantString[#String#];
-// GLOBAL_LOOKUP_NO_TYPE_RELATION: End completions
     }
   }
 
@@ -63,16 +59,12 @@ func testGlobalLookup() {
 
   @TupleBuilder<String> var x5 {
     "hello: \(#^GLOBAL_LOOKUP_IN_STRING_LITERAL^#)"
-// GLOBAL_LOOKUP_IN_STRING_LITERAL: Begin completions
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
-// GLOBAL_LOOKUP_IN_STRING_LITERAL: End completions
   }
 
   @TupleBuilder<String> var x5 {
     if #^GLOBAL_LOOKUP_IN_IF_CONDITION^# {
-// GLOBAL_LOOKUP_IN_IF_CONDITION: Begin completions
 // GLOBAL_LOOKUP_IN_IF_CONDITION: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantBool[#Bool#]; name=MyConstantBool
-// GLOBAL_LOOKUP_IN_IF_CONDITION: End completions
     }
   }
 }
@@ -80,19 +72,15 @@ func testGlobalLookup() {
 func testStaticMemberLookup() {
   @TupleBuilder<String> var x1 {
     StringFactory.#^COMPLETE_STATIC_MEMBER^#
-    // COMPLETE_STATIC_MEMBER: Begin completions
     // COMPLETE_STATIC_MEMBER: Keyword[self]/CurrNominal:          self[#StringFactory.Type#]; name=self
     // COMPLETE_STATIC_MEMBER: Keyword/CurrNominal:                Type[#StringFactory.Type#]; name=Type
     // COMPLETE_STATIC_MEMBER: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]:     makeString({#x: String#})[#String#];
-    // COMPLETE_STATIC_MEMBER: End completions
   }
 
   @TupleBuilder<String> var x2 {
     if true {
       StringFactory.#^COMPLETE_STATIC_MEMBER_IN_IF_BODY^#
-// COMPLETE_STATIC_MEMBER_IN_IF_BODY: Begin completions
 // COMPLETE_STATIC_MEMBER_IN_IF_BODY: Decl[StaticMethod]/CurrNominal:     makeString({#x: String#})[#String#];
-// COMPLETE_STATIC_MEMBER_IN_IF_BODY: End completions
     }
   }
 
@@ -112,11 +100,9 @@ func testPatternMatching() {
   @TupleBuilder<String> var x1 {
     let x = Letters.b
     if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE^# = x {
-// COMPLETE_CASE: Begin completions
 // COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: a[#Letters#];
 // COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: b[#Letters#];
 // COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: c[#Letters#];
-// COMPLETE_CASE: End completions
     }
   }
 
@@ -134,7 +120,6 @@ func testPatternMatching() {
     // OPTIONAL_FOOSTRUCT: Begin completions, 2 items
     // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<FooStruct>#]; name=none
     // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
-    // OPTIONAL_FOOSTRUCT: End completions
   }
 
   @TupleBuilder<String> var x4 {
@@ -148,16 +133,13 @@ func testCompleteFunctionArgumentLabels() {
     StringFactory.makeString(#^FUNCTION_ARGUMENT_LABEL^#)
     // FUNCTION_ARGUMENT_LABEL: Begin completions, 1 item
     // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: String#}[')'][#String#];
-    // FUNCTION_ARGUMENT_LABEL: End completions
   }
 }
 
 func testCompleteFunctionArgument() {
   @TupleBuilder<String> var x1 {
     StringFactory.makeString(x: #^ARGUMENT_LOOKUP^#)
-    // ARGUMENT_LOOKUP: Begin completions
     // ARGUMENT_LOOKUP: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
-    // ARGUMENT_LOOKUP: End completions
   }
 
   @TupleBuilder<String> var x2 {
@@ -175,10 +157,8 @@ func testCompleteErrorTypeInCatch() {
   @TupleBuilder<String> var x1 {
     do {} catch Error4.#^CATCH2^#
   }
-// CATCH2: Begin completions
-// CATHC2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E1[#Error4#]; name=E1
-// CATHC2-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2(Int32)
-// CATCH2: End completions
+// CATCH2-DAG: Decl[EnumElement]/CurrNominal: E1[#Error4#]; name=E1
+// CATCH2-DAG: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#Error4#]; name=E2()
 }
 
 func testCompleteInStringLiteral() {
@@ -215,7 +195,6 @@ func testCompleteInStringLiteral() {
 // STRING_LITERAL_VAR: Begin completions, 2 items
 // STRING_LITERAL_VAR-DAG: Keyword[self]/CurrNominal:          self[#Island#]; name=self
 // STRING_LITERAL_VAR-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: turnipPrice[#String#]; name=turnipPrice
-// STRING_LITERAL_VAR: End completions
   }
 
   func bar(island: Island) {
@@ -240,9 +219,7 @@ func testTypeRelationInResultBuilder() {
     @ViewBuilder2 var body: some View2 {
       #^SINGLE_ELEMENT^#
     }
-    // SINGLE_ELEMENT: Begin completions
     // SINGLE_ELEMENT-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyText[#MyText#];
-    // SINGLE_ELEMENT: End completions
 
     @ViewBuilder2 var body2: some View2 {
       MyText()
@@ -271,7 +248,6 @@ func testAmbiguousInResultBuilder() {
 // AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: Int#}[#Int#];
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];
-// AMBIGUOUS_IN_RESULT_BUILDER: End completions
   }
 }
 
@@ -298,9 +274,7 @@ func testCompleteGlobalInResultBuilderIf() {
     }
   }
 
-  // GLOBAL_IN_RESULT_BUILDER_IF: Begin completions
   // GLOBAL_IN_RESULT_BUILDER_IF-DAG: Decl[Struct]/Local/TypeRelation[Convertible]: MyView[#MyView#]; name=MyView
-  // GLOBAL_IN_RESULT_BUILDER_IF: End completions
 }
 
 func testInStringLiteralInResultBuilder() {
@@ -327,7 +301,6 @@ func testInStringLiteralInResultBuilder() {
 // IN_STRING_LITERAL_IN_RESULT_BUILDER: Begin completions, 2 items
 // IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Keyword[self]/CurrNominal:          self[#Foo#]; name=self
 // IN_STRING_LITERAL_IN_RESULT_BUILDER-DAG: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
-// IN_STRING_LITERAL_IN_RESULT_BUILDER: End completions
 }
 
 func testSwitchInResultBuilder() {
@@ -363,5 +336,4 @@ func testSwitchInResultBuilder() {
 // SWITCH_IN_RESULT_BUILDER: Begin completions, 2 items
 // SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
 // SWITCH_IN_RESULT_BUILDER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Action#})[#(into: inout Hasher) -> Void#];
-// SWITCH_IN_RESULT_BUILDER: End completions
 }

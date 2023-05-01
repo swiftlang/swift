@@ -401,13 +401,15 @@ public:
     auto *CS = DS->InlinedCallSite;
     if (!CS)
       return nullptr;
-
+ 
     auto CachedInlinedAt = InlinedAtCache.find(CS);
     if (CachedInlinedAt != InlinedAtCache.end())
       return cast<llvm::MDNode>(CachedInlinedAt->second);
 
     auto L = decodeFilenameAndLocation(CS->Loc);
     auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
+    if (auto *Fn = CS->Parent.dyn_cast<SILFunction *>())
+      Scope = getOrCreateScope(Fn->getDebugScope());
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
@@ -416,6 +418,7 @@ public:
     InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
   }
+
 private:
 
 #ifndef NDEBUG
@@ -572,6 +575,12 @@ private:
     if (ValueDecl *D = L.getAsASTNode<ValueDecl>())
       return D->getBaseIdentifier().str();
 
+    if (auto *D = L.getAsASTNode<MacroExpansionDecl>())
+      return D->getMacroName().getBaseIdentifier().str();
+
+    if (auto *E = L.getAsASTNode<MacroExpansionExpr>())
+      return E->getMacroName().getBaseIdentifier().str();
+
     return StringRef();
   }
 
@@ -612,6 +621,10 @@ private:
     case DeclContextKind::TopLevelCodeDecl:
       return getOrCreateContext(DC->getParent());
 
+    case DeclContextKind::Package: {
+      auto *pkg = cast<PackageUnit>(DC);
+      return getOrCreateContext(pkg);
+    }
     case DeclContextKind::Module:
       return getOrCreateModule(
           {ImportPath::Access(), cast<ModuleDecl>(DC)});
@@ -621,7 +634,11 @@ private:
     case DeclContextKind::MacroDecl:
       return getOrCreateContext(DC->getParent());
     case DeclContextKind::GenericTypeDecl: {
+      // The generic signature of this nominal type has no relation to the current
+      // function's generic signature.
       auto *NTD = cast<NominalTypeDecl>(DC);
+      GenericContextScope scope(IGM, NTD->getGenericSignature().getCanonicalSignature());
+
       auto Ty = NTD->getDeclaredInterfaceType();
       // Create a Forward-declared type.
       auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
@@ -673,9 +690,6 @@ private:
     // The function return type is the first element in the list.
     createParameterType(Parameters, getResultTypeForDebugInfo(IGM, FnTy));
 
-    // Actually, the input type is either a single type or a tuple
-    // type. We currently represent a function with one n-tuple argument
-    // as an n-ary function.
     for (auto Param : FnTy->getParameters())
       createParameterType(
           Parameters, IGM.silConv.getSILType(
@@ -916,6 +930,9 @@ private:
         Ty->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
@@ -930,6 +947,9 @@ private:
         Reconstructed->dump(llvm::errs());
         if (Sig)
           llvm::errs() << "Generic signature: " << Sig << "\n";
+        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+             "this assertion.\n";
         abort();
       }
     }
@@ -1736,6 +1756,7 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
     case TypeKind::BuiltinDefaultActorStorage:
+    case TypeKind::BuiltinNonDefaultDistributedActorStorage:
     case TypeKind::SILMoveOnlyWrapped:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -1772,7 +1793,7 @@ private:
     // Retrieve the private discriminator.
     auto *MSC = Decl->getDeclContext()->getModuleScopeContext();
     auto *FU = cast<FileUnit>(MSC);
-    Identifier PD = FU->getDiscriminatorForPrivateValue(Decl);
+    Identifier PD = FU->getDiscriminatorForPrivateDecl(Decl);
     bool ExportSymbols = true;
     return DBuilder.createNameSpace(Parent, PD.str(), ExportSymbols);
   }
@@ -1980,9 +2001,11 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       SDK = *It;
   }
 
+  bool EnableCXXInterop =
+      IGM.getSILModule().getASTContext().LangOpts.EnableCXXInterop;
   TheCU = DBuilder.createCompileUnit(
-      Lang, MainFile, Producer, Opts.shouldOptimize(), Opts.getDebugFlags(PD),
-      MajorRuntimeVersion, SplitName,
+      Lang, MainFile, Producer, Opts.shouldOptimize(),
+      Opts.getDebugFlags(PD, EnableCXXInterop), MajorRuntimeVersion, SplitName,
       Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,
@@ -2040,10 +2063,8 @@ void IRGenDebugInfoImpl::finalize() {
   // Get the list of imported modules (which may actually be different
   // from all ImportDecls).
   SmallVector<ImportedModule, 8> ModuleWideImports;
-  IGM.getSwiftModule()->getImportedModules(
-      ModuleWideImports, {ModuleDecl::ImportFilterKind::Exported,
-                          ModuleDecl::ImportFilterKind::Default,
-                          ModuleDecl::ImportFilterKind::ImplementationOnly});
+  IGM.getSwiftModule()->getImportedModules(ModuleWideImports,
+                                           ModuleDecl::getImportFilterLocal());
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.importedModule))
       createImportedModule(MainFile, M, MainFile, 0);
@@ -2150,6 +2171,14 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DILocation::get(IGM.getLLVMContext(), L.line, L.column, Scope,
                                   InlinedAt);
+#ifndef NDEBUG
+  {
+    llvm::DILocalScope *Scope = DL->getInlinedAtScope();
+    llvm::DISubprogram *SP = Scope->getSubprogram();
+    llvm::Function *F = Builder.GetInsertBlock()->getParent();
+    assert((!F || SP->describes(F)) && "location points to different function");
+  }
+#endif
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -2574,8 +2603,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  // We cannot yet represent opened existentials.
-  if (DbgTy.getType()->hasOpenedExistential())
+  // We cannot yet represent local archetypes.
+  if (DbgTy.getType()->hasLocalArchetype())
     return;
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
@@ -2995,7 +3024,8 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  Type IntTy = IGM.Context.getIntType();
+  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(0),
+                                       IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
   emitVariableDeclaration(

@@ -22,6 +22,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -535,10 +536,11 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
 
-  // If the source of the copyInst is taken, we must insert a compensating
-  // destroy_addr. This must be done at the right spot: after the last use
-  // tempObj, but before any (potential) re-initialization of the source.
-  bool needToInsertDestroy = copyInst->isTakeOfSrc();
+  // If the source of the copyInst is taken, it must be deinitialized (via
+  // destroy_addr, load [take], copy_addr [take]).  This must be done at the
+  // right spot: after the last use tempObj, but before any (potential)
+  // re-initialization of the source.
+  bool needFinalDeinit = copyInst->isTakeOfSrc();
 
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
@@ -557,7 +559,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
     // Also, destroys are allowed to be in a different block.
     if (isa<DestroyAddrInst>(user)) {
-      if (!isOSSA && needToInsertDestroy) {
+      if (!isOSSA && needFinalDeinit) {
         // In non-OSSA mode, for the purpose of inserting the destroy of
         // copySrc, we have to be conservative and assume that the lifetime of
         // tempObj goes beyond it's last use - until the final destroy_addr.
@@ -588,7 +590,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // Example:
   //   copy_addr [take] %copySrc to [init] %tempObj   // copyInst
   //   copy_addr [take] %tempObj to [init] %copySrc   // lastLoadInst
-  if (needToInsertDestroy && lastLoadInst != copyInst &&
+  if (needFinalDeinit && lastLoadInst != copyInst &&
       !isa<DestroyAddrInst>(lastLoadInst) &&
       aa->mayWriteToMemory(lastLoadInst, copySrc))
     return;
@@ -601,6 +603,40 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
+  // If copyInst's source must be deinitialized, whether that must be done via
+  // a newly created destroy_addr.
+  //
+  // If lastLoadInst is a load or a copy_addr, then the deinitialization can be
+  // done in that instruction.
+  //
+  // This is necessary for correctness: otherwise, copies of move-only values
+  // would be introduced.
+  bool needToInsertDestroy = [&]() {
+    if (!needFinalDeinit)
+      return false;
+    if (lastLoadInst == copyInst)
+      return true;
+    if (auto *cai = dyn_cast<CopyAddrInst>(lastLoadInst)) {
+      if (cai->getSrc() == tempObj && cai->isTakeOfSrc()) {
+        // This copy_addr [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
+    }
+    if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
+      if (li->getOperand() == tempObj &&
+          li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        // This load [take] will perform the final deinitialization.
+        return false;
+      }
+      assert(!tempObj->getType().isMoveOnly() &&
+             "introducing copy of move-only value!?");
+      return true;
+    }
+    return true;
+  }();
   if (needToInsertDestroy) {
     // Compensate the [take] of the original copyInst.
     SILBuilderWithScope::insertAfter(lastLoadInst, [&] (SILBuilder &builder) {
@@ -630,16 +666,19 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       auto *cai = cast<CopyAddrInst>(user);
       if (cai != copyInst) {
         assert(cai->getSrc() == tempObj);
-        if (cai->isTakeOfSrc())
+        if (cai->isTakeOfSrc() && (!needFinalDeinit || lastLoadInst != cai)) {
           cai->setIsTakeOfSrc(IsNotTake);
+        }
       }
       use->set(copySrc);
       break;
     }
     case SILInstructionKind::LoadInst: {
       auto *li = cast<LoadInst>(user);
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
+          (!needFinalDeinit || li != lastLoadInst)) {
         li->setOwnershipQualifier(LoadOwnershipQualifier::Copy);
+      }
       use->set(copySrc);
       break;
     }
@@ -692,8 +731,6 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
-  bool isOrHasEnum = tempObj->getType().isOrHasEnum();
-
   // Scan all uses of the temporary storage (tempObj) to verify they all refer
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
@@ -703,16 +740,6 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
     if (user == si)
       continue;
-
-    // For enums we require that all uses are in the same block.
-    // Otherwise it could be a switch_enum of an optional where the none-case
-    // does not have a destroy of the enum value.
-    // After transforming such an alloc_stack the value would leak in the none-
-    // case block.
-    if (isOrHasEnum && user->getParent() != si->getParent() &&
-        !isa<DeallocStackInst>(user)) {
-      return std::next(si->getIterator());
-    }
 
     // Bail if there is any kind of user which is not handled in the code below.
     switch (user->getKind()) {
@@ -826,6 +853,7 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
   si->eraseFromParent();
   tempObj->eraseFromParent();
   invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
   return nextIter;
 }
 
@@ -835,12 +863,19 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
 /// The main entry point of the pass.
 void TempRValueOptPass::run() {
-  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func "
-                          << getFunction()->getName() << "\n");
+  auto *function = getFunction();
+
+  auto *da = PM->getAnalysis<DominanceAnalysis>();
+
+  LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func " << function->getName()
+                          << "\n");
+
+  SmallVector<SILValue> valuesToComplete;
 
   // Find all copy_addr instructions.
   llvm::SmallSetVector<CopyAddrInst *, 8> deadCopies;
-  for (auto &block : *getFunction()) {
+
+  for (auto &block : *function) {
     // Increment the instruction iterator only after calling
     // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
     // deleted, but copyInst itself won't be deleted until later.
@@ -861,7 +896,21 @@ void TempRValueOptPass::run() {
       }
 
       if (auto *si = dyn_cast<StoreInst>(&*ii)) {
+        auto stored = si->getSrc();
+        bool isOrHasEnum = stored->getType().isOrHasEnum();
+        auto nextIter = std::next(si->getIterator());
+
         ii = tryOptimizeStoreIntoTemp(si);
+
+        // If the optimization was successful, and the stack loc was an enum
+        // type, collect the stored value for lifetime completion.
+        // This is needed because we can have incomplete address lifetimes on
+        // none/trivial paths for an enum type. Once we convert to value form,
+        // this will cause incomplete value lifetimes which can raise ownership
+        // verification errors, because we rely on linear lifetimes in OSSA.
+        if (ii == nextIter && isOrHasEnum) {
+          valuesToComplete.push_back(stored);
+        }
         continue;
       }
 
@@ -878,7 +927,7 @@ void TempRValueOptPass::run() {
     }
   );
 
-  DeadEndBlocks deBlocks(getFunction());
+  DeadEndBlocks deBlocks(function);
   for (auto *deadCopy : deadCopies) {
     auto *srcInst = deadCopy->getSrc()->getDefiningInstruction();
     deadCopy->eraseFromParent();
@@ -890,6 +939,12 @@ void TempRValueOptPass::run() {
   }
   if (!deadCopies.empty()) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+
+  // Call the utlity to complete ossa lifetime.
+  OSSALifetimeCompletion completion(function, da->get(function));
+  for (auto it : valuesToComplete) {
+    completion.completeOSSALifetime(it, /* forceBoundaryCompletion */ true);
   }
 }
 

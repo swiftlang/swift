@@ -131,6 +131,7 @@ function(handle_swift_sources
         list(APPEND swift_compile_flags "${_lto_flag_out}")
       endif()
     endif()
+    list(APPEND swift_compile_flags "-color-diagnostics")
     _compile_swift_files(
         dependency_target
         module_dependency_target
@@ -294,8 +295,8 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING")
   endif()
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_REFLECTION")
+  if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION")
   endif()
 
   if(SWIFT_STDLIB_OS_VERSIONING)
@@ -639,8 +640,11 @@ function(_compile_swift_files
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
+      set(private_interface_file "${module_base}.private.swiftinterface")
+      set(private_interface_file_static "${module_base_static}.private.swiftinterface")
       list(APPEND swift_module_flags
-           "-emit-module-interface-path" "${interface_file}")
+           "-emit-module-interface-path" "${interface_file}"
+           "-emit-private-module-interface-path" "${private_interface_file}")
     endif()
 
     if (NOT SWIFTFILE_IS_STDLIB_CORE)
@@ -651,7 +655,7 @@ function(_compile_swift_files
     set(module_outputs "${module_file}" "${module_doc_file}")
 
     if(interface_file)
-      list(APPEND module_outputs "${interface_file}")
+      list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
     endif()
 
     set(optional_arg)
@@ -694,9 +698,11 @@ function(_compile_swift_files
 
       if(SWIFT_ENABLE_MODULE_INTERFACES)
         set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
-        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}")
+        set(maccatalyst_private_interface_file "${maccatalyst_module_base}.private.swiftinterface")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}" "${maccatalyst_private_interface_file}")
       else()
         set(maccatalyst_interface_file)
+        set(maccatalyst_private_interface_file)
       endif()
 
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
@@ -719,8 +725,8 @@ function(_compile_swift_files
   set(module_outputs "${module_file}" "${module_doc_file}")
   set(module_outputs_static "${module_file_static}" "${module_doc_file_static}")
   if(interface_file)
-    list(APPEND module_outputs "${interface_file}")
-    list(APPEND module_outputs_static "${interface_file_static}")
+    list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
+    list(APPEND module_outputs_static "${interface_file_static}" "${private_interface_file_static}")
   endif()
 
   swift_install_in_component(DIRECTORY "${specific_module_dir}"
@@ -820,10 +826,20 @@ function(_compile_swift_files
     list(APPEND maccatalyst_swift_flags
       "-I" "${lib_dir}/${maccatalyst_library_subdir}")
     set(maccatalyst_swift_module_flags ${swift_module_flags})
+
+    # Remove original interface file
     list(FIND maccatalyst_swift_module_flags "${interface_file}" interface_file_index)
     if(NOT interface_file_index EQUAL -1)
       list(INSERT maccatalyst_swift_module_flags ${interface_file_index} "${maccatalyst_interface_file}")
       math(EXPR old_interface_file_index "${interface_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
+
+    # Remove original private interface
+    list(FIND maccatalyst_swift_module_flags "${private_interface_file}" private_interface_file_index)
+    if(NOT private_interface_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${private_interface_file_index} "${maccatalyst_private_interface_file}")
+      math(EXPR old_interface_file_index "${private_interface_file_index} + 1")
       list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
     endif()
 

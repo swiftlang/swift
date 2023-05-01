@@ -19,7 +19,7 @@
 // -- superclass
 // CHECK-SAME:   i32 0,
 // -- negative size in words
-// CHECK-SAME:   i32 2,
+// CHECK-SAME:   i32 3,
 // -- positive size in words
 // CHECK-objc-SAME:   i32 17,
 // CHECK-native-SAME:   i32 14,

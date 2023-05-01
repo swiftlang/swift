@@ -26,9 +26,6 @@ public struct ColorLiteralMacro: ExpressionMacro {
       of: macro.argumentList, with: "_colorLiteralRed"
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
-    if let leadingTrivia = macro.leadingTrivia {
-      return initSyntax.with(\.leadingTrivia, leadingTrivia)
-    }
     return initSyntax
   }
 }
@@ -41,17 +38,25 @@ public struct FileIDMacro: ExpressionMacro {
     of macro: Node,
     in context: Context
   ) throws -> ExprSyntax {
-    guard let sourceLoc = context.location(of: macro),
-      let fileID = sourceLoc.file
-    else {
+    guard let sourceLoc = context.location(of: macro) else {
       throw CustomError.message("can't find location for macro")
     }
 
-    let fileLiteral: ExprSyntax = "\(literal: fileID)"
-    if let leadingTrivia = macro.leadingTrivia {
-      return fileLiteral.with(\.leadingTrivia, leadingTrivia)
-    }
+    let fileLiteral: ExprSyntax = "\(sourceLoc.file)"
     return fileLiteral
+  }
+}
+
+public struct AssertMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "assert(\(argument))"
   }
 }
 
@@ -65,6 +70,19 @@ public struct StringifyMacro: ExpressionMacro {
     }
 
     return "(\(argument), \(StringLiteralExprSyntax(content: argument.description)))"
+  }
+}
+
+public struct StringifyAndTryMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "(try \(argument), \(StringLiteralExprSyntax(content: argument.description)))"
   }
 }
 
@@ -113,8 +131,6 @@ public enum AddBlocker: ExpressionMacro {
                       newNode: Syntax(
                         TokenSyntax(
                           .binaryOperator("-"),
-                          leadingTrivia: binOp.operatorToken.leadingTrivia,
-                          trailingTrivia: binOp.operatorToken.trailingTrivia,
                           presence: .present
                         )
                       )
@@ -131,7 +147,7 @@ public enum AddBlocker: ExpressionMacro {
               ExprSyntax(
                 binOp.with(
                   \.operatorToken,
-                  binOp.operatorToken.withKind(.binaryOperator("-"))
+                  binOp.operatorToken.with(\.tokenKind, .binaryOperator("-"))
                 )
               )
             )
@@ -197,6 +213,15 @@ enum CustomError: Error, CustomStringConvertible {
   }
 }
 
+public struct EmptyDeclarationMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return []
+  }
+}
+
 public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -214,8 +239,8 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
         """
 
         struct \(raw: prefix) {
-          func \(context.createUniqueName("method"))() { return 0 }
-          func \(context.createUniqueName("method"))() { return 1 }
+          func \(context.makeUniqueName("method"))() { return 0 }
+          func \(context.makeUniqueName("method"))() { return 1 }
         }
         """
       ]
@@ -225,8 +250,8 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
       """
 
       struct \(raw: prefix)\(raw: String(bitwidth)) {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """
     }
@@ -242,15 +267,15 @@ public struct DefineDeclsWithKnownNamesMacro: DeclarationMacro {
       """
 
       struct A {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """,
       """
 
       struct B {
-        func \(context.createUniqueName("method"))() { }
-        func \(context.createUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
+        func \(context.makeUniqueName("method"))() { }
       }
       """,
       """
@@ -303,6 +328,51 @@ public struct WarningMacro: ExpressionMacro {
   }
 }
 
+public struct ErrorMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = macro.argumentList.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(messageString)? = stringLiteral.segments.first
+      else {
+        let errorNode: Syntax
+          if let firstElement = macro.argumentList.first {
+          errorNode = Syntax(firstElement)
+        } else {
+          errorNode = Syntax(macro)
+        }
+
+        let messageID = MessageID(domain: "silly", id: "error")
+        let diag = Diagnostic(
+          node: errorNode,
+          message: SimpleDiagnosticMessage(
+            message: "#myError macro requires a string literal",
+            diagnosticID: messageID,
+            severity: .error
+          )
+        )
+
+       throw DiagnosticsError(diagnostics: [diag])
+     }
+
+     context.diagnose(
+       Diagnostic(
+         node: Syntax(macro),
+         message: SimpleDiagnosticMessage(
+           message: messageString.content.description,
+           diagnosticID: MessageID(domain: "test", id: "error"),
+           severity: .error
+         )
+       )
+     )
+
+     return "()"
+  }
+}
+
 public struct PropertyWrapperMacro {}
 
 extension PropertyWrapperMacro: AccessorMacro, Macro {
@@ -332,6 +402,29 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
           _\(identifier).wrappedValue = newValue
         }
       """,
+    ]
+  }
+}
+
+extension PropertyWrapperMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil,
+      let type = binding.typeAnnotation?.type
+    else {
+      return []
+    }
+
+    return [
+      """
+      var _\(raw: identifier.trimmedDescription): MyWrapperThingy<\(type)>
+      """
     ]
   }
 }
@@ -443,6 +536,8 @@ public struct AddMembers: MemberMacro {
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
+    let uniqueClassName = context.makeUniqueName("uniqueClass")
+
     let storageStruct: DeclSyntax =
       """
       struct Storage {}
@@ -468,7 +563,12 @@ public struct AddMembers: MemberMacro {
 
     let initDecl: DeclSyntax =
       """
-      init() {}
+      init() { _ = \(uniqueClassName)() }
+      """
+
+    let classDecl: DeclSyntax =
+      """
+      class \(uniqueClassName) { }
       """
 
     return [
@@ -477,6 +577,57 @@ public struct AddMembers: MemberMacro {
       instanceMethod,
       staticMethod,
       initDecl,
+      classDecl,
+    ]
+  }
+}
+
+public struct AddExtMembers: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let uniqueClassName = context.makeUniqueName("uniqueClass")
+
+    let instanceMethod: DeclSyntax =
+      """
+      func extInstanceMethod() {}
+      """
+
+    let staticMethod: DeclSyntax =
+      """
+      static func extStaticMethod() {}
+      """
+
+    let classDecl: DeclSyntax =
+      """
+      class \(uniqueClassName) { }
+      """
+
+    return [
+      instanceMethod,
+      staticMethod,
+      classDecl,
+    ]
+  }
+}
+
+public struct AddArbitraryMembers: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let identified = decl.asProtocol(IdentifiedDeclSyntax.self) else {
+      return []
+    }
+
+    let parentName = identified.identifier.trimmed
+    return [
+      "struct \(parentName)1 {}",
+      "struct \(parentName)2 {}",
+      "struct \(parentName)3 {}",
     ]
   }
 }
@@ -516,7 +667,6 @@ public struct WrapStoredPropertiesMacro: MemberAttributeMacro {
           name: .identifier(wrapperName.content.text)
         )
       )
-      .with(\.leadingTrivia, [.newlines(1), .spaces(2)])
     ]
   }
 }
@@ -564,7 +714,7 @@ extension DeclGroupSyntax {
   /// Enumerate the stored properties that syntactically occur in this
   /// declaration.
   func storedProperties() -> [VariableDeclSyntax] {
-    return members.members.compactMap { member in
+    return memberBlock.members.compactMap { member in
       guard let variable = member.decl.as(VariableDeclSyntax.self),
             variable.isStoredProperty else {
         return nil
@@ -594,7 +744,7 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
         fatalError("missing source location information")
       }
 
-      print("Source range for LHS is \(lhsStartLoc.file!): \(lhsStartLoc.line!):\(lhsStartLoc.column!)-\(lhsEndLoc.line!):\(lhsEndLoc.column!)")
+      print("Source range for LHS is \(lhsStartLoc.file): \(lhsStartLoc.line):\(lhsStartLoc.column)-\(lhsEndLoc.line):\(lhsEndLoc.column)")
 
       return .visitChildren
     }
@@ -636,7 +786,7 @@ public struct AddCompletionHandler: PeerMacro {
     let completionHandlerParam =
       FunctionParameterSyntax(
         firstName: .identifier("completionHandler"),
-        colon: .colonToken(trailingTrivia: .space),
+        colon: .colonToken(),
         type: "@escaping (\(resultType ?? "")) -> Void" as TypeSyntax
       )
 
@@ -649,7 +799,7 @@ public struct AddCompletionHandler: PeerMacro {
         .appending(
           lastParam.with(
             \.trailingComma,
-            .commaToken(trailingTrivia: .space)
+            .commaToken()
           )
         )
         .appending(completionHandlerParam)
@@ -657,15 +807,11 @@ public struct AddCompletionHandler: PeerMacro {
       newParameterList = parameterList.appending(completionHandlerParam)
     }
 
-    let callArguments: [String] = try parameterList.map { param in
-      guard let argName = param.secondName ?? param.firstName else {
-        throw CustomError.message(
-          "@addCompletionHandler argument must have a name"
-        )
-      }
+    let callArguments: [String] = parameterList.map { param in
+      let argName = param.secondName ?? param.firstName
 
-      if let paramName = param.firstName, paramName.text != "_" {
-        return "\(paramName.text): \(argName.text)"
+      if param.firstName.text != "_" {
+        return "\(param.firstName.text): \(argName.text)"
       }
 
       return "\(argName.text)"
@@ -678,11 +824,9 @@ public struct AddCompletionHandler: PeerMacro {
     // so that the full body could go here.
     let newBody: ExprSyntax =
       """
-
         Task {
           completionHandler(await \(call))
         }
-
       """
 
     // Drop the @addCompletionHandler attribute from the new declaration.
@@ -718,17 +862,57 @@ public struct AddCompletionHandler: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(newBody))]
           ),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
-      .with(\.leadingTrivia, .newlines(2))
 
     return [DeclSyntax(newFunc)]
+  }
+}
+
+public struct InvalidMacro: PeerMacro, DeclarationMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "import Swift",
+      "precedencegroup MyPrecedence {}",
+      "@attached(member) macro myMacro()",
+      "extension Int {}",
+      """
+      @main
+      struct MyMain {
+        static func main() {}
+      }
+      """,
+      "typealias Array = Void",
+      "typealias Dictionary = Void",
+      "typealias BooleanLiteralType = Void",
+      "typealias ExtendedGraphemeClusterType = Void",
+      "typealias FloatLiteralType = Void",
+      "typealias IntegerLiteralType = Void",
+      "typealias StringLiteralType = Void",
+      "typealias UnicodeScalarType = Void",
+      "typealias _ColorLiteralType = Void",
+      "typealias _ImageLiteralType = Void",
+      "typealias _FileReferenceLiteralType = Void",
+    ]
+  }
+
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "var value: Int"
+    ]
   }
 }
 
@@ -745,13 +929,11 @@ public struct WrapInType: PeerMacro {
     // Build a new function with the same signature that forwards arguments
     // to the the original function.
     let parameterList = funcDecl.signature.input.parameterList
-    let callArguments: [String] = try parameterList.map { param in
-      guard let argName = param.secondName ?? param.firstName else {
-        throw CustomError.message("@wrapInType argument must have a name")
-      }
+    let callArguments: [String] = parameterList.map { param in
+      let argName = param.secondName ?? param.firstName
 
-      if let paramName = param.firstName, paramName.text != "_" {
-        return "\(paramName.text): \(argName.text)"
+      if param.firstName.text != "_" {
+        return "\(param.firstName.text): \(argName.text)"
       }
 
       return "\(argName.text)"
@@ -780,7 +962,7 @@ public struct WrapInType: PeerMacro {
       funcDecl
       .with(
         \.identifier,
-         "\(context.createUniqueName(funcDecl.identifier.text))"
+         "\(context.makeUniqueName(funcDecl.identifier.text))"
       )
       .with(
         \.signature,
@@ -789,19 +971,18 @@ public struct WrapInType: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(call))]
-          )
-          .with(\.leadingTrivia, [.newlines(1), .spaces(2)]),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          ),
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
 
     let structType: DeclSyntax =
       """
-      struct \(context.createUniqueName(funcDecl.identifier.text)) {
+      struct \(context.makeUniqueName(funcDecl.identifier.text)) {
         \(method)
       }
       """
@@ -868,7 +1049,7 @@ public struct ObservableMacro: MemberMacro, MemberAttributeMacro {
       """
 
     let memberList = MemberDeclListSyntax(
-      declaration.members.members.filter {
+      declaration.memberBlock.members.filter {
         $0.decl.isObservableStoredProperty
       }
     )
@@ -1024,6 +1205,17 @@ public struct EquatableMacro: ConformanceMacro {
   }
 }
 
+public struct HashableMacro: ConformanceMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingConformancesOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [(TypeSyntax, GenericWhereClauseSyntax?)] {
+    let protocolName: TypeSyntax = "Hashable"
+    return [(protocolName, nil)]
+  }
+}
+
 public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1056,5 +1248,159 @@ public struct DelegatedConformanceMacro: ConformanceMacro, MemberMacro {
       """
 
     return [requirement]
+  }
+}
+
+public struct ExtendableEnum: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let unknownDecl: DeclSyntax =
+    """
+    func unknown() -> Int { 34 } // or something like: `case unknown`
+    """
+    return [unknownDecl]
+  }
+}
+
+public struct DefineStructWithUnqualifiedLookupMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+    struct StructWithUnqualifiedLookup {
+      let hello = 1
+
+      func foo() -> Int {
+        hello + world // looks up "world" in the parent scope
+      }
+    }
+    """]
+  }
+}
+
+extension TupleExprElementListSyntax {
+  /// Retrieve the first element with the given label.
+  func first(labeled name: String) -> Element? {
+    return first { element in
+      if let label = element.label, label.text == name {
+        return true
+      }
+
+      return false
+    }
+  }
+}
+
+
+public struct DefineAnonymousTypesMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let body = node.trailingClosure else {
+      throw CustomError.message("#anonymousTypes macro requires a trailing closure")
+    }
+
+    let accessSpecifier: String
+    if let _ = node.argumentList.first(labeled: "public") {
+      accessSpecifier = "public "
+    } else {
+      accessSpecifier = ""
+    }
+    return [
+      """
+
+      \(raw:accessSpecifier)class \(context.makeUniqueName("name")) {
+        \(raw:accessSpecifier)func hello() -> String {
+          \(body.statements)
+        }
+
+        \(raw:accessSpecifier)func getSelf() -> Any.Type { return Self.self }
+      }
+      """,
+      """
+
+      enum \(context.makeUniqueName("name")) {
+        case apple
+        case banana
+
+        func hello() -> String {
+          \(body.statements)
+        }
+      }
+      """
+    ]
+  }
+}
+
+public struct AddClassReferencingSelfMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let protocolDecl = declaration.as(ProtocolDeclSyntax.self) else {
+      throw CustomError.message("Macro can only be applied to a protocol declarations.")
+    }
+
+    let className = "\(protocolDecl.identifier.text)Builder"
+    return [
+      """
+      struct \(raw: className) {
+       init(_ build: (_ builder: Self) -> Self) {
+         _ = build(self)
+       }
+      }
+      """
+    ]
+  }
+}
+
+public struct SimpleCodeItemMacro: CodeItemMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    [
+      .init(item: .decl("""
+
+      struct \(context.makeUniqueName("foo")) {
+        var x: Int
+      }
+      """)),
+      .init(item: .stmt("""
+
+      if true {
+        print("from stmt")
+        usedInExpandedStmt()
+      }
+      if false {
+        print("impossible")
+      }
+      """)),
+      .init(item: .expr("""
+
+      print("from expr")
+      """)),
+    ]
+  }
+}
+
+public struct MultiStatementClosure: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+      {
+        let temp = 10
+        let result = temp
+        return result
+      }()
+      """
   }
 }

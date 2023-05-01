@@ -85,6 +85,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheJobType;
   if (Name == "DefaultActorStorage")
     return Context.TheDefaultActorStorageType;
+  if (Name == "NonDefaultDistributedActorStorage")
+    return Context.TheNonDefaultDistributedActorStorageType;
   if (Name == "Executor")
     return Context.TheExecutorType;
   if (Name == "NativeObject")
@@ -243,7 +245,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters) {
-  assert(numParameters <= llvm::array_lengthof(GenericParamNames));
+  assert(numParameters <= std::size(GenericParamNames));
 
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
@@ -693,9 +695,9 @@ namespace {
 
     template <class G>
     void addParameter(const G &generator,
-                      ValueOwnership ownership = ValueOwnership::Default) {
+                      ParamSpecifier ownership = ParamSpecifier::Default) {
       Type gTyIface = generator.build(*this);
-      auto flags = ParameterTypeFlags().withValueOwnership(ownership);
+      auto flags = ParameterTypeFlags().withOwnershipSpecifier(ownership);
       InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
 
@@ -912,7 +914,7 @@ static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
                                                  Identifier Id,
                                                  int NumTailTypes) {
   if (NumTailTypes < 1 ||
-      1 + NumTailTypes > (int)llvm::array_lengthof(GenericParamNames))
+      1 + NumTailTypes > (int)std::size(GenericParamNames))
     return nullptr;
   BuiltinFunctionBuilder builder(Context, 1 + NumTailTypes);
   builder.addParameter(makeMetatype(makeGenericParam(0)));
@@ -1097,20 +1099,20 @@ static ValueDecl *getAtomicStoreOperation(ASTContext &ctx, Identifier id,
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                       BuiltinValueKind BV) {
 
-  ValueOwnership ownership;
+  ParamSpecifier ownership;
   Type builtinTy;
   switch (BV) {
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:
   case BuiltinValueKind::CastFromNativeObject:
     builtinTy = Context.TheNativeObjectType;
-    ownership = ValueOwnership::Owned;
+    ownership = ParamSpecifier::LegacyOwned;
     break;
 
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
     builtinTy = Context.TheRawPointerType;
-    ownership = ValueOwnership::Default;
+    ownership = ParamSpecifier::Default;
     break;
 
   default:
@@ -1208,7 +1210,7 @@ static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -1218,7 +1220,7 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinFunctionBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::LegacyOwned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -1388,7 +1390,7 @@ static ValueDecl *getConvertStrongToUnownedUnsafe(ASTContext &ctx,
   // builtin, so we can crash.
   BuiltinFunctionBuilder builder(ctx, 2);
   builder.addParameter(makeGenericParam(0));
-  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(1), ParamSpecifier::InOut);
   builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
   return builder.build(id);
 }
@@ -1404,7 +1406,7 @@ static ValueDecl *getConvertUnownedUnsafeToGuaranteed(ASTContext &ctx,
   // builtin, so we can crash.
   BuiltinFunctionBuilder builder(ctx, 3);
   builder.addParameter(makeGenericParam(0));                        // Base
-  builder.addParameter(makeGenericParam(1), ValueOwnership::InOut); // Unmanaged
+  builder.addParameter(makeGenericParam(1), ParamSpecifier::InOut); // Unmanaged
   builder.setResult(makeGenericParam(2)); // Guaranteed Result
   return builder.build(id);
 }
@@ -1594,6 +1596,15 @@ static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                             _executor);
 }
 
+static ValueDecl *getBuildComplexEqualitySerialExecutorRef(ASTContext &ctx,
+                                                           Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                              _conformsTo(_typeparam(0), _serialExecutor)),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -1632,7 +1643,7 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinFunctionBuilder builder(Context);
-  builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(), ParamSpecifier::InOut);
   builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
@@ -1659,7 +1670,7 @@ static ValueDecl *getTypeJoinInoutOperation(ASTContext &Context,
                                             Identifier Id) {
   // <T,U,V> (inout T, U.Type) -> V.Type
   BuiltinFunctionBuilder builder(Context, 3);
-  builder.addParameter(makeGenericParam(0), ValueOwnership::InOut);
+  builder.addParameter(makeGenericParam(0), ParamSpecifier::InOut);
   builder.addParameter(makeMetatype(makeGenericParam(1)));
   builder.setResult(makeMetatype(makeGenericParam(2)));
   return builder.build(Id);
@@ -2885,6 +2896,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     return getBuildOrdinarySerialExecutorRef(Context, Id);
+  case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
+    return getBuildComplexEqualitySerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
@@ -2913,6 +2926,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTriggerFallbackDiagnosticOperation(Context, Id);
 
   case BuiltinValueKind::InitializeDefaultActor:
+  case BuiltinValueKind::InitializeNonDefaultDistributedActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
 
@@ -3021,6 +3035,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);
+    break;
+  case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE);
     break;
   case BuiltinTypeKind::BuiltinPackIndex:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_PACKINDEX);

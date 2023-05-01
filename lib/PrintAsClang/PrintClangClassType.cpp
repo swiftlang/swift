@@ -12,6 +12,7 @@
 
 #include "PrintClangClassType.h"
 #include "ClangSyntaxPrinter.h"
+#include "DeclAndTypePrinter.h"
 #include "PrintClangValueType.h"
 #include "swift/AST/Decl.h"
 #include "swift/IRGen/Linking.h"
@@ -19,7 +20,8 @@
 using namespace swift;
 
 void ClangClassTypePrinter::printClassTypeDecl(
-    const ClassDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter) {
+    const ClassDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter,
+    DeclAndTypePrinter &declAndTypePrinter) {
   auto printCxxImplClassName = ClangValueTypePrinter::printCxxImplClassName;
 
   ClangSyntaxPrinter printer(os);
@@ -31,7 +33,9 @@ void ClangClassTypePrinter::printClassTypeDecl(
   // Print out a forward declaration of the "hidden" _impl class.
   printer.printNamespace(cxx_synthesis::getCxxImplNamespaceName(),
                          [&](raw_ostream &os) {
-                           os << "class ";
+                           os << "class";
+                           declAndTypePrinter.printAvailability(os, typeDecl);
+                           os << ' ';
                            printCxxImplClassName(os, typeDecl);
                            os << ";\n";
                            // Print out special functions, like functions that
@@ -57,6 +61,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
   }
 
   os << "class";
+  declAndTypePrinter.printAvailability(os, typeDecl);
   ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
   os << ' ';
   printer.printBaseName(typeDecl);
@@ -70,23 +75,30 @@ void ClangClassTypePrinter::printClassTypeDecl(
   os << "  using " << baseClassName << "::operator=;\n";
   bodyPrinter();
   os << "protected:\n";
-  os << "  inline ";
+  os << "  ";
+  printer.printInlineForThunk();
   printer.printBaseName(typeDecl);
   os << "(void * _Nonnull ptr) noexcept : " << baseClassName << "(ptr) {}\n";
   os << "private:\n";
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
+
+  printer.printSwiftMangledNameForDebugger(typeDecl);
+
   os << "};\n\n";
 
   // Print out the "hidden" _impl class.
   printer.printNamespace(
       cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
-        os << "class ";
+        os << "class";
+        declAndTypePrinter.printAvailability(os, typeDecl);
+        os << ' ';
         printCxxImplClassName(os, typeDecl);
         os << " {\n";
         os << "public:\n";
-        os << "static inline ";
+        os << "static ";
+        printer.printInlineForThunk();
         printer.printBaseName(typeDecl);
         os << " makeRetained(void * _Nonnull ptr) noexcept { return ";
         printer.printBaseName(typeDecl);
@@ -96,7 +108,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
   ClangValueTypePrinter::printTypeGenericTraits(
       os, typeDecl, typeMetadataFuncName, /*genericRequirements=*/{},
-      typeDecl->getModuleContext());
+      typeDecl->getModuleContext(), declAndTypePrinter);
 }
 
 void ClangClassTypePrinter::printClassTypeReturnScaffold(

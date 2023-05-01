@@ -46,6 +46,7 @@ public func equality() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     %swift.full_type* bitcast (
     // CHECK-SAME:       <{
+    // CHECK-SAME:         i8*,
     // CHECK-SAME:         i8**,
     // CHECK-SAME:         [[INT]],
     // CHECK-SAME:         %swift.type_descriptor*,
@@ -57,7 +58,7 @@ public func equality() {
     // CHECK-SAME:       to %swift.full_type*
     // CHECK-SAME:     ),
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 1
+    // CHECK-SAME:     i32 2
     // CHECK-SAME:   ),
     // CHECK-SAME:   i8** [[Struct_Equatable]]
     // CHECK-SAME: )
@@ -69,6 +70,7 @@ public func equality() {
     // CHECK-SAME:     %swift.full_type, 
     // CHECK-SAME:     %swift.full_type* bitcast (
     // CHECK-SAME:       <{ 
+    // CHECK-SAME:         i8*,
     // CHECK-SAME:         i8**, 
     // CHECK-SAME:         [[INT]], 
     // CHECK-SAME:         %swift.type_descriptor*, 
@@ -79,7 +81,7 @@ public func equality() {
     // CHECK-SAME:       to %swift.full_type*
     // CHECK-SAME:     ), 
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 1
+    // CHECK-SAME:     i32 2
     // CHECK-SAME:   ), 
     // CHECK-SAME:   i8** [[Enum_Equatable]]
     // CHECK-SAME: )
@@ -96,6 +98,7 @@ public func encodable() {
     // CHECK-SAME:     %swift.full_type, 
     // CHECK-SAME:     %swift.full_type* bitcast (
     // CHECK-SAME:       <{ 
+    // CHECK-SAME:         i8*,
     // CHECK-SAME:         i8**, 
     // CHECK-SAME:         [[INT]], 
     // CHECK-SAME:         %swift.type_descriptor*, 
@@ -107,7 +110,7 @@ public func encodable() {
     // CHECK-SAME:       to %swift.full_type*
     // CHECK-SAME:     ), 
     // CHECK-SAME:     i32 0, 
-    // CHECK-SAME:     i32 1
+    // CHECK-SAME:     i32 2
     // CHECK-SAME:   ), 
     // CHECK-SAME:   i8** [[Struct_Encodable]]
     // CHECK-SAME: )
@@ -119,6 +122,7 @@ public func encodable() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     %swift.full_type* bitcast (
     // CHECK-SAME:       <{
+    // CHECK-SAME:         i8*,
     // CHECK-SAME:         i8**,
     // CHECK-SAME:         [[INT]],
     // CHECK-SAME:         %swift.type_descriptor*,
@@ -129,7 +133,7 @@ public func encodable() {
     // CHECK-SAME:       to %swift.full_type*
     // CHECK-SAME:     ),
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 1
+    // CHECK-SAME:     i32 2
     // CHECK-SAME:   ),
     // CHECK-SAME:   i8** [[Enum_Encodable]]
     // CHECK-SAME: )

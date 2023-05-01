@@ -14,7 +14,7 @@ public enum E {
     case i(Int)
 }
 
-// CHECK:      inline E E::_impl_c::operator()(const C& val) const {
+// CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
 // CHECK-NEXT:   auto result = E::_make();
 // CHECK-NEXT:   auto op = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
 // CHECK-NEXT:   memcpy(result._getOpaquePointer(), &op, sizeof(op));
@@ -22,7 +22,7 @@ public enum E {
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 
-// CHECK:      inline C E::getC() const {
+// CHECK:      SWIFT_INLINE_THUNK C E::getC() const {
 // CHECK-NEXT:   if (!isC()) abort();
 // CHECK-NEXT:   alignas(E) unsigned char buffer[sizeof(E)];
 // CHECK-NEXT:   auto *thisCopy = new(buffer) E(*this);

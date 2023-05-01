@@ -501,7 +501,19 @@ void BindingSet::finalize(
 
         if (TransitiveProtocols.has_value()) {
           for (auto *constraint : *TransitiveProtocols) {
-            auto protocolTy = constraint->getSecondType();
+            Type protocolTy = constraint->getSecondType();
+
+            // The Copyable protocol can't have members, yet will be a
+            // constraint of basically all type variables, so don't suggest it.
+            //
+            // NOTE: worth considering for all marker protocols, but keep in
+            // mind that you're allowed to extend them with members!
+            if (auto p = protocolTy->getAs<ProtocolType>()) {
+              if (ProtocolDecl *decl = p->getDecl())
+                if (decl->isSpecificProtocol(KnownProtocolKind::Copyable))
+                  continue;
+            }
+
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
           }
         }
@@ -1482,7 +1494,14 @@ void PotentialBindings::infer(Constraint *constraint) {
       packType = packType->mapTypeOutOfContext();
       auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
                                                       shapeClass);
+
+      // Without an opened element environment, we cannot derive the
+      // element binding.
+      if (!elementEnv)
+        break;
+
       auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
+      assert(!elementType->is<PackType>());
       addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
 
       break;
@@ -1765,7 +1784,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PO.PrintTypesForDebugging = true;
 
   if (auto typeVar = getTypeVariable()) {
-    typeVar->print(out, PO);
+    typeVar->getImpl().print(out);
     out << " ";
   }
 
@@ -1912,12 +1931,15 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   if (!Defaults.empty()) {
     out << " [defaults: ";
-    for (const auto &entry : Defaults) {
-      auto *constraint = entry.second;
-      auto defaultBinding =
-          PrintableBinding::exact(constraint->getSecondType());
-      defaultBinding.print(out, PO);
-    }
+    interleave(
+        Defaults,
+        [&](const auto &entry) {
+          auto *constraint = entry.second;
+          auto defaultBinding =
+              PrintableBinding::exact(constraint->getSecondType());
+          defaultBinding.print(out, PO);
+        },
+        [&] { out << ", "; });
     out << "]";
   }
   
@@ -2280,8 +2302,17 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto result =
       cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
 
-  if (result.isFailure())
+  if (result.isFailure()) {
+    if (cs.isDebugMode()) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "(failed to establish binding " << TypeVar->getString(PO)
+          << " := " << type->getString(PO) << ")\n";
+    }
     return false;
+  }
 
   auto reportHole = [&]() {
     if (cs.isForCodeCompletion()) {

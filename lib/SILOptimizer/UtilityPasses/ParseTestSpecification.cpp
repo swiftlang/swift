@@ -568,7 +568,10 @@ public:
     specificationString.split(components, " ");
     for (unsigned long index = 0, size = components.size(); index < size;
          ++index) {
-      auto componentString = components[index];
+      auto componentString = components[index].trim();
+      if (componentString.empty())
+        continue;
+
       ParseArgumentSpecification parser(*this, componentString,
                                         specification.context);
       auto argument = parser.parse();

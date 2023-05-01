@@ -243,7 +243,8 @@ private:
   }
 
   /// Prints an encoded string, escaped properly for C.
-  void printEncodedString(StringRef str, bool includeQuotes = true) {
+  void printEncodedString(raw_ostream &os, StringRef str,
+                          bool includeQuotes = true) {
     // NB: We don't use raw_ostream::write_escaped() because it does hex escapes
     // for non-ASCII chars.
 
@@ -296,11 +297,10 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
-      // FIXME: Print availability.
       // FIXME: forward decl should be handled by ModuleWriter.
-      ClangValueTypePrinter::forwardDeclType(os, CD);
+      ClangValueTypePrinter::forwardDeclType(os, CD, owningPrinter);
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getMembers()); });
+          CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
       return;
     }
 
@@ -347,20 +347,22 @@ private:
     if (outputLang != OutputLanguageMode::Cxx)
       return;
     // FIXME: Print struct's doc comment.
-    // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                   owningPrinter.interopContext);
-    printer.printValueTypeDecl(SD, /*bodyPrinter=*/[&]() {
-      printMembers(SD->getMembers());
-      for (const auto *ed :
-           owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-        auto sign = ed->getGenericSignature();
-        // FIXME: support requirements.
-        if (!sign.getRequirements().empty())
-          continue;
-        printMembers(ed->getMembers());
-      }
-    });
+    printer.printValueTypeDecl(
+        SD, /*bodyPrinter=*/
+        [&]() {
+          printMembers(SD->getMembers());
+          for (const auto *ed :
+               owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
+            auto sign = ed->getGenericSignature();
+            // FIXME: support requirements.
+            if (!sign.getRequirements().empty())
+              continue;
+            printMembers(ed->getMembers());
+          }
+        },
+        owningPrinter);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -404,7 +406,6 @@ private:
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
 
-    // FIXME: Print enum's availability
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
     ClangSyntaxPrinter syntaxPrinter(os);
@@ -434,11 +435,15 @@ private:
       ClangSyntaxPrinter(nameOS).printIdentifier(caseName);
       name[0] = std::toupper(name[0]);
 
-      os << "  inline bool is" << name << "() const;\n";
+      os << "  ";
+      ClangSyntaxPrinter(os).printInlineForThunk();
+      os << "bool is" << name << "() const;\n";
 
       outOfLineSyntaxPrinter
           .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-      outOfLineOS << "  inline bool ";
+      outOfLineOS << "  ";
+      ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+      outOfLineOS << " bool ";
       outOfLineSyntaxPrinter.printNominalTypeQualifier(
           ED, /*moduleContext=*/ED->getModuleContext());
       outOfLineOS << "is" << name << "() const {\n";
@@ -469,10 +474,14 @@ private:
           /*NeedsReturnTypes=*/true,
           [&](auto &types) {
             // Printing function name and return type
-            os << "  inline " << types[paramType] << " get" << name;
+            os << "  ";
+            ClangSyntaxPrinter(os).printInlineForThunk();
+            os << types[paramType] << " get" << name;
             outOfLineSyntaxPrinter
                 .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-            outOfLineOS << "  inline " << types[paramType] << ' ';
+            outOfLineOS << "  ";
+            ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+            outOfLineOS << types[paramType] << ' ';
             outOfLineSyntaxPrinter.printNominalTypeQualifier(
                 ED, /*moduleContext=*/ED->getModuleContext());
             outOfLineOS << "get" << name;
@@ -526,8 +535,8 @@ private:
                 outOfLineOS << "::makeRetained(*reinterpret_cast<void "
                                "**>(payloadFromDestruction));\n  ";
               } else {
-                outOfLineOS
-                    << "::returnNewValue([&](char * _Nonnull result) {\n";
+                outOfLineOS << "::returnNewValue([&](char * _Nonnull result) "
+                               "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
                 outOfLineOS << "      swift::"
                             << cxx_synthesis::getCxxImplNamespaceName();
                 outOfLineOS << "::implClassFor<";
@@ -550,7 +559,9 @@ private:
                                elementInfo) {
       os << "  inline const static struct _impl_" << caseName << " {  "
          << "// impl struct for case " << caseName << '\n';
-      os << "    inline constexpr operator cases() const {\n";
+      os << "    ";
+      syntaxPrinter.printInlineForThunk();
+      os << "constexpr operator cases() const {\n";
       os << "      return cases::";
       syntaxPrinter.printIdentifier(caseName);
       os << ";\n";
@@ -579,14 +590,15 @@ private:
             [&](auto &types) {
               const auto *ED = elementDecl->getParentEnum();
               // Printing function name and return type
-              os << "    inline ";
+              os << "    SWIFT_INLINE_THUNK "; // TODO
               syntaxPrinter.printNominalTypeReference(ED,
                                                       ED->getModuleContext());
               os << " operator()";
 
               outOfLineSyntaxPrinter
                   .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
-              outOfLineOS << "  inline ";
+              outOfLineOS << "  ";
+              outOfLineSyntaxPrinter.printInlineForThunk();
               outOfLineSyntaxPrinter.printNominalTypeReference(
                   ED, ED->getModuleContext());
               outOfLineOS << ' ';
@@ -749,79 +761,88 @@ private:
       os << ";\n";
     };
 
-    valueTypePrinter.printValueTypeDecl(ED, /*bodyPrinter=*/[&]() {
-      os << '\n';
-      os << "  enum class cases {";
-      llvm::interleave(
-          elementTagMapping, os,
-          [&](const auto &pair) {
-            os << "\n    ";
-            syntaxPrinter.printIdentifier(pair.first->getNameStr());
-            syntaxPrinter.printSymbolUSRAttribute(pair.first);
-          },
-          ",");
-      // TODO: allow custom name for this special case
-      auto resilientUnknownDefaultCaseName = "unknownDefault";
-      if (ED->isResilient()) {
-        os << (ED->getNumElements() > 0 ? ",\n    " : "\n    ")
-           << resilientUnknownDefaultCaseName;
-      }
-      os << "\n  };\n\n"; // enum class cases' closing bracket
+    valueTypePrinter.printValueTypeDecl(
+        ED, /*bodyPrinter=*/
+        [&]() {
+          os << '\n';
+          os << "  enum class cases {";
+          llvm::interleave(
+              elementTagMapping, os,
+              [&](const auto &pair) {
+                os << "\n    ";
+                syntaxPrinter.printIdentifier(pair.first->getNameStr());
+                syntaxPrinter.printSymbolUSRAttribute(pair.first);
+              },
+              ",");
+          // TODO: allow custom name for this special case
+          auto resilientUnknownDefaultCaseName = "unknownDefault";
+          if (ED->isResilient()) {
+            os << (ED->getNumElements() > 0 ? ",\n    " : "\n    ")
+               << resilientUnknownDefaultCaseName;
+          }
+          os << "\n  };\n\n"; // enum class cases' closing bracket
 
-      os << "#pragma clang diagnostic push\n";
-      os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"  "
-         << "// allow use of inline static data member\n";
-      for (const auto &pair : elementTagMapping) {
-        // Printing struct
-        printStruct(pair.first->getNameStr(), pair.first, pair.second);
-        // Printing `is` function
-        printIsFunction(pair.first->getNameStr(), ED);
-        if (pair.first->hasAssociatedValues()) {
-          // Printing `get` function
-          printGetFunction(pair.first);
-        }
-        os << '\n';
-      }
+          os << "#pragma clang diagnostic push\n";
+          os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"  "
+             << "// allow use of inline static data member\n";
+          for (const auto &pair : elementTagMapping) {
+            // Printing struct
+            printStruct(pair.first->getNameStr(), pair.first, pair.second);
+            // Printing `is` function
+            printIsFunction(pair.first->getNameStr(), ED);
+            if (pair.first->hasAssociatedValues()) {
+              // Printing `get` function
+              printGetFunction(pair.first);
+            }
+            os << '\n';
+          }
 
-      if (ED->isResilient()) {
-        // Printing struct for unknownDefault
-        printStruct(resilientUnknownDefaultCaseName, /* elementDecl */ nullptr,
-                    /* elementInfo */ None);
-        // Printing isUnknownDefault
-        printIsFunction(resilientUnknownDefaultCaseName, ED);
-        os << '\n';
-      }
-      os << "#pragma clang diagnostic pop\n";
+          if (ED->isResilient()) {
+            // Printing struct for unknownDefault
+            printStruct(resilientUnknownDefaultCaseName,
+                        /* elementDecl */ nullptr,
+                        /* elementInfo */ None);
+            // Printing isUnknownDefault
+            printIsFunction(resilientUnknownDefaultCaseName, ED);
+            os << '\n';
+          }
+          os << "#pragma clang diagnostic pop\n";
 
-      // Printing operator cases()
-      os << "  inline operator cases() const {\n";
-      if (ED->isResilient()) {
-        if (!elementTagMapping.empty()) {
-          os << "    auto tag = _getEnumTag();\n";
-        }
-        for (const auto &pair : elementTagMapping) {
-          os << "    if (tag == " << cxx_synthesis::getCxxImplNamespaceName();
-          os << "::" << pair.second.globalVariableName << ") return cases::";
-          syntaxPrinter.printIdentifier(pair.first->getNameStr());
-          os << ";\n";
-        }
-        os << "    return cases::" << resilientUnknownDefaultCaseName << ";\n";
-      } else { // non-resilient enum
-        os << "    switch (_getEnumTag()) {\n";
-        for (const auto &pair : elementTagMapping) {
-          os << "      case " << pair.second.tag << ": return cases::";
-          syntaxPrinter.printIdentifier(pair.first->getNameStr());
-          os << ";\n";
-        }
-        // TODO: change to Swift's fatalError when it's available in C++
-        os << "      default: abort();\n";
-        os << "    }\n"; // switch's closing bracket
-      }
-      os << "  }\n"; // operator cases()'s closing bracket
-      os << "\n";
-      
-      printMembers(ED->getMembers());
-    });
+          // Printing operator cases()
+          os << "  ";
+          ClangSyntaxPrinter(os).printInlineForThunk();
+          os << "operator cases() const {\n";
+          if (ED->isResilient()) {
+            if (!elementTagMapping.empty()) {
+              os << "    auto tag = _getEnumTag();\n";
+            }
+            for (const auto &pair : elementTagMapping) {
+              os << "    if (tag == "
+                 << cxx_synthesis::getCxxImplNamespaceName();
+              os << "::" << pair.second.globalVariableName
+                 << ") return cases::";
+              syntaxPrinter.printIdentifier(pair.first->getNameStr());
+              os << ";\n";
+            }
+            os << "    return cases::" << resilientUnknownDefaultCaseName
+               << ";\n";
+          } else { // non-resilient enum
+            os << "    switch (_getEnumTag()) {\n";
+            for (const auto &pair : elementTagMapping) {
+              os << "      case " << pair.second.tag << ": return cases::";
+              syntaxPrinter.printIdentifier(pair.first->getNameStr());
+              os << ";\n";
+            }
+            // TODO: change to Swift's fatalError when it's available in C++
+            os << "      default: abort();\n";
+            os << "    }\n"; // switch's closing bracket
+          }
+          os << "  }\n"; // operator cases()'s closing bracket
+          os << "\n";
+
+          printMembers(ED->getMembers());
+        },
+        owningPrinter);
   }
 
   void visitEnumDecl(EnumDecl *ED) {
@@ -1011,17 +1032,17 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         if (SD)
           declPrinter.printCxxSubscriptAccessorMethod(
-              typeDeclContext, accessor, funcABI->getSignature(),
+              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isDefinition=*/false, dispatchInfo);
         else
           declPrinter.printCxxPropertyAccessorMethod(
-              typeDeclContext, accessor, funcABI->getSignature(),
+              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
               /*isDefinition=*/false, dispatchInfo);
       } else {
-        declPrinter.printCxxMethod(typeDeclContext, AFD,
+        declPrinter.printCxxMethod(owningPrinter, typeDeclContext, AFD,
                                    funcABI->getSignature(),
                                    funcABI->getSymbolName(), resultTy,
                                    /*isStatic=*/isClassMethod,
@@ -1036,24 +1057,24 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         if (SD)
           defPrinter.printCxxSubscriptAccessorMethod(
-              typeDeclContext, accessor, funcABI->getSignature(),
+              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy, /*isDefinition=*/true,
               dispatchInfo);
         else
           defPrinter.printCxxPropertyAccessorMethod(
-              typeDeclContext, accessor, funcABI->getSignature(),
+              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
               /*isStatic=*/isClassMethod,
               /*isDefinition=*/true, dispatchInfo);
       } else {
-        defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
+        defPrinter.printCxxMethod(owningPrinter, typeDeclContext, AFD,
+                                  funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
                                   /*isStatic=*/isClassMethod,
                                   /*isDefinition=*/true, dispatchInfo);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
-      // FIXME: availability
       return;
     }
     printDocumentationComment(AFD);
@@ -1509,9 +1530,16 @@ private:
     Yes = true
   };
 
-  /// Returns \c true if anything was printed.
   bool printAvailability(const Decl *D, PrintLeadingSpace printLeadingSpace =
                                             PrintLeadingSpace::Yes) {
+    return printAvailability(os, D, printLeadingSpace);
+  }
+
+public:
+  /// Returns \c true if anything was printed.
+  bool printAvailability(
+      raw_ostream &os, const Decl *D,
+      PrintLeadingSpace printLeadingSpace = PrintLeadingSpace::Yes) {
     bool hasPrintedAnything = false;
     auto maybePrintLeadingSpace = [&] {
       if (printLeadingSpace == PrintLeadingSpace::Yes || hasPrintedAnything)
@@ -1530,17 +1558,17 @@ private:
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
                << cast<ValueDecl>(D)->getBaseName()
                << "' has been renamed to '";
-            printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
+            printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
               os << ": ";
-              printEncodedString(AvAttr->Message, false);
+              printEncodedString(os, AvAttr->Message, false);
             }
             os << "\")";
           } else if (!AvAttr->Message.empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(";
-            printEncodedString(AvAttr->Message);
+            printEncodedString(os, AvAttr->Message);
             os << ")";
           } else {
             maybePrintLeadingSpace();
@@ -1552,10 +1580,10 @@ private:
           if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_DEPRECATED_MSG(";
-            printEncodedString(AvAttr->Message);
+            printEncodedString(os, AvAttr->Message);
             if (!AvAttr->Rename.empty()) {
               os << ", ";
-              printRenameForDecl(AvAttr, cast<ValueDecl>(D), true);
+              printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), true);
             }
             os << ")";
           } else {
@@ -1642,24 +1670,25 @@ private:
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
-        printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
+        printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
         if (!AvAttr->Message.empty()) {
           os << ": ";
-          printEncodedString(AvAttr->Message, false);
+          printEncodedString(os, AvAttr->Message, false);
         }
         os << "\"";
       } else if (!AvAttr->Message.empty()) {
         os << ",message=";
-        printEncodedString(AvAttr->Message);
+        printEncodedString(os, AvAttr->Message);
       }
       os << ")";
     }
     return hasPrintedAnything;
   }
 
-  void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
-                          bool includeQuotes) {
+private:
+  void printRenameForDecl(raw_ostream &os, const AvailableAttr *AvAttr,
+                          const ValueDecl *D, bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
     auto *renamedDecl = evaluateOrDefault(
@@ -1670,9 +1699,9 @@ private:
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);
-      printEncodedString(renamedObjCRuntimeName, includeQuotes);
+      printEncodedString(os, renamedObjCRuntimeName, includeQuotes);
     } else {
-      printEncodedString(AvAttr->Rename, includeQuotes);
+      printEncodedString(os, AvAttr->Rename, includeQuotes);
     }
   }
 
@@ -1697,10 +1726,10 @@ private:
       os << "method";
     os << " '";
     auto nominal = VD->getDeclContext()->getSelfNominalTypeDecl();
-    printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
+    printEncodedString(os, nominal->getName().str(), /*includeQuotes=*/false);
     os << ".";
     SmallString<32> scratch;
-    printEncodedString(VD->getName().getString(scratch),
+    printEncodedString(os, VD->getName().getString(scratch),
                        /*includeQuotes=*/false);
     os << "' uses '@objc' inference deprecated in Swift 4; add '@objc' to "
        <<   "provide an Objective-C entrypoint\")";
@@ -1799,7 +1828,6 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
-      // FIXME: availability.
       auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
       printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
@@ -2687,7 +2715,7 @@ static bool isStringNestedType(const ValueDecl *VD, StringRef Typename) {
 
 static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
-    if (VD == VD->getASTContext().getStringDecl() && !isExtension)
+    if (VD == VD->getASTContext().getStringDecl())
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
@@ -2708,60 +2736,103 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
     // FIXME: Do not expose 'index' methods as the overloads are conflicting.
     // this should either be prohibited in the stdlib module, or the overloads
     // should be renamed automatically or using the expose attribute.
-    if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
-      if (isa<AbstractFunctionDecl>(VD) &&
-          !cast<AbstractFunctionDecl>(VD)
-               ->getName()
-               .getBaseName()
-               .isSpecial() &&
-          cast<AbstractFunctionDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("index"))
-        return false;
-    }
+    if ((ED->getExtendedNominal() == VD->getASTContext().getArrayDecl() ||
+         ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) &&
+        (isa<AbstractFunctionDecl>(VD) &&
+         !cast<AbstractFunctionDecl>(VD)->getName().getBaseName().isSpecial() &&
+         cast<AbstractFunctionDecl>(VD)
+             ->getName()
+             .getBaseName()
+             .getIdentifier()
+             .str()
+             .contains_insensitive("index")))
+      return false;
+    // Limit exposition of String constructors as there's overloading conflict.
+    // FIXME: resolve it in some other way.
     if (ED->getExtendedNominal() == VD->getASTContext().getStringDecl()) {
-      if (isa<ValueDecl>(VD) &&
-          !cast<ValueDecl>(VD)->getName().getBaseName().isSpecial() &&
-          cast<ValueDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("utf8"))
-        return true;
-    }
-    if (isStringNestedType(ED->getExtendedNominal(), "UTF8View")) {
-      // Do not expose ambiguous 'index(after:' / 'index(before:' overloads.
-      if (isa<AbstractFunctionDecl>(VD) &&
-          cast<AbstractFunctionDecl>(VD)->getParameters()->size() == 1 &&
-          !cast<AbstractFunctionDecl>(VD)
-               ->getName()
-               .getBaseName()
-               .isSpecial() &&
-          cast<AbstractFunctionDecl>(VD)
-              ->getName()
-              .getBaseName()
-              .getIdentifier()
-              .str()
-              .contains_insensitive("index"))
+      if (isa<ConstructorDecl>(VD))
         return false;
     }
+
     return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
   }
   return false;
+}
+
+/// Skip \c \@objcImplementation \c extension member implementations and
+/// overrides. They are already declared in handwritten headers, and they may
+/// have attributes that aren't allowed in a category.
+///
+/// \return true if \p VD should \em not be included in the header.
+static bool excludeForObjCImplementation(const ValueDecl *VD) {
+  // Exclude member implementations; they are declared elsewhere.
+  if (VD->isObjCMemberImplementation())
+    return true;
+  // Exclude overrides in an @_objcImplementation extension; the decl they're
+  // overriding is declared elsewhere.
+  if (VD->isImplicit() && VD->getOverriddenDecl()) {
+    auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+    if (ED && ED->isObjCImplementation())
+      return true;
+  }
+  return false;
+}
+
+static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
+                                  const llvm::StringSet<> &exposedModules) {
+  if (VD->hasClangNode())
+    return true;
+  auto *mc = VD->getModuleContext();
+  if (mc == &M)
+    return true;
+  // Only certain declarations are exposed from
+  // the standard library.
+  if (mc->isStdlibModule())
+    return hasExposeAttr(VD);
+  return exposedModules.count(mc->getName().str());
+}
+
+static bool isEnumExposableToCxx(const ValueDecl *VD,
+                                 DeclAndTypePrinter &printer) {
+  auto *enumDecl = dyn_cast<EnumDecl>(VD);
+  if (!enumDecl)
+    return true;
+  // The supported set of enum elements is restricted by
+  // the types that can be represented in C++. We already
+  // check for different type categories in `getDeclRepresentation`, however,
+  // we also need to perform additional check on whether the type can be
+  // emitted here as well, to ensure that we don't emit types from dependent
+  // modules that do not have a C++ representation.
+  for (const auto *enumCase : enumDecl->getAllCases()) {
+    for (const auto *elementDecl : enumCase->getElements()) {
+      if (!elementDecl->hasAssociatedValues())
+        continue;
+      if (auto *params = elementDecl->getParameterList()) {
+        for (const auto *param : *params) {
+          auto paramType = param->getInterfaceType();
+          if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                  printer.getTypeMapping(), printer.getInteropContext(),
+                  printer, enumDecl->getModuleContext(), paramType)
+                  .isUnsupported())
+            return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
-                    cxx_translation::isExposableToCxx(VD)
+                    isExposedToThisModule(M, VD, exposedModules) &&
+                    cxx_translation::isExposableToCxx(VD) &&
+                    isEnumExposableToCxx(VD, *this)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
-         !isAsyncAlternativeOfOtherDecl(VD);
+         !isAsyncAlternativeOfOtherDecl(VD) &&
+         !excludeForObjCImplementation(VD);
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {
@@ -2770,6 +2841,10 @@ void DeclAndTypePrinter::print(const Decl *D) {
 
 void DeclAndTypePrinter::print(Type ty) {
   getImpl().print(ty, /*overridingOptionality*/None);
+}
+
+void DeclAndTypePrinter::printAvailability(raw_ostream &os, const Decl *D) {
+  getImpl().printAvailability(os, D);
 }
 
 void DeclAndTypePrinter::printAdHocCategory(

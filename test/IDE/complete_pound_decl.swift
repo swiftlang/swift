@@ -10,17 +10,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_ELIF_GBLNAME | %FileCheck %s -check-prefix=GLOBAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POUND_ELIF_GBLATTR | %FileCheck %s -check-prefix=ATTR
 
-// MEMBER: Begin completions
 // MEMBER: override func foo() {|}; name=foo()
-// MEMBER: End completions
 
-// ATTR: Begin completions
 // ATTR: available[#Declaration Attribute#]; name=available
-// ATTR: End completions
 
-// GLOBAL: Begin completions
 // GLOBAL: Foo[#Foo#]; name=Foo
-// GLOBAL: End completions
 
 class Foo {
   func foo() {}

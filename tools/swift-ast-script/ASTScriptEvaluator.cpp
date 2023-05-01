@@ -37,6 +37,10 @@ public:
   ASTScriptWalker(const ASTScript &script, ProtocolDecl *viewProtocol)
     : Script(script), ViewProtocol(viewProtocol) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     visit(D);
     return Action::Continue();

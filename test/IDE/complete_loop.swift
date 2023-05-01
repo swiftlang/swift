@@ -19,7 +19,6 @@ class C {
 	func f1(_ Seq : [Int], I : Int, G : Gen) {
 		for i in #^LOOP_1^#
 	}
-// LOOP_1: Begin completions
 // LOOP_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: Seq[#[Int]#]{{; name=.+$}}
 // LOOP_1-DAG: Decl[LocalVar]/Local:               I[#Int#]{{; name=.+$}}
 // LOOP_1-DAG: Decl[LocalVar]/Local:               G[#Gen#]{{; name=.+$}}
@@ -31,7 +30,6 @@ class C {
 
 		}
 	}
-// LOOP_2: Begin completions
 // LOOP_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: Seq[#[Int]#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[LocalVar]/Local:               I[#Int#]{{; name=.+$}}
 // LOOP_2-DAG: Decl[LocalVar]/Local:               G[#Gen#]{{; name=.+$}}
@@ -44,7 +42,6 @@ class C {
 		for i in G.#^LOOP_3^#
 	}
 
-// LOOP_3: Begin completions
 // LOOP_3-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]{{; name=.+$}}
 // LOOP_3-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]{{; name=.+$}}
 // LOOP_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntSeqGen()[#[Int]#]{{; name=.+$}}
@@ -55,7 +52,6 @@ class C {
 		}
 	}
 
-// LOOP_4: Begin completions
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]{{; name=.+$}}
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]{{; name=.+$}}
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntSeqGen()[#[Int]#]{{; name=.+$}}
@@ -64,10 +60,15 @@ class C {
     do {
       for user in a {
         user.#^LOOP_5^#
+// LOOP_5-DAG: Keyword[self]/CurrNominal:          self[#C#]; 
+// LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#];
+// LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#];
+// LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f3({#(G): Gen#})[#Void#];
+// LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f4({#(G): Gen#})[#Void#];
+// LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f5({#(a): [C]#})[#Void#];
       }
     } catch {}
   }
-// LOOP_5: Begin completions
 }
 
 // https://github.com/apple/swift/issues/58633
@@ -79,4 +80,3 @@ do {
 }
 // LOOP_6: Begin completions, 1 items
 // LOOP_6-CHECK-NEXT: Keyword[in]/None:                   in; name=in
-// LOOP_6-CHECK-NEXT: End completions

@@ -10,7 +10,7 @@
 // CHECK:   private constant { i32, i32, [2 x { i32, i32, i32, i32 }] }
 // CHECK:   { i32 0, i32 2, [2 x { i32, i32, i32, i32 }] [
 // CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFTx"{{.*}}@"$s1A16_replacement_bar1yQrSi_tF"{{.*}}%swift.dyn_repl_link_entry* @"$s1A16_replacement_bar1yQrSi_tFTX"{{.*}}, i32 0 },
-// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }] }, section "__TEXT,__const", align 8
+// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }] }, section "__TEXT,__const", no_sanitize_address, align 8
 
 public protocol P {
   func myValue() -> Int

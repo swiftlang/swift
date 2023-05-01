@@ -33,6 +33,9 @@ SWIFT_REQUEST(ClangImporter, ObjCInterfaceAndImplementationRequest,
 SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
               CxxRecordSemanticsKind(const clang::CXXRecordDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
+              ValueDecl *(CxxRecordSemanticsDescriptor), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
               bool(SafeUseOfCxxRecordDescriptor), Cached,
               NoLocationInfo)

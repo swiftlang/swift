@@ -16,6 +16,9 @@
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level api -verify -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level=api -verify -module-name MainLib
 
 /// Expect no errors when building an SPI client.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
@@ -71,9 +74,14 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 @_spiOnly import LocalClang
 
 /// Test error message on an unknown library level name.
-// RUN: not %target-swift-frontend -typecheck %s -library-level ThatsNotALibraryLevel 2>&1 \
+// RUN: not %target-swift-frontend -typecheck %t/Empty.swift \
+// RUN:   -library-level ThatsNotALibraryLevel 2>&1 \
+// RUN:   | %FileCheck %s --check-prefix CHECK-ARG
+// RUN: not %target-swift-frontend -typecheck %t/Empty.swift \
+// RUN:   -library-level=ThatsNotALibraryLevel 2>&1 \
 // RUN:   | %FileCheck %s --check-prefix CHECK-ARG
 // CHECK-ARG: error: unknown library level 'ThatsNotALibraryLevel', expected one of 'api', 'spi', 'ipi', or 'other'
+//--- Empty.swift
 
 /// Expect no errors in swiftinterfaces.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
@@ -92,3 +100,60 @@ import PublicClang_Private
 import FullyPrivateClang
 import LocalClang
 @_exported import MainLib
+
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/InternalImports.swift \
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -module-name MainLib -module-cache-path %t \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level api -verify
+//--- InternalImports.swift
+internal import PublicSwift
+internal import PrivateSwift
+
+internal import PublicClang
+internal import PublicClang_Private
+internal import FullyPrivateClang
+internal import LocalClang
+
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/FileprivateImports.swift \
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -module-name MainLib -module-cache-path %t \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level api -verify
+//--- FileprivateImports.swift
+fileprivate import PublicSwift
+fileprivate import PrivateSwift
+
+fileprivate import PublicClang
+fileprivate import PublicClang_Private
+fileprivate import FullyPrivateClang
+fileprivate import LocalClang
+
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PrivateImports.swift \
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -module-name MainLib -module-cache-path %t \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level api -verify
+//--- PrivateImports.swift
+private import PublicSwift
+private import PrivateSwift
+
+private import PublicClang
+private import PublicClang_Private
+private import FullyPrivateClang
+private import LocalClang
+
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ExplicitlyPublicImports.swift \
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -module-name MainLib -module-cache-path %t \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level api -verify
+//--- ExplicitlyPublicImports.swift
+public import PublicSwift
+public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
+
+public import PublicClang
+public import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
+public import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
+public import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
+@_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}

@@ -55,8 +55,10 @@ class SwiftTestCase(unittest.TestCase):
             enable_stdlibcore_exclusivity_checking=False,
             enable_experimental_differentiable_programming=False,
             enable_experimental_concurrency=False,
+            enable_experimental_cxx_interop=False,
             enable_experimental_distributed=False,
-            enable_experimental_reflection=False,
+            enable_experimental_observation=False,
+            swift_enable_backtracing=False,
             build_early_swiftsyntax=False,
             build_swift_stdlib_static_print=False,
             build_swift_stdlib_unicode_data=True,
@@ -95,8 +97,10 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -119,8 +123,10 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -352,6 +358,18 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY' in x])
 
+    def test_experimental_cxx_interop_flags(self):
+        self.args.enable_experimental_cxx_interop = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=TRUE'],
+            [option for option in swift.cmake_options
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP' in option])
+
     def test_experimental_distributed_flags(self):
         self.args.enable_experimental_distributed = True
         swift = Swift(
@@ -365,18 +383,31 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED' in x])
 
-    def test_experimental_reflection_flags(self):
-        self.args.enable_experimental_reflection = True
+    def test_experimental_observation_flags(self):
+        self.args.enable_experimental_observation = True
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL='
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL='
              'TRUE'],
             [x for x in swift.cmake_options
-             if 'DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION' in x])
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION' in x])
+
+    def test_backtracing_flags(self):
+        self.args.swift_enable_backtracing = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_BACKTRACING:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_BACKTRACING' in x])
 
     def test_freestanding_is_darwin_flags(self):
         self.args.swift_freestanding_is_darwin = True

@@ -209,6 +209,15 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
       break;
     }
+
+    case RequirementError::Kind::UnsupportedSameElement: {
+      if (error.requirement.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::unsupported_same_element);
+      diagnosedError = true;
+      break;
+    }
     }
   }
 

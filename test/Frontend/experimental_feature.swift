@@ -10,7 +10,7 @@ let x = BOOM
 #endif
 
 // Use variadic generics
-func debugPrint<T...>(_ items: repeat each T)
-  where each T: CustomDebugStringConvertible
+func debugPrint<each T>(_ items: repeat each T)
+  where repeat each T: CustomDebugStringConvertible
 {
 }

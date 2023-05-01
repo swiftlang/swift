@@ -176,6 +176,16 @@ public:
   explicit BuiltinTypeInfo(TypeRefBuilder &builder,
                            RemoteRef<BuiltinTypeDescriptor> descriptor);
 
+  /// Construct an empty builtin type info.
+  BuiltinTypeInfo()
+      : TypeInfo(TypeInfoKind::Builtin,
+                 /*Size=*/0,
+                 /*Alignment=*/1,
+                 /*Stride=*/1,
+                 /*ExtraInhabitants=*/0,
+                 /*BitwiseTakable=*/true),
+        Name("") {}
+
   const std::string &getMangledTypeName() const {
     return Name;
   }
@@ -328,7 +338,7 @@ public:
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider *>,
+  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>,
                  const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
@@ -367,7 +377,7 @@ public:
   /// class.
   ///
   /// Not cached.
-  const TypeInfo *
+  const RecordTypeInfo *
   getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
                            remote::TypeInfoProvider *ExternalTypeInfo);
 

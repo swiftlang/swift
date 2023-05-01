@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -471,24 +470,24 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
   // Tuples do not alias non-tuples.
   bool LTyTT = LTy.is<TupleType>();
   bool RTyTT = RTy.is<TupleType>();
-  if ((LTyTT && !RTyTT) || (!LTyTT && RTyTT))
+  if (LTyTT != RTyTT)
     return false;
 
   // Structs do not alias non-structs.
   StructDecl *LTyStruct = LTy.getStructOrBoundGenericStruct();
   StructDecl *RTyStruct = RTy.getStructOrBoundGenericStruct();
-  if ((LTyStruct && !RTyStruct) || (!LTyStruct && RTyStruct))
+  if ((LTyStruct != nullptr) != (RTyStruct != nullptr))
     return false;
 
   // Enums do not alias non-enums.
   EnumDecl *LTyEnum = LTy.getEnumOrBoundGenericEnum();
   EnumDecl *RTyEnum = RTy.getEnumOrBoundGenericEnum();
-  if ((LTyEnum && !RTyEnum) || (!LTyEnum && RTyEnum))
+  if ((LTyEnum != nullptr) != (RTyEnum != nullptr))
     return false;
 
   // Classes do not alias non-classes.
   ClassDecl *RTyClass = RTy.getClassOrBoundGenericClass();
-  if ((LTyClass && !RTyClass) || (!LTyClass && RTyClass))
+  if ((LTyClass != nullptr) != (RTyClass != nullptr))
     return false;
 
   // Classes with separate class hierarchies do not alias.
@@ -522,10 +521,10 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
 //===----------------------------------------------------------------------===//
 
 // Bridging functions.
-static AliasAnalysisGetMemEffectFn getMemEffectsFunction = nullptr;
-static AliasAnalysisEscaping2InstFn isObjReleasedFunction = nullptr;
-static AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFunction = nullptr;
-static AliasAnalysisEscaping2ValFn canReferenceSameFieldFunction = nullptr;
+static BridgedAliasAnalysis::GetMemEffectFn getMemEffectsFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2InstFn isObjReleasedFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2ValIntFn isAddrVisibleFromObjFunction = nullptr;
+static BridgedAliasAnalysis::Escaping2ValFn canReferenceSameFieldFunction = nullptr;
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
@@ -702,29 +701,17 @@ SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
-  return  const_cast<AliasAnalysis *>(
-    static_cast<const AliasAnalysis *>(aa.aliasAnalysis));
-}
-
-BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
-                                                   BridgedInstruction inst,
-                                                   BridgedValue addr) {
-  return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
-    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
-}
-
-void AliasAnalysis_register(AliasAnalysisGetMemEffectFn getMemEffectsFn,
-                            AliasAnalysisEscaping2InstFn isObjReleasedFn,
-                            AliasAnalysisEscaping2ValFn isAddrVisibleFromObjFn,
-                            AliasAnalysisEscaping2ValFn canReferenceSameFieldFn) {
+void BridgedAliasAnalysis::registerAnalysis(GetMemEffectFn getMemEffectsFn,
+                                            Escaping2InstFn isObjReleasedFn,
+                                            Escaping2ValIntFn isAddrVisibleFromObjFn,
+                                            Escaping2ValFn canReferenceSameFieldFn) {
   getMemEffectsFunction = getMemEffectsFn;
   isObjReleasedFunction = isObjReleasedFn;
   isAddrVisibleFromObjFunction = isAddrVisibleFromObjFn;
   canReferenceSameFieldFunction = canReferenceSameFieldFn;
 }
 
-SILInstruction::MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
+MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
             SILValue addr, SILInstruction *toInst) {
   if (getMemEffectsFunction) {
     return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()}, {addr},
@@ -742,7 +729,16 @@ bool AliasAnalysis::isObjectReleasedByInst(SILValue obj, SILInstruction *inst) {
 
 bool AliasAnalysis::isAddrVisibleFromObject(SILValue addr, SILValue obj) {
   if (isAddrVisibleFromObjFunction) {
-    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()}, {addr}, {obj}) != 0;
+    // This function is called a lot from ARCSequenceOpt and ReleaseHoisting.
+    // To avoid quadratic complexity for large functions, we limit the amount
+    // of work what the EscapeUtils are allowed to to.
+    // This keeps the complexity linear.
+    //
+    // This arbitrary limit is good enough for almost all functions. It lets
+    // the EscapeUtils do several hundred up/down walks which is much more than
+    // needed in most cases.
+    SwiftInt complexityLimit = 1000000 / getEstimatedFunctionSize(addr);
+    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()}, {addr}, {obj}, complexityLimit) != 0;
   }
   return true;
 }
@@ -752,4 +748,16 @@ bool AliasAnalysis::canReferenceSameField(SILValue lhs, SILValue rhs) {
     return canReferenceSameFieldFunction({PM->getSwiftPassInvocation()}, {lhs}, {rhs}) != 0;
   }
   return true;
+}
+
+int AliasAnalysis::getEstimatedFunctionSize(SILValue valueInFunction) {
+  if (estimatedFunctionSize < 0) {
+    int numInsts = 0;
+    SILFunction *f = valueInFunction->getFunction();
+    for (SILBasicBlock &block : *f) {
+      numInsts += std::distance(block.begin(), block.end());
+    }
+    estimatedFunctionSize = numInsts;
+  }
+  return estimatedFunctionSize;
 }

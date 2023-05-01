@@ -58,3 +58,7 @@ let not = MyPredicate.not()
 let and = MyPredicate.and([])
 let or = MyPredicate.or([not, and])
 
+// When a bridging header macro refers to a macro imported from another module,
+// do we actually find the other module's macro definition, or do we just fail
+// to import it?
+if MY_TRUE == 1 {}

@@ -78,6 +78,7 @@ add_swift_host_library(swiftBasic STATIC
   Unicode.cpp
   UUID.cpp
   Version.cpp
+  BlockList.cpp
 
   ${llvm_revision_inc}
   ${clang_revision_inc}
@@ -101,6 +102,7 @@ target_link_libraries(swiftBasic PUBLIC
 target_link_libraries(swiftBasic PRIVATE
   ${UUID_LIBRARIES})
 
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/SwiftVersion.cmake)
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 

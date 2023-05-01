@@ -22,7 +22,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
@@ -821,9 +820,10 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   if (isa<ConvertEscapeToNoEscapeInst>(inst))
     return true;
 
-  // Look through copy_value, begin_borrow. They are inert for our purposes, but
-  // we need to look through it.
-  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst);
+  // Look through copy_value, begin_borrow, move_value. They are inert for our
+  // purposes, but we need to look through it.
+  return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst) ||
+         isa<MoveValueInst>(inst);
 }
 
 static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
@@ -1307,7 +1307,7 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
     return;
   }
 
-  // Incidental uses of an addres are meaningless with regard to the loaded
+  // Incidental uses of an address are meaningless with regard to the loaded
   // value.
   if (isIncidentalUse(inst) || isa<BeginUnpairedAccessInst>(inst))
     return;

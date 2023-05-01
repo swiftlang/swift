@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-move-only -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-move-only -parse-as-library -g -c %s -o %t/out.o
+// RUN: %target-swift-frontend -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -g -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
 // This test checks that:
@@ -64,23 +64,23 @@ public var falseValue: Bool { false }
 // DWARF-NEXT: DW_AT_external	(true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(
-// DWARF-NEXT: DW_AT_name	("m")
-// DWARF-NEXT: DW_AT_decl_file	(
-// DWARF-NEXT: DW_AT_decl_line	(
-// DWARF-NEXT: DW_AT_type	(
-//
-// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location	(0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name	("k")
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
 // DWARF-NEXT: DW_AT_type	(
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location	(
+// DWARF-NEXT: DW_AT_name	("m")
+// DWARF-NEXT: DW_AT_decl_file	(
+// DWARF-NEXT: DW_AT_decl_line	(
+// DWARF-NEXT: DW_AT_type	(
 public func copyableValueTest() {
     let k = Klass()
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
 }
 
@@ -126,7 +126,7 @@ public func copyableValueTest() {
 // DWARF-NEXT: DW_AT_type	(
 public func copyableArgTest(_ k: __owned Klass) {
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
 }
 
@@ -149,13 +149,6 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_external	(
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location	(
-// DWARF-NEXT: DW_AT_name	("m")
-// DWARF-NEXT: DW_AT_decl_file	(
-// DWARF-NEXT: DW_AT_decl_line	(
-// DWARF-NEXT: DW_AT_type	(
-//
-// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location	(0x{{[a-z0-9]+}}:
 // We check that we get two separate locations for the different lifetimes of
 // the values.
@@ -165,10 +158,18 @@ public func copyableArgTest(_ k: __owned Klass) {
 // DWARF-NEXT: DW_AT_decl_file	(
 // DWARF-NEXT: DW_AT_decl_line	(
 // DWARF-NEXT: DW_AT_type	(
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location	(
+// DWARF-NEXT: DW_AT_name	("m")
+// DWARF-NEXT: DW_AT_decl_file	(
+// DWARF-NEXT: DW_AT_decl_line	(
+// DWARF-NEXT: DW_AT_type	(
+
 public func copyableVarTest() {
     var k = Klass()
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
     k = Klass()
     k.doSomething()
@@ -211,7 +212,7 @@ public func copyableVarTest() {
 // DWARF-NEXT: DW_AT_type	(
 public func copyableVarArgTest(_ k: inout Klass) {
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
     k = Klass()
     k.doSomething()
@@ -245,23 +246,23 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 //
 // DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-//
-// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name      ("k")
 // DWARF-NEXT: DW_AT_decl_file (
 // DWARF-NEXT: DW_AT_decl_line (
 // DWARF-NEXT: DW_AT_type      (
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("m")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueTest<T : P>(_ x: T) {
     let k = x
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
 }
 
@@ -303,7 +304,7 @@ public func addressOnlyValueTest<T : P>(_ x: T) {
 // DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
 }
 
@@ -348,7 +349,7 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 public func addressOnlyVarTest<T : P>(_ x: T) {
     var k = x
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
     k = x
     k.doSomething()
@@ -393,7 +394,7 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 public func addressOnlyVarArgTest<T : P>(_ k: inout T, _ x: T) {
     k.doSomething()
-    let m = _move k
+    let m = consume k
     m.doSomething()
     k = x
     k.doSomething()
@@ -416,7 +417,7 @@ public func copyableValueCCFlowTest() {
     let k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
 }
@@ -433,7 +434,7 @@ public func copyableValueCCFlowTest() {
 public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
 }
@@ -463,7 +464,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
     var k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = Klass()
@@ -493,7 +494,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = Klass()
@@ -528,7 +529,7 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
     var k = Klass()
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
         k = Klass()
     }
@@ -562,7 +563,7 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
 public func copyableVarArgTestCCFlowReinitInBlockTest(_ k: inout Klass) {
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
         k = Klass()
     }
@@ -594,7 +595,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
     var k = T.value
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = T.value
@@ -625,7 +626,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = T.value
@@ -659,7 +660,7 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
     var k = T.value
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
         k = T.value
     }
@@ -692,7 +693,7 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
 public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
     k.doSomething()
     if trueValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
         k = T.value
     }

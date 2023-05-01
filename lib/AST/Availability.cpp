@@ -102,7 +102,6 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
                                           StringRef Rename,
                                           ValueDecl *RenameDecl,
                                           ASTContext &Context) {
-
   llvm::VersionTuple Introduced =
       Inferred.Introduced.value_or(llvm::VersionTuple());
   llvm::VersionTuple Deprecated =
@@ -135,26 +134,33 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // a per-platform basis.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
-    for (const DeclAttribute *Attr : D->getAttrs()) {
-      auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
-      if (!AvAttr || AvAttr->isInvalid())
-        continue;
+    do {
+      for (const DeclAttribute *Attr : D->getAttrs()) {
+        auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
+        if (!AvAttr || AvAttr->isInvalid())
+          continue;
 
-      mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
 
-      if (Message.empty() && !AvAttr->Message.empty())
-        Message = AvAttr->Message;
+        if (Message.empty() && !AvAttr->Message.empty())
+          Message = AvAttr->Message;
 
-      if (Rename.empty() && !AvAttr->Rename.empty()) {
-        Rename = AvAttr->Rename;
-        RenameDecl = AvAttr->RenameDecl;
+        if (Rename.empty() && !AvAttr->Rename.empty()) {
+          Rename = AvAttr->Rename;
+          RenameDecl = AvAttr->RenameDecl;
+        }
       }
-    }
+
+      // Walk up the enclosing declaration hierarchy to make sure we aren't
+      // missing any inherited attributes.
+      D = AvailabilityInference::parentDeclForInferredAvailability(D);
+    } while (D);
   }
+
+  DeclAttributes &Attrs = ToDecl->getAttrs();
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
-  DeclAttributes &Attrs = ToDecl->getAttrs();
   for (auto &Pair : Inferred) {
     auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
                                      Rename, RenameDecl, Context);
@@ -165,7 +171,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
 /// Returns the decl that should be considered the parent decl of the given decl
 /// when looking for inherited availability annotations.
-static Decl *parentDeclForAvailability(const Decl *D) {
+const Decl *
+AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
   if (auto *AD = dyn_cast<AccessorDecl>(D))
     return AD->getStorage();
 
@@ -173,6 +180,12 @@ static Decl *parentDeclForAvailability(const Decl *D) {
     if (auto *NTD = ED->getExtendedNominal())
       return NTD;
   }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
+    return PBD->getAnchoringVarDecl(0);
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(D))
+    return OTD->getNamingDecl();
 
   // Clang decls may be inaccurately parented rdar://53956555
   if (D->hasClangNode())
@@ -230,7 +243,8 @@ SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
           decl, decl->getASTContext()))
     return std::make_pair(attr, decl);
 
-  if (auto *parent = parentDeclForAvailability(decl))
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticAvailableRangeAttr();
 
   return None;
@@ -262,7 +276,8 @@ SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator,
   if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext()))
     return std::make_pair(attr, decl);
 
-  if (auto *parent = parentDeclForAvailability(decl))
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl))
     return parent->getSemanticUnavailableAttr();
 
   return None;
@@ -474,6 +489,10 @@ AvailabilityContext ASTContext::getBackDeployedConcurrencyAvailability() {
   return getSwift51Availability();
 }
 
+AvailabilityContext ASTContext::getConcurrencyDistributedActorWithCustomExecutorAvailability() {
+  return getSwift59Availability();
+}
+
 AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
@@ -627,6 +646,28 @@ AvailabilityContext ASTContext::getSwift57Availability() {
   }
 }
 
+AvailabilityContext ASTContext::getSwift58Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(13, 3, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(16, 4, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9, 4, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift59Availability() {
+  // TODO: Update Availability impl when Swift 5.9 is released
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 
@@ -635,10 +676,10 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isiOS()) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isWatchOS()) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
@@ -656,6 +697,8 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 5: return getSwift55Availability();
     case 6: return getSwift56Availability();
     case 7: return getSwift57Availability();
+    case 8: return getSwift58Availability();
+    case 9: return getSwift59Availability();
     default: break;
     }
   }

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -109,12 +110,7 @@ static bool contains(const SetLike &setLike, Item item) {
 /// By default, all imports are included.
 static void getImmediateImports(
     ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &imports,
-    ModuleDecl::ImportFilter importFilter = {
-        ModuleDecl::ImportFilterKind::Exported,
-        ModuleDecl::ImportFilterKind::Default,
-        ModuleDecl::ImportFilterKind::ImplementationOnly,
-        ModuleDecl::ImportFilterKind::SPIAccessControl,
-        ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay}) {
+    ModuleDecl::ImportFilter importFilter = ModuleDecl::getImportFilterAll()) {
   SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 

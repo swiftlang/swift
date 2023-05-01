@@ -26,19 +26,22 @@ public struct Types : MyProto {
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
-// CHECK-NEXT:        "type": "ExtractTypes.TypeA.Type"
+// CHECK-NEXT:        "type": "ExtractTypes.TypeA"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeAV"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
-// CHECK-NEXT:        "type": "ExtractTypes.TypeB.Type"
+// CHECK-NEXT:        "type": "ExtractTypes.TypeB"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeBO"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
-// CHECK-NEXT:        "type": "ExtractTypes.TypeC.Type"
+// CHECK-NEXT:        "type": "ExtractTypes.TypeC"
+// CHECK-NEXT:        "mangledName": "12ExtractTypes5TypeCC"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ]

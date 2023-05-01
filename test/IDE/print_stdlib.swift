@@ -1,6 +1,10 @@
 // Check interface produced for the standard library.
 //
 // REQUIRES: nonexecutable_test
+// REQUIRES: swift_swift_parser
+// FIXME: Swift parser is not enabled on Linux CI yet.
+// REQUIRES: OS=macosx
+
 //
 // RUN: %target-swift-frontend -typecheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface > %t.txt
@@ -68,3 +72,8 @@
 // CHECK-GROUPS1-DAG: Collection/Type-erased
 // CHECK-GROUPS1-NOT: <NULL>
 // CHECK-GROUPS1: Module groups end.
+
+/// Check that we can still print the interface of the stdlib with
+/// deserialization safety enabled.
+// RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface -enable-deserialization-safety > %t-group.txt
+// RUN: %FileCheck -check-prefix=CHECK-GROUPS1 %s < %t-group.txt

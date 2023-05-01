@@ -1,5 +1,8 @@
 // RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s
 
+// Note: test has not been updated to match the swift-syntax style.
+// REQUIRES: newswiftsyntaxstyle
+
 1 + 2
 
 func foo(a: Int, b: Int) {

@@ -125,7 +125,7 @@ private:
 /// across other code.
 static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
   for (SILInstruction &I : *BB) {
-    if (I.getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
+    if (I.getMemoryBehavior() == MemoryBehavior::None)
       continue;
     if (auto *CF = dyn_cast<CondFailInst>(&I)) {
       // Allow cond_fail if the condition is "produced" by a builtin in the
@@ -221,7 +221,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // This optimization works with all kind of terminators, except those which
   // have side-effects, like try_apply.
   TermInst *Condition = CommonBranchBlock->getTerminator();
-  if (Condition->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
+  if (Condition->getMemoryBehavior() != MemoryBehavior::None)
     return false;
 
   // Are there any other branch block successors beside the predecessors which

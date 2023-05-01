@@ -553,8 +553,8 @@ func rdar_48114578() {
   struct S<T> {
     var value: T
 
-    static func valueOf<T>(_ v: T) -> S<T> {
-      return S<T>(value: v)
+    static func valueOf<U>(_ v: U) -> S<U> {
+      return S<U>(value: v)
     }
   }
 
@@ -801,4 +801,17 @@ func test_leading_dot_syntax_unknown_base_ambiguity() {
   func fn<T: Hashable>(_: String, value: T?) {}
 
   fn("", value: .member) // expected-error {{cannot infer contextual base in reference to member 'member'}}
+}
+
+// rdar://105348781 - failed to produce a diagnostic when passing optional to unrelated type.
+func test_mismatch_between_param_and_optional_chain() {
+  func fn(_: String) {}
+
+  struct Test {
+    var data: [Int]?
+
+    func test() {
+      fn(data?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String'}}
+    }
+  }
 }

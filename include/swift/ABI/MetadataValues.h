@@ -49,6 +49,10 @@ enum {
   /// in a default actor.
   NumWords_DefaultActor = 12,
 
+  /// The number of words (in addition to the heap-object header)
+  /// in a non-default distributed actor.
+  NumWords_NonDefaultDistributedActor = 12,
+
   /// The number of words in a task.
   NumWords_AsyncTask = 24,
 
@@ -138,6 +142,7 @@ const size_t MaximumAlignment = 16;
 
 /// The alignment of a DefaultActor.
 const size_t Alignment_DefaultActor = MaximumAlignment;
+const size_t Alignment_NonDefaultDistributedActor = MaximumAlignment;
 
 /// The alignment of a TaskGroup.
 const size_t Alignment_TaskGroup = MaximumAlignment;
@@ -163,7 +168,8 @@ public:
     IsNonBitwiseTakable = 0x00100000,
     HasEnumWitnesses =    0x00200000,
     Incomplete =          0x00400000,
-    // unused             0xFF800000,
+    IsNonCopyable =       0x00800000,
+    // unused             0xFF000000,
   };
 
   static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
@@ -209,8 +215,8 @@ public:
                                    (isInline ? 0 : IsNonInline));
   }
 
-  /// True if values of this type can be copied with memcpy and
-  /// destroyed with a no-op.
+  /// True if values of this type can be copied with memcpy (if it's copyable)
+  /// and destroyed with a no-op.
   bool isPOD() const { return !(Data & IsNonPOD); }
   constexpr TargetValueWitnessFlags withPOD(bool isPOD) const {
     return TargetValueWitnessFlags((Data & ~IsNonPOD) |
@@ -226,6 +232,13 @@ public:
   constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  
+  /// True if values of this type can be copied.
+  bool isCopyable() const { return !(Data & IsNonCopyable); }
+  constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
+    return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
+                                   (isCopyable ? 0 : IsNonCopyable));
   }
 
   /// True if this type's binary representation is that of an enum, and the
@@ -853,6 +866,7 @@ private:
     HasSuggestedValueWitnesses  = 0x00000400U,
     HasImplicitReqSigParams     = 0x00000800U,
     HasImplicitGenSigParams     = 0x00001000U,
+    HasTypePacks                = 0x00002000U,
   };
   int_type Data;
 
@@ -893,6 +907,12 @@ public:
     return ExtendedExistentialTypeShapeFlags(
       implicit ? (Data | HasImplicitGenSigParams)
                : (Data & ~HasImplicitGenSigParams));
+  }
+  constexpr ExtendedExistentialTypeShapeFlags
+  withTypePacks(bool hasTypePacks) const {
+    return ExtendedExistentialTypeShapeFlags(
+      hasTypePacks ? (Data | HasTypePacks)
+                   : (Data & ~HasTypePacks));
   }
 
   /// Is this a special kind of existential?
@@ -937,6 +957,14 @@ public:
   /// they must match GenericParamDescriptor::implicit().
   bool hasImplicitGenSigParams() const {
     return Data & HasImplicitGenSigParams;
+  }
+
+  /// Whether the generic context has type parameter packs. This
+  /// occurs when the existential has a superclass requirement
+  /// whose class declaration has a type parameter pack, eg
+  /// `any P & C<...>` with `class C<each T> {}`.
+  bool hasTypePacks() const {
+    return Data & HasTypePacks;
   }
 
   int_type getIntValue() const {
@@ -1445,6 +1473,8 @@ namespace SpecialPointerAuthDiscriminators {
 
   // Relative protocol witness table descriminator
   const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
+
+  const uint16_t TypeLayoutString = 0x8b65; // = 35685
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1598,6 +1628,9 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// prespecializations.
     HasCanonicalMetadataPrespecializations = 3,
 
+    /// Set if the metadata contains a pointer to a layout string
+    HasLayoutString = 4,
+
     // Type-specific flags:
 
     /// Set if the class is an actor.
@@ -1679,6 +1712,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
+                                hasLayoutString,
+                                setHasLayoutString)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
@@ -1780,34 +1817,64 @@ public:
                                 setHasMangledName)
 };
 
+class GenericContextDescriptorFlags {
+  uint16_t Value;
+
+public:
+  constexpr GenericContextDescriptorFlags() : Value(0) {}
+
+  explicit constexpr GenericContextDescriptorFlags(uint16_t value)
+    : Value(value) {}
+
+  constexpr GenericContextDescriptorFlags(bool hasTypePacks)
+    : GenericContextDescriptorFlags(
+        GenericContextDescriptorFlags((uint16_t)0)
+          .withHasTypePacks(hasTypePacks)) {}
+
+  /// Whether this generic context has at least one type parameter
+  /// pack, in which case the generic context will have a trailing
+  /// GenericPackShapeHeader.
+  constexpr bool hasTypePacks() const {
+    return (Value & 0x1) != 0;
+  }
+
+  constexpr GenericContextDescriptorFlags
+  withHasTypePacks(bool hasTypePacks) const {
+    return GenericContextDescriptorFlags((uint16_t)(
+      (Value & ~0x1) | (hasTypePacks ? 0x1 : 0)));
+  }
+
+  constexpr uint16_t getIntValue() const {
+    return Value;
+  }
+};
+
 enum class GenericParamKind : uint8_t {
   /// A type parameter.
   Type = 0,
+
+  /// A type parameter pack.
+  TypePack = 1,
 
   Max = 0x3F,
 };
 
 class GenericParamDescriptor {
+  /// Don't set 0x40 for compatibility with pre-Swift 5.8 runtimes
   uint8_t Value;
 
   explicit constexpr GenericParamDescriptor(uint8_t Value)
     : Value(Value) {}
 public:
   constexpr GenericParamDescriptor(GenericParamKind kind,
-                                   bool hasKeyArgument,
-                                   bool hasExtraArgument)
+                                   bool hasKeyArgument)
     : GenericParamDescriptor(GenericParamDescriptor(0)
                          .withKind(kind)
-                         .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument))
+                         .withKeyArgument(hasKeyArgument))
   {}
 
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
-  }
-
-  constexpr bool hasExtraArgument() const {
-    return (Value & 0x40u) != 0;
   }
 
   constexpr GenericParamKind getKind() const {
@@ -1818,12 +1885,6 @@ public:
   withKeyArgument(bool hasKeyArgument) const {
     return GenericParamDescriptor((Value & 0x7Fu)
       | (hasKeyArgument ? 0x80u : 0));
-  }
-
-  constexpr GenericParamDescriptor
-  withExtraArgument(bool hasExtraArgument) const {
-    return GenericParamDescriptor((Value & 0xBFu)
-      | (hasExtraArgument ? 0x40u : 0));
   }
 
   constexpr GenericParamDescriptor withKind(GenericParamKind kind) const {
@@ -1847,8 +1908,7 @@ public:
   /// The default parameter descriptor for an implicit parameter.
   static constexpr GenericParamDescriptor implicit() {
     return GenericParamDescriptor(GenericParamKind::Type,
-                                  /*key argument*/ true,
-                                  /*extra argument*/ false);
+                                  /*key argument*/ true);
   }
 };
 
@@ -1878,11 +1938,14 @@ enum class GenericRequirementKind : uint8_t {
   /// A "same-conformance" requirement, implied by a same-type or base-class
   /// constraint that binds a parameter with protocol requirements.
   SameConformance = 3,
-  /// A layout constraint.
+  /// A same-shape requirement between generic parameter packs.
+  SameShape = 4,
+  /// A layout requirement.
   Layout = 0x1F,
 };
 
 class GenericRequirementFlags {
+  /// Don't set 0x40 for compatibility with pre-Swift 5.8 runtimes
   uint32_t Value;
 
   explicit constexpr GenericRequirementFlags(uint32_t Value)
@@ -1890,19 +1953,22 @@ class GenericRequirementFlags {
 public:
   constexpr GenericRequirementFlags(GenericRequirementKind kind,
                                     bool hasKeyArgument,
-                                    bool hasExtraArgument)
+                                    bool isPackRequirement)
     : GenericRequirementFlags(GenericRequirementFlags(0)
                          .withKind(kind)
                          .withKeyArgument(hasKeyArgument)
-                         .withExtraArgument(hasExtraArgument))
+                         .withPackRequirement(isPackRequirement))
   {}
 
   constexpr bool hasKeyArgument() const {
     return (Value & 0x80u) != 0;
   }
 
-  constexpr bool hasExtraArgument() const {
-    return (Value & 0x40u) != 0;
+  /// If this is true, the subject type of the requirement is a pack.
+  /// When the requirement is a conformance requirement, the corresponding
+  /// entry in the generic arguments array becomes a TargetWitnessTablePack.
+  constexpr bool isPackRequirement() const {
+    return (Value & 0x20u) != 0;
   }
 
   constexpr GenericRequirementKind getKind() const {
@@ -1916,9 +1982,9 @@ public:
   }
 
   constexpr GenericRequirementFlags
-  withExtraArgument(bool hasExtraArgument) const {
+  withPackRequirement(bool isPackRequirement) const {
     return GenericRequirementFlags((Value & 0xBFu)
-      | (hasExtraArgument ? 0x40u : 0));
+      | (isPackRequirement ? 0x20u : 0));
   }
 
   constexpr GenericRequirementFlags
@@ -1935,6 +2001,11 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+enum class GenericPackKind : uint16_t {
+  Metadata = 0,
+  WitnessTable = 1
 };
 
 class GenericEnvironmentFlags {

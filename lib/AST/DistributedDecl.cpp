@@ -56,7 +56,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;

@@ -455,6 +455,13 @@
               key.usr: <usr>,
               key.line: 50,
               key.column: 19
+            },
+            {
+              key.kind: source.lang.swift.ref.class,
+              key.usr: <usr>,
+              key.line: 50,
+              key.column: 19,
+              key.is_implicit: 1
             }
           ],
           key.effective_access: source.decl.effective_access.internal

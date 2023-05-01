@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-move-only %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -enable-experimental-move-only %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-sil %s | %FileCheck -check-prefix=SIL %s
 
 // This test makes sure that in various situations (ignoring errors), we
 // properly handle deinits with move only types.
@@ -9,7 +9,7 @@ public struct FD {
     var i = 5
 }
 
-public func borrowVal(_ e : __shared FD) {}
+public func borrowVal(_ e : borrowing FD) {}
 public func consumeVal(_ s: __owned FD) {}
 
 // CHECK: sil hidden [ossa] @$s22moveonly_deinit_access0B17AccessConsumeTestyyAA2FDVzF : $@convention(thin) (@inout FD) -> () {

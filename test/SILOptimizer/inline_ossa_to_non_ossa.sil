@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline | %FileCheck %s
+
+import Builtin
+
+sil @paable : $@convention(thin) (Builtin.Int64) -> ()
+
+sil [ossa] @partial_apply_on_stack_nesting_violator : $@convention(thin) () -> () {
+    %paable = function_ref @paable : $@convention(thin) (Builtin.Int64) -> ()
+    %one = integer_literal $Builtin.Int64, 1
+    %first = partial_apply [callee_guaranteed] [on_stack] %paable(%one) : $@convention(thin) (Builtin.Int64) -> ()
+    %two = integer_literal $Builtin.Int64, 2
+    %second = partial_apply [callee_guaranteed] [on_stack] %paable(%two) : $@convention(thin) (Builtin.Int64) -> ()
+    // Note that the destroy_values do not occur in an order which coincides
+    // with stack disciplined dealloc_stacks.
+    destroy_value %first : $@noescape @callee_guaranteed () -> ()
+    destroy_value %second : $@noescape @callee_guaranteed () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that when inlining partial_apply_on_stack_nesting_violator, the stack
+// nesting of the on_stack closures is fixed.
+// CHECK-LABEL: sil @test_inline_stack_violating_ossa_func : {{.*}} {
+// CHECK:         [[PAABLE:%[^,]+]] = function_ref @paable
+// CHECK:         [[FIRST:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         [[SECOND:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         dealloc_stack [[SECOND]]
+// CHECK:         dealloc_stack [[FIRST]]
+// CHECK-LABEL: } // end sil function 'test_inline_stack_violating_ossa_func'
+sil @test_inline_stack_violating_ossa_func : $@convention(thin) () -> () {
+    %callee = function_ref @partial_apply_on_stack_nesting_violator : $@convention(thin) () -> ()
+    apply %callee() : $@convention(thin) () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+

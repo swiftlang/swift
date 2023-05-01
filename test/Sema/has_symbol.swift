@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol/has_symbol_helper.swift -enable-library-evolution
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t -enable-experimental-feature ResultBuilderASTTransform
 
 // UNSUPPORTED: OS=windows-msvc
 

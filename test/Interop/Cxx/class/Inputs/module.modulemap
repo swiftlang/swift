@@ -136,3 +136,8 @@ module ConformsTo {
   header "conforms-to.h"
   requires cplusplus
 }
+
+module CopyMoveAssignment {
+  header "copy-move-assignment.h"
+  requires cplusplus
+}

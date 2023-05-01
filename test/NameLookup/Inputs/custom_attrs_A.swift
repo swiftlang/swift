@@ -9,5 +9,5 @@ public struct Wrapper<Value> {
 
 @resultBuilder
 public struct Builder {
-  static func buildBlock<T>(_ component: T) -> T { component }
+  public static func buildBlock<T>(_ component: T) -> T { component }
 }

@@ -9,7 +9,9 @@
 // Verify that symbolic interface is not emitted without interop.
 //
 // RUN: rm -r %t/store/interfaces
-// RUN: %target-swift-frontend %t/test.swift -I %t -c -index-system-modules -index-store-path %t/store -Rindexing-system-module 2>&1 | %FileCheck --check-prefix=REMARK_NONE %s
+// RUN: %target-swift-frontend %t/test.swift -I %t -c -index-system-modules -index-store-path %t/store -Rindexing-system-module 2>&1 > %t/out
+// RUN: echo "non-empty-file-check" >> %t/out
+// RUN: cat %t/out | %FileCheck --check-prefix=REMARK_NONE %s
 // RUN: not ls %t/store/interfaces
 
 // REQUIRES: objc_interop

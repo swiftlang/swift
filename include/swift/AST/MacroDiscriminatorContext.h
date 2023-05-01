@@ -31,6 +31,10 @@ struct MacroDiscriminatorContext
   static MacroDiscriminatorContext getParentOf(
       SourceLoc loc, DeclContext *origDC
   );
+
+  /// Return the innermost declaration context that is suitable for
+  /// use in identifying a macro.
+  static DeclContext *getInnermostMacroContext(DeclContext *dc);
 };
 
 }

@@ -57,7 +57,7 @@ RequirementMachine::getLocalRequirements(
 
   GenericSignature::LocalRequirements result;
   result.anchor = Map.getTypeForTerm(term, genericParams);
-  result.packShape = getReducedShape(depType);
+  result.packShape = getReducedShape(depType, genericParams);
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
@@ -244,10 +244,19 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
              "Protocol symbol can only appear at the start of a type term");
       break;
 
-    case Symbol::Kind::GenericParam:
+    case Symbol::Kind::GenericParam: {
       assert(prefix.empty() &&
              "Generic parameter symbol can only appear at the start of a type term");
+
+      if (std::find_if(Params.begin(), Params.end(),
+                       [&](Type otherParam) -> bool {
+                         return otherParam->isEqual(symbol.getGenericParam());
+                       }) == Params.end()) {
+        return prefix;
+      }
+
       break;
+    }
 
     case Symbol::Kind::AssociatedType: {
       const auto *props = Map.lookUpProperties(prefix);
@@ -355,6 +364,17 @@ Type RequirementMachine::getReducedType(
   return type.transformRec([&](Type t) -> Optional<Type> {
     if (!t->hasTypeParameter())
       return t;
+
+    // The reduced type of a PackExpansionType has a reduced *shape* for
+    // the count type.
+    if (auto *packExpansionType = t->getAs<PackExpansionType>()) {
+      auto reducedPattern = getReducedType(packExpansionType->getPatternType(),
+                                           genericParams);
+      auto reducedShape = packExpansionType->getCountType();
+      if (reducedShape->isParameterPack())
+        reducedShape = getReducedShape(reducedShape, genericParams);
+      return Type(PackExpansionType::get(reducedPattern, reducedShape));
+    }
 
     if (!t->isTypeParameter())
       return None;
@@ -718,12 +738,12 @@ RequirementMachine::getReducedShapeTerm(Type type) const {
   return reducedTerm;
 }
 
-Type RequirementMachine::getReducedShape(Type type) const {
+Type RequirementMachine::getReducedShape(Type type,
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
   if (!type->isParameterPack())
     return Type();
 
-  return Map.getTypeForTerm(getReducedShapeTerm(type),
-                            getGenericParams());
+  return Map.getTypeForTerm(getReducedShapeTerm(type), genericParams);
 }
 
 bool RequirementMachine::haveSameShape(Type type1, Type type2) const {

@@ -432,6 +432,9 @@ public:
   /// the same shape equivalence class.
   bool haveSameShape(Type type1, Type type2) const;
 
+  /// Returns all unique shape classes defined by this generic signature.
+  SmallVector<CanType, 2> getShapeClasses() const;
+
   /// Get the ordinal of a generic parameter in this generic signature.
   ///
   /// For example, if you have a generic signature for a nested context like:

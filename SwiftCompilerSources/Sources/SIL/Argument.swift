@@ -20,7 +20,7 @@ public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {
-    return SILArgument_getParent(bridged).block
+    return bridged.getParent().block
   }
 
   var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
@@ -40,7 +40,7 @@ public class Argument : Value, Hashable {
 
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
-    SILArgument_getConvention(bridged).convention
+    bridged.getConvention().convention
   }
 }
 
@@ -122,10 +122,26 @@ public enum ArgumentConvention {
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
 
+  /// This argument is a value pack of mutable references to storage,
+  /// which the function is being given exclusive access to.  The elements
+  /// must be passed indirectly.
+  case packInout
+
+  /// This argument is a value pack, and ownership of the elements is being
+  /// transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packOwned
+
+  /// This argument is a value pack, and ownership of the elements is not
+  /// being transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packGuaranteed
+
   public var isIndirect: Bool {
     switch self {
     case .indirectIn, .indirectInGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout, .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
       return false
@@ -134,20 +150,23 @@ public enum ArgumentConvention {
 
   public var isIndirectIn: Bool {
     switch self {
-    case .indirectIn, .indirectInGuaranteed:
+    case .indirectIn, .indirectInGuaranteed,
+         .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout:
       return false
     }
   }
 
   public var isGuaranteed: Bool {
     switch self {
-    case .indirectInGuaranteed, .directGuaranteed:
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed:
       return true
     case .indirectIn, .directOwned, .directUnowned,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectOut,
+         .packInout, .packOwned:
       return false
     }
   }
@@ -157,7 +176,10 @@ public enum ArgumentConvention {
     case .indirectIn,
          .indirectOut,
          .indirectInGuaranteed,
-         .indirectInout:
+         .indirectInout,
+         .packInout,
+         .packOwned,
+         .packGuaranteed:
       return true
 
     case .indirectInoutAliasable,
@@ -171,7 +193,8 @@ public enum ArgumentConvention {
   public var isInout: Bool {
     switch self {
     case .indirectInout,
-         .indirectInoutAliasable:
+         .indirectInoutAliasable,
+         .packInout:
       return true
 
     case .indirectIn,
@@ -179,7 +202,9 @@ public enum ArgumentConvention {
          .indirectInGuaranteed,
          .directUnowned,
          .directGuaranteed,
-         .directOwned:
+         .directOwned,
+         .packOwned,
+         .packGuaranteed:
       return false
     }
   }
@@ -196,14 +221,17 @@ extension BridgedArgument {
 extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
-      case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case ArgumentConvention_Indirect_Inout:          return .indirectInout
-      case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable
-      case ArgumentConvention_Indirect_Out:            return .indirectOut
-      case ArgumentConvention_Direct_Owned:            return .directOwned
-      case ArgumentConvention_Direct_Unowned:          return .directUnowned
-      case ArgumentConvention_Direct_Guaranteed:       return .directGuaranteed
+      case .Indirect_In:             return .indirectIn
+      case .Indirect_In_Guaranteed:  return .indirectInGuaranteed
+      case .Indirect_Inout:          return .indirectInout
+      case .Indirect_InoutAliasable: return .indirectInoutAliasable
+      case .Indirect_Out:            return .indirectOut
+      case .Direct_Owned:            return .directOwned
+      case .Direct_Unowned:          return .directUnowned
+      case .Direct_Guaranteed:       return .directGuaranteed
+      case .Pack_Inout:              return .packInout
+      case .Pack_Owned:              return .packOwned
+      case .Pack_Guaranteed:         return .packGuaranteed
       default:
         fatalError("unsupported argument convention")
     }

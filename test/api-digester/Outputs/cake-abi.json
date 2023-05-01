@@ -920,55 +920,6 @@
             ],
             "fixedbinaryorder": 2,
             "hasStorage": true
-          },
-          {
-            "kind": "Var",
-            "name": "unavailableProperty",
-            "printedName": "unavailableProperty",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Int",
-                "printedName": "Swift.Int",
-                "usr": "s:Si"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivp",
-            "mangledName": "$s4cake17fixedLayoutStructV19unavailablePropertySivp",
-            "moduleName": "cake",
-            "declAttributes": [
-              "HasInitialValue",
-              "Available",
-              "HasStorage"
-            ],
-            "fixedbinaryorder": 3,
-            "isLet": true,
-            "hasStorage": true,
-            "accessors": [
-              {
-                "kind": "Accessor",
-                "name": "Get",
-                "printedName": "Get()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "Int",
-                    "printedName": "Swift.Int",
-                    "usr": "s:Si"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivg",
-                "mangledName": "$s4cake17fixedLayoutStructV19unavailablePropertySivg",
-                "moduleName": "cake",
-                "implicit": true,
-                "declAttributes": [
-                  "Transparent"
-                ],
-                "accessorKind": "get"
-              }
-            ]
           }
         ],
         "declKind": "Struct",

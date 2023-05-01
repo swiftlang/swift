@@ -398,6 +398,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(PackExpansion);
   NO_REFERENCE(PackElement);
+  NO_REFERENCE(MaterializePack);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -488,7 +489,12 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
     llvm::function_ref<Expr *(Expr *)> callback;
     Expr *ThisNode;
-    
+
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
@@ -532,6 +538,11 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
 void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
     llvm::function_ref<Expr *(Expr *)> callback;
+
+    /// Only walk the arguments of a macro, to represent the source as written.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
 
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
@@ -757,6 +768,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
   case ExprKind::PackElement:
+  case ExprKind::MaterializePack:
     return false;
 
   case ExprKind::Call:
@@ -853,6 +865,11 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   public:
     llvm::DenseMap<Expr *, Expr *> &ParentMap;
 
+    /// Walk everything that's available.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
 
@@ -936,6 +953,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::VarargExpansion:
   case ExprKind::PackExpansion:
   case ExprKind::PackElement:
+  case ExprKind::MaterializePack:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -1265,6 +1283,11 @@ void PackExpansionExpr::getExpandedPacks(SmallVectorImpl<ASTNode> &packs) {
   struct PackCollector : public ASTWalker {
     llvm::SmallVector<ASTNode, 2> packs;
 
+    /// Walk everything that's available.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::ArgumentsAndExpansion;
+    }
+
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into nested pack expansions
       if (isa<PackExpansionExpr>(E)) {
@@ -1300,6 +1323,14 @@ PackElementExpr *
 PackElementExpr::create(ASTContext &ctx, SourceLoc eachLoc, Expr *packRefExpr,
                         bool implicit, Type type) {
   return new (ctx) PackElementExpr(eachLoc, packRefExpr, implicit, type);
+}
+
+MaterializePackExpr *
+MaterializePackExpr::create(ASTContext &ctx, Expr *fromExpr,
+                            SourceLoc elementLoc,
+                            Type type, bool implicit) {
+  return new (ctx) MaterializePackExpr(fromExpr, elementLoc,
+                                       type, implicit);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -2493,11 +2524,7 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
     if (!BS)
       continue;
 
-    auto elts = BS->getElements();
-    if (elts.size() != 1)
-      continue;
-
-    auto *S = elts.front().dyn_cast<Stmt *>();
+    auto *S = BS->getSingleActiveStatement();
     if (!S)
       continue;
 
@@ -2584,7 +2611,7 @@ ArrayRef<Expr *> SingleValueStmtExpr::getSingleExprBranches(
     auto *BS = dyn_cast<BraceStmt>(branch);
     if (!BS)
       continue;
-    if (auto *E = BS->getSingleExpressionElement())
+    if (auto *E = BS->getSingleActiveExpression())
       scratch.push_back(E);
   }
   return scratch;
@@ -2685,16 +2712,34 @@ TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
   return createImpl(ctx, joinType.getPointer(), /*elements*/ {}, arena, SVE);
 }
 
+MacroExpansionExpr::MacroExpansionExpr(
+    DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
+    DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
+    ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
+    ArgumentList *argList, MacroRoles roles, bool isImplicit,
+    Type ty
+) : Expr(ExprKind::MacroExpansion, isImplicit, ty), DC(dc),
+    Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
+  ASTContext &ctx = dc->getASTContext();
+  info = new (ctx) MacroExpansionInfo{
+      sigilLoc, macroName, macroNameLoc,
+      leftAngleLoc, rightAngleLoc, genericArgs,
+      argList ? argList : ArgumentList::createImplicit(ctx, {})
+  };
+
+  Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
+}
+
 SourceRange MacroExpansionExpr::getSourceRange() const {
   SourceLoc endLoc;
-  if (ArgList && !ArgList->isImplicit())
-    endLoc = ArgList->getEndLoc();
-  else if (RightAngleLoc.isValid())
-    endLoc = RightAngleLoc;
+  if (info->ArgList && !info->ArgList->isImplicit())
+    endLoc = info->ArgList->getEndLoc();
+  else if (info->RightAngleLoc.isValid())
+    endLoc = info->RightAngleLoc;
   else
-    endLoc = MacroNameLoc.getEndLoc();
+    endLoc = info->MacroNameLoc.getEndLoc();
 
-  return SourceRange(SigilLoc, endLoc);
+  return SourceRange(info->SigilLoc, endLoc);
 }
 
 unsigned MacroExpansionExpr::getDiscriminator() const {
@@ -2712,6 +2757,18 @@ unsigned MacroExpansionExpr::getDiscriminator() const {
 
   assert(getRawDiscriminator() != InvalidDiscriminator);
   return getRawDiscriminator();
+}
+
+MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() {
+  auto dc = DC;
+  if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
+    dc = tlcd->getDeclContext();
+  SubstituteDecl = new (DC->getASTContext()) MacroExpansionDecl(dc, info);
+  return SubstituteDecl;
+}
+
+MacroExpansionDecl *MacroExpansionExpr::getSubstituteDecl() const {
+  return SubstituteDecl;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

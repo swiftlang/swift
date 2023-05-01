@@ -12,7 +12,9 @@
 
 #include "SILGen.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -30,6 +32,16 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // We don't need to emit dependent conformances.
   if (conformanceRef.isAbstract())
     return;
+
+  // Recursively visit pack conformances.
+  if (conformanceRef.isPack()) {
+    auto *packConformance = conformanceRef.getPack();
+
+    for (auto patternConformanceRef : packConformance->getPatternConformances())
+      useConformance(patternConformanceRef);
+
+    return;
+  }
 
   auto conformance = conformanceRef.getConcrete();
 

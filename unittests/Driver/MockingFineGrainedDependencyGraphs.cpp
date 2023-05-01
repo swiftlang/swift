@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 
 #include <array>
 #include <unordered_map>
@@ -48,12 +49,13 @@ mocking_fine_grained_dependency_graphs::getChangesForSimulatedLoad(
 
   SourceManager sm;
   DiagnosticEngine diags(sm);
+  llvm::vfs::OnDiskOutputBackend backend;
 
   auto sfdg =
       UnitTestSourceFileDepGraphFactory(
           hadCompilationError, swiftDeps, interfaceHash,
           g.emitFineGrainedDependencyDotFileAfterEveryImport,
-          dependencyDescriptions, diags)
+          dependencyDescriptions, diags, backend)
           .construct();
 
   return g.loadFromSourceFileDepGraph(cmd, sfdg, diags);

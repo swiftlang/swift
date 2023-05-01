@@ -74,8 +74,7 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 // CHECK-LABEL: sil hidden [ossa] @$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 
 // CHECK: [[LOOP_DEST]]:
@@ -104,8 +103,7 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK-LABEL: sil hidden [ossa] @$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 
 // CHECK: [[LOOP_DEST]]:
@@ -161,8 +159,7 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK-LABEL: sil hidden [ossa] @$s13foreach_async26trivialStructContinueBreakyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> ()
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
-// CHECK:   [[ITERATOR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ITERATOR_BOX]]
-// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
+// CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 
 // CHECK: [[LOOP_DEST]]:

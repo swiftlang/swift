@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
 //
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
@@ -36,6 +36,6 @@ public func test() {
   _ = x.test()
 }
 
-// CHECK-LABEL: sil [clang IntPair.create] @{{_ZN7IntPair6createEv|\?create\@IntPair\@\@SAPEAU1\@XZ}} : $@convention(c) () -> IntPair
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang IntPair.create] @{{_ZN7IntPair6createEv|\?create\@IntPair\@\@SAPEAU1\@XZ}} : $@convention(c) () -> IntPair
 
-// CHECK-LABEL: sil [clang IntPair.test] @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed IntPair) -> Int32
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang IntPair.test] @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed IntPair) -> Int32

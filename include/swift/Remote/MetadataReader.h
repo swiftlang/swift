@@ -1244,6 +1244,9 @@ public:
       case GenericRequirementKind::Layout:
         return TypeLookupError(
             "Unexpected layout requirement in runtime generic signature");
+      case GenericRequirementKind::SameShape:
+        return TypeLookupError(
+            "Unexpected same-shape requirement in runtime generic signature");
       }
     }
 
@@ -2771,6 +2774,9 @@ private:
             }
             break;
           }
+
+          case GenericRequirementKind::SameShape:
+            llvm_unreachable("Implement me");
           }
         }
 
@@ -2953,19 +2959,13 @@ private:
           // Only consider generic contexts of type class, enum or struct.
           // There are other context types that can be generic, but they should
           // not affect the generic shape.
-          if (current->getKind() == ContextDescriptorKind::Class ||
-              current->getKind() == ContextDescriptorKind::Enum ||
-              current->getKind() == ContextDescriptorKind::Struct) {
-            if (genericContext) {
-              auto contextHeader = genericContext->getGenericContextHeader();
-              paramsPerLevel.emplace_back(contextHeader.NumParams -
-                                          runningCount);
-              runningCount += paramsPerLevel.back();
-            } else {
-              // If there is no generic context, this is a non-generic type
-              // which has 0 generic parameters.
-              paramsPerLevel.emplace_back(0);
-            }
+          if (genericContext &&
+              (current->getKind() == ContextDescriptorKind::Class ||
+               current->getKind() == ContextDescriptorKind::Enum ||
+               current->getKind() == ContextDescriptorKind::Struct)) {
+            auto contextHeader = genericContext->getGenericContextHeader();
+            paramsPerLevel.emplace_back(contextHeader.NumParams - runningCount);
+            runningCount += paramsPerLevel.back();
           }
         };
     countLevels(descriptor, runningCount);
@@ -3020,11 +3020,6 @@ private:
     for (auto param : generics->getGenericParams()) {
       switch (param.getKind()) {
       case GenericParamKind::Type:
-        // We don't know about type parameters with extra arguments.
-        if (param.hasExtraArgument()) {
-          return {};
-        }
-        
         // The type should have a key argument unless it's been same-typed
         // to another type.
         if (param.hasKeyArgument()) {
@@ -3051,6 +3046,9 @@ private:
         }
         break;
         
+      case GenericParamKind::TypePack:
+        assert(false && "Packs not supported here yet");
+
       default:
         // We don't know about this kind of parameter.
         return {};

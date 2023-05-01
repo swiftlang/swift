@@ -178,7 +178,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
@@ -188,7 +188,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
           &returnedSingleTermOperands) const;
 
@@ -218,10 +218,6 @@ protected:
   }
 };
 
-inline SILArgument *castToArgument(SwiftObject argument) {
-  return static_cast<SILArgument *>(argument);
-}
-
 class SILPhiArgument : public SILArgument {
   friend class SILBasicBlock;
 
@@ -240,6 +236,9 @@ public:
   /// Return true if this is block argument is a phi, as opposed to a terminator
   /// result.
   bool isPhi() const;
+
+  /// Whether any of the values incoming to this phi are lexical.
+  bool isLexical() const;
 
   /// Return true if this block argument is a terminator result.
   bool isTerminatorResult() const { return !isPhi(); }
@@ -291,7 +290,7 @@ public:
   ///
   /// Returns false when called on a non-phi and when the visitor returns false.
   bool visitTransitiveIncomingPhiOperands(
-      function_ref<bool(SILPhiArgument *, Operand *)> visitor);
+      function_ref<bool(SILPhiArgument *, Operand *)> visitor) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -300,7 +299,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
@@ -310,7 +309,7 @@ public:
   /// Note: this peeks through any projections or cast implied by the
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
-  bool getSingleTerminatorOperands(
+  [[nodiscard]] bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
           &returnedSingleTermOperands) const;
 
@@ -339,12 +338,14 @@ class SILFunctionArgument : public SILArgument {
       ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isCapture = false)
+      bool isCapture = false,
+      bool isParameterPack = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {
     sharedUInt32().SILFunctionArgument.noImplicitCopy = isNoImplicitCopy;
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = lifetimeAnnotation;
     sharedUInt32().SILFunctionArgument.closureCapture = isCapture;
+    sharedUInt32().SILFunctionArgument.parameterPack = isParameterPack;
   }
 
   // A special constructor, only intended for use in
@@ -368,6 +369,23 @@ public:
   }
   void setClosureCapture(bool newValue) {
     sharedUInt32().SILFunctionArgument.closureCapture = newValue;
+  }
+
+  /// Is this parameter a pack that corresponds to multiple
+  /// formal parameters?  (This could mean multiple ParamDecl*s,
+  /// or it could mean a ParamDecl* that's a pack expansion.)  Note
+  /// that not all lowered parameters of pack type are parameter packs:
+  /// they can be part of a single formal parameter of tuple type.
+  /// This flag indicates that the lowered parameter has a one-to-many
+  /// relationship with formal parameters.
+  ///
+  /// TODO: preserve the parameter pack references in SIL in a side table
+  /// instead of using a single bit.
+  bool isFormalParameterPack() const {
+    return sharedUInt32().SILFunctionArgument.parameterPack;
+  }
+  void setFormalParameterPack(bool isPack) {
+    sharedUInt32().SILFunctionArgument.parameterPack = isPack;
   }
 
   LifetimeAnnotation getLifetimeAnnotation() const {
@@ -413,6 +431,7 @@ public:
     setNoImplicitCopy(arg->isNoImplicitCopy());
     setLifetimeAnnotation(arg->getLifetimeAnnotation());
     setClosureCapture(arg->isClosureCapture());
+    setFormalParameterPack(arg->isFormalParameterPack());
   }
 
   static bool classof(const SILInstruction *) = delete;

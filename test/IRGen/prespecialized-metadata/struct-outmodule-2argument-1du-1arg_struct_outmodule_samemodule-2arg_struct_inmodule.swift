@@ -65,6 +65,7 @@ struct AnotherArgument {
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       %swift.full_type* bitcast (
 // CHECK-SAME:         <{
+// CHECK-SAME:           i8*,
 // CHECK-SAME:           i8**,
 // CHECK-SAME:           [[INT]],
 // CHECK-SAME:           %swift.type_descriptor*,
@@ -76,7 +77,7 @@ struct AnotherArgument {
 // CHECK-SAME:         }>* @"$s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
 // CHECK-SAME:     %swift.type** @"$s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMJ"
 // CHECK-SAME:   )

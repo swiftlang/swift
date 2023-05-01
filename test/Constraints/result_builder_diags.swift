@@ -5,8 +5,9 @@ enum Either<T,U> {
   case second(U)
 }
 
-@resultBuilder
-struct TupleBuilder { // expected-note {{struct 'TupleBuilder' declared here}}
+// expected-note @+2 {{add 'buildArray(_:)' to the result builder 'TupleBuilder' to add support for 'for'..'in' loops}}
+// expected-note @+1 2 {{struct 'TupleBuilder' declared here}}
+@resultBuilder struct TupleBuilder {
   static func buildBlock() -> () { }
   
   static func buildBlock<T1>(_ t1: T1) -> T1 {
@@ -78,7 +79,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{in call to function 'tuplify(_:body:)'}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note {{'tuplify(_:body:)' declared here}}
   print(body(cond))
 }
 
@@ -88,9 +89,9 @@ func tuplifyWithoutIf<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T)
 
 func testDiags() {
   // For loop
-  tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+  tuplify(true) { _ in
     17
-    for c in name {
+    for c in name { // expected-error {{closure containing control flow statement cannot be used with result builder 'TupleBuilder'}}
     // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
@@ -299,8 +300,8 @@ struct MyTuplifiedStruct {
 
   @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the result builder}}{{3-17=}}
     if condition {
+      // expected-note@+1 {{remove 'return' statements to apply the result builder}}{{7-14=}}{{+2:12-19=}}
       return 17 // expected-warning{{application of result builder 'TupleBuilder' disabled by explicit 'return' statement}}
-      // expected-note@-1{{remove 'return' statements to apply the result builder}}{{7-14=}}{{12-19=}}
     } else {
            return 42
     }
@@ -464,7 +465,7 @@ struct TestConstraintGenerationErrors {
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+    tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
@@ -622,7 +623,7 @@ func wrapperifyInfer<T, U>(_ cond: Bool, @WrapperBuilder body: (U) -> T) -> T {
 }
 
 let intValue = 17
-wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closure parameter 'x' in the current context}}
+_ = wrapperifyInfer(true) { x in // Ok
   intValue + x
 }
 
@@ -732,7 +733,7 @@ struct TuplifiedStructWithInvalidClosure {
 
   @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
     tuplify(true) { _ in
-      tuplify { _ in
+      tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
         self. // expected-error {{expected member name following '.'}}
       }
       42
@@ -998,5 +999,19 @@ func test_requirement_failure_in_buildBlock() {
         B()
       }
     }
+  }
+}
+
+func test_partially_resolved_closure_params() {
+  struct S<T> {
+    var a: String = ""
+  }
+
+  func test<T>(@TupleBuilder _: (S<T>) -> T) { // expected-note {{in call to function 'test'}}
+  }
+
+  test { // expected-error {{generic parameter 'T' could not be inferred}}
+    $0.a
+    42
   }
 }

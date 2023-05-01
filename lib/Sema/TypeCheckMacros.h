@@ -29,23 +29,20 @@ namespace swift {
 class CustomAttr;
 class Expr;
 class MacroDecl;
+class MacroExpansionExpr;
 class MacroExpansionDecl;
 class TypeRepr;
 
 /// Expands the given macro expression and type-check the result with
 /// the given expanded type.
 ///
-/// \returns the type-checked replacement expression, or NULL if the
-// macro could not be expanded.
-Expr *expandMacroExpr(
-    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType);
+/// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
+Optional<unsigned> expandMacroExpr(MacroExpansionExpr *mee);
 
-/// Expands the given macro expansion declaration, type-checks the replacement
-/// declarations, and adds them to \p results.
+/// Expands the given macro expansion declaration.
 ///
-/// \returns true if expansion succeeded, false if failed.
-bool expandFreestandingDeclarationMacro(
-    MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results);
+/// \returns Expansion buffer ID if expansion succeeded, \p None if failed.
+Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
 
 /// Expand the accessors for the given storage declaration based on the
 /// custom attribute that references the given macro.

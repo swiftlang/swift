@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
@@ -299,8 +300,8 @@ public:
 
 /// Determine whether an existential type conforming to this protocol
 /// requires the \c any syntax.
-class ExistentialRequiresAnyRequest :
-    public SimpleRequest<ExistentialRequiresAnyRequest,
+class HasSelfOrAssociatedTypeRequirementsRequest :
+    public SimpleRequest<HasSelfOrAssociatedTypeRequirementsRequest,
                          bool(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:
@@ -2133,7 +2134,8 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determines the specifier for a parameter (inout, __owned, etc).
+/// Determines the ownership specifier for a parameter
+/// (inout/consuming/borrowing)
 class ParamSpecifierRequest
     : public SimpleRequest<ParamSpecifierRequest,
                            ParamSpecifier(ParamDecl *),
@@ -2216,6 +2218,74 @@ public:
   bool isCached() const { return true; }
   Optional<NamedPattern *> getCachedResult() const;
   void cacheResult(NamedPattern *P) const;
+};
+
+class ExprPatternMatchResult {
+  VarDecl *MatchVar;
+  Expr *MatchExpr;
+
+  friend class ExprPattern;
+
+  // Should only be used as the default value for the request, as the caching
+  // logic assumes the request always produces a non-null result.
+  ExprPatternMatchResult(llvm::NoneType)
+      : MatchVar(nullptr), MatchExpr(nullptr) {}
+
+public:
+  ExprPatternMatchResult(VarDecl *matchVar, Expr *matchExpr)
+      : MatchVar(matchVar), MatchExpr(matchExpr) {
+    // Note the caching logic currently requires the request to produce a
+    // non-null result.
+    assert(matchVar && matchExpr);
+  }
+
+  VarDecl *getMatchVar() const { return MatchVar; }
+  Expr *getMatchExpr() const { return MatchExpr; }
+};
+
+/// Compute the match VarDecl and expression for an ExprPattern, which applies
+/// the \c ~= operator.
+class ExprPatternMatchRequest
+    : public SimpleRequest<ExprPatternMatchRequest,
+                           ExprPatternMatchResult(const ExprPattern *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExprPatternMatchResult evaluate(Evaluator &evaluator,
+                                  const ExprPattern *EP) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ExprPatternMatchResult> getCachedResult() const;
+  void cacheResult(ExprPatternMatchResult result) const;
+};
+
+/// Creates a corresponding ExprPattern from the original Expr of an
+/// EnumElementPattern. This needs to be a cached request to ensure we don't
+/// generate multiple ExprPatterns along different constraint solver paths.
+class EnumElementExprPatternRequest
+    : public SimpleRequest<EnumElementExprPatternRequest,
+                           ExprPattern *(const EnumElementPattern *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExprPattern *evaluate(Evaluator &evaluator,
+                        const EnumElementPattern *EEP) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 class InterfaceTypeRequest :
@@ -3173,6 +3243,12 @@ public:
   friend llvm::hash_code hash_value(const UnresolvedMacroReference &ref) {
     return reinterpret_cast<ptrdiff_t>(ref.pointer.getOpaqueValue());
   }
+
+  friend SourceLoc extractNearestSourceLoc(
+      const UnresolvedMacroReference &ref
+  ) {
+    return ref.getSigilLoc();
+  }
 };
 
 void simple_display(llvm::raw_ostream &out,
@@ -3182,7 +3258,7 @@ void simple_display(llvm::raw_ostream &out,
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
                            ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                                           const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3192,10 +3268,13 @@ private:
 
   ConcreteDeclRef
   evaluate(Evaluator &evaluator, UnresolvedMacroReference macroRef,
-           DeclContext *dc) const;
+           const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
+
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 class ResolveTypeEraserTypeRequest
@@ -3352,6 +3431,27 @@ public:
 /// same file are consistently using \c @_spiOnly.
 class CheckInconsistentSPIOnlyImportsRequest
     : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Report default imports if other imports of the same target from this
+/// module have an explicitly defined access level. In such a case, all imports
+/// of the target module need an explicit access level or it may be made public
+/// by error. This applies only to pre-Swift 6 mode.
+class CheckInconsistentAccessLevelOnImport
+    : public SimpleRequest<CheckInconsistentAccessLevelOnImport,
                            evaluator::SideEffect(SourceFile *),
                            RequestFlags::Cached> {
 public:
@@ -3813,7 +3913,7 @@ public:
 /// Find the definition of a given macro.
 class ExpandMacroExpansionDeclRequest
     : public SimpleRequest<ExpandMacroExpansionDeclRequest,
-                           ArrayRef<Decl *>(MacroExpansionDecl *),
+                           Optional<unsigned>(MacroExpansionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3821,11 +3921,33 @@ public:
 private:
   friend SimpleRequest;
 
-  ArrayRef<Decl *> evaluate(Evaluator &evaluator,
-                            MacroExpansionDecl *med) const;
+  Optional<unsigned>
+  evaluate(Evaluator &evaluator, MacroExpansionDecl *med) const;
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Expand a 'MacroExpansionExpr',
+class ExpandMacroExpansionExprRequest
+    : public SimpleRequest<ExpandMacroExpansionExprRequest,
+                           Optional<unsigned>(MacroExpansionExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Optional<unsigned>
+  evaluate(Evaluator &evaluator, MacroExpansionExpr *mee) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all accessor macros attached to the given declaration.
@@ -3846,6 +3968,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all conformance macros attached to the given declaration.
@@ -3866,6 +3990,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand all member attribute macros attached to the given
@@ -3886,6 +4012,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Expand synthesized member macros attached to the given declaration.
@@ -3905,24 +4033,39 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Load a plugin module with the given name.
-///
-///
+/// Represent a loaded plugin either an in-process library or an executable.
+class LoadedCompilerPlugin {
+  llvm::PointerUnion<LoadedLibraryPlugin *, LoadedExecutablePlugin *> ptr;
+
+public:
+  LoadedCompilerPlugin(std::nullptr_t) : ptr(nullptr) {}
+  LoadedCompilerPlugin(LoadedLibraryPlugin *ptr) : ptr(ptr){};
+  LoadedCompilerPlugin(LoadedExecutablePlugin *ptr) : ptr(ptr){};
+
+  LoadedLibraryPlugin *getAsLibraryPlugin() const {
+    return ptr.dyn_cast<LoadedLibraryPlugin *>();
+  }
+  LoadedExecutablePlugin *getAsExecutablePlugin() const {
+    return ptr.dyn_cast<LoadedExecutablePlugin *>();
+  }
+};
+
 class CompilerPluginLoadRequest
-  : public SimpleRequest<CompilerPluginLoadRequest,
-                         void *(ASTContext *, Identifier),
-                         RequestFlags::Cached> {
+    : public SimpleRequest<CompilerPluginLoadRequest,
+                           LoadedCompilerPlugin(ASTContext *, Identifier),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  void *evaluate(
-      Evaluator &evaluator, ASTContext *ctx, Identifier moduleName
-  ) const;
+  LoadedCompilerPlugin evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                Identifier moduleName) const;
 
 public:
   // Source location
@@ -3946,6 +4089,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Resolve an external macro given its module and type name.
@@ -4043,11 +4188,91 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieve the raw documentation comment of a declaration.
+class RawCommentRequest
+    : public SimpleRequest<RawCommentRequest,
+                           RawComment(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  RawComment evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the brief portion of a declaration's document comment, potentially
+/// walking to find the comment providing decl if needed.
+class SemanticBriefCommentRequest
+    : public SimpleRequest<SemanticBriefCommentRequest,
+                           StringRef(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  StringRef evaluate(Evaluator &evaluator, const Decl *D) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Checks that all of a class's \c \@objcImplementation extensions provide
+/// complete and correct implementations for their corresponding interfaces.
+/// This is done on all of a class's implementations at once to improve diagnostics.
+class TypeCheckObjCImplementationRequest
+    : public SimpleRequest<TypeCheckObjCImplementationRequest,
+                           evaluator::SideEffect(ExtensionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 void simple_display(llvm::raw_ostream &out, ResultBuilderBodyPreCheck pck);
+
+/// Computes whether a module is part of the stdlib or contained within the
+/// SDK. If no SDK was specified, falls back to whether the module was
+/// specified as a system module (ie. it's on the system search path).
+class IsNonUserModuleRequest
+    : public SimpleRequest<IsNonUserModuleRequest,
+                           bool(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+
+public:
+  bool isCached() const { return true; }
+};
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

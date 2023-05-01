@@ -45,7 +45,8 @@ class ASTScopeImpl;
 /// Walk the type representation recursively, collecting any
 /// \c OpaqueReturnTypeRepr, \c CompositionTypeRepr  or \c DeclRefTypeRepr
 /// nodes.
-CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
+CollectedOpaqueReprs collectOpaqueTypeReprs(TypeRepr *, ASTContext &ctx,
+                                            DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -239,6 +240,8 @@ enum class UnqualifiedLookupFlags {
   // This lookup should include results that are @inlinable or
   // @usableFromInline.
   IncludeUsableFromInline = 1 << 5,
+  /// This lookup should exclude any names introduced by macro expansions.
+  ExcludeMacroExpansions = 1 << 6,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -542,6 +545,17 @@ template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
 
+/// Call the given function body with each macro declaration and its associated
+/// role attribute for the given role.
+///
+/// This routine intentionally avoids calling `forEachAttachedMacro`, which
+/// triggers request cycles, and should only be used when resolving macro
+/// names for the purposes of (other) name lookup.
+void forEachPotentialResolvedMacro(
+    DeclContext *moduleScopeCtx, DeclNameRef macroName, MacroRole role,
+    llvm::function_ref<void(MacroDecl *, const MacroRoleAttr *)> body
+);
+
 } // end namespace namelookup
 
 /// Describes an inherited nominal entry.
@@ -636,6 +650,7 @@ private:
   void visitReturnStmt(ReturnStmt *) {}
   void visitYieldStmt(YieldStmt *) {}
   void visitThrowStmt(ThrowStmt *) {}
+  void visitForgetStmt(ForgetStmt *) {}
   void visitPoundAssertStmt(PoundAssertStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing in the defer is visible.

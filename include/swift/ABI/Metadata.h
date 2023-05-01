@@ -116,6 +116,15 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing a pointer to the
+/// type layout string.
+template <typename Runtime>
+struct TargetTypeMetadataLayoutPrefix {
+    TargetSignedPointer<Runtime, const uint8_t *
+                                      __ptrauth_swift_type_layout_string>
+        layoutString;
+};
+
 /// The header before a metadata object which appears on all type
 /// metadata.  Note that heap metadata are not necessarily type
 /// metadata, even for objects of a heap type: for example, objects of
@@ -124,11 +133,25 @@ struct MetadataDependency {
 /// This case can be distinguished using the isTypeMetadata() flag
 /// on ClassMetadata.
 template <typename Runtime>
-struct TargetTypeMetadataHeader {
+struct TargetTypeMetadataHeaderBase {
   /// A pointer to the value-witnesses for this type.  This is only
   /// present for type metadata.
   TargetPointer<Runtime, const ValueWitnessTable> ValueWitnesses;
 };
+
+template <typename Runtime>
+struct TargetTypeMetadataHeader
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
+
+  TargetTypeMetadataHeader() = default;
+  constexpr TargetTypeMetadataHeader(
+    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
+    const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
+        TargetTypeMetadataHeaderBase<Runtime>(header) {}
+};
+
 using TypeMetadataHeader = TargetTypeMetadataHeader<InProcess>;
 
 /// A "full" metadata pointer is simply an adjusted address point on a
@@ -284,6 +307,17 @@ public:
     return isAnyKindOfClass(getKind());
   }
 
+  const uint8_t *getLayoutString() const {
+    assert(hasLayoutString());
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(
+                     this))
+          ->layoutString;
+    }
+    return asFullMetadata(this)->layoutString;
+  }
+
   const ValueWitnessTable *getValueWitnesses() const {
     return asFullMetadata(this)->ValueWitnesses;
   }
@@ -294,6 +328,23 @@ public:
 
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
+  }
+
+  void setLayoutString(const uint8_t *layoutString) {
+    if (isAnyClass()) {
+      asFullMetadata(reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->layoutString = layoutString;
+    } else {
+      asFullMetadata(this)->layoutString = layoutString;
+    }
+  }
+
+  bool hasLayoutString() const {
+    if (auto *contextDescriptor = getTypeContextDescriptor()) {
+      return contextDescriptor->hasLayoutString();
+    }
+
+    return false;
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value
@@ -445,7 +496,7 @@ protected:
 /// The common structure of opaque metadata.  Adds nothing.
 template <typename Runtime>
 struct TargetOpaqueMetadata {
-  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+  typedef TargetTypeMetadataHeaderBase<Runtime> HeaderType;
 
   // We have to represent this as a member so we can list-initialize it.
   TargetMetadata<Runtime> base;
@@ -469,13 +520,16 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetHeapMetadataHeaderPrefix<Runtime>,
-      TargetTypeMetadataHeader<Runtime> {
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetHeapMetadataHeaderPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
-      const TargetTypeMetadataHeader<Runtime> &typePrefix)
-    : TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeader<Runtime>(typePrefix) {}
+      const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
+    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
+      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;
@@ -1511,6 +1565,7 @@ using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
                                     uint32_t numElements,
@@ -1696,6 +1751,7 @@ struct TargetExistentialTypeMetadata
       TargetExistentialTypeMetadata<Runtime>,
       ConstTargetMetadataPointer<Runtime, TargetMetadata>,
       TargetProtocolDescriptorRef<Runtime>> {
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
@@ -1877,7 +1933,13 @@ struct TargetExtendedExistentialTypeShape
       GenericParamDescriptor,
       // Requirements for requirement signature, followed by requirements
       // for generalization signature
-      TargetGenericRequirementDescriptor<Runtime>> {
+      TargetGenericRequirementDescriptor<Runtime>,
+      // Optional header describing any type packs in the generalization
+      // signature.
+      GenericPackShapeHeader,
+      // For each type pack in the generalization signature, a descriptor
+      // storing the shape class.
+      GenericPackShapeDescriptor> {
 private:
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
@@ -1890,7 +1952,9 @@ private:
       TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
-      TargetGenericRequirementDescriptor<Runtime>>;
+      TargetGenericRequirementDescriptor<Runtime>,
+      GenericPackShapeHeader,
+      GenericPackShapeDescriptor>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1913,8 +1977,19 @@ private:
          + (Flags.hasImplicitGenSigParams() ? 0 : getNumGenSigParams());
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeHeader>) const {
+    return (Flags.hasTypePacks() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
+    if (!Flags.hasTypePacks())
+      return 0;
+
+    return getGenSigPackShapeHeader().NumTypePacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *
@@ -1961,7 +2036,8 @@ public:
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
-    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
+    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
+            {0, 0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2040,7 +2116,8 @@ public:
 
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
-    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
+    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors()};
   }
 
   unsigned getNumGenSigParams() const {
@@ -2067,6 +2144,20 @@ public:
   getGenSigRequirements() const {
     assert(hasGeneralizationSignature());
     return getReqSigRequirements() + ReqSigHeader.NumRequirements;
+  }
+
+  GenericPackShapeHeader getGenSigPackShapeHeader() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericPackShapeHeader>();
+  }
+
+  const GenericPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return nullptr;
+    return this->template getTrailingObjects<GenericPackShapeDescriptor>();
   }
 
   /// Return the amount of space used in ExtendedExistentialTypeMetadata
@@ -3642,6 +3733,10 @@ public:
     return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
   }
 
+  bool hasLayoutString() const {
+    return getTypeContextDescriptorFlags().hasLayoutString();
+  }
+
   /// Given that this type has foreign metadata initialization, return the
   /// control structure for it.
   const TargetForeignMetadataInitialization<Runtime> &
@@ -4806,6 +4901,76 @@ public:
             numEntries};
   }
 };
+
+enum class PackLifetime : uint8_t {
+  OnStack = 0,
+  OnHeap = 1
+};
+
+/// A pointer to a metadata or witness table pack. If the LSB is set,
+/// the pack is allocated on the heap; otherwise, it is allocated on
+/// the stack.
+template<typename Runtime, template <typename> class Pointee>
+class TargetPackPointer {
+  typename Runtime::StoredSize Ptr;
+
+  using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
+
+public:
+  explicit TargetPackPointer() : Ptr(0) {}
+
+  explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
+
+  explicit TargetPackPointer(const void *rawPtr)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(rawPtr)) {}
+
+  explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
+          (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  explicit operator bool() const {
+    return Ptr != 0;
+  }
+
+  // Strips off the LSB.
+  const PointerType *getElements() const {
+    return reinterpret_cast<const PointerType *>(Ptr & ~1);
+  }
+
+  // Strips off the LSB.
+  PointerType *getElements() {
+    return reinterpret_cast<PointerType *>(Ptr & ~1);
+  }
+
+  // Leaves the LSB.
+  const PointerType *getPointer() const {
+    return reinterpret_cast<const PointerType *>(Ptr);
+  }
+
+  PackLifetime getLifetime() const {
+    return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
+  }
+
+  // Get the number of elements in the pack, only valid for on-heap packs.
+  size_t getNumElements() const {
+    if (getLifetime() == PackLifetime::OnHeap)
+      return *(reinterpret_cast<const size_t *>(Ptr & ~1) - 1);
+
+    fatalError(0, "Cannot get length of on-stack pack");
+  }
+};
+
+/// A pointer to a metadata pack.
+template<typename Runtime>
+using TargetMetadataPackPointer = TargetPackPointer<Runtime, TargetMetadata>;
+
+using MetadataPackPointer = TargetMetadataPackPointer<InProcess>;
+
+/// A pointer to a witness table pack.
+template<typename Runtime>
+using TargetWitnessTablePackPointer = TargetPackPointer<Runtime, TargetWitnessTable>;
+
+using WitnessTablePackPointer = TargetWitnessTablePackPointer<InProcess>;
 
 } // end namespace swift
 

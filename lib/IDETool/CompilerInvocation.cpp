@@ -173,9 +173,14 @@ bool ide::initCompilerInvocation(
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
+  // Derive 'swiftc' path from 'swift-frontend' path (swiftExecutablePath).
+  SmallString<256> driverPath(swiftExecutablePath);
+  llvm::sys::path::remove_filename(driverPath);
+  llvm::sys::path::append(driverPath, "swiftc");
+
   bool InvocationCreationFailed =
       driver::getSingleFrontendInvocationFromDriverArguments(
-          Args, Diags,
+          driverPath, Args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
             return Invocation.parseArgs(
                 FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,
@@ -278,8 +283,11 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   ClangArgList.insert(ClangArgList.end(), ArgList.begin(), ArgList.end());
 
   // Create a new Clang compiler invocation.
+  clang::CreateInvocationOptions CIOpts;
+  CIOpts.Diags = ClangDiags;
+  CIOpts.ProbePrecompiled = true;
   std::unique_ptr<clang::CompilerInvocation> ClangInvok =
-      clang::createInvocationFromCommandLine(ClangArgList, ClangDiags);
+      clang::createInvocation(ClangArgList, std::move(CIOpts));
   if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
     for (auto I = DiagBuf.err_begin(), E = DiagBuf.err_end(); I != E; ++I) {
       Error += I->second;

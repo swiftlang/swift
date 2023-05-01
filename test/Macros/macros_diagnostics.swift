@@ -1,12 +1,15 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature Macros -module-name MacrosTest
+// REQUIRES: swift_swift_parser
+
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
 // expected-warning@-3{{@expression has been removed in favor of @freestanding(expression)}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
-// expected-warning@-1{{external macro definitions are now written using #externalMacro}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
+// expected-warning@-1{{external macro definitions are now written using #externalMacro}}
 // expected-warning@-2{{external macro implementation type}}
+// expected-note@-3{{use '#externalMacro'}}{{57-82=#externalMacro(module: "MissingModule", type: "MissingType")}}
 @freestanding(expression) macro missingMacro2(_: Any) = #externalMacro(module: "MissingModule", type: "MissingType")
 // expected-warning@-1{{external macro implementation type}}
 
@@ -14,7 +17,7 @@ protocol P { }
 
 @freestanding(expression) macro tryToHide<T: P>(_: T) -> some P = #externalMacro(module: "BuiltinMacros", type: "Blah")
 // expected-error@-1{{some' types are only permitted in properties, subscripts, and functions}}
-// expected-error@-2{{generic parameter 'T' could not be inferred}}
+// expected-warning@-2{{external macro implementation type}}
 
 internal struct X { } // expected-note{{type declared here}}
 
@@ -61,6 +64,15 @@ func overloaded1(_ p: Any) { }
 @freestanding(expression) macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingType") // expected-note{{'notOverloaded1' previously declared here}}
 // expected-warning@-1{{external macro implementation type}}
 @freestanding(expression) macro notOverloaded1(_ p: P) = #externalMacro(module: "MissingModule", type: "MissingOtherType") // expected-error{{invalid redeclaration of 'notOverloaded1'}}
+// expected-warning@-1{{external macro implementation type}}
+
+// Overloading based on generic constraint.
+public protocol ResultBuilder {
+}
+
+@freestanding(expression) public macro ApplyBuilder<R: ResultBuilder>(resultBuilder: R.Type, to closure: () -> Void) -> (() -> String) = #externalMacro(module: "MacroExamplesPlugin", type: "ResultBuilderMacro")
+// expected-warning@-1{{external macro implementation type}}
+@freestanding(expression)  public macro ApplyBuilder<R>(resultBuilder: R.Type, to closure: () -> Void) -> (() -> String) = #externalMacro(module: "MacroExamplesPlugin", type: "ResultBuilderMacro2")
 // expected-warning@-1{{external macro implementation type}}
 
 @freestanding(expression) macro intIdentity(value: Int, _: Float) -> Int = #externalMacro(module: "MissingModule", type: "MissingType")
@@ -137,5 +149,43 @@ func testExternalMacroOutOfPlace() {
 
 @freestanding(expression)
 public macro macroWithDefaults(_: Int = 17) = #externalMacro(module: "A", type: "B")
-// expected-error@-1{{default arguments are not allowed in macros}}
-// expected-warning@-2{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+// expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+// expected-note@-2{{'macroWithDefaults' declared here}}
+
+func callMacroWithDefaults() {
+  _ = #macroWithDefaults()
+  // expected-error@-1 {{external macro implementation type 'A.B' could not be found for macro 'macroWithDefaults'}}
+}
+
+// Make sure we don't allow macros to prevent type folding.
+@attached(member)
+public macro MacroOrType() = #externalMacro(module: "A", type: "MacroOrType")
+// expected-warning@-1{{external macro implementation type}}
+
+@freestanding(codeItem, names: named(foo))
+public macro badCodeItemMacro() = #externalMacro(module: "A", type: "B")
+// expected-error@-2{{'codeItem' macros are not allowed to introduce names}}
+// expected-warning@-2{{external macro implementation type 'A.B' could not be found}}
+
+struct MacroOrType {
+  typealias Nested = Int
+}
+
+func test() {
+  let _: [MacroOrType.Nested] = []
+  _ = [MacroOrType.Nested]()
+}
+
+// Make sure we have the right declaration context for type-checking the result
+// types of macros. At one point, we would reject the following macro.
+protocol MyProto {
+}
+struct MyStruct<T: MyProto> {
+}
+
+@freestanding(expression) macro myMacro<T : MyProto>(_ value: MyStruct<T>) -> MyStruct<T> = #externalMacro(module: "A", type: "B")
+// expected-warning@-1{{external macro implementation type}}
+
+#undefinedMacro { definitelyNotDefined }
+// expected-error@-1{{cannot find 'definitelyNotDefined' in scope}}
+// expected-error@-2{{no macro named 'undefinedMacro'}}

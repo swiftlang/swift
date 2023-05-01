@@ -19,6 +19,7 @@
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
@@ -218,7 +219,8 @@ public:
                      llvm::function_ref<void()> body) {
     if (!optionalKind || optionalKind == OTK_None)
       return body();
-    os << "Swift::Optional<";
+    printBaseName(moduleContext->getASTContext().getStdlibModule());
+    os << "::Optional<";
     body();
     os << '>';
   }
@@ -610,9 +612,10 @@ static void printDirectReturnOrParamCType(
     minimalStubName.consume_front(stubTypeName);
     if (isResultType) {
       // Emit a stub that returns a value directly from swiftcc function.
-      os << "static inline void swift_interop_returnDirect_" << minimalStubName;
+      os << "static SWIFT_C_INLINE_THUNK void swift_interop_returnDirect_"
+         << minimalStubName;
       os << "(char * _Nonnull result, struct " << stubName << " value";
-      os << ") __attribute__((always_inline)) {\n";
+      os << ") {\n";
       for (size_t i = 0; i < fields.size(); ++i) {
         os << "  memcpy(result + " << fields[i].first.getQuantity() << ", "
            << "&value._" << (i + 1) << ", "
@@ -621,9 +624,9 @@ static void printDirectReturnOrParamCType(
     } else {
       // Emit a stub that is used to pass value type directly to swiftcc
       // function.
-      os << "static inline struct " << stubName << " swift_interop_passDirect_"
-         << minimalStubName;
-      os << "(const char * _Nonnull value) __attribute__((always_inline)) {\n";
+      os << "static SWIFT_C_INLINE_THUNK struct " << stubName
+         << " swift_interop_passDirect_" << minimalStubName;
+      os << "(const char * _Nonnull value) {\n";
       os << "  struct " << stubName << " result;\n";
       for (size_t i = 0; i < fields.size(); ++i) {
         os << "  memcpy(&result._" << (i + 1) << ", value + "
@@ -710,14 +713,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     os << "static ";
   }
   if (modifiers.isInline)
-    os << "inline ";
+    ClangSyntaxPrinter(os).printInlineForThunk();
 
   ClangRepresentation resultingRepresentation =
       ClangRepresentation::representable;
 
   // Print out the return type.
   if (FD->hasThrows() && outputLang == OutputLanguageMode::Cxx)
-    os << "Swift::ThrowingResult<";
+    os << "swift::ThrowingResult<";
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ return type is representable.
     {
@@ -875,10 +878,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           emitNewParam();
           os << "void * _Nonnull ";
           auto reqt = genericRequirementParam.getRequirement();
-          if (reqt.isWitnessTable())
+          if (reqt.isAnyWitnessTable())
             ClangSyntaxPrinter(os).printBaseName(reqt.getProtocol());
           else
-            assert(reqt.isMetadata());
+            assert(reqt.isAnyMetadata());
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
@@ -1047,7 +1050,8 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
 
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
-       << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+       << ">::type::returnNewValue([&](void * _Nonnull returnValue) "
+          "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
     if (!initializeWithTakeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
     } else {
@@ -1211,7 +1215,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           emitNewParam();
           auto genericRequirement = genericRequirementParam.getRequirement();
           // FIXME: Add protocol requirement support.
-          assert(genericRequirement.isMetadata());
+          assert(genericRequirement.isAnyMetadata());
           if (auto *gtpt = genericRequirement.getTypeParameter()
                                ->getAs<GenericTypeParamType>()) {
             os << "swift::TypeMetadataTrait<";
@@ -1328,17 +1332,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (hasThrows) {
     os << "  if (opaqueError != nullptr)\n";
     os << "#ifdef __cpp_exceptions\n";
-    os << "    throw (Swift::Error(opaqueError));\n";
+    os << "    throw (swift::Error(opaqueError));\n";
     os << "#else\n";
     if (resultTy->isVoid()) {
-      os << "    return Swift::Expected<void>(Swift::Error(opaqueError));\n";
+      os << "    return swift::Expected<void>(swift::Error(opaqueError));\n";
       os << "#endif\n";
     } else {
       auto directResultType = signature.getDirectResultType();
       printDirectReturnOrParamCType(
           *directResultType, resultTy, moduleContext, os, cPrologueOS,
           typeMapping, interopContext, [&]() {
-            os << "    return Swift::Expected<";
+            os << "    return swift::Expected<";
             OptionalTypeKind retKind;
             Type objTy;
             std::tie(objTy, retKind) =
@@ -1346,7 +1350,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
             auto s = printClangFunctionReturnType(objTy, retKind, const_cast<ModuleDecl *>(moduleContext),
                                                   OutputLanguageMode::Cxx);
-            os << ">(Swift::Error(opaqueError));\n";
+            os << ">(swift::Error(opaqueError));\n";
             os << "#endif\n";
 
             // Return the function result value if it doesn't throw.
@@ -1376,6 +1380,7 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1400,6 +1405,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
       resultTy, FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too");
 
+  declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1445,6 +1451,7 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isStatic, bool isDefinition,
@@ -1465,6 +1472,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1479,6 +1487,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
+    DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
     Type resultTy, bool isDefinition,
@@ -1493,6 +1502,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       printFunctionSignature(accessor, signature, "operator []", resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
     return;
@@ -1570,4 +1580,17 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
   outOfLineOS << " {\n";
   bodyPrinter(typeRefs);
   outOfLineOS << "}\n";
+}
+
+ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+    PrimitiveTypeMapping &typeMapping,
+    SwiftToClangInteropContext &interopContext, DeclAndTypePrinter &declPrinter,
+    const ModuleDecl *emittedModule, Type ty) {
+  CFunctionSignatureTypePrinterModifierDelegate delegate;
+  CFunctionSignatureTypePrinter typePrinter(
+      llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
+      interopContext, delegate, emittedModule, declPrinter,
+      FunctionSignatureTypeUse::TypeReference);
+  return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
+                           /*isInOutParam=*/false);
 }

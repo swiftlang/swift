@@ -67,6 +67,14 @@ set SWIFTPM_MODULECACHE_OVERRIDE=%build_root%\tmp\org.swift.package-manager
 set RunTest=1
 if "%1"=="-notest" set RunTest=0
 
+rem TODO(compnerd) remove this clean up code once we have had enough time for
+rem the injection to soak.
+:: Clean up old deployments as that breaks the tests
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap"
+del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\module.modulemap"
+del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
+
 call :clone_repositories %exitOnError%
 :: TODO: Disabled until we need Foundation in this build script.
 :: call :download_icu %exitOnError%
@@ -78,7 +86,6 @@ path %PATH%;%install_directory%\bin
 
 call :build_cmark %exitOnError%
 
-call :prepare_platform_modules %exitOnError%
 call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
@@ -159,22 +166,6 @@ curl -L -O "https://www.sqlite.org/2021/%file_name%" %exitOnError%
 
 goto :eof
 endlocal
-
-
-:prepare_platform_modules
-:: Create files into the right places of the Windows SDK to the files in the
-:: swift repository, in order to consider the headers of the Windows SDK a
-:: module to compile Swift code against them.
-setlocal enableextensions enabledelayedexpansion
-
-copy /y "%source_root%\swift\stdlib\public\Platform\ucrt.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\winsdk.modulemap" "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.modulemap" "%VCToolsInstallDir%\include\module.modulemap" %exitOnError%
-copy /y "%source_root%\swift\stdlib\public\Platform\vcruntime.apinotes" "%VCToolsInstallDir%\include\vcruntime.apinotes" %exitOnError%
-
-goto :eof
-endlocal
-
 
 :build_llvm
 :: Configures, builds, and installs LLVM
@@ -271,10 +262,11 @@ cmake^
     -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES^
-    -DSWIFT_ENABLE_EXPERIMENTAL_REFLECTION=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;testsuite-tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
@@ -340,6 +332,7 @@ endlocal
 setlocal enableextensions enabledelayedexpansion
 
 for /f "delims=" %%O in ('cygpath -m %install_directory%\lib\swift') do set RESOURCE_DIR=%%O
+for /f "delims=" %%O in ('cygpath -m %build_root%\swift\stdlib\windows-vfs-overlay.yaml') do set VFS_OVERLAY=%%O
 
 cmake^
     -B "%build_root%\swift-corelibs-libdispatch"^
@@ -360,8 +353,7 @@ cmake^
     -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
-    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
+    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\" -vfsoverlay %VFS_OVERLAY%"^
     -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%

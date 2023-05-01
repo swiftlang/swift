@@ -266,6 +266,8 @@ public:
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
 
+  void visit(Decl *D);
+
   // These are either not allowed at global scope or don't require
   // code emission.
   void visitImportDecl(ImportDecl *d) {}

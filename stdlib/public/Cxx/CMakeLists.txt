@@ -1,12 +1,21 @@
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../../cmake/modules)
+include(StdlibOptions)
+
 set(SWIFT_CXX_LIBRARY_KIND STATIC)
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
   set(SWIFT_CXX_LIBRARY_KIND SHARED)
 endif()
 
-add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB
+set(SWIFT_CXX_DEPS symlink_clang_headers)
+if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  list(APPEND SWIFT_CXX_DEPS copy-legacy-layouts)
+endif()
+
+add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
     CxxPair.swift
+    CxxOptional.swift
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
@@ -19,6 +28,7 @@ add_swift_target_library(swiftCxx ${SWIFT_CXX_LIBRARY_KIND} NO_LINK_NAME IS_STDL
     -Xcc -nostdinc++
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    DEPENDS ${SWIFT_CXX_DEPS}
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED)
 

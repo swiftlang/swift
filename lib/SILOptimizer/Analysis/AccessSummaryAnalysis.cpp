@@ -215,6 +215,10 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
+  case SILInstructionKind::MoveValueInst:
+    return llvm::all_of(cast<MoveValueInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:
@@ -545,6 +549,37 @@ AccessSummaryAnalysis::findSubPathAccessed(BeginAccessInst *BAI) {
   }
 
   return SubPath;
+}
+
+SILType AccessSummaryAnalysis::getSubPathType(SILType baseType,
+                                              const IndexTrieNode *subPath,
+                                              SILModule &mod,
+                                              TypeExpansionContext context) {
+  // Walk the trie to the root to collect the sequence (in reverse order).
+  llvm::SmallVector<unsigned, 4> reversedIndices;
+  const IndexTrieNode *indexTrieNode = subPath;
+  while (!indexTrieNode->isRoot()) {
+    reversedIndices.push_back(indexTrieNode->getIndex());
+    indexTrieNode = indexTrieNode->getParent();
+  }
+
+  SILType iterType = baseType;
+  for (unsigned index : llvm::reverse(reversedIndices)) {
+    if (StructDecl *decl = iterType.getStructOrBoundGenericStruct()) {
+      VarDecl *var = decl->getStoredProperties()[index];
+      iterType = iterType.getFieldType(var, mod, context);
+      continue;
+    }
+
+    if (auto tupleTy = iterType.getAs<TupleType>()) {
+      iterType = iterType.getTupleElementType(index);
+      continue;
+    }
+
+    llvm_unreachable("unexpected type in projection subpath!");
+  }
+
+  return iterType;
 }
 
 /// Returns a string representation of the SubPath

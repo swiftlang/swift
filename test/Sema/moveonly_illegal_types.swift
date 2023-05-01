@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-typecheck-verify-swift
 
 // This test focuses on the prevention of users from _writing_ types where
 // a move-only type is substituted for a generic parameter.
@@ -39,7 +39,7 @@ enum Maybe<T> {
 }
 
 struct CerebralValley<T> {
-  struct GenericBro<T> {}
+  struct GenericBro<U> {}
   struct TechBro {}
 }
 

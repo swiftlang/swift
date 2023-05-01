@@ -68,5 +68,5 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
   LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries}
   MACCATALYST_BUILD_FLAVOR "zippered")
-set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++14)
+set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++17)
 

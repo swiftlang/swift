@@ -28,6 +28,7 @@
 #include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyTypeUtils.h"
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
@@ -543,236 +544,6 @@ void Implementation::checkDestructureUsesOnBoundary() const {
         getMarkedValue(), use->getUser(), destructureUseSpan, boundary);
   }
 }
-
-static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
-  if (!structDecl || structDecl->hasUnreferenceableStorage())
-    return nullptr;
-  return structDecl;
-}
-
-namespace {
-
-struct TypeOffsetSizePair {
-  SubElementOffset startOffset = 0;
-  TypeSubElementCount size = 0;
-
-  TypeOffsetSizePair() : startOffset(0), size(0) {}
-  TypeOffsetSizePair(SILType baseType, SILFunction *fn)
-      : startOffset(0), size(baseType, fn) {}
-  TypeOffsetSizePair(SubElementOffset offset, TypeSubElementCount size)
-      : startOffset(offset), size(size) {}
-  TypeOffsetSizePair(SILValue projection, SILValue base)
-      : startOffset(*SubElementOffset::compute(projection, base)),
-        size(TypeSubElementCount(projection)) {}
-
-  IntRange<unsigned> getRange() const {
-    return range(startOffset, getEndOffset());
-  }
-
-  SubElementOffset getEndOffset() const {
-    return SubElementOffset(startOffset + size);
-  }
-
-  bool operator==(const TypeOffsetSizePair &other) const {
-    return startOffset == other.startOffset && size == other.size;
-  }
-
-  bool operator!=(const TypeOffsetSizePair &other) const {
-    return !(*this == other);
-  }
-
-  /// Given an ancestor offset \p ancestorOffset and a type called \p
-  /// ancestorType, walk one level towards this current type which is assumed to
-  /// be a child type of \p ancestorType.
-  Optional<std::pair<TypeOffsetSizePair, SILType>>
-  walkOneLevelTowardsChild(TypeOffsetSizePair ancestorOffsetSize,
-                           SILType ancestorType, SILFunction *fn) const {
-    assert(ancestorOffsetSize.size >= size &&
-           "Too large to be a child of ancestorType");
-    assert((ancestorOffsetSize.startOffset <= startOffset &&
-            startOffset <
-                (ancestorOffsetSize.startOffset + ancestorOffsetSize.size)) &&
-           "Not within the offset range of ancestor");
-
-    if (auto tupleType = ancestorType.getAs<TupleType>()) {
-      // Before we do anything, see if we have a single element tuple. If we do,
-      // just return that.
-      if (tupleType->getNumElements() == 1) {
-        return {{ancestorOffsetSize, ancestorType.getTupleElementType(0)}};
-      }
-
-      assert(ancestorOffsetSize.size > size &&
-             "Too large to be a child of ancestorType");
-
-      unsigned childOffset = ancestorOffsetSize.startOffset;
-
-      for (auto index : indices(tupleType->getElementTypes())) {
-        SILType newType = ancestorType.getTupleElementType(index);
-        unsigned newSize = TypeSubElementCount(newType, fn);
-
-        // childOffset + size(tupleChild) is the offset of the next tuple
-        // element. If our target offset is less than that, then we know that
-        // the target type must be a descendent of this tuple element type.
-        if (childOffset + newSize > startOffset) {
-          return {{{childOffset, newSize}, newType}};
-        }
-
-        // Otherwise, add the new size of this field to iterOffset so we visit
-        // our sibling type next.
-        childOffset += newSize;
-      }
-
-      // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occurred.
-      llvm_unreachable("Not a child of this type?!");
-    }
-
-    if (auto *structDecl = getFullyReferenceableStruct(ancestorType)) {
-      // Before we do anything, see if we have a single element struct. If we
-      // do, just return that.
-      auto storedProperties = structDecl->getStoredProperties();
-      if (storedProperties.size() == 1) {
-        return {{ancestorOffsetSize,
-                 ancestorType.getFieldType(storedProperties[0], fn)}};
-      }
-
-      assert(ancestorOffsetSize.size > size &&
-             "Too large to be a child of ancestorType");
-
-      unsigned childOffset = ancestorOffsetSize.startOffset;
-      for (auto *fieldDecl : storedProperties) {
-        SILType newType = ancestorType.getFieldType(fieldDecl, fn);
-        unsigned newSize = TypeSubElementCount(newType, fn);
-
-        // iterOffset + size(tupleChild) is the offset of the next tuple
-        // element. If our target offset is less than that, then we know that
-        // the target type must be a child of this tuple element type.
-        if (childOffset + newSize > startOffset) {
-          return {{{childOffset, newSize}, newType}};
-        }
-
-        // Otherwise, add the new size of this field to iterOffset so we visit
-        // our sibling type next.
-        childOffset += newSize;
-      }
-
-      // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occurred.
-      llvm_unreachable("Not a child of this type?!");
-    }
-
-    if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
-      llvm_unreachable("Cannot find child type of enum!\n");
-    }
-
-    llvm_unreachable("Hit a leaf type?! Should have handled it earlier");
-  }
-
-  /// Given an ancestor offset \p ancestorOffset and a type called \p
-  /// ancestorType, walk one level towards this current type inserting on value,
-  /// the relevant projection.
-  Optional<std::pair<TypeOffsetSizePair, SILValue>>
-  walkOneLevelTowardsChild(SILBuilderWithScope &builder, SILLocation loc,
-                           TypeOffsetSizePair ancestorOffsetSize,
-                           SILValue ancestorValue) const {
-    auto *fn = ancestorValue->getFunction();
-    SILType ancestorType = ancestorValue->getType();
-
-    assert(ancestorOffsetSize.size >= size &&
-           "Too large to be a child of ancestorType");
-    assert((ancestorOffsetSize.startOffset <= startOffset &&
-            startOffset <
-                (ancestorOffsetSize.startOffset + ancestorOffsetSize.size)) &&
-           "Not within the offset range of ancestor");
-    if (auto tupleType = ancestorType.getAs<TupleType>()) {
-      // Before we do anything, see if we have a single element tuple. If we do,
-      // just return that.
-      if (tupleType->getNumElements() == 1) {
-        auto *newValue = builder.createTupleExtract(loc, ancestorValue, 0);
-        return {{ancestorOffsetSize, newValue}};
-      }
-
-      assert(ancestorOffsetSize.size > size &&
-             "Too large to be a child of ancestorType");
-
-      unsigned childOffset = ancestorOffsetSize.startOffset;
-
-      for (auto index : indices(tupleType->getElementTypes())) {
-        SILType newType = ancestorType.getTupleElementType(index);
-        unsigned newSize = TypeSubElementCount(newType, fn);
-
-        // childOffset + size(tupleChild) is the offset of the next tuple
-        // element. If our target offset is less than that, then we know that
-        // the target type must be a descendent of this tuple element type.
-        if (childOffset + newSize > startOffset) {
-          auto *newValue =
-              builder.createTupleExtract(loc, ancestorValue, index);
-          return {{{childOffset, newSize}, newValue}};
-        }
-
-        // Otherwise, add the new size of this field to iterOffset so we visit
-        // our sibling type next.
-        childOffset += newSize;
-      }
-
-      // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occurred.
-      llvm_unreachable("Not a child of this type?!");
-    }
-
-    if (auto *structDecl = getFullyReferenceableStruct(ancestorType)) {
-      // Before we do anything, see if we have a single element struct. If we
-      // do, just return that.
-      auto storedProperties = structDecl->getStoredProperties();
-      if (storedProperties.size() == 1) {
-        auto *newValue = builder.createStructExtract(loc, ancestorValue,
-                                                     storedProperties[0]);
-        return {{ancestorOffsetSize, newValue}};
-      }
-
-      assert(ancestorOffsetSize.size > size &&
-             "Too large to be a child of ancestorType");
-
-      unsigned childOffset = ancestorOffsetSize.startOffset;
-      for (auto *fieldDecl : structDecl->getStoredProperties()) {
-        SILType newType = ancestorType.getFieldType(fieldDecl, fn);
-        unsigned newSize = TypeSubElementCount(newType, fn);
-
-        // iterOffset + size(tupleChild) is the offset of the next tuple
-        // element. If our target offset is less than that, then we know that
-        // the target type must be a child of this tuple element type.
-        if (childOffset + newSize > startOffset) {
-          auto *newValue =
-              builder.createStructExtract(loc, ancestorValue, fieldDecl);
-          return {{{childOffset, newSize}, newValue}};
-        }
-
-        // Otherwise, add the new size of this field to iterOffset so we visit
-        // our sibling type next.
-        childOffset += newSize;
-      }
-
-      // At this point, we know that our type is not a subtype of this
-      // type. Some sort of logic error occurred.
-      llvm_unreachable("Not a child of this type?!");
-    }
-
-    if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
-      llvm_unreachable("Cannot find child type of enum!\n");
-    }
-
-    llvm_unreachable("Hit a leaf type?! Should have handled it earlier");
-  }
-};
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const TypeOffsetSizePair &other) {
-  return os << "(startOffset: " << other.startOffset << ", size: " << other.size
-            << ")";
-}
-
-} // anonymous namespace
 
 #ifndef NDEBUG
 static void dumpSmallestTypeAvailable(
@@ -1412,6 +1183,14 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
               continue;
+            } else {
+              // Otherwise, put the end_borrow.
+              for (auto *succBlock : ti->getSuccessorBlocks()) {
+                auto *nextInst = &succBlock->front();
+                SILBuilderWithScope endBuilder(nextInst);
+                endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
+              }
+              continue;
             }
           }
 
@@ -1507,7 +1286,6 @@ void Implementation::cleanup() {
   // not actually completely consume.
   auto *fn = getMarkedValue()->getFunction();
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
   PrunedLivenessBoundary boundary;
   while (!interface.createdDestructures.empty()) {
     auto *inst = interface.createdDestructures.pop_back_val();
@@ -1515,8 +1293,8 @@ void Implementation::cleanup() {
     for (auto result : inst->getResults()) {
       if (result->getType().isTrivial(*fn))
         continue;
+      SSAPrunedLiveness liveness(fn, &discoveredBlocks);
       SWIFT_DEFER {
-        liveness.clear();
         discoveredBlocks.clear();
         boundary.clear();
       };
@@ -1533,8 +1311,8 @@ void Implementation::cleanup() {
     if (arg->getType().isTrivial(*fn))
       continue;
 
+    SSAPrunedLiveness liveness(fn, &discoveredBlocks);
     SWIFT_DEFER {
-      liveness.clear();
       discoveredBlocks.clear();
       boundary.clear();
     };
@@ -1542,6 +1320,7 @@ void Implementation::cleanup() {
   }
 
   // And finally do the same thing for our initial copy_value.
+  SSAPrunedLiveness liveness(fn, &discoveredBlocks);
   addCompensatingDestroys(liveness, boundary, initialValue);
 }
 
@@ -1868,7 +1647,6 @@ bool BorrowToDestructureTransform::transform() {
       // copy_value in each destination block that we originally inserted.
       {
         SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-        SSAPrunedLiveness liveness(&discoveredBlocks);
         PrunedLivenessBoundary boundary;
 
         SILBuilderWithScope builder(s);
@@ -1887,8 +1665,8 @@ bool BorrowToDestructureTransform::transform() {
 
             // If we have a copyable type, we need to insert compensating
             // destroys.
+            SSAPrunedLiveness liveness(fn, &discoveredBlocks);
             SWIFT_DEFER {
-              liveness.clear();
               discoveredBlocks.clear();
               boundary.clear();
             };

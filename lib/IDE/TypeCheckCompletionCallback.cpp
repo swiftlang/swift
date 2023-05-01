@@ -31,9 +31,9 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   if (!fallback)
     return;
 
-  SolutionApplicationTarget completionTarget(fallback->E, fallback->DC,
-                                             CTP_Unused, Type(),
-                                             /*isDiscared=*/true);
+  SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
+                                          Type(),
+                                          /*isDiscared=*/true);
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
                              [&](const Solution &S) { sawSolution(S); });
 }
@@ -136,6 +136,11 @@ void swift::ide::getSolutionSpecificVarTypes(
   }
 }
 
+void WithSolutionSpecificVarTypesRAII::setInterfaceType(VarDecl *VD, Type Ty) {
+  VD->getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{VD},
+                                            std::move(Ty));
+}
+
 bool swift::ide::isImplicitSingleExpressionReturn(ConstraintSystem &CS,
                                                   Expr *CompletionExpr) {
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
@@ -165,9 +170,8 @@ bool swift::ide::isContextAsync(const constraints::Solution &S,
   //    closure that doesn't contain any async calles. Thus the closure is
   //    type-checked as non-async, but it might get converted to an async
   //    closure based on its contextual type
-  auto target = S.solutionApplicationTargets.find(dyn_cast<ClosureExpr>(DC));
-  if (target != S.solutionApplicationTargets.end()) {
-    if (auto ContextTy = target->second.getClosureContextualType()) {
+  if (auto target = S.getTargetFor(dyn_cast<ClosureExpr>(DC))) {
+    if (auto ContextTy = target->getClosureContextualType()) {
       if (auto ContextFuncTy =
               S.simplifyType(ContextTy)->getAs<AnyFunctionType>()) {
         return ContextFuncTy->isAsync();

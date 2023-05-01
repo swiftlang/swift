@@ -136,8 +136,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-    opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
-    
+    opaqueReprs = collectOpaqueTypeReprs(repr, ctx, dc);
+
     if (opaqueReprs.empty()) {
       return nullptr;
     }
@@ -498,6 +498,63 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   }
 }
 
+/// Ensure we don't re-declare any generic parameters in the current scope,
+/// or shadow a generic parameter from an outer scope.
+void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
+  // Collect all outer generic parameters for lookup.
+  llvm::SmallDenseMap<Identifier, GenericTypeParamDecl *, 4> genericParamDecls;
+  for (auto *parentDC = dc->getParent(); parentDC != nullptr;
+       parentDC = parentDC->getParentForLookup()) {
+    if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDC)) {
+      parentDC = extensionDecl->getExtendedNominal();
+
+      // This can happen with invalid code.
+      if (parentDC == nullptr)
+        return;
+    }
+    if (auto *parentDecl = parentDC->getAsDecl()) {
+      if (auto *parentGeneric = parentDecl->getAsGenericContext()) {
+        if (auto *genericParamList = parentGeneric->getGenericParams()) {
+          for (auto *genericParamDecl : genericParamList->getParams()) {
+            if (genericParamDecl->isOpaqueType())
+              continue;
+            genericParamDecls[genericParamDecl->getName()] = genericParamDecl;
+          }
+        }
+      }
+    }
+  }
+
+  for (auto *genericParamDecl : dc->getGenericParams()->getParams()) {
+    if (genericParamDecl->isOpaqueType() || genericParamDecl->isImplicit())
+      continue;
+
+    auto found = genericParamDecls.find(genericParamDecl->getName());
+    if (found != genericParamDecls.end()) {
+      auto *existingParamDecl = found->second;
+
+      if (existingParamDecl->getDeclContext() == dc) {
+        genericParamDecl->diagnose(
+            diag::invalid_redecl,
+            genericParamDecl->getName());
+      } else {
+        genericParamDecl->diagnose(
+            diag::shadowed_generic_param,
+            genericParamDecl->getName()).warnUntilSwiftVersion(6);
+      }
+
+      if (existingParamDecl->getLoc()) {
+        existingParamDecl->diagnose(diag::invalid_redecl_prev,
+                                    existingParamDecl->getName());
+      }
+
+      continue;
+    }
+
+    genericParamDecls[genericParamDecl->getName()] = genericParamDecl;
+  }
+}
+
 ///
 /// Generic types
 ///
@@ -789,27 +846,45 @@ static std::string gatherGenericParamBindingsText(
     return "";
 
   SmallString<128> result;
+  llvm::raw_svector_ostream OS(result);
+
   for (auto gp : genericParams) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
     if (!knownGenericParams.count(canonGP))
       continue;
 
     if (result.empty())
-      result += " [with ";
+      OS << " [with ";
     else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
+      OS << "; ";
+
+    if (gp->isParameterPack())
+      OS << "each ";
+
+    OS << gp->getName().str();
+    OS << " = ";
 
     auto type = substitutions(canonGP);
     if (!type)
       return "";
 
-    result += type.getString();
+    if (auto *packType = type->getAs<PackType>()) {
+      bool first = true;
+      for (auto eltType : packType->getElementTypes()) {
+        if (first)
+          first = false;
+        else
+          OS << ", ";
+
+        OS << eltType;
+      }
+    } else {
+      OS << type.getString();
+    }
   }
 
-  result += "]";
-  return result.str().str();
+  OS << "]";
+  return std::string(result.str());
 }
 
 void TypeChecker::diagnoseRequirementFailure(
@@ -828,7 +903,9 @@ void TypeChecker::diagnoseRequirementFailure(
   const auto reqKind = req.getKind();
   switch (reqKind) {
   case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
+    diagnostic = diag::types_not_same_shape;
+    diagnosticNote = diag::same_shape_requirement;
+    break;
 
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
@@ -886,66 +963,74 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       SmallVector<ParentConditionalConformance, 2>;
 
   struct WorklistItem {
-    /// The set of requirements to check. These are either the primary set
-    /// of requirements, or the conditional requirements of the last conformance
-    /// in \c ReqsPath (if any).
-    ArrayRef<Requirement> Requirements;
+    /// The requirement to check. This is either a top-level requirement or
+    /// a conditional requirements of the last conformancein \c ReqsPath
+    /// (if any).
+    Requirement Req;
+
+    /// The substituted requirement.
+    Requirement SubstReq;
 
     /// The chain of conditional conformances that leads to the above
     /// requirement set.
-    ParentConditionalConformances ReqsPath;
+    ParentConditionalConformances Path;
 
-    WorklistItem(ArrayRef<Requirement> Requirements,
-                 ParentConditionalConformances ReqsPath)
-        : Requirements(Requirements), ReqsPath(ReqsPath) {}
+    WorklistItem(Requirement Req, Requirement SubstReq,
+                 ParentConditionalConformances Path)
+        : Req(Req), SubstReq(SubstReq), Path(Path) {}
   };
 
   bool hadSubstFailure = false;
   SmallVector<WorklistItem, 4> worklist;
 
-  worklist.emplace_back(requirements, ParentConditionalConformances{});
+  for (auto req : llvm::reverse(requirements)) {
+    auto substReq = req.subst(substitutions, LookUpConformanceInModule(module));
+    worklist.emplace_back(req, substReq, ParentConditionalConformances{});
+  }
+
   while (!worklist.empty()) {
     const auto item = worklist.pop_back_val();
 
-    const bool isPrimaryReq = item.ReqsPath.empty();
-    for (const auto &req : item.Requirements) {
-      Requirement substReq = req;
-      if (isPrimaryReq) {
-        // Primary requirements do not have substitutions applied.
-        auto resolved =
-            req.subst(substitutions, LookUpConformanceInModule(module));
-        if (!resolved.hasError()) {
-          substReq = resolved;
-        } else {
-          // Another requirement might fail later; just continue.
-          hadSubstFailure = true;
-          continue;
-        }
-      }
+    auto req = item.Req;
+    auto substReq = item.SubstReq;
 
-      ArrayRef<Requirement> conditionalRequirements;
-      if (!substReq.isSatisfied(conditionalRequirements,
-                                /*allowMissing=*/true)) {
-        return CheckGenericArgumentsResult::createRequirementFailure(
-            req, substReq, std::move(item.ReqsPath));
-      }
+    SmallVector<Requirement, 2> subReqs;
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+      break;
 
-      if (conditionalRequirements.empty()) {
-        continue;
-      }
+    case CheckRequirementResult::ConditionalConformance: {
+      assert(substReq.getKind() == RequirementKind::Conformance);
 
-      assert(req.getKind() == RequirementKind::Conformance);
-
-      auto reqsPath = item.ReqsPath;
+      auto reqsPath = item.Path;
       reqsPath.push_back({substReq.getFirstType(), substReq.getProtocolDecl()});
 
-      worklist.emplace_back(conditionalRequirements, std::move(reqsPath));
+      for (auto subReq : llvm::reverse(subReqs))
+        worklist.emplace_back(subReq, subReq, reqsPath);
+      break;
+    }
+
+    case CheckRequirementResult::PackRequirement: {
+      for (auto subReq : llvm::reverse(subReqs)) {
+        // Note: we keep the original unsubstituted pack requirement here for
+        // the diagnostic
+        worklist.emplace_back(req, subReq, item.Path);
+      }
+      break;
+    }
+
+    case CheckRequirementResult::RequirementFailure:
+      return CheckGenericArgumentsResult::createRequirementFailure(
+          req, substReq, item.Path);
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
     }
   }
 
-  if (hadSubstFailure) {
+  if (hadSubstFailure)
     return CheckGenericArgumentsResult::createSubstitutionFailure();
-  }
 
   return CheckGenericArgumentsResult::createSuccess();
 }
@@ -954,31 +1039,35 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
     ModuleDecl *module, ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> worklist;
-  bool valid = true;
+
+  bool hadSubstFailure = false;
 
   for (auto req : requirements) {
-    auto resolved = req.subst(substitutions,
-                              LookUpConformanceInModule(module), options);
-    if (!resolved.hasError()) {
-      worklist.push_back(resolved);
-    } else {
-      valid = false;
-    }
+    worklist.push_back(req.subst(substitutions,
+                              LookUpConformanceInModule(module), options));
   }
 
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
-    ArrayRef<Requirement> conditionalRequirements;
-    if (!req.isSatisfied(conditionalRequirements, /*allowMissing=*/true))
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
       return CheckGenericArgumentsResult::RequirementFailure;
 
-    worklist.append(conditionalRequirements.begin(),
-                    conditionalRequirements.end());
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
   }
 
-  if (valid)
-    return CheckGenericArgumentsResult::Success;
-  return CheckGenericArgumentsResult::SubstitutionFailure;
+  if (hadSubstFailure)
+    return CheckGenericArgumentsResult::SubstitutionFailure;
+
+  return CheckGenericArgumentsResult::Success;
 }
 
 Requirement
@@ -996,7 +1085,8 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     context = TypeResolverContext::GenericRequirement;
   }
   auto options = TypeResolutionOptions(context);
-  options |= TypeResolutionFlags::AllowPackReferences;
+  if (reqRepr.isExpansionPattern())
+    options |= TypeResolutionFlags::AllowPackReferences;
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;

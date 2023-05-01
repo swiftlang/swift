@@ -10,7 +10,6 @@ protocol MyProtocol {}
 
 func testType() {
     let a: #^TYPE^#
-// TYPE: Begin completions
 // TYPE-NOT: Keyword[import]
 // TYPE-NOT: Keyword[struct]
 // TYPE-NOT: Keyword[defer]
@@ -18,12 +17,10 @@ func testType() {
 // TYPE-DAG: Decl[Protocol]/CurrModule: MyProtocol[#MyProtocol#]; name=MyProtocol
 // TYPE-DAG: Decl[Protocol]/OtherModule[Swift]/IsSystem: IteratorProtocol[#IteratorProtocol#]; name=IteratorProtocol
 // TYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
-// TYPE: End completions
 }
 
 func testType() {
     #^EXPR^#
-// EXPR: Begin completions
 // EXPR-DAG: Keyword[import]/None/Flair[RareKeyword]: import; name=import
 // EXPR-DAG: Keyword[struct]/None/Flair[RareKeyword]: struct; name=struct
 // EXPR-DAG: Keyword[defer]/None: defer; name=defer
@@ -31,11 +28,9 @@ func testType() {
 // EXPR-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // EXPR-DAG: Decl[Protocol]/OtherModule[Swift]/Flair[RareType]/IsSystem: IteratorProtocol[#IteratorProtocol#]; name=IteratorProtocol
 // EXPR-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
-// EXPR: End completions
 }
 
 #^TOPLEVEL^#
-// TOPLEVEL: Begin completions
 // TOPLEVEL-DAG: Keyword[import]/None:       import; name=import
 // TOPLEVEL-DAG: Keyword[struct]/None/Flair[CommonKeyword]: struct; name=struct
 // TOPLEVEL-DAG: Keyword[defer]/None/Flair[ExprAtFileScope]: defer; name=defer
@@ -43,4 +38,3 @@ func testType() {
 // TOPLEVEL-DAG: Decl[Protocol]/CurrModule/Flair[RareType,ExprAtFileScope]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // TOPLEVEL-DAG: Decl[Protocol]/OtherModule[Swift]/Flair[RareType,ExprAtFileScope]/IsSystem: IteratorProtocol[#IteratorProtocol#]; name=IteratorProtocol
 // TOPLEVEL-DAG: Decl[Struct]/OtherModule[Swift]/Flair[ExprAtFileScope]/IsSystem: Int[#Int#]; name=Int
-// TOPLEVEL: End completions

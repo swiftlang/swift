@@ -575,6 +575,10 @@ public:
 
 /// Describes the role of a mangled type reference string.
 enum class MangledTypeRefRole {
+  /// The mangled type reference is used for field metadata, which is used
+  /// by both in-process and out-of-process reflection, so still requires
+  /// referenced types' metadata to be fully emitted.
+  FieldMetadata,
   /// The mangled type reference is used for normal metadata.
   Metadata,
   /// The mangled type reference is used for reflection metadata.
@@ -695,7 +699,9 @@ public:
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
   llvm::PointerType *FullBoxMetadataPtrTy;/// %swift.full_boxmetadata*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
+  llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
+  llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
   llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
   llvm::StructType *ProtocolRequirementStructTy; /// %swift.protocol_requirement
@@ -1012,7 +1018,8 @@ public:
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
                                            CanSILFunctionType funcTy);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -1240,8 +1247,12 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
-  /// List of types to generate runtime-resolvable metadata records for.
+  /// List of types to generate runtime-resolvable metadata records for that
+  /// are consumable for any Swift runtime.
   SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
+  /// List of types to generate runtime-resolvable metadata records for that
+  /// are consumable for any Swift runtime aware of noncopyable types.
+  SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes2;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -1508,7 +1519,8 @@ public:
 
   Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind);
+                         FunctionPointerKind kind,
+                         bool forStaticCall = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1585,6 +1597,7 @@ public:
                                       const ProtocolConformance *conformance);
 
   void setColocateMetadataSection(llvm::Function *f);
+  void setColocateTypeDescriptorSection(llvm::GlobalVariable *v);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,

@@ -64,9 +64,6 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The name of the package this module belongs to.
-  std::string PackageName;
-
   /// Module name to use when referenced in clients module interfaces.
   std::string ExportAsName;
 
@@ -124,6 +121,15 @@ public:
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
+
+  /// Use CAS.
+  bool EnableCAS = false;
+
+  /// The CAS Path.
+  std::string CASPath;
+
+  /// CASFS Root.
+  std::string CASFSRootID;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
@@ -406,16 +412,25 @@ public:
     /// Expose all public declarations in the generated header.
     AllPublic,
     /// Expose declarations only when they have expose attribute.
-    HasExposeAttr
+    HasExposeAttr,
+    /// Expose declarations only when they have expose attribute or are the
+    /// implicitly exposed Stdlib declarations.
+    HasExposeAttrOrImplicitDeps
   };
 
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   llvm::Optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
 
-  /// Emit C++ bindings for the exposed Swift declarations in the generated
-  /// clang header.
-  bool EnableExperimentalCxxInteropInClangHeader = false;
+  struct ClangHeaderExposedImportedModule {
+    std::string moduleName;
+    std::string headerName;
+  };
+
+  /// Indicates which imported modules have a generated header associated with
+  /// them that can be imported into the generated header for the current
+  /// module.
+  std::vector<ClangHeaderExposedImportedModule> clangHeaderExposedImports;
 
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
@@ -430,6 +445,9 @@ public:
   /// \return true if the given action requires input files to be provided.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
+  /// \return true if the given action supports caching.
+  static bool supportCompilationCaching(ActionType action);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
@@ -439,7 +457,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return llvm::hash_value(0);
+    return hash_combine(ModuleName,
+                        ModuleABIName,
+                        ModuleLinkName,
+                        ImplicitObjCHeaderPath,
+                        PrebuiltModuleCachePath,
+                        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;
@@ -492,6 +515,9 @@ public:
   /// to encode the actual paths into the .swiftmodule file.
   PathObfuscator serializedPathObfuscator;
 
+  /// Whether to run the job twice to check determinism.
+  bool DeterministicCheck = false;
+
   /// Avoid printing actual module content into the ABI descriptor file.
   /// This should only be used as a workaround when emitting ABI descriptor files
   /// crashes the compiler.
@@ -501,6 +527,8 @@ public:
   /// textual imports
   bool EmitClangHeaderWithNonModularIncludes = false;
 
+  /// All block list configuration files to be honored in this compilation.
+  std::vector<std::string> BlocklistConfigFilePaths;
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);

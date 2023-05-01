@@ -9,6 +9,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-error)
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=SwiftToCxxTest -I %t -source-filename=x -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR | %FileCheck --check-prefix=INTERFACE %s
+
 // XFAIL: OS=linux-android, OS=linux-androideabi
 
 //--- header.h
@@ -32,6 +34,8 @@ public func testFunction() -> String {
     return ""
 }
 
-// CHECK: namespace Swift __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("Swift") {
-// CHECK: namespace SwiftMod __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("SwiftMod") {
-// CHECK-NOT: namespace Swift {
+// CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
+// CHECK: namespace SwiftMod SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("SwiftMod") {
+// CHECK-NOT: namespace swift {
+
+// INTERFACE-NOT: enum swift

@@ -493,6 +493,10 @@ ERROR(cannot_convert_yield_value_protocol,none,
 ERROR(cannot_convert_yield_value_nil,none,
       "nil is not compatible with expected yield type %0", (Type))
 
+ERROR(cannot_convert_forget_value,none,
+      "cannot convert value of type %0 to expected forget type %1",
+      (Type,Type))
+
 ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
       (Type,Type))
@@ -760,6 +764,8 @@ ERROR(expect_compile_time_const,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
+NOTE(did_you_mean_cxxstdlib,none,
+      "did you mean 'CxxStdlib'?'", ())
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
       "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
@@ -807,10 +813,6 @@ ERROR(serialization_module_incompatible_revision,Fatal,
       "compiled module was created by a different version of the compiler '%0'; "
       "rebuild %1 and try again: %2",
       (StringRef, Identifier, StringRef))
-REMARK(serialization_module_problematic_revision, none,
-      "compiled module was created by a different version of the compiler '%0': "
-      "%1",
-      (StringRef, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
@@ -1005,16 +1007,26 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(in_package_module_not_compiled_from_source,none,
+      "module %0 is in package '%1' but was built from interface; "
+      "modules of the same package can only be loaded if built from source: %2",
+      (Identifier, StringRef, StringRef))
+
+WARNING(in_package_module_not_compiled_locally,none,
+        "module %0 is in package %1 but was loaded from SDK; "
+        "modules of the same package should be built locally from source only: %2",
+        (Identifier, Identifier, StringRef))
+
 ERROR(import_restriction_conflict,none,
       "module %0 cannot be both "
       "%select{implementation-only|SPI only|exported}1 and "
       "%select{implementation-only|SPI only|exported}2 ",
       (Identifier, unsigned, unsigned))
 
-WARNING(module_not_compiled_with_library_evolution,none,
-        "module %0 was not compiled with library evolution support; "
-        "using it means binary compatibility for %1 can't be guaranteed",
-        (Identifier, Identifier))
+ERROR(module_not_compiled_with_library_evolution,none,
+      "module %0 was not compiled with library evolution support; "
+      "using it means binary compatibility for %1 can't be guaranteed",
+      (Identifier, Identifier))
 
 ERROR(module_allowable_client_violation,none,
       "module %0 doesn't allow importation from module %1",
@@ -1029,6 +1041,11 @@ REMARK(module_loaded,none,
        "%select{| (overlay for a clang dependency)}1"
        "; source: '%2', loaded: '%3'",
        (Identifier, unsigned, StringRef, StringRef))
+
+REMARK(transitive_dependency_behavior,none,
+       "%1 has %select{a required|an optional|an ignored}2 "
+       "transitive dependency on '%0'",
+       (StringRef, Identifier, unsigned))
        
 REMARK(explicit_interface_build_skipped,none,
        "Skipped rebuilding module at %0 - up-to-date",
@@ -1126,6 +1143,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(single_value_stmt_branch_empty,none,
+      "expected expression in branch of '%0' expression",
+      (StmtKind))
 ERROR(single_value_stmt_branch_must_end_in_throw,none,
       "non-expression branch of '%0' expression may only end with a 'throw'",
       (StmtKind))
@@ -1172,9 +1192,9 @@ WARNING(conditional_downcast_coercion,none,
       (Type, Type))
 
 WARNING(literal_conditional_downcast_to_coercion,none,
-        "conditional downcast from literal to %0 always fails; "
+        "cast from literal of inferred type %0 to unrelated type %1 always fails; "
         "consider using 'as' coercion",
-        (Type))
+        (Type, Type))
 
 WARNING(forced_downcast_noop,none,
         "forced cast of %0 to same type has no effect", (Type))
@@ -1212,7 +1232,7 @@ ERROR(optional_chain_isnt_chaining,none,
       "'?' must be followed by a call, member lookup, or subscript",
       ())
 ERROR(pattern_in_expr,none,
-      "%0 cannot appear in an expression", (PatternKind))
+      "%0 cannot appear in an expression", (DescriptivePatternKind))
 NOTE(note_call_to_operator,none,
      "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
@@ -1403,10 +1423,13 @@ WARNING(unlabeled_trailing_closure_deprecated,Deprecation,
 NOTE(decl_multiple_defaulted_closure_parameters,none,
      "%0 contains defaulted closure parameters %1 and %2",
      (DeclName, Identifier, Identifier))
+NOTE(candidate_with_extraneous_args_closure,none,
+     "candidate %0 requires %1 argument%s1, "
+     "but %2 %select{were|was}3 used in closure body",
+     (Type, unsigned, unsigned, bool))
 NOTE(candidate_with_extraneous_args,none,
-      "candidate %0 requires %1 argument%s1, "
-      "but %2 %select{were|was}3 %select{provided|used in closure body}4",
-      (Type, unsigned, unsigned, bool, bool))
+     "candidate %0 has %1 parameter%s1, but context %2 has %3",
+     (Type, unsigned, Type, unsigned))
 
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
@@ -1587,13 +1610,55 @@ ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "%0 %1 does not match any %0 declared in the headers for %2; did you use "
       "the %0's Swift name?",
       (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
-NOTE(fixit_add_objc_for_objc_implementation,none,
-     "add '@objc' to define an Objective-C-compatible %0 not declared in "
-     "the header",
+NOTE(fixit_add_private_for_objc_implementation,none,
+     "add 'private' or 'fileprivate' to define an Objective-C-compatible %0 "
+     "not declared in the header",
      (DescriptiveDeclKind))
 NOTE(fixit_add_final_for_objc_implementation,none,
      "add 'final' to define a Swift %0 that cannot be overridden",
      (DescriptiveDeclKind))
+
+ERROR(objc_implementation_wrong_category,none,
+      "%0 %1 should be implemented in extension for "
+      "%select{main class interface|category %2}2, not "
+      "%select{main class interface|category %3}3",
+      (DescriptiveDeclKind, ValueDecl *, Identifier, Identifier))
+
+ERROR(objc_implementation_wrong_objc_name,none,
+      "selector %0 for %1 %2 not found in header; did you mean %3?",
+      (ObjCSelector, DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+
+ERROR(objc_implementation_wrong_swift_name,none,
+      "selector %0 used in header by an %1 with a different name; did you "
+      "mean %2?",
+      (ObjCSelector, DescriptiveDeclKind, DeclName))
+
+ERROR(objc_implementation_missing_impl,none,
+      "extension for %select{main class interface|category %0}0 should "
+      "provide implementation for %1 %2",
+      (Identifier, DescriptiveDeclKind, ValueDecl *))
+
+ERROR(objc_implementation_class_or_instance_mismatch,none,
+      "%0 %1 does not match %2 declared in header",
+      (DescriptiveDeclKind, ValueDecl *, DescriptiveDeclKind))
+
+ERROR(objc_implementation_multiple_matching_candidates,none,
+      "found multiple implementations that could match %0 %1 with selector %2",
+      (DescriptiveDeclKind, ValueDecl *, ObjCSelector))
+NOTE(objc_implementation_candidate_impl_here,none,
+     "%0 %1 is a potential match%select{|; insert '@objc(%3)' to use it}2",
+     (DescriptiveDeclKind, ValueDecl *, bool, StringRef))
+NOTE(objc_implementation_requirement_here,none,
+     "%0 %1 declared in header here",
+     (DescriptiveDeclKind, ValueDecl *))
+
+ERROR(objc_implementation_multiple_matching_requirements,none,
+      "%0 %1 could match several different members declared in the header",
+      (DescriptiveDeclKind, ValueDecl *))
+NOTE(objc_implementation_one_matched_requirement,none,
+     "%0 %1 (with selector %2) is a potential match%select{|; insert "
+     "'@objc(%4)' to use it}3",
+     (DescriptiveDeclKind, ValueDecl *, ObjCSelector, bool, StringRef))
 
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
@@ -1609,12 +1674,26 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
+ERROR(expose_unsupported_objc_decl_to_cxx,none,
+      "@objc %0 %1 can not yet be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_async_decl_to_cxx,none,
       "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_actor_isolated_to_cxx,none,
       "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_client_emission_to_cxx,none,
       "%0 %1 can not be exposed to C++ as it requires code to be emitted into client", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_generic_decl_to_cxx,none,
+      "generic %0 %1 can not yet be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_generic_requirement_to_cxx,none,
+      "generic requirements for %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_throwing_to_cxx,none,
+      "%0 %1 can not yet be represented in C++ as it may throw an error", (DescriptiveDeclKind, ValueDecl *))
+ERROR(expose_indirect_enum_cxx,none,
+      "indirect enum %0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_type_to_cxx,none,
+      "enum %0 can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++", (ValueDecl *))
+ERROR(expose_enum_case_tuple_to_cxx,none,
+      "enum %0 can not yet be represented in C++ as one of its cases has multiple associated values", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -1673,7 +1752,9 @@ ERROR(access_control_open_bad_decl,none,
 WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
-
+ERROR(access_control_requires_package_name, none,
+      "decl has a package access level but no -package-name was passed",
+      ())
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
@@ -1930,9 +2011,9 @@ ERROR(where_nongeneric_toplevel,none,
       "'where' clause cannot be applied to a non-generic top-level "
       "declaration", ())
 ERROR(unable_to_convert_generic_swift_types,none,
-      "could not generate C++ types from the generic Swift types provided. "
-      "The following Swift type(s) provided to '%0' could not be "
-      "converted: %1.",
+      "could not generate C++ types from the generic Swift types provided; "
+      "the following Swift type(s) provided to '%0' could not be "
+      "converted: %1",
       (StringRef, StringRef))
 
 // Type aliases
@@ -2047,6 +2128,27 @@ WARNING(spi_attribute_on_import_of_public_module,none,
 ERROR(spi_only_imports_not_enabled, none,
       "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
       ())
+
+// Access level on imports
+ERROR(access_level_on_import_not_enabled, none,
+      "Access level on imports require '-enable-experimental-feature AccessLevelOnImport'",
+      ())
+ERROR(access_level_on_import_unsupported, none,
+      "The access level %0 is unsupported on imports: "
+      "only 'public', 'package', 'internal', 'fileprivate' and 'private' "
+      "are unsupported",
+      (DeclAttribute))
+ERROR(access_level_conflict_with_exported,none,
+      "'%0' is incompatible with %1; it can only be applied to public imports",
+      (DeclAttribute, DeclAttribute))
+NOTE(module_imported_here,none,
+     "module %0 imported as '%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' here",
+     (Identifier, AccessLevel))
+NOTE(decl_import_via_here,none,
+     "%0 %1 imported as "
+     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}2' "
+     "from %3 here",
+     (DescriptiveDeclKind, DeclName, AccessLevel, Identifier))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -2238,12 +2340,14 @@ NOTE(candidate_types_equal_requirement,none,
      (Type, Type, Type, Type))
 NOTE(candidate_types_same_shape_requirement,none,
      "candidate requires that the type packs %0 and %1 have the same shape "
-     "(requirement specified as %2.shape == %3.shape)",
+     "(same-shape requirement inferred between %2 and %3)",
      (Type, Type, Type, Type))
 NOTE(candidate_types_inheritance_requirement,none,
      "candidate requires that %1 inherit from %2 "
      "(requirement specified as %2 : %3)",
      (Type, Type, Type, Type))
+NOTE(same_shape_requirement,none,
+     "same-shape requirement inferred between %0 and %1%2", (Type, Type, StringRef))
 NOTE(types_not_equal_requirement,none,
      "requirement specified as %0 == %1%2", (Type, Type, StringRef))
 ERROR(type_is_not_a_class,none,
@@ -2405,10 +2509,10 @@ WARNING(protocol_access_warn,none,
         (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 ERROR(protocol_usable_from_inline,none,
       "protocol %select{refined|used}0 by '@usableFromInline' protocol "
-      "must be '@usableForInline' or public", (bool))
+      "must be '@usableFromInline' or public", (bool))
 WARNING(protocol_usable_from_inline_warn,none,
         "protocol %select{refined|used}0 by '@usableFromInline' protocol "
-        "should be '@usableForInline' or public", (bool))
+        "should be '@usableFromInline' or public", (bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "protocols cannot require properties to be immutable; declare read-only "
       "properties by using 'var' with a '{ get }' specifier", ())
@@ -2669,6 +2773,9 @@ ERROR(requires_not_suitable_archetype,none,
 ERROR(invalid_shape_requirement,none,
       "invalid same-shape requirement between %0 and %1",
       (Type, Type))
+ERROR(unsupported_same_element,none,
+      "same-element requirements are not yet supported",
+      ())
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
@@ -2676,6 +2783,10 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
+ERROR(shadowed_generic_param,none,
+      "generic parameter %0 shadows generic parameter from outer scope with the same name",
+      (DeclName))
+
 ERROR(recursive_decl_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature,none,
@@ -3150,6 +3261,18 @@ ERROR(error_public_import_of_private_module,none,
       "private module %0 is imported publicly from the public module %1",
       (Identifier, Identifier))
 
+ERROR(inconsistent_implicit_access_level_on_import,none,
+      "ambiguous implicit access level for import of %0; it is imported as "
+      "'%select{private|fileprivate|internal|package|public|%error}1' elsewhere",
+      (Identifier, AccessLevel))
+NOTE(inconsistent_implicit_access_level_on_import_here,none,
+     "imported "
+     "'%select{private|fileprivate|internal|package|public|%error}0' here",
+     (AccessLevel))
+FIXIT(inconsistent_implicit_access_level_on_import_fixit,
+     "%select{private|fileprivate|internal|package|public|%error}0 ",
+     (AccessLevel))
+
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
 ERROR(implementation_only_override_changed_type,none,
@@ -3410,6 +3533,8 @@ ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
 ERROR(eagermove_and_lexical_combined,none,
       "@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes "
       "and can't be combined", ())
+ERROR(eagermove_and_noncopyable_combined,none,
+      "@_eagerMove cannot be applied to NonCopyable types", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -3491,6 +3616,11 @@ ERROR(attr_ApplicationMain_with_script,none,
       "%" SELECT_APPLICATION_MAIN "0 attribute cannot be used in a module that contains "
       "top-level code",
       (unsigned))
+ERROR(attr_ApplicationMain_deprecated,none,
+      "%" SELECT_APPLICATION_MAIN "0 is deprecated",
+      (unsigned))
+NOTE(attr_ApplicationMain_deprecated_use_attr_main,none,
+     "use @main instead", ())
 
 NOTE(attr_ApplicationMain_parse_as_library,none,
      "pass '-parse-as-library' to compiler invocation if this is intentional",
@@ -4109,7 +4239,8 @@ ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
-      "expected member name or constructor call after type name", ())
+      "expected member name or constructor call after type name%select{|; this "
+      "will be an error in Swift 6}0", (bool))
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())
@@ -4467,6 +4598,27 @@ ERROR(opaque_type_var_no_init,none,
 ERROR(opaque_type_var_no_underlying_type,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
+
+ERROR(forget_wrong_context_decl,none,
+      "'forget' statement cannot appear in %0",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_context_closure,none,
+      "'forget' statement cannot appear in closure",
+      ())
+ERROR(forget_wrong_context_misc,none,
+      "'forget' statement cannot appear in this context",
+      ())
+ERROR(forget_wrong_context_copyable,none,
+      "'forget' statement can only appear in noncopyable type's member",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_context_nonconsuming,none,
+      "'forget' statement can only appear in consuming %0",
+      (DescriptiveDeclKind))
+ERROR(forget_wrong_not_self,none,
+      "you can only forget 'self'", ())
+ERROR(forget_wrong_module,none,
+      "can only 'forget' from the same module defining type %0",
+      (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
@@ -5232,22 +5384,40 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
+ERROR(tuple_pack_element_label,none,
+      "cannot use label with pack expansion tuple element",
+      ())
+ERROR(tuple_move_only_not_supported,none,
+      "tuples with noncopyable elements are not supported", ())
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
+
+ERROR(experimental_type_with_parameter_pack,none,
+      "generic types with parameter packs are experimental",
+      ())
 ERROR(expansion_not_allowed,none,
-      "variadic expansion %0 cannot appear outside of a function parameter list, "
-      "function result, tuple element or generic argument list", (Type))
+      "pack expansion %0 can only appear in a function parameter list, "
+      "tuple element, or generic argument list", (Type))
+ERROR(expansion_expr_not_allowed,none,
+      "value pack expansion can only appear inside a function argument list "
+      "or tuple element", ())
+ERROR(invalid_expansion_argument,none,
+      "cannot pass value pack expansion to non-pack parameter of type %0",
+      (Type))
 ERROR(expansion_not_variadic,none,
-      "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
+      "pack expansion %0 must contain at least one pack reference", (Type))
 ERROR(pack_reference_outside_expansion,none,
-      "pack reference %0 can only appear in pack expansion or generic requirement",
+      "pack reference %0 can only appear in pack expansion ",
       (Type))
 ERROR(each_non_pack,none,
       "'each' cannot be applied to non-pack type %0",
       (Type))
-ERROR(pack_expansion_missing_pack_reference,none,
-      "pack expansion %0 must specify a pack reference",
+ERROR(pack_reference_must_be_in_expansion,none,
+      "pack reference %0 requires expansion using keyword 'repeat'",
+      (TypeRepr*))
+ERROR(pack_type_requires_keyword_each,none,
+      "pack type %0 must be referenced with 'each'",
       (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
@@ -5255,7 +5425,7 @@ ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
 
 ERROR(expansion_not_same_shape,none,
-      "variadic expansion %0 requires that %1 and %2 have the same shape",
+      "pack expansion %0 requires that %1 and %2 have the same shape",
       (Type, Type, Type))
 ERROR(expansion_expr_not_same_shape,none,
       "pack expansion requires that %0 and %1 have the same shape",
@@ -5761,6 +5931,9 @@ ERROR(borrowed_with_objc_dynamic,none,
 ERROR(borrowed_on_objc_protocol_requirement,none,
       "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
       (DescriptiveDeclKind))
+ERROR(borrowed_with_effect,none,
+      "%0 cannot be '@_borrowed' if it is 'async' or 'throws'",
+      (DescriptiveDeclKind))
 
 //------------------------------------------------------------------------------
 // MARK: dynamic
@@ -5906,10 +6079,6 @@ ERROR(availability_decl_more_than_enclosing, none,
       "%0 cannot be more available than enclosing scope",
       (DescriptiveDeclKind))
 
-WARNING(availability_decl_more_than_unavailable_enclosing, none,
-        "%0 cannot be more available than unavailable enclosing scope",
-        (DescriptiveDeclKind))
-
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
      (DescriptiveDeclKind, StringRef, llvm::VersionTuple))
@@ -5978,13 +6147,28 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
+ERROR(availability_deinit_no_potential, none,
+      "deinitializer cannot be marked potentially unavailable with "
+      "'@available'", ())
+
+ERROR(availability_deinit_no_unavailable, none,
+      "deinitializer cannot be marked unavailable with '@available'", ())
+
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
 
+ERROR(availability_global_script_no_unavailable,
+      none, "global variable cannot be marked unavailable "
+      "with '@available' in script mode", ())
+
 ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "
       "'@available'", ())
+
+ERROR(availability_stored_property_no_unavailable,
+      none, "stored properties cannot be marked unavailable with '@available'",
+      ())
 
 ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
@@ -6085,7 +6269,7 @@ ERROR(frozen_attr_on_internal_type,
       (DeclName, AccessLevel))
 
 ERROR(usable_from_inline_attr_with_explicit_access,
-      none, "'@usableFromInline' attribute can only be applied to internal "
+      none, "'@usableFromInline' attribute can only be applied to internal or package "
       "declarations, but %0 is %select{private|fileprivate|%error|package|public|open}1",
       (DeclName, AccessLevel))
 
@@ -6331,6 +6515,11 @@ WARNING(hashvalue_implementation,Deprecation,
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
 
+WARNING(executor_enqueue_unowned_implementation,Deprecation,
+        "'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Executor' by implementing 'func enqueue(Job)' instead",
+        (Type))
+
 //------------------------------------------------------------------------------
 // MARK: property wrapper diagnostics
 //------------------------------------------------------------------------------
@@ -6556,7 +6745,21 @@ ERROR(cannot_declare_computed_var_in_result_builder,none,
 ERROR(cannot_convert_result_builder_result_to_return_type,none,
       "cannot convert result builder result type %0 to return type %1",
       (Type,Type))
-
+ERROR(result_builder_buildblock_not_accessible,none,
+      "result builder must provide at least one static 'buildBlock' as "
+      "accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_first_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(first:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
+ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
+      "result builder must provide at least one static 'buildPartialBlock(accumulated:next:)' "
+      "as accessible as result builder type %0 "
+      "(which is %select{private|fileprivate|internal|package|public|open}1)",
+      (DeclName, AccessLevel))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
@@ -6674,22 +6877,23 @@ ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental move only is disabled! Pass"
       " the frontend flag -enable-experimental-move-only to swift to enable "
       "the usage of this language feature", ())
-ERROR(experimental_moveonly_feature_can_only_be_imported_when_enabled,
-      none, "Can not import module %0 that uses move only features when "
-      "experimental move only is disabled! Pass the frontend flag "
-      "-enable-experimental-move-only to swift to enable the usage of this "
-      "language feature", (Identifier))
 ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 ERROR(moveonly_generics, none, "move-only type %0 cannot be used with generics yet", (Type))
+ERROR(moveonly_effectful_getter,none,
+      "%0 of move-only type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
 ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
       "'@_noImplicitCopy' has no effect when applied to a move only type", ())
 ERROR(moveonly_enums_do_not_support_indirect,none,
       "move-only enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(moveonly_cast,none,
       "move-only types cannot be conditionally cast", ())
+ERROR(moveonly_failable_init,none,
+      "move-only types cannot have failable initializers yet", ())
+ERROR(moveonly_objc_enum_banned, none,
+      "@objc enums cannot be marked as move-only", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
@@ -6751,9 +6955,13 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' only applies to structs or enums", ())
 ERROR(move_expression_not_passed_lvalue,none,
-      "'move' can only be applied to lvalues", ())
+      "'consume' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
+
+ERROR(moveOnly_requires_lexical_lifetimes,none,
+      "noncopyable types require lexical borrow scopes "
+      "(add -enable-lexical-borrow-scopes=true)", ())
 
 //------------------------------------------------------------------------------
 // MARK: #_hasSymbol
@@ -6837,20 +7045,53 @@ ERROR(macro_unsupported,none,
       "macros are not supported in this compiler", ())
 ERROR(macro_recursive,none,
       "recursive expansion of macro %0", (DeclName))
-WARNING(macro_definition_old_style,none,
-        "external macro definitions are now written using #externalMacro", ())
-WARNING(macro_definition_unknown_builtin,none,
-        "ignoring definition of unknown builtin macro %0", (Identifier))
-ERROR(macro_definition_not_expansion,none,
-      "macro must itself be defined by a macro expansion such as "
-      "'#externalMacro(...)'", ())
 ERROR(macro_definition_unsupported,none,
       "macro definitions other than '#externalMacro(...)' are unsupported", ())
 ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
       "the external macro's %select{module|type}0", (unsigned))
-ERROR(attached_declaration_macro_not_supported,none,
-      "attached declaration macros are not yet supported", ())
+ERROR(invalid_decl_in_macro_expansion,none,
+      "macro expansion cannot introduce %0",
+      (DescriptiveDeclKind))
+ERROR(invalid_main_type_in_macro_expansion,none,
+      "macro expansion cannot introduce '@main' type",
+      ())
+ERROR(literal_type_in_macro_expansion,none,
+      "macro expansion cannot introduce default literal type %0",
+      (Identifier))
+ERROR(invalid_macro_introduced_name,none,
+      "declaration name %0 is not covered by macro %1",
+      (DeclName, DeclName))
+ERROR(global_freestanding_macro_script,none,
+      "global freestanding macros not yet supported in script mode",
+      ())
+ERROR(invalid_macro_role_for_macro_syntax,none,
+      "invalid macro role for %{a freestanding|an attached}0 macro",
+      (unsigned))
+ERROR(macro_cannot_introduce_names,none,
+      "'%0' macros are not allowed to introduce names", (StringRef))
+
+ERROR(macro_resolve_circular_reference, none,
+      "circular reference resolving %select{freestanding|attached}0 macro %1",
+      (bool, DeclName))
+NOTE(macro_resolve_circular_reference_through, none,
+     "while resolving %select{freestanding|attached}0 macro %1",
+     (bool, DeclName))
+
+ERROR(macro_expand_circular_reference, none,
+      "circular reference expanding %0 macro %1", (StringRef, DeclName))
+NOTE(macro_expand_circular_reference_through, none,
+     "circular reference expanding %0 macro %1", (StringRef, DeclName))
+
+ERROR(macro_expand_circular_reference_entity, none,
+      "circular reference expanding %0 macros on %1", (StringRef, DeclName))
+NOTE(macro_expand_circular_reference_entity_through, none,
+     "circular reference expanding %0 macros on %1", (StringRef, DeclName))
+
+ERROR(macro_expand_circular_reference_unnamed, none,
+      "circular reference expanding %0 macros", (StringRef))
+NOTE(macro_expand_circular_reference_unnamed_through, none,
+     "circular reference expanding %0 macros", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Move Only Errors
@@ -6865,8 +7106,6 @@ NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
 ERROR(moveonly_cannot_conform_to_type, none,
      "move-only %0 %1 cannot conform to %2",
      (DescriptiveDeclKind, DeclName, Type))
-ERROR(moveonly_non_final_class_cannot_contain_moveonly_field, none,
-     "non-final classes containing move only fields is not yet supported", ())
 ERROR(moveonly_parameter_missing_ownership, none,
       "noncopyable parameter must specify its ownership", ())
 NOTE(moveonly_parameter_ownership_suggestion, none,
