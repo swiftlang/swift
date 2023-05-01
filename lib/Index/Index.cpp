@@ -965,7 +965,6 @@ private:
   bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
   bool reportInheritedTypeRefs(
       ArrayRef<InheritedEntry> Inherited, Decl *Inheritee);
-  NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
     return reportPseudoAccessor(D, AccessorKind::Get, /*IsRef=*/false,
@@ -1472,17 +1471,6 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
       Cancelled = true;
   }
   return !Cancelled;
-}
-
-NominalTypeDecl *
-IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
-  if (Type T = Ty.getType())
-    return T->getAnyNominal();
-  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(Ty.getTypeRepr())) {
-    if (auto NTD = dyn_cast_or_null<NominalTypeDecl>(declRefTR->getBoundDecl()))
-      return NTD;
-  }
-  return nullptr;
 }
 
 bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
