@@ -5389,7 +5389,15 @@ namespace {
       E->setMacroRef(macroRef);
       E->setType(expandedType);
 
-      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions)) {
+      // FIXME: Expansion should be lazy.
+      // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
+      // 'getRewritten()', and performed on-demand.
+      if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions) &&
+          // Do not expand macros inside macro arguments. For example for
+          // '#stringify(#assert(foo))' when typechecking `#assert(foo)`,
+          // we don't want to expand it.
+          llvm::none_of(makeArrayRef(ExprStack).drop_back(1),
+                       [](Expr *E) { return isa<MacroExpansionExpr>(E); })) {
         (void)evaluateOrDefault(cs.getASTContext().evaluator,
                                 ExpandMacroExpansionExprRequest{E}, None);
       }
