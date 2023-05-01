@@ -1024,9 +1024,10 @@ public:
                                       PatternBindingInitializer *initContext);
 
   /// Parse the optional modifiers before a declaration.
-  bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
-                             StaticSpellingKind &StaticSpelling,
-                             bool isFromClangAttribute = false);
+  ParserStatus parseDeclModifierList(DeclAttributes &Attributes,
+                                     SourceLoc &StaticLoc,
+                                     StaticSpellingKind &StaticSpelling,
+                                     bool isFromClangAttribute = false);
 
   /// Parse an availability attribute of the form
   /// @available(*, introduced: 1.0, deprecated: 3.1).
@@ -1138,9 +1139,9 @@ public:
   ParserResult<CustomAttr> parseCustomAttribute(
       SourceLoc atLoc, PatternBindingInitializer *&initContext);
 
-  bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                             DeclAttrKind DK,
-                             bool isFromClangAttribute = false);
+  ParserStatus parseNewDeclAttribute(DeclAttributes &Attributes,
+                                     SourceLoc AtLoc, DeclAttrKind DK,
+                                     bool isFromClangAttribute = false);
 
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.

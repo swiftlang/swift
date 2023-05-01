@@ -10101,6 +10101,14 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+std::vector<MacroRole> swift::getAllMacroRoles() {
+  return {
+      MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
+      MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
+      MacroRole::Conformance,     MacroRole::CodeItem,
+  };
+}
+
 StringRef swift::getMacroRoleString(MacroRole role) {
   switch (role) {
   case MacroRole::Expression:
@@ -10190,6 +10198,21 @@ bool swift::isAttachedMacro(MacroRoles contexts) {
 
 MacroRoles swift::getAttachedMacroRoles() {
   return attachedMacroRoles;
+}
+
+bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
+  switch (role) {
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+  case MacroRole::Accessor:
+  case MacroRole::MemberAttribute:
+  case MacroRole::Member:
+  case MacroRole::Peer:
+  case MacroRole::Conformance:
+    return true;
+  case MacroRole::CodeItem:
+    return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
+  }
 }
 
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
