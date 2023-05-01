@@ -5416,11 +5416,12 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
 
     if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
       auto params = funcDecl->getParameters();
-
       if (params->size() != 1)
         continue;
 
-      if (params->get(0)->getType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
+      auto param = params->get(0);
+      if (param->getSpecifier() == ParamSpecifier::LegacyOwned ||
+          param->getSpecifier() == ParamSpecifier::Consuming) {
         return funcDecl;
       }
     }
