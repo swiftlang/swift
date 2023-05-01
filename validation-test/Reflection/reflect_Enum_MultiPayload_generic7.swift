@@ -41,9 +41,7 @@ reflect(enum: A<Int>.a(7))
 // X64-NEXT:   (case name=c index=2 offset=0
 // X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic71AOySiG
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic71AOySiG
 // CHECK-NEXT: Demangled name: reflect_Enum_MultiPayload_generic7.A<Swift.Int>
 
 // CHECK: Enum value:
@@ -65,17 +63,15 @@ reflect(enum: A<Void>.a(()))
 // CHECK: Reflecting an enum.
 
 // CHECK: Type info:
-// X64-NEXT: (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
-// X64-NEXT:   (case name=a index=0 offset=0
-// X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
-// X64-NEXT:   (case name=b index=1 offset=0
-// X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
-// X64-NEXT:   (case name=c index=2 offset=0
-// X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-NEXT: (multi_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-NEXT:   (case name=a index=0 offset=0
+// CHECK-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-NEXT:   (case name=b index=1 offset=0
+// CHECK-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+// CHECK-NEXT:   (case name=c index=2 offset=0
+// CHECK-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic71AOyytG
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic71AOyytG
 // CHECK-NEXT: Demangled name: reflect_Enum_MultiPayload_generic7.A<()>
 
 // CHECK: Enum value:
@@ -123,9 +119,7 @@ reflect(enum: B<Int>.a(1))
 // X64-NEXT:   (case name=c index=2 offset=0
 // X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic71BOySiG
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic71BOySiG
 // CHECK-NEXT: Demangled name: reflect_Enum_MultiPayload_generic7.B<Swift.Int>
 
 // CHECK: Enum value:
@@ -165,9 +159,7 @@ reflect(enum: B<Void>.a(8))
 // X64-NEXT:   (case name=c index=2 offset=0
 // X64-NEXT:     (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))
 
-// X32: FAIL
-
-// CHECK-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic71BOyytG
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic71BOyytG
 // CHECK-NEXT: Demangled name: reflect_Enum_MultiPayload_generic7.B<()>
 
 // CHECK: Enum value:

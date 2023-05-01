@@ -42,7 +42,7 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 // The TR for E is not a BoundGenericTypeRef
 // The compiler is not providing a BuiltinTypeInfo
 
-// X64: Type info:
+// CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=11 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 // X64-NEXT:   (case name=some index=0 offset=0
 // X64-NEXT:     (struct size=10 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
@@ -64,10 +64,9 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 // X64-NEXT:                 (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
 // X64-NEXT:           (case name=none index=1)))))
 // X64-NEXT:   (case name=none index=1))
-// X64-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic6010StructWithB6Depth0VySiGSg
-// X64-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic6.StructWithEnumDepth0<Swift.Int>>
 
-// X32: FAIL
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic6010StructWithB6Depth0VySiGSg
+// CHECK-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic6.StructWithEnumDepth0<Swift.Int>>
 
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=none index=1)
@@ -75,6 +74,8 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 let example = StructWithEnumDepth0<Int>(e: StructWithEnumDepth0<Int>.E.w(17))
 reflect(enum: example as StructWithEnumDepth0<Int>?)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=some index=0
 // CHECK-NEXT:   (bound_generic_struct reflect_Enum_MultiPayload_generic6.StructWithEnumDepth0
@@ -83,6 +84,8 @@ reflect(enum: example as StructWithEnumDepth0<Int>?)
 
 reflect(enum: example.e)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=some index=0
 // CHECK-NEXT: (bound_generic_enum reflect_Enum_MultiPayload_generic6.StructWithEnumDepth0.E
@@ -92,6 +95,8 @@ reflect(enum: example.e)
 
 reflect(enum: example.e!)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=w index=0
 // CHECK-NEXT: (struct Swift.Int)
@@ -100,6 +105,8 @@ reflect(enum: example.e!)
 let example2 = StructWithEnumDepth0<Int>(e: StructWithEnumDepth0<Int>.E.t(()))
 reflect(enum: example2 as StructWithEnumDepth0<Int>?)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=some index=0
 // CHECK-NEXT:   (bound_generic_struct reflect_Enum_MultiPayload_generic6.StructWithEnumDepth0
@@ -108,6 +115,8 @@ reflect(enum: example2 as StructWithEnumDepth0<Int>?)
 
 reflect(enum: example2.e!)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=t index=1
 // CHECK-NEXT: (tuple)
@@ -116,6 +125,8 @@ reflect(enum: example2.e!)
 let example3 = StructWithEnumDepth0<Int>(e: StructWithEnumDepth0<Int>.E.x(()))
 reflect(enum: example3.e!)
 
+// CHECK: Reflecting an enum.
+// CHECK: Type info:
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=x index=4
 // CHECK-NEXT: (tuple)

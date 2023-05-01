@@ -37,7 +37,7 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 // MemoryLayout<> on ARM64 macOS gives 9,8,16 as the sizes of both SWED0<Int>? and SWED0<Int>.E
 // from that, we can infer that SWED0<Int>.E must have a non-zero number of extra inhabitants
 
-// X64: Type info:
+// CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=252 bitwise_takable=1
 // X64-NEXT:   (case name=some index=0 offset=0
 // X64-NEXT:     (struct size=9 alignment=8 stride=16 num_extra_inhabitants=253 bitwise_takable=1
@@ -55,10 +55,9 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 // X64-NEXT:                     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X64-NEXT:           (case name=none index=1)))))
 // X64-NEXT:   (case name=none index=1))
-// X64-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic4010StructWithB6Depth0VySiGSg
-// X64-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic4.StructWithEnumDepth0<Swift.Int>>
 
-// X32: FAIL
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic4010StructWithB6Depth0VySiGSg
+// CHECK-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic4.StructWithEnumDepth0<Swift.Int>>
 
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=none index=1)

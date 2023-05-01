@@ -34,7 +34,7 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 //   MemoryLayout<StructWithEnumDepth0<Int>>.size => 10
 //   MemoryLayout<StructWithEnumDepth0<Int>?>.size => 11
 
-// X64: Type info:
+// CHECK: Type info:
 // X64-NEXT: (single_payload_enum size=11 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 // X64-NEXT:   (case name=some index=0 offset=0
 // X64-NEXT:     (struct size=10 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
@@ -50,10 +50,9 @@ reflect(enum: StructWithEnumDepth0<Int>?.none)
 // X64-NEXT:                 (tuple size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))
 // X64-NEXT:           (case name=none index=1)))))
 // X64-NEXT:   (case name=none index=1))
-// X64-NEXT: Mangled name: $s34reflect_Enum_MultiPayload_generic5010StructWithB6Depth0VySiGSg
-// X64-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic5.StructWithEnumDepth0<Swift.Int>>
 
-// X32: FAIL
+// CHECK: Mangled name: $s34reflect_Enum_MultiPayload_generic5010StructWithB6Depth0VySiGSg
+// CHECK-NEXT: Demangled name: Swift.Optional<reflect_Enum_MultiPayload_generic5.StructWithEnumDepth0<Swift.Int>>
 
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=none index=1)
