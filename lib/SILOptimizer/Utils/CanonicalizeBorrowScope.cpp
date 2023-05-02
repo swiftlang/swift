@@ -824,8 +824,6 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
 
   LLVM_DEBUG(llvm::dbgs() << "*** Canonicalize Borrow: " << borrowedValue);
 
-  SWIFT_DEFER { liveness.invalidate(); };
-
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
 
