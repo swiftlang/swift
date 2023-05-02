@@ -1177,6 +1177,22 @@ public:
   }
 };
 
+class LocatorPathElt::PackExpansionType final
+    : public StoredPointerElement<swift::PackExpansionType> {
+public:
+  PackExpansionType(swift::PackExpansionType *openedPackExpansionTy)
+      : StoredPointerElement(PathElementKind::PackExpansionType,
+                             openedPackExpansionTy) {
+    assert(openedPackExpansionTy);
+  }
+
+  swift::PackExpansionType *getOpenedType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::PackExpansionType;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {

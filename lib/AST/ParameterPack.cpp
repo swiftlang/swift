@@ -117,8 +117,11 @@ unsigned TupleType::getNumScalarElements() const {
 }
 
 bool TupleType::containsPackExpansionType() const {
+  assert(!hasTypeVariable());
   for (auto elt : getElements()) {
-    if (elt.getType()->is<PackExpansionType>())
+    auto eltTy = elt.getType();
+    assert(!eltTy->hasTypeVariable());
+    if (eltTy->is<PackExpansionType>())
       return true;
   }
 
@@ -144,7 +147,9 @@ bool TupleType::isSingleUnlabeledPackExpansion() const {
 
 bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   for (auto param : params) {
-    if (param.getPlainType()->is<PackExpansionType>())
+    auto paramTy = param.getPlainType();
+    assert(!paramTy->hasTypeVariable());
+    if (paramTy->is<PackExpansionType>())
       return true;
   }
 

@@ -106,6 +106,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::AnyPatternDecl:
   case ConstraintLocator::GlobalActorType:
   case ConstraintLocator::CoercionOperand:
+  case ConstraintLocator::PackExpansionType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -500,6 +501,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::CoercionOperand: {
     out << "coercion operand";
+    break;
+
+  case ConstraintLocator::PackExpansionType:
+    auto expansionElt = elt.castTo<LocatorPathElt::PackExpansionType>();
+    out << "pack expansion type ("
+        << expansionElt.getOpenedType()->getString(PO) << ")";
     break;
   }
   }
