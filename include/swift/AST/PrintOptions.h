@@ -320,9 +320,6 @@ struct PrintOptions {
   /// for class layout
   bool PrintClassLayoutName = false;
 
-  /// Replace @freestanding(expression) with @expression.
-  bool SuppressingFreestandingExpression = false;
-
   /// Suppress emitting @available(*, noasync)
   bool SuppressNoAsyncAvailabilityAttr = false;
 
