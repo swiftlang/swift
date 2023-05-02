@@ -1088,7 +1088,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
 
   CloseClangModuleFiles scopedCloseFiles(
       *CompIns.getASTContext().getClangModuleLoader());
-  Consumer.setInputBufferIDs(ASTRef->getCompilerInstance().getInputBufferIDs());
   CompIns.performSema();
 
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
