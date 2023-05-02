@@ -215,11 +215,18 @@ enum class DiagnosticCategory {
   NoUsage
 };
 
+struct RawCharSourceRange {
+  unsigned Offset;
+  unsigned Length;
+};
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
-    unsigned Offset;
-    unsigned Length;
+    RawCharSourceRange Range;
     std::string Text;
+
+    Fixit(RawCharSourceRange Range, std::string Text)
+        : Range(Range), Text(std::move(Text)) {}
   };
 
   std::string ID;
@@ -229,7 +236,7 @@ struct DiagnosticEntryInfoBase {
   unsigned Column = 0;
   std::string Filename;
   SmallVector<DiagnosticCategory, 1> Categories;
-  SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
+  SmallVector<RawCharSourceRange, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
 };
