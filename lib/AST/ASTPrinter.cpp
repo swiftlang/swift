@@ -3341,14 +3341,6 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
 }
 
 static void
-suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.SuppressingFreestandingExpression = true;
-  action();
-}
-
-static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<PrintOptions> originalOptions(options);
