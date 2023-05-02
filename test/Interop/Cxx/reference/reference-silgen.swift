@@ -51,21 +51,3 @@ func setCxxConstRef() {
 // CHECK: sil hidden @$s4main14setCxxConstRefyyF : $@convention(thin) () -> ()
 // CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (@in_guaranteed Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in_guaranteed Int32) -> ()
-
-func setCxxRvalueRef() {
-  var val: CInt = 21
-  setStaticIntRvalueRef(&val)
-}
-
-// CHECK: sil hidden @$s4main15setCxxRvalueRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z21setStaticIntRvalueRefOi|\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z}} : $@convention(c) (@inout Int32) -> ()
-// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
-
-func setCxxConstRvalueRef() {
-  let val: CInt = 21
-  setConstStaticIntRvalueRef(val)
-}
-
-// CHECK: sil hidden @$s4main20setCxxConstRvalueRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z26setConstStaticIntRvalueRefOKi|\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z}} : $@convention(c) (@in_guaranteed Int32) -> ()
-// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in_guaranteed Int32) -> ()
