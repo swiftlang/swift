@@ -155,14 +155,14 @@ SILValue ManagedValue::forward(SILGenFunction &SGF) const {
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                SILValue address) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
   SGF.emitSemanticStore(loc, forward(SGF), address, addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                               SILValue address) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF));
   auto &addrTL = SGF.getTypeLowering(address->getType());
   SGF.emitSemanticStore(loc, forward(SGF), address, addrTL,
                         IsNotInitialization);
@@ -170,7 +170,7 @@ void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                Initialization *dest) {
-  assert(isPlusOne(SGF));
+  assert(isPlusOneOrTrivial(SGF));
   dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
   dest->finishInitialization(SGF);
 }
@@ -281,7 +281,7 @@ ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
   if (isa<SILUndef>(getValue()))
     return *this;
 
-  if (!isPlusOne(SGF)) {
+  if (!isPlusOneOrTrivial(SGF)) {
     return copy(SGF, loc);
   }
   return *this;
