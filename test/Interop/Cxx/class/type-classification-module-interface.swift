@@ -5,13 +5,7 @@
 // CHECK-NOT: StructWithPrivateDefaultedCopyConstructor
 // CHECK-NOT: StructWithInheritedPrivateDefaultedCopyConstructor
 // CHECK-NOT: StructWithSubobjectPrivateDefaultedCopyConstructor
-// CHECK-NOT: StructNonCopyableTriviallyMovable
-// CHECK-NOT: StructWithPointerNonCopyableTriviallyMovable
-// CHECK-NOT: StructWithPointerNonCopyableTriviallyMovableField
 // CHECK-NOT: StructNonCopyableNonMovable
-// CHECK-NOT: StructWithMoveConstructor
-// CHECK-NOT: StructWithInheritedMoveConstructor
-// CHECK-NOT: StructWithSubobjectMoveConstructor
 // CHECK-NOT: StructWithMoveAssignment
 // CHECK-NOT: StructWithInheritedMoveAssignment
 // CHECK-NOT: StructWithSubobjectMoveAssignment
@@ -23,6 +17,14 @@
 // CHECK-NOT: StructWithDeletedDestructor
 // CHECK-NOT: StructWithInheritedDeletedDestructor
 // CHECK-NOT: StructWithSubobjectDeletedDestructor
+
+// CHECK: struct StructWithMoveConstructor
+
+// CHECK: struct StructWithInheritedMoveConstructor
+
+// CHECK: struct StructWithSubobjectMoveConstructor
+
+// CHECK: struct StructNonCopyableTriviallyMovable
 
 // CHECK: struct Iterator {
 // CHECK: }
