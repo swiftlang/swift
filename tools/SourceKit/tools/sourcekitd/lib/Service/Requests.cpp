@@ -3515,37 +3515,6 @@ void SKEditorConsumer::recordFormattedText(StringRef Text) {
 }
 
 static void fillDictionaryForDiagnosticInfoBase(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
-
-static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
-
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
-  fillDictionaryForDiagnosticInfoBase(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
-    }
-  }
-}
-
-static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
   if (!Info.ID.empty())
@@ -3599,6 +3568,34 @@ static void fillDictionaryForDiagnosticInfoBase(
       FixitElem.set(KeyOffset, F.Offset);
       FixitElem.set(KeyLength, F.Length);
       FixitElem.set(KeySourceText, F.Text);
+    }
+  }
+}
+
+static void fillDictionaryForDiagnosticInfo(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
+
+  UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
+  switch (Info.Severity) {
+  case DiagnosticSeverityKind::Warning:
+    SeverityUID = UIDKindDiagWarning;
+    break;
+  case DiagnosticSeverityKind::Error:
+    SeverityUID = UIDKindDiagError;
+    break;
+  }
+
+  Elem.set(KeySeverity, SeverityUID);
+  fillDictionaryForDiagnosticInfoBase(Elem, Info);
+
+  if (!Info.Notes.empty()) {
+    auto NotesArr = Elem.setArray(KeyDiagnostics);
+    for (auto &NoteDiag : Info.Notes) {
+      auto NoteElem = NotesArr.appendDictionary();
+      NoteElem.set(KeySeverity, KindDiagNote);
+      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
     }
   }
 }
