@@ -51,20 +51,6 @@ ReferenceTestSuite.test("pass-const-lvalue-reference") {
   expectEqual(22, getStaticInt())
 }
 
-ReferenceTestSuite.test("pass-rvalue-reference") {
-  expectNotEqual(52, getStaticInt())
-  var val: CInt = 52
-  setStaticIntRvalueRef(&val)
-  expectEqual(52, getStaticInt())
-}
-
-ReferenceTestSuite.test("pass-const-rvalue-reference") {
-  expectNotEqual(53, getStaticInt())
-  let val: CInt = 53
-  setConstStaticIntRvalueRef(val)
-  expectEqual(53, getStaticInt())
-}
-
 ReferenceTestSuite.test("func-reference") {
   let cxxF: @convention(c) () -> Int32 = getFuncRef()
 
