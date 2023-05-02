@@ -56,6 +56,10 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 
 #anonymousTypes { "hello" }
 
+// This should fails to typecheck because `#assert("foo")` is expanded to `assert("foo")`, but `assert(_:)` expects 'Bool' argument
+@freestanding(expression) macro assert(_: String) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
+#assert("foobar")
+
 // REQUIRES: swift_swift_parser, executable_test, shell
 
 // RUN: %empty-directory(%t)
@@ -271,3 +275,6 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // RUN: %sourcekitd-test -req=format -line=23 -length=1 %s | %FileCheck -check-prefix=FORMATTED %s
 // FORMATTED: "  var x: Int"
 
+//##-- Expansion on "fails to typecheck" macro expression
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=61:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ERRONEOUS_EXPAND %s
+// ERRONEOUS_EXPAND: 61:1-61:18 (@__swiftmacro_{{.+}}.swift) "assert("foobar")"

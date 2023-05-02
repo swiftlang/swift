@@ -181,6 +181,20 @@ func testDiscardableStringify(x: Int) {
 }
 #endif
 
+#if TEST_DIAGNOSTICS
+// This causes an error when non-'Bool' value is passed.
+@freestanding(expression) macro assertAny<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
+
+func testNested() {
+  struct Nested { }
+  _ = #stringify(#assertAny(Nested()))
+  // expected-note@-1 2 {{in expansion of macro 'stringify' here}}
+// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+// CHECK-DIAGS: @__swiftmacro_9MacroUser10testNestedyyF9stringifyfMf_9assertAnyfMf_.swift:1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+// CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+}
+#endif
+
 func testStringifyWithThrows() throws {
   // Okay, we can put the try inside or outside
   _ = try #stringify(maybeThrowing())
