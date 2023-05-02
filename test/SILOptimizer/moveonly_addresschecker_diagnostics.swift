@@ -53,6 +53,8 @@ public struct NonTrivialStruct {
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
+
+    var computedCopyableK: CopyableKlass { CopyableKlass() }
 }
 
 @_moveOnly
@@ -67,6 +69,7 @@ public struct NonTrivialCopyableStruct {
 
 public struct NonTrivialCopyableStruct2 {
     var copyableKlass = CopyableKlass()
+    var computedCopyableKlass: CopyableKlass { CopyableKlass() }
 }
 
 @_moveOnly
@@ -3473,6 +3476,49 @@ func copyableStructsInMoveOnlyStructNonConsuming() {
     borrowVal(a.nonTrivialCopyableStruct)
     borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2)
     borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass)
+}
+
+func computedCopyableKlassInAMoveOnlyStruct() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+}
+
+// This shouldn't error since we are consuming a copyable type.
+func computedCopyableKlassInAMoveOnlyStruct2() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+}
+
+// This shouldn't error since we are working with a copyable type.
+func computedCopyableKlassInAMoveOnlyStruct3() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    borrowVal(a.computedCopyableK)
+}
+
+// This used to error, but no longer errors since we are using a true field
+// sensitive model.
+func computedCopyableKlassInAMoveOnlyStruct4() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    borrowVal(a.nonTrivialStruct2)
+}
+
+func computedCopyableStructsInMoveOnlyStructNonConsuming() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a)
+    borrowVal(a.computedCopyableK)
+    borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.computedCopyableKlass)
 }
 
 ///////////////////////////
