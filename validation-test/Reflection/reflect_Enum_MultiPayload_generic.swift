@@ -25,6 +25,15 @@ class ClassWithEnumDepth0<T> {
   var e: E?
 }
 
+/*
+print("ClassWithEnumDepth0:  ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.size,
+  " ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.alignment,
+  " ",
+  MemoryLayout<ClassWithEnumDepth0<S>.E?>.stride)
+*/
+
 reflect(object: ClassWithEnumDepth0<S>())
 
 // CHECK: Reflecting an object.
@@ -84,7 +93,6 @@ reflect(object: ClassWithEnumDepth0<S>())
 // X32-NEXT:               (field name=_value offset=0
 // X32-NEXT:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X32-NEXT:       (case name=none index=1))))
-
 
 class ClassWithEnumDepth1<T> {
   enum E<T> {
@@ -153,6 +161,7 @@ reflect(object: ClassWithEnumDepth1<S>())
 // X32-NEXT:               (field name=_value offset=0
 // X32-NEXT:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))))
 // X32-NEXT:       (case name=none index=1))))
+
 
 doneReflecting()
 

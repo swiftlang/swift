@@ -400,7 +400,10 @@ public:
   EmptyEnumTypeInfo(const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(/*Size*/ 0, /* Alignment*/ 1, /*Stride*/ 1,
                    /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true,
-                   EnumKind::NoPayloadEnum, Cases) {}
+                   EnumKind::NoPayloadEnum, Cases) {
+    // No cases
+    assert(Cases.size() == 0);
+  }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
@@ -424,7 +427,12 @@ public:
                    /*Stride*/ 1,
                    /*NumExtraInhabitants*/ 0,
                    /*BitwiseTakable*/ true,
-                   Kind, Cases) {}
+                   Kind, Cases) {
+    // Exactly one case
+    assert(Cases.size() == 1);
+    // The only case has no payload
+    assert(Cases[0].TR == 0);
+  }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
@@ -451,7 +459,10 @@ public:
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    /*BitwiseTakable*/ true,
                    Kind, Cases) {
+    // There are at least 2 cases
+    // (one case would be trivial, zero is impossible)
     assert(Cases.size() >= 2);
+    // No non-empty payloads
     assert(getNumNonEmptyPayloadCases() == 0);
   }
 
@@ -496,8 +507,10 @@ public:
                             const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    BitwiseTakable, Kind, Cases) {
+    // The first case has a payload (possibly empty)
     assert(Cases[0].TR != 0);
-    assert(getNumNonEmptyPayloadCases() == 1);
+    // At most one non-empty payload case
+    assert(getNumNonEmptyPayloadCases() <= 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -531,6 +544,31 @@ public:
     }
   }
 
+  // Think of a single-payload enum as being encoded in "pages".
+  // The discriminator (tag) tells us which page we're on:
+  // * Page 0 is the payload page which can either store
+  //   the single payload case (any valid value
+  //   for the payload) or any of N non-payload cases
+  //   (encoded as XIs for the payload)
+  // * Other pages use the payload area to encode non-payload
+  //   cases.  The number of cases that can be encoded
+  //   on each such page depends only on the size of the
+  //   payload area.
+  //
+  // The above logic generalizes the following important cases:
+  // * A payload with XIs will generally have enough to
+  //   encode all payload cases.  If so, then it will have
+  //   no discriminator allocated, so the discriminator is
+  //   always treated as zero.
+  // * If the payload has no XIs but is not zero-sized, then
+  //   we'll need a page one.  That page will usually be
+  //   large enough to encode all non-payload cases.
+  // * If the payload is zero-sized, then we only have a
+  //   discriminator.  In effect, the single-payload enum
+  //   degenerates in this case to a non-payload enum
+  //   (except for the subtle distinction that the
+  //   single-payload enum doesn't export XIs).
+
   bool projectEnumValue(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
                        int *CaseIndex) const override {
@@ -539,7 +577,7 @@ public:
     auto DiscriminatorAddress = address + PayloadSize;
     auto DiscriminatorSize = getSize() - PayloadSize;
     unsigned discriminator = 0;
-    if (getSize() > PayloadSize) {
+    if (DiscriminatorSize > 0) {
       if (!reader.readInteger(DiscriminatorAddress,
                               DiscriminatorSize,
                               &discriminator)) {
@@ -549,26 +587,26 @@ public:
     unsigned nonPayloadCasesUsingXIs = PayloadCase.TI.getNumExtraInhabitants();
     int ComputedCase = 0;
     if (discriminator == 0) {
-      // Discriminator is for a page that encodes payload (and maybe tag data too)
+      // This is Page 0, which encodes payload case and some additional cases in Xis
       int XITag;
       if (!PayloadCase.TI.readExtraInhabitantIndex(reader, address, &XITag)) {
         return false;
       }
       ComputedCase = XITag < 0 ? 0 : XITag + 1;
     } else {
+      // This is some other page, so the entire payload area is just a case index
       unsigned payloadTag;
       if (!reader.readInteger(address, PayloadSize, &payloadTag)) {
         return false;
       }
       auto casesPerNonPayloadPage =
-        DiscriminatorSize >= 4
+        PayloadSize >= 4
          ? ValueWitnessFlags::MaxNumExtraInhabitants
-         : (1UL << (DiscriminatorSize * 8UL));
+         : (1UL << (PayloadSize * 8UL));
       ComputedCase =
-        1
-        + nonPayloadCasesUsingXIs
-        + (discriminator - 1) * casesPerNonPayloadPage
-        + payloadTag;
+        1 + nonPayloadCasesUsingXIs // Cases on page 0
+        + (discriminator - 1) * casesPerNonPayloadPage // Cases on other pages
+        + payloadTag; // Cases on this page
     }
     if (static_cast<unsigned>(ComputedCase) < getNumCases()) {
       *CaseIndex = ComputedCase;
@@ -579,8 +617,10 @@ public:
   }
 };
 
-// *Simple* Multi-payload enums have 2 or more payload cases and no common
-// "spare bits" in the payload area. This includes cases such as:
+// *Tagged* Multi-payload enums use a separate tag value exclusively.
+// This may be because it only has one payload (with no XIs) or
+// because it's a true MPE but with no "spare bits" in the payload area.
+// This includes cases such as:
 //
 // ```
 // // Enums with non-pointer payloads (only pointers carry spare bits)
@@ -602,20 +642,33 @@ public:
 //   case b(ClassTypeB)
 //   case c(Int)
 // }
+//
+// // Enums with one non-empty payload but that has no XIs
+// // (This is almost but not quite the same as the single-payload
+// // case.  Different in that this MPE exposes extra tag values
+// // as XIs to an enclosing enum; SPEs don't do that.)
+// enum A {
+//   case a(Int)
+//   case b(Void)
+// }
 // ```
-class SimpleMultiPayloadEnumTypeInfo: public EnumTypeInfo {
+class TaggedMultiPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
-  SimpleMultiPayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
+  TaggedMultiPayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                            unsigned Stride, unsigned NumExtraInhabitants,
                            bool BitwiseTakable,
                            const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    BitwiseTakable, EnumKind::MultiPayloadEnum, Cases) {
-    assert(Cases[0].TR != 0);
-    assert(Cases[1].TR != 0);
-    assert(getNumNonEmptyPayloadCases() > 1);
-    assert(getSize() > getPayloadSize());
-    assert(getCases().size() > 1);
+    // Definition of "multi-payload enum"
+    assert(getCases().size() > 1); // At least 2 cases
+    assert(Cases[0].TR != 0); // At least 2 payloads
+    // assert(Cases[1].TR != 0);
+    // At least one payload is non-empty (otherwise this
+    // would get laid out as a non-payload enum)
+    assert(getNumNonEmptyPayloadCases() > 0);
+    // There's a tag, so the total size must be bigger than any payload
+    // assert(getSize() > getPayloadSize());
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -2027,10 +2080,14 @@ public:
 
   const TypeInfo *build(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
-    // Sort enum into payload and no-payload cases.
-    unsigned TrueNoPayloadCases = 0;
-    unsigned EmptyPayloadCases = 0;
-    std::vector<FieldTypeInfo> PayloadCases;
+    // Count various categories of cases:
+    unsigned NonPayloadCases = 0; // `case a`
+    unsigned NonGenericEmptyPayloadCases = 0; // `case a(Void)` or `case b(Never)`
+    unsigned NonGenericNonEmptyPayloadCases = 0; // `case a(Int)` or `case d([Int?])`
+    unsigned GenericPayloadCases = 0; // `case a(T)` or `case a([String : (Int, T)])`
+
+    // For a single-payload enum, this is the only payload
+    const TypeRef *LastPayloadCaseTR = nullptr;
 
     std::vector<FieldTypeInfo> Fields;
     if (!TC.getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields)) {
@@ -2040,30 +2097,33 @@ public:
 
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
-        ++TrueNoPayloadCases;
+        ++NonPayloadCases;
         addCase(Case.Name);
       } else {
         auto *CaseTR = getCaseTypeRef(Case);
         assert(CaseTR != nullptr);
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
-	if (CaseTI == nullptr) {
-	  // We don't have typeinfo; assume it's not
-	  // zero-sized to match earlier behavior.
-	  // TODO: Maybe this should prompt us to fall
-	  // back to UnsupportedEnumTypeInfo??
-          PayloadCases.push_back(Case);
-	} else if (CaseTI->getSize() == 0) {
-          // Zero-sized payloads get special treatment
-          ++EmptyPayloadCases;
+        if (CaseTI == nullptr) {
+          // We don't have typeinfo; something is very broken.
+          Invalid = true;
+          return nullptr;
+        } else if (Case.Generic) {
+          ++GenericPayloadCases;
+          LastPayloadCaseTR = CaseTR;
+        } else if (CaseTI->getSize() == 0) {
+          ++NonGenericEmptyPayloadCases;
         } else {
-          PayloadCases.push_back(Case);
+          ++NonGenericNonEmptyPayloadCases;
+          LastPayloadCaseTR = CaseTR;
         }
         addCase(Case.Name, CaseTR, CaseTI);
       }
     }
-    // For layout purposes, cases w/ empty payload are
-    // treated the same as cases with no payload.
-    unsigned EffectiveNoPayloadCases = TrueNoPayloadCases + EmptyPayloadCases;
+    // For determining a layout strategy, cases w/ empty payload are treated the
+    // same as cases with no payload, and generic cases are always considered
+    // non-empty.
+    unsigned EffectiveNoPayloadCases = NonPayloadCases + NonGenericEmptyPayloadCases;
+    unsigned EffectivePayloadCases = GenericPayloadCases + NonGenericNonEmptyPayloadCases;
 
     if (Cases.empty()) {
       return TC.makeTypeInfo<EmptyEnumTypeInfo>(Cases);
@@ -2071,58 +2131,72 @@ public:
 
     // `Kind` is used when dumping data, so it reflects how the enum was
     // declared in source; the various *TypeInfo classes mentioned below reflect
-    // the in-memory layout, which may be different because cases whose
-    // payload is zero-sized get treated (for layout purposes) as non-payload
+    // the in-memory layout, which may be different because non-generic cases
+    // with zero-sized payloads get treated for layout purposes as non-payload
     // cases.
     EnumKind Kind;
-    switch (PayloadCases.size() + EmptyPayloadCases) {
+    switch (GenericPayloadCases + NonGenericEmptyPayloadCases + NonGenericNonEmptyPayloadCases) {
     case 0: Kind = EnumKind::NoPayloadEnum; break;
     case 1: Kind = EnumKind::SinglePayloadEnum; break;
     default: Kind = EnumKind::MultiPayloadEnum; break;
     }
 
-    if (PayloadCases.empty()) {
-      // NoPayloadEnumImplStrategy
-      if (EffectiveNoPayloadCases == 1) {
+    if (Cases.size() == 1) {
+      if (EffectivePayloadCases == 0) {
+        // Zero-sized enum with only one empty case
         return TC.makeTypeInfo<TrivialEnumTypeInfo>(Kind, Cases);
       } else {
-        unsigned Size, NumExtraInhabitants;
-        if (EffectiveNoPayloadCases < 256) {
-          Size = 1;
-          NumExtraInhabitants = 256 - EffectiveNoPayloadCases;
-        } else if (EffectiveNoPayloadCases < 65536) {
-          Size = 2;
-          NumExtraInhabitants = 65536 - EffectiveNoPayloadCases;
-        } else {
-          Size = 4;
-          NumExtraInhabitants = std::numeric_limits<uint32_t>::max() - EffectiveNoPayloadCases + 1;
-        }
-        if (EmptyPayloadCases > 0) {
-          // This enum uses no-payload layout, but the source actually does
-          // have payloads (they're just all zero-sized).
-          // If this is really a single-payload enum, we take extra inhabitants
-          // from the first payload, which is zero sized in this case.
-          // If this is really a multi-payload enum, ...
-          NumExtraInhabitants = 0;
-        }
-        if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
-          NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
-        }
-        return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
-          /* Size */ Size, /* Alignment */ Size, /* Stride */ Size,
-          NumExtraInhabitants, Kind, Cases);
+        // Enum that has only one payload case is represented as that case
+        return TC.getTypeInfo(LastPayloadCaseTR, ExternalTypeInfo);
       }
-    } else if (PayloadCases.size() == 1) {
+    }
+
+    if (EffectivePayloadCases == 0) {
+      // Enum with no non-empty payloads.  (It may
+      // formally be a single-payload or multi-payload enum,
+      // but all the actual payloads have zero size.)
+
+      // Represent it as a 1-, 2-, or 4-byte integer
+      unsigned Size, NumExtraInhabitants;
+      if (EffectiveNoPayloadCases < 256) {
+        Size = 1;
+        NumExtraInhabitants = 256 - EffectiveNoPayloadCases;
+      } else if (EffectiveNoPayloadCases < 65536) {
+        Size = 2;
+        NumExtraInhabitants = 65536 - EffectiveNoPayloadCases;
+      } else {
+        Size = 4;
+        NumExtraInhabitants = std::numeric_limits<uint32_t>::max() - EffectiveNoPayloadCases + 1;
+      }
+      if (NonGenericEmptyPayloadCases > 0) {
+        // This enum uses no-payload layout, but the source actually does
+        // have payloads (they're just all zero-sized).
+        // If this is really a single-payload or multi-payload enum, we
+        // formally take extra inhabitants from the first payload, which is
+        // zero sized in this case.
+        NumExtraInhabitants = 0;
+      }
+      if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+        NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+      }
+      return TC.makeTypeInfo<NoPayloadEnumTypeInfo>(
+        /* Size */ Size, /* Alignment */ Size, /* Stride */ Size,
+        NumExtraInhabitants, Kind, Cases);
+    }
+
+    if (EffectivePayloadCases == 1) {
       // SinglePayloadEnumImplStrategy
-      auto *CaseTR = getCaseTypeRef(PayloadCases[0]);
+
+      // This is a true single-payload enum with
+      // a single non-zero-sized payload, or an MPE
+      // with a single payload that is not statically empty.
+      // It also has at least one non-payload (or empty) case.
+
+      auto *CaseTR = LastPayloadCaseTR;
       auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
       if (CaseTR == nullptr || CaseTI == nullptr) {
         return nullptr;
       }
-      // An enum consisting of a single payload case and nothing else
-      // is lowered as the payload type.
-      if (EffectiveNoPayloadCases == 0)
-        return CaseTI;
       // Below logic should match the runtime function
       // swift_initEnumMetadataSinglePayload().
       auto PayloadExtraInhabitants = CaseTI->getNumExtraInhabitants();
@@ -2141,127 +2215,137 @@ public:
       unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
       return TC.makeTypeInfo<SinglePayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
-    } else {
-      // MultiPayloadEnumImplStrategy
 
-      // Uncomment the following line to dump the MPE section every time we come through here...
-      //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
+    }
 
-      // Check if this is a dynamic or static multi-payload enum
+    //
+    // Multi-Payload Enum strategies
+    //
+    // We now know this is a multi-payload enum with at least one non-zero-sized
+    // payload case.
+    //
 
-      // If we have a fixed descriptor for this type, it is a fixed-size
-      // multi-payload enum that possibly uses payload spare bits.
-      auto FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
-      if (FixedDescriptor) {
-        Size = FixedDescriptor->Size;
-        Alignment = FixedDescriptor->getAlignment();
-        NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
-        BitwiseTakable = FixedDescriptor->isBitwiseTakable();
-        unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-        if (Stride == 0)
-          Stride = 1;
-        auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
-
-        // If there's a multi-payload enum descriptor, then we
-        // have layout information from the compiler.
-        auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
-        if (MPEDescriptor) {
-          if (MPEDescriptor->usesPayloadSpareBits()) {
-            auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
-            auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
-            auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-            BitMask spareBitsMask(PayloadSize, SpareBitMask,
-                                  PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
-
-            if (!spareBitsMask.isZero()) {
-
-#if 0  // TODO: This should be !defined(NDEBUG)
-              // DEBUG verification that compiler mask and locally-computed
-              // mask are the same (whenever both are available).
-              BitMask locallyComputedSpareBitsMask(PayloadSize);
-              auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-              auto locallyComputedSpareBitsMaskIsValid
-                = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
-              // If the local computation were always correct, we could:
-              // assert(locallyComputedSpareBitsMaskIsValid);
-              if (locallyComputedSpareBitsMaskIsValid) {
-                // Whenever the compiler and local computation both produce
-                // data, they should agree.
-                // TODO: Make this true, then change `#if 0` above
-                assert(locallyComputedSpareBitsMask == spareBitsMask);
-              }
-#endif
-
-              // Use compiler-provided spare bit information
-              return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-                Size, Alignment, Stride, NumExtraInhabitants,
-                BitwiseTakable, Cases, spareBitsMask);
-            } else {
-              // The MPE descriptor doesn't make sense: It has a spare bit mask,
-              // but that mask is empty?  If this ever happens, fall through to
-              // the local calculation.
-            }
-          } else {
-            // If there are no spare bits, use the "simple" tag-only implementation.
-            return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
-              Size, Alignment, Stride, NumExtraInhabitants,
-              BitwiseTakable, Cases);
-          }
-        }
-
-        // If there was no compiler data, try computing the mask ourselves
-        // (This is less robust, but necessary to support images from older
-        // compilers.)
-        BitMask spareBitsMask(PayloadSize);
-        auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-        auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
-        // For DEBUGGING, disable fallback to local computation to
-        // make missing compiler data more obvious:
-        // validSpareBitsMask = false;
-        if (!validSpareBitsMask) {
-          // If we couldn't correctly determine the spare bits mask,
-          // return a TI that will always fail when asked for XIs or value.
-          return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
-            Size, Alignment, Stride, NumExtraInhabitants,
-            BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
-        } else if (spareBitsMask.isZero()) {
-          // Simple case that does not use spare bits
-          // This is correct as long as our local spare bits calculation
-          // above only returns an empty mask when the mask is really empty,
-          return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
-            Size, Alignment, Stride, NumExtraInhabitants,
-            BitwiseTakable, Cases);
-        } else {
-          // General case can mix spare bits and extra discriminator
-          // It obviously relies on having an accurate spare bit mask.
-          return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-            Size, Alignment, Stride, NumExtraInhabitants,
-            BitwiseTakable, Cases, spareBitsMask);
-        }
+    // Do we have a fixed layout?
+    // TODO: Test whether a missing FixedDescriptor is actually relevant.
+    auto FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+    if (!FixedDescriptor || GenericPayloadCases > 0) {
+      // This is a "dynamic multi-payload enum".  For example,
+      // this occurs with:
+      // ```
+      // class ClassWithEnum<T> {
+      //   enum E {
+      //   case t(T)
+      //   case u(Int)
+      //   }
+      //   var e: E?
+      // }
+      // ```
+      auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
+                                        EffectivePayloadCases);
+      Size += tagCounts.numTagBytes;
+      if (tagCounts.numTagBytes >= 4) {
+        NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
       } else {
-        // Dynamic multi-payload enums cannot use spare bits, so they
-        // always use a separate tag value:
-        auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
-                                          PayloadCases.size());
-        Size += tagCounts.numTagBytes;
-        // Dynamic multi-payload enums use the tag representations not assigned
-        // to cases for extra inhabitants.
-        if (tagCounts.numTagBytes >= 4) {
+        NumExtraInhabitants =
+          (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+        if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
           NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
-        } else {
-          NumExtraInhabitants =
-            (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
-          if (NumExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
-            NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
-          }
         }
-        unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
-        if (Stride == 0)
-          Stride = 1;
-        return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
+      }
+      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      if (Stride == 0)
+        Stride = 1;
+      return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, Cases);
+    }
+
+    // This is a multi-payload enum that:
+    //  * Has no generic cases
+    //  * Has at least two cases with non-zero payload size
+    //  * Has a descriptor stored as BuiltinTypeInfo
+    Size = FixedDescriptor->Size;
+    Alignment = FixedDescriptor->getAlignment();
+    NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
+    BitwiseTakable = FixedDescriptor->isBitwiseTakable();
+    unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    if (Stride == 0)
+      Stride = 1;
+    auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
+
+    // If there's a multi-payload enum descriptor, then we
+    // have spare bits information from the compiler.
+
+    // Uncomment the following line to dump the MPE section every time we come through here...
+    //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
+
+    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
+    if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
+      auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
+      auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
+      auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
+      BitMask spareBitsMask(PayloadSize, SpareBitMask,
+                            PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
+      
+      if (spareBitsMask.isZero()) {
+        // If there are no spare bits, use the "simple" tag-only implementation.
+        return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
           Size, Alignment, Stride, NumExtraInhabitants,
           BitwiseTakable, Cases);
       }
+
+#if 0  // TODO: This should be !defined(NDEBUG)
+      // DEBUG verification that compiler mask and locally-computed
+      // mask are the same (whenever both are available).
+      BitMask locallyComputedSpareBitsMask(PayloadSize);
+      auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+      auto locallyComputedSpareBitsMaskIsValid
+        = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
+      // If the local computation were always correct, we could:
+      // assert(locallyComputedSpareBitsMaskIsValid);
+      if (locallyComputedSpareBitsMaskIsValid) {
+        // Whenever the compiler and local computation both produce
+        // data, they should agree.
+        // TODO: Make this true, then change `#if 0` above
+        assert(locallyComputedSpareBitsMask == spareBitsMask);
+      }
+#endif
+
+      // Use compiler-provided spare bit information
+      return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, Cases, spareBitsMask);
+    }
+
+    // Either there was no compiler data or it didn't make sense
+    // (existed but claimed to have no mask).
+    // Try computing the mask ourselves: This is less robust, but necessary to
+    // support images from older compilers.
+    BitMask spareBitsMask(PayloadSize);
+    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+    auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
+    // For DEBUGGING, disable fallback to local computation to
+    // make missing compiler data more obvious:
+    // validSpareBitsMask = false;
+    if (!validSpareBitsMask) {
+      // If we couldn't correctly determine the spare bits mask,
+      // return a TI that will always fail when asked for XIs or value.
+      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
+    } else if (spareBitsMask.isZero()) {
+      // Simple case that does not use spare bits
+      // This is correct as long as our local spare bits calculation
+      // above only returns an empty mask when the mask is really empty,
+      return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, Cases);
+    } else {
+      // General case can mix spare bits and extra discriminator
+      // It obviously relies on having an accurate spare bit mask.
+      return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+        Size, Alignment, Stride, NumExtraInhabitants,
+        BitwiseTakable, Cases, spareBitsMask);
     }
   }
 };

@@ -93,7 +93,7 @@ struct Outer2 {
   }
 }
 
-reflect(enum: Outer2.E<S1>.Inner.F<S2>.b)
+reflect(enum: Outer2.E<S1>.Inner.F<S2>.u(S2()))
 
 //CHECK: Reflecting an enum.
 //CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -114,6 +114,148 @@ reflect(enum: Outer2.E<S1>.Inner.F<S2>.b)
 
 //CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S1V_AA2S2VG
 //CHECK-NEXT: Demangled name: reflect_nested_generic.Outer2.E<reflect_nested_generic.S1>.F<reflect_nested_generic.S2>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=u index=0
+//CHECK-NEXT:   (struct reflect_nested_generic.S2)
+//CHECK-NEXT: )
+
+reflect(enum: Outer2.E<S1>.Inner.F<S2>.b)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type info:
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S1V_AA2S2VG
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=b index=2)
+
+reflect(enum: Outer2.E<S1>.Inner.F<S2>.b as Outer2.E<S1>.Inner.F<S2>??)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=3 alignment=1 stride=3 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:   (case name=some index=0 offset=0
+//CHECK-NEXT:     (single_payload_enum size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:       (case name=some index=0 offset=0
+//CHECK-NEXT:         (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:           (case name=u index=0 offset=0
+//CHECK-NEXT:             (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))
+//CHECK-NEXT:           (case name=a index=1)
+//CHECK-NEXT:           (case name=b index=2)))
+//CHECK-NEXT:       (case name=none index=1)))
+//CHECK-NEXT:   (case name=none index=1))
+
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S1V_AA2S2VGSgSg
+//CHECK-NEXT: Demangled name: Swift.Optional<Swift.Optional<reflect_nested_generic.Outer2.E<reflect_nested_generic.S1>.F<reflect_nested_generic.S2>>>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=some index=0
+//CHECK-NEXT: (bound_generic_enum Swift.Optional
+//CHECK-NEXT:   (bound_generic_enum reflect_nested_generic.Outer2.E.Inner.F
+//CHECK-NEXT:     (struct reflect_nested_generic.S2)
+//CHECK-NEXT:     (bound_generic_enum reflect_nested_generic.Outer2.E
+//CHECK-NEXT:       (struct reflect_nested_generic.S1))))
+//CHECK-NEXT: )
+
+reflect(enum: Outer2.E<S1>.Inner.F<S2>??.none)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type info:
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S1V_AA2S2VGSgSg
+//CHECK: Demangled name: Swift.Optional<Swift.Optional<reflect_nested_generic.Outer2.E<reflect_nested_generic.S1>.F<reflect_nested_generic.S2>>>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=none index=1)
+
+struct S3: P { var a: UInt8 = 0 }
+
+reflect(enum: Outer2.E<S2>.Inner.F<S3>.u(S3()))
+
+//CHECK: Reflecting an enum.
+//CHECK-NEXT: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+
+//CHECK: Type reference:
+//CHECK-NEXT: (bound_generic_enum reflect_nested_generic.Outer2.E.Inner.F
+//CHECK-NEXT:   (struct reflect_nested_generic.S3)
+//CHECK-NEXT:   (bound_generic_enum reflect_nested_generic.Outer2.E
+//CHECK-NEXT:     (struct reflect_nested_generic.S2)))
+
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:   (case name=u index=0 offset=0
+//CHECK-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:       (field name=a offset=0
+//CHECK-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:           (field name=_value offset=0
+//CHECK-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))))
+//CHECK-NEXT:   (case name=a index=1)
+//CHECK-NEXT:   (case name=b index=2))
+
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S2V_AA2S3VG
+//CHECK-NEXT: Demangled name: reflect_nested_generic.Outer2.E<reflect_nested_generic.S2>.F<reflect_nested_generic.S3>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=u index=0
+//CHECK-NEXT: (struct reflect_nested_generic.S3)
+//CHECK-NEXT: )
+
+
+reflect(enum: Outer2.E<S2>.Inner.F<S3>.b)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type reference:
+//CHECK: Type info:
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S2V_AA2S3VG
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=b index=2)
+
+reflect(enum: Outer2.E<S2>.Inner.F<S3>??.none)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type reference:
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=4 alignment=1 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:   (case name=some index=0 offset=0
+//CHECK-NEXT:     (single_payload_enum size=3 alignment=1 stride=3 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:       (case name=some index=0 offset=0
+//CHECK-NEXT:         (single_payload_enum size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:           (case name=u index=0 offset=0
+//CHECK-NEXT:             (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:               (field name=a offset=0
+//CHECK-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
+//CHECK-NEXT:                   (field name=_value offset=0
+//CHECK-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1))))))
+//CHECK-NEXT:           (case name=a index=1)
+//CHECK-NEXT:           (case name=b index=2)))
+//CHECK-NEXT:       (case name=none index=1)))
+//CHECK-NEXT:   (case name=none index=1))
+
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S2V_AA2S3VGSgSg
+//CHECK: Demangled name: Swift.Optional<Swift.Optional<reflect_nested_generic.Outer2.E<reflect_nested_generic.S2>.F<reflect_nested_generic.S3>>>
+
+//CHECK: Enum value:
+//CHECK-NEXT: (enum_value name=none index=1)
+
+struct S4: P { var a: Bool = true }
+
+reflect(enum: Outer2.E<S3>.Inner.F<S4>.b)
+
+//CHECK: Reflecting an enum.
+//CHECK: Type reference:
+//CHECK: Type info:
+//CHECK-NEXT: (single_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=252 bitwise_takable=1
+//CHECK-NEXT:   (case name=u index=0 offset=0
+//CHECK-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
+//CHECK-NEXT:       (field name=a offset=0
+//CHECK-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1
+//CHECK-NEXT:           (field name=_value offset=0
+//CHECK-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254 bitwise_takable=1))))))
+//CHECK-NEXT:   (case name=a index=1)
+//CHECK-NEXT:   (case name=b index=2))
+
+//CHECK: Mangled name: $s22reflect_nested_generic6Outer2V1EO1FOy_AA2S3V_AA2S4VG
+//CHECK: Demangled name: reflect_nested_generic.Outer2.E<reflect_nested_generic.S3>.F<reflect_nested_generic.S4>
 
 //CHECK: Enum value:
 //CHECK-NEXT: (enum_value name=b index=2)
