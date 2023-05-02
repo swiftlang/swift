@@ -3319,15 +3319,6 @@ static void finishNSManagedImplInfo(VarDecl *var,
   }
 }
 
-static Expr *getParentExecutableInitializer(VarDecl *var) {
-  if (auto *PBD = var->getParentPatternBinding()) {
-    const auto i = PBD->getPatternEntryIndexForVarDecl(var);
-    return PBD->getExecutableInit(i);
-  }
-
-  return nullptr;
-}
-
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
   auto dc = storage->getDeclContext();
