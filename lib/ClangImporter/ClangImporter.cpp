@@ -6761,8 +6761,10 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
-      swiftDecl->getClangDecl()->getOwningModule());
+  auto *clangMod = swiftDecl->getClangDecl()->getOwningModule();
+  if (clangMod && clangMod->isSubModule())
+    clangMod = clangMod->getTopLevelModule();
+  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
   ctx.lookupInModule(parentModule, name, results);
 
   if (results.size() == 1)

@@ -6311,6 +6311,15 @@ public:
       // inherit the sourrounding scope in IRGenSIL.
       if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
+      // FIXME: There are situations where the execution legitimately goes
+      //        backwards, such as
+      //
+      //            while case let w: String? = Optional.some("b") {}
+      //
+      //        where the RHS of the assignment gets run first and then the
+      //        result is copied into the LHS.
+      if (!llvm::isa<BeginBorrowInst>(&SI) || !llvm::isa<CopyValueInst>(&SI))
+        continue;
 
       // If we haven't seen this debug scope yet, update the
       // map and go on.

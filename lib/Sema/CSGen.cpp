@@ -3081,6 +3081,12 @@ namespace {
       // pack expansion expression through the shape type variable.
       SmallVector<ASTNode, 2> expandedPacks;
       expr->getExpandedPacks(expandedPacks);
+
+      if (expandedPacks.empty()) {
+        (void)CS.recordFix(AllowValueExpansionWithoutPackReferences::create(
+            CS, CS.getConstraintLocator(expr)));
+      }
+
       for (auto pack : expandedPacks) {
         Type packType;
         if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {

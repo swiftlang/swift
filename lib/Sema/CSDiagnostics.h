@@ -99,23 +99,42 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    auto &cs = getConstraintSystem();
+    rawType = rawType.transform([&](Type type) -> Type {
+      if (auto *typeVar = type->getAs<TypeVariableType>()) {
+        auto resolvedType = S.simplifyType(typeVar);
 
-    if (rawType->hasTypeVariable() || rawType->hasPlaceholder()) {
-      rawType = rawType.transform([&](Type type) {
-        if (auto *typeVar = type->getAs<TypeVariableType>()) {
-          auto resolvedType = S.simplifyType(typeVar);
-          Type GP = typeVar->getImpl().getGenericParameter();
-          return resolvedType->is<UnresolvedType>() && GP
-                     ? GP
-                     : resolvedType;
+        if (!resolvedType->hasUnresolvedType())
+          return resolvedType;
+
+        // If type variable was simplified to an unresolved pack expansion
+        // type, let's examine its original pattern type because it could
+        // contain type variables replaceable with their generic parameter
+        // types.
+        if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
+          auto *locator = typeVar->getImpl().getLocator();
+          auto *openedExpansionTy =
+              locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+                  .getOpenedType();
+          auto patternType = resolveType(openedExpansionTy->getPatternType());
+          return PackExpansionType::get(patternType, expansion->getCountType());
         }
 
-        return type->isPlaceholder()
-                   ? Type(cs.getASTContext().TheUnresolvedType)
-                   : type;
-      });
-    }
+        Type GP = typeVar->getImpl().getGenericParameter();
+        return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
+      }
+
+      if (auto *packType = type->getAs<PackType>()) {
+        if (packType->getNumElements() == 1) {
+          auto eltType = resolveType(packType->getElementType(0));
+          if (auto expansion = eltType->getAs<PackExpansionType>())
+            return expansion->getPatternType();
+        }
+      }
+
+      return type->isPlaceholder()
+                 ? Type(type->getASTContext().TheUnresolvedType)
+                 : type;
+    });
 
     if (reconstituteSugar)
       rawType = rawType->reconstituteSugar(/*recursive*/ true);
@@ -2955,6 +2974,47 @@ public:
 private:
   Diag<Type, Type> getDiagnosticMessage() const;
   bool diagnoseTupleElement();
+};
+
+/// Diagnose situation when a single argument to tuple type is passed to
+/// a value pack expansion parameter that expects distinct N elements:
+///
+/// ```swift
+/// struct S<each T> {
+///   func test(x: Int, _: repeat each T) {}
+/// }
+///
+/// S<Int, String>().test(x: 42, (2, "b"))
+/// ```
+class DestructureTupleToUseWithPackExpansionParameter final
+    : public FailureDiagnostic {
+  PackType *ParamShape;
+
+public:
+  DestructureTupleToUseWithPackExpansionParameter(const Solution &solution,
+                                                  PackType *paramShape,
+                                                  ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ParamShape(paramShape) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+};
+
+/// Diagnose situations when value pack expansion doesn't have any pack
+/// references i.e.:
+///
+/// ```swift
+/// func test(x: Int) {
+///   repeat x
+/// }
+/// ```
+class ValuePackExpansionWithoutPackReferences final : public FailureDiagnostic {
+public:
+  ValuePackExpansionWithoutPackReferences(const Solution &solution,
+                                          ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints
