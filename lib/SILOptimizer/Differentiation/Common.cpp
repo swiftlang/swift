@@ -260,8 +260,8 @@ findDebugLocationAndVariable(SILValue originalValue) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
-        if (var.DIExpr.startsWithDeref())
-          var.DIExpr.eraseElement(var.DIExpr.element_begin());
+        if (var.exprStartsWithDeref())
+          var.eraseDeref(dvi->getModule());
         return std::make_pair(dvi->getDebugLocation(), var);
       });
   }

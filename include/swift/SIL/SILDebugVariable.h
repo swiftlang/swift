@@ -35,7 +35,7 @@ inline llvm::hash_code hash_value(const SILDebugVariable &P);
 struct SILDebugVariable {
   friend llvm::hash_code hash_value(const SILDebugVariable &P);
 
-  StringRef Name;
+  Identifier Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
   unsigned Implicit : 1;
@@ -43,7 +43,7 @@ struct SILDebugVariable {
   Optional<SILType> Type;
   Optional<SILLocation> Loc;
   const SILDebugScope *Scope;
-  SILDebugInfoExpression DIExpr;
+  const SILDebugInfoExpression *DIExpr;
 
   // Use vanilla copy ctor / operator
   SILDebugVariable(const SILDebugVariable &) = default;
@@ -59,18 +59,19 @@ struct SILDebugVariable {
 
   SILDebugVariable()
       : ArgNo(0), Constant(false), Implicit(false), isDenseMapSingleton(0),
-        Scope(nullptr) {}
+        Scope(nullptr), DIExpr(nullptr) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant), Implicit(false),
-        isDenseMapSingleton(0), Scope(nullptr) {}
-  SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false, Optional<SILType> AuxType = {},
+        isDenseMapSingleton(0), Scope(nullptr), DIExpr(nullptr) {}
+  SILDebugVariable(SILModule &mod, Identifier Name, bool Constant,
+                   unsigned ArgNo, bool IsImplicit = false,
+                   Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
-                   llvm::ArrayRef<SILDIExprElement> ExprElements = {})
+                   const SILDebugInfoExpression *DbgInfoExpr = nullptr)
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
         isDenseMapSingleton(0), Type(AuxType), Loc(DeclLoc), Scope(DeclScope),
-        DIExpr(ExprElements) {}
+        DIExpr(DbgInfoExpr) {}
 
   /// Created from either AllocStack or AllocBox instruction
   static Optional<SILDebugVariable>
@@ -92,9 +93,50 @@ struct SILDebugVariable {
     return result;
   }
 
-  bool isLet() const { return Name.size() && Constant; }
+  void appendingElements(SILModule &mod,
+                         ArrayRef<const SILDIExprElement *> newElts) {
+    if (DIExpr) {
+      DIExpr = DIExpr->append(mod, newElts);
+      return;
+    }
+    DIExpr = SILDebugInfoExpression::get(mod, newElts);
+  }
 
-  bool isVar() const { return Name.size() && !Constant; }
+  void appendingElements(SILModule &mod,
+                         const SILDebugInfoExpression *newDIExpr) {
+    if (DIExpr) {
+      DIExpr = DIExpr->append(mod, newDIExpr);
+      return;
+    }
+    DIExpr = newDIExpr;
+  }
+
+  void prependingElements(SILModule &mod,
+                          ArrayRef<const SILDIExprElement *> newElts) {
+    if (DIExpr) {
+      DIExpr = DIExpr->prepend(mod, newElts);
+      return;
+    }
+    DIExpr = SILDebugInfoExpression::get(mod, newElts);
+  }
+
+  bool isLet() const { return Name.str().size() && Constant; }
+
+  bool isVar() const { return Name.str().size() && !Constant; }
+
+  StringRef getName() const { return Name.str(); }
+
+  bool hasFragment() const { return DIExpr ? DIExpr->hasFragment() : false; }
+
+  bool exprStartsWithDeref() const {
+    return DIExpr ? DIExpr->startsWithDeref() : false;
+  }
+
+  void eraseDeref(SILModule &mod) {
+    if (!DIExpr)
+      return;
+    DIExpr = DIExpr->dropDeref(mod);
+  }
 };
 
 /// Returns the hashcode for the new projection path.

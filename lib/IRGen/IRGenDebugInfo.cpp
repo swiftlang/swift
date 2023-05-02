@@ -2522,8 +2522,8 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
   assert(CurDIExprOp.getOperator() == SILDIExprOperator::Fragment);
   // Expecting a VarDecl that points to a field in an struct
   auto DIExprArgs = CurDIExprOp.args();
-  auto *VD = dyn_cast_or_null<VarDecl>(DIExprArgs.size()?
-                                       DIExprArgs[0].getAsDecl() : nullptr);
+  auto *VD = dyn_cast_or_null<VarDecl>(
+      DIExprArgs.size() ? DIExprArgs[0]->getAsDecl() : nullptr);
   assert(VD && "Expecting a VarDecl as the operand for "
                "DIExprOperator::Fragment");
   // Translate the based type
@@ -2563,7 +2563,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
   assert(VarInfo.DIExpr && "SIL debug info expression not found");
 
   const auto &DIExpr = VarInfo.DIExpr;
-  for (const SILDIExprOperand &ExprOperand : DIExpr.operands()) {
+  for (const SILDIExprOperand &ExprOperand : DIExpr->operands()) {
     switch (ExprOperand.getOperator()) {
     case SILDIExprOperator::Fragment:
       if (!handleFragmentDIExpr(ExprOperand, Operands))
@@ -2580,13 +2580,13 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
       break;
     case SILDIExprOperator::ConstUInt:
       Operands.push_back(llvm::dwarf::DW_OP_constu);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      Operands.push_back(*ExprOperand[1]->getAsConstInt());
       break;
     case SILDIExprOperator::ConstSInt:
       Operands.push_back(llvm::dwarf::DW_OP_consts);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      Operands.push_back(*ExprOperand[1]->getAsConstInt());
       break;
-    case SILDIExprOperator::INVALID:
+    case SILDIExprOperator::Invalid:
       return false;
     }
   }
@@ -2628,7 +2628,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   unsigned DInstLine = DInstLoc.line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!DInstLine ||
+      (ArgNo > 0 && VarInfo.getName() == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2654,7 +2655,8 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
   // VarInfo.Name points into tail-allocated storage in debug_value insns.
-  llvm::StringRef UniqueName = VarNames.insert(VarInfo.Name).first->getKey();
+  llvm::StringRef UniqueName =
+      VarNames.insert(VarInfo.getName()).first->getKey();
   VarID Key(VarScope, UniqueName, DVarLine, DVarCol);
   auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
@@ -2665,11 +2667,12 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     // preserved even at -Onone.
     bool Preserve = true;
     if (ArgNo > 0)
-      Var = DBuilder.createParameterVariable(
-          VarScope, VarInfo.Name, ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
+      Var = DBuilder.createParameterVariable(VarScope, VarInfo.getName(), ArgNo,
+                                             Unit, DVarLine, DITy, Preserve,
+                                             Flags);
     else
-      Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
-                                        DITy, Preserve, Flags);
+      Var = DBuilder.createAutoVariable(VarScope, VarInfo.getName(), Unit,
+                                        DVarLine, DITy, Preserve, Flags);
     LocalVarCache.insert({Key, llvm::TrackingMDNodeRef(Var)});
   }
 
@@ -3004,13 +3007,13 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
-                          // swift.type is already a pointer type,
-                          // having a shadow copy doesn't add another
-                          // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
-                          ArtificialValue);
+  emitVariableDeclaration(
+      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {},
+      {IGF.getSILModule(), IGF.getIdentifier(OS.str()), 0, false},
+      // swift.type is already a pointer type,
+      // having a shadow copy doesn't add another
+      // layer of indirection.
+      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
 }
 
 void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,

@@ -1303,11 +1303,11 @@ public:
     }
   }
 
-  void printDebugInfoExpression(const SILDebugInfoExpression &DIExpr) {
+  void printDebugInfoExpression(const SILDebugInfoExpression *DIExpr) {
     assert(DIExpr && "DIExpression empty?");
     *this << ", expr ";
     bool IsFirst = true;
-    for (const auto &Operand : DIExpr.operands()) {
+    for (const auto &Operand : DIExpr->operands()) {
       if (IsFirst)
         IsFirst = false;
       else
@@ -1315,19 +1315,19 @@ public:
 
       // Print the operator
       SILDIExprOperator Op = Operand.getOperator();
-      assert(Op != SILDIExprOperator::INVALID &&
+      assert(Op != SILDIExprOperator::Invalid &&
              "Invalid SILDIExprOperator kind");
       *this << SILDIExprInfo::get(Op)->OpText;
 
       // Print arguments
       for (const auto &Arg : Operand.args()) {
         *this << ":";
-        switch (Arg.getKind()) {
+        switch (Arg->getKind()) {
         case SILDIExprElement::OperatorKind:
           llvm_unreachable("Cannot use operator as argument");
           break;
         case SILDIExprElement::DeclKind: {
-          const Decl *D = Arg.getAsDecl();
+          const Decl *D = Arg->getAsDecl();
           // FIXME: Can we generalize this special handling for VarDecl
           // to other kinds of Decl?
           if (const auto *VD = dyn_cast<VarDecl>(D)) {
@@ -1339,7 +1339,7 @@ public:
           break;
         }
         case SILDIExprElement::ConstIntKind: {
-          uint64_t V = *Arg.getAsConstInt();
+          uint64_t V = *Arg->getAsConstInt();
           if (Op == SILDIExprOperator::ConstSInt)
             *this << static_cast<int64_t>(V);
           else

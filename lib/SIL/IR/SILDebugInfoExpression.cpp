@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILDebugInfoExpression.h"
+#include "swift/SIL/SILModule.h"
 #include <unordered_map>
 
 using namespace swift;
@@ -55,8 +56,8 @@ void SILDebugInfoExpression::op_iterator::increment() {
     return;
   }
 
-  const SILDIExprElement &NextHead = Remain[0];
-  SILDIExprOperator Op = NextHead.getAsOperator();
+  const SILDIExprElement *const &NextHead = Remain[0];
+  SILDIExprOperator Op = NextHead->getAsOperator();
   if (const auto *ExprInfo = SILDIExprInfo::get(Op)) {
     auto NewSlice = Remain.take_front(ExprInfo->OperandKinds.size() + 1);
     Current = SILDIExprOperand(NewSlice.data(), NewSlice.size());
@@ -65,9 +66,111 @@ void SILDebugInfoExpression::op_iterator::increment() {
   }
 }
 
-SILDebugInfoExpression SILDebugInfoExpression::createFragment(VarDecl *Field) {
-  assert(Field);
-  return SILDebugInfoExpression(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Fragment),
-       SILDIExprElement::createDecl(Field)});
+SILDebugInfoExpression *
+SILDebugInfoExpression::get(SILModule &mod,
+                            ArrayRef<const SILDIExprElement *> start,
+                            ArrayRef<const SILDIExprElement *> end) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, start);
+  Profile(id, end);
+
+  void *insertPos;
+  auto existing = mod.diExprs.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  unsigned numTrailingElts = start.size() + end.size();
+  unsigned numBytes =
+      totalSizeToAlloc<const SILDIExprElement *>(numTrailingElts);
+  void *mem = mod.allocate(numBytes, alignof(SILDebugInfoExpression));
+  auto *diExpr = new (mem) SILDebugInfoExpression();
+  diExpr->numElts = numTrailingElts;
+  auto elements = llvm::makeMutableArrayRef(
+      diExpr->getTrailingObjects<const SILDIExprElement *>(), numTrailingElts);
+  unsigned index = 0;
+  for (auto &elt : start)
+    elements[index++] = elt;
+  for (auto &elt : end)
+    elements[index++] = elt;
+  assert(diExpr->getElements().size() == numTrailingElts);
+  assert(llvm::all_of(diExpr->getElements(),
+                      [](const SILDIExprElement *elt) -> bool {
+                        return bool(elt);
+                      }));
+  mod.diExprs.InsertNode(diExpr, insertPos);
+  return diExpr;
+}
+
+SILDebugInfoExpression *SILDebugInfoExpression::createFragment(SILModule &mod,
+                                                               VarDecl *field) {
+  assert(field);
+  std::array<const SILDIExprElement *, 2> inputs = {
+      SILDIExprElement::createOperator(mod, SILDIExprOperator::Fragment),
+      SILDIExprElement::createDecl(mod, field)};
+  return SILDebugInfoExpression::get(mod, inputs);
+}
+
+void SILDebugInfoExpression::Profile(
+    llvm::FoldingSetNodeID &id, ArrayRef<const SILDIExprElement *> elements) {
+  for (auto &e : elements) {
+    e->Profile(id);
+  }
+}
+
+SILDIExprElement *SILDIExprElement::createOperator(SILModule &mod,
+                                                   SILDIExprOperator op) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, op, nullptr, None);
+
+  void *insertPos;
+  auto existing = mod.diExprElements.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = mod.allocate(sizeof(SILDIExprElement), alignof(SILDIExprElement));
+  SILDIExprElement *diOp = new (mem) SILDIExprElement(OperatorKind);
+  diOp->Operator = op;
+  mod.diExprElements.InsertNode(diOp, insertPos);
+  return diOp;
+}
+
+SILDIExprElement *SILDIExprElement::createDecl(SILModule &mod, Decl *decl) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, SILDIExprOperator::Invalid, decl, None);
+
+  void *insertPos;
+  auto existing = mod.diExprElements.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = mod.allocate(sizeof(SILDIExprElement), alignof(SILDIExprElement));
+  SILDIExprElement *diOp = new (mem) SILDIExprElement(DeclKind);
+  diOp->Declaration = decl;
+  mod.diExprElements.InsertNode(diOp, insertPos);
+  return diOp;
+}
+
+SILDIExprElement *SILDIExprElement::createConstInt(SILModule &mod,
+                                                   uint64_t value) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, SILDIExprOperator::Invalid, nullptr, value);
+
+  void *insertPos;
+  auto existing = mod.diExprElements.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = mod.allocate(sizeof(SILDIExprElement), alignof(SILDIExprElement));
+  SILDIExprElement *diOp = new (mem) SILDIExprElement(ConstIntKind);
+  diOp->ConstantInt = value;
+  mod.diExprElements.InsertNode(diOp, insertPos);
+  return diOp;
+}
+
+void SILDIExprElement::Profile(llvm::FoldingSetNodeID &id, SILDIExprOperator op,
+                               Decl *decl, Optional<uint64_t> intValue) {
+  id.AddInteger(unsigned(op));
+  id.AddPointer(decl);
+  id.AddBoolean(intValue.hasValue());
+  id.AddInteger(intValue.getValueOr(0));
 }

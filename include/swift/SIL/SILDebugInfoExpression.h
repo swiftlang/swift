@@ -33,30 +33,35 @@ class TailAllocatedDebugVariable;
 
 /// Operator in a debug info expression
 enum class SILDIExprOperator : unsigned {
-  INVALID = 0,
+  Invalid = 0,
+
   /// Dereferences the SSA value
   Dereference,
-  /// Specifies that the SSA value is a fragment (sub-field) of the
-  /// associated source variable. This operator takes a single
-  /// VarDecl operand pointing to the field declaration.
-  /// Note that this directive can only appear at the end of an
-  /// expression.
+
+  /// Specifies that the SSA value is a fragment (sub-field) of the associated
+  /// source variable. This operator takes a list of VarDecl/Tuple element
+  /// operand pointing to a list of field declarations. Note that this directive
+  /// can only appear at the end of an expression.
   Fragment,
+
   /// Perform arithmetic addition on the top two elements of the
   /// expression stack and push the result back to the stack.
   Plus,
+
   /// Subtract the top element in expression stack by the second
   /// element. Then push the result back to the stack.
   Minus,
+
   /// Push an unsigned integer constant onto the stack.
   ConstUInt,
+
   /// Push a signed integer constant onto the stack.
-  ConstSInt
+  ConstSInt,
 };
 
 /// Represents a single component in a debug info expression.
 /// Including operator and operand.
-struct SILDIExprElement {
+struct SILDIExprElement : llvm::FoldingSetNode {
   enum Kind {
     /// A di-expression operator.
     OperatorKind,
@@ -82,7 +87,7 @@ public:
   Kind getKind() const { return OpKind; }
 
   SILDIExprOperator getAsOperator() const {
-    return OpKind == OperatorKind ? Operator : SILDIExprOperator::INVALID;
+    return OpKind == OperatorKind ? Operator : SILDIExprOperator::Invalid;
   }
 
   Decl *getAsDecl() const { return OpKind == DeclKind ? Declaration : nullptr; }
@@ -94,22 +99,23 @@ public:
       return {};
   }
 
-  static SILDIExprElement createOperator(SILDIExprOperator Op) {
-    SILDIExprElement DIOp(OperatorKind);
-    DIOp.Operator = Op;
-    return DIOp;
-  }
+  static SILDIExprElement *createOperator(SILModule &mod, SILDIExprOperator op);
 
-  static SILDIExprElement createDecl(Decl *D) {
-    SILDIExprElement DIOp(DeclKind);
-    DIOp.Declaration = D;
-    return DIOp;
-  }
+  static SILDIExprElement *createDecl(SILModule &mod, Decl *decl);
 
-  static SILDIExprElement createConstInt(uint64_t V) {
-    SILDIExprElement DIOp(ConstIntKind);
-    DIOp.ConstantInt = V;
-    return DIOp;
+  static SILDIExprElement *createConstInt(SILModule &mod, uint64_t value);
+
+  /// Is this an element that can be the tail of a fragment operator.
+  ///
+  /// Today, this just includes Decls but with time we will add support for
+  /// other things like tuples.
+  bool isFragmentTail() const { return bool(getAsDecl()); }
+
+  static void Profile(llvm::FoldingSetNodeID &id, SILDIExprOperator op,
+                      Decl *decl, Optional<uint64_t> intValue);
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    Profile(id, getAsOperator(), getAsDecl(), getAsConstInt());
   }
 };
 
@@ -130,14 +136,14 @@ struct SILDIExprInfo {
 
 /// A DIExpr operand is consisting of a SILDIExprOperator and
 /// SILDIExprElement arguments following after.
-struct SILDIExprOperand : public llvm::ArrayRef<SILDIExprElement> {
+struct SILDIExprOperand : public llvm::ArrayRef<const SILDIExprElement *> {
   // Reuse all the ctors
-  using llvm::ArrayRef<SILDIExprElement>::ArrayRef;
+  using llvm::ArrayRef<const SILDIExprElement *>::ArrayRef;
 
   SILDIExprOperator getOperator() const {
     assert(size() && "empty DIExpr operand");
-    const SILDIExprElement &First = front();
-    return First.getAsOperator();
+    const SILDIExprElement *const &First = front();
+    return First->getAsOperator();
   }
 
   size_t getNumArg() const {
@@ -145,68 +151,70 @@ struct SILDIExprOperand : public llvm::ArrayRef<SILDIExprElement> {
     return size() - 1;
   }
 
-  llvm::ArrayRef<SILDIExprElement> args() const {
-    return drop_front();
-  }
+  llvm::ArrayRef<const SILDIExprElement *> args() const { return drop_front(); }
 };
 
 /// Represents a debug info expression in SIL
-class SILDebugInfoExpression {
+class SILDebugInfoExpression final
+    : public llvm::FoldingSetNode,
+      private llvm::TrailingObjects<SILDebugInfoExpression,
+                                    const SILDIExprElement *> {
   friend class TailAllocatedDebugVariable;
-  llvm::SmallVector<SILDIExprElement, 2> Elements;
+  friend TrailingObjects;
 
-public:
+  unsigned numElts;
+
   SILDebugInfoExpression() = default;
 
-  explicit SILDebugInfoExpression(llvm::ArrayRef<SILDIExprElement> EL)
-      : Elements(EL.begin(), EL.end()) {}
+  using TrailingObjects::getTrailingObjects;
+  using TrailingObjects::totalSizeToAlloc;
+  ;
 
-  void clear() { Elements.clear(); }
-
-  size_t getNumElements() const { return Elements.size(); }
-
-  using iterator = typename decltype(Elements)::iterator;
-  using const_iterator = typename decltype(Elements)::const_iterator;
-
-  iterator element_begin() { return Elements.begin(); }
-  iterator element_end() { return Elements.end(); }
-
-  const_iterator element_begin() const { return Elements.begin(); }
-  const_iterator element_end() const { return Elements.end(); }
-
-  llvm::iterator_range<iterator> elements() {
-    return llvm::make_range(element_begin(), element_end());
+public:
+  static SILDebugInfoExpression *get(SILModule &mod,
+                                     ArrayRef<const SILDIExprElement *> start,
+                                     ArrayRef<const SILDIExprElement *> end);
+  static SILDebugInfoExpression *
+  get(SILModule &mod, ArrayRef<const SILDIExprElement *> elements) {
+    return get(mod, elements, {});
   }
 
-  llvm::iterator_range<const_iterator> elements() const {
-    return llvm::make_range(element_begin(), element_end());
+  static SILDebugInfoExpression *get(SILModule &mod) {
+    return get(mod, {}, {});
   }
 
-  const SILDIExprElement &getElement(size_t index) const {
-    assert(index < Elements.size());
-    return Elements[index];
+  ArrayRef<const SILDIExprElement *> getElements() const {
+    return {getTrailingObjects<const SILDIExprElement *>(), numElts};
   }
 
-  void push_back(const SILDIExprElement &Element) {
-    Elements.push_back(Element);
+  size_t getNumElements() const { return numElts; }
+
+  using iterator = ArrayRef<const SILDIExprElement *>::iterator;
+  using const_iterator = ArrayRef<const SILDIExprElement *>::const_iterator;
+
+  iterator begin() { return getElements().begin(); }
+  iterator end() { return getElements().end(); }
+  const_iterator begin() const { return getElements().begin(); }
+  const_iterator end() const { return getElements().end(); }
+
+  const SILDIExprElement *getElement(size_t index) const {
+    return getElements()[index];
   }
 
-  void appendElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
-    if (NewElements.size())
-      Elements.append(NewElements.begin(), NewElements.end());
+  SILDebugInfoExpression *
+  append(SILModule &mod, ArrayRef<const SILDIExprElement *> newElements) const {
+    return get(mod, getElements(), newElements);
   }
 
-  void append(const SILDebugInfoExpression &Tail) {
-    appendElements(Tail.Elements);
+  SILDebugInfoExpression *append(SILModule &mod,
+                                 const SILDebugInfoExpression *other) const {
+    return get(mod, getElements(), other->getElements());
   }
 
-  void prependElements(llvm::ArrayRef<SILDIExprElement> NewElements) {
-    Elements.insert(Elements.begin(),
-                    NewElements.begin(), NewElements.end());
-  }
-
-  void eraseElement(const_iterator It) {
-    Elements.erase(It);
+  SILDebugInfoExpression *
+  prepend(SILModule &mod,
+          ArrayRef<const SILDIExprElement *> newElements) const {
+    return get(mod, newElements, getElements());
   }
 
   /// The iterator for SILDIExprOperand
@@ -214,12 +222,12 @@ public:
     friend class SILDebugInfoExpression;
 
     SILDIExprOperand Current;
-    llvm::ArrayRef<SILDIExprElement> Remain;
+    llvm::ArrayRef<const SILDIExprElement *> Remain;
 
     void increment();
 
-    explicit
-    op_iterator(llvm::ArrayRef<SILDIExprElement> Remain): Remain(Remain) {
+    explicit op_iterator(llvm::ArrayRef<const SILDIExprElement *> Remain)
+        : Remain(Remain) {
       increment();
     }
 
@@ -253,11 +261,9 @@ public:
     }
   };
 
-  op_iterator operand_begin() const {
-    return op_iterator(Elements);
-  }
+  op_iterator operand_begin() const { return op_iterator(getElements()); }
   op_iterator operand_end() const {
-    return op_iterator(llvm::ArrayRef<SILDIExprElement>{});
+    return op_iterator(llvm::ArrayRef<const SILDIExprElement *>{});
   }
 
   llvm::iterator_range<op_iterator> operands() const {
@@ -265,28 +271,73 @@ public:
   }
 
   /// Return true if this expression is not empty
-  inline operator bool() const { return Elements.size(); }
+  inline operator bool() const { return numElts; }
 
   /// Create a op_fragment expression
-  static SILDebugInfoExpression createFragment(VarDecl *Field);
+  static SILDebugInfoExpression *createFragment(SILModule &mod, VarDecl *Field);
 
   /// Return true if this DIExpression starts with op_deref
   bool startsWithDeref() const {
-    return Elements.size() &&
-           Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
+    auto elements = getElements();
+    auto ii = elements.begin();
+    if (ii == elements.end())
+      return false;
+    return (*ii)->getAsOperator() == SILDIExprOperator::Dereference;
+  }
+
+  const SILDebugInfoExpression *dropDeref(SILModule &mod) const {
+    if (!startsWithDeref())
+      return this;
+
+    return get(mod, getElements().drop_front());
   }
 
   /// Return true if this DIExpression has op_fragment (at the end)
   bool hasFragment() const {
-    return Elements.size() >= 2 &&
-           Elements[Elements.size() - 2].getAsOperator() ==
-            SILDIExprOperator::Fragment;
+    // Walk from front to back to see if we have a fragment. The pattern we are
+    // looking for is fragment fragment_tail+
+    auto elements = getElements();
+    auto ii = elements.rbegin(), ie = elements.rend();
+
+    // If we don't have any elements, we can't have a fragment.
+    if (ii == ie)
+      return false;
+
+    // If our last element is not a fragment tail, then return false. We should
+    // /always/ have at least one fragment tail before the fragment operator.
+    if (!(*ii)->isFragmentTail())
+      return false;
+    ++ii;
+
+    // If we had a fragment tail and do not have a fragment operator afterwards,
+    // then we are done. Return false.
+    while (ii != ie) {
+      auto *val = *ii;
+      ++ii;
+
+      if (val->getAsOperator() == SILDIExprOperator::Fragment)
+        return true;
+      if (!val->isFragmentTail())
+        return false;
+    }
+
+    // If we did not find either pattern (for instance, if we saw a tail and no
+    // fragment), return false.
+    return false;
   }
+
+  static void Profile(llvm::FoldingSetNodeID &id,
+                      ArrayRef<const SILDIExprElement *> elements);
+
+  void Profile(llvm::FoldingSetNodeID &id) { Profile(id, getElements()); }
+
+  void
+  verify(llvm::function_ref<void(bool, StringRef)> require = nullptr) const;
 };
 
 /// Returns the hashcode for the di expr element.
 inline llvm::hash_code hash_value(const SILDebugInfoExpression &elt) {
-  return llvm::hash_combine_range(elt.element_begin(), elt.element_end());
+  return llvm::hash_combine_range(elt.begin(), elt.end());
 }
 
 } // end namespace swift

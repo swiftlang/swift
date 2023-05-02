@@ -292,7 +292,7 @@ bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
   if (!varInfo)
     return false;
 
-  auto name = varInfo->Name;
+  auto name = varInfo->getName();
   if (name.empty())
     return false;
 

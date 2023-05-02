@@ -590,7 +590,7 @@ private:
               origBBLoc.getLocation().print(adjNameStream, getASTContext().SourceMgr);
             }
             adjNameStream << " (scope #" << origBB->getDebugID() << ")";
-            dv.Name = adjName;
+            dv.Name = getASTContext().getIdentifier(adjName);
             return dv;
           }));
     return (insertion.first->getSecond() = newBuf);

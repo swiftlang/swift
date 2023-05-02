@@ -1285,7 +1285,7 @@ static void diagnoseInvalidCaptureByConcurrentClosure(
   auto varInfo = abi->getVarInfo();
   StringRef name = "<unknown>";
   if (varInfo) {
-    name = varInfo->Name;
+    name = varInfo->getName();
   }
 
   de.diagnoseWithNotes(
