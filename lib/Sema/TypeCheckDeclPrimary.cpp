@@ -3794,9 +3794,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
 
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(
-      ctx.evaluator, ResolveMacroRequest{MED, MED},
-      ConcreteDeclRef());
+  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
+                                 ConcreteDeclRef());
   if (!macro)
     return None;
   MED->setMacroRef(macro);
