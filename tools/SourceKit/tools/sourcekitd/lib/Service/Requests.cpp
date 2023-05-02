@@ -3514,6 +3514,12 @@ void SKEditorConsumer::recordFormattedText(StringRef Text) {
   Dict.set(KeySourceText, Text);
 }
 
+static void fillDictionaryForRange(ResponseBuilder::Dictionary Elem,
+                                   const RawCharSourceRange &R) {
+  Elem.set(KeyOffset, R.Offset);
+  Elem.set(KeyLength, R.Length);
+}
+
 static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
@@ -3554,19 +3560,15 @@ static void fillDictionaryForDiagnosticInfoBase(
 
   if (!Info.Ranges.empty()) {
     auto RangesArr = Elem.setArray(KeyRanges);
-    for (auto R : Info.Ranges) {
-      auto RangeElem = RangesArr.appendDictionary();
-      RangeElem.set(KeyOffset, R.first);
-      RangeElem.set(KeyLength, R.second);
-    }
+    for (auto R : Info.Ranges)
+      fillDictionaryForRange(RangesArr.appendDictionary(), R);
   }
 
   if (!Info.Fixits.empty()) {
     auto FixitsArr = Elem.setArray(KeyFixits);
     for (auto F : Info.Fixits) {
       auto FixitElem = FixitsArr.appendDictionary();
-      FixitElem.set(KeyOffset, F.Offset);
-      FixitElem.set(KeyLength, F.Length);
+      fillDictionaryForRange(FixitElem, F.Range);
       FixitElem.set(KeySourceText, F.Text);
     }
   }
