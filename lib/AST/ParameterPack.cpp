@@ -134,6 +134,14 @@ bool CanTupleType::containsPackExpansionTypeImpl(CanTupleType tuple) {
   return false;
 }
 
+bool TupleType::isSingleUnlabeledPackExpansion() const {
+  if (getNumElements() != 1)
+    return false;
+
+  const auto &elt = getElement(0);
+  return !elt.hasName() && elt.getType()->is<PackExpansionType>();
+}
+
 bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   for (auto param : params) {
     if (param.getPlainType()->is<PackExpansionType>())
