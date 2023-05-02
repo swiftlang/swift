@@ -181,6 +181,8 @@ template <typename BitfieldContainer> struct BitfieldRef {
     return ref;
   }
 
+  explicit operator bool() { return ref; }
+
   // Stack-allocated state must be nested relative to other node bitfields.
   struct StackState {
     BitfieldRef &ref;
