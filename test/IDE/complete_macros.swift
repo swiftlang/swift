@@ -36,6 +36,16 @@ public macro AttachedMemberMacro()
 @attached(member)
 public macro AttachedMemberMacroWithArgs(arg1: Int)
 
+public enum Direction {
+  case up, down
+}
+
+@attached(member)
+public macro AttachedMemberMacroWithEnumArgs(_ direction: Direction)
+
+@attached(member)
+public macro AttachedMemberMacroWithMultipleArgs(first: Int, second: Int)
+
 @attached(memberAttribute)
 public macro AttachedMemberAttributeMacro()
 
@@ -156,6 +166,19 @@ struct NestedFreestanding {
 // ITEM_FREESTANDING-NOT: freestandingCodeItemMacro
 // ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: freestandingDeclMacro[#Void#]; name=freestandingDeclMacro
 // ITEM_FREESTANDING-DAG: Decl[Macro]/{{.*}}: EverythingMacro[#Void#]; name=EverythingMacro
+
+
+@AttachedMemberMacroWithEnumArgs(.#^ATTACHED_MACRO_ARG^#)
+struct AttachedMacroArg {}
+
+// ATTACHED_MACRO_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: up[#Direction#]; name=up
+// ATTACHED_MACRO_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: down[#Direction#]; name=down
+
+@AttachedMemberMacroWithMultipleArgs(first: 1, #^ATTACHED_MACRO_SECOND_ARG_LABEL^#)
+struct AttachedMacroSecondArgLabel {}
+
+// ATTACHED_MACRO_SECOND_ARG_LABEL: Pattern/Local/Flair[ArgLabels]:     {#second: Int#}[#Int#]; name=second:
+
 
 struct LastMember {
   @#^LAST_MEMBER_ATTR?check=INDEPENDENT_ATTR^#

@@ -1495,12 +1495,9 @@ swift::expandConformances(CustomAttr *attr, MacroDecl *macro,
   return macroSourceFile->getBufferID();
 }
 
-ConcreteDeclRef
-ResolveMacroRequest::evaluate(Evaluator &evaluator,
-                              UnresolvedMacroReference macroRef,
-                              const Decl *decl) const {
-  auto dc = decl->getDeclContext();
-
+ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                                              UnresolvedMacroReference macroRef,
+                                              DeclContext *dc) const {
   // Macro expressions and declarations have their own stored macro
   // reference. Use it if it's there.
   if (auto *expr = macroRef.getExpr()) {
