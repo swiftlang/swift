@@ -89,6 +89,7 @@ public final class CopyableKlassWithMoveOnlyField {
 
 public protocol P {
     static var value: Self { get }
+    var name: CopyableKlass { get }
     static var value2: any P { get }
 }
 
@@ -110,6 +111,7 @@ public struct AddressOnlyGeneric<T : P> {
 extension CopyableKlass : P {
     public static var value: Self { fatalError() }
     public static var value2: any P { CopyableKlass() }
+    public var name: CopyableKlass { CopyableKlass() }
 }
 
 @_moveOnly
@@ -2359,6 +2361,39 @@ public func addressOnlyGenericAccessConsumeField2<T>(_ x: borrowing AddressOnlyG
     }
 }
 
+public func addressOnlyGenericAccessConsumeGrandField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.copyable.name)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandField2<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandField2a<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.moveOnly.copyableK)
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
+
 public func addressOnlyGenericAccessConsumeFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
     consumeVal(x2.copyable)
     for _ in 0..<1024 {
@@ -2395,6 +2430,57 @@ public func addressOnlyGenericAccessConsumeFieldArg4<T>(_ x2: consuming AddressO
     }
 }
 
+public func addressOnlyGenericAccessConsumeGrandFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable.name)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg2a<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    consumeVal(x2.moveOnly.copyableK)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable.name)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg4<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg4a<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    consumeVal(x2.moveOnly.copyableK)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
 
 extension AddressOnlyGeneric {
     func testNoUseSelf() { // expected-error {{'self' has guaranteed ownership but was consumed}}
