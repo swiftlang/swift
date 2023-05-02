@@ -370,20 +370,9 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
   // Decide whether to pick a parent scope instead.
   if (ASTScope->ignoreInDebugInfo()) {
     LLVM_DEBUG(llvm::dbgs() << "ignored\n");
-    // FIXME: it would be more deterministic to use
-    //        getOrCreateScope(ASTScope->getParent().getPtrOrNull());
-    //        here. Unfortunately property wrappers rearrange AST
-    //        nodes without marking them as implicit, e.g.:
-    //
-    //           @Wrapper(a) var v = b
-    //        ->
-    //           let _tmp = Constructor(a, b); var v = _tmp
-    //
-    //        Since the arguments to Constructor aren't marked as implicit,
-    //        argument b is in the scope of v, but the call to Constructor
-    //        isn't, which correctly triggers the scope hole verifier.
-    auto *CurScope = B.getCurrentDebugScope();
-    return CurScope->InlinedCallSite != InlinedAt ? FnScope : CurScope;
+    auto *ParentScope = getOrCreateScope(ASTScope->getParent().getPtrOrNull(),
+                                         FnScope, InlinedAt);
+    return ParentScope->InlinedCallSite != InlinedAt ? FnScope : ParentScope;
   }
 
   // Collapse BraceStmtScopes whose parent is a .*BodyScope.
