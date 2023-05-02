@@ -97,7 +97,13 @@ enum class MacroIntroducedDeclNameKind {
   Prefixed,
   Suffixed,
   Arbitrary,
+
+  // NOTE: When adding a new name kind, also add it to
+  // `getAllMacroIntroducedDeclNameKinds`.
 };
+
+/// Returns an enumeratable list of all macro introduced decl name kinds.
+std::vector<MacroIntroducedDeclNameKind> getAllMacroIntroducedDeclNameKinds();
 
 /// Whether a macro-introduced name of this kind requires an argument.
 bool macroIntroducedNameRequiresArgument(MacroIntroducedDeclNameKind kind);
