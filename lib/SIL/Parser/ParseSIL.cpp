@@ -117,6 +117,11 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
            "Failed to parse SIL but did not emit any errors!");
     return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
+  // If SIL parsing succeeded, verify the generated SIL.
+  if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
+    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
+  }
+
   return silMod;
 }
 
@@ -7045,10 +7050,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
 
   if (FunctionState.diagnoseProblems())
     return true;
-
-  // If SIL parsing succeeded, verify the generated SIL.
-  if (!P.Diags.hadAnyError() && !DisableInputVerify)
-    FunctionState.F->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
 
   return false;
 }

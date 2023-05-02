@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -774,3 +775,21 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> () {
+[%0: read s0]
+}
+
+// CHECK: SIL memory lifetime failure in @test_partial_read_in_argument: memory is not initialized, but should be
+sil [ossa] @test_partial_read_in_argument : $@convention(thin) (@in Inner) -> () {
+bb0(%0: $*Inner):
+  %1 = struct_element_addr %0 : $*Inner, #Inner.a
+  destroy_addr %1 : $*T
+  %3 = function_ref @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %5 = struct_element_addr %0 : $*Inner, #Inner.b
+  destroy_addr %5 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
