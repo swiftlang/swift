@@ -10,7 +10,7 @@ public class S {
     // CHECK: sil_scope [[X1:[0-9]+]] { loc "{{.*}}":[[@LINE-1]]:5
     // CHECK: sil_scope [[X2:[0-9]+]] { loc "{{.*}}":[[@LINE-2]]:29
     // CHECK: debug_value {{.*}} : $Optional<C>, let, name "x", {{.*}}, scope [[X1]]
-    // CHECK: debug_value %29 : $C, let, name "x", {{.*}}, scope [[X2]]
+    // CHECK: debug_value {{.*}} : $C, let, name "x", {{.*}}, scope [[X2]]
     // CHECK-NEXT:  scope [[X2]]
       throw MyError()
     }
