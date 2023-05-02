@@ -170,6 +170,10 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
 // it returns true for every instruction that has a lifetime-ending operand.
 void UnreachableLifetimeCompletion::visitUnreachableInst(
     SILInstruction *instruction) {
+
+  if (!instruction->getModule().getOptions().OSSACompleteLifetimes)
+    return;
+
   auto *block = instruction->getParent();
   bool inReachableBlock = !unreachableBlocks.contains(block);
   // If this instruction's block is already marked unreachable, and

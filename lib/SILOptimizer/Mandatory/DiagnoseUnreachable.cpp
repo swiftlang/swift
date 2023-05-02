@@ -17,13 +17,14 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -724,8 +725,9 @@ static SILInstruction *getPrecedingCallToNoReturn(SILBasicBlock &BB) {
   return first;
 }
 
-static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
-                                     UnreachableUserCodeReportingState *State) {
+static bool simplifyBlocksWithCallsToNoReturn(
+    SILBasicBlock &BB, UnreachableUserCodeReportingState *State,
+    UnreachableLifetimeCompletion &lifetimeCompletion) {
   auto I = BB.begin(), E = BB.end();
   bool DiagnosedUnreachableCode = false;
   SILInstruction *NoReturnCall = nullptr;
@@ -736,6 +738,11 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   // If all of the predecessor blocks end in a try_apply to a noreturn
   // function, the entire block is dead.
   NoReturnCall = getPrecedingCallToNoReturn(BB);
+  if (NoReturnCall) {
+    // Mark the successor of a no-return try-apply as unreachable so that the
+    // try_apply results are considered unreachable.
+    lifetimeCompletion.visitUnreachableBlock(&BB);
+  }
 
   // Diagnose the unreachable code within the same block as the call to
   // noreturn.
@@ -787,6 +794,10 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 
       // We will need to delete the instruction later on.
       ToBeDeleted.push_back(CurrentInst);
+
+      // visitUnreachableBlock requires this loop to forward iterate starting at
+      // the first unreachable instruction.
+      lifetimeCompletion.visitUnreachableInst(CurrentInst);
 
       DiagnosedUnreachableCode |=
           diagnoseUnreachableCode(NoReturnCall, CurrentInst);
@@ -848,6 +859,9 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   SILBuilder B(&BB);
   B.setCurrentDebugScope(Scope);
   B.createUnreachable(ArtificialUnreachableLocation());
+
+  // Warning: this leaves OSSA in an incomplete state.
+  // removeUnreachableBlocks() must be called to fix lifetimes.
 
   return true;
 }
@@ -1034,14 +1048,17 @@ static void performNoReturnFunctionProcessing(SILFunction &Fn,
                                               SILFunctionTransform *T) {
   LLVM_DEBUG(llvm::errs() << "*** No return function processing: "
                           << Fn.getName() << "\n");
+  UnreachableLifetimeCompletion lifetimeCompletion(&Fn, /*DomInfo*/nullptr);
   bool Changed = false;
   for (auto &BB : Fn) {
     // Remove instructions from the basic block after a call to a noreturn
     // function.
-    Changed |= simplifyBlocksWithCallsToNoReturn(BB, nullptr);
+    Changed |=
+        simplifyBlocksWithCallsToNoReturn(BB, nullptr, lifetimeCompletion);
   }
   if (Changed) {
     removeUnreachableBlocks(Fn);
+    lifetimeCompletion.completeLifetimes();
     T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
@@ -1051,38 +1068,46 @@ static void diagnoseUnreachable(SILFunction &Fn) {
                           << Fn.getName() << "\n");
 
   UnreachableUserCodeReportingState State(&Fn);
+  {
+    UnreachableLifetimeCompletion lifetimeCompletion(&Fn, /*DomInfo*/nullptr);
 
-  for (auto &BB : Fn) {
-    // Simplify the blocks with terminators that rely on constant conditions.
-    if (constantFoldTerminator(BB, &State))
-      continue;
+    for (auto &BB : Fn) {
+      // Simplify the blocks with terminators that rely on constant conditions.
+      if (constantFoldTerminator(BB, &State))
+        continue;
 
-    // Remove instructions from the basic block after a call to a noreturn
-    // function.
-    if (simplifyBlocksWithCallsToNoReturn(BB, &State))
-      continue;
+      // Remove instructions from the basic block after a call to a noreturn
+      // function.
+      if (simplifyBlocksWithCallsToNoReturn(BB, &State, lifetimeCompletion))
+        continue;
+    }
+
+    // Remove unreachable blocks.
+    removeUnreachableBlocks(Fn, Fn.getModule(), &State);
+    lifetimeCompletion.completeLifetimes();
   }
-
-  // Remove unreachable blocks.
-  removeUnreachableBlocks(Fn, Fn.getModule(), &State);
 
   for (auto &BB : Fn) {
     propagateBasicBlockArgs(BB);
   }
 
-  for (auto &BB : Fn) {
-    // Simplify the blocks with terminators that rely on constant conditions.
-    if (constantFoldTerminator(BB, &State)) {
-      continue;
+  {
+    UnreachableLifetimeCompletion lifetimeCompletion(&Fn, /*DomInfo*/nullptr);
+    for (auto &BB : Fn) {
+      // Simplify the blocks with terminators that rely on constant conditions.
+      if (constantFoldTerminator(BB, &State)) {
+        continue;
+      }
+      // Remove instructions from the basic block after a call to a noreturn
+      // function.
+      if (simplifyBlocksWithCallsToNoReturn(BB, &State, lifetimeCompletion))
+        continue;
     }
-    // Remove instructions from the basic block after a call to a noreturn
-    // function.
-    if (simplifyBlocksWithCallsToNoReturn(BB, &State))
-      continue;
-  }
 
-  // Remove unreachable blocks.
-  removeUnreachableBlocks(Fn, Fn.getModule(), &State);
+    // Remove unreachable blocks.
+    removeUnreachableBlocks(Fn, Fn.getModule(), &State);
+    lifetimeCompletion.completeLifetimes();
+  }
 }
 
 // External entry point for other passes, which must do their own invalidation.
