@@ -209,6 +209,32 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
 
+  // '-plugin-path' options.
+  for (const auto &path : getSearchPathOptions().PluginSearchPaths) {
+    serializationOpts.PluginSearchPaths.push_back(path);
+  }
+  // '-external-plugin-path' options.
+  for (const ExternalPluginSearchPathAndServerPath &pair :
+       getSearchPathOptions().ExternalPluginSearchPaths) {
+    serializationOpts.ExternalPluginSearchPaths.push_back(
+        pair.SearchPath + "#" +
+        pair.ServerPath);
+  }
+  // '-load-plugin-library' options.
+  for (const auto &path :
+       getSearchPathOptions().getCompilerPluginLibraryPaths()) {
+    serializationOpts.CompilerPluginLibraryPaths.push_back(path);
+  }
+  // '-load-plugin-executable' options.
+  for (const PluginExecutablePathAndModuleNames &pair :
+       getSearchPathOptions().getCompilerPluginExecutablePaths()) {
+    std::string optStr = pair.ExecutablePath + "#";
+    llvm::interleave(
+        pair.ModuleNames, [&](auto &name) { optStr += name; },
+        [&]() { optStr += ","; });
+    serializationOpts.CompilerPluginLibraryPaths.push_back(optStr);
+  }
+
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
 
