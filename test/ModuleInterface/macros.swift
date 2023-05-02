@@ -5,7 +5,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -module-name Macros -emit-module-interface-path %t/Macros.swiftinterface %s
+// RUN: %target-swift-emit-module-interface(%t/Macros.swiftinterface) -module-name Macros %s
 // RUN: %FileCheck %s < %t/Macros.swiftinterface --check-prefix CHECK
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Macros.swiftinterface -o %t/Macros.swiftmodule
 
@@ -14,6 +14,9 @@
 // CHECK-NEXT: #endif
 @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 
+// CHECK: #if compiler(>=5.3) && $Macros && $FreestandingExpressionMacros
+// CHECK: @freestanding(expression) public macro labeledStringify<T>(_ value: T, label: Swift.String) -> (T, Swift.String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
+// CHECK-NEXT: #endif
 @freestanding(expression) public macro labeledStringify<T>(_ value: T, label: String) -> (T, String) = #externalMacro(module: "SomeModule", type: "StringifyMacro")
 
 // CHECK: #if compiler(>=5.3) && $Macros && $FreestandingExpressionMacros
