@@ -2135,15 +2135,6 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (!Impl.SwiftContext.LangOpts.hasFeature(Feature::MoveOnly)) {
-          Impl.addImportDiagnostic(
-              decl, Diagnostic(
-                        diag::move_only_requires_move_only,
-                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
-              decl->getLocation());
-          return nullptr;
-        }
-
         result->getAttrs().add(new (Impl.SwiftContext)
                                    MoveOnlyAttr(/*Implicit=*/true));
       }
