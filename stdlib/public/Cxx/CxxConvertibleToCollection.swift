@@ -25,12 +25,22 @@ public protocol CxxConvertibleToCollection<Element> {
 
 extension CxxConvertibleToCollection {
   @inlinable
-  internal func forEach(_ body: (RawIterator.Pointee) -> Void) {
+  public func forEach(_ body: (RawIterator.Pointee) throws -> Void) rethrows {
     var rawIterator = __beginUnsafe()
     let endIterator = __endUnsafe()
     while rawIterator != endIterator {
-      body(rawIterator.pointee)
+      try body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
+    }
+  }
+}
+
+// Break the ambiguity between Sequence.forEach and CxxConvertibleToCollection.forEach.
+extension CxxConvertibleToCollection where Self: Sequence {
+  @inlinable
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
+    for element in self {
+      try body(element)
     }
   }
 }

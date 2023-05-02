@@ -39,4 +39,13 @@ CxxSequenceTestSuite.test("SimpleEmptySequence to Swift.Set") {
   expectTrue(set.isEmpty)
 }
 
+CxxSequenceTestSuite.test("SimpleSequence.forEach") {
+  let seq = SimpleSequence()
+  var array: [Int32] = []
+  seq.forEach {
+    array.append($0)
+  }
+  expectEqual([1, 2, 3, 4] as [Int32], array)
+}
+
 runAllTests()
