@@ -493,7 +493,7 @@ swift_auth_code(T value, unsigned extra) {
 #elif defined(_WIN32)
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
 #  define SWIFT_BACKTRACE_SECTION ".sw5bckt"
-#elif defined(__linux__)
+#elif defined(__linux__) && (defined(__arm64__) || defined(__x86_64__))
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
 #  define SWIFT_BACKTRACE_SECTION "swift5_backtrace"
 #else
