@@ -2356,9 +2356,14 @@ ClangImporter::Implementation::importParameterType(
                  dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
     swiftParamTy = findGenericTypeInGenericDecls(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
-  } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+  } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {    
     // We don't support reference type to a dependent type, just bail.
     if (refType->getPointeeType()->isDependentType()) {
+      return None;
+    }
+
+    // We don't support rvalue reference types, just bail.
+    if (refType->isRValueReferenceType()) {
       return None;
     }
 
