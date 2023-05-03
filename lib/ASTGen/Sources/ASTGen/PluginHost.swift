@@ -24,10 +24,18 @@ enum PluginError: Error {
 
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
-  opaqueHandle: UnsafeMutableRawPointer
-) {
+  opaqueHandle: UnsafeMutableRawPointer,
+  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
+) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
-  plugin.initialize()
+  do {
+    try plugin.initialize()
+    return true
+  } catch {
+    // Diagnostics are emitted in the caller.
+    // FIXME: Return what happened or emit diagnostics here.
+    return false
+  }
 }
 
 @_cdecl("swift_ASTGen_deinitializePlugin")
@@ -52,12 +60,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   let libraryPath = String(cString: libraryPath)
   let moduleName = String(cString: moduleName)
 
-  let diagEngine: PluginDiagnosticsEngine?
-  if let cxxDiagnosticEngine = cxxDiagnosticEngine {
-    diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
-  } else {
-    diagEngine = nil
-  }
+  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
 
   do {
     let result = try plugin.sendMessageAndWaitWithoutLock(
@@ -136,20 +139,15 @@ struct CompilerPlugin {
   }
 
   /// Initialize the plugin. This should be called inside lock.
-  func initialize() {
-    do {
-      // Get capability.
-      let response = try self.sendMessageAndWaitWithoutLock(.getCapability)
-      guard case .getCapabilityResult(let capability) = response else {
-        throw PluginError.invalidReponseKind
-      }
-      let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
-      ptr.initialize(to: .init(capability))
-      Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
-    } catch {
-      assertionFailure(String(describing: error))
-      return
+  func initialize() throws {
+    // Get capability.
+    let response = try self.sendMessageAndWaitWithoutLock(.getCapability)
+    guard case .getCapabilityResult(let capability) = response else {
+      throw PluginError.invalidReponseKind
     }
+    let ptr = UnsafeMutablePointer<Capability>.allocate(capacity: 1)
+    ptr.initialize(to: .init(capability))
+    Plugin_setCapability(opaqueHandle, UnsafeRawPointer(ptr))
   }
 
   func deinitialize() {
@@ -177,6 +175,14 @@ class PluginDiagnosticsEngine {
 
   init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
     self.cxxDiagnosticEngine = cxxDiagnosticEngine
+  }
+
+  /// Failable convenience initializer for optional cxx engine pointer.
+  convenience init?(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?) {
+    guard let cxxDiagnosticEngine = cxxDiagnosticEngine else {
+      return nil
+    }
+    self.init(cxxDiagnosticEngine: cxxDiagnosticEngine)
   }
 
   /// Register an 'ExportedSourceFile' to the engine. So the engine can get
