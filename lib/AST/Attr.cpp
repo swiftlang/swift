@@ -1356,14 +1356,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
-
-    if (Options.SuppressingFreestandingExpression &&
-        Attr->getMacroSyntax() == MacroSyntax::Freestanding &&
-        Attr->getMacroRole() == MacroRole::Expression) {
-      Printer.printAttrName("@expression");
-      break;
-    }
-
     switch (Attr->getMacroSyntax()) {
     case MacroSyntax::Freestanding:
       Printer.printAttrName("@freestanding");
@@ -1384,7 +1376,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
               SmallString<32> buffer;
               StringRef nameText = name.getName().getString(buffer);
-              bool shouldEscape = nameText == "$";
+              bool shouldEscape =
+                  escapeKeywordInContext(nameText, PrintNameContext::Normal) ||
+                  nameText == "$";
               Printer << "(";
               if (shouldEscape)
                 Printer << "`";

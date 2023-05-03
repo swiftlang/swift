@@ -50,7 +50,14 @@ protocol P {
   var value: A { get }
 
   func f(_ self: Self) -> Self
+
+  func makeA() -> A
 }
+
+extension P {
+  func makeA() -> [Self] { return [self] }
+}
+
 
 func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
   let _: (repeat (each T.A, U)) = (repeat ((each t).value, u))
@@ -133,7 +140,7 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1.element, with: repeat each tuple1.element)
 
   _ = zip(repeat each tuple1.element, with: repeat each tuple2.element)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each U' and 'each T' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each T' and 'each U' have the same shape}}
 }
 
 protocol Generatable {
@@ -330,10 +337,11 @@ func test_pack_expansions_with_closures() {
 }
 
 // rdar://107151854 - crash on invalid due to specialized pack expansion
-func test_pack_expansion_specialization() {
+func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
-    init(_: repeat each T) {} // expected-note 2 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {} // expected-note 2 {{'init(vals:)' declared here}}
+    init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
@@ -341,11 +349,28 @@ func test_pack_expansion_specialization() {
   _ = Data<Int, String>(42, "") // Ok
   _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
-  // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{38-39=}} {{48-49=}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
-  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
+  _ = Data<Int, String, Float>(tuple)
+  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
+  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}} {{39-40=}} {{49-50=}}
+
+  struct Ambiguity<each T> {
+    func test(_: repeat each T) -> Int { 42 }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+    func test(_: repeat each T) -> String { "" }
+    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  }
+
+  _ = Ambiguity<Int, String, Float>().test(tuple) // expected-error {{no exact matches in call to instance method 'test'}}
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
@@ -396,4 +421,63 @@ do {
   _ = Defaulted(t: "a", 0, 1.0) // Ok
   _ = Defaulted(t: "b", 0) // Ok
   _ = Defaulted(t: "c", 1.0, u: "d", 0) // Ok
+}
+
+// rdar://108064941 - unused result diagnostic is unaware of Void packs
+func test_no_unused_result_warning(arr: inout [Any]) {
+  func test1<each T>(_ value: (repeat each T)) {
+    repeat arr.append(each value.element) // no warning
+  }
+
+  func test2<each T>(_ value: repeat each T) {
+    ((repeat arr.append(each value))) // no warning
+  }
+}
+
+func test_partually_flattened_expansions() {
+  struct S<each T> {
+    init() {}
+
+    func fn<each U>(t: repeat each T, u: repeat each U) -> (repeat (each T, each U)) {
+      return (repeat (each t, each u))
+    }
+  }
+
+  _ = S().fn(t: 1, "hi", u: false, 1.0) // Ok
+  _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
+}
+
+// rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
+do {
+  func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat (each value).makeA()) // Ok
+  }
+
+  func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
+    return (repeat each value.makeA())
+    // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
+  }
+}
+
+// rdar://107835215 - failed to produce a diagnostic for invalid pack expansion expression
+do {
+  func test1(x: Int) {
+    repeat x
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  func test2<T: Numeric>(_ x: T) {
+    repeat print(x * 2)
+    // expected-error@-1:5 {{value pack expansion must contain at least one pack reference}}
+  }
+
+  struct S<T> {
+    init(_: T) {}
+  }
+
+  func test<each T>(x: repeat each T, y: Int) {
+    func f<each A, each B>(_: repeat each A, y: repeat each B) {}
+    f(repeat each x, y: repeat [S(y)])
+    // expected-error@-1:25 {{value pack expansion must contain at least one pack reference}}
+  }
 }

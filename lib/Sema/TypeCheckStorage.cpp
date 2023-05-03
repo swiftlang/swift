@@ -2324,6 +2324,12 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   AvailabilityInference::applyInferredAvailableAttrs(accessor,
                                                      asAvailableAs, ctx);
 
+  // A modify coroutine should have the same SPI visibility as the setter.
+  if (kind == AccessorKind::Modify) {
+    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
+      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
+  }
+
   finishImplicitAccessor(accessor, ctx);
 
   return accessor;
@@ -3317,15 +3323,6 @@ static void finishNSManagedImplInfo(VarDecl *var,
   } else {
     diagnoseNotStored(/*computed*/ 0);
   }
-}
-
-static Expr *getParentExecutableInitializer(VarDecl *var) {
-  if (auto *PBD = var->getParentPatternBinding()) {
-    const auto i = PBD->getPatternEntryIndexForVarDecl(var);
-    return PBD->getExecutableInit(i);
-  }
-
-  return nullptr;
 }
 
 static void finishStorageImplInfo(AbstractStorageDecl *storage,

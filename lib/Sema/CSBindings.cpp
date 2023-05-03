@@ -148,6 +148,11 @@ bool BindingSet::isDelayed() const {
 }
 
 bool BindingSet::involvesTypeVariables() const {
+  // This type variable always depends on a pack expansion variable
+  // which should be inferred first if possible.
+  if (TypeVar->getImpl().canBindToPack())
+    return true;
+
   // This is effectively O(1) right now since bindings are re-computed
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
@@ -1474,55 +1479,10 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::PackElementOf:
+  case ConstraintKind::SameShape:
     // Constraints from which we can't do anything.
     break;
-
-  case ConstraintKind::PackElementOf: {
-    auto elementType = CS.simplifyType(constraint->getFirstType());
-    auto packType = CS.simplifyType(constraint->getSecondType());
-
-    if (elementType->isTypeVariableOrMember() && packType->isTypeVariableOrMember())
-      break;
-
-    auto *elementVar = elementType->getAs<TypeVariableType>();
-    auto *packVar = packType->getAs<TypeVariableType>();
-
-    if (elementVar == TypeVar && !packVar) {
-      // Produce a potential binding to the opened element archetype corresponding
-      // to the pack type.
-      auto shapeClass = packType->getReducedShape();
-      packType = packType->mapTypeOutOfContext();
-      auto *elementEnv = CS.getPackElementEnvironment(constraint->getLocator(),
-                                                      shapeClass);
-
-      // Without an opened element environment, we cannot derive the
-      // element binding.
-      if (!elementEnv)
-        break;
-
-      auto elementType = elementEnv->mapPackTypeIntoElementContext(packType);
-      assert(!elementType->is<PackType>());
-      addPotentialBinding({elementType, AllowedBindingKind::Exact, constraint});
-
-      break;
-    } else if (packVar == TypeVar && !elementVar) {
-      // Produce a potential binding to the pack archetype corresponding to
-      // the opened element type.
-      Type patternType;
-      auto *packEnv = CS.DC->getGenericEnvironmentOfContext();
-      if (!elementType->hasElementArchetype()) {
-        patternType = elementType;
-      } else {
-        patternType = packEnv->mapElementTypeIntoPackContext(elementType);
-      }
-
-      addPotentialBinding({patternType, AllowedBindingKind::Exact, constraint});
-
-      break;
-    }
-
-    break;
-  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
@@ -2255,6 +2215,13 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
           IgnoreUnresolvedPatternVar::create(cs, pattern, dstLocator);
       return std::make_pair(fix, /*impact=*/(unsigned)100);
     }
+  }
+
+  if (srcLocator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+    auto *baseExpr = castToExpr<UnresolvedMemberExpr>(srcLocator->getAnchor());
+    ConstraintFix *fix = SpecifyBaseTypeForContextualMember::create(
+        cs, baseExpr->getName(), srcLocator);
+    return std::make_pair(fix, defaultImpact);
   }
 
   return None;

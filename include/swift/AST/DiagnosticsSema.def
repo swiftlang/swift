@@ -5423,6 +5423,15 @@ ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
       "only a single element can be variadic", ())
+ERROR(cannot_convert_tuple_into_pack_expansion_parameter,none,
+      "value pack expansion at parameter #%0 expects %1 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}2",
+      (unsigned, unsigned, bool))
+NOTE(cannot_convert_tuple_into_pack_expansion_parameter_note,none,
+     "value pack expansion at parameter #%0 expects %1 separate arguments",
+     (unsigned, unsigned))
+ERROR(value_expansion_not_variadic,none,
+      "value pack expansion must contain at least one pack reference", ())
 
 ERROR(expansion_not_same_shape,none,
       "pack expansion %0 requires that %1 and %2 have the same shape",

@@ -1749,6 +1749,16 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
 }
 
 static bool isDiscardableType(Type type) {
+  // If type is `(_: repeat ...)`, it can be discardable.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    if (tuple->isSingleUnlabeledPackExpansion()) {
+      type = tuple->getElementType(0);
+    }
+  }
+
+  if (auto *expansion = type->getAs<PackExpansionType>())
+    return isDiscardableType(expansion->getPatternType());
+
   return (type->hasError() ||
           type->isUninhabited() ||
           type->lookThroughAllOptionalTypes()->isVoid());

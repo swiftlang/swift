@@ -400,12 +400,12 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 6+32,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+31,
     /// Type variable options.
-    Options : 6,
+    Options : 7,
     : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 32
+    ID : 31
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
@@ -2458,6 +2458,10 @@ public:
                       ArrayRef<TupleTypeElt> Elements);
   
   bool containsPackExpansionType() const;
+
+  /// Check whether this tuple consists of a single unlabeled element
+  /// of \c PackExpansionType.
+  bool isSingleUnlabeledPackExpansion() const;
 
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
