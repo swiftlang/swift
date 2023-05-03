@@ -13420,11 +13420,11 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      auto *shapeOf = Constraint::create(
-          *this, ConstraintKind::ShapeOf, type1, type2,
-          getConstraintLocator(locator));
+      auto *explictGenericArgs =
+          Constraint::create(*this, ConstraintKind::ExplicitGenericArguments,
+                             type1, type2, getConstraintLocator(locator));
 
-      addUnsolvedConstraint(shapeOf);
+      addUnsolvedConstraint(explictGenericArgs);
       return SolutionKind::Solved;
     }
 
