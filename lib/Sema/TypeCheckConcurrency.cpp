@@ -1343,14 +1343,24 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
       (!legacyMoveOnlyEnqueueWitnessDecl || legacyMoveOnlyEnqueueWitnessDecl->getLoc().isInvalid())) {
     // Neither old nor new implementation have been found, but we provide default impls for them
     // that are mutually recursive, so we must error and suggest implementing the right requirement.
-    auto ownedRequirement = C.getExecutorDecl()->getExecutorOwnedEnqueueFunction();
-    nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
-    ownedRequirement->diagnose(diag::no_witnesses,
-                               getProtocolRequirementKind(ownedRequirement),
-                               ownedRequirement->getName(),
-                               ownedRequirement->getParameters()->get(0)->getInterfaceType(),
-                               /*AddFixIt=*/true);
-    return;
+    //
+    // If we're running against an SDK that does not have the ExecutorJob enqueue function,
+    // try to diagnose using the next-best one available.
+    auto missingRequirement = C.getExecutorDecl()->getExecutorOwnedEnqueueFunction();
+    if (!missingRequirement)
+      missingRequirement = C.getExecutorDecl()->getExecutorLegacyOwnedEnqueueFunction();
+    if (!missingRequirement)
+      missingRequirement = C.getExecutorDecl()->getExecutorLegacyUnownedEnqueueFunction();
+
+    if (missingRequirement) {
+      nominal->diagnose(diag::type_does_not_conform, nominalTy, proto->getDeclaredInterfaceType());
+      missingRequirement->diagnose(diag::no_witnesses,
+                                   getProtocolRequirementKind(missingRequirement),
+                                   missingRequirement->getName(),
+                                   missingRequirement->getParameters()->get(0)->getInterfaceType(),
+                                   /*AddFixIt=*/true);
+      return;
+    }
   }
 }
 
