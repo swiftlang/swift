@@ -7119,6 +7119,11 @@ ERROR(moveonly_parameter_missing_ownership, none,
       "noncopyable parameter must specify its ownership", ())
 NOTE(moveonly_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
+ERROR(ownership_specifier_copyable,none,
+      "Copyable types cannot be 'consuming' or 'borrowing' yet", ())
+ERROR(self_ownership_specifier_copyable,none,
+      "%0 is not yet valid on %1s in a Copyable type",
+      (SelfAccessKind, DescriptiveDeclKind))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
