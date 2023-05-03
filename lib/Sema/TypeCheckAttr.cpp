@@ -466,7 +466,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   }
 
   auto DC = FD->getDeclContext();
-  // mutation attributes may only appear in type context.
+  // self-ownership attributes may only appear in type context.
   if (auto contextTy = DC->getDeclaredInterfaceType()) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
@@ -487,6 +487,27 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
         break;
       }
     }
+
+    // Unless we have the experimental no-implicit-copy feature enabled, Copyable
+    // types can't use 'consuming' or 'borrowing' ownership specifiers.
+    if (!Ctx.LangOpts.hasFeature(Feature::NoImplicitCopy)) {
+      if (!contextTy->isPureMoveOnly()) {
+        switch (attrModifier) { // check the modifier for the Copyable type.
+        case SelfAccessKind::NonMutating:
+        case SelfAccessKind::Mutating:
+        case SelfAccessKind::LegacyConsuming:
+          // already checked
+          break;
+
+        case SelfAccessKind::Consuming:
+        case SelfAccessKind::Borrowing:
+          diagnoseAndRemoveAttr(attr, diag::self_ownership_specifier_copyable,
+                                attrModifier, FD->getDescriptiveKind());
+          break;
+        }
+      }
+    }
+
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
                           attrModifier);
