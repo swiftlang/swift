@@ -2,11 +2,11 @@
 
 public struct S {}
 
-// CHECK-LABEL: sil {{.*}} @$s4Test15unavailableFuncAA1SVyF
+// CHECK-LABEL: sil{{.*}}@$s4Test15unavailableFuncAA1SVyF
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:ss31_diagnoseUnavailableCodeReacheds5NeverOy(FTwb|F)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK-NEXT:    unreachable
-// CHECK-NEXT:  end sil function '$s4Test15unavailableFuncAA1SVyF'
+// CHECK-NEXT:  } // end sil function '$s4Test15unavailableFuncAA1SVyF'
 @available(*, unavailable)
 public func unavailableFunc() -> S {
 

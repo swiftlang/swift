@@ -20,28 +20,28 @@ public func testImplicitConstructor() {
 @available(*, unavailable)
 public struct ExplicitInitStruct {
   // ExplicitInitStruct.s.getter
-  // CHECK-LABEL: sil {{.*}} @$s4Test18ExplicitInitStructV1sAA1SVvg
+  // CHECK-LABEL: sil{{.*}}@$s4Test18ExplicitInitStructV1sAA1SVvg
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         struct_extract
   // CHECK:       } // end sil function '$s4Test18ExplicitInitStructV1sAA1SVvg'
   //
   // ExplicitInitStruct.s.setter
-  // CHECK-LABEL: sil {{.*}} @$s4Test18ExplicitInitStructV1sAA1SVvs
+  // CHECK-LABEL: sil{{.*}}@$s4Test18ExplicitInitStructV1sAA1SVvs
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         assign
   // CHECK:       } // end sil function '$s4Test18ExplicitInitStructV1sAA1SVvs'
   //
   // ExplicitInitStruct.s.modify
-  // CHECK-LABEL: sil {{.*}} @$s4Test18ExplicitInitStructV1sAA1SVvM
+  // CHECK-LABEL: sil{{.*}}@$s4Test18ExplicitInitStructV1sAA1SVvM
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         yield
   // CHECK:       } // end sil function '$s4Test18ExplicitInitStructV1sAA1SVvM'
   public var s: S
 
-  // CHECK-LABEL: sil {{.*}} @$s4Test18ExplicitInitStructVACycfC
+  // CHECK-LABEL: sil{{.*}}@$s4Test18ExplicitInitStructVACycfC
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         function_ref @$s4Test1SVACycfC
@@ -56,7 +56,7 @@ func foo() {}
 @available(*, unavailable)
 @_moveOnly
 struct MoveOnlyStruct {
-  // CHECK-LABEL: sil {{.*}} @$s4Test14MoveOnlyStructVfD
+  // CHECK-LABEL: sil{{.*}}@$s4Test14MoveOnlyStructVfD
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         {{%.*}} = function_ref @$s4Test3fooyyF

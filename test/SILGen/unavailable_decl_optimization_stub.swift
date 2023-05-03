@@ -2,7 +2,7 @@
 
 public struct S {}
 
-// CHECK-LABEL: sil {{.*}} @$s4Test15unavailableFuncAA1SVyF
+// CHECK-LABEL: sil{{.*}}@$s4Test15unavailableFuncAA1SVyF
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:ss31_diagnoseUnavailableCodeReacheds5NeverOy(FTwb|F)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         function_ref @$s4Test1SVACycfC
@@ -14,7 +14,7 @@ public func unavailableFunc() -> S {
 
 enum SomeError: Error { case generic }
 
-// CHECK-LABEL: sil {{.*}} @$s4Test23unavailableThrowingFuncyyKF
+// CHECK-LABEL: sil{{.*}}@$s4Test23unavailableThrowingFuncyyKF
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         throw
@@ -25,14 +25,14 @@ public func unavailableThrowingFunc() throws {
 }
 
 // one-time initialization function for globalVar
-// CHECK-LABEL: sil {{.*}} @$s4Test9globalVar_WZ
+// CHECK-LABEL: sil{{.*}}@$s4Test9globalVar_WZ
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         alloc_global
 // CHECK:       } // end sil function '$s4Test9globalVar_WZ'
 //
 // globalVar.unsafeMutableAddressor
-// CHECK-LABEL: sil {{.*}} @$s4Test9globalVarAA1SVvau
+// CHECK-LABEL: sil{{.*}}@$s4Test9globalVarAA1SVvau
 // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         global_addr @$s4Test9globalVar_Wz
