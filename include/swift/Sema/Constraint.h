@@ -233,6 +233,8 @@ enum class ConstraintKind : char {
   /// an overload. The second type is a PackType containing the explicit
   /// generic arguments.
   ExplicitGenericArguments,
+  /// Both (first and second) pack types should have the same reduced shape.
+  SameShape,
 };
 
 /// Classification of the different kinds of constraints.
@@ -701,6 +703,7 @@ public:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::SameShape:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

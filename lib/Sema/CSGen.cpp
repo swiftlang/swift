@@ -2768,8 +2768,9 @@ namespace {
         // correct handling of patterns like `_ as Foo` where `_` would
         // get a type of `Foo` but `is` pattern enclosing it could still be
         // inferred from enclosing context.
-        auto isType = CS.createTypeVariable(CS.getConstraintLocator(pattern),
-                                            TVO_CanBindToNoEscape);
+        auto isType =
+            CS.createTypeVariable(CS.getConstraintLocator(pattern),
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
         CS.addConstraint(
             ConstraintKind::Conversion, subPatternType, isType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
@@ -2919,8 +2920,8 @@ namespace {
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
         return setType(
-            CS.createTypeVariable(
-              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape));
+            CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                  TVO_CanBindToNoEscape | TVO_CanBindToHole));
       }
 
       llvm_unreachable("Unhandled pattern kind");
@@ -3080,6 +3081,12 @@ namespace {
       // pack expansion expression through the shape type variable.
       SmallVector<ASTNode, 2> expandedPacks;
       expr->getExpandedPacks(expandedPacks);
+
+      if (expandedPacks.empty()) {
+        (void)CS.recordFix(AllowValueExpansionWithoutPackReferences::create(
+            CS, CS.getConstraintLocator(expr)));
+      }
+
       for (auto pack : expandedPacks) {
         Type packType;
         if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
