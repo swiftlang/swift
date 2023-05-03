@@ -4858,10 +4858,10 @@ private:
       ASTNode element, ContextualTypeInfo context, bool isDiscarded,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
-  /// Simplify a shape constraint by binding the reduced shape of the
-  /// left hand side to the right hand side.
+  /// Simplify a shape constraint by binding the left-hand side to the
+  /// reduced shape of the right-hand side.
   SolutionKind simplifyShapeOfConstraint(
-      Type type1, Type type2, TypeMatchOptions flags,
+      Type shapeTy, Type packTy, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
   /// Simplify an explicit generic argument constraint by equating the

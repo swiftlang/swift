@@ -13234,17 +13234,17 @@ static bool hasUnresolvedPackVars(Type type) {
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
-    Type type1, Type type2, TypeMatchOptions flags,
+    Type shapeTy, Type packTy, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
   // Recursively replace all type variables with fixed bindings if
   // possible.
-  type1 = simplifyType(type1, flags);
+  packTy = simplifyType(packTy, flags);
 
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *shapeOf = Constraint::create(
-          *this, ConstraintKind::ShapeOf, type1, type2,
+          *this, ConstraintKind::ShapeOf, shapeTy, packTy,
           getConstraintLocator(locator));
 
       addUnsolvedConstraint(shapeOf);
@@ -13255,30 +13255,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   };
 
   // Don't try computing the shape of a type variable.
-  if (type1->isTypeVariableOrMember())
+  if (packTy->isTypeVariableOrMember())
     return formUnsolved();
 
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
   SmallPtrSet<TypeVariableType *, 2> typeVars;
-  type1->getTypeVariables(typeVars);
+  packTy->getTypeVariables(typeVars);
   for (auto *typeVar : typeVars) {
     if (typeVar->getImpl().canBindToPack() ||
         typeVar->getImpl().isPackExpansion())
       return formUnsolved();
   }
 
-  if (type1->hasPlaceholder()) {
+  if (packTy->hasPlaceholder()) {
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    recordTypeVariablesAsHoles(type2);
+    recordTypeVariablesAsHoles(shapeTy);
     return SolutionKind::Solved;
   }
 
-  auto shape = type1->getReducedShape();
-  addConstraint(ConstraintKind::Bind, shape, type2, locator);
+  auto shape = packTy->getReducedShape();
+  addConstraint(ConstraintKind::Bind, shapeTy, shape, locator);
   return SolutionKind::Solved;
 }
 
