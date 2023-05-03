@@ -219,20 +219,30 @@ public:
 
   /// Returns true if this managed value can be consumed.
   ///
-  /// This is true if either this value has a cleanup or if it is an
-  /// SSA value without ownership.
+  /// This is true if either this value has a cleanup or if it is a trivial
+  /// object value. For address values, this returns true only if the value has
+  /// a cleanup regardless of whether the type is trivial.
   ///
-  /// When an SSA value does not have ownership, it can be used by a consuming
-  /// operation without destroying it. Consuming a value by address, however,
-  /// deinitializes the memory regardless of whether the value has ownership.
+  /// When an object value is trivial, it can be passed to a consuming operation
+  /// without destroying it. Consuming a value by address, however, always
+  /// deinitializes the memory regardless of whether or not it is trivial.
+  ///
+  /// Use this before emitting an operation that "takes" this value or passing
+  /// this value to a call that consumes the argument.
   bool isPlusOne(SILGenFunction &SGF) const;
 
   /// Returns true if this managed value can be forwarded without necessarilly
   /// destroying the original.
   ///
-  /// This is true if either isPlusOne is true or the value is trivial. A
-  /// trivial value in memory can be forwarded as a +1 value without
-  /// deinitializing the memory.
+  /// This is true if either isPlusOne is true or the value is trivial. Unlike
+  /// isPlusOne(), this returns true for trivial address values regardless of
+  /// whether the value has a cleanup. A +1 value can be created from a trivial
+  /// value without consuming the original.
+  ///
+  /// Use this when storing this value into a new location simply by forwarding
+  /// the cleanup without destroying the original value. If it's necessary to
+  /// "take" or otherwise immediately consume the original value, then use
+  /// isPlusOne() instead.
   bool isPlusOneOrTrivial(SILGenFunction &SGF) const;
 
   /// Returns true if this is an ManagedValue that can be used safely as a +0
