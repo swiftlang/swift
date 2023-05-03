@@ -514,7 +514,7 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
 static void setDecl(SyntaxStructureNode &N, Decl *D) {
   N.Dcl = D;
   N.Attrs = D->getOriginalAttrs();
-  N.DocRange = D->getRawComment(/*SerializedOK=*/false).getCharSourceRange();
+  N.DocRange = D->getRawComment().getCharSourceRange();
 }
 
 } // anonymous namespace

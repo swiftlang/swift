@@ -227,7 +227,7 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
       }
     }
   } else {
-    setBriefDocComment(AssociatedDecl->getBriefComment());
+    setBriefDocComment(AssociatedDecl->getSemanticBriefComment());
   }
 }
 

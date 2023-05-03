@@ -1440,7 +1440,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   Result.SourceFilePath = SM.getIdentifierForBuffer(BufferID);
   setLoc(Result.Loc, MainLoc);
   if (!InGeneratedBuffer) {
-    for (const auto &SRC : D->getRawComment(/*SerializedOK=*/false).Comments) {
+    for (const auto &SRC : D->getRawComment().Comments) {
       Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(),
                                     SRC.Range.getByteLength());
       setLoc(Result.DocRanges.back().first, SRC.Range.getStart());
