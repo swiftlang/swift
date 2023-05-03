@@ -4625,6 +4625,14 @@ public:
   ArgumentList *getArgs() const { return ArgList; }
   void setArgs(ArgumentList *newArgList) { ArgList = newArgList; }
 
+  /// Retrieve the expression that directly represents the callee.
+  ///
+  /// The "direct" callee is the expression representing the callee
+  /// after looking through top-level constructs that don't affect the
+  /// identity of the callee, e.g., extra parentheses, optional
+  /// unwrapping (?)/forcing (!), etc.
+  Expr *getDirectCallee() const;
+
   /// Has the type-checker set the 'throws' bit yet?
   ///
   /// In general, this should only be used for debugging purposes.
@@ -4759,14 +4767,6 @@ public:
     SourceLoc FnLoc = getFn()->getLoc(); 
     return FnLoc.isValid() ? FnLoc : getArgs()->getStartLoc();
   }
-
-  /// Retrieve the expression that directly represents the callee.
-  ///
-  /// The "direct" callee is the expression representing the callee
-  /// after looking through top-level constructs that don't affect the
-  /// identity of the callee, e.g., extra parentheses, optional
-  /// unwrapping (?)/forcing (!), etc.
-  Expr *getDirectCallee() const;
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };

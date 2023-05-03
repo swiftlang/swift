@@ -38,8 +38,7 @@ class Bar { // CHECK: [[@LINE]]:7 | class/Swift | Bar | [[Bar_USR:.*]] | Def | r
   static func baz() -> Self {
     Self()
     // CHECK: [[@LINE-1]]:5 | class/Swift | Bar | [[Bar_USR]] | Ref,Impl,RelCont | rel: 1
-    // TODO: This reference should be dynamic
-    // CHECK: [[@LINE-3]]:5 | constructor/Swift | init() | [[Bar_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:5 | constructor/Swift | init() | [[Bar_init_USR]] | Ref,Call,Dyn,RelCall,RelCont | rel: 1
   }
 }
 
@@ -51,7 +50,6 @@ protocol Proto { // CHECK: [[@LINE]]:10 | protocol/Swift | Proto | [[Proto_USR:.
 
 extension Proto {
   func foo() -> Self {
-    // TODO: This reference should be dynamic
-    Self() // CHECK: [[@LINE]]:5 | constructor/Swift | init() | [[Proto_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
+    Self() // CHECK: [[@LINE]]:5 | constructor/Swift | init() | [[Proto_init_USR]] | Ref,Call,Dyn,RelCall,RelCont | rel: 1
   }
 }

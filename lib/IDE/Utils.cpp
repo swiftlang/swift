@@ -878,11 +878,15 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
   Expr *ParentE = getContainingExpr(ExprStack, 1);
   if (ParentE && isa<FunctionConversionExpr>(ParentE)) {
     ParentE = getContainingExpr(ExprStack, 2);
+  } else if (ParentE && isa<MetatypeConversionExpr>(ParentE)) {
+    ParentE = getContainingExpr(ExprStack, 2);
   }
   Expr *Base = nullptr;
 
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
     Base = DSE->getBase();
+  else if (auto DSE = dyn_cast_or_null<ConstructorRefCallExpr>(ParentE))
+    Base = DSE->getDirectCallee();
   else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
     Base = MRE->getBase();
   else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))

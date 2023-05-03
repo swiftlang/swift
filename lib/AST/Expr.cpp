@@ -1691,7 +1691,7 @@ CallExpr *CallExpr::createImplicitEmpty(ASTContext &ctx, Expr *fn) {
   return createImplicit(ctx, fn, ArgumentList::createImplicit(ctx, {}));
 }
 
-Expr *CallExpr::getDirectCallee() const {
+Expr *ApplyExpr::getDirectCallee() const {
   auto fn = getFn();
   while (true) {
     fn = fn->getSemanticsProvidingExpr();
