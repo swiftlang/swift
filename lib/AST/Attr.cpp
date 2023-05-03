@@ -1376,7 +1376,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
             if (macroIntroducedNameRequiresArgument(name.getKind())) {
               SmallString<32> buffer;
               StringRef nameText = name.getName().getString(buffer);
-              bool shouldEscape = nameText == "$";
+              bool shouldEscape =
+                  escapeKeywordInContext(nameText, PrintNameContext::Normal) ||
+                  nameText == "$";
               Printer << "(";
               if (shouldEscape)
                 Printer << "`";
