@@ -1089,6 +1089,20 @@ public:
     copy.push_back(Alloca.getAddress());
   }
 
+  void emitPackCountDebugVariable(llvm::Value *Shape) {
+    if (!PackShapeExpressions.insert(Shape).second)
+      return;
+    llvm::SmallString<8> Buf;
+    unsigned Position = PackShapeExpressions.size() - 1;
+    llvm::raw_svector_ostream(Buf) << "$pack_count_" << Position;
+    auto Name = IGM.Context.getIdentifier(Buf.str());
+    SILDebugVariable Var(Name.str(), true, 0);
+    Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
+                                   false /*was move*/);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitPackCountParameter(*this, Shape, Var);
+  }
+
   /// Force all archetypes referenced by the type to be bound by this point.
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
@@ -1102,17 +1116,10 @@ public:
           emitTypeMetadataRef(packArchetype);
         else if (auto packtype = dyn_cast<SILPackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
-          if (PackShapeExpressions.insert(Shape).second) {
-              llvm::SmallString<8> Buf;
-              unsigned Position = PackShapeExpressions.size() - 1;
-              llvm::raw_svector_ostream(Buf) << "$pack_count_" << Position;
-              auto Name = IGM.Context.getIdentifier(Buf.str());
-              SILDebugVariable Var(Name.str(), true, 0);
-              Shape = emitShadowCopyIfNeeded(Shape, getDebugScope(), Var, false,
-                                             false /*was move*/);
-              if (IGM.DebugInfo)
-                IGM.DebugInfo->emitPackCountParameter(*this, Shape, Var);
-          }
+          emitPackCountDebugVariable(Shape);
+        } else if (auto packtype = dyn_cast<PackType>(t)) {
+          llvm::Value *Shape = emitPackShapeExpression(t);
+          emitPackCountDebugVariable(Shape);
         }
       });
   }
