@@ -109,14 +109,13 @@ public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
-/// Returns `x` as its concrete type `U`.
+/// Returns `x` as its concrete type `U`, or `nil` if `x` has a different
+/// concrete type.
 ///
 /// This cast can be useful for dispatching to specializations of generic
 /// functions.
-///
-/// - Requires: `x` has type `U`.
 @_alwaysEmitIntoClient
-public func _conditionalIdentityCast<T, U>(_ x: T, to: U.Type) -> U? {
+public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
   guard T.self == U.self else {
     return nil
   }

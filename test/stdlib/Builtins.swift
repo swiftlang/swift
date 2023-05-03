@@ -307,9 +307,9 @@ tests.test("_isConcrete") {
   expectFalse(isConcrete_false(Int.self))
 }
 
-tests.test("_conditionalIdentityCast") {
+tests.test("_specialize") {
   func something<T>(with x: some Collection<T>) -> Int {
-    if let y = _conditionalIdentityCast(x, to: [Int].self) {
+    if let y = _specialize(x, for: [Int].self) {
       return y[0]
     } else {
       return 1234567890
@@ -323,7 +323,7 @@ tests.test("_conditionalIdentityCast") {
   expectEqual(something(with: y), 1234567890)
 
   let z: Any = [0, 1, 2, 3]
-  expectNil(_conditionalIdentityCast(z, to: [Int].self))
+  expectNil(_specialize(z, for: [Int].self))
 }
 
 runAllTests()
