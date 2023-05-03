@@ -295,7 +295,7 @@ public:
     }
 
     if (emitInto) {
-      if (mv.isPlusOne(SGF))
+      if (mv.isPlusOneOrTrivial(SGF))
         mv.forwardInto(SGF, loc, emitInto);
       else
         mv.copyInto(SGF, loc, emitInto);
