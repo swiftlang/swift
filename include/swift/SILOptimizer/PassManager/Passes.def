@@ -112,6 +112,9 @@ PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
+PASS(EarlyAllocBoxToStack, "early-allocbox-to-stack",
+     "Stack Promotion of Box Objects. Doesn't attempt to promote noncopyable "
+     "types captured by escaping closures")
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "Stack Promotion of Box Objects")
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
