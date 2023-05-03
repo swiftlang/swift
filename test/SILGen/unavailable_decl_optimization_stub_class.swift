@@ -6,21 +6,21 @@ func foo() {}
 @available(*, unavailable)
 public class ExplicitInitClass {
   // ExplicitInitClass.s.getter
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassC1sAA1SVvg
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassC1sAA1SVvg
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:ss31_diagnoseUnavailableCodeReacheds5NeverOy(FTwb|F)]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         load
   // CHECK:       } // end sil function '$s4Test17ExplicitInitClassC1sAA1SVvg'
   //
   // ExplicitInitClass.s.setter
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassC1sAA1SVvs
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassC1sAA1SVvs
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         assign
   // CHECK:       } // end sil function '$s4Test17ExplicitInitClassC1sAA1SVvs'
   //
   // ExplicitInitClass.s.modify
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassC1sAA1SVvM
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassC1sAA1SVvM
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         yield
@@ -28,7 +28,7 @@ public class ExplicitInitClass {
   public var s: S
 
   // ExplicitInitClass.__allocating_init()
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassCACycfC
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassCACycfC
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         alloc_ref $ExplicitInitClass
@@ -36,7 +36,7 @@ public class ExplicitInitClass {
   // CHECK:       } // end sil function '$s4Test17ExplicitInitClassCACycfC'
   //
   // ExplicitInitClass.init()
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassCACycfc
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassCACycfc
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         function_ref @$s4Test1SVACycfC
@@ -46,14 +46,14 @@ public class ExplicitInitClass {
   }
 
   // ExplicitInitClass.deinit
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassCfd
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassCfd
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         {{%.*}} = function_ref @$s4Test3fooyyF
   // CHECK:       } // end sil function '$s4Test17ExplicitInitClassCfd'
   //
   // ExplicitInitClass.__deallocating_deinit
-  // CHECK-LABEL: sil {{.*}} @$s4Test17ExplicitInitClassCfD
+  // CHECK-LABEL: sil{{.*}}@$s4Test17ExplicitInitClassCfD
   // CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN]] : $@convention(thin) () -> Never
   // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:         {{%.*}} = function_ref @$s4Test17ExplicitInitClassCfd
