@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name moveonly_closure %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name moveonly_closure -verify %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature NoImplicitCopy -module-name moveonly_closure %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature NoImplicitCopy -module-name moveonly_closure -verify %s
 
 @_moveOnly
 struct Empty {}
