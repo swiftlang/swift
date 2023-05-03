@@ -916,6 +916,15 @@ public struct InvalidMacro: PeerMacro, DeclarationMacro {
   }
 }
 
+public struct CoerceToIntMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    "\(node.argumentList.first!.expression) as Int"
+  }
+}
+
 public struct WrapInType: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,

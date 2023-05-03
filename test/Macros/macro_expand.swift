@@ -188,7 +188,7 @@ func testDiscardableStringify(x: Int) {
 func testNested() {
   struct Nested { }
   _ = #stringify(#assertAny(Nested()))
-  // expected-note@-1 2 {{in expansion of macro 'stringify' here}}
+  // expected-note@-1 {{in expansion of macro 'stringify' here}}
 // CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
 // CHECK-DIAGS: @__swiftmacro_9MacroUser10testNestedyyF9stringifyfMf_9assertAnyfMf_.swift:1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
 // CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
