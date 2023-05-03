@@ -35,7 +35,7 @@
 @attached(accessor) public macro myWrapper() = #externalMacro(module: "SomeModule", type: "Wrapper")
 
 // CHECK: #if compiler(>=5.3) && $Macros && $AttachedMacros
-// CHECK: @attached(member, names: named(init), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
+// CHECK: @attached(member, names: named(`init`), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
 // CHECK-NEXT: #endif
 @attached(member, names: named(init), prefixed(`$`)) public macro MemberwiseInit() -> () = #externalMacro(module: "SomeModule", type: "MemberwiseInitMacro")
 
