@@ -2346,6 +2346,12 @@ ClangImporter::Implementation::importParameterType(
       return None;
   } else if (isa<clang::ReferenceType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+    // We don't support rvalue reference / universal perfect ref, bail.
+    if (paramTy->isRValueReferenceType()) {
+      addImportDiagnosticFn(Diagnostic(diag::rvalue_ref_params_not_imported));
+      return None;
+    }
+
     auto templateParamType =
         cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
     swiftParamTy = findGenericTypeInGenericDecls(
