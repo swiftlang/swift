@@ -449,8 +449,8 @@ public:
       CodeCompletionKeywordKind KeyKind = CodeCompletionKeywordKind::None,
       CodeCompletionFlair flair = {});
 
-  void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
-                               bool NeedSpecify);
+  void addDeclAttrParamKeyword(StringRef Name, ArrayRef<StringRef> Parameters,
+                               StringRef Annotation, bool NeedSpecify);
 
   void addDeclAttrKeyword(StringRef Name, StringRef Annotation);
 
@@ -586,7 +586,7 @@ public:
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
 
   void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
-                                        int ParamIndex);
+                                        int ParamIndex, bool HasLabel);
 
   void getTypeAttributeKeywordCompletions();
 

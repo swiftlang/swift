@@ -508,7 +508,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
           .highlight(SourceRange(ArgumentLoc));
       if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeDeclAttrParam(
-            CustomSyntaxAttributeKind::Available, ParamIndex);
+            CustomSyntaxAttributeKind::Available, ParamIndex,
+            /*HasLabel=*/false);
         consumeToken(tok::code_complete);
       } else {
         consumeIf(tok::identifier);
@@ -941,7 +942,7 @@ bool Parser::parseAvailability(
       !(Tok.isAnyOperator() && Tok.getText() == "*")) {
     if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeDeclAttrParam(
-          CustomSyntaxAttributeKind::Available, 0);
+          CustomSyntaxAttributeKind::Available, 0, /*HasLabel=*/false);
       consumeToken(tok::code_complete);
     }
     diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -2185,6 +2186,14 @@ Optional<MacroRole> getMacroRole(StringRef roleName) {
       .Default(None);
 }
 
+static CustomSyntaxAttributeKind getCustomSyntaxAttributeKind(bool isAttached) {
+  if (isAttached) {
+    return CustomSyntaxAttributeKind::AttachedMacro;
+  } else {
+    return CustomSyntaxAttributeKind::FreestandingMacro;
+  }
+}
+
 ParserResult<MacroRoleAttr>
 Parser::parseMacroRoleAttribute(
     MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
@@ -2221,20 +2230,18 @@ Parser::parseMacroRoleAttribute(
                                    [&] {
     ParserStatus status;
 
-    if (Tok.is(tok::code_complete)) {
-      consumeIf(tok::code_complete);
+    if (consumeIf(tok::code_complete)) {
       status.setHasCodeCompletionAndIsError();
-      CustomSyntaxAttributeKind attributeKind =
-          isAttached ? CustomSyntaxAttributeKind::AttachedMacro
-                     : CustomSyntaxAttributeKind::FreestandingMacro;
       if (!sawRole) {
         sawRole = true;
         if (this->CodeCompletionCallbacks) {
-          this->CodeCompletionCallbacks->completeDeclAttrParam(attributeKind, 0);
+          this->CodeCompletionCallbacks->completeDeclAttrParam(
+              getCustomSyntaxAttributeKind(isAttached), 0, /*HasLabel=*/false);
         }
       } else if (!sawNames) {
         if (this->CodeCompletionCallbacks) {
-          this->CodeCompletionCallbacks->completeDeclAttrParam(attributeKind, 1);
+          this->CodeCompletionCallbacks->completeDeclAttrParam(
+              getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/false);
         }
       }
     }
@@ -2309,10 +2316,15 @@ Parser::parseMacroRoleAttribute(
     // Parse the introduced name kind.
     Identifier introducedNameKind;
     SourceLoc introducedNameKindLoc;
-    if (parseIdentifier(
-            introducedNameKind, introducedNameKindLoc,
-            diag::macro_attribute_unknown_argument_form,
-            /*diagnoseDollarPrefix=*/true)) {
+    if (consumeIf(tok::code_complete)) {
+      status.setHasCodeCompletionAndIsError();
+      if (this->CodeCompletionCallbacks) {
+        this->CodeCompletionCallbacks->completeDeclAttrParam(
+            getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/true);
+      }
+    } else if (parseIdentifier(introducedNameKind, introducedNameKindLoc,
+                               diag::macro_attribute_unknown_argument_form,
+                               /*diagnoseDollarPrefix=*/true)) {
       status.setIsParseError();
       return status;
     }

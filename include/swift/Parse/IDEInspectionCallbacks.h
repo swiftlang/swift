@@ -194,7 +194,10 @@ public:
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
-  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index){};
+  /// If `HasLabel` is `true`, then the argument already has a label specified,
+  /// e.g. we're completing after `names: ` in a macro declaration.
+  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+                                     bool HasLabel){};
 
   /// Complete 'async' and 'throws' at effects specifier position.
   virtual void completeEffectsSpecifier(bool hasAsync, bool hasThrows) {};
