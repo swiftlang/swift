@@ -832,7 +832,7 @@ importer::addCommonInvocationArguments(
   invocationArgStrs.push_back("-fansi-escape-codes");
 
   invocationArgStrs.push_back("-Xclang");
-  invocationArgStrs.push_back("-no-opaque-pointers");
+  invocationArgStrs.push_back("-opaque-pointers");
 
   if (importerOpts.ValidateModulesOnce) {
     invocationArgStrs.push_back("-fmodules-validate-once-per-build-session");

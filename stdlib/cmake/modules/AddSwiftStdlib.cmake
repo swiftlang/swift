@@ -138,8 +138,8 @@ function(_add_target_variant_c_compile_link_flags)
   if (_lto_flag_out)
     list(APPEND result "${_lto_flag_out}")
     # Disable opaque pointers in lto mode.
-    list(APPEND result "-Xclang")
-    list(APPEND result "-no-opaque-pointers")
+    #list(APPEND result "-Xclang")
+    #list(APPEND result "-no-opaque-pointers")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
