@@ -224,7 +224,8 @@ enum class ConstraintKind : char {
   /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
   /// this discards function parameter flags.
   BindTupleOfFunctionParams,
-  /// The first type is a type pack, and the second type is its reduced shape.
+  /// The first type is a reduced shape of the second type (represented as a
+  /// pack type).
   ShapeOf,
   /// Represents explicit generic arguments provided for a reference to
   /// a declaration.
