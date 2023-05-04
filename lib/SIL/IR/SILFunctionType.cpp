@@ -2384,7 +2384,7 @@ struct DeallocatorConventions : Conventions {
 
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
-    llvm_unreachable("Deallocators do not have indirect self parameters");
+    return ParameterConvention::Indirect_In;
   }
 
   static bool classof(const Conventions *C) {

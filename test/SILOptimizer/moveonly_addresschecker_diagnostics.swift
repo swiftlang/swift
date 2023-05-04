@@ -18,6 +18,9 @@ public func borrowVal(_ x: borrowing AggStruct) {}
 public func borrowVal(_ x: borrowing AggGenericStruct<CopyableKlass>) {}
 public func borrowVal<T>(_ x: borrowing AggGenericStruct<T>) {}
 public func borrowVal(_ x: borrowing EnumTy) {}
+public func borrowVal<T>(_ x: borrowing AddressOnlyGeneric<T>) {}
+public func borrowVal(_ x: borrowing AddressOnlyProtocol) {}
+public func borrowVal<T>(_ x: borrowing T) {}
 
 public func consumeVal(_ x: __owned CopyableKlass) {}
 public func consumeVal(_ x: __owned Klass) {}
@@ -28,6 +31,9 @@ public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 public func consumeVal(_ x: __owned EnumTy) {}
 public func consumeVal(_ x: __owned NonTrivialStruct) {}
 public func consumeVal(_ x: __owned NonTrivialStruct2) {}
+public func consumeVal<T>(_ x: __owned AddressOnlyGeneric<T>) {}
+public func consumeVal(_ x: __owned AddressOnlyProtocol) {}
+public func consumeVal<T>(_ x: __owned T) {}
 
 @_moveOnly
 public final class Klass {
@@ -47,6 +53,8 @@ public struct NonTrivialStruct {
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
+
+    var computedCopyableK: CopyableKlass { CopyableKlass() }
 }
 
 @_moveOnly
@@ -61,6 +69,7 @@ public struct NonTrivialCopyableStruct {
 
 public struct NonTrivialCopyableStruct2 {
     var copyableKlass = CopyableKlass()
+    var computedCopyableKlass: CopyableKlass { CopyableKlass() }
 }
 
 @_moveOnly
@@ -79,6 +88,39 @@ public final class FinalKlass {
 public final class CopyableKlassWithMoveOnlyField {
     var moveOnlyVarStruct = NonTrivialStruct()
     let moveOnlyLetStruct = NonTrivialStruct()
+}
+
+public protocol P {
+    static var value: Self { get }
+    var name: CopyableKlass { get }
+    static var value2: any P { get }
+}
+
+@_moveOnly
+public struct AddressOnlyGeneric<T : P> {
+    var copyable: T
+    var moveOnly = NonTrivialStruct()
+
+    init() {
+        self.copyable = T.value
+    }
+
+    init(_ input1: T) {
+        copyable = input1
+        moveOnly = NonTrivialStruct()
+    }
+}
+
+extension CopyableKlass : P {
+    public static var value: Self { fatalError() }
+    public static var value2: any P { CopyableKlass() }
+    public var name: CopyableKlass { CopyableKlass() }
+}
+
+@_moveOnly
+public struct AddressOnlyProtocol {
+    var copyable: any P = CopyableKlass.value2
+    var moveOnly = NonTrivialStruct()
 }
 
 ///////////
@@ -1839,6 +1881,1175 @@ public func enumPatternMatchSwitch2WhereClause2Arg(_ x2: inout EnumTy) { // expe
     }
 }
 
+////////////////////////////////
+// Address Only Generic Tests //
+////////////////////////////////
+
+public func addressOnlyGenericSimpleChainTest<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+               // expected-error @-1 {{'x2' consumed more than once}}
+    x2 = x // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consuming use here}}
+    let k2 = y2
+    let k3 = x2 // expected-note {{consuming use here}}
+    let _ = k3
+    borrowVal(k2)
+}
+
+public func addressOnlyGenericSimpleChainArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    var y2 = x2 // expected-note {{consuming use here}}
+    y2 = x2 // expected-note {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    let k2 = y2
+    borrowVal(k2)
+}
+
+public func addressOnlyGenericSimpleChainConsumingArgTest<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    var y2 = x2 // expected-note {{consuming use here}}
+    y2 = x2 // expected-note {{consuming use here}}
+    let k2 = y2
+    borrowVal(k2)
+}
+
+public func addressOnlyGenericSimpleNonConsumingUseTest<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+}
+
+public func addressOnlyGenericSimpleNonConsumingUseArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    borrowVal(x2)
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseTest<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2)
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseArgTest<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseArgTest2<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseArgTest3<T>(_ x2: inout AddressOnlyGeneric<T>) {  // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                   // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseArgTest4<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseConsumingArgTest<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2)
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseConsumingArgTest2<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseConsumingArgTest3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericMultipleNonConsumingUseConsumingArgTest4<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericUseAfterConsume<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericUseAfterConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                         // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                   // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyGenericUseAfterConsumeArg2<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericDoubleConsume<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x  // expected-error {{'x2' consumed more than once}}
+                // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericDoubleConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                     // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyGenericDoubleConsumeArg2<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyGenericLoopConsume<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericLoopConsumeArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericLoopConsumeArg2<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericLoopConsumeArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericDiamond<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    if boolValue {
+        consumeVal(x2)
+    } else {
+        consumeVal(x2)
+    }
+}
+
+public func addressOnlyGenericDiamondArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                 // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    if boolValue {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    } else {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericDiamondArg2<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    if boolValue {
+        consumeVal(x2)
+    } else {
+        consumeVal(x2)
+    }
+}
+
+public func addressOnlyGenericDiamondInLoop<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
+               // expected-error @-1 {{'x2' consumed more than once}}
+               // expected-note @-2 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyGenericDiamondInLoopArg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                       // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyGenericDiamondInLoopArg2<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericDiamondInLoopArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyGenericDiamondInLoopArg4<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed by a use in a loop}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+    x2 = AddressOnlyGeneric<T>()
+}
+
+public func addressOnlyGenericAssignToVar1<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar1Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+            // expected-note @-1 {{consuming use here}}
+    x3 = AddressOnlyGeneric<T>()
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar1Arg2<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    x3 = AddressOnlyGeneric<T>()
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar2<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar2Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+            // expected-note @-1 {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar2Arg2<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar3<T>(_ x: borrowing AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    var x3 = x2
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar3Arg<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar3Arg2<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                                   // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar4<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar4Arg<T>(_ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2)   // expected-note {{consuming use here}}
+                // expected-note @-1 {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar4Arg2<T>(_ x2: consuming AddressOnlyGeneric<T>) { // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2)   // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar5<T : P>(_ ty: T.Type) {
+    var x2 = AddressOnlyGeneric<T>() // expected-error {{'x2' used after consume}}
+    x2 = AddressOnlyGeneric<T>()
+    var x3 = x2 // expected-note {{consuming use here}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = AddressOnlyGeneric<T>()
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar5Arg<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' used after consume}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyGenericAssignToVar5Arg2<T>(_ x: borrowing AddressOnlyGeneric<T>, _ x2: inout AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+                                                                   // expected-error @-1 {{'x2' used after consume}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+    x2 = AddressOnlyGeneric<T>()
+}
+
+// MG: We are calling these consuming uses since I have not taught the checker
+// that a use of a copy_addr that is copyable is not a consuming use. I will
+// remove them when I fix it in the next commit.
+public func addressOnlyGenericAccessAccessField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessAccessField2<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyGenericAccessAccessFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessAccessFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyGenericAccessAccessFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessAccessFieldArg4<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.copyable)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeField2<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandField<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.copyable.name)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandField2<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed by a use in a loop}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandField2a<T>(_ x: borrowing AddressOnlyGeneric<T>) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyGeneric<T>()
+
+    consumeVal(x2.moveOnly.copyableK)
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeFieldArg4<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable.name)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg2<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg2a<T>(_ x2: inout AddressOnlyGeneric<T>) {
+    consumeVal(x2.moveOnly.copyableK)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg3<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    consumeVal(x2.copyable.name)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable.name)
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg4<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.k) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyGenericAccessConsumeGrandFieldArg4a<T>(_ x2: consuming AddressOnlyGeneric<T>) {
+    consumeVal(x2.moveOnly.copyableK)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly.copyableK)
+    }
+}
+
+extension AddressOnlyGeneric {
+    func testNoUseSelf() { // expected-error {{'self' has guaranteed ownership but was consumed}}
+        let x = self // expected-note {{consuming use here}}
+        let _ = x
+    }
+
+    mutating func testNoUseSelf2() { // expected-error {{'self' consumed but not reinitialized before end of function}}
+        let x = self // expected-note {{consuming use here}}
+        let _ = x
+    }
+}
+
+@_moveOnly
+struct AddressOnlyGenericInit<T : P> {
+    var copyable: T
+    var moveOnly: NonTrivialStruct
+    var moveOnly2: AddressOnlyGeneric<T>
+
+    init(_ input1: T, _ input2: consuming NonTrivialStruct) {
+        if boolValue {
+            copyable = input1
+        } else {
+            copyable = T.value
+        }
+        moveOnly2 = AddressOnlyGeneric<T>(T.value)
+        moveOnly = input2
+    }
+
+    init(_ input1: T, _ input2: consuming NonTrivialStruct, _ input3 : consuming AddressOnlyGeneric<T>) {
+        copyable = input1
+        if boolValue {
+            moveOnly2 = input3
+        } else {
+            moveOnly2 = AddressOnlyGeneric<T>(T.value)
+        }
+        moveOnly = input2
+    }
+}
+
+///////////////////////////
+// Address Only Protocol //
+///////////////////////////
+
+public func addressOnlyProtocolSimpleChainTest(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+               // expected-error @-1 {{'x2' consumed more than once}}
+    x2 = x // expected-note {{consuming use here}}
+    let y2 = x2 // expected-note {{consuming use here}}
+    let k2 = y2
+    let k3 = x2 // expected-note {{consuming use here}}
+    let _ = k3
+    borrowVal(k2)
+}
+
+public func addressOnlyProtocolSimpleChainArgTest(_ x2: inout AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    var y2 = x2 // expected-note {{consuming use here}}
+    y2 = x2 // expected-note {{consuming use here}}
+    // expected-note @-1 {{consuming use here}}
+    let k2 = y2
+    borrowVal(k2)
+}
+
+public func addressOnlyProtocolSimpleChainConsumingArgTest(_ x2: consuming AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    var y2 = x2 // expected-note {{consuming use here}}
+    y2 = x2 // expected-note {{consuming use here}}
+    let k2 = y2
+    borrowVal(k2)
+}
+
+public func addressOnlyProtocolSimpleNonConsumingUseTest(_ x: borrowing AddressOnlyProtocol) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+}
+
+public func addressOnlyProtocolSimpleNonConsumingUseArgTest(_ x2: inout AddressOnlyProtocol) {
+    borrowVal(x2)
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseTest(_ x: borrowing AddressOnlyProtocol) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2)
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest2(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest3(_ x2: inout AddressOnlyProtocol) {  // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                   // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseArgTest4(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseConsumingArgTest(_ x2: consuming AddressOnlyProtocol) {
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2)
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseConsumingArgTest2(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseConsumingArgTest3(_ x2: consuming AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolMultipleNonConsumingUseConsumingArgTest4(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' used after consume}}
+    borrowVal(x2)
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolUseAfterConsume(_ x: borrowing AddressOnlyProtocol) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = x // expected-note {{consuming use here}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolUseAfterConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                         // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                   // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyProtocolUseAfterConsumeArg2(_ x2: consuming AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed more than once}}
+    borrowVal(x2)
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolDoubleConsume(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x  // expected-error {{'x2' consumed more than once}}
+                // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolDoubleConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+                     // expected-note @-1 {{consuming use here}}
+}
+
+public func addressOnlyProtocolDoubleConsumeArg2(_ x2: consuming AddressOnlyProtocol) {
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+}
+
+public func addressOnlyProtocolLoopConsume(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyProtocolLoopConsumeArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyProtocolLoopConsumeArg2(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed by a use in a loop}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolLoopConsumeArg3(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' consumed by a use in a loop}}
+    for _ in 0..<1024 {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolDiamond(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    if boolValue {
+        consumeVal(x2)
+    } else {
+        consumeVal(x2)
+    }
+}
+
+public func addressOnlyProtocolDiamondArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                 // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    if boolValue {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    } else {
+        consumeVal(x2) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyProtocolDiamondArg2(_ x2: consuming AddressOnlyProtocol) {
+    if boolValue {
+        consumeVal(x2)
+    } else {
+        consumeVal(x2)
+    }
+}
+
+public func addressOnlyProtocolDiamondInLoop(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed by a use in a loop}}
+               // expected-error @-1 {{'x2' consumed more than once}}
+               // expected-note @-2 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyProtocolDiamondInLoopArg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                       // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyProtocolDiamondInLoopArg2(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed by a use in a loop}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolDiamondInLoopArg3(_ x2: consuming AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+          // expected-note @-1 {{consuming use here}}
+      }
+    }
+}
+
+public func addressOnlyProtocolDiamondInLoopArg4(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' consumed by a use in a loop}}
+                                                       // expected-error @-1 {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          consumeVal(x2) // expected-note {{consuming use here}}
+      } else {
+          consumeVal(x2) // expected-note {{consuming use here}}
+                           // expected-note @-1 {{consuming use here}}
+      }
+    }
+    x2 = AddressOnlyProtocol()
+}
+
+public func addressOnlyProtocolAssignToVar1(_ x: borrowing AddressOnlyProtocol) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar1Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+            // expected-note @-1 {{consuming use here}}
+    x3 = AddressOnlyProtocol()
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar1Arg2(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    x3 = AddressOnlyProtocol()
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar2(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar2Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+            // expected-note @-1 {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar2Arg2(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar3(_ x: borrowing AddressOnlyProtocol) {
+    // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    var x3 = x2
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar3Arg(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar3Arg2(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed but not reinitialized before end of function}}
+                                                                   // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar4(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-error {{'x2' consumed more than once}}
+               // expected-note @-1 {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2) // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar4Arg(_ x2: inout AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+                                                      // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2)   // expected-note {{consuming use here}}
+                // expected-note @-1 {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar4Arg2(_ x2: consuming AddressOnlyProtocol) { // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use here}}
+    consumeVal(x2)   // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar5<T : P>(_ ty: T.Type) {
+    var x2 = AddressOnlyProtocol() // expected-error {{'x2' used after consume}}
+    x2 = AddressOnlyProtocol()
+    var x3 = x2 // expected-note {{consuming use here}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = AddressOnlyProtocol()
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar5Arg(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' used after consume}}
+    // expected-error @-2 {{'x' has guaranteed ownership but was consumed}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+}
+
+public func addressOnlyProtocolAssignToVar5Arg2(_ x: borrowing AddressOnlyProtocol, _ x2: inout AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+                                                                   // expected-error @-1 {{'x2' used after consume}}
+    var x3 = x2 // expected-note {{consuming use here}}
+    borrowVal(x2) // expected-note {{non-consuming use here}}
+    x3 = x // expected-note {{consuming use here}}
+    consumeVal(x3)
+    x2 = AddressOnlyProtocol()
+}
+
+// MG: We are calling these consuming uses since I have not taught the checker
+// that a use of a copy_addr that is copyable is not a consuming use. I will
+// remove them when I fix it in the next commit.
+public func addressOnlyProtocolAccessAccessField(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessAccessField2(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyProtocolAccessAccessFieldArg(_ x2: inout AddressOnlyProtocol) {
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessAccessFieldArg2(_ x2: inout AddressOnlyProtocol) {
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyProtocolAccessAccessFieldArg3(_ x2: consuming AddressOnlyProtocol) {
+    borrowVal(x2.copyable)
+    for _ in 0..<1024 {
+        borrowVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessAccessFieldArg4(_ x2: consuming AddressOnlyProtocol) {
+    borrowVal(x2.moveOnly)
+    for _ in 0..<1024 {
+        borrowVal(x2.moveOnly)
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeField(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    x2 = AddressOnlyProtocol()
+
+    consumeVal(x2.copyable)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeField2(_ x: borrowing AddressOnlyProtocol) { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    var x2 = x // expected-note {{consuming use here}}
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    x2 = AddressOnlyProtocol()
+
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeFieldArg(_ x2: inout AddressOnlyProtocol) {
+    consumeVal(x2.copyable)
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeFieldArg2(_ x2: inout AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeFieldArg3(_ x2: consuming AddressOnlyProtocol) {
+    consumeVal(x2.copyable)
+
+    for _ in 0..<1024 {
+        consumeVal(x2.copyable)
+    }
+}
+
+public func addressOnlyProtocolAccessConsumeFieldArg4(_ x2: consuming AddressOnlyProtocol) {
+    // expected-error @-1 {{'x2' consumed by a use in a loop}}
+    // expected-error @-2 {{'x2' consumed more than once}}
+    consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+
+    for _ in 0..<1024 {
+        consumeVal(x2.moveOnly) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+    }
+}
+
+extension AddressOnlyProtocol {
+    func testNoUseSelf() { // expected-error {{'self' has guaranteed ownership but was consumed}}
+        let x = self // expected-note {{consuming use here}}
+        let _ = x
+    }
+}
+
 /////////////////////////////
 // Closure and Defer Tests //
 /////////////////////////////
@@ -2267,6 +3478,49 @@ func copyableStructsInMoveOnlyStructNonConsuming() {
     borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass)
 }
 
+func computedCopyableKlassInAMoveOnlyStruct() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+}
+
+// This shouldn't error since we are consuming a copyable type.
+func computedCopyableKlassInAMoveOnlyStruct2() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+}
+
+// This shouldn't error since we are working with a copyable type.
+func computedCopyableKlassInAMoveOnlyStruct3() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    borrowVal(a.computedCopyableK)
+}
+
+// This used to error, but no longer errors since we are using a true field
+// sensitive model.
+func computedCopyableKlassInAMoveOnlyStruct4() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a.computedCopyableK)
+    consumeVal(a.computedCopyableK)
+    borrowVal(a.nonTrivialStruct2)
+}
+
+func computedCopyableStructsInMoveOnlyStructNonConsuming() {
+    var a = NonTrivialStruct()
+    a = NonTrivialStruct()
+    borrowVal(a)
+    borrowVal(a.computedCopyableK)
+    borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.computedCopyableKlass)
+}
+
 ///////////////////////////
 // Field Sensitive Tests //
 ///////////////////////////
@@ -2481,6 +3735,29 @@ func inoutCaptureTest() -> (() -> ()) {
         useInOut(&x)
         consumeVal(x)
         // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    }
+    g()
+
+    return f
+}
+
+func inoutCaptureTestAddressOnlyGeneric<T : P>(_ t: T.Type) -> (() -> ()) {
+    var x = AddressOnlyGeneric<T>()
+    x = AddressOnlyGeneric<T>()
+
+    func useInOut(_ x: inout AddressOnlyGeneric<T>) {}
+    let f = {
+        useInOut(&x)
+    }
+
+    borrowVal(x)
+    consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    x = AddressOnlyGeneric<T>()
+
+    let g = {
+        x = AddressOnlyGeneric<T>()
+        useInOut(&x)
+        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
     }
     g()
 
