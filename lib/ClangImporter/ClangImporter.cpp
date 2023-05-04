@@ -6834,3 +6834,15 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
     return req.first == "cplusplus";
   });
 }
+
+llvm::Optional<clang::QualType>
+importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
+  if (type->isReferenceType())
+    return type->getPointeeType();
+  return {};
+}
+
+bool importer::isCxxConstReferenceType(const clang::Type *type) {
+  auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
+  return pointeeType && pointeeType->isConstQualified();
+}
