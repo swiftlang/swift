@@ -8876,6 +8876,10 @@ const ParamDecl *getParameterAt(ConcreteDeclRef declRef, unsigned index);
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
+const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
+
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 
