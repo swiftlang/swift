@@ -185,7 +185,7 @@ extension ProtocolCheckMoveOnlyEnum : Any {}
 
 extension ProtocolCheckMoveOnlyEnum : AnyHashable {}
 // expected-error@-1 {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to 'AnyHashable'}}
-// expected-error@-2 {{class can only inherit from protocol in extension declaration 'AnyHashable'}}
+// expected-error@-2 {{cannot inherit from non-protocol type 'AnyHashable'}}
 
 // But a normal extension is ok.
 extension ProtocolCheckMoveOnlyKlass {}
