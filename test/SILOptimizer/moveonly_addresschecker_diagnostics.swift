@@ -392,8 +392,6 @@ public func classAssignToVar5() {
     var x2 = Klass() // expected-error {{'x2' used after consume}}
     x2 = Klass()
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = Klass()
     consumeVal(x3)
@@ -1781,15 +1779,12 @@ public func enumPatternMatchIfLet2Arg(_ x2: inout EnumTy) { // expected-error {{
     }
 }
 
-// This is wrong.
 public func enumPatternMatchSwitch1() {
     var x2 = EnumTy.klass(Klass()) // expected-error {{'x2' used after consume}}
     x2 = EnumTy.klass(Klass())
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
         borrowVal(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
         borrowVal(x2) // expected-note {{non-consuming use here}}
     case .int:
         break
@@ -1800,8 +1795,6 @@ public func enumPatternMatchSwitch1Arg(_ x2: inout EnumTy) { // expected-error {
     switch x2 { // expected-note {{consuming use here}}
     case let EnumTy.klass(k):
         borrowVal(k)
-        // This should be flagged as the use after free use. We are atleast
-        // erroring though.
         borrowVal(x2)
     case .int:
         break
@@ -2267,8 +2260,6 @@ public func addressOnlyGenericAssignToVar5<T : P>(_ ty: T.Type) {
     var x2 = AddressOnlyGeneric<T>() // expected-error {{'x2' used after consume}}
     x2 = AddressOnlyGeneric<T>()
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = AddressOnlyGeneric<T>()
     consumeVal(x3)
@@ -2910,8 +2901,6 @@ public func addressOnlyProtocolAssignToVar5<T : P>(_ ty: T.Type) {
     var x2 = AddressOnlyProtocol() // expected-error {{'x2' used after consume}}
     x2 = AddressOnlyProtocol()
     var x3 = x2 // expected-note {{consuming use here}}
-    // TODO: Need to mark this as the lifetime extending use. We fail
-    // appropriately though.
     borrowVal(x2) // expected-note {{non-consuming use here}}
     x3 = AddressOnlyProtocol()
     consumeVal(x3)
