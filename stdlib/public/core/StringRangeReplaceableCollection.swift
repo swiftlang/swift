@@ -51,12 +51,14 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameter other: A string instance or another sequence of
   ///   characters.
-  @_specialize(where S == String)
-  @_specialize(where S == Substring)
   public init<S: Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    if let str = other as? String {
+    if let str = _specialize(other, for: String.self) {
       self = str
+      return
+    }
+    if let str = _specialize(other, for: Substring.self) {
+      self = str.description
       return
     }
     self = other.description
@@ -77,16 +79,13 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameter characters: A string instance or another sequence of
   ///   characters.
-  @_specialize(where S == String)
-  @_specialize(where S == Substring)
-  @_specialize(where S == Array<Character>)
   public init<S: Sequence>(_ characters: S)
   where S.Iterator.Element == Character {
-    if let str = characters as? String {
+    if let str = _specialize(characters, for: String.self) {
       self = str
       return
     }
-    if let subStr = characters as? Substring {
+    if let subStr = _specialize(characters, for: Substring.self) {
       self.init(subStr)
       return
     }
@@ -159,17 +158,21 @@ extension String: RangeReplaceableCollection {
   /// Appends the characters in the given sequence to the string.
   ///
   /// - Parameter newElements: A sequence of characters.
-  @_specialize(where S == String)
-  @_specialize(where S == Substring)
-  @_specialize(where S == Array<Character>)
   public mutating func append<S: Sequence>(contentsOf newElements: S)
   where S.Iterator.Element == Character {
-    if let str = newElements as? String {
+    if let str = _specialize(newElements, for: String.self) {
       self.append(str)
       return
     }
-    if let substr = newElements as? Substring {
+    if let substr = _specialize(newElements, for: Substring.self) {
       self.append(contentsOf: substr)
+      return
+    }
+    if let substr = _specialize(newElements, for: Array<Character>.self) {
+      // FIXME: Does this really pull its weight?
+      for c in newElements {
+        self.append(c._str)
+      }
       return
     }
     for c in newElements {
@@ -191,9 +194,6 @@ extension String: RangeReplaceableCollection {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
-  @_specialize(where C == String)
-  @_specialize(where C == Substring)
-  @_specialize(where C == Array<Character>)
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
@@ -236,9 +236,6 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the combined length of the string and
   ///   `newElements`.
-  @_specialize(where S == String)
-  @_specialize(where S == Substring)
-  @_specialize(where S == Array<Character>)
   public mutating func insert<S: Collection>(
     contentsOf newElements: S, at i: Index
   ) where S.Element == Character {
