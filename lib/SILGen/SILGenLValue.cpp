@@ -3183,7 +3183,8 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     SILValue accessAddr = UnenforcedFormalAccess::enter(*this, loc, destAddr,
                                                         SILAccessKind::Read);
 
-    if (accessAddr->getType().isMoveOnly()) {
+    if (accessAddr->getType().isMoveOnly() &&
+        !isa<MarkMustCheckInst>(accessAddr)) {
       // When loading an rvalue, we should never need to modify the place
       // we're loading from.
       accessAddr = B.createMarkMustCheckInst(
