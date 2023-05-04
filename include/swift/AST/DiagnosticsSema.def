@@ -3065,7 +3065,7 @@ ERROR(multiple_inheritance,none,
 ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
-  "class can only inherit from protocol in extension declaration %0", (Type))
+  "cannot inherit from non-protocol type %0", (Type))
 ERROR(inheritance_from_anyobject,none,
   "only protocols can inherit from 'AnyObject'", ())
 ERROR(inheritance_from_parameterized_protocol,none,
