@@ -1,3 +1,4 @@
+// REQUIRES: asserts
 // RUN: %target-swift-frontend -emit-ir %s -g -o - \
 // RUN:    -parse-as-library -module-name a -enable-experimental-feature VariadicGenerics | %FileCheck %s
 
