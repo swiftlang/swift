@@ -20,18 +20,17 @@ StdVectorTestSuite.test("init") {
 
 StdVectorTestSuite.test("push back") {
     var v = Vector()
-    var _42: CInt = 42
-    v.push_back(&_42)
+    let _42: CInt = 42
+    v.push_back(_42)
     expectEqual(v.size(), 1)
     expectFalse(v.empty())
     expectEqual(v[0], 42)
 }
 
 func fill(vector v: inout Vector) {
-    var _1: CInt = 1, _2: CInt = 2, _3: CInt = 3
-    v.push_back(&_1)
-    v.push_back(&_2)
-    v.push_back(&_3)
+    v.push_back(1)
+    v.push_back(2)
+    v.push_back(CInt(3))
 }
 
 StdVectorTestSuite.test("for loop") {
