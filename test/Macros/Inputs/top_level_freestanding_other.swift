@@ -1,3 +1,7 @@
+#if IMPORT_MACRO_LIBRARY
+import freestanding_macro_library
+#endif
+
 #anonymousTypes { "hello2" }
 
 var globalVar = #stringify(1 + 1)
