@@ -1419,14 +1419,25 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     llvm::SaveAndRestore<TypeCheckCompletionCallback*>
       CompletionCollector(Context.CompletionCallback, &Lookup);
     if (AttrWithCompletion) {
-      /// The attribute might not be attached to the AST if there is no var decl
-      /// it could be attached to. Type check it standalone.
-      ASTNode Call = CallExpr::create(
-          CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
-          AttrWithCompletion->getArgs(), /*implicit=*/true);
-      typeCheckContextAt(
-          TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
-          CompletionLoc);
+      /// The attribute might not be attached to the AST if there is no var
+      /// decl it could be attached to. Type check it standalone.
+
+      // First try to check it as an attached macro.
+      auto resolvedMacro = evaluateOrDefault(
+          CurDeclContext->getASTContext().evaluator,
+          ResolveMacroRequest{AttrWithCompletion, CurDeclContext},
+          ConcreteDeclRef());
+
+      // If that fails, type check as a call to the attribute's type. This is
+      // how, e.g., property wrappers are modelled.
+      if (!resolvedMacro) {
+        ASTNode Call = CallExpr::create(
+            CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
+            AttrWithCompletion->getArgs(), /*implicit=*/true);
+        typeCheckContextAt(
+            TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
+            CompletionLoc);
+      }
     } else {
       typeCheckContextAt(
           TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
