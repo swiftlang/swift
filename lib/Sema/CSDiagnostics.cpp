@@ -2448,9 +2448,6 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  if (diagnoseExtraneousAssociatedValues())
-    return true;
-
   // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion()) {
@@ -2889,24 +2886,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
   if (tryTypeCoercionFixIt(diagnostic))
     return;
-}
-
-bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
-  if (auto match =
-          getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
-    if (auto enumElementPattern =
-            dyn_cast<EnumElementPattern>(match->getPattern())) {
-      emitDiagnosticAt(enumElementPattern->getNameLoc(),
-                       diag::enum_element_pattern_assoc_values_mismatch,
-                       enumElementPattern->getName());
-      emitDiagnosticAt(enumElementPattern->getNameLoc(),
-                       diag::enum_element_pattern_assoc_values_remove)
-          .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
@@ -8681,6 +8660,19 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
 bool TupleLabelMismatchWarning::diagnoseAsError() {
   emitDiagnostic(diag::tuple_label_mismatch_warning, getFromType(), getToType())
       .highlight(getSourceRange());
+  return true;
+}
+
+bool AssociatedValueMismatchFailure::diagnoseAsError() {
+  auto match = getLocator()->castLastElementTo<LocatorPathElt::PatternMatch>();
+  auto *enumElementPattern = dyn_cast<EnumElementPattern>(match.getPattern());
+
+  emitDiagnosticAt(enumElementPattern->getNameLoc(),
+                   diag::enum_element_pattern_assoc_values_mismatch,
+                   enumElementPattern->getName());
+  emitDiagnosticAt(enumElementPattern->getNameLoc(),
+                   diag::enum_element_pattern_assoc_values_remove)
+      .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
   return true;
 }
 

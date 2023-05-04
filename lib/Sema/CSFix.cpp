@@ -2426,6 +2426,20 @@ bool AllowTupleLabelMismatch::diagnose(const Solution &solution,
   return warning.diagnose(asNote);
 }
 
+AllowAssociatedValueMismatch *
+AllowAssociatedValueMismatch::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAssociatedValueMismatch(cs, fromType, toType, locator);
+}
+
+bool AllowAssociatedValueMismatch::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  AssociatedValueMismatchFailure failure(solution, getFromType(), getToType(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,
                                               bool asNote) const {
   SwiftToCPointerConversionInInvalidContext failure(solution, getLocator());
