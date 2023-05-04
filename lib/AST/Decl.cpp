@@ -8363,6 +8363,14 @@ const ParamDecl *swift::getParameterAt(const ValueDecl *source,
   return nullptr;
 }
 
+const ParamDecl *swift::getParameterAt(const DeclContext *source,
+                                       unsigned index) {
+  if (auto *params = getParameterList(const_cast<DeclContext *>(source))) {
+    return index < params->size() ? params->get(index) : nullptr;
+  }
+  return nullptr;
+}
+
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
   assert(getDeclContext()->isTypeContext());
   auto Ty = getInterfaceType();

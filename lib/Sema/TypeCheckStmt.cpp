@@ -2376,13 +2376,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         }
       }
     } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(defaultArg->getParent())) {
-        auto *Param = AFD->getParameters()->get(defaultArg->getIndex());
-        (void)Param->getTypeCheckedDefaultExpr();
-        return false;
-      }
-      if (auto *SD = dyn_cast<SubscriptDecl>(defaultArg->getParent())) {
-        auto *Param = SD->getIndices()->get(defaultArg->getIndex());
+      if (const ParamDecl *Param =
+              getParameterAt(defaultArg->getParent(), defaultArg->getIndex())) {
         (void)Param->getTypeCheckedDefaultExpr();
         return false;
       }
