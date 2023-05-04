@@ -692,7 +692,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
 
   auto incomingOuterVal = createOuterValues(incomingInnerVal);
 
-  auto *insertPt = incomingOuterVal->getNextInstruction();
+  auto *insertPt = innerValue->getDefiningInsertionPoint();
   auto *clone = innerInst->clone(insertPt);
   scope.getCallbacks().createdNewInst(clone);
   Operand *use = &clone->getOperandRef(0);
