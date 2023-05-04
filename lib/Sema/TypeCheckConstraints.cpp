@@ -1642,12 +1642,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   }
 
   // Since move-only types currently cannot conform to protocols, nor be a class
-  // type, the subtyping hierarchy is a bit bizarre as of now:
+  // type, the subtyping hierarchy looks a bit like this:
   //
-  //              noncopyable
-  //           structs and enums
-  //                   |
-  //       +--------- Any
+  //                  ~Copyable
+  //                    /  \
+  //                   /    \
+  //       +--------- Any    noncopyable structs/enums
   //       |           |
   //   AnyObject    protocol
   //       |       existentials
@@ -1659,7 +1659,9 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   //
   // Thus, right now, a move-only type is only a subtype of itself.
-  if (fromType->isPureMoveOnly() || toType->isPureMoveOnly())
+  // We also want to prevent conversions of a move-only type's metatype.
+  if (fromType->getMetatypeInstanceType()->isPureMoveOnly()
+      || toType->getMetatypeInstanceType()->isPureMoveOnly())
     return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.
