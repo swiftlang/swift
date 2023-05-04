@@ -23,10 +23,9 @@ public struct CalleeAnalysis {
         return inst.instruction.isDeinitBarrier(bca.analysis)
       },
       // getMemBehaviorFn
-      { (bridgedCtxt: BridgedPassContext, bridgedApply: BridgedInstruction, observeRetains: Bool) -> swift.MemoryBehavior in
-        let context = FunctionPassContext(_bridged: bridgedCtxt)
+      { (bridgedApply: BridgedInstruction, observeRetains: Bool, bca: BridgedCalleeAnalysis) -> swift.MemoryBehavior in
         let apply = bridgedApply.instruction as! ApplySite
-        let e = context.calleeAnalysis.getSideEffects(of: apply)
+        let e = bca.analysis.getSideEffects(of: apply)
         return e.getMemBehavior(observeRetains: observeRetains)
       }
     )
