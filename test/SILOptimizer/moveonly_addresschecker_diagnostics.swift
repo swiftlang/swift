@@ -3079,8 +3079,6 @@ public func closureClassUseAfterConsumeArg(_ argX: inout Klass) {
 }
 
 // We do not support captures of vars by closures today.
-//
-// TODO: Why are we erroring for the same variable twice?
 public func closureCaptureClassUseAfterConsume() {
     var x2 = Klass()
     x2 = Klass()
