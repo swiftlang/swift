@@ -3834,8 +3834,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  // move-only types cannot match with any existential types.
-  if (type1->isPureMoveOnly()) {
+  // move-only types (and their metatypes) cannot match with existential types.
+  if (type1->getMetatypeInstanceType()->isPureMoveOnly()) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this, type1,
