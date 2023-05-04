@@ -6,13 +6,23 @@ struct Context {
 }
 
 @inline(never)
-func test2(x: Context) -> Context? {
-  return .some(x)
+func test(x: Context) -> Context? {
+  return x
 }
 
 // CHECK: works
-if (test2(x: Context()) == nil) {
+if (test(x: Context()) == nil) {
     print("bug")
 } else {
     print("works")
 }
+
+@inline(never)
+func test2() -> Context {
+  var g: [Context]  = [Context()]
+  print(g.endIndex)
+  return g.removeLast()
+}
+
+// CHECK: Context(x: nil)
+print(test2())

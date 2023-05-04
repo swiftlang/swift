@@ -838,6 +838,13 @@ namespace {
                   .getFixedExtraInhabitantValue(IGM, bits, \
                                                 index + IsOptional); \
     } \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, \
+                                         Address src, SILType T, \
+                                         bool isOutlined) const override { \
+      return PointerInfo::forHeapObject(IGF.IGM) \
+        .withNullable(IsNullable_t(IsOptional)) \
+        .getExtraInhabitantIndex(IGF, src); \
+    } \
     /* FIXME -- Use REF_STORAGE_HELPER and make */ \
     /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
     void emitValueRetain(IRGenFunction &IGF, llvm::Value *value, \
