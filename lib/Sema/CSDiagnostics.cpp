@@ -3877,7 +3877,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
       if (conformsToRACollection(baseType)) {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
-        ctx.Diags.diagnose(loc, diag::get_swift_iterator)
+        ctx.Diags.diagnose(loc, diag::use_collection_apis)
             .fixItReplaceChars(
                 loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
                 "makeIterator");
