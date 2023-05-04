@@ -221,9 +221,9 @@ public struct ExecutorJob: Sendable {
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
-      return "ExecutorJob(id: \(id))"
+      return "\(Self.self)(id: \(id))"
     } else {
-      return "ExecutorJob(id: nil)"
+      return "\(Self.self)(id: nil)"
     }
   }
 }
