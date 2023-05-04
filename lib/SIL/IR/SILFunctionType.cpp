@@ -1420,8 +1420,7 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
   // Pass C++ const reference types indirectly. Right now there's no way to
   // express immutable borrowed params, so we have to have this hack.
   // Eventually, we should just express these correctly: rdar://89647503
-  if (clangTy->isReferenceType() &&
-      clangTy->getPointeeType().isConstQualified())
+  if (importer::isCxxConstReferenceType(clangTy))
     return true;
 
   return false;
@@ -3109,7 +3108,7 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
 static ParameterConvention getIndirectCParameterConvention(clang::QualType type) {
   // Non-trivial C++ types would be Indirect_Inout (at least in Itanium).
   // A trivial const * parameter in C should be considered @in.
-  if (type->isReferenceType() && type->getPointeeType().isConstQualified())
+  if (importer::isCxxConstReferenceType(type.getTypePtr()))
     return ParameterConvention::Indirect_In_Guaranteed;
   return ParameterConvention::Indirect_In;
 }

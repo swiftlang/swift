@@ -10,6 +10,8 @@
 // CHECK: func setConstStaticIntRef(_: Int32)
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
+// CHECK: func setConstStaticIntRefTypealias(_ ref: Int32)
+// CHECK: func setStaticIntRefTypealias(_ ref: inout Int32)
 // CHECK: func refToTemplate<T>(_ t: inout T) -> UnsafeMutablePointer<T>
 // CHECK: func constRefToTemplate<T>(_ t: T) -> UnsafePointer<T>
 
