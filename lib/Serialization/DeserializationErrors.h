@@ -442,6 +442,28 @@ public:
   }
 };
 
+class SILFunctionTypeMismatch : public llvm::ErrorInfo<SILFunctionTypeMismatch> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  StringRef name;
+  std::string descLHS, descRHS;
+public:
+  SILFunctionTypeMismatch(StringRef name, std::string descLHS,
+                          std::string descRHS)
+      : name(name), descLHS(descLHS), descRHS(descRHS) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "SILFunction type mismatch for '" << name << "': '";
+    OS << descLHS << "' != '" <<  descRHS << "'\n";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 // Decl was not deserialized because its attributes did not match the filter.
 //
 // \sa getDeclChecked
