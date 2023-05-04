@@ -2139,9 +2139,10 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
 
 bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
                                           bool asNote) const {
-  // Not being able to infer the type of a pattern should already have been
-  // diagnosed on the pattern's initializer or as a structural issue of the AST.
-  return true;
+  // An unresolved AnyPatternDecl means there was some issue in the match
+  // that means we couldn't infer the pattern. We don't have a diagnostic to
+  // emit here, the failure should be diagnosed by the fix for expression.
+  return false;
 }
 
 IgnoreUnresolvedPatternVar *
