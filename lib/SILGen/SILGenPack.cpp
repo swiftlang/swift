@@ -860,14 +860,14 @@ SILGenFunction::emitPackTransform(SILLocation loc,
                                   CanPackType outputFormalPackType,
                                   unsigned outputComponentIndex,
                                   bool isSimpleProjection,
-                                  bool outputIsPlusOne,
+                                  bool canForwardOutput,
                llvm::function_ref<ManagedValue(ManagedValue input,
                                                SILType outputEltTy,
                                                SGFContext context)> emitBody) {
 
   // This is an inherent limitation of the representation; we need pack
   // coroutines to get around it.
-  assert((isSimpleProjection || outputIsPlusOne) &&
+  assert((isSimpleProjection || canForwardOutput) &&
          "we cannot support complex transformations that yield borrows");
 
   CleanupCloner inputCloner(*this, inputPackMV);
@@ -890,7 +890,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
                       {&inputEltTy, &outputEltTy});
 
   auto &outputEltTL = getTypeLowering(outputEltTy);
-  bool outputNeedsCleanup = (outputIsPlusOne && !outputEltTL.isTrivial());
+  bool outputNeedsCleanup = (canForwardOutput && !outputEltTL.isTrivial());
 
   // If the transformation is not a simple projection, we need to
   // create a tuple to hold the transformed values.
@@ -947,10 +947,10 @@ SILGenFunction::emitPackTransform(SILLocation loc,
     // Apply the transform.
     ManagedValue outputElt =
       emitBody(inputElt, outputEltTy,
-               outputIsPlusOne ? SGFContext(outputEltInit.get())
+               canForwardOutput ? SGFContext(outputEltInit.get())
                                : SGFContext::AllowGuaranteedPlusZero);
-    assert(outputIsPlusOne == (outputElt.isInContext() ||
-                               outputElt.isPlusOne(*this)) &&
+    assert(canForwardOutput == (outputElt.isInContext() ||
+                               outputElt.isPlusOneOrTrivial(*this)) &&
            "transformation produced a value of the wrong ownership");
     assert((outputElt.isInContext() ||
             outputElt.getType() == outputEltTy) &&
@@ -991,7 +991,7 @@ SILGenFunction::emitPackTransform(SILLocation loc,
                                                   outputComponentIndex,
                                                   /*limit*/ SILValue());
     return ManagedValue::forOwnedAddressRValue(outputPackAddr, cleanup);
-  } else if (outputIsPlusOne) {
+  } else if (canForwardOutput) {
     return ManagedValue::forTrivialAddressRValue(outputPackAddr);
   } else {
     return ManagedValue::forBorrowedAddressRValue(outputPackAddr);
