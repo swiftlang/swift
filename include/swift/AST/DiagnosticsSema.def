@@ -6526,7 +6526,11 @@ WARNING(hashvalue_implementation,Deprecation,
 
 WARNING(executor_enqueue_unowned_implementation,Deprecation,
         "'Executor.enqueue(UnownedJob)' is deprecated as a protocol requirement; "
-        "conform type %0 to 'Executor' by implementing 'func enqueue(Job)' instead",
+        "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
+        (Type))
+WARNING(executor_enqueue_deprecated_owned_job_implementation,Deprecation,
+        "'Executor.enqueue(Job)' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead",
         (Type))
 
 //------------------------------------------------------------------------------

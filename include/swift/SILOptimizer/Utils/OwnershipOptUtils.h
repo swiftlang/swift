@@ -115,13 +115,6 @@ public:
     : deleter(deleter), deBlocks(deBlocks),
       guaranteedLiveness(function), ownedLifetime(function) {}
 
-  void invalidate() {
-    guaranteedLiveness.invalidate();
-    ownedLifetime.invalidate();
-    ownedConsumeBlocks.clear();
-    beginBorrow = nullptr;
-  }
-
   /// Invalid indicates that the current guaranteed scope is insufficient, and
   /// it does not meet the precondition for scope extension.
   ///

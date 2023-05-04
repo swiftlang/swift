@@ -5318,6 +5318,9 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 AbstractFunctionDecl *
 NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   auto &C = getASTContext();
+  StructDecl *executorJobDecl = C.getExecutorJobDecl();
+  if (!executorJobDecl)
+    return nullptr;
 
   auto proto = dyn_cast<ProtocolDecl>(this);
   if (!proto)
@@ -5335,11 +5338,90 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
       continue;
 
     if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
-      if (funcDecl->getParameters()->size() != 1)
+      auto params = funcDecl->getParameters();
+
+      if (params->size() != 1)
         continue;
 
+      if ((params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned ||
+           params->get(0)->getSpecifier() == ParamSpecifier::Consuming) &&
+          params->get(0)->getInterfaceType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
+        return funcDecl;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
+  auto &C = getASTContext();
+  StructDecl *legacyJobDecl = C.getJobDecl();
+  if (!legacyJobDecl)
+    return nullptr;
+
+  auto proto = dyn_cast<ProtocolDecl>(this);
+  if (!proto)
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  lookupQualified(getSelfNominalTypeDecl(),
+                  DeclNameRef(C.Id_enqueue),
+                  NL_ProtocolMembers,
+                  results);
+
+  for (auto candidate: results) {
+    // we're specifically looking for the Executor protocol requirement
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
       auto params = funcDecl->getParameters();
-      if (params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned) { // TODO: make this Consuming
+
+      if (params->size() != 1)
+        continue;
+
+      if ((params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned ||
+          params->get(0)->getSpecifier() == ParamSpecifier::Consuming) &&
+          params->get(0)->getType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
+        return funcDecl;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
+  auto &C = getASTContext();
+  StructDecl *unownedJobDecl = C.getUnownedJobDecl();
+  if (!unownedJobDecl)
+    return nullptr;
+
+  auto proto = dyn_cast<ProtocolDecl>(this);
+  if (!proto)
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  lookupQualified(getSelfNominalTypeDecl(),
+                  DeclNameRef(C.Id_enqueue),
+                  NL_ProtocolMembers,
+                  results);
+
+  for (auto candidate: results) {
+    // we're specifically looking for the Executor protocol requirement
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
+      auto params = funcDecl->getParameters();
+
+      if (params->size() != 1)
+        continue;
+
+      if (params->get(0)->getType()->isEqual(unownedJobDecl->getDeclaredInterfaceType())) {
         return funcDecl;
       }
     }

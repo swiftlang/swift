@@ -3879,8 +3879,13 @@ public:
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl *getDistributedRemoteCallArgumentInitFunction() const;
 
-  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  /// Get the move-only `enqueue(ExecutorJob)` protocol requirement function on the `Executor` protocol.
   AbstractFunctionDecl *getExecutorOwnedEnqueueFunction() const;
+  /// This method should be deprecated and removed
+  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyOwnedEnqueueFunction() const;
+  /// Get the move-only `enqueue(UnownedJob)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyUnownedEnqueueFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).

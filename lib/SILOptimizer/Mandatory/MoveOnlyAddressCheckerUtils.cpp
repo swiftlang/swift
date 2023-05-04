@@ -1511,6 +1511,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
+
+    // If we have a non-move only type, just treat this as a liveness use.
+    if (!copyAddr->getSrc()->getType().isMoveOnly()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found copy of copyable type. Treating as liveness use! "
+                 << *user);
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+
     if (markedValue->getCheckKind() ==
         MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1520,16 +1533,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
 
-    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
-    if (!leafRange)
-      return false;
-
     // TODO: Add borrow checking here like below.
 
     // TODO: Add destructure deinit checking here once address only checking is
     // completely brought up.
-
-    // TODO: Add check here that we don't error on trivial/copyable types.
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1721,9 +1728,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
   if (::memInstMustConsume(op)) {
+    // If we don't have a consumeable and assignable check kind, then we can't
+    // consume. Emit an error.
+    //
+    // NOTE: Since SILGen eagerly loads loadable types from memory, this
+    // generally will only handle address only types.
+    if (markedValue->getCheckKind() !=
+        MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+      auto *fArg = dyn_cast<SILFunctionArgument>(
+          stripAccessMarkers(markedValue->getOperand()));
+      if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+        moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(markedValue,
+                                                                   fArg);
+      } else {
+        moveChecker.diagnosticEmitter
+            .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+      }
+      emittedEarlyDiagnostic = true;
+      return true;
+    }
+
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
+
     LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
     useState.takeInsts.insert({user, *leafRange});
     return true;
@@ -2423,7 +2451,6 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
     return false;
   }
-  addressUseState.initializeInOutTermUsers();
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an
   // exclusivity error, then we emitted an early error. Bail now and allow the
@@ -2438,9 +2465,14 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   if (diagCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
-  // Then check if we emitted an error. If we did not, return true.
-  if (diagCount != diagnosticEmitter.getDiagnosticCount())
-    return true;
+  // Now that we know that we have run our visitor and did not emit any errors
+  // and successfully visited everything, see if have any
+  // assignable_but_not_consumable of address only types that are consumed.
+  //
+  // DISCUSSION: For non address only types, this is not an issue since we
+  // eagerly load
+
+  addressUseState.initializeInOutTermUsers();
 
   //===---
   // Liveness Checking

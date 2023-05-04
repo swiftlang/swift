@@ -295,7 +295,7 @@ public:
     }
 
     if (emitInto) {
-      if (mv.isPlusOne(SGF))
+      if (mv.isPlusOneOrTrivial(SGF))
         mv.forwardInto(SGF, loc, emitInto);
       else
         mv.copyInto(SGF, loc, emitInto);
@@ -748,7 +748,6 @@ private:
   /// if not null.
   void makeArgumentIntoBinding(SILLocation loc, ParamDecl *pd) {
     ManagedValue argrv = makeArgument(loc, pd);
-
     SILValue value = argrv.getValue();
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -768,18 +767,52 @@ private:
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
-    } else {
-      if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
-        allocStack->setArgNo(ArgNo);
-        if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
-                SGF.getModule()) &&
-            SGF.F.getLifetime(pd, value->getType()).isLexical())
-          allocStack->setIsLexical();
-      } else {
-        SGF.B.createDebugValueAddr(loc, value, varinfo);
-      }
-      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+      return;
     }
+
+    if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
+      allocStack->setArgNo(ArgNo);
+      if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
+              SGF.getModule()) &&
+          SGF.F.getLifetime(pd, value->getType()).isLexical())
+        allocStack->setIsLexical();
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
+      return;
+    }
+
+    if (value->getType().isMoveOnly()) {
+      switch (pd->getValueOwnership()) {
+      case ValueOwnership::Default:
+        if (pd->isSelfParameter()) {
+          assert(!isa<MarkMustCheckInst>(value) &&
+                 "Should not have inserted mark must check inst in EmitBBArgs");
+          if (!pd->isInOut()) {
+            value = SGF.B.createMarkMustCheckInst(
+                loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+          }
+        } else {
+          assert(isa<MarkMustCheckInst>(value) &&
+                 "Should have inserted mark must check inst in EmitBBArgs");
+        }
+        break;
+      case ValueOwnership::InOut:
+        assert(isa<MarkMustCheckInst>(value) &&
+               "Expected mark must check inst with inout to be handled in "
+               "emitBBArgs earlier");
+        break;
+      case ValueOwnership::Owned:
+        value = SGF.B.createMarkMustCheckInst(
+            loc, value, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        break;
+      case ValueOwnership::Shared:
+        value = SGF.B.createMarkMustCheckInst(
+            loc, value, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+        break;
+      }
+    }
+
+    SGF.B.createDebugValueAddr(loc, value, varinfo);
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 
   void emitParam(ParamDecl *PD) {
