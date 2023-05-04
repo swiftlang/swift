@@ -637,7 +637,7 @@ do {
   let exist: any InvalidTypeParameters
 
   exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
-  // expected-error@-1 {{inferred result type '(any InvalidTypeParameters).A.A' requires explicit coercion due to loss of generic requirements}}{{16-16=as (any InvalidTypeParameters).A.A}}
+  // expected-error@-1 {{inferred result type '(any InvalidTypeParameters).A.A' requires explicit coercion due to loss of generic requirements}}
   exist.method2(false) // expected-error {{instance method 'method2' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   exist.method3(false, false) // expected-error {{instance method 'method3' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   // expected-error@-1 {{member 'method3' cannot be used on value of type 'any InvalidTypeParameters'; consider using a generic constraint instead}}
@@ -795,14 +795,14 @@ do {
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
-    ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.method4 // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}{{74-74=as any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes}}
+    ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.method4 // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
     ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.property4
 
     let _: any Class<Struct<Bool>.Inner> & ConcreteAssocTypes =
-      arg[ // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}{{7-7=(}} {{807:8-8=as any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes)}}
+      arg[ // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}
         subscript4: Struct<Bool>(), (any ConcreteAssocTypes).self, { true }
       ]
   }

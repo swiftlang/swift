@@ -631,9 +631,11 @@ Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
   bool hasExplicitAnyObject = requiresClass(type);
 
   llvm::SmallVector<Type, 2> types;
+
+  // Class Inheritence
+  // If the class contains a type parameter that cannot be reduced,
+  // try looking for a non-dependent superclass.
   if (Type superclass = getSuperclassBound(type)) {
-    // If the class contains a type parameter that cannot be reduced,
-    // try looking for a non-dependent superclass.
     while (superclass &&
            superclass->hasTypeParameter()) { // check if the current protocol
                                              // has an associated type]
@@ -661,7 +663,8 @@ Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
   }
   
   // Protocol Inheritence
-  // Change here too! if there is a reduced type, erase to it othererwise keep goign until we hit something that has unresolved components
+  // If there is a reduced type, erase to it.
+  // Otherwise keep going until we hit a type that has unresolved components.
   for (auto *proto : getRequiredProtocols(type)) {
     if (proto->requiresClass())
       hasExplicitAnyObject = false;
