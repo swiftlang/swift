@@ -196,7 +196,7 @@ NOTE(mark_safe_to_import, none, "annotate method '%0' with 'SWIFT_RETURNS_INDEPE
 NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",
      ())
-NOTE(get_swift_iterator, none, "do you want to make a Swift iterator instead?",
+NOTE(use_collection_apis, none, "do you want to use a for-loop instead?",
      ())
 NOTE(replace_with_nil, none, "do you want to compare against 'nil' instead?",
      ())
