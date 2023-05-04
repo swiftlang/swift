@@ -62,7 +62,7 @@ struct BridgedCalleeAnalysis {
 
   typedef bool (* _Nonnull IsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
   typedef swift::MemoryBehavior (* _Nonnull GetMemBehvaiorFn)(
-        BridgedPassContext context, BridgedInstruction apply, bool observeRetains);
+        BridgedInstruction apply, bool observeRetains, BridgedCalleeAnalysis bca);
 
   static void registerAnalysis(IsDeinitBarrierFn isDeinitBarrierFn,
                                GetMemBehvaiorFn getEffectsFn);

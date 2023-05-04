@@ -1271,7 +1271,7 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
   Changed |= hoistChecksInLoop(DT->getNode(Header), ABC, IndVars, Preheader,
                                Header, SingleExitingBlk, /*recursionDepth*/ 0);
   if (Changed) {
-    Preheader->getParent()->verify();
+    Preheader->getParent()->verify(getPassManager());
   }
   return Changed;
 }

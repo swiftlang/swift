@@ -751,7 +751,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
           "Found verification error when verifying before lowering "
           "ownership. Please re-run with -sil-verify-all to identify the "
           "actual pass that introduced the verification error.");
-      f->verify();
+      f->verify(getPassManager());
     }
 
     if (stripOwnership(*f)) {
