@@ -798,6 +798,7 @@ namespace {
   class Name##ClassExistentialTypeInfo final \
     : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
                                            LoadableTypeInfo> { \
+  bool IsOptional; \
   public: \
     Name##ClassExistentialTypeInfo( \
         ArrayRef<const ProtocolDecl *> storedProtocols, \
@@ -807,7 +808,8 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize) {} \
+                                      IsCopyable, IsFixedSize), \
+        IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
                           SILType T, \
@@ -823,6 +825,18 @@ namespace {
         return IGM.getNativeObjectTypeInfo(); \
       else \
         return IGM.getUnknownObjectTypeInfo(); \
+    } \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantCount(IGM) - IsOptional; \
+    } \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
+                                       unsigned bits, \
+                                       unsigned index) const override { \
+      /* Note that we pass down the original bit-width. */ \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantValue(IGM, bits, \
+                                                index + IsOptional); \
     } \
     /* FIXME -- Use REF_STORAGE_HELPER and make */ \
     /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
