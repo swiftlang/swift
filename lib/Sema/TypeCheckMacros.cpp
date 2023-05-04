@@ -310,8 +310,6 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
   if (!executablePlugin->isInitialized()) {
 #if SWIFT_SWIFT_PARSER
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
-      ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded,
-                         executablePluginPath, "failed to initialize plugin");
       return nullptr;
     }
     executablePlugin->setCleanup([executablePlugin] {
