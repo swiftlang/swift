@@ -5532,7 +5532,8 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
-                                         TypePosition outermostPosition);
+                                         TypePosition outermostPosition,
+                                         bool wantNonDependentBound = true);
 
 Type transformFn(Type type, Type existentialBaseType,
                             TypePosition initialPos);

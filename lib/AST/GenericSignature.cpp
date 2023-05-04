@@ -632,23 +632,26 @@ Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
 
   llvm::SmallVector<Type, 2> types;
   if (Type superclass = getSuperclassBound(type)) {
-    // If the class contains a type parameter, try looking for a non-dependent
-    // superclass.
-    while (superclass && superclass->hasTypeParameter()) {
-//      auto primaryAssocTypes = proto->getPrimaryAssociatedTypes();
-//      if (!primaryAssocTypes.empty()) {
-//        SmallVector<Type, 2> argTypes;
-//
-//        // Attempt to recover same-type requirements on primary associated types.
-//        for (auto *assocType : primaryAssocTypes) {
-//          // For each primary associated type A of P, compute the reduced type
-//          // of T.[P]A.
-//          auto *memberType = DependentMemberType::get(type, assocType);
-//          auto reducedType = getReducedType(memberType);
-//
-//        }
-//      }
-      
+    // If the class contains a type parameter that cannot be reduced,
+    // try looking for a non-dependent superclass.
+    while (superclass &&
+           superclass->hasTypeParameter()) { // check if the current protocol
+                                             // has an associated type]
+      auto *boundgeneric = superclass->castTo<BoundGenericClassType>();
+
+      SmallVector<Type, 2> argTypes;
+
+      for (Type argTy : boundgeneric->getGenericArgs()) {
+        argTypes.push_back(getReducedType(argTy));
+      }
+
+      boundgeneric = BoundGenericClassType::get(
+          boundgeneric->getDecl(), boundgeneric->getParent(), argTypes);
+      if (!boundgeneric->hasDependentMember() &&
+          !boundgeneric->hasTypeParameter()) {
+        superclass = boundgeneric;
+        break;
+      }
       superclass = superclass->getSuperclass();
     }
     if (superclass) {
@@ -746,8 +749,20 @@ Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
   // FIXME: If the superclass bound is implied by one of our protocols, we
   // shouldn't add it to the constraint type.
   if (Type superclass = getSuperclassBound(type)) {
-    types.push_back(superclass);
     hasExplicitAnyObject = false;
+
+    if (auto *boundgeneric = superclass->getAs<BoundGenericClassType>()) {
+      SmallVector<Type, 2> argTypes;
+
+      for (Type argTy : boundgeneric->getGenericArgs()) {
+        argTypes.push_back(getReducedType(argTy));
+      }
+      boundgeneric = BoundGenericClassType::get(
+          boundgeneric->getDecl(), boundgeneric->getParent(), argTypes);
+      types.push_back(boundgeneric);
+    } else {
+      types.push_back(superclass);
+    }
   }
 
   for (auto proto : getRequiredProtocols(type)) {

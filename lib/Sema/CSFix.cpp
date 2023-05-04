@@ -2496,8 +2496,10 @@ bool AddExplicitExistentialCoercion::isRequired(
         if (!existentialType)
           return Action::SkipChildren;
 
+        // let's grab the dependent upper bound here instead of nondependent
         auto erasedMemberTy = typeEraseOpenedExistentialReference(
-            Type(member), *existentialType, typeVar, TypePosition::Covariant);
+            Type(member), *existentialType, typeVar, TypePosition::Covariant,
+            false);
 
         // If result is an existential type and the base has `where` clauses
         // associated with its associated types, the call needs a coercion.
@@ -2506,13 +2508,17 @@ bool AddExplicitExistentialCoercion::isRequired(
           RequiresCoercion = true;
           return Action::Stop;
         }
-        
-        if (auto *const nominal = erasedMemberTy->getAs<NominalOrBoundGenericNominalType>()) {
-          // Bound Generic Nominals 
-          if (!hasConstrainedAssociatedTypes(member, *existentialType)) {
-            RequiresCoercion = true;
-            return Action::Stop;
-          }
+
+        if (erasedMemberTy->isExistentialType() &&
+            (erasedMemberTy->hasDependentMember() ||
+             erasedMemberTy->hasTypeParameter())) {
+          RequiresCoercion = true;
+          return Action::Stop;
+        }
+
+        if (erasedMemberTy->hasTypeVariable()) {
+          RequiresCoercion = true;
+          return Action::Stop;
         }
 
         return Action::SkipChildren;

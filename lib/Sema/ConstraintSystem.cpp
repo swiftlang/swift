@@ -1998,9 +1998,9 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
 static Type
-typeEraseExistentialSelfReferences(
-    Type refTy, Type baseTy,
-    TypePosition outermostPosition) {
+typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
+                                   TypePosition outermostPosition,
+                                   bool wantNonDependentBound = true) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
@@ -2103,7 +2103,9 @@ typeEraseExistentialSelfReferences(
       if (t->is<GenericTypeParamType>()) {
         erasedTy = baseTy;
       } else {
-        erasedTy = existentialSig->getNonDependentUpperBounds(t);
+        erasedTy = wantNonDependentBound
+                       ? existentialSig->getNonDependentUpperBounds(t)
+                       : existentialSig->getDependentUpperBounds(t);
       }
 
       if (metatypeDepth) {
@@ -2114,12 +2116,12 @@ typeEraseExistentialSelfReferences(
       return erasedTy;
     });
   };
-  return transformFn(refTy, outermostPosition);    
+  return transformFn(refTy, outermostPosition);
 }
 
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
-    TypePosition outermostPosition) {
+    TypePosition outermostPosition, bool wantNonDependentBound) {
   Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
 
   // First, temporarily reconstitute the 'Self' generic parameter.
@@ -2136,8 +2138,8 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 
   // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
-                                            outermostPosition);
+  type = typeEraseExistentialSelfReferences(
+      type, existentialBaseType, outermostPosition, wantNonDependentBound);
 
   // Finally, swap the 'Self'-corresponding type variable back in.
   return type.transformRec([&](TypeBase *t) -> Optional<Type> {
@@ -2242,8 +2244,16 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
+
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
+
+    Type contextualTy;
+
+    if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {
+      contextualTy =
+          getContextualType(getParentExpr(anchor), /*forConstraint=*/false);
+    }
 
     if (!hasFixFor(locator) &&
         AddExplicitExistentialCoercion::isRequired(
@@ -2251,7 +2261,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
             [&](TypeVariableType *typeVar) {
               return openedTypeVar == typeVar ? baseObjTy : Optional<Type>();
             },
-            locator)) {
+            locator) &&
+        !contextualTy) {
       recordFix(AddExplicitExistentialCoercion::create(
           *this, getResultType(type), locator));
     }

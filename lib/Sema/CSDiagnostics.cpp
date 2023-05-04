@@ -8760,6 +8760,10 @@ bool MissingExplicitExistentialCoercion::fixItRequiresParens() const {
 
 void MissingExplicitExistentialCoercion::fixIt(
     InFlightDiagnostic &diagnostic) const {
+
+  if (ErasedResultType->hasDependentMember())
+    return;
+
   bool requiresParens = fixItRequiresParens();
 
   auto callRange = getSourceRange();
