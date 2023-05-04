@@ -6228,16 +6228,6 @@ bool ConstraintSystem::repairFailures(
     // `Int` vs. `(_, _)`.
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If the element type is `Any` i.e. `for (x, y) in [] { ... }`
-    // it would never match and the pattern (`rhs` = `(x, y)`)
-    // doesn't have any other source of contextual information,
-    // so instead of waiting for elements to become holes with an
-    // unrelated fixes, let's proactively bind all of the pattern
-    // elemnts to holes here.
-    if (lhs->isAny()) {
-      recordTypeVariablesAsHoles(rhs);
-    }
-
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;

@@ -18,11 +18,12 @@
 #ifndef SWIFT_SEMA_CONSTRAINTLOCATOR_H
 #define SWIFT_SEMA_CONSTRAINTLOCATOR_H
 
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -312,6 +313,10 @@ public:
   /// Whether this locator identifies a conversion for a SingleValueStmtExpr
   /// branch, and if so, the kind of branch.
   Optional<SingleValueStmtBranchKind> isForSingleValueStmtBranch() const;
+
+  /// If the locator in question is for a pattern match, returns the pattern,
+  /// otherwise \c nullptr.
+  NullablePtr<Pattern> getPatternMatch() const;
 
   /// Returns true if \p locator is ending with either of the following
   ///  - Member
