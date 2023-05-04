@@ -1829,9 +1829,8 @@ public func closureCaptureClassOwnedArgUseAfterConsume4(_ x2: consuming NonTrivi
         consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}} 
     }
     f()
-    // TODO (MG): This is wrong
-    let x3 = x2 // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    let x3 = x2 // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
     let _ = x3
 }
 

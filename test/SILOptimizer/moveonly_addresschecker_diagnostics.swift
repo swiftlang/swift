@@ -3109,9 +3109,9 @@ public func closureCaptureClassUseAfterConsumeError() {
         consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
     }
     f()
-    // TODO: This is wrong
-    let x3 = x2 // expected-note {{consuming use here}}
-    // expected-error @-1 {{'x2' has guaranteed ownership but was consumed}}
+    consumeVal(x2) // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    let x3 = x2 // expected-error {{'x2' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    x2 = Klass()
     let _ = x3
 }
 
