@@ -669,6 +669,14 @@ ConstraintLocator::isForSingleValueStmtBranch() const {
   return SingleValueStmtBranchKind::Regular;
 }
 
+NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {
+  auto matchElt = findLast<LocatorPathElt::PatternMatch>();
+  if (!matchElt)
+    return nullptr;
+
+  return matchElt->getPattern();
+}
+
 bool ConstraintLocator::isMemberRef() const {
   if (isLastElement<LocatorPathElt::Member>()) {
     return true;

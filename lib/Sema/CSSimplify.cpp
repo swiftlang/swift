@@ -2755,24 +2755,17 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     }
   }
 
-  // Increase the impact of a conformance fix for a standard library
-  // or foundation type, as it's unlikely to be a good suggestion.
-  //
-  // Also do the same for the builtin compiler types Any and AnyObject,
-  // which cannot conform to protocols.
-  //
-  // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
-  // removing it currently regresses the diagnostic for the test case for
-  // rdar://60727310. Once we better handle the separation of conformance fixes
-  // from argument mismatches in cases like
-  // https://github.com/apple/swift/issues/54877, we should be able to remove
-  // it from the condition.
-  if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
-      resolvedTy->isAny() || resolvedTy->isAnyObject() ||
-      getKnownFoundationEntity(resolvedTy->getString())) {
-    if (locator.isForRequirement(RequirementKind::Conformance)) {
+  if (locator.isForRequirement(RequirementKind::Conformance)) {
+    // Increase the impact of a conformance fix for a standard library
+    // or foundation type, as it's unlikely to be a good suggestion.
+    if (resolvedTy->isStdlibType() ||
+        getKnownFoundationEntity(resolvedTy->getString())) {
       impact += 2;
     }
+    // Also do the same for the builtin compiler types Any and AnyObject, but
+    // bump the impact even higher as they cannot conform to protocols at all.
+    if (resolvedTy->isAny() || resolvedTy->isAnyObject())
+      impact += 4;
   }
 
   // If this requirement is associated with an overload choice let's
@@ -6235,16 +6228,6 @@ bool ConstraintSystem::repairFailures(
     // `Int` vs. `(_, _)`.
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If the element type is `Any` i.e. `for (x, y) in [] { ... }`
-    // it would never match and the pattern (`rhs` = `(x, y)`)
-    // doesn't have any other source of contextual information,
-    // so instead of waiting for elements to become holes with an
-    // unrelated fixes, let's proactively bind all of the pattern
-    // elemnts to holes here.
-    if (lhs->isAny()) {
-      recordTypeVariablesAsHoles(rhs);
-    }
-
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -6380,8 +6363,7 @@ bool ConstraintSystem::repairFailures(
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-
-      conversionsOrFixes.push_back(ContextualMismatch::create(
+      conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
 
@@ -6784,22 +6766,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             return matchTypesBindTypeVar(typeVar1, type2, ConstraintKind::Equal,
                                          flags, locator, formUnsolvedResult);
           }
-        }
-      }
-
-      // If the left-hand side of a 'sequence element' constraint
-      // is a dependent member type without any type variables it
-      // means that conformance check has been "fixed".
-      // Let's record other side of the conversion as a "hole"
-      // to give the solver a chance to continue and avoid
-      // producing diagnostics for both missing conformance and
-      // invalid element type.
-      if (shouldAttemptFixes()) {
-        if (locator.endsWith<LocatorPathElt::SequenceElementType>() &&
-            desugar1->is<DependentMemberType>() &&
-            !desugar1->hasTypeVariable()) {
-          recordPotentialHole(typeVar2);
-          return getTypeMatchSuccess();
         }
       }
 
@@ -14572,6 +14538,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidPackExpansion:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
+  case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
