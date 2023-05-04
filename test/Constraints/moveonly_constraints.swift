@@ -88,8 +88,8 @@ func testBasic(_ mo: borrowing MO) {
   genericVarArg(5)
   genericVarArg(mo) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
 
-  takeGeneric( (mo, 5) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to '_Copyable'}}
-  takeGenericSendable((mo, mo)) // expected-error 2{{global function 'takeGenericSendable' requires that 'MO' conform to '_Copyable'}}
+  takeGeneric( (mo, 5) ) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
+  takeGenericSendable((mo, mo)) // expected-error 2{{move-only type 'MO' cannot be used with generics yet}}
 
   let singleton : (MO) = (mo)
   takeGeneric(singleton) // expected-error {{move-only type 'MO' cannot be used with generics yet}}
