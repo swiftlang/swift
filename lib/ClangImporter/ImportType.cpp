@@ -2371,7 +2371,7 @@ ClangImporter::Implementation::importParameterType(
 
       // We don't support rvalue reference types, just bail.
       if (paramTy->isRValueReferenceType()) {
-        // FIXME: add import diagnostic.
+        addImportDiagnosticFn(Diagnostic(diag::rvalue_ref_params_not_imported));
         return None;
       }
 
