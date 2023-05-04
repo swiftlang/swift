@@ -3103,7 +3103,8 @@ namespace {
           llvm_unreachable("unsupported pack reference ASTNode");
         }
 
-        CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
+        CS.addConstraint(
+            ConstraintKind::ShapeOf, shapeTypeVar, packType,
             CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       }
 
