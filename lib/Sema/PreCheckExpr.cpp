@@ -1354,15 +1354,13 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // LeaveClosureBodiesUnchecked, as the closure may become a single expression
   // closure.
   auto *body = closure->getBody();
-  if (body->getNumElements() == 1) {
-    if (auto *S = body->getLastElement().dyn_cast<Stmt *>()) {
-      if (S->mayProduceSingleValue(Ctx)) {
-        auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-            Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
-        auto *RS = new (Ctx) ReturnStmt(SourceLoc(), SVE);
-        body->setLastElement(RS);
-        closure->setBody(body, /*isSingleExpression*/ true);
-      }
+  if (auto *S = body->getSingleActiveStatement()) {
+    if (S->mayProduceSingleValue(Ctx)) {
+      auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+          Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
+      auto *RS = new (Ctx) ReturnStmt(SourceLoc(), SVE);
+      body->setLastElement(RS);
+      closure->setBody(body, /*isSingleExpression*/ true);
     }
   }
 

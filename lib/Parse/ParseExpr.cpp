@@ -2902,37 +2902,36 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setParameterList(params);
     closure->setHasAnonymousClosureVars();
   }
-  
+
+  auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
+
   // If the body consists of a single expression, turn it into a return
   // statement.
   bool hasSingleExpressionBody = false;
-  if (!missingRBrace &&
-      Parser::shouldReturnSingleExpressionElement(bodyElements)) {
-    auto Element = bodyElements.back();
-    
-    if (Element.is<Stmt *>()) {
-      if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
-        hasSingleExpressionBody = true;
-        if (!returnStmt->hasResult()) {
-          auto returnExpr = TupleExpr::createEmpty(Context,
-                                                   SourceLoc(),
-                                                   SourceLoc(),
-                                                   /*implicit*/true);
-          returnStmt->setResult(returnExpr);
+  if (!missingRBrace) {
+    if (auto Element = BS->getSingleActiveElement()) {
+      if (Element.is<Stmt *>()) {
+        if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
+          hasSingleExpressionBody = true;
+          if (!returnStmt->hasResult()) {
+            auto returnExpr = TupleExpr::createEmpty(Context,
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     /*implicit*/true);
+            returnStmt->setResult(returnExpr);
+          }
         }
+      } else if (Element.is<Expr *>()) {
+        // Create the wrapping return.
+        hasSingleExpressionBody = true;
+        auto returnExpr = Element.get<Expr*>();
+        BS->setLastElement(new (Context) ReturnStmt(SourceLoc(), returnExpr));
       }
-    } else if (Element.is<Expr *>()) {
-      // Create the wrapping return.
-      hasSingleExpressionBody = true;
-      auto returnExpr = Element.get<Expr*>();
-      bodyElements.back() = new (Context) ReturnStmt(SourceLoc(), returnExpr);
     }
   }
 
   // Set the body of the closure.
-  closure->setBody(BraceStmt::create(Context, leftBrace, bodyElements,
-                                     rightBrace),
-                   hasSingleExpressionBody);
+  closure->setBody(BS, hasSingleExpressionBody);
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;
