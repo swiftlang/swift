@@ -2485,6 +2485,16 @@ public:
                                            unsigned componentIndex,
                                            SILValue currentIndexWithinComponent);
 
+  /// Copy the elements of a pack, which must consist of a single pack expansion,
+  /// into a tuple value having the same pack expansion and its sole element type.
+  void copyPackElementsToTuple(SILLocation loc, SILValue tupleAddr, SILValue pack,
+                               CanPackType formalPackType);
+
+  /// Initialize a pack with the addresses of the elements of a tuple, which must
+  /// consist of a single pack expansion.
+  void projectTupleElementsToPack(SILLocation loc, SILValue tupleAddr, SILValue pack,
+                                  CanPackType formalPackType);
+
   /// Return an owned managed value for \p value that is cleaned up using an end_lifetime instruction.
   ///
   /// The end_lifetime cleanup is not placed into the ManagedValue itself and
