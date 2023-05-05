@@ -45,7 +45,7 @@ enum E: Error { case err }
   init() throws {
     self.fd = 0
 
-    _forget self
+    _forget self // expected-error {{'forget' statement cannot appear in initializer}}
 
     throw E.err
   }
@@ -53,7 +53,7 @@ enum E: Error { case err }
   init(_ b: Bool) throws {
     try self.init()
 
-    _forget self
+    _forget self // expected-error {{'forget' statement cannot appear in initializer}}
 
     throw E.err
   }
@@ -122,7 +122,7 @@ enum E: Error { case err }
   case nothing
 
   init() throws {
-    _forget self
+    _forget self // expected-error {{'forget' statement cannot appear in initializer}}
     throw E.err
   }
 
