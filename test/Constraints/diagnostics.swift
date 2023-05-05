@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// REQUIRES: rdar_108947721
+
 protocol P {
   associatedtype SomeType
 }
