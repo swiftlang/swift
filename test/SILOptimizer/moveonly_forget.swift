@@ -64,10 +64,12 @@ final class Wallet {
   case pagedOut(GoodFileDescriptor)
   case within(Wallet)
 
+  consuming func forget() { _forget self }
+
   init(inWallet wallet: Wallet? = nil) { // expected-error {{'self' consumed more than once}}
     self = .within(Wallet())
     if let existingWallet = wallet {
-      _forget self
+      forget()
       self = .within(existingWallet)
     }
     forget(forever: true) // expected-note {{consuming use here}}

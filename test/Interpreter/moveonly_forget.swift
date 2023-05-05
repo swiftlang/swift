@@ -14,6 +14,8 @@ struct FileDescriptor {
   var fd: Int
   static var nextFD: Int = 0
 
+  consuming func forget() { _forget self }
+
   init() {
     self.fd = FileDescriptor.nextFD
     FileDescriptor.nextFD += 1
@@ -22,7 +24,7 @@ struct FileDescriptor {
   init(doForget: Bool) throws {
     self.init()
     if doForget {
-      _forget self
+      forget()
       throw E.err
     }
   }
@@ -61,10 +63,12 @@ struct FileDescriptor {
   case some(FileDescriptor)
   case nothing
 
+  consuming func forget() { _forget self }
+
   init(reinit: Bool) {
     self = .some(FileDescriptor())
     if reinit {
-      _forget self
+      forget()
       self = .some(FileDescriptor())
     }
   }
