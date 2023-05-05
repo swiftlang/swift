@@ -314,6 +314,9 @@ extension _StringGuts {
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
+  @_specialize(where C == String)
+  @_specialize(where C == Substring)
+  @_specialize(where C == Array<Character>)
   @discardableResult
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,

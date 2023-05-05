@@ -169,7 +169,6 @@ extension String: RangeReplaceableCollection {
       return
     }
     if let substr = _specialize(newElements, for: Array<Character>.self) {
-      // FIXME: Does this really pull its weight?
       for c in newElements {
         self.append(c._str)
       }
