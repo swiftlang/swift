@@ -11,6 +11,11 @@ public func takesTuple(_ x: (Float, Float)) {}
 public func takesVoid(_ x: ()) {}
 
 // CHECK:     takeFloat
+
+protocol TestProtocol {}
+
+// CHECK: class TestProtocol { } SWIFT_UNAVAILABLE_MSG("protocol 'TestProtocol' can not yet be represented in C++");
+
 // CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'.
 // CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'.
 

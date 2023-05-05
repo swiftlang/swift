@@ -77,6 +77,7 @@ enum RepresentationError {
   UnrepresentableIndirectEnum,
   UnrepresentableEnumCaseType,
   UnrepresentableEnumCaseTuple,
+  UnrepresentableProtocol,
 };
 
 /// Constructs a diagnostic that describes the given C++ representation error.
