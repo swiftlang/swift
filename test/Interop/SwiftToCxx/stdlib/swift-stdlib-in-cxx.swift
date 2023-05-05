@@ -117,6 +117,10 @@
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
+// CHECK: class AnyKeyPath { } SWIFT_UNAVAILABLE_MSG("class 'AnyKeyPath' is not yet exposed to C++");
+// CHECK: class FloatingPointSign { } SWIFT_UNAVAILABLE_MSG("enum 'FloatingPointSign' is not yet exposed to C++");
+// CHECK: // Unavailable in C++: Swift global function 'abs(_:)'.
+
 // CHECK: #pragma clang diagnostic push
 // CHECK: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 // CHECK: #if __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)

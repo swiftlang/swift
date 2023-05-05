@@ -14,4 +14,4 @@ public enum UseFoundationEnum {
 
 #endif
 
-// CHECK-NOT: UseFoundationEnum
+// CHECK: class UseFoundationEnum { } SWIFT_UNAVAILABLE_MSG("Swift enum 'UseFoundationEnum' cannot be represented in C++"); 
