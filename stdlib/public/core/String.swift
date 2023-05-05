@@ -965,7 +965,7 @@ extension String: CustomStringConvertible {
   ///
   /// Using this property directly is discouraged. Instead, use simple
   /// assignment to create a new constant or variable equal to this string.
-  @inlinable
+  @inlinable @inline(__always)
   public var description: String { return self }
 }
 
