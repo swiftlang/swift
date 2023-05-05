@@ -19,6 +19,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+class Triple;
+}
+
 namespace swift {
 
 class ModuleFile;
@@ -301,6 +305,11 @@ void diagnoseSerializedASTLoadFailure(
 void diagnoseSerializedASTLoadFailureTransitive(
     ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
     ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable);
+
+/// Determine whether two triples are considered to be compatible for module
+/// serialization purposes.
+bool areCompatible(const llvm::Triple &moduleTarget,
+                   const llvm::Triple &ctxTarget);
 
 } // end namespace serialization
 } // end namespace swift
