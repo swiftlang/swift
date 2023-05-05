@@ -415,8 +415,7 @@ extension Substring: StringProtocol {
       startingAt: i._encodedOffset, endingAt: endOffset)
   }
 
-  @_specialize(where C == String)
-  @_specialize(where C == Substring)
+  // FIXME: Add @_specialize
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
@@ -1124,8 +1123,7 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   @inlinable
   public init() { _slice = Slice.init() }
 
-  @_specialize(where C == String)
-  @_specialize(where C == Substring)
+  // FIXME: Add @_specialize
   public mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with replacement: C
   ) where C.Element == Element {
