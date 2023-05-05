@@ -815,11 +815,16 @@ void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
   size_t retainCount = swift_retainCount(object);
-  if (SWIFT_UNLIKELY(retainCount > 1))
+  if (SWIFT_UNLIKELY(retainCount > 1)) {
+    auto descriptor = object->metadata->getTypeContextDescriptor();
+
     swift::fatalError(0,
-                      "Object %p deallocated with retain count %zd, reference "
-                      "may have escaped from deinit.\n",
-                      object, retainCount);
+                      "Object %p of class %s deallocated with retain count %zd, "
+                      "reference may have escaped from deinit.\n",
+                      object,
+                      descriptor ? descriptor->Name.get() : "<unknown>",
+                      retainCount);
+  }
 
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
