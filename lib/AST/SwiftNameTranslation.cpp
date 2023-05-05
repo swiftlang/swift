@@ -221,6 +221,8 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
       genericSignature = AFD->getGenericSignature().getCanonicalSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
+    if (isa<ProtocolDecl>(typeDecl))
+      return {Unsupported, UnrepresentableProtocol};
     if (typeDecl->isGeneric()) {
       if (isa<ClassDecl>(VD))
         return {Unsupported, UnrepresentableGeneric};
@@ -316,5 +318,7 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_enum_case_type_to_cxx, vd);
   case UnrepresentableEnumCaseTuple:
     return Diagnostic(diag::expose_enum_case_tuple_to_cxx, vd);
+  case UnrepresentableProtocol:
+    return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
   }
 }
