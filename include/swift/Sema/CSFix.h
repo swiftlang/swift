@@ -444,6 +444,9 @@ enum class FixKind : uint8_t {
 
   /// Allow value pack expansion without pack references.
   AllowValueExpansionWithoutPackReferences,
+
+  /// Ignore missing 'each' keyword before value pack reference.
+  IgnoreMissingEachKeyword,
 };
 
 class ConstraintFix {
@@ -3503,6 +3506,33 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowValueExpansionWithoutPackReferences;
+  }
+};
+
+class IgnoreMissingEachKeyword final : public ConstraintFix {
+  Type ValuePackType;
+
+  IgnoreMissingEachKeyword(ConstraintSystem &cs, Type valuePackTy,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreMissingEachKeyword, locator),
+        ValuePackType(valuePackTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow value pack reference without 'each'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreMissingEachKeyword *
+  create(ConstraintSystem &cs, Type valuePackTy, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreMissingEachKeyword;
   }
 };
 
