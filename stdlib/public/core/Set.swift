@@ -956,7 +956,7 @@ extension Set: SetAlgebra {
   public __consuming func intersection<S: Sequence>(_ other: S) -> Set<Element>
   where S.Element == Element {
     if let s = _specialize(other, for: Set<Element>.self) {
-      return self.intersection(other)
+      return self.intersection(s)
     }
     return Set(_native: _variant.convertedToNative.genericIntersection(other))
   }
