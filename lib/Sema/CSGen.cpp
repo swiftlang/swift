@@ -3063,6 +3063,50 @@ namespace {
       return variadicSeq;
     }
 
+    void collectExpandedPacks(PackExpansionExpr *expansion,
+                              SmallVectorImpl<ASTNode> &packs) {
+      struct PackCollector : public ASTWalker {
+      private:
+        SmallVectorImpl<ASTNode> &Packs;
+
+      public:
+        PackCollector(SmallVectorImpl<ASTNode> &packs) : Packs(packs) {}
+
+        /// Walk everything that's available.
+        MacroWalking getMacroWalkingBehavior() const override {
+          return MacroWalking::ArgumentsAndExpansion;
+        }
+
+        virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+          // Don't walk into nested pack expansions
+          if (isa<PackExpansionExpr>(E)) {
+            return Action::SkipChildren(E);
+          }
+
+          if (isa<PackElementExpr>(E)) {
+            Packs.push_back(E);
+          }
+
+          return Action::Continue(E);
+        }
+
+        virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+          // Don't walk into nested pack expansions
+          if (isa<PackExpansionTypeRepr>(T)) {
+            return Action::SkipChildren();
+          }
+
+          if (isa<PackElementTypeRepr>(T)) {
+            Packs.push_back(T);
+          }
+
+          return Action::Continue();
+        }
+      } packCollector(packs);
+
+      expansion->getPatternExpr()->walk(packCollector);
+    }
+
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
       assert(PackElementEnvironments.back() == expr);
       PackElementEnvironments.pop_back();
@@ -3086,7 +3130,7 @@ namespace {
       // Generate ShapeOf constraints between all packs expanded by this
       // pack expansion expression through the shape type variable.
       SmallVector<ASTNode, 2> expandedPacks;
-      expr->getExpandedPacks(expandedPacks);
+      collectExpandedPacks(expr, expandedPacks);
 
       if (expandedPacks.empty()) {
         (void)CS.recordFix(AllowValueExpansionWithoutPackReferences::create(
