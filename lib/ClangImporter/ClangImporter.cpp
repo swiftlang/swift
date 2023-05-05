@@ -1255,6 +1255,9 @@ ClangImporter::create(ASTContext &ctx,
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 
+  // Clang implicitly enables this by default in C++20 mode.
+  instance.getLangOpts().ModulesLocalVisibility = false;
+
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
