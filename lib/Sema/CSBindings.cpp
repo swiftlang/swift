@@ -2203,16 +2203,25 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     return std::make_pair(fix, /*impact=*/(unsigned)10);
   }
 
-  if (auto pattern = getAsPattern(dstLocator->getAnchor())) {
-    if (dstLocator->getPath().size() == 1 &&
-        dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
+  if (auto pattern = dstLocator->getPatternMatch()) {
+    if (dstLocator->isLastElement<LocatorPathElt::PatternDecl>()) {
+      // If this is the pattern in a for loop, and we have a mismatch of the
+      // element type, then we don't have any useful contextual information
+      // for the pattern, and can just bind to a hole without needing to penalize
+      // the solution further.
+      auto *seqLoc = cs.getConstraintLocator(
+          dstLocator->getAnchor(), ConstraintLocator::SequenceElementType);
+      if (cs.hasFixFor(seqLoc,
+                       FixKind::IgnoreCollectionElementContextualMismatch)) {
+        return None;
+      }
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
       // expression because we want to preferrably point the diagnostic to a
       // part of the expression that caused us to be unable to infer the
       // variable's type.
       ConstraintFix *fix =
-          IgnoreUnresolvedPatternVar::create(cs, pattern, dstLocator);
+          IgnoreUnresolvedPatternVar::create(cs, pattern.get(), dstLocator);
       return std::make_pair(fix, /*impact=*/(unsigned)100);
     }
   }

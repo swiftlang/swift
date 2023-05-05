@@ -48,6 +48,8 @@ using namespace llvm::support;
 
 const char SILEntityError::ID = '\0';
 void SILEntityError::anchor() {}
+const char SILFunctionTypeMismatch::ID = '\0';
+void SILFunctionTypeMismatch::anchor() {}
 
 STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
 
@@ -615,8 +617,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // If we have an existing function, verify that the types match up.
   if (fn) {
-    if (fn->getLoweredType() != ty)
-      return MF->diagnoseFatal("SILFunction type mismatch");
+    if (fn->getLoweredType() != ty) {
+      auto error = llvm::make_error<SILFunctionTypeMismatch>(
+                     name,
+                     fn->getLoweredType().getDebugDescription(),
+                     ty.getDebugDescription());
+      return MF->diagnoseFatal(std::move(error));
+    }
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
@@ -650,7 +657,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     }
 
     if (fn->isDynamicallyReplaceable() != isDynamic)
-      return MF->diagnoseFatal("SILFunction type mismatch");
+      return MF->diagnoseFatal("SILFunction dynamic replaceable mismatch");
 
   } else {
     // Otherwise, create a new function.

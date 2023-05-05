@@ -513,7 +513,10 @@ bool MissingConformanceFailure::diagnoseAsError() {
       llvm::SmallPtrSet<Expr *, 4> anchors;
       for (const auto *fix : getSolution().Fixes) {
         if (auto anchor = fix->getAnchor()) {
-          if (anchor.is<Expr *>())
+          auto path = fix->getLocator()->getPath();
+          SourceRange range;
+          simplifyLocator(anchor, path, range);
+          if (anchor && anchor.is<Expr *>())
             anchors.insert(getAsExpr(anchor));
         }
       }
@@ -654,10 +657,15 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   if (!ODRE)
     return false;
 
-  auto name = ODRE->getDecls().front()->getBaseName();
-  if (!(name.isOperator() && getLHS()->isStdlibType() && getRHS()->isStdlibType()))
-    return false;
+  auto isStandardType = [](Type ty) {
+    return ty->isStdlibType() || ty->is<TupleType>();
+  };
 
+  auto name = ODRE->getDecls().front()->getBaseName();
+  if (!(name.isOperator() && isStandardType(getLHS()) &&
+        isStandardType(getRHS()))) {
+    return false;
+  }
   // If this is an operator reference and both types are from stdlib,
   // let's produce a generic diagnostic about invocation and a note
   // about missing conformance just in case.
@@ -2448,9 +2456,6 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
 
-  if (diagnoseExtraneousAssociatedValues())
-    return true;
-
   // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion()) {
@@ -2889,24 +2894,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 
   if (tryTypeCoercionFixIt(diagnostic))
     return;
-}
-
-bool ContextualFailure::diagnoseExtraneousAssociatedValues() const {
-  if (auto match =
-          getLocator()->getLastElementAs<LocatorPathElt::PatternMatch>()) {
-    if (auto enumElementPattern =
-            dyn_cast<EnumElementPattern>(match->getPattern())) {
-      emitDiagnosticAt(enumElementPattern->getNameLoc(),
-                       diag::enum_element_pattern_assoc_values_mismatch,
-                       enumElementPattern->getName());
-      emitDiagnosticAt(enumElementPattern->getNameLoc(),
-                       diag::enum_element_pattern_assoc_values_remove)
-          .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
@@ -3877,7 +3864,7 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
       if (conformsToRACollection(baseType)) {
         ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                            name.getBaseIdentifier().str());
-        ctx.Diags.diagnose(loc, diag::get_swift_iterator)
+        ctx.Diags.diagnose(loc, diag::use_collection_apis)
             .fixItReplaceChars(
                 loc, loc.getAdvancedLoc(name.getBaseIdentifier().str().size()),
                 "makeIterator");
@@ -8681,6 +8668,19 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
 bool TupleLabelMismatchWarning::diagnoseAsError() {
   emitDiagnostic(diag::tuple_label_mismatch_warning, getFromType(), getToType())
       .highlight(getSourceRange());
+  return true;
+}
+
+bool AssociatedValueMismatchFailure::diagnoseAsError() {
+  auto match = getLocator()->castLastElementTo<LocatorPathElt::PatternMatch>();
+  auto *enumElementPattern = dyn_cast<EnumElementPattern>(match.getPattern());
+
+  emitDiagnosticAt(enumElementPattern->getNameLoc(),
+                   diag::enum_element_pattern_assoc_values_mismatch,
+                   enumElementPattern->getName());
+  emitDiagnosticAt(enumElementPattern->getNameLoc(),
+                   diag::enum_element_pattern_assoc_values_remove)
+      .fixItRemove(enumElementPattern->getSubPattern()->getSourceRange());
   return true;
 }
 

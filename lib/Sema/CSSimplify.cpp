@@ -2755,24 +2755,17 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     }
   }
 
-  // Increase the impact of a conformance fix for a standard library
-  // or foundation type, as it's unlikely to be a good suggestion.
-  //
-  // Also do the same for the builtin compiler types Any and AnyObject,
-  // which cannot conform to protocols.
-  //
-  // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
-  // removing it currently regresses the diagnostic for the test case for
-  // rdar://60727310. Once we better handle the separation of conformance fixes
-  // from argument mismatches in cases like
-  // https://github.com/apple/swift/issues/54877, we should be able to remove
-  // it from the condition.
-  if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
-      resolvedTy->isAny() || resolvedTy->isAnyObject() ||
-      getKnownFoundationEntity(resolvedTy->getString())) {
-    if (locator.isForRequirement(RequirementKind::Conformance)) {
+  if (locator.isForRequirement(RequirementKind::Conformance)) {
+    // Increase the impact of a conformance fix for a standard library
+    // or foundation type, as it's unlikely to be a good suggestion.
+    if (resolvedTy->isStdlibType() ||
+        getKnownFoundationEntity(resolvedTy->getString())) {
       impact += 2;
     }
+    // Also do the same for the builtin compiler types Any and AnyObject, but
+    // bump the impact even higher as they cannot conform to protocols at all.
+    if (resolvedTy->isAny() || resolvedTy->isAnyObject())
+      impact += 4;
   }
 
   // If this requirement is associated with an overload choice let's
@@ -3834,8 +3827,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  // move-only types cannot match with any existential types.
-  if (type1->isPureMoveOnly()) {
+  // move-only types (and their metatypes) cannot match with existential types.
+  if (type1->getMetatypeInstanceType()->isPureMoveOnly()) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this, type1,
@@ -6235,16 +6228,6 @@ bool ConstraintSystem::repairFailures(
     // `Int` vs. `(_, _)`.
     recordAnyTypeVarAsPotentialHole(rhs);
 
-    // If the element type is `Any` i.e. `for (x, y) in [] { ... }`
-    // it would never match and the pattern (`rhs` = `(x, y)`)
-    // doesn't have any other source of contextual information,
-    // so instead of waiting for elements to become holes with an
-    // unrelated fixes, let's proactively bind all of the pattern
-    // elemnts to holes here.
-    if (lhs->isAny()) {
-      recordTypeVariablesAsHoles(rhs);
-    }
-
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -6380,8 +6363,7 @@ bool ConstraintSystem::repairFailures(
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-
-      conversionsOrFixes.push_back(ContextualMismatch::create(
+      conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
 
@@ -6784,22 +6766,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             return matchTypesBindTypeVar(typeVar1, type2, ConstraintKind::Equal,
                                          flags, locator, formUnsolvedResult);
           }
-        }
-      }
-
-      // If the left-hand side of a 'sequence element' constraint
-      // is a dependent member type without any type variables it
-      // means that conformance check has been "fixed".
-      // Let's record other side of the conversion as a "hole"
-      // to give the solver a chance to continue and avoid
-      // producing diagnostics for both missing conformance and
-      // invalid element type.
-      if (shouldAttemptFixes()) {
-        if (locator.endsWith<LocatorPathElt::SequenceElementType>() &&
-            desugar1->is<DependentMemberType>() &&
-            !desugar1->hasTypeVariable()) {
-          recordPotentialHole(typeVar2);
-          return getTypeMatchSuccess();
         }
       }
 
@@ -13234,17 +13200,17 @@ static bool hasUnresolvedPackVars(Type type) {
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
-    Type type1, Type type2, TypeMatchOptions flags,
+    Type shapeTy, Type packTy, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
   // Recursively replace all type variables with fixed bindings if
   // possible.
-  type1 = simplifyType(type1, flags);
+  packTy = simplifyType(packTy, flags);
 
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *shapeOf = Constraint::create(
-          *this, ConstraintKind::ShapeOf, type1, type2,
+          *this, ConstraintKind::ShapeOf, shapeTy, packTy,
           getConstraintLocator(locator));
 
       addUnsolvedConstraint(shapeOf);
@@ -13255,30 +13221,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   };
 
   // Don't try computing the shape of a type variable.
-  if (type1->isTypeVariableOrMember())
+  if (packTy->isTypeVariableOrMember())
     return formUnsolved();
 
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes
   // or pack expansions.
   SmallPtrSet<TypeVariableType *, 2> typeVars;
-  type1->getTypeVariables(typeVars);
+  packTy->getTypeVariables(typeVars);
   for (auto *typeVar : typeVars) {
     if (typeVar->getImpl().canBindToPack() ||
         typeVar->getImpl().isPackExpansion())
       return formUnsolved();
   }
 
-  if (type1->hasPlaceholder()) {
+  if (packTy->hasPlaceholder()) {
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    recordTypeVariablesAsHoles(type2);
+    recordTypeVariablesAsHoles(shapeTy);
     return SolutionKind::Solved;
   }
 
-  auto shape = type1->getReducedShape();
-  addConstraint(ConstraintKind::Bind, shape, type2, locator);
+  auto shape = packTy->getReducedShape();
+  addConstraint(ConstraintKind::Bind, shapeTy, shape, locator);
   return SolutionKind::Solved;
 }
 
@@ -13420,11 +13386,11 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      auto *shapeOf = Constraint::create(
-          *this, ConstraintKind::ShapeOf, type1, type2,
-          getConstraintLocator(locator));
+      auto *explictGenericArgs =
+          Constraint::create(*this, ConstraintKind::ExplicitGenericArguments,
+                             type1, type2, getConstraintLocator(locator));
 
-      addUnsolvedConstraint(shapeOf);
+      addUnsolvedConstraint(explictGenericArgs);
       return SolutionKind::Solved;
     }
 
@@ -14572,6 +14538,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidPackExpansion:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
+  case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

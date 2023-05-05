@@ -221,12 +221,11 @@ class SILPassManager {
 
   std::chrono::nanoseconds totalPassRuntime = std::chrono::nanoseconds(0);
 
+public:
   /// C'tor. It creates and registers all analysis passes, which are defined
-  /// in Analysis.def. This is private as it should only be used by
-  /// ExecuteSILPipelineRequest.
+  /// in Analysis.def.
   SILPassManager(SILModule *M, bool isMandatory, irgen::IRGenModule *IRMod);
 
-public:
   const SILOptions &getOptions() const;
 
   /// Searches for an analysis of type T in the list of registered

@@ -588,6 +588,14 @@ namespace importer {
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
 
+/// Returns the pointee type if the given type is a C++ `const`
+/// reference type, `None` otherwise.
+llvm::Optional<clang::QualType>
+getCxxReferencePointeeTypeOrNone(const clang::Type *type);
+
+/// Returns true if the given type is a C++ `const` reference type.
+bool isCxxConstReferenceType(const clang::Type *type);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

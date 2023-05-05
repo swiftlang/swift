@@ -445,8 +445,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
 MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
   auto declRef = evaluateOrDefault(
       getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, this},
-      ConcreteDeclRef());
+      ResolveMacroRequest{customAttr, getDeclContext()}, ConcreteDeclRef());
 
   return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
@@ -8358,6 +8357,14 @@ const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
   if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+    return index < params->size() ? params->get(index) : nullptr;
+  }
+  return nullptr;
+}
+
+const ParamDecl *swift::getParameterAt(const DeclContext *source,
+                                       unsigned index) {
+  if (auto *params = getParameterList(const_cast<DeclContext *>(source))) {
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;

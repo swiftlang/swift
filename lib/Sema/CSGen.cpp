@@ -2471,6 +2471,9 @@ namespace {
                      : nullptr;
         };
 
+        auto matchLoc =
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
+
         // Always prefer a contextual type when it's available.
         if (externalPatternType) {
           type = externalPatternType;
@@ -2479,8 +2482,8 @@ namespace {
           type = CS.getType(initializer)->getRValueType();
         } else {
           type = CS.createTypeVariable(
-              CS.getConstraintLocator(pattern,
-                                      ConstraintLocator::AnyPatternDecl),
+              CS.getConstraintLocator(matchLoc,
+                                      LocatorPathElt::AnyPatternDecl()),
               TVO_CanBindToNoEscape | TVO_CanBindToHole);
         }
         return setType(type);
@@ -2515,9 +2518,12 @@ namespace {
           }
         }
 
+        auto matchLoc =
+            locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
+
         if (!varType) {
           varType = CS.createTypeVariable(
-              CS.getConstraintLocator(pattern,
+              CS.getConstraintLocator(matchLoc,
                                       LocatorPathElt::NamedPatternDecl()),
               TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
@@ -3103,7 +3109,8 @@ namespace {
           llvm_unreachable("unsupported pack reference ASTNode");
         }
 
-        CS.addConstraint(ConstraintKind::ShapeOf, packType, shapeTypeVar,
+        CS.addConstraint(
+            ConstraintKind::ShapeOf, shapeTypeVar, packType,
             CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       }
 
