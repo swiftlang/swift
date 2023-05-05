@@ -827,9 +827,22 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 
   if (auto *TD = dyn_cast<TypeDecl>(D)) {
     if (!CtorRefs.empty() && BaseNameLoc.isValid()) {
-      Expr *Fn = CtorRefs.back()->getFn();
-      if (Fn->getLoc() == BaseNameLoc) {
-        D = ide::getReferencedDecl(Fn).second.getDecl();
+      ConstructorRefCallExpr *Ctor = CtorRefs.back();
+      SourceLoc CtorLoc = Ctor->getFn()->getLoc();
+      // Get the location of the type, ignoring parens, rather than the start of
+      // the Expr, to match the lookup.
+      if (auto *TE = dyn_cast<TypeExpr>(Ctor->getBase()))
+        CtorLoc = TE->getTypeRepr()->getWithoutParens()->getLoc();
+
+      bool isImplicit = false;
+      Expr *Fn = Ctor->getFn();
+      while (auto *ICE = dyn_cast<ImplicitConversionExpr>(Fn))
+        Fn = ICE->getSubExpr();
+      if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
+        isImplicit = DRE->isImplicit();
+
+      if (isImplicit && CtorLoc == BaseNameLoc) {
+        D = ide::getReferencedDecl(Ctor->getFn()).second.getDecl();
         if (D == nullptr) {
           assert(false && "Unhandled constructor reference");
           return true;
