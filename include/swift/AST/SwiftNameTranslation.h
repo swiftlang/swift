@@ -13,8 +13,9 @@
 #ifndef SWIFT_NAME_TRANSLATION_H
 #define SWIFT_NAME_TRANSLATION_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Identifier.h"
 
 namespace swift {
   class ValueDecl;
@@ -77,6 +78,9 @@ enum RepresentationError {
   UnrepresentableEnumCaseType,
   UnrepresentableEnumCaseTuple,
 };
+
+/// Constructs a diagnostic that describes the given C++ representation error.
+Diagnostic diagnoseRepresenationError(RepresentationError error, ValueDecl *vd);
 
 struct DeclRepresentation {
   RepresentationKind kind;

@@ -4,11 +4,16 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK:     takeFloat
-// CHECK-NOT: takes
-
 public func takeFloat(_ x: Float) {}
 
 public func takesTuple(_ x: (Float, Float)) {}
 
 public func takesVoid(_ x: ()) {}
+
+// CHECK:     takeFloat
+// CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'.
+// CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'.
+
+typealias unsupportedTypeAlias = () -> (Float, Float)
+
+// CHECK: // Unavailable in C++: Swift type alias 'unsupportedTypeAlias'

@@ -30,6 +30,15 @@ class PrimitiveTypeMapping;
 class ValueDecl;
 class SwiftToClangInteropContext;
 
+/// Tracks which C++ declarations have been emitted in a lexical
+/// C++ scope.
+struct CxxDeclEmissionScope {
+  /// Additional Swift declarations that are unrepresentable in C++.
+  std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
+  /// Records the C++ declaration names already emitted in this lexical scope.
+  llvm::StringSet<> emittedDeclarationNames;
+};
+
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
 class DeclAndTypePrinter {
@@ -45,6 +54,7 @@ private:
   raw_ostream &prologueOS;
   raw_ostream &outOfLineDefinitionsOS;
   const DelayedMemberSet &delayedMembers;
+  CxxDeclEmissionScope *cxxDeclEmissionScope;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
@@ -63,6 +73,7 @@ public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      raw_ostream &outOfLineDefinitionsOS,
                      DelayedMemberSet &delayed,
+                     CxxDeclEmissionScope &topLevelEmissionScope,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
                      AccessLevel access, bool requiresExposedAttribute,
@@ -70,14 +81,22 @@ public:
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
         outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
-        typeMapping(typeMapping), interopContext(interopContext),
-        minRequiredAccess(access),
+        cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
+        interopContext(interopContext), minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),
         exposedModules(exposedModules), outputLang(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
 
   SwiftToClangInteropContext &getInteropContext() { return interopContext; }
+
+  CxxDeclEmissionScope &getCxxDeclEmissionScope() {
+    return *cxxDeclEmissionScope;
+  }
+
+  void setCxxDeclEmissionScope(CxxDeclEmissionScope &scope) {
+    cxxDeclEmissionScope = &scope;
+  }
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.

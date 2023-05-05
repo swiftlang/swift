@@ -17,6 +17,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -282,4 +283,38 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
     }
   }
   return false;
+}
+
+Diagnostic
+swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
+                                                   ValueDecl *vd) {
+  switch (error) {
+  case UnrepresentableObjC:
+    return Diagnostic(diag::expose_unsupported_objc_decl_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableAsync:
+    return Diagnostic(diag::expose_unsupported_async_decl_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableIsolatedInActor:
+    return Diagnostic(diag::expose_unsupported_actor_isolated_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableRequiresClientEmission:
+    return Diagnostic(diag::expose_unsupported_client_emission_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableGeneric:
+    return Diagnostic(diag::expose_generic_decl_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableGenericRequirements:
+    return Diagnostic(diag::expose_generic_requirement_to_cxx,
+                      vd->getDescriptiveKind(), vd);
+  case UnrepresentableThrows:
+    return Diagnostic(diag::expose_throwing_to_cxx, vd->getDescriptiveKind(),
+                      vd);
+  case UnrepresentableIndirectEnum:
+    return Diagnostic(diag::expose_indirect_enum_cxx, vd);
+  case UnrepresentableEnumCaseType:
+    return Diagnostic(diag::expose_enum_case_type_to_cxx, vd);
+  case UnrepresentableEnumCaseTuple:
+    return Diagnostic(diag::expose_enum_case_tuple_to_cxx, vd);
+  }
 }
