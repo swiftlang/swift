@@ -359,20 +359,13 @@ public:
   }
 };
 
-class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
-  friend ErrorInfo;
-  static const char ID;
-  void anchor() override;
+// Service class for errors with an underlying cause.
+class ErrorWithUnderlyingReason {
+  std::unique_ptr<llvm::ErrorInfoBase> underlyingReason;
 
-  std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
-  explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags={}, unsigned numVTableEntries=0)
-      : underlyingReason(std::move(reason)) {
-    this->name = name;
-    this->flags = flags;
-    this->numVTableEntries = numVTableEntries;
-  }
+  explicit ErrorWithUnderlyingReason (std::unique_ptr<llvm::ErrorInfoBase> reason) :
+    underlyingReason(std::move(reason)) {}
 
   template <typename UnderlyingErrorT>
   bool underlyingReasonIsA() const {
@@ -381,36 +374,53 @@ public:
     return underlyingReason->isA<UnderlyingErrorT>();
   }
 
-  void log(raw_ostream &OS) const override {
-    OS << "Could not deserialize type for '" << name << "'";
+  void log(raw_ostream &OS) const {
     if (underlyingReason) {
       OS << "\nCaused by: ";
       underlyingReason->log(OS);
     }
   }
 
+};
+
+class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError>,
+                  public ErrorWithUnderlyingReason {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
+                     Flags flags={}, unsigned numVTableEntries=0)
+      : ErrorWithUnderlyingReason(std::move(reason)) {
+    this->name = name;
+    this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "Could not deserialize type for '" << name << "'";
+    ErrorWithUnderlyingReason::log(OS);
+  }
+
   std::error_code convertToErrorCode() const override {
     return llvm::inconvertibleErrorCode();
   }
 };
 
-class ExtensionError : public llvm::ErrorInfo<ExtensionError> {
+class ExtensionError : public llvm::ErrorInfo<ExtensionError>,
+                       public ErrorWithUnderlyingReason {
   friend ErrorInfo;
   static const char ID;
   void anchor() override;
-
-  std::unique_ptr<ErrorInfoBase> underlyingReason;
 
 public:
   explicit ExtensionError(std::unique_ptr<ErrorInfoBase> reason)
-      : underlyingReason(std::move(reason)) {}
+      : ErrorWithUnderlyingReason(std::move(reason)) {}
 
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize extension";
-    if (underlyingReason) {
-      OS << ": ";
-      underlyingReason->log(OS);
-    }
+    ErrorWithUnderlyingReason::log(OS);
   }
 
   std::error_code convertToErrorCode() const override {
@@ -418,23 +428,20 @@ public:
   }
 };
 
-class SILEntityError : public llvm::ErrorInfo<SILEntityError> {
+class SILEntityError : public llvm::ErrorInfo<SILEntityError>,
+                       public ErrorWithUnderlyingReason {
   friend ErrorInfo;
   static const char ID;
   void anchor() override;
 
-  std::unique_ptr<ErrorInfoBase> underlyingReason;
   StringRef name;
 public:
   SILEntityError(StringRef name, std::unique_ptr<ErrorInfoBase> reason)
-      : underlyingReason(std::move(reason)), name(name) {}
+      : ErrorWithUnderlyingReason(std::move(reason)), name(name) {}
 
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize SIL entity '" << name << "'";
-    if (underlyingReason) {
-      OS << ": ";
-      underlyingReason->log(OS);
-    }
+    ErrorWithUnderlyingReason::log(OS);
   }
 
   std::error_code convertToErrorCode() const override {
