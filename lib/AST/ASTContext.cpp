@@ -3135,16 +3135,17 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
 
     return false;
   }();
-  auto arena = hasTypeVariables ? AllocationArena::ConstraintSolver
-                                : AllocationArena::Permanent;
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPlaceholder;
+  if (hasTypeVariables)
+    properties |= RecursiveTypeProperties::HasTypeVariable;
 
+  auto arena = getArena(properties);
   auto &cache = ctx.getImpl().getArena(arena).PlaceholderTypes;
   auto &entry = cache[originator.getOpaqueValue()];
   if (entry)
     return entry;
 
-  entry = new (ctx, arena)
-      PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
+  entry = new (ctx, arena) PlaceholderType(ctx, originator, properties);
   return entry;
 }
 
