@@ -5737,13 +5737,13 @@ ConstraintSystem::repairFailures(
       // detected a tuple splat issue.
       if (hasFixFor(loc,
                     FixKind::DestructureTupleToMatchPackExpansionParameter))
-        return true;
+        return getTypeMatchSuccess();
 
       // Path would end with `ApplyArgument`.
       auto *argsLoc = getConstraintLocator(anchor, tmpPath.drop_back());
       if (hasFixFor(argsLoc, FixKind::RemoveExtraneousArguments) ||
           hasFixFor(argsLoc, FixKind::AddMissingArguments))
-        return true;
+        return getTypeMatchSuccess();
     }
 
     // If the argument couldn't be found, this could be a default value
@@ -6412,7 +6412,7 @@ ConstraintSystem::repairFailures(
   case ConstraintLocator::EnumPatternImplicitCastMatch: {
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
