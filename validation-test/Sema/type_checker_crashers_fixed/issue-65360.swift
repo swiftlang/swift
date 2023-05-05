@@ -13,8 +13,7 @@ let _: () -> Void = {
   // expected-error@-1 {{cannot convert value of type 'Any?' to specified type '(_, _)}}
 }
 
-let _: () -> Void = {
+let _: () -> Void = { // expected-error {{unable to infer closure type in the current context}}
   for case (0)? in [a] {}
   for case (0, 0) in [a] {}
-  // expected-error@-1 {{cannot convert value of type 'Any?' to expected element type '(_, _)'}}
 }

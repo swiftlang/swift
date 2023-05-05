@@ -448,6 +448,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   bool includeUnderlying = false;
   StringRef importDirective =
       useCxxImport ? "#pragma clang module import" : "@import";
+  StringRef importDirectiveLineEnd = useCxxImport ? "\n" : ";\n";
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
       if (useCxxImport) {
@@ -464,7 +465,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         continue;
       }
       if (seenImports.insert(Name).second) {
-        out << importDirective << ' ' << Name.str() << ";\n";
+        out << importDirective << ' ' << Name.str() << importDirectiveLineEnd;
         if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
           if (const clang::Module *underlyingClangModule =
                   swiftModule->findUnderlyingClangModule()) {
@@ -487,8 +488,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
              "top-level modules should use a normal swift::ModuleDecl");
       out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
-      out << ";\n";
-
+      out << importDirectiveLineEnd;
       if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
         collectClangModuleHeaderIncludes(
             clangModule, fileManager, requiredTextualIncludes, visitedModules,
