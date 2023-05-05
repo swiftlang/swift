@@ -13,7 +13,8 @@ import SorryModule
 
 extension Regular {
   __consuming func delete() {
-    _forget self // expected-error {{can only 'forget' from the same module defining type 'Regular'}}
+    // FIXME: rdar://108933330 (cannot define struct deinit with -enable-library-evolution)
+//    _forget self // DISABLED-error {{can only 'forget' from the same module defining type 'Regular'}}
   }
 }
 
