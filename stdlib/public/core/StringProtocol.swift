@@ -125,6 +125,7 @@ extension StringProtocol {
   // TODO(String performance): Provide a closure-based call with stack-allocated
   // _SharedString for non-smol Substrings
   //
+  @inlinable @inline(__always)
   public // @SPI(NSStringAPI.swift)
   var _ephemeralString: String {
     String(self)

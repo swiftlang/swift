@@ -792,17 +792,17 @@ extension Sequence where Element: StringProtocol {
     result.reserveCapacity(underestimatedCap)
     if separator.isEmpty {
       for x in self {
-        result.append(x._ephemeralString)
+        result.append(contentsOf: x)
       }
       return result
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result.append(first._ephemeralString)
+      result.append(contentsOf: first)
       while let next = iter.next() {
         result.append(separator)
-        result.append(next._ephemeralString)
+        result.append(contentsOf: next)
       }
     }
     return result
