@@ -25,6 +25,12 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: UnownedJob)
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(*, deprecated, message: "Use enqueue(ExecutorJob) instead")
+  func enqueue(_ job: __owned Job)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.9, *)
   func enqueue(_ job: __owned ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -45,6 +51,17 @@ public protocol SerialExecutor: Executor {
   @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(*, deprecated, message: "Use enqueue(ExecutorJob) instead")
+  func enqueue(_ job: __owned Job)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   // This requirement is repeated here as a non-override so that we
@@ -90,6 +107,10 @@ extension Executor {
   }
 
   public func enqueue(_ job: __owned ExecutorJob) {
+    self.enqueue(UnownedJob(job))
+  }
+
+  public func enqueue(_ job: __owned Job) {
     self.enqueue(UnownedJob(job))
   }
 }
