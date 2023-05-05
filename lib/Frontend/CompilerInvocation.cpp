@@ -614,6 +614,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     auto value =
         llvm::StringSwitch<Optional<UnavailableDeclOptimization>>(A->getValue())
             .Case("none", UnavailableDeclOptimization::None)
+            .Case("stub", UnavailableDeclOptimization::Stub)
             .Case("complete", UnavailableDeclOptimization::Complete)
             .Default(None);
 

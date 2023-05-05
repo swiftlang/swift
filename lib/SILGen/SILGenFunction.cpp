@@ -882,6 +882,9 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     prepareEpilog(fd->getResultInterfaceType(),
                   fd->hasThrows(), CleanupLocation(fd));
 
+    if (shouldLowerToUnavailableCodeStub(fd))
+      emitApplyOfUnavailableCodeReached();
+
     emitProfilerIncrement(fd->getTypecheckedBody());
 
     // Emit the actual function body as usual
