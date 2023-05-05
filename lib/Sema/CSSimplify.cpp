@@ -8166,6 +8166,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Solved;
   }
 
+  // Copyable is checked structurally, so for better performance, split apart
+  // this constraint into individual Copyable constraints on each tuple element.
+  if (auto *tupleType = type->getAs<TupleType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
+        addConstraint(ConstraintKind::ConformsTo,
+                      tupleType->getElementType(i),
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::TupleElement(i)));
+      }
+
+      return SolutionKind::Solved;
+    }
+  }
+
   auto *loc = getConstraintLocator(locator);
 
   /// Record the given conformance as the result, adding any conditional
