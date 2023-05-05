@@ -7,6 +7,8 @@ func invokedDeinit() {}
   case some(File)
   case none
 
+  deinit {}
+
   // NOTE: we can't pattern match on self since
   // that would consume it before we can forget self!
   var test: Int {

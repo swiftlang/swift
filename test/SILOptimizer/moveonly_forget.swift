@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
 
 func posix_close(_ t: Int) {}
 
@@ -28,6 +28,8 @@ struct GoodFileDescriptor {
 @_moveOnly
 struct BadFileDescriptor {
   let _fd: Int = 0
+
+  deinit {}
 
   var rawFileDescriptor: Int {
     __consuming get { // expected-error {{'self' consumed more than once}}
@@ -89,5 +91,7 @@ final class Wallet {
       return
     }
   }
+
+  deinit {}
 
 }

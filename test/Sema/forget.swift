@@ -147,3 +147,17 @@ enum E: Error { case err }
     try? take().close()
   }
 }
+
+struct NoDeinitStruct: ~Copyable {
+  consuming func blah() {
+    _forget self // expected-error {{'forget' has no effect for type 'NoDeinitStruct' unless it has a deinitializer}}{{5-18=}}
+  }
+}
+
+enum NoDeinitEnum: ~Copyable {
+  case whatever
+
+  consuming func blah() {
+    _forget self // expected-error {{'forget' has no effect for type 'NoDeinitEnum' unless it has a deinitializer}}{{5-18=}}
+  }
+}

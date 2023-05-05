@@ -1259,14 +1259,24 @@ public:
       }
     }
 
-    // This member function/accessor/etc has to be within a noncopyable type.
+    // check the kind of type this forget statement appears within.
     if (!diagnosed) {
-      Type nominalType =
-          fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+      auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
+      Type nominalType = nominalDecl->getDeclaredType();
+
+      // must be noncopyable
       if (!nominalType->isPureMoveOnly()) {
         ctx.Diags.diagnose(FS->getForgetLoc(),
                            diag::forget_wrong_context_copyable,
                            fn->getDescriptiveKind());
+        diagnosed = true;
+
+      // has to have a deinit or else it's pointless.
+      } else if (!nominalDecl->getValueTypeDestructor()) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_no_deinit,
+                           nominalType)
+            .fixItRemove(FS->getSourceRange());
         diagnosed = true;
       } else {
         // Set the contextual type for the sub-expression before we typecheck.
