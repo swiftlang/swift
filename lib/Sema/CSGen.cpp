@@ -1089,6 +1089,23 @@ namespace {
       return outputTy;
     }
 
+    Type openPackElement(Type packType, ConstraintLocator *locator) {
+      // If 'each t' is written outside of a pack expansion expression, allow the
+      // type to bind to a hole. The invalid pack reference will be diagnosed when
+      // attempting to bind the type variable for the underlying pack reference to
+      // a pack type without TVO_CanBindToPack.
+      if (PackElementEnvironments.empty()) {
+        return CS.createTypeVariable(locator,
+                                     TVO_CanBindToHole | TVO_CanBindToNoEscape);
+      }
+
+      // The type of a PackElementExpr is the opened pack element archetype
+      // of the pack reference.
+      OpenPackElementType openPackElement(CS, locator,
+                                          PackElementEnvironments.back());
+      return openPackElement(packType, /*packRepr*/ nullptr);
+    }
+
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
         : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
@@ -1405,6 +1422,20 @@ namespace {
           // If the known type has an error, bail out.
           if (knownType->hasError()) {
             return invalidateReference();
+          }
+
+          // value packs cannot be referenced without `each` immediately
+          // preceding them.
+          if (auto *expansion = knownType->getAs<PackExpansionType>()) {
+            if (!PackElementEnvironments.empty() &&
+                !isExpr<PackElementExpr>(CS.getParentExpr(E))) {
+              auto packType = expansion->getPatternType();
+              (void)CS.recordFix(
+                  IgnoreMissingEachKeyword::create(CS, packType, locator));
+              auto eltType = openPackElement(packType, locator);
+              CS.setType(E, eltType);
+              return eltType;
+            }
           }
 
           if (!knownType->hasPlaceholder()) {
@@ -3067,10 +3098,12 @@ namespace {
                               SmallVectorImpl<ASTNode> &packs) {
       struct PackCollector : public ASTWalker {
       private:
+        ConstraintSystem &CS;
         SmallVectorImpl<ASTNode> &Packs;
 
       public:
-        PackCollector(SmallVectorImpl<ASTNode> &packs) : Packs(packs) {}
+        PackCollector(ConstraintSystem &cs, SmallVectorImpl<ASTNode> &packs)
+            : CS(cs), Packs(packs) {}
 
         /// Walk everything that's available.
         MacroWalking getMacroWalkingBehavior() const override {
@@ -3085,6 +3118,21 @@ namespace {
 
           if (isa<PackElementExpr>(E)) {
             Packs.push_back(E);
+          }
+
+          if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
+            auto type = CS.getTypeIfAvailable(declRef);
+            if (!type)
+              return Action::Continue(E);
+
+            if (type->is<ElementArchetypeType>() &&
+                CS.hasFixFor(CS.getConstraintLocator(declRef),
+                             FixKind::IgnoreMissingEachKeyword)) {
+              Packs.push_back(PackElementExpr::create(CS.getASTContext(),
+                                                      /*eachLoc=*/SourceLoc(),
+                                                      declRef,
+                                                      /*implicit=*/true));
+            }
           }
 
           return Action::Continue(E);
@@ -3102,7 +3150,7 @@ namespace {
 
           return Action::Continue();
         }
-      } packCollector(packs);
+      } packCollector(CS, packs);
 
       expansion->getPatternExpr()->walk(packCollector);
     }
@@ -3162,23 +3210,8 @@ namespace {
     }
 
     Type visitPackElementExpr(PackElementExpr *expr) {
-      auto packType = CS.getType(expr->getPackRefExpr());
-
-      // If 'each t' is written outside of a pack expansion expression, allow the
-      // type to bind to a hole. The invalid pack reference will be diagnosed when
-      // attempting to bind the type variable for the underlying pack reference to
-      // a pack type without TVO_CanBindToPack.
-      if (PackElementEnvironments.empty()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                     TVO_CanBindToHole |
-                                     TVO_CanBindToNoEscape);
-      }
-
-      // The type of a PackElementExpr is the opened pack element archetype
-      // of the pack reference.
-      OpenPackElementType openPackElement(CS, CS.getConstraintLocator(expr),
-                                          PackElementEnvironments.back());
-      return openPackElement(packType, /*packRepr*/ nullptr);
+      return openPackElement(CS.getType(expr->getPackRefExpr()),
+                             CS.getConstraintLocator(expr));
     }
 
     Type visitMaterializePackExpr(MaterializePackExpr *expr) {

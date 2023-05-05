@@ -455,7 +455,8 @@ do {
 
   func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
     return (repeat each value.makeA())
-    // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
+    // expected-error@-1 {{value pack 'each T' must be referenced with 'each'}} {{25-25=(each }} {{30-30=)}}
+    // expected-error@-2 {{pack expansion requires that '()' and 'each T' have the same shape}}
   }
 }
 
@@ -479,5 +480,18 @@ do {
     func f<each A, each B>(_: repeat each A, y: repeat each B) {}
     f(repeat each x, y: repeat [S(y)])
     // expected-error@-1:25 {{value pack expansion must contain at least one pack reference}}
+  }
+}
+
+// missing 'each' keyword before value pack references
+do {
+  func overloaded<each U>(_: String, _: repeat each U) -> Int { 42 }
+  func overloaded<each T>(_: Int, _ b: repeat each T) -> (repeat each T) {
+    fatalError()
+  }
+
+  func test<each T>(v: repeat each T) {
+    _ = (repeat overloaded(42, v)) // expected-error {{value pack 'each T' must be referenced with 'each'}} {{32-32=each }}
+    _ = (repeat overloaded(42, each v)) // Ok
   }
 }
