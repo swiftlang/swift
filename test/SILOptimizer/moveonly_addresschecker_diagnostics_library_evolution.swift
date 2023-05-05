@@ -8,6 +8,21 @@
 // MARK: Deinit Tests //
 ////////////////////////
 
+@_moveOnly public struct EmptyStruct {}
+@_moveOnly public struct NonEmptyStruct {
+    var e = EmptyStruct()
+}
+public class CopyableKlass {
+    var s = NonEmptyStruct()
+}
+
+public func borrowVal(_ x: borrowing NonEmptyStruct) {}
+public func borrowVal(_ x: borrowing EmptyStruct) {}
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
 public struct DeinitTest : ~Copyable {
     deinit {}
 }
