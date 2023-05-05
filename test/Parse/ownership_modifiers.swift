@@ -101,3 +101,9 @@ enum Exercising {
     __consuming get { 0 }
   }
 }
+
+func consumingClosure1(_ f: consuming () -> ()) { } // expected-error {{'consuming' cannot be applied to nonescaping closure}}
+func consumingClosure2(_ f: consuming @escaping () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+
+func borrowingClosure1(_ f: borrowing () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func borrowingClosure2(_ f: borrowing @escaping () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
