@@ -38,12 +38,6 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
 
   ArrayRef<AnyFunctionType::Param> ParamsToPass = Res.FuncTy->getParams();
 
-  ParameterList *PL = nullptr;
-  if (Res.FuncD) {
-    PL = swift::getParameterList(Res.FuncD);
-  }
-  assert(!PL || PL->size() == ParamsToPass.size());
-
   bool ShowGlobalCompletions = false;
   for (auto Idx : range(*Res.ParamIdx, ParamsToPass.size())) {
     bool IsCompletion = (Idx == Res.ParamIdx);
@@ -53,14 +47,27 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
       break;
     }
 
-    const AnyFunctionType::Param *P = &ParamsToPass[Idx];
-    bool Required =
-        !(PL && PL->get(Idx)->isDefaultArgument()) && !P->isVariadic();
+    // We work with the parameter from the function type and the declaration
+    // because they contain different information that we need.
+    //
+    // Since not all function types are backed by declarations (e.g. closure
+    // paramters), `DeclParam` might be `nullptr`.
+    const AnyFunctionType::Param *TypeParam = &ParamsToPass[Idx];
+    const ParamDecl *DeclParam = getParameterAt(Res.FuncDeclRef, Idx);
 
-    if (P->hasLabel() && !(IsCompletion && Res.IsNoninitialVariadic)) {
+    bool Required = true;
+    if (DeclParam && DeclParam->isDefaultArgument()) {
+      Required = false;
+    } else if (DeclParam && DeclParam->getType()->is<PackExpansionType>()) {
+      Required = false;
+    } else if (TypeParam->isVariadic()) {
+      Required = false;
+    }
+
+    if (TypeParam->hasLabel() && !(IsCompletion && Res.IsNoninitialVariadic)) {
       // Suggest parameter label if parameter has label, we are completing in it
       // and it is not a variadic parameter that already has arguments
-      PossibleParamInfo PP(P, Required);
+      PossibleParamInfo PP(TypeParam, Required);
       if (!llvm::is_contained(Params, PP)) {
         Params.push_back(std::move(PP));
       }
@@ -68,7 +75,7 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
       // We have a parameter that doesn't require a label. Suggest global
       // results for that type.
       ShowGlobalCompletions = true;
-      Types.push_back(P->getPlainType());
+      Types.push_back(TypeParam->getPlainType());
     }
     if (Required) {
       // The user should only be suggested the first required param. Stop.
@@ -157,7 +164,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
 
   auto Info = getSelectedOverloadInfo(S, CalleeLocator);
-  if (Info.Value && Info.Value->shouldHideFromEditor()) {
+  if (Info.getValue() && Info.getValue()->shouldHideFromEditor()) {
     return;
   }
   // Disallow invalid initializer references
@@ -215,7 +222,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
 
   // If this is a duplicate of any other result, ignore this solution.
   if (llvm::any_of(Results, [&](const Result &R) {
-        return R.FuncD == Info.Value &&
+        return R.FuncDeclRef == Info.ValueRef &&
                nullableTypesEqual(R.FuncTy, Info.ValueTy) &&
                nullableTypesEqual(R.BaseType, Info.BaseTy) &&
                R.ParamIdx == ParamIdx &&
@@ -232,9 +239,10 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     FuncTy = Info.ValueTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
   }
   Results.push_back({ExpectedTy, ExpectedCallType,
-                     isa<SubscriptExpr>(ParentCall), Info.Value, FuncTy, ArgIdx,
-                     ParamIdx, std::move(ClaimedParams), IsNoninitialVariadic,
-                     Info.BaseTy, HasLabel, IsAsync, SolutionSpecificVarTypes});
+                     isa<SubscriptExpr>(ParentCall), Info.ValueRef, FuncTy,
+                     ArgIdx, ParamIdx, std::move(ClaimedParams),
+                     IsNoninitialVariadic, Info.BaseTy, HasLabel, IsAsync,
+                     SolutionSpecificVarTypes});
 }
 
 void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
@@ -243,24 +251,25 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
     auto &ResultA = Results[i];
     for (size_t j = i + 1; j < Results.size(); ++j) {
       auto &ResultB = Results[j];
-      if (!ResultA.FuncD || !ResultB.FuncD || !ResultA.FuncTy || !ResultB.FuncTy) {
+      if (!ResultA.getFuncD() || !ResultB.getFuncD() || !ResultA.FuncTy ||
+          !ResultB.FuncTy) {
         continue;
       }
-      if (ResultA.FuncD->getName() != ResultB.FuncD->getName()) {
+      if (ResultA.getFuncD()->getName() != ResultB.getFuncD()->getName()) {
         continue;
       }
       if (!ResultA.FuncTy->isEqual(ResultB.FuncTy)) {
         continue;
       }
       ProtocolDecl *inProtocolExtensionA =
-          ResultA.FuncD->getDeclContext()->getExtendedProtocolDecl();
+          ResultA.getFuncD()->getDeclContext()->getExtendedProtocolDecl();
       ProtocolDecl *inProtocolExtensionB =
-          ResultB.FuncD->getDeclContext()->getExtendedProtocolDecl();
+          ResultB.getFuncD()->getDeclContext()->getExtendedProtocolDecl();
 
       if (inProtocolExtensionA && !inProtocolExtensionB) {
-        ShadowedDecls.insert(ResultA.FuncD);
+        ShadowedDecls.insert(ResultA.getFuncD());
       } else if (!inProtocolExtensionA && inProtocolExtensionB) {
-        ShadowedDecls.insert(ResultB.FuncD);
+        ShadowedDecls.insert(ResultB.getFuncD());
       }
     }
   }
@@ -301,8 +310,8 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
         }
         if ((BaseNominal = BaseTy->getAnyNominal())) {
           SemanticContext = SemanticContextKind::CurrentNominal;
-          if (Result.FuncD &&
-              Result.FuncD->getDeclContext()->getSelfNominalTypeDecl() !=
+          if (Result.getFuncD() &&
+              Result.getFuncD()->getDeclContext()->getSelfNominalTypeDecl() !=
                   BaseNominal) {
             SemanticContext = SemanticContextKind::Super;
           }
@@ -310,26 +319,28 @@ void ArgumentTypeCheckCompletionCallback::deliverResults(
           SemanticContext = SemanticContextKind::CurrentNominal;
         }
       }
-      if (SemanticContext == SemanticContextKind::None && Result.FuncD) {
-        if (Result.FuncD->getDeclContext()->isTypeContext()) {
+      if (SemanticContext == SemanticContextKind::None && Result.getFuncD()) {
+        if (Result.getFuncD()->getDeclContext()->isTypeContext()) {
           SemanticContext = SemanticContextKind::CurrentNominal;
-        } else if (Result.FuncD->getDeclContext()->isLocalContext()) {
+        } else if (Result.getFuncD()->getDeclContext()->isLocalContext()) {
           SemanticContext = SemanticContextKind::Local;
-        } else if (Result.FuncD->getModuleContext() == DC->getParentModule()) {
+        } else if (Result.getFuncD()->getModuleContext() ==
+                   DC->getParentModule()) {
           SemanticContext = SemanticContextKind::CurrentModule;
         }
       }
       if (Result.FuncTy) {
         if (auto FuncTy = Result.FuncTy) {
-          if (ShadowedDecls.count(Result.FuncD) == 0) {
+          if (ShadowedDecls.count(Result.getFuncD()) == 0) {
             // Don't show call pattern completions if the function is
             // overridden.
             if (Result.IsSubscript) {
               assert(SemanticContext != SemanticContextKind::None);
-              auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+              auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.getFuncD());
               Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
             } else {
-              auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
+              auto *FD =
+                  dyn_cast_or_null<AbstractFunctionDecl>(Result.getFuncD());
               Lookup.addFunctionCallPattern(FuncTy, FD, SemanticContext);
             }
           }
