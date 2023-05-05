@@ -7128,6 +7128,8 @@ ERROR(ownership_specifier_copyable,none,
 ERROR(self_ownership_specifier_copyable,none,
       "%0 is not yet valid on %1s in a Copyable type",
       (SelfAccessKind, DescriptiveDeclKind))
+ERROR(ownership_specifier_nonescaping_closure,none,
+      "'%0' cannot be applied to nonescaping closure", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Runtime discoverable attributes (@runtimeMetadata)
