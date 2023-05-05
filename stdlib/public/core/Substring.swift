@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 extension String {
-  // FIXME(strings): at least temporarily remove it to see where it was applied
   /// Creates a new string from the given substring.
   ///
   /// - Parameter substring: A substring to convert to a standalone `String`
@@ -432,6 +431,10 @@ extension Substring: StringProtocol {
   internal mutating func _replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with newElements: C
   ) where C.Element == Element {
+    // Note: this is intentionally not discarding the sliced off parts
+    // of the original base string, as that is how slice mutations are expected
+    // to work. Changing this to discard the hidden parts would break code.
+
     // Note: SE-0180 requires us to use `subrange` bounds even if they aren't
     // `Character` aligned. (We still have to round things down to the nearest
     // scalar boundary, though, or we may generate ill-formed encodings.)
@@ -1122,6 +1125,10 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with replacement: C
   ) where C.Element == Element {
+    // Note: this is intentionally not discarding the sliced off parts
+    // of the original base string, as that is how slice mutations are expected
+    // to work. Changing this to discard the hidden parts would break code.
+
     let subrange = _wholeGuts.validateScalarRange(subrange, in: _bounds)
 
     // Replacing the range is easy -- we can just reuse `String`'s
@@ -1152,6 +1159,8 @@ extension Substring: RangeReplaceableCollection {
       return
     }
     if let subStr = _specialize(elements, for: Substring.self) {
+      // Note: this is preserving the base string, so it is observably
+      // different from the fallback case below.
       self = subStr
       return
     }
@@ -1161,6 +1170,8 @@ extension Substring: RangeReplaceableCollection {
   @inlinable // specialize
   public mutating func append<S: Sequence>(contentsOf elements: S)
   where S.Element == Character {
+    // FIXME: This isn't right. Slice mutations must not discard the hidden
+    // parts of their base collection.
     var string = String(self)
     self = Substring() // Keep unique storage if possible
     string.append(contentsOf: elements)
