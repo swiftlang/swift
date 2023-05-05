@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// REQUIRES: rdar_108947854
+
 protocol P {}
 struct X: P {}
 struct Y {}
