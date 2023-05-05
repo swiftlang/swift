@@ -324,6 +324,12 @@ public:
 
   bool isUnresolvedMemberIdealType(Type Ty);
 
+  /// Creates a \c CodeCompletionResultBuilder in this lookup’s sink and sets
+  /// the current expected type context in it
+  CodeCompletionResultBuilder
+  makeResultBuilder(CodeCompletionResultKind kind,
+                    SemanticContextKind semanticContext) const;
+
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
 

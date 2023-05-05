@@ -288,8 +288,8 @@ CompletionLookup::CompletionLookup(CodeCompletionResultSink &Sink,
 void CompletionLookup::addSubModuleNames(
     std::vector<std::pair<std::string, bool>> &SubModuleNameVisibilityPairs) {
   for (auto &Pair : SubModuleNameVisibilityPairs) {
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResultKind::Declaration, SemanticContextKind::None);
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Declaration, SemanticContextKind::None);
     auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
     MD->setFailedToLoad();
     Builder.setAssociatedDecl(MD);
@@ -331,8 +331,8 @@ void CompletionLookup::addModuleName(
   if (MD->getDeclaringModuleIfCrossImportOverlay())
     return;
 
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration, SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Declaration, SemanticContextKind::None);
   Builder.setAssociatedDecl(MD);
   auto moduleName = MD->getName();
 
@@ -464,6 +464,14 @@ bool CompletionLookup::isUnresolvedMemberIdealType(Type Ty) {
   return idealTy->isEqual(Ty);
 }
 
+CodeCompletionResultBuilder
+CompletionLookup::makeResultBuilder(CodeCompletionResultKind kind,
+                                    SemanticContextKind semanticContext) const {
+  CodeCompletionResultBuilder builder(Sink, kind, semanticContext);
+  builder.setTypeContext(expectedTypeContext, CurrDeclContext);
+  return builder;
+}
+
 void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
                                         DeclBaseName Name) {
   auto NameStr = Name.userFacingName();
@@ -510,7 +518,6 @@ void CompletionLookup::addTypeAnnotation(CodeCompletionResultBuilder &Builder,
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
   Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
   Builder.setResultTypes(T);
-  Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
 void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -846,9 +853,9 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   if (auto accessor = VD->getEffectfulGetAccessor()) {
     explicitlyAsync = accessor->hasAsync();
   }
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(VD, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(VD, Reason, dynamicLookupInfo));
   Builder.setIsAsync(explicitlyAsync || implicitlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
@@ -1091,8 +1098,8 @@ void CompletionLookup::addEffectsSpecifiers(
 void CompletionLookup::addPoundAvailable(Optional<StmtKind> ParentKind) {
   if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
     return;
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Keyword,
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword,
       // FIXME: SemanticContextKind::Local is not correct.
       // Use 'None' (and fix prioritization) or introduce a new context.
       SemanticContextKind::Local);
@@ -1110,8 +1117,8 @@ void CompletionLookup::addPoundSelector(bool needPound) {
   if (!Ctx.LangOpts.EnableObjCInterop)
     return;
 
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   if (needPound)
     Builder.addTextChunk("#selector");
   else
@@ -1130,8 +1137,8 @@ void CompletionLookup::addPoundKeyPath(bool needPound) {
   if (!Ctx.LangOpts.EnableObjCInterop)
     return;
 
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   if (needPound)
     Builder.addTextChunk("#keyPath");
   else
@@ -1176,8 +1183,7 @@ void CompletionLookup::addSubscriptCallPattern(
   if (SD)
     genericSig = SD->getGenericSignatureOfContext();
 
-  CodeCompletionResultBuilder Builder(
-      Sink,
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
       SD ? CodeCompletionResultKind::Declaration
          : CodeCompletionResultKind::Pattern,
       SemanticContext ? *SemanticContext : getSemanticContextKind(SD));
@@ -1216,8 +1222,7 @@ void CompletionLookup::addFunctionCallPattern(
   // Add the pattern, possibly including any default arguments.
   auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
                         bool includeDefaultArgs = true) {
-    CodeCompletionResultBuilder Builder(
-        Sink,
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
         AFD ? CodeCompletionResultKind::Declaration
             : CodeCompletionResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(AFD));
@@ -1365,9 +1370,9 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
   // Add the method, possibly including any default arguments.
   auto addMethodImpl = [&](bool includeDefaultArgs = true,
                            bool trivialTrailingClosure = false) {
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResultKind::Declaration,
-        getSemanticContext(FD, Reason, dynamicLookupInfo));
+    CodeCompletionResultBuilder Builder =
+        makeResultBuilder(CodeCompletionResultKind::Declaration,
+                          getSemanticContext(FD, Reason, dynamicLookupInfo));
     Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
     Builder.setHasAsyncAlternative(
         FD->getAsyncAlternative() &&
@@ -1514,9 +1519,9 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
 
   // Add the constructor, possibly including any default arguments.
   auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResultKind::Declaration,
-        getSemanticContext(CD, Reason, dynamicLookupInfo));
+    CodeCompletionResultBuilder Builder =
+        makeResultBuilder(CodeCompletionResultKind::Declaration,
+                          getSemanticContext(CD, Reason, dynamicLookupInfo));
     Builder.setAssociatedDecl(CD);
 
     if (IsSuperRefExpr && CurrentMethod &&
@@ -1626,9 +1631,9 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   bool implictlyAsync = false;
   analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(SD, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(SD, Reason, dynamicLookupInfo));
   Builder.setIsAsync(implictlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
@@ -1667,9 +1672,9 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
 void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo) {
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(NTD, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(NTD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(NTD);
   addLeadingDot(Builder);
   Builder.addBaseName(NTD->getName().str());
@@ -1691,9 +1696,9 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
 void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                                        DeclVisibilityKind Reason,
                                        DynamicLookupInfo dynamicLookupInfo) {
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(TAD, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(TAD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
   Builder.addBaseName(TAD->getName().str());
@@ -1714,9 +1719,9 @@ void CompletionLookup::addGenericTypeParamRef(
     const GenericTypeParamDecl *GP, DeclVisibilityKind Reason,
     DynamicLookupInfo dynamicLookupInfo) {
   assert(!GP->getName().empty());
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(GP, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(GP, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(GP);
   addLeadingDot(Builder);
   Builder.addBaseName(GP->getName().str());
@@ -1726,9 +1731,9 @@ void CompletionLookup::addGenericTypeParamRef(
 void CompletionLookup::addAssociatedTypeRef(
     const AssociatedTypeDecl *AT, DeclVisibilityKind Reason,
     DynamicLookupInfo dynamicLookupInfo) {
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(AT, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(AT, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AT);
   addLeadingDot(Builder);
   Builder.addBaseName(AT->getName().str());
@@ -1739,8 +1744,8 @@ void CompletionLookup::addAssociatedTypeRef(
 void CompletionLookup::addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
   auto semanticContext =
       getSemanticContext(PGD, DeclVisibilityKind::VisibleAtTopLevel, {});
-  CodeCompletionResultBuilder builder(
-      Sink, CodeCompletionResultKind::Declaration, semanticContext);
+  CodeCompletionResultBuilder builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
 
   builder.addBaseName(PGD->getName().str());
   builder.setAssociatedDecl(PGD);
@@ -1754,9 +1759,9 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
       EED->shouldHideFromEditor())
     return;
 
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(EED, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(EED, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(EED);
 
   addLeadingDot(Builder);
@@ -1801,9 +1806,9 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
       return;
   }
 
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(MD, Reason, DynamicLookupInfo()));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(MD, Reason, DynamicLookupInfo()));
   Builder.setAssociatedDecl(MD);
 
   addValueBaseName(Builder, MD->getBaseIdentifier());
@@ -1817,16 +1822,18 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
     Builder.addRightParen();
   }
 
-  addTypeAnnotation(
-      Builder, MD->getResultInterfaceType(), MD->getGenericSignature());
+  if (!MD->getResultInterfaceType()->isVoid()) {
+    addTypeAnnotation(Builder, MD->getResultInterfaceType(),
+                      MD->getGenericSignature());
+  }
 }
 
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
                                   SemanticContextKind SK,
                                   CodeCompletionKeywordKind KeyKind,
                                   unsigned NumBytesToErase) {
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SK);
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Keyword, SK);
   addLeadingDot(Builder);
   Builder.addKeyword(Name);
   Builder.setKeywordKind(KeyKind);
@@ -1839,8 +1846,8 @@ void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
 void CompletionLookup::addKeyword(StringRef Name, StringRef TypeAnnotation,
                                   CodeCompletionKeywordKind KeyKind,
                                   CodeCompletionFlair flair) {
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   Builder.addFlair(flair);
   addLeadingDot(Builder);
   Builder.addKeyword(Name);
@@ -1853,15 +1860,15 @@ void CompletionLookup::addDeclAttrParamKeyword(StringRef Name,
                                                ArrayRef<StringRef> Parameters,
                                                StringRef Annotation,
                                                bool NeedSpecify) {
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   Builder.addDeclAttrParamKeyword(Name, Parameters, Annotation, NeedSpecify);
 }
 
 void CompletionLookup::addDeclAttrKeyword(StringRef Name,
                                           StringRef Annotation) {
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::None);
   Builder.addDeclAttrKeyword(Name, Annotation);
 }
 
@@ -1893,9 +1900,9 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   if (dropCurryLevel && isDuplicate(AFD, funcTy))
     return true;
 
-  CodeCompletionResultBuilder Builder(
-      Sink, CodeCompletionResultKind::Declaration,
-      getSemanticContext(AFD, Reason, dynamicLookupInfo));
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(AFD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AFD);
 
   // Base name
@@ -2185,8 +2192,8 @@ bool CompletionLookup::tryTupleExprCompletions(Type ExprType) {
 
   unsigned Index = 0;
   for (auto TupleElt : TT->getElements()) {
-    CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Pattern,
-                                        SemanticContextKind::CurrentNominal);
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
     addLeadingDot(Builder);
     if (TupleElt.hasName()) {
       Builder.addBaseName(TupleElt.getName().str());
@@ -2377,9 +2384,8 @@ void CompletionLookup::collectOperators(
 }
 
 void CompletionLookup::addPostfixBang(Type resultType) {
-  CodeCompletionResultBuilder builder(Sink,
-                                      CodeCompletionResultKind::BuiltinOperator,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder builder = makeResultBuilder(
+      CodeCompletionResultKind::BuiltinOperator, SemanticContextKind::None);
   // FIXME: we can't use the exclamation mark chunk kind, or it isn't
   // included in the completion name.
   builder.addTextChunk("!");
@@ -2393,8 +2399,8 @@ void CompletionLookup::addPostfixOperatorCompletion(OperatorDecl *op,
   // operator decl.
   auto semanticContext =
       getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel, {});
-  CodeCompletionResultBuilder builder(
-      Sink, CodeCompletionResultKind::Declaration, semanticContext);
+  CodeCompletionResultBuilder builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
 
   // FIXME: handle variable amounts of space.
   if (HaveLeadingSpace)
@@ -2418,9 +2424,8 @@ void CompletionLookup::tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
 }
 
 void CompletionLookup::addAssignmentOperator(Type RHSType, Type resultType) {
-  CodeCompletionResultBuilder builder(Sink,
-                                      CodeCompletionResultKind::BuiltinOperator,
-                                      SemanticContextKind::None);
+  CodeCompletionResultBuilder builder = makeResultBuilder(
+      CodeCompletionResultKind::BuiltinOperator, SemanticContextKind::None);
 
   if (HaveLeadingSpace)
     builder.addAnnotatedWhitespace(" ");
@@ -2443,8 +2448,8 @@ void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
   // operator decl.
   auto semanticContext =
       getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel, {});
-  CodeCompletionResultBuilder builder(
-      Sink, CodeCompletionResultKind::Declaration, semanticContext);
+  CodeCompletionResultBuilder builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
   builder.setAssociatedDecl(op);
 
   if (HaveLeadingSpace)
@@ -2612,9 +2617,8 @@ void CompletionLookup::addValueLiteralCompletions() {
       [&](CodeCompletionLiteralKind kind,
           llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
           bool isKeyword = false) {
-        CodeCompletionResultBuilder builder(Sink,
-                                            CodeCompletionResultKind::Literal,
-                                            SemanticContextKind::None);
+        CodeCompletionResultBuilder builder = makeResultBuilder(
+            CodeCompletionResultKind::Literal, SemanticContextKind::None);
         builder.setLiteralKind(kind);
         builder.addFlair(flair);
 
@@ -2686,8 +2690,8 @@ void CompletionLookup::addValueLiteralCompletions() {
 
   // Add tuple completion (item, item).
   {
-    CodeCompletionResultBuilder builder(Sink, CodeCompletionResultKind::Literal,
-                                        SemanticContextKind::None);
+    CodeCompletionResultBuilder builder = makeResultBuilder(
+        CodeCompletionResultKind::Literal, SemanticContextKind::None);
     builder.setLiteralKind(LK::Tuple);
     builder.addFlair(flair);
 
@@ -2878,8 +2882,8 @@ void CompletionLookup::addCallArgumentCompletionResults(
     const auto *Arg = Info.Param;
     if (!Arg)
       continue;
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResultKind::Pattern,
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Pattern,
         // FIXME: SemanticContextKind::Local is not correct.
         // Use 'None' (and fix prioritization) or introduce a new context.
         SemanticContextKind::Local);
@@ -3077,8 +3081,8 @@ void CompletionLookup::getAttributeDeclParamCompletions(
 
 void CompletionLookup::getTypeAttributeKeywordCompletions() {
   auto addTypeAttr = [&](StringRef Name) {
-    CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                        SemanticContextKind::None);
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Keyword, SemanticContextKind::None);
     Builder.addAttributeKeyword(Name, "Type Attribute");
   };
   addTypeAttr("autoclosure");
@@ -3188,8 +3192,8 @@ void CompletionLookup::getSelfTypeCompletionInDeclContext(
     // and can be used anywhere.
   }
 
-  CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
-                                      SemanticContextKind::CurrentNominal);
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Keyword, SemanticContextKind::CurrentNominal);
   Builder.addKeyword("Self");
   Builder.setKeywordKind(CodeCompletionKeywordKind::kw_Self);
   addTypeAnnotation(Builder, selfType);
@@ -3310,8 +3314,8 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
   const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);
   for (auto name : Finder.Result) {
-    CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Pattern,
-                                        SemanticContextKind::Local);
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Pattern, SemanticContextKind::Local);
     Builder.addTextChunk(name.str());
   }
 }
