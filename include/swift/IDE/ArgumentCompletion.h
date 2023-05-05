@@ -29,8 +29,8 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     Type ExpectedCallType;
     /// True if this is a subscript rather than a function call.
     bool IsSubscript;
-    /// The FuncDecl or SubscriptDecl associated with the call.
-    ValueDecl *FuncD;
+    /// The reference to the FuncDecl or SubscriptDecl associated with the call.
+    ConcreteDeclRef FuncDeclRef;
     /// The type of the function being called.
     AnyFunctionType *FuncTy;
     /// The index of the argument containing the completion location
@@ -55,6 +55,9 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// this result. This in particular includes parameters of closures that
     /// were type-checked with the code completion expression.
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
+
+    /// Return the \c FuncDecl or \c SubscriptDecl associated with this call.
+    ValueDecl *getFuncD() const { return FuncDeclRef.getDecl(); }
   };
 
   CodeCompletionExpr *CompletionExpr;
