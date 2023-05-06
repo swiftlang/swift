@@ -820,18 +820,18 @@ public:
          emissionScope.additionalUnrepresentableDeclarations)
       removedVDList.push_back(removedVD);
 
+    // Do not report internal/private decls as unavailable.
     // @objc declarations are emitted in the Objective-C section, so do not
     // report them as unavailable. Also skip underscored decls from the standard
     // library. Also skip structs from the standard library, they can cause
     // ambiguities because of the arithmetic types that conflict with types we
     // already have in `swift::` namespace. Also skip `Error` protocol from
     // stdlib, we have experimental support for it.
-    // FIXME: Note unrepresented type aliases too.
     removedVDList.erase(
         llvm::remove_if(
             removedVDList,
-            [](const ValueDecl *vd) {
-              return vd->isObjC() ||
+            [&](const ValueDecl *vd) {
+              return !printer.isVisible(vd) || vd->isObjC() ||
                      (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
                       vd->getBaseIdentifier().str().startswith("_")) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
@@ -897,6 +897,7 @@ public:
 
       // FIXME: Emit an unavailable stub for a function / function overload set
       // / variable.
+      // FIXME: Note unrepresented type aliases too.
       emitStubComment();
     }
   }
