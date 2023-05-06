@@ -193,6 +193,8 @@ static SILInstruction *createDealloc(SingleValueInstruction *Alloc,
     case SILInstructionKind::AllocRefInst:
       assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
       return B.createDeallocStackRef(Location, Alloc);
+    case SILInstructionKind::AllocPackInst:
+      return B.createDeallocPack(Location, Alloc);
     default:
       llvm_unreachable("unknown stack allocation");
   }
