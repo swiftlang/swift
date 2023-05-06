@@ -18,6 +18,7 @@ final class InlineExecutor_UnownedJob: SerialExecutor, CustomStringConvertible {
     "\(Self.self)()"
   }
 }
+
 final class InlineExecutor_Job: SerialExecutor, CustomStringConvertible {
   public func enqueue(_ job: __owned Job) {
     job.runSynchronously(on: self.asUnownedSerialExecutor())

@@ -3831,8 +3831,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchAmbiguous();
   }
 
-  // move-only types cannot match with any existential types.
-  if (type1->isPureMoveOnly()) {
+  // move-only types (and their metatypes) cannot match with existential types.
+  if (type1->getMetatypeInstanceType()->isPureMoveOnly()) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this, type1,
@@ -8198,6 +8198,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
 
     return SolutionKind::Solved;
+  }
+
+  // Copyable is checked structurally, so for better performance, split apart
+  // this constraint into individual Copyable constraints on each tuple element.
+  if (auto *tupleType = type->getAs<TupleType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
+        addConstraint(ConstraintKind::ConformsTo,
+                      tupleType->getElementType(i),
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::TupleElement(i)));
+      }
+
+      return SolutionKind::Solved;
+    }
   }
 
   auto *loc = getConstraintLocator(locator);

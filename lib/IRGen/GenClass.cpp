@@ -1228,7 +1228,7 @@ namespace {
         const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
-      visitConformances(getClass()->getImplementationContext());
+      visitConformances(getClass());
 
       if (getClass()->isRootDefaultActor()) {
         Ivars.push_back(Field::DefaultActorStorage);
@@ -1249,7 +1249,7 @@ namespace {
           FieldLayout(nullptr) {
       buildCategoryName(CategoryName);
 
-      visitConformances(theExtension->getImplementationContext());
+      visitConformances(theExtension);
 
       for (Decl *member : TheExtension->getImplementationContext()->getMembers())
         visit(member);
@@ -1295,6 +1295,15 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(const IterableDeclContext *idc) {
+      auto dc = idc->getAsGenericContext();
+      if (dc->getImplementedObjCContext() != dc) {
+        // We want to use the conformance list imported from the ObjC header.
+        auto importedIDC = cast<IterableDeclContext>(
+                                 dc->getImplementedObjCContext()->getAsDecl());
+        visitConformances(importedIDC);
+        return;
+      }
+
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : idc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit)) {
