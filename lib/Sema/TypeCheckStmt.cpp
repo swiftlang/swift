@@ -1251,21 +1251,32 @@ public:
       // Save this for SILGen, since Stmt's don't know their decl context.
       FS->setInnermostMethodContext(fn);
 
-      if (fn->isStatic() || isa<DestructorDecl>(fn)) {
+      if (fn->isStatic() || isa<DestructorDecl>(fn)
+          || isa<ConstructorDecl>(fn)) {
         ctx.Diags.diagnose(FS->getForgetLoc(), diag::forget_wrong_context_decl,
                            fn->getDescriptiveKind());
         diagnosed = true;
       }
     }
 
-    // This member function/accessor/etc has to be within a noncopyable type.
+    // check the kind of type this forget statement appears within.
     if (!diagnosed) {
-      Type nominalType =
-          fn->getDeclContext()->getSelfNominalTypeDecl()->getDeclaredType();
+      auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
+      Type nominalType = nominalDecl->getDeclaredType();
+
+      // must be noncopyable
       if (!nominalType->isPureMoveOnly()) {
         ctx.Diags.diagnose(FS->getForgetLoc(),
                            diag::forget_wrong_context_copyable,
                            fn->getDescriptiveKind());
+        diagnosed = true;
+
+      // has to have a deinit or else it's pointless.
+      } else if (!nominalDecl->getValueTypeDestructor()) {
+        ctx.Diags.diagnose(FS->getForgetLoc(),
+                           diag::forget_no_deinit,
+                           nominalType)
+            .fixItRemove(FS->getSourceRange());
         diagnosed = true;
       } else {
         // Set the contextual type for the sub-expression before we typecheck.
@@ -1321,30 +1332,21 @@ public:
 
     // The 'self' parameter must be owned (aka "consuming").
     if (!diagnosed) {
-      bool isConsuming = false;
       if (auto *funcDecl = dyn_cast<FuncDecl>(fn)) {
         switch (funcDecl->getSelfAccessKind()) {
         case SelfAccessKind::LegacyConsuming:
         case SelfAccessKind::Consuming:
-          isConsuming = true;
           break;
           
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
-          isConsuming = false;
+          ctx.Diags.diagnose(FS->getForgetLoc(),
+                             diag::forget_wrong_context_nonconsuming,
+                             fn->getDescriptiveKind());
+          diagnosed = true;
           break;
         }
-      } else if (isa<ConstructorDecl>(fn)) {
-        // constructors are implicitly "consuming" of the self instance.
-        isConsuming = true;
-      }
-
-      if (!isConsuming) {
-        ctx.Diags.diagnose(FS->getForgetLoc(),
-                           diag::forget_wrong_context_nonconsuming,
-                           fn->getDescriptiveKind());
-        diagnosed = true;
       }
     }
 

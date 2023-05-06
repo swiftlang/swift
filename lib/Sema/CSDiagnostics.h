@@ -800,6 +800,19 @@ protected:
   }
 };
 
+class NonClassTypeToAnyObjectConversionFailure final
+    : public ContextualFailure {
+
+public:
+  NonClassTypeToAnyObjectConversionFailure(const Solution &solution, Type lhs,
+                                           Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(solution, lhs, rhs, locator, FixBehavior::Error) {}
+
+  bool diagnoseAsError() override;
+
+  bool diagnoseAsNote() override;
+};
+
 /// Diagnose errors related to using an array literal where a
 /// dictionary is expected.
 class ArrayLiteralToDictionaryConversionFailure final : public ContextualFailure {
