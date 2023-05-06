@@ -2437,7 +2437,7 @@ namespace {
           structResult->setIsCxxNonTrivial(
               isNonTrivialForPurposeOfCalls(cxxRecordDecl));
 
-        for (auto &getterAndSetter : Impl.GetterSetterMap) {
+        for (auto &getterAndSetter : Impl.GetterSetterMap[result]) {
           auto getter = getterAndSetter.second.first;
           auto setter = getterAndSetter.second.second;
           // We cannot make a computed property without a getter.
@@ -3521,13 +3521,17 @@ namespace {
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
-        CXXMethodBridging bridgingInfo(decl);
-        if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
-          auto name = bridgingInfo.getClangName().drop_front(3);
-          Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
-        } else if (bridgingInfo.classify() == CXXMethodBridging::Kind::setter) {
-          auto name = bridgingInfo.getClangName().drop_front(3);
-          Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
+        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+          auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
+          CXXMethodBridging bridgingInfo(decl);
+          if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
+            auto name = bridgingInfo.getClangName().drop_front(3);
+            Impl.GetterSetterMap[parent][name].first = funcDecl;
+          } else if (bridgingInfo.classify() ==
+                     CXXMethodBridging::Kind::setter) {
+            auto name = bridgingInfo.getClangName().drop_front(3);
+            Impl.GetterSetterMap[parent][name].second = funcDecl;
+          }
         }
       }
 
