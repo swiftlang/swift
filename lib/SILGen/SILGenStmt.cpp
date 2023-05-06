@@ -765,6 +765,36 @@ void StmtEmitter::visitForgetStmt(ForgetStmt *S) {
   auto *nominal = fn->getDeclContext()->getSelfNominalTypeDecl();
   assert(nominal);
 
+  // Check if the nominal's contents are trivial. This is a temporary
+  // restriction until we get forget implemented the way we want.
+  for (auto *varDecl : nominal->getStoredProperties()) {
+    assert(varDecl->hasStorage());
+    auto varType = varDecl->getType();
+    auto &varTypeLowering = SGF.getTypeLowering(varType);
+    if (!varTypeLowering.isTrivial()) {
+      diagnose(getASTContext(),
+               S->getStartLoc(),
+               diag::forget_nontrivial_storage,
+               nominal->getDeclaredInterfaceType());
+
+      // emit a note pointing out the problematic storage type
+      if (auto varLoc = varDecl->getLoc()) {
+        diagnose(getASTContext(),
+                 varLoc,
+                 diag::forget_nontrivial_storage_note,
+                 varType);
+      } else {
+        diagnose(getASTContext(),
+                 nominal->getLoc(),
+                 diag::forget_nontrivial_implicit_storage_note,
+                 nominal->getDeclaredInterfaceType(),
+                 varType);
+      }
+
+      break; // only one diagnostic is needed per forget
+    }
+  }
+
   SGF.emitMoveOnlyMemberDestruction(selfValue.forward(SGF), nominal, loc,
                                     nullptr);
 }
