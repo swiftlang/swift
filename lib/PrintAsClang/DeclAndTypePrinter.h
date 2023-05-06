@@ -37,6 +37,10 @@ struct CxxDeclEmissionScope {
   std::vector<const ValueDecl *> additionalUnrepresentableDeclarations;
   /// Records the C++ declaration names already emitted in this lexical scope.
   llvm::StringSet<> emittedDeclarationNames;
+  /// Records the names of the function overloads already emitted in this
+  /// lexical scope.
+  llvm::StringMap<llvm::SmallVector<const AbstractFunctionDecl *, 2>>
+      emittedFunctionOverloads;
 };
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be

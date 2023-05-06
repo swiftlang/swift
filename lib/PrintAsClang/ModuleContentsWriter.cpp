@@ -27,6 +27,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Strings.h"
 
@@ -676,8 +677,26 @@ public:
       if (result != 0)
         return result;
       // Two overloaded functions can have the same name when emitting C++.
-      if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs))
+      if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs)) {
+        // Sort top level functions with the same C++ name by their location to
+        // have stable sorting that depends on users source but not on the
+        // compiler invocation.
+        if ((*rhs)->getLoc().isValid() && (*lhs)->getLoc().isValid()) {
+          std::string rhsLoc, lhsLoc;
+          auto getLocText = [](const AbstractFunctionDecl *afd) {
+            std::string res;
+            llvm::raw_string_ostream os(res);
+            afd->getLoc().print(os, afd->getASTContext().SourceMgr);
+            return std::move(os.str());
+          };
+          if (getLocText(cast<AbstractFunctionDecl>(*lhs)) <
+              getLocText(cast<AbstractFunctionDecl>(*rhs)))
+            return Descending;
+          return Ascending;
+        }
         return result;
+      }
+
       // A function and a global variable can have the same name in C++,
       // even when the variable might not actually be emitted by the emitter.
       // In that case, order the function before the variable.

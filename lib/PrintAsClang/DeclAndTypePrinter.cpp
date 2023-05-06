@@ -1012,6 +1012,39 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns true if the given function overload is safe to emit in the current
+  /// C++ lexical scope.
+  bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
+    assert(outputLang == OutputLanguageMode::Cxx);
+    auto &overloads =
+        owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
+    auto cxxName = cxx_translation::getNameForCxx(funcDecl);
+    auto overloadIt = overloads.find(cxxName);
+    if (overloadIt == overloads.end()) {
+      overloads.insert(std::make_pair(
+          cxxName,
+          llvm::SmallVector<const AbstractFunctionDecl *>({funcDecl})));
+      return true;
+    }
+    auto selfArity =
+        funcDecl->getParameters() ? funcDecl->getParameters()->size() : 0;
+    for (const auto *overload : overloadIt->second) {
+      auto arity =
+          overload->getParameters() ? overload->getParameters()->size() : 0;
+      // Avoid printing out an overload with the same and arity, as that might
+      // be an ambiguous overload on the C++ side.
+      // FIXME: we should take types into account, not all overloads with the
+      // same arity are ambiguous in C++.
+      if (selfArity == arity) {
+        owningPrinter.getCxxDeclEmissionScope()
+            .additionalUnrepresentableDeclarations.push_back(funcDecl);
+        return false;
+      }
+    }
+    overloadIt->second.push_back(funcDecl);
+    return true;
+  }
+
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
@@ -1051,6 +1084,12 @@ private:
         if (!dispatchInfo)
           return;
       }
+      // FIXME: handle getters/setters ambiguities here too.
+      if (!isa<AccessorDecl>(AFD)) {
+        if (!canPrintOverloadOfFunction(AFD))
+          return;
+      }
+
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
@@ -1779,6 +1818,8 @@ private:
             .additionalUnrepresentableDeclarations.push_back(FD);
         return;
       }
+      if (!canPrintOverloadOfFunction(FD))
+        return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
       printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
       recordEmittedDeclInCurrentCxxLexicalScope(FD);
