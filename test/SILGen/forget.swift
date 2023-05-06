@@ -60,10 +60,10 @@ func invokedDeinit() {}
 }
 
 @_moveOnly struct PointerTree {
-  let left: Ptr = Ptr()
-  let file: File = File()
-  let popularity: Int = 0
-  var right: Ptr = Ptr()
+  let left: UnsafePointer<UInt>?
+  let file: Int = 0
+  lazy var popularity: Int = 0
+  var right: Float = 0.0
 
   consuming func tryDestroy(doForget: Bool) throws {
     if doForget {
@@ -75,28 +75,23 @@ func invokedDeinit() {}
 // CHECK-LABEL: sil hidden [ossa] @$s4test11PointerTreeV10tryDestroy8doForgetySb_tKF : $@convention(method) (Bool, @owned PointerTree) -> @error any Error {
 // CHECK:   bb0{{.*}}:
 // CHECK:     [[SELF_BOX:%.*]] = alloc_box ${ var PointerTree }, var, name "self"
-// CHECK:     [[SELF:%.*]] = begin_borrow [lexical] [[SELF_BOX]] : ${ var PointerTree }
-// CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF]] : ${ var PointerTree }, 0
+// CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF_BOX]] : ${ var PointerTree }, 0
 //            .. skip to the conditional test ..
-// CHECK:     [[SHOULD_THROW:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
-// CHECK:     cond_br [[SHOULD_THROW]], bb1, bb2
+// CHECK:     [[SHOULD_FORGET:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
+// CHECK:     cond_br [[SHOULD_FORGET]], bb1, bb2
 //
 // CHECK:   bb1:
 // CHECK:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF_PTR]] : $*PointerTree
 // CHECK:     [[MMC:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]] : $*PointerTree
 // CHECK:     [[COPIED_SELF:%.*]] = load [copy] [[MMC]] : $*PointerTree
 // CHECK:     end_access [[ACCESS]] : $*PointerTree
-// CHECK:     ([[LEFT:%.*]], [[FILE:%.*]], {{%.*}}, [[RIGHT:%.*]]) = destructure_struct [[COPIED_SELF]] : $PointerTree
-// CHECK:     destroy_value [[LEFT]] : $Ptr
-// CHECK:     destroy_value [[FILE]] : $File
-// CHECK:     destroy_value [[RIGHT]] : $Ptr
+// CHECK:     end_lifetime [[COPIED_SELF]]
 // CHECK:     br bb3
 //
 // CHECK:   bb2:
 // CHECK:     br bb3
 //
 // CHECK:   bb3:
-// CHECK:     end_borrow [[SELF]] : ${ var PointerTree }
 // CHECK:     destroy_value [[SELF_BOX]] : ${ var PointerTree }
 // CHECK:     throw
 // CHECK: } // end sil function
@@ -104,20 +99,15 @@ func invokedDeinit() {}
 // After the mandatory passes have run, check for correct deinitializations within the init.
 
 // CHECK-SIL-LABEL: sil hidden @$s4test11PointerTreeV10tryDestroy8doForgetySb_tKF
-// CHECK-SIL:     [[SHOULD_THROW:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
-// CHECK-SIL:     cond_br [[SHOULD_THROW]], bb1, bb2
+// CHECK-SIL:     [[SHOULD_FORGET:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
+// CHECK-SIL:     cond_br [[SHOULD_FORGET]], bb1, bb2
 //
 // CHECK-SIL:  bb1:
 // CHECK-SIL:     [[ACCESS:%.*]] = begin_access [modify] [static] {{.*}} : $*PointerTree
 // CHECK-SIL:     [[SELF_VAL:%.*]] = load [[ACCESS]] : $*PointerTree
 // CHECK-SIL:     end_access [[ACCESS]] : $*PointerTree
-// CHECK-SIL:     [[LEFT:%.*]] = struct_extract [[SELF_VAL]] : $PointerTree, #PointerTree.left
-// CHECK-SIL:     [[FILE:%.*]] = struct_extract [[SELF_VAL]] : $PointerTree, #PointerTree.file
-// CHECK-SIL:     [[RIGHT:%.*]] = struct_extract [[SELF_VAL]] : $PointerTree, #PointerTree.right
-// CHECK-SIL:     strong_release [[LEFT]] : $Ptr
-// CHECK-SIL:     [[FILE_DEINIT:%.*]] = function_ref @$s4test4FileVfD : $@convention(method) (@owned File) -> ()
-// CHECK-SIL:     apply [[FILE_DEINIT]]([[FILE]])
-// CHECK-SIL:     strong_release [[RIGHT]] : $Ptr
+// CHECK-SIL-NOT: struct_extract
+                  // no accesses to the fields are expected because the fields are no-op destroyed.
 // CHECK-SIL:     br bb3
 //
 // CHECK-SIL:  bb2:

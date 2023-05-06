@@ -735,6 +735,18 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "@_noImplicitCopy can not be used on a generic or existential typed "
       "binding or a nominal type containing such typed things", ())
 
+// forget statement
+ERROR(forget_nontrivial_storage,none,
+      "can only 'forget' type %0 if it contains trivially-destroyed "
+      "stored properties at this time",
+      (Type))
+NOTE(forget_nontrivial_storage_note,none,
+      "type %0 cannot be trivially destroyed",
+      (Type))
+NOTE(forget_nontrivial_implicit_storage_note,none,
+     "type %0 implicitly contains %1 which cannot be trivially destroyed",
+     (Type, Type))
+
 // move only checker diagnostics
 ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
