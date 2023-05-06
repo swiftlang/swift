@@ -25,6 +25,20 @@ extension std.string {
       self.push_back(value_type(bitPattern: char))
     }
   }
+
+  public init(_ string: UnsafePointer<CChar>?) {
+    self.init()
+
+    guard let str = string else {
+      return
+    }
+
+    let len = UTF8._nullCodeUnitOffset(in: str)
+    for i in 0..<len {
+      let char = UInt8(str[i])
+      self.push_back(value_type(bitPattern: char))
+    }
+  }
 }
 
 extension std.u16string {
