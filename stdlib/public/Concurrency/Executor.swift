@@ -102,12 +102,16 @@ public protocol SerialExecutor: Executor {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Executor {
+
+  // Delegation goes like this:
+  // Unowned Job -> Executor Job -> Job -> ---||---
+
   public func enqueue(_ job: UnownedJob) {
     self.enqueue(ExecutorJob(job))
   }
 
   public func enqueue(_ job: __owned ExecutorJob) {
-    self.enqueue(UnownedJob(job))
+    self.enqueue(Job(job))
   }
 
   public func enqueue(_ job: __owned Job) {
