@@ -106,6 +106,10 @@ public:
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);
 
+  /// Returns true if \p vd is visible given the current access level and thus
+  /// can be included in the generated header.
+  bool isVisible(const ValueDecl *vd) const;
+
   void print(const Decl *D);
   void print(Type ty);
 

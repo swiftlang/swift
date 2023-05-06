@@ -2908,6 +2908,12 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
          !excludeForObjCImplementation(VD);
 }
 
+bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
+  return outputLang == OutputLanguageMode::Cxx
+             ? cxx_translation::isVisibleToCxx(vd, minRequiredAccess)
+             : isVisibleToObjC(vd, minRequiredAccess);
+}
+
 void DeclAndTypePrinter::print(const Decl *D) {
   getImpl().print(D);
 }
