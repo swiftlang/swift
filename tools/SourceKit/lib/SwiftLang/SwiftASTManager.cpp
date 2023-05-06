@@ -109,6 +109,10 @@ SwiftInvocation::~SwiftInvocation() {
   delete &Impl;
 }
 
+ArrayRef<std::string> SwiftInvocation::getArgs() const {
+  return ArrayRef(Impl.Opts.Args);
+}
+
 void SwiftInvocation::applyTo(swift::CompilerInvocation &CompInvok) const {
   return Impl.Opts.applyTo(CompInvok);
 }
