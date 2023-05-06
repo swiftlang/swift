@@ -1145,10 +1145,11 @@ public:
 class FixedTypeRepr : public TypeRepr {
   Type Ty;
   SourceLoc Loc;
+  bool IsSelf;
 
 public:
-  FixedTypeRepr(Type Ty, SourceLoc Loc)
-    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc) {}
+  FixedTypeRepr(Type Ty, SourceLoc Loc, bool IsSelf = false)
+    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc), IsSelf(IsSelf) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -1158,6 +1159,9 @@ public:
 
   /// Retrieve the location.
   SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve whether this was written as 'Self'.
+  bool getIsSelf() const { return IsSelf; }
 
   /// Retrieve the fixed type.
   Type getType() const { return Ty; }

@@ -627,6 +627,7 @@ namespace {
       if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
         auto typeExpr = TypeExpr::createImplicitHack(
             loc.getBaseNameLoc(), adjustedFullType->getMetatypeInstanceType(), ctx);
+        typeExpr->setImplicit(implicit);
         cs.cacheType(typeExpr);
         return typeExpr;
       }
