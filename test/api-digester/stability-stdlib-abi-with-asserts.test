@@ -57,7 +57,6 @@
 // Note: normally you'll need to add new entries to
 // `stability-stdlib-abi-without-asserts.test`, not this file.
 Func _collectReferencesInsideObject(_:) is a new API without @available attribute
-Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
 Func _loadDestroyTLSCounter() is a new API without @available attribute
 Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without @available attribute
 Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
