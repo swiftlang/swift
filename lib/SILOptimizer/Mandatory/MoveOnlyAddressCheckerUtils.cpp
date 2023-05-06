@@ -1526,6 +1526,13 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     if (markedValue->getCheckKind() ==
         MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+      if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found mark must check [nocopy] use of escaping box: " << *user);
+        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+        emittedEarlyDiagnostic = true;
+        return true;
+      }
       LLVM_DEBUG(llvm::dbgs()
                  << "Found mark must check [nocopy] error: " << *user);
       diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
