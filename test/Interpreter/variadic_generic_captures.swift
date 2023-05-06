@@ -53,4 +53,36 @@ types.test("Lifetime") {
   expectEqual((Int, Double).self, fn2())
 }
 
+// Test captured parameter packs
+func testEscapingCapture<each T: Hashable>(_ t: repeat each T) -> () -> [AnyHashable] {
+  return {
+    var result = [AnyHashable]()
+    repeat result.append(each t)
+    return result
+  }
+}
+
+func callNonEscaping(_ fn: () -> [AnyHashable]) -> [AnyHashable] {
+  return fn()
+}
+
+func testNonEscapingCapture<each T: Hashable>(_ t: repeat each T) -> [AnyHashable] {
+  return callNonEscaping {
+    var result = [AnyHashable]()
+    repeat result.append(each t)
+    return result
+  }
+}
+
+types.test("CapturedValue") {
+  let fn1 = testEscapingCapture(1, "hi")
+  let fn2 = testEscapingCapture(5.0, false)
+
+  expectEqual([1, "hi"], fn1())
+  expectEqual([5.0, false], fn2())
+
+  expectEqual(["bye", 3.0], testNonEscapingCapture("bye", 3.0))
+  expectEqual([true, 7], testNonEscapingCapture(true, 7))
+}
+
 runAllTests()

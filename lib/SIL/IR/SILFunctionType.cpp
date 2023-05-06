@@ -1929,6 +1929,16 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     auto type = VD->getInterfaceType();
     auto canType = type->getReducedType(origGenericSig);
 
+    // If we're capturing a parameter pack, wrap it in a tuple.
+    if (isa<PackExpansionType>(canType)) {
+      assert(!cast<ParamDecl>(VD)->supportsMutation() &&
+             "Cannot capture a pack as an lvalue");
+
+      SmallVector<TupleTypeElt, 1> elts;
+      elts.push_back(canType);
+      canType = CanTupleType(TupleType::get(elts, TC.Context));
+    }
+
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
                            expansion);

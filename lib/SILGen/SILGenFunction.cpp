@@ -505,10 +505,24 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
 
     auto *vd = cast<VarDecl>(capture.getDecl());
-    auto type = FunctionDC->mapTypeIntoContext(
-      vd->getInterfaceType());
+
+    auto interfaceType = vd->getInterfaceType();
+
+    bool isPack = false;
+    if (interfaceType->is<PackExpansionType>()) {
+      assert(!vd->supportsMutation() &&
+             "Cannot capture a pack as an lvalue");
+
+      SmallVector<TupleTypeElt, 1> elts;
+      elts.push_back(interfaceType);
+      interfaceType = TupleType::get(elts, getASTContext());
+
+      isPack = true;
+    }
+
+    auto type = FunctionDC->mapTypeIntoContext(interfaceType);
     auto valueType = FunctionDC->mapTypeIntoContext(
-      vd->getValueInterfaceType());
+      interfaceType->getReferenceStorageReferent());
 
     //
     // If we haven't emitted the captured value yet, we're forming a closure
@@ -571,8 +585,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](VarLoc entryVarLoc) -> SILValue {
-      SILValue entryValue = entryVarLoc.value;
+    auto getAddressValue = [&](SILValue entryValue, bool forceCopy) -> SILValue {
       if (SGM.M.useLoweredAddresses()
           && SGM.Types
                  .getTypeLowering(
@@ -582,32 +595,62 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                  .isAddressOnly()
           && !entryValue->getType().isAddress()) {
 
+        assert(!isPack);
+
         auto addr = emitTemporaryAllocation(vd, entryValue->getType(), false,
                                             false, /*generateDebugInfo*/ false);
         auto val = B.emitCopyValueOperation(loc, entryValue);
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
-        entryValue = addr;
-        enterDestroyCleanup(addr);
+
+        if (!forceCopy)
+          enterDestroyCleanup(addr);
+        return addr;
+
+      } else if (isPack) {
+        SILType ty = getLoweredType(valueType).getObjectType();
+        auto addr = B.createAllocStack(loc, ty);
+        enterDeallocStackCleanup(addr);
+
+        auto formalPackType = cast<TupleType>(valueType->getCanonicalType())
+            .getInducedPackType();
+        copyPackElementsToTuple(loc, addr, entryValue, formalPackType);
+
+        if (!forceCopy)
+          enterDestroyCleanup(addr);
+        return addr;
+
+      } else if (forceCopy) {
+        // We cannot pass a valid SILDebugVariable while creating the temp here
+        // See rdar://60425582
+        auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
+        enterDeallocStackCleanup(addr);
+        B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
+        return addr;
+
+      } else {
+        return entryValue;
       }
-      return entryValue;
     };
 
     auto Entry = found->second;
+    auto val = Entry.value;
+
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
+      assert(!isPack);
+
       // let declarations.
       auto &tl = getTypeLowering(valueType);
-      SILValue Val = Entry.value;
       bool eliminateMoveOnlyWrapper =
-          Val->getType().isMoveOnlyWrapped() &&
-          !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
+          val->getType().isMoveOnlyWrapped() &&
+          !interfaceType->is<SILMoveOnlyWrappedType>();
 
-      if (!Val->getType().isAddress()) {
+      if (!val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
-          auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
+          auto guaranteed = ManagedValue::forUnmanaged(val).borrow(*this, loc);
           if (eliminateMoveOnlyWrapper)
             guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
                 loc, guaranteed);
@@ -616,64 +659,63 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         }
 
         // Just copy a by-val let.
-        Val = B.emitCopyValueOperation(loc, Val);
+        val = B.emitCopyValueOperation(loc, val);
         // If we need to unwrap a moveonlywrapped value, do so now but in an
         // owned way to ensure that the partial apply is viewed as a semantic
         // use of the value.
         if (eliminateMoveOnlyWrapper)
-          Val = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, Val);
+          val = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
-        if (Val->getType().isMoveOnly()) {
-          Val = B.createMarkMustCheckInst(
-              loc, Val,
+        if (val->getType().isMoveOnly()) {
+          val = B.createMarkMustCheckInst(
+              loc, val,
               MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
         }
-        Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
+        val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }
 
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
-      if (vd->getInterfaceType()->is<ReferenceStorageType>())
-        Val = emitConversionFromSemanticValue(loc, Val, getLoweredType(type));
+      if (interfaceType->is<ReferenceStorageType>())
+        val = emitConversionFromSemanticValue(loc, val, getLoweredType(type));
 
-      capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
+      capturedArgs.push_back(emitManagedRValueWithCleanup(val));
       break;
     }
     case CaptureKind::Immutable: {
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto entryValue = getAddressValue(Entry);
-        capturedArgs.push_back(ManagedValue::forBorrowedRValue(entryValue));
+        auto addr = getAddressValue(val, /*forceCopy=*/false);
+        capturedArgs.push_back(ManagedValue::forBorrowedRValue(addr));
       }
       else if (!silConv.useLoweredAddresses()) {
         capturedArgs.push_back(
-          B.createCopyValue(loc, ManagedValue::forUnmanaged(Entry.value)));
+          B.createCopyValue(loc, ManagedValue::forUnmanaged(val)));
       } else {
-        auto entryValue = getAddressValue(Entry);
-        // We cannot pass a valid SILDebugVariable while creating the temp here
-        // See rdar://60425582
-        auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
-        enterDeallocStackCleanup(addr);
-        B.createCopyAddr(loc, entryValue, addr, IsNotTake, IsInitialization);
+        auto addr = getAddressValue(val, /*forceCopy=*/true);
         capturedArgs.push_back(ManagedValue::forLValue(addr));
       }
       break;
     }
     case CaptureKind::StorageAddress: {
-      auto entryValue = getAddressValue(Entry);
+      assert(!isPack);
+
+      auto addr = getAddressValue(val, /*forceCopy=*/false);
       // No-escaping stored declarations are captured as the
       // address of the value.
-      assert(entryValue->getType().isAddress() && "no address for captured var!");
-      capturedArgs.push_back(ManagedValue::forLValue(entryValue));
+      assert(addr->getType().isAddress() && "no address for captured var!");
+      capturedArgs.push_back(ManagedValue::forLValue(addr));
       break;
     }
 
     case CaptureKind::Box: {
-      auto entryValue = getAddressValue(Entry);
+      assert(!isPack);
+
+      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
       // LValues are captured as both the box owning the value and the
       // address of the value.
       assert(entryValue->getType().isAddress() && "no address for captured var!");
@@ -722,7 +764,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       break;
     }
     case CaptureKind::ImmutableBox: {
-      auto entryValue = getAddressValue(Entry);
+      assert(!isPack);
+
+      auto entryValue = getAddressValue(val, /*forceCopy=*/false);
       // LValues are captured as both the box owning the value and the
       // address of the value.
       assert(entryValue->getType().isAddress() &&
