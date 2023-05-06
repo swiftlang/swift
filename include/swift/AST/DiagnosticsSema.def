@@ -4599,9 +4599,16 @@ ERROR(opaque_type_var_no_underlying_type,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
 
+
+//------------------------------------------------------------------------------
+// MARK: Forget Statement
+//------------------------------------------------------------------------------
 ERROR(forget_wrong_context_decl,none,
       "'forget' statement cannot appear in %0",
       (DescriptiveDeclKind))
+ERROR(forget_no_deinit,none,
+      "'forget' has no effect for type %0 unless it has a deinitializer",
+      (Type))
 ERROR(forget_wrong_context_closure,none,
       "'forget' statement cannot appear in closure",
       ())
