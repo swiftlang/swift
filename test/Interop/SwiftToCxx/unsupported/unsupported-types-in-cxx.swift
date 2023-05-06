@@ -12,13 +12,27 @@ public func takesVoid(_ x: ()) {}
 
 // CHECK:     takeFloat
 
-protocol TestProtocol {}
+@_moveOnly
+public enum MoveOnlyEnum {
+    case a
+}
+
+// CHECK: class MoveOnlyEnum { } SWIFT_UNAVAILABLE_MSG("move-only enum 'MoveOnlyEnum' can not yet be represented in C++");
+
+@_moveOnly
+public struct MoveOnlyStruct {
+    let x: Int
+}
+
+// CHECK: class MoveOnlyStruct { } SWIFT_UNAVAILABLE_MSG("move-only struct 'MoveOnlyStruct' can not yet be represented in C++");
+
+public protocol TestProtocol {}
 
 // CHECK: class TestProtocol { } SWIFT_UNAVAILABLE_MSG("protocol 'TestProtocol' can not yet be represented in C++");
 
 // CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'.
 // CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'.
 
-typealias unsupportedTypeAlias = () -> (Float, Float)
+public typealias unsupportedTypeAlias = () -> (Float, Float)
 
 // CHECK: // Unavailable in C++: Swift type alias 'unsupportedTypeAlias'

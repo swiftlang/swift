@@ -226,6 +226,9 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl))
       return {Unsupported, UnrepresentableProtocol};
+    // Swift's consume semantics are not yet supported in C++.
+    if (typeDecl->isMoveOnly())
+      return {Unsupported, UnrepresentableMoveOnly};
     if (typeDecl->isGeneric()) {
       if (isa<ClassDecl>(VD))
         return {Unsupported, UnrepresentableGeneric};
@@ -323,5 +326,8 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_enum_case_tuple_to_cxx, vd);
   case UnrepresentableProtocol:
     return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
+  case UnrepresentableMoveOnly:
+    return Diagnostic(diag::expose_move_only_to_cxx, vd->getDescriptiveKind(),
+                      vd);
   }
 }
