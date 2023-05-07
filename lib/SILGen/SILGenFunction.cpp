@@ -232,8 +232,16 @@ struct MacroInfo {
 };
 }
 
+static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
+  for (; DC; DC = DC->getParent())
+    if (DC->getContextKind() == DeclContextKind::AbstractFunctionDecl)
+      return DC;
+  return nullptr;
+}
+
 /// Return location of the macro expansion and the macro name.
-static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
+static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
+                              DeclContext *FunctionDC) {
   MacroInfo Result(Info.generatedSourceRange.getStart(),
                    Info.originalSourceRange.getStart());
   if (!Info.astNode)
@@ -252,6 +260,13 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info) {
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
+    // If the parent function of the macro expansion expression is not the
+    // current function, then the macro expanded to a closure or nested
+    // function. As far as the generated SIL is concerned this is the same as a
+    // function generated from a freestanding macro expansion.
+    DeclContext *MacroContext = getInnermostFunctionContext(Info.declContext);
+    if (MacroContext != FunctionDC)
+      Result.Freestanding = true;
     break;
   }
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
@@ -295,7 +310,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
   // declaration that isn't part of a real function. By not handling them here,
   // source locations will still point into the macro expansion buffer, but
   // debug info doesn't know what macro that buffer was expanded from.
-  auto Macro = getMacroInfo(*GeneratedSourceInfo);
+  auto Macro = getMacroInfo(*GeneratedSourceInfo, FunctionDC);
   if (Macro.Freestanding)
     return nullptr;
   
