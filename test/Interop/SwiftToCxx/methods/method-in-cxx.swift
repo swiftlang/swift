@@ -95,7 +95,8 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK LargeStruct staticFinalClassMethod(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ");
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: SWIFT_INLINE_THUNK LargeStruct(LargeStruct &&)
+// CHECK: SWIFT_INLINE_PRIVATE_HELPER LargeStruct(LargeStruct &&)
+// CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct scaled(swift::Int x, swift::Int y) const SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
