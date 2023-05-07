@@ -93,6 +93,21 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreserved-identifier"
+
+extern "C" void _swift_stdlib_reportFatalError(const char *_Nonnull prefix,
+                                               int prefixLength,
+                                               const char *_Nonnull message,
+                                               int messageLength,
+                                               uint32_t flags) noexcept;
+
+// A dummy symbol that forces a linker error when
+// C++ tries to invoke a move of a Swift value type.
+extern "C" void _fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
+
+#pragma clang diagnostic pop
+
 SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,
                                               size_t align) noexcept {
 #if defined(_WIN32)
