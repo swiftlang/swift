@@ -5,6 +5,8 @@ struct S {
   __consuming func c() {
     _forget self
   }
+
+  deinit {}
 }
 
 // CHECK: @_moveOnly internal struct S {
