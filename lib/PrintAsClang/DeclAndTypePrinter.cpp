@@ -456,6 +456,11 @@ private:
       return p1.second.tag < p2.second.tag;
     });
 
+    auto isIndirectCase = [&](EnumElementDecl *elementDecl) {
+      return elementDecl->isIndirect() ||
+             elementDecl->getParentEnum()->isIndirect();
+    };
+
     auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
@@ -541,16 +546,45 @@ private:
                 paramType->getNominalOrBoundGenericNominal(), paramType);
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
 
+            if (isIndirectCase(elementDecl)) {
+              outOfLineOS << "    void ** _Nonnull refCountedBox = "
+                             "reinterpret_cast<void ** "
+                             "_Nonnull>(payloadFromDestruction);\n";
+              outOfLineOS
+                  << "    void * _Nonnull actualPayload = "
+                     "::swift::_impl::swift_projectBox(*refCountedBox);\n";
+            }
+
             if (auto knownCxxType =
                     owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
-              outOfLineOS << "    "
-                             "memcpy(&result, payloadFromDestruction, "
-                             "sizeof(result));\n";
+              outOfLineOS << "    ";
+
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS << "memcpy(&result, actualPayload, ";
+              } else {
+                outOfLineOS << "memcpy(&result, payloadFromDestruction, ";
+              }
+              outOfLineOS << "sizeof(result));\n";
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS
+                    << "    ::swift::_impl::swift_release(*refCountedBox);\n";
+              }
               outOfLineOS << "    return result;\n  ";
             } else {
-              outOfLineOS << "    return swift::";
+              if (isIndirectCase(elementDecl)) {
+                if (isa<ClassDecl>(objectTypeDecl)) {
+                  outOfLineOS << "    void * _Nonnull actualObject = "
+                                 "*reinterpret_cast<void ** "
+                                 "_Nonnull>(actualPayload);\n";
+                  outOfLineOS
+                      << "    ::swift::_impl::swift_retain(actualObject);\n";
+                }
+                outOfLineOS << "    auto toReturn = swift::";
+              } else {
+                outOfLineOS << "    return swift::";
+              }
               outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
               outOfLineOS << "::implClassFor<";
               outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
@@ -559,8 +593,12 @@ private:
               outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
               outOfLineOS << ">::type";
               if (isa<ClassDecl>(objectTypeDecl)) {
-                outOfLineOS << "::makeRetained(*reinterpret_cast<void "
-                               "**>(payloadFromDestruction));\n  ";
+                if (isIndirectCase(elementDecl)) {
+                  outOfLineOS << "::makeRetained(actualObject);\n";
+                } else {
+                  outOfLineOS << "::makeRetained(*reinterpret_cast<void "
+                                 "**>(payloadFromDestruction));\n  ";
+                }
               } else {
                 outOfLineOS << "::returnNewValue([&](char * _Nonnull result) "
                                "SWIFT_INLINE_THUNK_ATTRIBUTES {\n";
@@ -572,9 +610,21 @@ private:
                     elementDecl->getParentEnum()->getModuleContext());
                 outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                 outOfLineOS << ">::type";
-                outOfLineOS << "::initializeWithTake(result, "
-                               "payloadFromDestruction);\n";
+                if (isIndirectCase(elementDecl)) {
+                  outOfLineOS
+                      << "::initializeWithCopy(result, "
+                         "static_cast<char * _Nonnull>(actualPayload));\n";
+                } else {
+                  outOfLineOS << "::initializeWithTake(result, "
+                                 "payloadFromDestruction);\n";
+                }
                 outOfLineOS << "    });\n  ";
+              }
+
+              if (isIndirectCase(elementDecl)) {
+                outOfLineOS
+                    << "    ::swift::_impl::swift_release(*refCountedBox);\n";
+                outOfLineOS << "    return toReturn;\n";
               }
             }
           },
@@ -706,18 +756,40 @@ private:
                       objectType->getNominalOrBoundGenericNominal();
                   assert(objectTypeDecl != nullptr);
 
+                  if (isIndirectCase(elementDecl)) {
+                    outOfLineOS
+                        << "    auto metadata = swift::TypeMetadataTrait<"
+                        << types[paramType] << ">::getTypeMetadata();\n";
+                    outOfLineOS
+                        << "    auto allocBoxResult = "
+                        << cxx_synthesis::getCxxSwiftNamespaceName()
+                        << "::" << cxx_synthesis::getCxxImplNamespaceName()
+                        << "::"
+                        << "swift_allocBox(metadata);\n";
+                  }
+
                   if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                          objectTypeDecl)) {
-                    outOfLineOS
-                        << "    memcpy(result._getOpaquePointer(), &val, "
-                           "sizeof(val));\n";
-                  } else if (isa<ClassDecl>(objectTypeDecl)) {
-                    outOfLineOS
-                        << "    auto op = swift::"
-                        << cxx_synthesis::getCxxImplNamespaceName()
-                        << "::_impl_RefCountedClass::copyOpaquePointer(val);\n";
-                    outOfLineOS << "    memcpy(result._getOpaquePointer(), "
-                                   "&op, sizeof(op));\n";
+                          objectTypeDecl) ||
+                      isa<ClassDecl>(objectTypeDecl)) {
+                    if (isa<ClassDecl>(objectTypeDecl)) {
+                      outOfLineOS << "    auto src = swift::"
+                                  << cxx_synthesis::getCxxImplNamespaceName()
+                                  << "::_impl_RefCountedClass::"
+                                     "copyOpaquePointer(val);\n";
+                    } else {
+                      outOfLineOS << "    auto src = val;\n";
+                    }
+
+                    if (isIndirectCase(elementDecl)) {
+                      outOfLineOS << "    memcpy(allocBoxResult.opaquePtr, "
+                                     "&src, sizeof(src));\n";
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&allocBoxResult.refCountedPtr, "
+                                     "sizeof(allocBoxResult.refCountedPtr));\n";
+                    } else {
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&src, sizeof(src));\n";
+                    }
                   } else {
                     objectTypeDecl =
                         paramType->getNominalOrBoundGenericNominal();
@@ -751,9 +823,13 @@ private:
                             objectTypeDecl->getModuleContext(),
                             ED->getModuleContext());
                     outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                    outOfLineOS << ">::type::initializeWithTake(result._"
-                                   "getOpaquePointer(), ";
-                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                    outOfLineOS << ">::type::initializeWithTake(";
+                    outOfLineOS << (isIndirectCase(elementDecl)
+                                        ? "static_cast<char * "
+                                          "_Nonnull>(allocBoxResult.opaquePtr)"
+                                        : "result._getOpaquePointer()");
+                    outOfLineOS << ", "
+                                << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                     outOfLineOS << "::implClassFor<";
@@ -764,6 +840,12 @@ private:
                     outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
                     outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                     outOfLineOS << ");\n";
+
+                    if (isIndirectCase(elementDecl)) {
+                      outOfLineOS << "    memcpy(result._getOpaquePointer(), "
+                                     "&allocBoxResult.refCountedPtr, "
+                                     "sizeof(allocBoxResult.refCountedPtr));\n";
+                    }
                   }
                 }
               }
