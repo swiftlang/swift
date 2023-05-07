@@ -103,5 +103,32 @@ int main() {
 // CHECK-NEXT: destroy ClassWithIntField
 // CHECK-NEXT: ClassWithIntField: 0;
 // CHECK-NEXT: destroy ClassWithIntField
+
+  {
+    auto x = returnClassWithIntField();
+    assert(getRetainCount(x) == 1);
+    ClassWithIntField x2(std::move(x));
+    // Moving a Swift class in C++ is not consuming.
+    assert(getRetainCount(x) == 2);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+
+  {
+      auto x = returnClassWithIntField();
+      auto x2 = returnClassWithIntField();
+      assert(getRetainCount(x) == 1);
+      assert(getRetainCount(x2) == 1);
+      x2 = std::move(x);
+      // Moving a Swift class in C++ is not consuming.
+      assert(getRetainCount(x) == 2);
+      assert(getRetainCount(x2) == 2);
+      takeClassWithIntField(x2);
+  }
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: init ClassWithIntField
+// CHECK-NEXT: destroy ClassWithIntField
+// CHECK-NEXT: ClassWithIntField: 0;
+// CHECK-NEXT: destroy ClassWithIntField
   return 0;
 }

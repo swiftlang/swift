@@ -159,6 +159,14 @@ public:
       : _opaquePointer(other._opaquePointer) {
     swift_retain(_opaquePointer);
   }
+  SWIFT_INLINE_THUNK RefCountedClass(RefCountedClass &&other) noexcept
+      : _opaquePointer(other._opaquePointer) {
+    // Moving a Swift class reference is a copy
+    // in C++. This allows C++ to avoid liveness
+    // checks to see if the pointer is `null` or not,
+    // as C++'s move is not consuming, unlike Swift's.
+    swift_retain(_opaquePointer);
+  }
   SWIFT_INLINE_THUNK RefCountedClass &
   operator=(const RefCountedClass &other) noexcept {
     swift_retain(other._opaquePointer);
@@ -166,11 +174,13 @@ public:
     _opaquePointer = other._opaquePointer;
     return *this;
   }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-  // FIXME: implement 'move'?
-  SWIFT_INLINE_THUNK RefCountedClass(RefCountedClass &&) noexcept { abort(); }
-#pragma clang diagnostic pop
+  SWIFT_INLINE_THUNK RefCountedClass &
+  operator=(RefCountedClass &&other) noexcept {
+    swift_retain(other._opaquePointer);
+    swift_release(_opaquePointer);
+    _opaquePointer = other._opaquePointer;
+    return *this;
+  }
 
 protected:
   SWIFT_INLINE_THUNK RefCountedClass(void *_Nonnull ptr) noexcept
