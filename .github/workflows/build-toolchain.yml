@@ -117,7 +117,9 @@ jobs:
       - name: Prepare sccache timestamp
         id: cache_key
         run: |
-          echo "SCCACHE_KEY=${{ matrix.target }}-${{ env.TOOLCHAIN_CHANNEL }}-sccache-v13-$(date +'%Y-%m-%d-%I-%M-%S')" >> $GITHUB_OUTPUT
+          export SCCACHE_KEY_PREFIX="${{ matrix.target }}-${{ env.TOOLCHAIN_CHANNEL }}-sccache-v14-"
+          echo "SCCACHE_KEY_PREFIX=$SCCACHE_KEY_PREFIX" >> $GITHUB_OUTPUT
+          echo "SCCACHE_KEY=$SCCACHE_KEY_PREFIX$(date +'%Y-%m-%d-%I-%M-%S')" >> $GITHUB_OUTPUT
 
       - name: Check Xcode version
         if: ${{ startsWith(matrix.build_os, 'macos-') }}
@@ -130,7 +132,7 @@ jobs:
           path: build-cache
           key: ${{ steps.cache_key.outputs.SCCACHE_KEY }}
           restore-keys: |
-            ${{ matrix.target }}-sccache-v13-
+            ${{ steps.cache_key.outputs.SCCACHE_KEY_PREFIX }}
 
       - name: Clean build directory
         if: ${{ matrix.clean_build_dir }}
