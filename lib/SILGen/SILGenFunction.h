@@ -1901,6 +1901,15 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
+  RValue emitApplyOfLibraryIntrinsic(SILLocation loc, SILDeclRef declRef,
+                                     SubstitutionMap subMap,
+                                     ArrayRef<ManagedValue> args,
+                                     SGFContext ctx);
+
+  /// Emits a call to the `_diagnoseUnavailableCodeReached()` function in the
+  /// standard library.
+  void emitApplyOfUnavailableCodeReached();
+
   RValue emitApplyAllocatingInitializer(SILLocation loc, ConcreteDeclRef init,
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
