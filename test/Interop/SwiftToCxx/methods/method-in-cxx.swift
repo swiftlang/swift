@@ -103,6 +103,35 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT: static SWIFT_INLINE_THUNK void staticMethod() SWIFT_SYMBOL("s:7Methods11LargeStructV12staticMethodyyFZ");
 // CHECK-NEXT: private
 
+public struct WrapOverloadedMethods {
+    let x: Int
+
+    public func method(_ x: Int) {
+    }
+    public func method(_ x: Float) {
+    }
+    public func method(argLabel y: Int64) {
+    }
+}
+
+// CHECK: WrapOverloadedMethods final {
+// CHECK: SWIFT_INLINE_THUNK void method
+// CHECK-SAME: (swift::Int x) const SWIFT_SYMBOL("s:7Methods014WrapOverloadedA0V6methodyySiF");
+// CHECK-NEXT: private:
+
+public struct WrapOverloadedMethodsSibling {
+    let x: Int
+
+    // Sibling method with same name should be emitted.
+    public func method(_ x: Int) {
+    }
+}
+
+// CHECK: WrapOverloadedMethodsSibling final {
+// CHECK: SWIFT_INLINE_THUNK void method
+// CHECK-SAME: (swift::Int x) const SWIFT_SYMBOL("s:7Methods014WrapOverloadedA7SiblingV6methodyySiF");
+// CHECK-NEXT: private:
+
 public func createClassWithMethods(_ x: Int) -> ClassWithMethods {
     return ClassWithMethods(x)
 }

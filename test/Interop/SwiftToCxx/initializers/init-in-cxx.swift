@@ -126,6 +126,21 @@ public class DerivedClass: BaseClass {
 public class DerivedClassTwo: BaseClass {
 }
 
+public struct WrapOverloadedInits {
+    let x: Int
+
+    public init(_ x: Int) {
+        self.x = x
+    }
+    public init(_ x: Float) {
+        self.x = Int(x)
+    }
+}
+
+// CHECK: static SWIFT_INLINE_THUNK WrapOverloadedInits init
+// CHECK-SAME: (swift::Int x) SWIFT_SYMBOL("s:4Init19WrapOverloadedInitsVyACSicfc");
+// CHECK-NOT: WrapOverloadedInits init(
+
 // CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) {
 // CHECK-NEXT: return _impl::_impl_BaseClass::makeRetained(_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
 
