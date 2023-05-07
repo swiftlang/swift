@@ -1694,6 +1694,14 @@ ERROR(expose_enum_case_type_to_cxx,none,
       "enum %0 can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++", (ValueDecl *))
 ERROR(expose_enum_case_tuple_to_cxx,none,
       "enum %0 can not yet be represented in C++ as one of its cases has multiple associated values", (ValueDecl *))
+ERROR(expose_protocol_to_cxx_unsupported,none,
+      "protocol %0 can not yet be represented in C++", (ValueDecl *))
+ERROR(expose_move_only_to_cxx,none,
+      "move-only %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(unexposed_other_decl_in_cxx,none,
+      "%0 %1 is not yet exposed to C++", (DescriptiveDeclKind, ValueDecl *))
+ERROR(unsupported_other_decl_in_cxx,none,
+      "Swift %0 %1 cannot be represented in C++", (DescriptiveDeclKind, ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
