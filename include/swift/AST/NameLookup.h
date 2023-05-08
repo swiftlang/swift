@@ -649,7 +649,7 @@ private:
   void visitReturnStmt(ReturnStmt *) {}
   void visitYieldStmt(YieldStmt *) {}
   void visitThrowStmt(ThrowStmt *) {}
-  void visitForgetStmt(ForgetStmt *) {}
+  void visitDiscardStmt(DiscardStmt *) {}
   void visitPoundAssertStmt(PoundAssertStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing in the defer is visible.

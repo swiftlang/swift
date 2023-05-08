@@ -600,18 +600,19 @@ public:
             cast<AccessorDecl>(CurDeclContext)->isCoroutine());
   }
 
-  /// `forget self` is the only valid phrase, but we peek ahead for just any
-  /// identifier after `forget` to determine if it's the statement. This helps
-  /// us avoid interpreting `forget(self)` as the statement and not a call.
-  /// We also want to be mindful of statements like `forget ++ something` where
+  /// `discard self` is the only valid phrase, but we peek ahead for just any
+  /// identifier after `discard` to determine if it's the statement. This helps
+  /// us avoid interpreting `discard(self)` as the statement and not a call.
+  /// We also want to be mindful of statements like `discard ++ something` where
   /// folks have defined a custom operator returning void.
   ///
-  /// Later, type checking will verify that you're forgetting the right thing
-  /// so that when people make a mistake, thinking they can `forget x` we give
+  /// Later, type checking will verify that you're discarding the right thing
+  /// so that when people make a mistake, thinking they can `discard x` we give
   /// a nice diagnostic.
-  bool isContextualForgetKeyword() {
-    // must be `forget` ...
-    if (!Tok.isContextualKeyword("_forget"))
+  bool isContextualDiscardKeyword() {
+    // must be `discard` ...
+    if (!(Tok.isContextualKeyword("_forget") // NOTE: support for deprecated _forget
+        || Tok.isContextualKeyword("discard")))
       return false;
 
     // followed by either an identifier, `self`, or `Self`.
@@ -1860,7 +1861,7 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtYield(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
-  ParserResult<Stmt> parseStmtForget();
+  ParserResult<Stmt> parseStmtDiscard();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus
   parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
