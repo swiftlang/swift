@@ -228,6 +228,8 @@ SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
 SWIFT_FUNCTION_PASS(TestInstructionIteration, "test-instruction-iteration",
      "Tests instruction iteration")
+SWIFT_FUNCTION_PASS(InitializeStaticGlobals, "initialize-static-globals",
+     "Initializes static global variables")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
