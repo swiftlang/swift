@@ -7325,10 +7325,14 @@ void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
   auto *idc = dyn_cast<IterableDeclContext>(decl);
   bool previousHadSemi = true;
 
+  SourceLoc startingLoc = Tok.getLoc();
   while (!Tok.is(tok::eof)) {
     parseDeclItem(previousHadSemi,
                   getMemberParseDeclOptions(idc),
                   [&](Decl *d) { items.push_back(d); });
+
+    if (Tok.getLoc() == startingLoc)
+      break;
   }
 
   // Consume remaining tokens.

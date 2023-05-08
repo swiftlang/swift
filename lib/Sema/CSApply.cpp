@@ -8475,8 +8475,8 @@ namespace {
       exprType = solution.simplifyType(exprType);
       // assert((!expr->getType() || expr->getType()->isEqual(exprType)) &&
       //       "Mismatched types!");
-      assert(!exprType->hasTypeVariable() &&
-             "Should not write type variable into expression!");
+      assert(!exprType->getRecursiveProperties().isSolverAllocated() &&
+             "Should not write solver allocated type into expression!");
       assert(!exprType->hasPlaceholder() &&
              "Should not write type placeholders into expression!");
       expr->setType(exprType);
@@ -8486,8 +8486,10 @@ namespace {
           Type componentType;
           if (cs.hasType(kp, i)) {
             componentType = solution.simplifyType(cs.getType(kp, i));
-            assert(!componentType->hasTypeVariable() &&
-                   "Should not write type variable into key-path component");
+            assert(
+                !componentType->getRecursiveProperties().isSolverAllocated() &&
+                "Should not write solver allocated type into key-path "
+                "component!");
             assert(!componentType->hasPlaceholder() &&
                    "Should not write type placeholder into key-path component");
             kp->getMutableComponents()[i].setComponentType(componentType);
