@@ -100,6 +100,7 @@ class SILPerformanceInliner {
   /// global_init attributes.
   InlineSelection WhatToInline;
 
+  SILPassManager *pm;
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
   BasicCalleeAnalysis *BCA;
@@ -227,11 +228,12 @@ class SILPerformanceInliner {
 
 public:
   SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
-                        InlineSelection WhatToInline, DominanceAnalysis *DA,
+                        InlineSelection WhatToInline,
+                        SILPassManager *pm, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, BasicCalleeAnalysis *BCA,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : PassName(PassName), FuncBuilder(FuncBuilder),
-        WhatToInline(WhatToInline), DA(DA), LA(LA), BCA(BCA), CBI(DA), ORE(ORE),
+        WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), CBI(DA), ORE(ORE),
         OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
@@ -934,6 +936,8 @@ void SILPerformanceInliner::collectAppliesToInline(
       if (!FullApplySite::isa(&*I))
         continue;
 
+      pm->setDependingOnCalleeBodies();
+
       FullApplySite AI = FullApplySite(&*I);
 
       auto *Callee = getEligibleFunction(AI, WhatToInline);
@@ -1155,8 +1159,8 @@ public:
 
     SILOptFunctionBuilder FuncBuilder(*this);
 
-    SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline, DA, LA,
-                                  BCA, OptMode, ORE);
+    SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline,
+                                  getPassManager(), DA, LA, BCA, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

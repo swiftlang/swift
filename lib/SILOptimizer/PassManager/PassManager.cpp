@@ -551,6 +551,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   updateSILModuleStatsBeforeTransform(F->getModule(), SFT, *this, NumPassesRun);
 
   CurrentPassHasInvalidated = false;
+  currentPassDependsOnCalleeBodies = false;
   numSubpassesRun = 0;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
@@ -652,7 +653,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                                      duration.count());
 
   // Remember if this pass didn't change anything.
-  if (!CurrentPassHasInvalidated)
+  if (!CurrentPassHasInvalidated && !currentPassDependsOnCalleeBodies)
     completedPasses.set((size_t)SFT->getPassKind());
 
   if (getOptions().VerifyAll &&
