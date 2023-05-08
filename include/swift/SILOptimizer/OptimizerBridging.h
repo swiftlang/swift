@@ -304,6 +304,23 @@ struct BridgedPassContext {
     return {&*nextIter};
   }
 
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedGlobalVar getFirstGlobalInModule() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    if (mod->getSILGlobals().empty())
+      return {nullptr};
+    return {&*mod->getSILGlobals().begin()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global) {
+    auto *g = global.getGlobal();
+    auto nextIter = std::next(g->getIterator());
+    if (nextIter == g->getModule().getSILGlobals().end())
+      return {nullptr};
+    return {&*nextIter};
+  }
+
   struct VTableArray {
     swift::SILVTable * const _Nonnull * _Nullable base;
     SwiftInt count;

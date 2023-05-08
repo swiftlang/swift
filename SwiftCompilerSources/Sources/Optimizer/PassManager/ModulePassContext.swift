@@ -35,6 +35,20 @@ struct ModulePassContext : Context {
     }
   }
 
+  struct GlobalVariableList : CollectionLikeSequence, IteratorProtocol {
+    private var currentGlobal: GlobalVariable?
+
+    fileprivate init(first: GlobalVariable?) { currentGlobal = first }
+
+    mutating func next() -> GlobalVariable? {
+      if let g = currentGlobal {
+        currentGlobal = BridgedPassContext.getNextGlobalInModule(g.bridged).globalVar
+        return g
+      }
+      return nil
+    }
+  }
+
   struct VTableArray : BridgedRandomAccessCollection {
     fileprivate let bridged: BridgedPassContext.VTableArray
 
@@ -79,6 +93,10 @@ struct ModulePassContext : Context {
     FunctionList(first: _bridged.getFirstFunctionInModule().function)
   }
   
+  var globalVariables: GlobalVariableList {
+    GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
+  }
+
   var vTables: VTableArray {
     VTableArray(bridged: _bridged.getVTables())
   }
@@ -99,5 +117,11 @@ struct ModulePassContext : Context {
     _bridged.beginTransformFunction(function.bridged)
     runOnFunction(FunctionPassContext(_bridged: _bridged))
     _bridged.endTransformFunction();
+  }
+}
+
+extension GlobalVariable {
+  func setIsLet(to value: Bool, _ context: ModulePassContext) {
+    bridged.setLet(value)
   }
 }

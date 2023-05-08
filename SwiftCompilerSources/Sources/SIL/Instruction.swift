@@ -141,7 +141,7 @@ extension BridgedInstruction {
 }
 
 extension OptionalBridgedInstruction {
-  var instruction: Instruction? { obj.getAs(Instruction.self) }
+  public var instruction: Instruction? { obj.getAs(Instruction.self) }
 }
 
 public class SingleValueInstruction : Instruction, Value {
@@ -462,6 +462,12 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
+final public class AllocGlobalInst : Instruction {
+  public var global: GlobalVariable {
+    bridged.AllocGlobalInst_getGlobal().globalVar
+  }
+}
+
 final public class IntegerLiteralInst : SingleValueInstruction {
   public var value: llvm.APInt { bridged.IntegerLiteralInst_getValue() }
 }
@@ -599,6 +605,8 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+
+  public var address: Value { operand.value }
 }
 
 // An instruction that is always paired with a scope ending instruction
