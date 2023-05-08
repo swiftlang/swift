@@ -5398,9 +5398,12 @@ ERROR(vararg_not_allowed,none,
 ERROR(experimental_type_with_parameter_pack,none,
       "generic types with parameter packs are experimental",
       ())
-ERROR(more_than_one_parameter_pack_in_type,none,
-      "generic type cannot have more than one pack", ())
-
+ERROR(more_than_one_pack_in_type,none,
+      "generic type cannot declare more than one type pack", ())
+ERROR(enum_with_pack,none,
+      "enums cannot declare a type pack", ())
+ERROR(superclass_with_pack,none,
+      "cannot inherit from a generic class that declares a type pack", ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument list", (Type))
