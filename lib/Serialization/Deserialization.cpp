@@ -7384,6 +7384,14 @@ llvm::Error ModuleFile::consumeExpectedError(llvm::Error &&error) {
 }
 
 void ModuleFile::diagnoseAndConsumeError(llvm::Error error) const {
+  auto &ctx = getContext();
+  if (ctx.LangOpts.EnableModuleRecoveryRemarks) {
+    error = diagnoseModularizationError(std::move(error),
+                                        DiagnosticBehavior::Remark);
+    // If error was already diagnosed it was also consumed.
+    if (!error)
+      return;
+  }
 
   consumeError(std::move(error));
 }
