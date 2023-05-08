@@ -485,7 +485,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
       }
 
       if (hasPack) {
-        gp->diagnose(diag::more_than_one_parameter_pack_in_type);
+        gp->diagnose(diag::more_than_one_pack_in_type);
       }
 
       hasPack = true;
@@ -2555,6 +2555,17 @@ public:
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
 
+    // Temporary restriction until we figure out pattern matching and
+    // enum case construction with packs.
+    if (auto genericSig = ED->getGenericSignature()) {
+      for (auto paramTy : genericSig.getGenericParams()) {
+        if (paramTy->isParameterPack()) {
+          ED->diagnose(diag::enum_with_pack);
+          break;
+        }
+      }
+    }
+
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
@@ -2834,6 +2845,18 @@ public:
       else if (superclass->isActor())
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
+
+      // Enforce a temporary restriction on inheriting from a superclass
+      // type with a pack, until we figure out the semantics of method
+      // overrides in these situations.
+      if (auto genericSig = superclass->getGenericSignature()) {
+        for (auto paramTy : genericSig.getGenericParams()) {
+          if (paramTy->isParameterPack()) {
+            CD->diagnose(diag::superclass_with_pack);
+            break;
+          }
+        }
+      }
     }
 
     if (CD->isDistributedActor()) {

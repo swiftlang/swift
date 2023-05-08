@@ -30,7 +30,7 @@ func f5<each T>() -> () -> (repeat each T) {}
 
 func f6<each T>() -> (repeat each T) -> () {}
 
-enum E<each T> {
+enum E<each T> { // expected-error {{enums cannot declare a type pack}}
   case f1(_: repeat each T)
 
   case f2(_: G<repeat each T>)
