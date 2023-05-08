@@ -257,8 +257,6 @@ PASS(ExistentialSpecializer, "existential-specializer",
 PASS(SILSkippingChecker, "check-sil-skipping",
      "Utility pass to ensure -experimental-skip-*-function-bodies skip "
      "SIL generation of not-to-be-serialized functions entirely")
-PASS(GlobalOpt, "global-opt",
-     "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Global Property Optimization")
 PASS(MandatoryARCOpts, "mandatory-arc-opts",
