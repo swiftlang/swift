@@ -2,6 +2,9 @@
 
 // REQUIRES: asserts
 
+struct MultiplePack<each T, each U> {} // expected-error {{generic type cannot have more than one pack}}
+typealias MultiplePackAlias<each T, each U> = (repeat each T, repeat each U) // expected-error {{generic type cannot have more than one pack}}
+
 func bindAll() {
   struct Bind<each U> {}
 
