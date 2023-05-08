@@ -207,6 +207,16 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
 
+  void createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const;
+
+  struct StaticInitCloneResult {
+    OptionalBridgedInstruction firstClonedInst;
+    OptionalBridgedValue clonedInitValue;
+  };
+
+  SWIFT_IMPORT_UNSAFE
+  StaticInitCloneResult copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const;
+
   SWIFT_IMPORT_UNSAFE
   BridgedValue getSILUndef(swift::SILType type) const {
     return {swift::SILUndef::get(type, *invocation->getFunction())};

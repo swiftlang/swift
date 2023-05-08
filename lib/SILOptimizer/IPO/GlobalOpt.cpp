@@ -348,7 +348,7 @@ static void replaceLoadsFromGlobal(SILValue addr,
   for (Operand *use : addr->getUses()) {
     SILInstruction *user = use->getUser();
     if (auto *load = dyn_cast<LoadInst>(user)) {
-      SingleValueInstruction *clonedInitVal = cloner.clone(initVal);
+      SingleValueInstruction *clonedInitVal = cast<SingleValueInstruction>(cloner.clone(initVal));
       load->replaceAllUsesWith(clonedInitVal);
       continue;
     }

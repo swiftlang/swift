@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
@@ -1434,6 +1435,21 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
   auto bi = builtin.getAs<BuiltinInst>();
   Optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+void BridgedPassContext::createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const {
+  StaticInitCloner::appendToInitializer(global.getGlobal(), initValue.getAs<SingleValueInstruction>());
+}
+
+BridgedPassContext::StaticInitCloneResult BridgedPassContext::
+copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const {
+  swift::SILBuilder builder(b.insertBefore.getInst(), b.insertAtEnd.getBlock(), b.loc.getScope());
+  StaticInitCloner cloner(builder);
+  if (!cloner.add(initValue.getSILValue())) {
+    return {{nullptr}, {nullptr}};
+  }
+  SILValue result = cloner.clone(initValue.getSILValue());
+  return {{cloner.getFirstClonedInst()->asSILNode()}, {result}};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
