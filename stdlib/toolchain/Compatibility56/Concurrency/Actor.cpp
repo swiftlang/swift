@@ -146,3 +146,21 @@ void swift::adoptTaskVoucher(AsyncTask *task) {
 void swift::restoreTaskVoucher(AsyncTask *task) {
   ExecutorTrackingInfo::current()->restoreVoucher(task);
 }
+
+static swift_once_t voucherDisableCheckOnce;
+static bool vouchersDisabled;
+
+static void _initializeVouchersDisabled(void *ctxt) {
+  if (__builtin_available(macOS 12.1, iOS 15.2, tvOS 15.2, watchOS 8.3, *)) {
+    vouchersDisabled = false;
+  } else {
+    vouchersDisabled = true;
+  }
+}
+
+bool VoucherManager::vouchersAreDisabled() {
+  swift_once(&voucherDisableCheckOnce,
+             &_initializeVouchersDisabled,
+             nullptr);
+  return vouchersDisabled;
+}
