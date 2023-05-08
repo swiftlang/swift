@@ -875,6 +875,16 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       break;
     }
 
+    if (constant.isInitAccessor()) {
+      auto *accessor = cast<AccessorDecl>(constant.getDecl());
+      preEmitFunction(constant, f, accessor);
+      PrettyStackTraceSILFunction X("silgen init accessor", f);
+      f->createProfiler(constant);
+      SILGenFunction(*this, *f, accessor).emitInitAccessor(accessor);
+      postEmitFunction(constant, f);
+      break;
+    }
+
     auto *fd = cast<FuncDecl>(constant.getDecl());
 
     preEmitFunction(constant, f, fd);

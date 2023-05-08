@@ -91,6 +91,9 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
         case AccessorKind::Modify:
           out << "modify";
           break;
+        case AccessorKind::Init:
+          out << "init";
+          break;
         }
 
         out << " for " << ASD->getName();

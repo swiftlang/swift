@@ -955,6 +955,14 @@ public:
         getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
   }
 
+  AssignOrInitInst *createAssignOrInit(SILLocation Loc, SILValue Src,
+                                       SILValue Initializer,
+                                       SILValue Setter,
+                                       AssignOrInitInst::Mode Mode) {
+    return insert(new (getModule()) AssignOrInitInst(
+        getSILDebugLocation(Loc), Src, Initializer, Setter, Mode));
+  }
+
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
                                      SILValue DestAddr) {
     return insert(new (getModule())
@@ -1009,7 +1017,11 @@ public:
                                                          SILValue src) {
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
-  
+  MarkUninitializedInst *createMarkUninitializedOut(SILLocation Loc,
+                                                    SILValue src) {
+    return createMarkUninitialized(Loc, src, MarkUninitializedInst::Out);
+  }
+
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
     return insert(
