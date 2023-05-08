@@ -1,7 +1,5 @@
 // (1) Onone, no evolution
 
-// REQUIRES: rdar_109037144
-//
 // RUN: %empty-directory(%t-onone)
 
 // RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t-onone/class.h -Onone
@@ -53,6 +51,7 @@
 #include <assert.h>
 #include "class.h"
 #include <cstdio>
+#include <utility>
 
 extern "C" size_t swift_retainCount(void * _Nonnull obj);
 
