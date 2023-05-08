@@ -1319,6 +1319,10 @@ def create_argument_parser():
            default=True,
            help='Enable experimental C++ interop.')
 
+    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
+           default=True,
+           help='Ship the <swift/bridging> header for C++ interop')
+
     option('--enable-experimental-distributed', toggle_true,
            default=True,
            help='Enable experimental Swift distributed actors.')
