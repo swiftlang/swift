@@ -1,6 +1,7 @@
 public extension Regular {
   __consuming func shutdownParty() {
-    _forget self // ok; same module
+    // FIXME: rdar://108933330 (cannot define struct deinit with -enable-library-evolution)
+//    _forget self // ok; same module
   }
 }
 

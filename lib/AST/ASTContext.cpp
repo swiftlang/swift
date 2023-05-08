@@ -430,7 +430,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, InOutType*> InOutTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
-    llvm::DenseMap<void *, PlaceholderType *> PlaceholderTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
@@ -3125,27 +3124,8 @@ Type ErrorType::get(Type originalType) {
 
 Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-
-  auto hasTypeVariables = [&]() -> bool {
-    if (originator.is<TypeVariableType *>())
-      return true;
-
-    if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
-      return depTy->hasTypeVariable();
-
-    return false;
-  }();
-  auto arena = hasTypeVariables ? AllocationArena::ConstraintSolver
-                                : AllocationArena::Permanent;
-
-  auto &cache = ctx.getImpl().getArena(arena).PlaceholderTypes;
-  auto &entry = cache[originator.getOpaqueValue()];
-  if (entry)
-    return entry;
-
-  entry = new (ctx, arena)
+  return new (ctx, AllocationArena::Permanent)
       PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
-  return entry;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

@@ -2582,7 +2582,6 @@ bool ContextualFailure::diagnoseAsError() {
     }
     return false;
   }
-
   case ConstraintLocator::UnresolvedMemberChainResult: {
     auto &solution = getSolution();
 
@@ -3513,6 +3512,66 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     break;
   }
   return None;
+}
+
+bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
+  auto locator = getLocator();
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
+  auto fromType = getFromType();
+  auto toType = getToType();
+  assert(fromType);
+  assert(toType);
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
+    return failure.diagnoseAsError();
+  }
+
+  Optional<Diag<Type, Type>> diagnostic;
+
+  bool forProtocol = toType->isConstraintType();
+  auto rawAnchor = getRawAnchor();
+
+  if (isExpr<ArrayExpr>(rawAnchor)) {
+    diagnostic = forProtocol ? diag::cannot_convert_array_element_protocol
+                             : diag::cannot_convert_array_element;
+  } else if (isExpr<DictionaryExpr>(rawAnchor)) {
+    auto lastElem = locator->getLastElementAs<LocatorPathElt::TupleElement>();
+    if (lastElem && lastElem->getIndex() == 0) {
+      diagnostic = forProtocol ? diag::cannot_convert_dict_key_protocol
+                               : diag::cannot_convert_dict_key;
+    } else {
+      diagnostic = forProtocol ? diag::cannot_convert_dict_value_protocol
+                               : diag::cannot_convert_dict_value;
+    }
+  } else if (toType->isAnyObject()) {
+    diagnostic = diag::cannot_convert_initializer_value_anyobject;
+  }
+
+  if (diagnostic.hasValue()) {
+    emitDiagnostic(*diagnostic, fromType, toType);
+    return true;
+  }
+
+  return false;
+}
+
+bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsNote();
+  }
+
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    ArgumentMismatchFailure failure(getSolution(), getFromType(), getToType(),
+                                    getLocator());
+    return failure.diagnoseAsNote();
+  }
+
+  return false;
 }
 
 bool TupleContextualFailure::diagnoseAsError() {

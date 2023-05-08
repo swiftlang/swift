@@ -1087,6 +1087,10 @@ LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 /// A declaration may not require lowering if, for example, it is annotated as
 /// unavailable and optimization settings allow it to be omitted.
 LLVM_LIBRARY_VISIBILITY bool shouldSkipLowering(Decl *D);
+
+/// Returns true if SIL/IR lowering for the given declaration should produce
+/// a stub that traps at runtime because the code ought to be unreachable.
+LLVM_LIBRARY_VISIBILITY bool shouldLowerToUnavailableCodeStub(Decl *D);
 } // namespace Lowering
 
 /// Apply the given function to each ABI member of \c D skipping the members

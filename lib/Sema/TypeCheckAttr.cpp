@@ -2055,50 +2055,9 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
 
   // Verify that the declaration is exposable.
   auto repr = cxx_translation::getDeclRepresentation(VD);
-  if (repr.isUnsupported()) {
-    using namespace cxx_translation;
-    switch (*repr.error) {
-    case UnrepresentableObjC:
-      diagnose(attr->getLocation(), diag::expose_unsupported_objc_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableAsync:
-      diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableIsolatedInActor:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_actor_isolated_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableRequiresClientEmission:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_client_emission_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGeneric:
-      diagnose(attr->getLocation(), diag::expose_generic_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGenericRequirements:
-      diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableThrows:
-      diagnose(attr->getLocation(), diag::expose_throwing_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableIndirectEnum:
-      diagnose(attr->getLocation(), diag::expose_indirect_enum_cxx, VD);
-      break;
-    case UnrepresentableEnumCaseType:
-      diagnose(attr->getLocation(), diag::expose_enum_case_type_to_cxx, VD);
-      break;
-    case UnrepresentableEnumCaseTuple:
-      diagnose(attr->getLocation(), diag::expose_enum_case_tuple_to_cxx, VD);
-      break;
-    }
-  }
+  if (repr.isUnsupported())
+    diagnose(attr->getLocation(),
+             cxx_translation::diagnoseRepresenationError(*repr.error, VD));
 
   // Verify that the name mentioned in the expose
   // attribute matches the supported name pattern.

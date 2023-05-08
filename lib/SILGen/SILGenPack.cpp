@@ -521,6 +521,49 @@ void SILGenFunction::emitPartialDestroyRemainingTuple(SILLocation loc,
   });
 }
 
+void SILGenFunction::copyPackElementsToTuple(SILLocation loc,
+                                             SILValue tupleAddr,
+                                             SILValue pack,
+                                             CanPackType formalPackType) {
+  auto pair = createOpenedElementValueEnvironment(
+    tupleAddr->getType().getTupleElementType(/*componentIndex=*/0));
+  auto elementEnv = pair.first;
+  auto elementTy = pair.second;
+
+  emitDynamicPackLoop(
+    loc, formalPackType, /*componentIndex=*/0, elementEnv,
+    [&](SILValue indexWithinComponent,
+        SILValue packExpansionIndex,
+        SILValue packIndex) {
+      auto packEltAddr = B.createPackElementGet(
+          loc, packIndex, pack, elementTy);
+      auto tupleEltAddr = B.createTuplePackElementAddr(
+          loc, packIndex, tupleAddr, elementTy);
+      B.createCopyAddr(loc, packEltAddr, tupleEltAddr,
+                       IsNotTake, IsInitialization);
+  });
+}
+
+void SILGenFunction::projectTupleElementsToPack(SILLocation loc,
+                                                SILValue tupleAddr,
+                                                SILValue pack,
+                                                CanPackType formalPackType) {
+  auto pair = createOpenedElementValueEnvironment(
+    tupleAddr->getType().getTupleElementType(/*componentIndex=*/0));
+  auto elementEnv = pair.first;
+  auto elementTy = pair.second;
+
+  emitDynamicPackLoop(
+    loc, formalPackType, /*componentIndex=*/0, elementEnv,
+    [&](SILValue indexWithinComponent,
+        SILValue packExpansionIndex,
+        SILValue packIndex) {
+      auto tupleEltAddr = B.createTuplePackElementAddr(
+          loc, packIndex, tupleAddr, elementTy);
+      B.createPackElementSet(loc, tupleEltAddr, packIndex, pack);
+  });
+}
+
 void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
                                          CanPackType formalPackType,
                                          unsigned componentIndex,
