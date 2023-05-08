@@ -3394,7 +3394,8 @@ private:
              isa<SelfApplyExpr>(parents[idx]) || // obj.f(a)
              isa<IdentityExpr>(parents[idx]) || // (f)(a)
              isa<ForceValueExpr>(parents[idx]) || // f!(a)
-             isa<BindOptionalExpr>(parents[idx])); // f?(a)
+             isa<BindOptionalExpr>(parents[idx]) || // f?(a)
+             isa<FunctionConversionExpr>(parents[idx]));
 
     auto *call = dyn_cast<ApplyExpr>(parents[idx]);
     if (!call || call->getFn() != parents[idx+1])
