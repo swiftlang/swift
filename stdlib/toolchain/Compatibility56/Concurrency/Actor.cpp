@@ -8,6 +8,9 @@
 #include "swift/Runtime/Casting.h"
 #include "Runtime/Threading/ThreadLocal.h"
 
+#include <Availability.h>
+#include <TargetConditionals.h>
+
 #include <atomic>
 #include <new>
 
@@ -150,17 +153,38 @@ void swift::restoreTaskVoucher(AsyncTask *task) {
 static swift_once_t voucherDisableCheckOnce;
 static bool vouchersDisabled;
 
+namespace {
+  struct _SwiftNSOperatingSystemVersion{
+    intptr_t majorVersion;
+    intptr_t minorVersion;
+    intptr_t patchVersion;
+  };
+}
+
+extern "C"
+_SwiftNSOperatingSystemVersion
+_swift_stdlib_operatingSystemVersion() __attribute__((const));
+
 static void _initializeVouchersDisabled(void *ctxt) {
-  if (__builtin_available(macOS 12.1, iOS 15.2, tvOS 15.2, watchOS 8.3, *)) {
-    // Concurrency library in the OS in new enough that it has voucher support.
-    vouchersDisabled = false;
-  } else if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
-    // Concurrency library in the OS falls in the range that has no voucher support.
-    vouchersDisabled = true;
-  } else {
-    // Concurrency library is back-deployed on this OS, and has voucher support.
-    vouchersDisabled = false;
-  }
+  auto osVersion = _swift_stdlib_operatingSystemVersion();
+  #if TARGET_OS_WATCH
+  vouchersDisabled = (
+    osVersion.majorVersion == 8 &&
+    osVersion.minorVersion >= 0 && osVersion.minorVersion < 3
+  );
+  #elif TARGET_OS_IPHONE
+  vouchersDisabled = (
+    osVersion.majorVersion == 15 &&
+    osVersion.minorVersion >= 0 && osVersion.minorVersion < 2
+  );
+  #elif TARGET_OS_OSX
+  vouchersDisabled = (
+    osVersion.majorVersion == 12 &&
+    osVersion.minorVersion >= 0 && osVersion.minorVersion < 1
+  );
+  #else
+  vouchersDisabled = false;
+  #endif
 }
 
 bool VoucherManager::vouchersAreDisabled() {
