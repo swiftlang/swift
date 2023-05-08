@@ -73,32 +73,24 @@ public class Instruction : CustomStringConvertible, Hashable {
     return mayTrap || mayWriteToMemory
   }
 
-  final public var mayReadFromMemory: Bool {
+  final public var memoryEffects: SideEffects.Memory {
     switch bridged.getMemBehavior() {
-      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .None:
+      return SideEffects.Memory()
+    case .MayRead:
+      return SideEffects.Memory(read: true)
+    case .MayWrite:
+      return SideEffects.Memory(write: true)
+    case .MayReadWrite, .MayHaveSideEffects:
+      return SideEffects.Memory(read: true, write: true)
+    default:
+      fatalError("invalid memory behavior")
     }
   }
 
-  final public var mayWriteToMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
-
-  final public var mayReadOrWriteMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
+  final public var mayReadFromMemory: Bool { memoryEffects.read }
+  final public var mayWriteToMemory: Bool { memoryEffects.write }
+  final public var mayReadOrWriteMemory: Bool { memoryEffects.read || memoryEffects.write }
 
   public final var mayRelease: Bool {
     return bridged.mayRelease()
