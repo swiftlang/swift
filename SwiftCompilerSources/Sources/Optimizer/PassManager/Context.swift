@@ -283,6 +283,12 @@ extension Instruction {
   }
 }
 
+extension BuiltinInst {
+  func constantFold(_ context: some MutatingContext) -> Value? {
+    context._bridged.constantFoldBuiltin(bridged).value
+  }
+}
+
 extension RefCountingInst {
   func setAtomicity(isAtomic: Bool, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()

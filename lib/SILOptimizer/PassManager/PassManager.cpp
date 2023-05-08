@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -1418,6 +1419,12 @@ void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
 
 bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
   return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
+}
+
+OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
+  auto bi = builtin.getAs<BuiltinInst>();
+  Optional<bool> resultsInError;
+  return {::constantFoldBuiltin(bi, resultsInError)};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {

@@ -203,6 +203,9 @@ struct BridgedPassContext {
   bool tryDeleteDeadClosure(BridgedInstruction closure) const;
 
   SWIFT_IMPORT_UNSAFE
+  OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+
+  SWIFT_IMPORT_UNSAFE
   BridgedValue getSILUndef(swift::SILType type) const {
     return {swift::SILUndef::get(type, *invocation->getFunction())};
   }

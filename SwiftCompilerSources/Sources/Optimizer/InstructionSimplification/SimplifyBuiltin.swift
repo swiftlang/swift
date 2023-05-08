@@ -23,8 +23,9 @@ extension BuiltinInst : OnoneSimplifyable {
       case .IsSameMetatype:
         optimizeIsSameMetatype(context)
       default:
-        // TODO: handle other builtin types
-        break
+        if let literal = constantFold(context) {
+          uses.replaceAll(with: literal, context)
+        }
     }
   }
 }
