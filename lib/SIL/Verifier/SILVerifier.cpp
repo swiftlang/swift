@@ -675,6 +675,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
       case SILInstructionKind::MarkMustCheckInst:
+      case SILInstructionKind::PackElementGetInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -692,6 +693,25 @@ struct ImmutableAddressUseVerifier {
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
         llvm_unreachable("invoking standard assertion failure");
         break;
+      }
+      case SILInstructionKind::TuplePackElementAddrInst: {
+        if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
+              TuplePackElementAddrInst::TupleOperand) == use) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+
+          break;
+        }
+
+        return false;
+      }
+      case SILInstructionKind::PackElementSetInst: {
+        if (&cast<PackElementSetInst>(inst)->getOperandRef(
+              PackElementSetInst::PackOperand) == use)
+          return true;
+
+        return false;
       }
       default:
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
