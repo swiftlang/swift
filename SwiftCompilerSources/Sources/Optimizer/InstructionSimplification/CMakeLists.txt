@@ -18,4 +18,5 @@ swift_compiler_sources(Optimizer
   SimplifyGlobalValue.swift
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
+  SimplifyTupleExtract.swift
   SimplifyUncheckedEnumData.swift)
