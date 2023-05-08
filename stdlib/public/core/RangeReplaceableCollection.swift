@@ -453,11 +453,18 @@ extension RangeReplaceableCollection {
   @inlinable
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
-
-    let approximateCapacity = self.count + newElements.underestimatedCount
-    self.reserveCapacity(approximateCapacity)
-    for element in newElements {
-      append(element)
+    
+    let done:Void? = newElements.withContiguousStorageIfAvailable {
+      _onFastPath()
+      replaceSubrange(endIndex..<endIndex, with: $0)
+    }
+      
+    if done == nil {
+      let approximateCapacity = self.count + newElements.underestimatedCount
+      self.reserveCapacity(approximateCapacity)
+      for element in newElements {
+        append(element)
+      }
     }
   }
 
