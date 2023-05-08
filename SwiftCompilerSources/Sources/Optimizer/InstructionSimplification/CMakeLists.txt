@@ -14,6 +14,7 @@ swift_compiler_sources(Optimizer
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
   SimplifyDebugStep.swift
+  SimplifyDestructure.swift
   SimplifyGlobalValue.swift
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
