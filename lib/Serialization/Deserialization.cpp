@@ -160,8 +160,6 @@ void UnsafeDeserializationError::anchor() {}
 const char ModularizationError::ID = '\0';
 void ModularizationError::anchor() {}
 
-static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error);
-
 /// Skips a single record in the bitstream.
 ///
 /// Destroys the stream position if the next entry is not a record.
@@ -3999,7 +3997,7 @@ public:
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.
         auto unconsumedError =
-          consumeErrorIfXRefNonLoadedModule(subMapOrError.takeError());
+          MF.consumeExpectedError(subMapOrError.takeError());
         if (unconsumedError)
           return std::move(unconsumedError);
       } else {
@@ -7267,13 +7265,16 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
   return suppliedMissingMember;
 }
 
-Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) {
-  llvm::consumeError(std::move(error));
+Decl *
+ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
+  diagnoseAndConsumeError(std::move(error));
   return nullptr;
 }
 
-Decl *handleErrorAndSupplyMissingMember(ASTContext &context, Decl *container,
-                                        llvm::Error &&error) {
+Decl *
+ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
+                                              Decl *container,
+                                              llvm::Error &&error) const {
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
@@ -7347,7 +7348,7 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
-static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
+llvm::Error ModuleFile::consumeExpectedError(llvm::Error &&error) {
     // Missing module errors are most likely caused by an
     // implementation-only import hiding types and decls.
     // rdar://problem/60291019
@@ -7441,7 +7442,7 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
 
     if (!conformance) {
       auto unconsumedError =
-        consumeErrorIfXRefNonLoadedModule(conformance.takeError());
+        consumeExpectedError(conformance.takeError());
       if (unconsumedError) {
         // Ignore if allowing errors, it's just doing a best effort to produce
         // *some* module anyway.

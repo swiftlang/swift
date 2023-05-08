@@ -341,6 +341,12 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
+  Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const;
+
+  Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
+                                          Decl *container,
+                                          llvm::Error &&error) const;
+
 public:
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -404,6 +410,13 @@ public:
     return llvm::consumeError(diagnoseFatal(msg));
   }
 
+  /// Consume errors that are usually safe to ignore because they
+  /// are expected to support language features or caused by project
+  /// misconfigurations.
+  ///
+  /// If the error is handled, success is returned, otherwise the original
+  /// error is returned.
+  llvm::Error consumeExpectedError(llvm::Error &&error);
 
   /// Report an unexpected format error that could happen only from a
   /// memory-level inconsistency. Please prefer passing an error to
