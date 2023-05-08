@@ -210,7 +210,7 @@ PASS(OnonePrespecializations, "onone-prespecializer",
      "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
-PASS(EarlyInliner, "early-inline",
+PASS(EarlyPerfInliner, "early-inline",
      "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
@@ -283,8 +283,6 @@ PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
      "Late Dead Function and Global Elimination")
-PASS(LateInliner, "late-inline",
-     "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",

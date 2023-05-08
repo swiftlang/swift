@@ -360,7 +360,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // Bail out if this is a generic call of a `@_specialize(exported:)` function
   // and we are in the early inliner. We want to give the generic specializer
   // the opportunity to see specialized call sites.
-  if (IsGeneric && WhatToInline == InlineSelection::NoSemanticsAndGlobalInit  &&
+  if (IsGeneric && WhatToInline == InlineSelection::NoSemanticsAndEffects  &&
       Callee->hasPrespecialization()) {
     return false;
   }
@@ -1141,9 +1141,7 @@ class SILPerformanceInlinerPass : public SILFunctionTransform {
 
 public:
   SILPerformanceInlinerPass(InlineSelection WhatToInline, StringRef LevelName):
-    WhatToInline(WhatToInline), PassName(LevelName) {
-    PassName.append(" Performance Inliner");
-  }
+    WhatToInline(WhatToInline), PassName(LevelName) {}
 
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
@@ -1180,24 +1178,19 @@ public:
 
 SILTransform *swift::createAlwaysInlineInliner() {
   return new SILPerformanceInlinerPass(InlineSelection::OnlyInlineAlways,
-                                       "InlineAlways");
+                                       "InlineAlways Performance Inliner");
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @_semantics, @_effects or global_init attributes.
-SILTransform *swift::createEarlyInliner() {
+/// the @_semantics or @_effects attributes.
+SILTransform *swift::createEarlyPerfInliner() {
   return new SILPerformanceInlinerPass(
-    InlineSelection::NoSemanticsAndGlobalInit, "Early");
-}
-
-/// Create an inliner pass that does not inline functions that are marked with
-/// the global_init attribute or have an "availability" semantics attribute.
-SILTransform *swift::createPerfInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit, "Middle");
+    InlineSelection::NoSemanticsAndEffects, "Early Performance Inliner");
 }
 
 /// Create an inliner pass that inlines all functions that are marked with
 /// the @_semantics, @_effects or global_init attributes.
-SILTransform *swift::createLateInliner() {
-  return new SILPerformanceInlinerPass(InlineSelection::Everything, "Late");
+SILTransform *swift::createPerfInliner() {
+  return new SILPerformanceInlinerPass(
+    InlineSelection::Everything, "Performance Inliner");
 }

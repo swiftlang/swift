@@ -485,17 +485,13 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
-    // Does not inline functions with defined semantics.
-    P.addEarlyInliner();
+    // Does not inline functions with defined semantics or effects.
+    P.addEarlyPerfInliner();
     break;
   case OptimizationLevelKind::MidLevel:
-    // Does inline semantics-functions (except "availability"), but not
-    // global-init functions.
-    P.addPerfInliner();
-    break;
   case OptimizationLevelKind::LowLevel:
     // Inlines everything
-    P.addLateInliner();
+    P.addPerfInliner();
     break;
   }
 
