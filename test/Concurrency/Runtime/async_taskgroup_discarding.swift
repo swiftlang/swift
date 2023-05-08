@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-leaks-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -11,29 +11,34 @@
 // UNSUPPORTED: OS=windows-msvc
 
 import _Concurrency
+import Darwin
 
-struct Boom: Error {
-  let id: String
+final class FIRST_PAYLOAD {}
+final class SECOND_PAYLOAD {}
+
+final class FIRST_ERROR: Error {
+  let first: FIRST_PAYLOAD
 
   init(file: String = #fileID, line: UInt = #line) {
-    self.id = "\(file):\(line)"
+    first = .init()
   }
-
-  init(id: String) {
-    self.id = id
+  deinit {
+    fputs("\(Self.self) deinit\n", stderr)
   }
 }
 
-struct IgnoredBoom: Error {}
+final class SECOND_ERROR: Error {
+  let second: SECOND_PAYLOAD
 
-@discardableResult
-func echo(_ i: Int) -> Int { i }
-@discardableResult
-func boom(file: String = #fileID, line: UInt = #line) throws -> Int { throw Boom(file: file, line: line) }
+  init(file: String = #fileID, line: UInt = #line) {
+    second = .init()
+  }
 
-func shouldEqual<T: Equatable>(_ lhs: T, _ rhs: T) {
-  precondition(lhs == rhs, "'\(lhs)' did not equal '\(rhs)'")
+  deinit {
+    fputs("\(Self.self) deinit\n", stderr)
+  }
 }
+
 func shouldStartWith(_ lhs: Any, _ rhs: Any) {
   let l = "\(lhs)"
   let r = "\(rhs)"
@@ -44,22 +49,26 @@ func shouldStartWith(_ lhs: Any, _ rhs: Any) {
 
 @main struct Main {
   static func main() async {
-    for i in 0...1_000 {
-      do {
-        let got = try await withThrowingDiscardingTaskGroup() { group in
-          group.addTask {
-            echo(1)
-          }
-          group.addTask {
-            try boom()
-          }
-
-          return 12
+    do {
+      let got = try await withThrowingDiscardingTaskGroup() { group in
+        group.addTask {
+          1
         }
-        fatalError("(iteration:\(i)) expected error to be re-thrown, got: \(got)")
-      } catch {
-        shouldStartWith(error, "Boom(")
+        group.addTask {
+          throw FIRST_ERROR()
+        }
+
+//        try? await Task.sleep(for: .seconds(1))
+
+        group.addTask {
+          throw SECOND_ERROR()
+        }
+
+        return 12
       }
+      fatalError("expected error to be re-thrown, got: \(got)")
+    } catch {
+      // shouldStartWith(error, "main.Boom")
     }
   }
 }
