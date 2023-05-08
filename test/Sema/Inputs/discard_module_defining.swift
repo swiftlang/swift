@@ -8,7 +8,7 @@ public struct Regular {
 public extension Regular {
   __consuming func endParty() {
     // FIXME: rdar://108933330 (cannot define struct deinit with -enable-library-evolution)
-//    _forget self
+//    discard self
   }
 }
 
@@ -20,6 +20,6 @@ public extension Regular {
 
 public extension Frozen {
   __consuming func endParty() {
-    _forget self
+    discard self
   }
 }

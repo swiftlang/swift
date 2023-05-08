@@ -10,10 +10,10 @@ func invokedDeinit() {}
   deinit {}
 
   // NOTE: we can't pattern match on self since
-  // that would consume it before we can forget self!
+  // that would consume it before we can discard self!
   var test: Int {
     __consuming get {
-      _forget self
+      discard self
       return 0
     }
   }
@@ -42,7 +42,7 @@ func invokedDeinit() {}
 
   __consuming func takeDescriptor() -> Int {
     let id = fd
-    _forget self
+    discard self
     return id
   }
 
@@ -67,14 +67,14 @@ func invokedDeinit() {}
   lazy var popularity: Int = 0
   var right: Float = 0.0
 
-  consuming func tryDestroy(doForget: Bool) throws {
-    if doForget {
-      _forget self
+  consuming func tryDestroy(doDiscard: Bool) throws {
+    if doDiscard {
+      discard self
     }
     throw E.err
   }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test11PointerTreeV10tryDestroy8doForgetySb_tKF : $@convention(method) (Bool, @owned PointerTree) -> @error any Error {
+// CHECK-LABEL: sil hidden [ossa] @$s4test11PointerTreeV10tryDestroy9doDiscardySb_tKF : $@convention(method) (Bool, @owned PointerTree) -> @error any Error {
 // CHECK:   bb0{{.*}}:
 // CHECK:     [[SELF_BOX:%.*]] = alloc_box ${ var PointerTree }, var, name "self"
 // CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF_BOX]] : ${ var PointerTree }, 0
@@ -101,7 +101,7 @@ func invokedDeinit() {}
 
 // After the mandatory passes have run, check for correct deinitializations within the init.
 
-// CHECK-SIL-LABEL: sil hidden @$s4test11PointerTreeV10tryDestroy8doForgetySb_tKF
+// CHECK-SIL-LABEL: sil hidden @$s4test11PointerTreeV10tryDestroy9doDiscardySb_tKF
 // CHECK-SIL:     [[SHOULD_FORGET:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
 // CHECK-SIL:     cond_br [[SHOULD_FORGET]], bb1, bb2
 //
@@ -139,11 +139,11 @@ final class Wallet {
 
   consuming func changeTicket(inWallet wallet: Wallet? = nil) {
     if let existingWallet = wallet {
-      _forget self
+      discard self
       self = .within(existingWallet)
     }
   }
-  // As of now, we allow reinitialization after forget. Not sure if this is intended.
+  // As of now, we allow reinitialization after discard. Not sure if this is intended.
   // CHECK-LABEL: sil hidden [ossa] @$s4test6TicketO06changeB08inWalletyAA0E0CSg_tF : $@convention(method) (@guaranteed Optional<Wallet>, @owned Ticket) -> () {
   // CHECK:    [[SELF_REF:%.*]] = project_box [[SELF_BOX:%.*]] : ${ var Ticket }, 0
   // CHECK:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: [[HAVE_WALLET_BB:bb.*]], case #Optional.none!enumelt: {{.*}}

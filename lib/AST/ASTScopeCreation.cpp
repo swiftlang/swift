@@ -500,9 +500,9 @@ public:
     return p;
   }
 
-  ASTScopeImpl *visitForgetStmt(ForgetStmt *fs, ASTScopeImpl *p,
-                               ScopeCreator &scopeCreator) {
-    visitExpr(fs->getSubExpr(), p, scopeCreator);
+  ASTScopeImpl *visitDiscardStmt(DiscardStmt *ds, ASTScopeImpl *p,
+                                 ScopeCreator &scopeCreator) {
+    visitExpr(ds->getSubExpr(), p, scopeCreator);
     return p;
   }
 
