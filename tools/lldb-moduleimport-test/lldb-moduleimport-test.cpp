@@ -239,6 +239,9 @@ int main(int argc, char **argv) {
   opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
                     cat(Visible));
 
+  opt<std::string> Filter("filter", desc("triple for filtering modules"),
+                          cat(Visible));
+
   opt<std::string> ModuleCachePath(
       "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
@@ -351,9 +354,11 @@ int main(int argc, char **argv) {
     ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
   }
 
+  llvm::Triple filter(Filter);
   for (auto &Module : Modules)
     if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
-                         StringRef(Module.first, Module.second), modules)) {
+                         StringRef(Module.first, Module.second), filter,
+                         modules)) {
       llvm::errs() << "error: Failed to parse AST section!\n";
       return 1;
     }
