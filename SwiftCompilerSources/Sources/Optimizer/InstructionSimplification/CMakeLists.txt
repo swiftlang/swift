@@ -12,6 +12,7 @@ swift_compiler_sources(Optimizer
   SimplifyBranch.swift
   SimplifyBuiltin.swift
   SimplifyCondBranch.swift
+  SimplifyCondFail.swift
   SimplifyGlobalValue.swift
   SimplifyStrongRetainRelease.swift
   SimplifyStructExtract.swift
