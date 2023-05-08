@@ -66,18 +66,16 @@ func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
 func sameElement<each T, U>(t: repeat each T, u: U) where repeat each T: P, repeat each T == U {
 // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   let _: (repeat each T) = (repeat (each t).f(u))
-  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'τ_1_0'}}
+  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'each T'}}
 }
 
 func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     where repeat each C: Collection, repeat (each C).Element == U {
     // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   _ = (repeat (each c).forEach(function))
-  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(each C.Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
@@ -332,6 +330,15 @@ func test_pack_expansions_with_closures() {
     takesVariadicFunction { fn(x, "") } // Ok
     takesVariadicFunction { y in fn(x, y) } // Ok
     takesVariadicFunction { y, z in fn(y, z) } // Ok
+  }
+
+  // rdar://108977234 - invalid error non-pack type instead of missing `Hashable` conformance
+  func testEscapingCapture<each T>(_ t: repeat each T) -> () -> [AnyHashable] {
+    return {
+      var result = [AnyHashable]()
+      repeat result.append(each t) // expected-error {{argument type 'each T' does not conform to expected type 'Hashable'}}
+      return result
+    }
   }
 }
 
