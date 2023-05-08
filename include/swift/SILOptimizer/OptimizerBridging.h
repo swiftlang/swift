@@ -149,6 +149,8 @@ struct BridgedPostDomTree {
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 
+  std::string getModuleDescription() const;
+
   SWIFT_IMPORT_UNSAFE
   BridgedChangeNotificationHandler asNotificationHandler() const {
     return {invocation};

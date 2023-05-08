@@ -1417,6 +1417,14 @@ void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
   }
 }
 
+std::string BridgedPassContext::getModuleDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  invocation->getPassManager()->getModule()->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
 bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
   return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
 }

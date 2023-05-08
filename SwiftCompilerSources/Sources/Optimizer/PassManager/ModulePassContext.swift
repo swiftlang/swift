@@ -18,8 +18,13 @@ import OptimizerBridging
 /// It provides access to all functions, v-tables and witness tables of a module,
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
-struct ModulePassContext : Context {
+struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
+
+  public var description: String {
+    let stdString = _bridged.getModuleDescription()
+    return String(_cxxString: stdString)
+  }
 
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
     private var currentFunction: Function?
