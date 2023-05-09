@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -217,6 +218,8 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
 
+  bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
+
   void createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const;
 
   struct StaticInitCloneResult {
@@ -226,6 +229,8 @@ struct BridgedPassContext {
 
   SWIFT_IMPORT_UNSAFE
   StaticInitCloneResult copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const;
+
+  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
 
   SWIFT_IMPORT_UNSAFE
   BridgedValue getSILUndef(swift::SILType type) const {
@@ -390,9 +395,18 @@ struct BridgedPassContext {
   }
 
   SWIFT_IMPORT_UNSAFE
-  OptionalBridgedFunction loadFunction(llvm::StringRef name) const {
+  OptionalBridgedFunction loadFunction(llvm::StringRef name, bool loadCalleesRecursively) const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return {mod->loadFunction(name, swift::SILModule::LinkingMode::LinkNormal)};
+    return {mod->loadFunction(name, loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
+                                                           : swift::SILModule::LinkingMode::LinkNormal)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    mod->loadFunction(function.getFunction(),
+                      loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
+                                             : swift::SILModule::LinkingMode::LinkNormal);
   }
 
   SWIFT_IMPORT_UNSAFE

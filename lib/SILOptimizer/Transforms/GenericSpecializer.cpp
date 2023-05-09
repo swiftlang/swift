@@ -74,8 +74,9 @@ static void transferSpecializeAttributeTargets(SILModule &M,
     }
   }
 }
+} // end anonymous namespace
 
-static bool specializeAppliesInFunction(SILFunction &F,
+bool swift::specializeAppliesInFunction(SILFunction &F,
                                         SILTransform *transform,
                                         bool isMandatory) {
   SILOptFunctionBuilder FunctionBuilder(*transform);
@@ -171,6 +172,8 @@ static bool specializeAppliesInFunction(SILFunction &F,
 
   return Changed;
 }
+
+namespace {
 
 /// The generic specializer, used in the optimization pipeline.
 class GenericSpecializer : public SILFunctionTransform {
@@ -276,8 +279,8 @@ bool MandatoryGenericSpecializer::optimize(SILFunction *func,
 
   // If this is a just specialized function, try to optimize copy_addr, etc.
   // instructions.
-  if (optimizeMemoryAccesses(*func)) {
-    eliminateDeadAllocations(*func);
+  if (optimizeMemoryAccesses(func)) {
+    eliminateDeadAllocations(func);
     changed = true;
   }
 

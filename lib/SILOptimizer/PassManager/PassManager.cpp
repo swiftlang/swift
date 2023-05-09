@@ -32,6 +32,8 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1453,6 +1455,20 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
   auto bi = builtin.getAs<BuiltinInst>();
   Optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
+  SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
+  InstructionDeleter deleter;
+  SILInliner::inlineFullApply(FullApplySite(apply.getInst()),
+                              mandatoryInline ? SILInliner::InlineKind::MandatoryInline
+                                              : SILInliner::InlineKind::PerformanceInline,
+                              funcBuilder,
+                              deleter);
+}
+
+bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
+  return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }
 
 void BridgedPassContext::createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const {

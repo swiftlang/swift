@@ -109,6 +109,24 @@ extension MutatingContext {
     return nil
   }
 
+  func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
+    let instAfterInling: Instruction?
+    switch apply {
+    case is ApplyInst, is BeginApplyInst:
+      instAfterInling = apply.next
+    case is TryApplyInst:
+      instAfterInling = apply.parentBlock.next?.instructions.first
+    default:
+      instAfterInling = nil
+    }
+
+    _bridged.inlineFunction(apply.bridged, mandatoryInline)
+
+    if let instAfterInling = instAfterInling {
+      notifyNewInstructions(from: apply, to: instAfterInling)
+    }
+  }
+
   /// Copies all instructions of a static init value of a global to the insertion point of `builder`.
   func copyStaticInitializer(fromInitValue: Value, to builder: Builder) -> Value? {
     let range = _bridged.copyStaticInitializer(fromInitValue.bridged, builder.bridged)
@@ -191,10 +209,19 @@ struct FunctionPassContext : MutatingContext {
     return PostDominatorTree(bridged: bridgedPDT)
   }
 
-  func loadFunction(name: StaticString) -> Function? {
+  func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      _bridged.loadFunction(llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
+      let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
+      return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
+  }
+
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
   }
 
   func erase(block: BasicBlock) {
@@ -208,6 +235,31 @@ struct FunctionPassContext : MutatingContext {
 
   fileprivate func notifyEffectsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
+  }
+
+  func optimizeMemoryAccesses(in function: Function) -> Bool {
+    if swift.optimizeMemoryAccesses(function.bridged.getFunction()) {
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
+  }
+
+  func eliminateDeadAllocations(in function: Function) -> Bool {
+    if swift.eliminateDeadAllocations(function.bridged.getFunction()) {
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
+  }
+
+  func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
+    if _bridged.specializeAppliesInFunction(function.bridged, isMandatory) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
   }
 
   /// Copies `initValue` (including all operand instructions, transitively) to the
