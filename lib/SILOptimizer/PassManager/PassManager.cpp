@@ -27,6 +27,8 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -550,6 +552,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   updateSILModuleStatsBeforeTransform(F->getModule(), SFT, *this, NumPassesRun);
 
   CurrentPassHasInvalidated = false;
+  currentPassDependsOnCalleeBodies = false;
   numSubpassesRun = 0;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
@@ -651,7 +654,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                                      duration.count());
 
   // Remember if this pass didn't change anything.
-  if (!CurrentPassHasInvalidated)
+  if (!CurrentPassHasInvalidated && !currentPassDependsOnCalleeBodies)
     completedPasses.set((size_t)SFT->getPassKind());
 
   if (getOptions().VerifyAll &&
@@ -1416,8 +1419,37 @@ void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
   }
 }
 
+std::string BridgedPassContext::getModuleDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  invocation->getPassManager()->getModule()->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return str;
+}
+
 bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
   return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
+}
+
+OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
+  auto bi = builtin.getAs<BuiltinInst>();
+  Optional<bool> resultsInError;
+  return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+void BridgedPassContext::createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const {
+  StaticInitCloner::appendToInitializer(global.getGlobal(), initValue.getAs<SingleValueInstruction>());
+}
+
+BridgedPassContext::StaticInitCloneResult BridgedPassContext::
+copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const {
+  swift::SILBuilder builder(b.insertBefore.getInst(), b.insertAtEnd.getBlock(), b.loc.getScope());
+  StaticInitCloner cloner(builder);
+  if (!cloner.add(initValue.getSILValue())) {
+    return {{nullptr}, {nullptr}};
+  }
+  SILValue result = cloner.clone(initValue.getSILValue());
+  return {{cloner.getFirstClonedInst()->asSILNode()}, {result}};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {

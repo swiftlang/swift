@@ -24,6 +24,23 @@ class C1<T> {
 class C2<T> : C1<T> {
 }
 
+// CHECK-LABEL: sil @constantFoldAdd
+// CHECK:         [[A:%.*]] = integer_literal $Builtin.Int64, 12
+// CHECK:         [[C:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[T:%.*]] = tuple ([[A]] : $Builtin.Int64, [[C]] : $Builtin.Int1)
+// CHECK:         [[R:%.*]] = tuple_extract [[T]] : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'constantFoldAdd'
+sil @constantFoldAdd : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = integer_literal $Builtin.Int64, 2
+  %2 = integer_literal $Builtin.Int1, 1
+  %3 = builtin "sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4 : $Builtin.Int64
+}
+
 // CHECK-LABEL: sil @isConcrete_true
 // CHECK:       bb0(%0 : $@thin Int.Type):
 // CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
@@ -247,3 +264,61 @@ bb0:
   %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
   return %4 : $Builtin.Int1
 }
+
+sil_global hidden [let] @g : $Int32
+
+sil [global_init_once_fn] @side_effect_free_init : $@convention(c) () -> () {
+bb0:
+  %1 = global_addr @g : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil [global_init_once_fn] @init_with_side_effect : $@convention(c) () -> () {
+bb0:
+  alloc_global @g
+  %1 = global_addr @g : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  store %3 to %1 : $*Int32
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil [global_init_once_fn] @unknown_init : $@convention(c) () -> ()
+
+// CHECK-LABEL: sil @remove_builtin_once :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_builtin_once'
+sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @side_effect_free_init : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_builtin_once_side_effect :
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_remove_builtin_once_side_effect'
+sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @init_with_side_effect : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_builtin_once_unknown :
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_remove_builtin_once_unknown'
+sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @unknown_init : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+

@@ -5411,6 +5411,12 @@ ERROR(vararg_not_allowed,none,
 ERROR(experimental_type_with_parameter_pack,none,
       "generic types with parameter packs are experimental",
       ())
+ERROR(more_than_one_pack_in_type,none,
+      "generic type cannot declare more than one type pack", ())
+ERROR(enum_with_pack,none,
+      "enums cannot declare a type pack", ())
+ERROR(superclass_with_pack,none,
+      "cannot inherit from a generic class that declares a type pack", ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument list", (Type))
@@ -5432,7 +5438,7 @@ ERROR(pack_reference_must_be_in_expansion,none,
       "pack reference %0 requires expansion using keyword 'repeat'",
       (TypeRepr*))
 ERROR(pack_type_requires_keyword_each,none,
-      "pack type %0 must be referenced with 'each'",
+      "type pack %0 must be referenced with 'each'",
       (TypeRepr*))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())

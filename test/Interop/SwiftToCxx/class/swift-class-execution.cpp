@@ -51,6 +51,7 @@
 #include <assert.h>
 #include "class.h"
 #include <cstdio>
+#include <utility>
 
 extern "C" size_t swift_retainCount(void * _Nonnull obj);
 

@@ -7,5 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  ReadOnlyGlobalVariables.swift
   StackProtection.swift
 )
