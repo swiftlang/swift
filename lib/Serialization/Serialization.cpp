@@ -6230,7 +6230,12 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       Scratch.push_back(synthesizedFile);
     files = llvm::makeArrayRef(Scratch);
   } else {
-    files = M->getFiles();
+    for (auto file : M->getFiles()) {
+      Scratch.push_back(file);
+      if (auto *synthesizedFile = file->getSynthesizedFile())
+        Scratch.push_back(synthesizedFile);
+    }
+    files = llvm::makeArrayRef(Scratch);
   }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())
