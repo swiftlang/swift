@@ -63,6 +63,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "Cygwin",
   "Haiku",
   "WASI",
+  "Darwin", // All inclusive for all Darwin platforms.
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
@@ -216,6 +217,11 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
+
+  if (Kind == PlatformConditionKind::OS && Value == "Darwin") {
+    // "Darwin" is an alias for all Darwin platforms.
+    return Target.isOSDarwin();
+  }
 
   // When compiling for iOS we consider "macCatalyst" to be a
   // synonym of "macabi". This enables the use of
