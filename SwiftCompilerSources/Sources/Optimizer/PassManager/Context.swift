@@ -71,6 +71,33 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  /// Copies all instructions of a static init value of a global to the insertion point of `builder`.
+  func copyStaticInitializer(fromInitValue: Value, to builder: Builder) -> Value? {
+    let range = _bridged.copyStaticInitializer(fromInitValue.bridged, builder.bridged)
+    guard let result = range.clonedInitValue.value,
+          let firstClonedInst = range.firstClonedInst.instruction else {
+      return nil
+    }
+    let resultInst = result.definingInstruction!
+    notifyNewInstructions(from: firstClonedInst, to: resultInst)
+    notifyInstructionChanged(resultInst)
+    return result
+  }
+
+  private func notifyNewInstructions(from: Instruction, to: Instruction) {
+    var inst = from
+    while inst != to {
+      if !inst.isDeleted {
+        notifyInstructionChanged(inst)
+      }
+      if let next = inst.next {
+        inst = next
+      } else {
+        inst = inst.parentBlock.next!.instructions.first!
+      }
+    }
+  }
+
   func tryDeleteDeadClosure(closure: SingleValueInstruction) -> Bool {
     _bridged.tryDeleteDeadClosure(closure.bridged)
   }
@@ -147,6 +174,12 @@ struct FunctionPassContext : MutatingContext {
 
   fileprivate func notifyEffectsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
+  }
+
+  /// Copies `initValue` (including all operand instructions, transitively) to the
+  /// static init value of `global`.
+  func createStaticInitializer(for global: GlobalVariable, initValue: SingleValueInstruction) {
+    _bridged.createStaticInitializer(global.bridged, initValue.bridged)
   }
 }
 
@@ -280,6 +313,12 @@ extension Instruction {
     context.notifyInstructionsChanged()
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
+  }
+}
+
+extension BuiltinInst {
+  func constantFold(_ context: some MutatingContext) -> Value? {
+    context._bridged.constantFoldBuiltin(bridged).value
   }
 }
 

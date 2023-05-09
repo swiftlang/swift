@@ -73,32 +73,24 @@ public class Instruction : CustomStringConvertible, Hashable {
     return mayTrap || mayWriteToMemory
   }
 
-  final public var mayReadFromMemory: Bool {
+  final public var memoryEffects: SideEffects.Memory {
     switch bridged.getMemBehavior() {
-      case .MayRead, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
+    case .None:
+      return SideEffects.Memory()
+    case .MayRead:
+      return SideEffects.Memory(read: true)
+    case .MayWrite:
+      return SideEffects.Memory(write: true)
+    case .MayReadWrite, .MayHaveSideEffects:
+      return SideEffects.Memory(read: true, write: true)
+    default:
+      fatalError("invalid memory behavior")
     }
   }
 
-  final public var mayWriteToMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
-
-  final public var mayReadOrWriteMemory: Bool {
-    switch bridged.getMemBehavior() {
-      case .MayRead, .MayWrite, .MayReadWrite, .MayHaveSideEffects:
-        return true
-      default:
-        return false
-    }
-  }
+  final public var mayReadFromMemory: Bool { memoryEffects.read }
+  final public var mayWriteToMemory: Bool { memoryEffects.write }
+  final public var mayReadOrWriteMemory: Bool { memoryEffects.read || memoryEffects.write }
 
   public final var mayRelease: Bool {
     return bridged.mayRelease()
@@ -149,7 +141,7 @@ extension BridgedInstruction {
 }
 
 extension OptionalBridgedInstruction {
-  var instruction: Instruction? { obj.getAs(Instruction.self) }
+  public var instruction: Instruction? { obj.getAs(Instruction.self) }
 }
 
 public class SingleValueInstruction : Instruction, Value {
@@ -470,6 +462,12 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
+final public class AllocGlobalInst : Instruction {
+  public var global: GlobalVariable {
+    bridged.AllocGlobalInst_getGlobal().globalVar
+  }
+}
+
 final public class IntegerLiteralInst : SingleValueInstruction {
   public var value: llvm.APInt { bridged.IntegerLiteralInst_getValue() }
 }
@@ -607,6 +605,8 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { bridged.BeginAccessInst_getAccessKind() }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
+
+  public var address: Value { operand.value }
 }
 
 // An instruction that is always paired with a scope ending instruction

@@ -122,6 +122,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// This means that the function terminates the program.
   public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }
 
+  /// True if this is a `[global_init]` function.
+  ///
+  /// Such a function is typically a global addressor which calls the global's
+  /// initializer (`[global_init_once_fn]`) via a `builtin "once"`.
+  public var isGlobalInitFunction: Bool { bridged.isGlobalInitFunction() }
+
+  /// True if this is a `[global_init_once_fn]` function.
+  ///
+  /// Such a function allocates a global and stores the global's init value.
+  /// It's called from a `[global_init]` function via a `builtin "once"`.
+  public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
+
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
     /// No effect attribute is specified.

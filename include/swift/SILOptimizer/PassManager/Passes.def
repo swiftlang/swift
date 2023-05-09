@@ -210,7 +210,7 @@ PASS(OnonePrespecializations, "onone-prespecializer",
      "Pre specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
-PASS(EarlyInliner, "early-inline",
+PASS(EarlyPerfInliner, "early-inline",
      "Early Inlining Preserving Semantic Functions")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
@@ -228,6 +228,8 @@ SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
 SWIFT_FUNCTION_PASS(TestInstructionIteration, "test-instruction-iteration",
      "Tests instruction iteration")
+SWIFT_FUNCTION_PASS(InitializeStaticGlobals, "initialize-static-globals",
+     "Initializes static global variables")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
@@ -255,8 +257,6 @@ PASS(ExistentialSpecializer, "existential-specializer",
 PASS(SILSkippingChecker, "check-sil-skipping",
      "Utility pass to ensure -experimental-skip-*-function-bodies skip "
      "SIL generation of not-to-be-serialized functions entirely")
-PASS(GlobalOpt, "global-opt",
-     "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Global Property Optimization")
 PASS(MandatoryARCOpts, "mandatory-arc-opts",
@@ -283,8 +283,6 @@ PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
      "Late Dead Function and Global Elimination")
-PASS(LateInliner, "late-inline",
-     "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",
      "Loop Canonicalization")
 PASS(LoopInfoPrinter, "loop-info-printer",
@@ -384,6 +382,8 @@ SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
 SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
+SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
+     "Converts read-only var-globals to let-globals")
 SWIFT_MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 SWIFT_FUNCTION_PASS(FunctionStackProtection, "function-stack-protection",

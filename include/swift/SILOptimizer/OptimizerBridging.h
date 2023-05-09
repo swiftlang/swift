@@ -149,6 +149,8 @@ struct BridgedPostDomTree {
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 
+  std::string getModuleDescription() const;
+
   SWIFT_IMPORT_UNSAFE
   BridgedChangeNotificationHandler asNotificationHandler() const {
     return {invocation};
@@ -201,6 +203,19 @@ struct BridgedPassContext {
   }
 
   bool tryDeleteDeadClosure(BridgedInstruction closure) const;
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+
+  void createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const;
+
+  struct StaticInitCloneResult {
+    OptionalBridgedInstruction firstClonedInst;
+    OptionalBridgedValue clonedInitValue;
+  };
+
+  SWIFT_IMPORT_UNSAFE
+  StaticInitCloneResult copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const;
 
   SWIFT_IMPORT_UNSAFE
   BridgedValue getSILUndef(swift::SILType type) const {
@@ -297,6 +312,23 @@ struct BridgedPassContext {
     auto *f = function.getFunction();
     auto nextIter = std::next(f->getIterator());
     if (nextIter == f->getModule().getFunctions().end())
+      return {nullptr};
+    return {&*nextIter};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  OptionalBridgedGlobalVar getFirstGlobalInModule() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    if (mod->getSILGlobals().empty())
+      return {nullptr};
+    return {&*mod->getSILGlobals().begin()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  static OptionalBridgedGlobalVar getNextGlobalInModule(BridgedGlobalVar global) {
+    auto *g = global.getGlobal();
+    auto nextIter = std::next(g->getIterator());
+    if (nextIter == g->getModule().getSILGlobals().end())
       return {nullptr};
     return {&*nextIter};
   }

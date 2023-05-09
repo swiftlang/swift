@@ -61,12 +61,14 @@ private func registerForSILCombine<InstType: SILCombineSimplifyable>(
 
 private func registerSwiftPasses() {
   // Module passes
+  registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
 
   // Function passes
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
+  registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(functionStackProtection, { functionStackProtection.run($0) })
