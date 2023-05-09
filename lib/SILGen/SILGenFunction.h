@@ -366,6 +366,10 @@ public:
   SourceLoc LastSourceLoc;
   using ASTScopeTy = ast_scope::ASTScopeImpl;
   const ASTScopeTy *FnASTScope = nullptr;
+  using VarDeclScopeMapTy =
+      llvm::SmallDenseMap<ValueDecl *, const ASTScopeTy *, 8>;
+  /// The ASTScope each variable declaration belongs to.
+  VarDeclScopeMapTy VarDeclScopeMap;
   /// Caches one SILDebugScope for each ASTScope.
   llvm::SmallDenseMap<std::pair<const ASTScopeTy *, const SILDebugScope *>,
                       const SILDebugScope *, 16>
