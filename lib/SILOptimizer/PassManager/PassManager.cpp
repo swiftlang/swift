@@ -30,6 +30,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -1427,8 +1428,25 @@ std::string BridgedPassContext::getModuleDescription() const {
   return str;
 }
 
-bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
-  return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
+bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
+  auto *pa = closure.getAs<PartialApplyInst>();
+  SILBuilder builder(pa);
+  return ::tryOptimizeApplyOfPartialApply(pa, builder.getBuilderContext(), InstModCallbacks());
+}
+
+bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const {
+  return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks(), needKeepArgsAlive);
+}
+
+BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
+                                                                          bool isMandatory) const {
+  auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
+  auto result = ::tryDevirtualizeApply(ApplySite(apply.getInst()), cha, nullptr, isMandatory);
+  if (result.first) {
+    OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());
+    return {newApply, result.second};
+  }
+  return {{nullptr}, false};
 }
 
 OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {

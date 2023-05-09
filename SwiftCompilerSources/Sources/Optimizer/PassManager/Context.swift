@@ -71,6 +71,44 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
+    if _bridged.tryOptimizeApplyOfPartialApply(closure.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+
+      for use in closure.callee.uses {
+        if use.instruction is FullApplySite {
+          notifyInstructionChanged(use.instruction)
+        }
+      }
+      return true
+    }
+    return false
+  }
+
+  func tryDeleteDeadClosure(closure: SingleValueInstruction, needKeepArgsAlive: Bool = true) -> Bool {
+    if _bridged.tryDeleteDeadClosure(closure.bridged, needKeepArgsAlive) {
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
+  }
+
+  func tryDevirtualize(apply: FullApplySite, isMandatory: Bool) -> ApplySite? {
+    let result = _bridged.tryDevirtualizeApply(apply.bridged, isMandatory)
+    if let newApply = result.newApply.instruction {
+      erase(instruction: apply)
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      if result.cfgChanged {
+        notifyBranchesChanged()
+      }
+      notifyInstructionChanged(newApply)
+      return newApply as! FullApplySite
+    }
+    return nil
+  }
+
   /// Copies all instructions of a static init value of a global to the insertion point of `builder`.
   func copyStaticInitializer(fromInitValue: Value, to builder: Builder) -> Value? {
     let range = _bridged.copyStaticInitializer(fromInitValue.bridged, builder.bridged)
@@ -96,10 +134,6 @@ extension MutatingContext {
         inst = inst.parentBlock.next!.instructions.first!
       }
     }
-  }
-
-  func tryDeleteDeadClosure(closure: SingleValueInstruction) -> Bool {
-    _bridged.tryDeleteDeadClosure(closure.bridged)
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {

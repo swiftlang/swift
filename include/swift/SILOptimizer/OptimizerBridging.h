@@ -202,7 +202,17 @@ struct BridgedPassContext {
     block.getBlock()->eraseFromParent();
   }
 
-  bool tryDeleteDeadClosure(BridgedInstruction closure) const;
+  bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
+
+  bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
+
+  struct DevirtResult {
+    OptionalBridgedInstruction newApply;
+    bool cfgChanged;
+  };
+
+  SWIFT_IMPORT_UNSAFE
+  DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
 
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
