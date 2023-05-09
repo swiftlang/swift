@@ -471,12 +471,12 @@ platform=$([[ $(uname) == Darwin ]] && echo macosx || echo linux)
 
 After setting that variable you can rebuild the compiler incrementally with this command:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-$(platform)-$(uname -m) bin/swift-frontend
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-${platform}-$(uname -m) bin/swift-frontend
 ```
 
 To rebuild everything that has its sources located in the `swift` repository, including the standard library:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-$(platform)-$(uname -m)
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-${platform}-$(uname -m)
 ```
 
 Similarly, you can rebuild other projects like Foundation or Dispatch by substituting their respective subdirectories in the commands above.
