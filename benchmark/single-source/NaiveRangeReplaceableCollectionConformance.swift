@@ -18,7 +18,7 @@ public let benchmarks = [
     BenchmarkInfo(name: "NaiveRRC.append.largeContiguous",
                   runFunction: runAppendLargeContiguous,
                   tags: [.validation, .api],
-                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) }),
+                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 10_000) }),
     BenchmarkInfo(name: "NaiveRRC.append.smallContiguousRepeatedly",
                   runFunction: runAppendLargeContiguous,
                   tags: [.validation, .api],
@@ -26,7 +26,7 @@ public let benchmarks = [
     BenchmarkInfo(name: "NaiveRRC.init.largeContiguous",
                   runFunction: runInitLargeContiguous,
                   tags: [.validation, .api],
-                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) })
+                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 10_000) })
 ]
 
 struct NaiveRRC : RangeReplaceableCollection {
@@ -86,7 +86,7 @@ public func runAppendLargeContiguous(N: Int) {
 public func runAppendSmallContiguousRepeatedly(N: Int) {
   for _ in 1...N {
     var rrc = NaiveRRC()
-    for _ in 1...1_000_000 {
+    for _ in 1...10_000_000 {
       rrc.append(contentsOf: contiguous)
     }
     blackHole(rrc.count + Int(rrc[0]))
