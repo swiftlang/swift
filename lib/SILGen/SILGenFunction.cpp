@@ -32,6 +32,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -201,7 +202,17 @@ const SILDebugScope *SILGenFunction::getScopeOrNull(SILLocation Loc,
   SourceLoc SLoc = Loc.getSourceLoc();
   if (!SF || LastSourceLoc == SLoc)
     return nullptr;
-  return getOrCreateScope(SLoc);
+  // Prime VarDeclScopeMap.
+  auto Scope = getOrCreateScope(SLoc);
+  if (ForMetaInstruction)
+    if (ValueDecl *ValDecl = Loc.getAsASTNode<ValueDecl>()) {
+      // The source location of a VarDecl isn't necessarily in the same scope
+      // that the variable resides in for name lookup purposes.
+      auto ValueScope = VarDeclScopeMap.find(ValDecl);
+      if (ValueScope != VarDeclScopeMap.end())
+        return getOrCreateScope(ValueScope->second, F.getDebugScope());
+    }
+  return Scope;
 }
 
 const SILDebugScope *SILGenFunction::getOrCreateScope(SourceLoc SLoc) {
@@ -378,9 +389,14 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
   if (It != ScopeMap.end())
     return It->second;
 
-  LLVM_DEBUG( ASTScope->print(llvm::errs(), 0, false, false) );
+  LLVM_DEBUG(ASTScope->print(llvm::errs(), 0, false, false));
 
-  SILDebugScope *SILScope = nullptr;
+  auto cache = [&](const SILDebugScope *SILScope) {
+    ScopeMap.insert({{ASTScope, InlinedAt}, SILScope});
+    assert(SILScope->getParentFunction() == &F &&
+           "inlinedAt points to other function");
+    return SILScope;
+  };
 
   // Decide whether to pick a parent scope instead.
   if (ASTScope->ignoreInDebugInfo()) {
@@ -390,11 +406,37 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
     return ParentScope->InlinedCallSite != InlinedAt ? FnScope : ParentScope;
   }
 
+  // Collect all variable declarations in this scope.
+  struct Consumer : public namelookup::AbstractASTScopeDeclConsumer {
+    const ast_scope::ASTScopeImpl *ASTScope;
+    VarDeclScopeMapTy &VarDeclScopeMap;
+    Consumer(const ast_scope::ASTScopeImpl *ASTScope,
+             VarDeclScopeMapTy &VarDeclScopeMap)
+        : ASTScope(ASTScope), VarDeclScopeMap(VarDeclScopeMap) {}
+
+    bool consume(ArrayRef<ValueDecl *> values,
+                 NullablePtr<DeclContext> baseDC) override {
+      for (auto &value : values) {
+        assert(VarDeclScopeMap.count(value) == 0 && "VarDecl appears twice");
+        VarDeclScopeMap.insert({value, ASTScope});
+      }
+      return false;
+    }
+    bool lookInMembers(const DeclContext *) const override { return false; }
+#ifndef NDEBUG
+    void startingNextLookupStep() override {}
+    void finishingLookup(std::string) const override {}
+    bool isTargetLookup() const override { return false; }
+#endif
+  };
+  Consumer consumer(ASTScope, VarDeclScopeMap);
+  ASTScope->lookupLocalsOrMembers(consumer);
+
   // Collapse BraceStmtScopes whose parent is a .*BodyScope.
   if (auto Parent = ASTScope->getParent().getPtrOrNull())
     if (Parent->getSourceRangeOfThisASTNode() ==
         ASTScope->getSourceRangeOfThisASTNode())
-      return getOrCreateScope(Parent, FnScope, InlinedAt);
+      return cache(getOrCreateScope(Parent, FnScope, InlinedAt));
 
   // The calls to defer closures have cleanup source locations pointing to the
   // defer. Reparent them into the current debug scope.
@@ -402,32 +444,30 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
   while (AncestorScope && AncestorScope != FnASTScope &&
          !ScopeMap.count({AncestorScope, InlinedAt})) {
     if (auto *FD = dyn_cast_or_null<FuncDecl>(
-          AncestorScope->getDeclIfAny().getPtrOrNull())) {
+            AncestorScope->getDeclIfAny().getPtrOrNull())) {
       if (cast<DeclContext>(FD) != FunctionDC)
-        return B.getCurrentDebugScope();
+        return cache(B.getCurrentDebugScope());
 
       // This is this function's own scope.
       // If this is the outermost BraceStmt scope, ignore it.
       if (AncestorScope == ASTScope->getParent().getPtrOrNull())
-        return FnScope;
+        return cache(FnScope);
       break;
     }
 
     AncestorScope = AncestorScope->getParent().getPtrOrNull();
   };
 
+  // Create the scope and recursively its parents.  getLookupParent implements a
+  // special case for GuardBlockStmt, which is nested incorrectly.
+  auto *ParentScope = ASTScope->getLookupParent().getPtrOrNull();
   const SILDebugScope *Parent =
-    getOrCreateScope(ASTScope->getParent().getPtrOrNull(), FnScope, InlinedAt);
+      getOrCreateScope(ParentScope, FnScope, InlinedAt);
   SourceLoc SLoc = ASTScope->getSourceRangeOfThisASTNode().Start;
   RegularLocation Loc(SLoc);
-  SILScope = new (SGM.M)
+  auto *SILScope = new (SGM.M)
       SILDebugScope(Loc, FnScope->getParentFunction(), Parent, InlinedAt);
-  ScopeMap.insert({{ASTScope, InlinedAt}, SILScope});
-
-  assert(SILScope->getParentFunction() == &F &&
-         "inlinedAt points to other function");
-
-  return SILScope;
+  return cache(SILScope);
 }
 
 void SILGenFunction::enterDebugScope(SILLocation Loc, bool isBindingScope) {
