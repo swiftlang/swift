@@ -5403,8 +5403,8 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   visit(stmt->getSubExpr());
 }
 
-void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
-  Printer << "_forget" << " ";
+void PrintAST::visitDiscardStmt(DiscardStmt *stmt) {
+  Printer << "discard" << " ";
   visit(stmt->getSubExpr());
 }
 

@@ -9221,7 +9221,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_YieldByValue:
     case CTP_YieldByReference:
     case CTP_ThrowStmt:
-    case CTP_ForgetStmt:
+    case CTP_DiscardStmt:
     case CTP_EnumCaseRawValue:
     case CTP_DefaultParameter:
     case CTP_AutoclosureDefaultParameter:

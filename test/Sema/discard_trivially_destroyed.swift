@@ -27,8 +27,8 @@ struct StructuredGuy: ~Copyable {
   @Appending(terminator: ClassyGal())
   var bestC: [ClassyGal]
 
-  consuming func doForget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'StructuredGuy' if it contains trivially-destroyed stored properties at this time}}
+  consuming func doDiscard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'StructuredGuy' if it contains trivially-destroyed stored properties at this time}}
   deinit {}
 }
 
@@ -38,16 +38,16 @@ struct AppendyEnby: ~Copyable {
   // expected-note@-1 {{type 'Appending<Int>' cannot be trivially destroyed}}
 
 
-  consuming func doForget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'AppendyEnby' if it contains trivially-destroyed stored properties at this time}}
+  consuming func doDiscard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'AppendyEnby' if it contains trivially-destroyed stored properties at this time}}
   deinit {}
 }
 
 struct HasGeneric: ~Copyable {
   var thing: Any // expected-note {{type 'Any' cannot be trivially destroyed}}
 
-  consuming func forget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'HasGeneric' if it contains trivially-destroyed stored properties at this time}}
+  consuming func discard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'HasGeneric' if it contains trivially-destroyed stored properties at this time}}
 
   deinit{}
 }
@@ -56,8 +56,8 @@ struct WrappingNoncopyable: ~Copyable {
   var computed: String { "mine" }
 
   var x: AppendyEnby // expected-note{{type 'AppendyEnby' cannot be trivially destroyed}}
-  consuming func doForget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'WrappingNoncopyable' if it contains trivially-destroyed stored properties at this time}}
+  consuming func doDiscard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'WrappingNoncopyable' if it contains trivially-destroyed stored properties at this time}}
   deinit {}
 }
 
@@ -65,8 +65,8 @@ struct LazyGuy: ~Copyable {
   lazy var thing: String = "asdf"
   // expected-note@-1 {{type 'String?' cannot be trivially destroyed}}
 
-  consuming func doForget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'LazyGuy' if it contains trivially-destroyed stored properties at this time}}
+  consuming func doDiscard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'LazyGuy' if it contains trivially-destroyed stored properties at this time}}
   deinit {}
 }
 
@@ -83,8 +83,8 @@ struct Boring {
 // FIXME: Despite not having a deinit, the noncopyable struct isn't considered trivial?
 struct ContainsBoring: ~Copyable {
   let z: BoringNoncopyable // expected-note {{type 'BoringNoncopyable' cannot be trivially destroyed}}
-  consuming func forget() { _forget self }
-  // expected-error@-1 {{can only 'forget' type 'ContainsBoring' if it contains trivially-destroyed stored properties at this time}}
+  consuming func discard() { discard self }
+  // expected-error@-1 {{can only 'discard' type 'ContainsBoring' if it contains trivially-destroyed stored properties at this time}}
   deinit {}
 }
 
@@ -95,6 +95,6 @@ struct AllOK: ~Copyable {
   var location: Boring = Boring()
   var unsafePtr: UnsafePointer<Int>
 
-  consuming func doForget() { _forget self }
+  consuming func doDiscard() { discard self }
   deinit {}
 }
