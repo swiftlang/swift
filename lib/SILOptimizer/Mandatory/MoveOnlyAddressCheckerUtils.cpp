@@ -433,7 +433,7 @@ static bool memInstMustConsume(Operand *memOper) {
       return false;
     ApplySite applySite(pai);
     auto convention = applySite.getArgumentConvention(*memOper);
-    return convention.isInoutConvention();
+    return !convention.isInoutConvention();
   }
   case SILInstructionKind::DestroyAddrInst:
     return true;
@@ -1802,8 +1802,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   }
 
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
-    if (pas->isOnStack()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply!\n");
+    if (pas->isOnStack() ||
+        ApplySite(pas).getArgumentConvention(*op).isInoutConvention()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
       // On-stack partial applications and their final consumes are always a
       // liveness use of their captures.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
