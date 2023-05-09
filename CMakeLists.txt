@@ -202,6 +202,10 @@ set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
 # This is primarily to support building smaller or faster project files.
 #
 
+# Subsequent options may refer to `StdlibOptions`, which have to be defined first.
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/stdlib/cmake/modules)
+include(StdlibOptions)
+
 option(SWIFT_APPEND_VC_REV
   "Embed the version control system revision in Swift"
   TRUE)
