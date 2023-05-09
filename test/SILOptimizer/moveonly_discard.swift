@@ -9,14 +9,14 @@ struct GoodFileDescriptor {
   var rawFileDescriptor: Int {
     __consuming get {
       let x = _fd
-      _forget self
+      discard self
       return x
     }
   }
 
   __consuming func close() {
     posix_close(_fd)
-    _forget self
+    discard self
   }
 
   deinit { // expected-error {{'self' consumed more than once}}
@@ -33,7 +33,7 @@ struct BadFileDescriptor {
 
   var rawFileDescriptor: Int {
     __consuming get { // expected-error {{'self' consumed more than once}}
-      _forget self    // expected-note {{consuming use here}}
+      discard self    // expected-note {{consuming use here}}
       return self.rawFileDescriptor  // expected-note {{consuming use here}}
                                      // expected-warning@-1 {{function call causes an infinite recursion}}
     }
@@ -41,7 +41,7 @@ struct BadFileDescriptor {
 
   __consuming func closeBoring(_ b: Bool) -> Int { // expected-error {{'self' consumed more than once}}
     if b {
-      _forget self // expected-note {{consuming use here}}
+      discard self // expected-note {{consuming use here}}
     }
     return rawFileDescriptor // expected-note {{consuming use here}}
   }
@@ -49,7 +49,7 @@ struct BadFileDescriptor {
   __consuming func closeRepeatedly(_ n: Int) -> Int { // expected-error {{'self' used after consume}}
     for _ in 0..<n {
       posix_close(_fd) // expected-note {{non-consuming use here}}
-      _forget self     // expected-note {{consuming use here}}
+      discard self     // expected-note {{consuming use here}}
     }
     return 0
   }
@@ -66,27 +66,27 @@ final class Wallet {
   case pagedOut(GoodFileDescriptor)
   case within(Wallet)
 
-  consuming func forget() { _forget self }
+  consuming func discard() { discard self }
 
   init(inWallet wallet: Wallet? = nil) { // expected-error {{'self' consumed more than once}}
     self = .within(Wallet())
     if let existingWallet = wallet {
-      forget()
+      discard()
       self = .within(existingWallet)
     }
-    forget(forever: true) // expected-note {{consuming use here}}
+    discard(forever: true) // expected-note {{consuming use here}}
   } // expected-note {{consuming use here}}
 
-  __consuming func forget(forever: Bool) { // expected-error {{'self' consumed by a use in a loop}}
+  __consuming func discard(forever: Bool) { // expected-error {{'self' consumed by a use in a loop}}
     while forever {
-      _forget self // expected-note {{consuming use here}}
+      discard self // expected-note {{consuming use here}}
     }
   }
 
   __consuming func inspect() { // expected-error {{'self' consumed more than once}}
     switch self { // expected-note {{consuming use here}}
     case .green, .yellow, .red:
-      _forget self // expected-note {{consuming use here}}
+      discard self // expected-note {{consuming use here}}
     default:
       return
     }

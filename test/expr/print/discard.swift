@@ -3,7 +3,7 @@
 @_moveOnly
 struct S {
   __consuming func c() {
-    _forget self
+    discard self
   }
 
   deinit {}
@@ -11,5 +11,5 @@ struct S {
 
 // CHECK: @_moveOnly internal struct S {
 // CHECK:   internal __consuming func c() {
-// CHECK:     _forget self
+// CHECK:     discard self
 // CHECK:   }

@@ -1655,10 +1655,10 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
-Stmt *Traversal::visitForgetStmt(ForgetStmt *FS) {
-  if (Expr *E = doIt(FS->getSubExpr())) {
-    FS->setSubExpr(E);
-    return FS;
+Stmt *Traversal::visitDiscardStmt(DiscardStmt *DS) {
+  if (Expr *E = doIt(DS->getSubExpr())) {
+    DS->setSubExpr(E);
+    return DS;
   }
   return nullptr;
 }
