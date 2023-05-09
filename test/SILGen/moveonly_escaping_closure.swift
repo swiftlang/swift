@@ -607,10 +607,8 @@ func testConsumingEscapeClosureCaptureLet(_ f: consuming @escaping () -> ()) {
 // CHECK: } // end sil function '$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzFyycfU_'
 var globalClosureCaptureInOut: () -> () = {}
 func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
-    // expected-error @-1 {{'x' consumed but not reinitialized before end of function}}
-    // expected-note @-2 {{'x' is declared 'inout'}}
+    // expected-note @-1 {{'x' is declared 'inout'}}
     globalClosureCaptureInOut = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
-        // expected-note @-1 {{consuming use here}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -652,9 +650,7 @@ func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzFyycfU_'
 func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{'x' consumed but not reinitialized before end of function}}
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
-        // expected-note @-1 {{consuming use here}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -700,10 +696,8 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK:   apply {{%.*}}([[LOADED_READ]], [[LOADED_TAKE]])
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_'
 func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
-    // expected-error @-1 {{'x' consumed but not reinitialized before end of function}}
-    // expected-note @-2 {{'x' is declared 'inout'}}
-    var f = { // expected-note {{consuming use here}}
-        // expected-error @-1 {{escaping closure captures 'inout' parameter 'x'}}
+    // expected-note @-1 {{'x' is declared 'inout'}}
+    var f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -750,10 +744,8 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK:   apply {{%.*}}([[LOADED_READ]], [[LOADED_TAKE]])
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_'
 func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) {
-    // expected-error @-1 {{'x' consumed but not reinitialized before end of function}}
-    // expected-note @-2 {{'x' is declared 'inout'}}
+    // expected-note @-1 {{'x' is declared 'inout'}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
-        // expected-note @-1 {{consuming use here}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -805,9 +797,7 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_'
 func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{'x' consumed but not reinitialized before end of function}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
-        // expected-note @-1 {{consuming use here}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
