@@ -2,7 +2,10 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/ModuleWithEquatable.swiftmodule %s -DMODULE_EXPORTING_TYPE -module-name ModuleWithEquatable -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/ModuleWithEquatable.swiftmodule %s -DMODULE_EXPORTING_TYPE -module-name ModuleWithEquatable -load-plugin-library %t/%target-library-name(MacroDefinition) -emit-module-interface-path %t/ModuleWithEquatable.swiftinterface
+
+// Check the generated .swiftinterface
+// RUN: %FileCheck -check-prefix INTERFACE %s < %t/ModuleWithEquatable.swiftinterface
 
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
@@ -22,6 +25,9 @@ macro Hashable() = #externalMacro(module: "MacroDefinition", type: "HashableMacr
 public struct PublicEquatable {
   public init() { }
 }
+
+// INTERFACE: public struct PublicEquatable
+// INTERFACE: extension ModuleWithEquatable.PublicEquatable : Swift.Equatable
 
 #else
 import ModuleWithEquatable
