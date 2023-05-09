@@ -120,7 +120,7 @@ extension UnownedJob: CustomStringConvertible {
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.9, *)
 @available(*, deprecated, renamed: "ExecutorJob")
 @frozen
 @_moveOnly
