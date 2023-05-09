@@ -431,6 +431,17 @@ struct BridgedPassContext {
     return mod->getOptions().EnableMoveInoutStackProtection;
   }
 
+  enum class AssertConfiguration {
+    Debug = swift::SILOptions::Debug,
+    Release = swift::SILOptions::Release,
+    Unchecked = swift::SILOptions::Unchecked
+  };
+
+  AssertConfiguration getAssertConfiguration() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return (AssertConfiguration)mod->getOptions().AssertConfig;
+  }
+
   bool enableSimplificationFor(BridgedInstruction inst) const;
 };
 

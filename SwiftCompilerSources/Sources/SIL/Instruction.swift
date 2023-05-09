@@ -365,6 +365,10 @@ final public class BuiltinInst : SingleValueInstruction {
   public var id: ID {
     return bridged.BuiltinInst_getID()
   }
+
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
+  }
 }
 
 final public class UpcastInst : SingleValueInstruction, UnaryInstruction {

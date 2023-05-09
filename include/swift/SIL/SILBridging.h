@@ -237,6 +237,10 @@ struct BridgedFunction {
     return getFunction()->isAvailableExternally();
   }
 
+  bool isTransparent() const {
+    return getFunction()->isTransparent() == swift::IsTransparent;
+  }
+
   bool isGlobalInitFunction() const {
     return getFunction()->isGlobalInit();
   }
@@ -251,6 +255,20 @@ struct BridgedFunction {
 
   swift::EffectsKind getEffectAttribute() const {
     return getFunction()->getEffectsKind();
+  }
+
+  swift::PerformanceConstraints getPerformanceConstraints() const {
+    return getFunction()->getPerfConstraints();
+  }
+
+  enum class InlineStrategy {
+    InlineDefault = swift::InlineDefault,
+    NoInline = swift::NoInline,
+    AlwaysInline = swift::AlwaysInline
+  };
+
+  InlineStrategy getInlineStrategy() const {
+    return (InlineStrategy)getFunction()->getInlineStrategy();
   }
 
   bool needsStackProtection() const {
@@ -364,6 +382,25 @@ struct OptionalBridgedInstruction {
   }
 };
 
+struct BridgedTypeArray {
+  llvm::ArrayRef<swift::Type> typeArray;
+
+  SWIFT_IMPORT_UNSAFE
+  static BridgedTypeArray fromReplacementTypes(swift::SubstitutionMap substMap) {
+    return {substMap.getReplacementTypes()};
+  }
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.size()); }
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SILType getAt(SwiftInt index) const {
+    auto ty = swift::CanType(typeArray[index]);
+    if (ty->isLegalSILType())
+      return swift::SILType::getPrimitiveObjectType(ty);
+    return swift::SILType();
+  }
+};
+
 struct BridgedInstruction {
   SwiftObject obj;
 
@@ -456,6 +493,12 @@ struct BridgedInstruction {
   swift::BuiltinValueKind BuiltinInst_getID() const {
     return getAs<swift::BuiltinInst>()->getBuiltinInfo().ID;
   }
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SubstitutionMap BuiltinInst_getSubstitutionMap() const {
+    return getAs<swift::BuiltinInst>()->getSubstitutions();
+  }
+
 
   bool AddressToPointerInst_needsStackProtection() const {
     return getAs<swift::AddressToPointerInst>()->needsStackProtection();

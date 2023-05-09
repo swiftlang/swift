@@ -43,6 +43,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
 
+  public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
+
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
     NominalTypeDecl(bridged: BridgedNominalTypeDecl(decl: bridged.getNominalOrBoundGenericNominal()))
@@ -82,6 +84,26 @@ extension Type: Equatable {
   }
 }
 
+public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
+  private let bridged: BridgedTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type? {
+    bridged.getAt(index).typeOrNil
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0 ?? "<invalid>") }
+    return Mirror(self, children: c)
+  }
+}
+
 public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
   fileprivate let function: Function
@@ -118,6 +140,7 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
 extension swift.SILType {
   var type: Type { Type(bridged: self) }
+  var typeOrNil: Type? { isNull() ? nil : type }
 }
 
 // TODO: use an AST type for this once we have it
