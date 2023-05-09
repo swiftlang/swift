@@ -548,8 +548,7 @@ static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
                                        ASTPrinter &Printer,
                                        const PrintOptions &Options) {
   assert(!Attrs.empty());
-  // TODO: Print `@backDeployed` in swiftinterfaces (rdar://104920183)
-  Printer << "@_backDeploy(before: ";
+  Printer << "@backDeployed(before: ";
   bool isFirst = true;
 
   for (auto *DA : Attrs) {
@@ -1344,8 +1343,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_BackDeployed: {
-    // TODO: Print `@backDeployed` in swiftinterfaces (rdar://104920183)
-    Printer.printAttrName("@_backDeploy");
+    Printer.printAttrName("@backDeployed");
     Printer << "(before: ";
     auto Attr = cast<BackDeployedAttr>(this);
     Printer << platformString(Attr->Platform) << " " <<

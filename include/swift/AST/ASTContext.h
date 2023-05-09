@@ -970,6 +970,9 @@ public:
   /// Swift compiler for future versions of the target platform.
   AvailabilityContext getSwiftFutureAvailability();
 
+  /// Returns `true` if versioned availability annotations are supported for the
+  /// target triple.
+  bool supportsVersionedAvailability() const;
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions

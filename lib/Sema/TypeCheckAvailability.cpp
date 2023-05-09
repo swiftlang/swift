@@ -3394,7 +3394,8 @@ private:
              isa<SelfApplyExpr>(parents[idx]) || // obj.f(a)
              isa<IdentityExpr>(parents[idx]) || // (f)(a)
              isa<ForceValueExpr>(parents[idx]) || // f!(a)
-             isa<BindOptionalExpr>(parents[idx])); // f?(a)
+             isa<BindOptionalExpr>(parents[idx]) || // f?(a)
+             isa<FunctionConversionExpr>(parents[idx]));
 
     auto *call = dyn_cast<ApplyExpr>(parents[idx]);
     if (!call || call->getFn() != parents[idx+1])
@@ -4260,6 +4261,13 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
 /// Should we warn that \p decl needs an explicit availability annotation
 /// in -require-explicit-availability mode?
 static bool declNeedsExplicitAvailability(const Decl *decl) {
+  auto &ctx = decl->getASTContext();
+
+  // Don't require an introduced version on platforms that don't support
+  // versioned availability.
+  if (!ctx.supportsVersionedAvailability())
+    return false;
+
   // Skip non-public decls.
   if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
     AccessScope scope =
@@ -4280,7 +4288,6 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
     return false;
 
   // Warn on decls without an introduction version.
-  auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
   return !safeRangeUnderApprox.getOSVersion().hasLowerEndpoint();
 }
@@ -4288,9 +4295,9 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
 void swift::checkExplicitAvailability(Decl *decl) {
   // Skip if the command line option was not set and
   // accessors as we check the pattern binding decl instead.
-  auto DiagLevel = decl->getASTContext().LangOpts.RequireExplicitAvailability;
-  if (!DiagLevel ||
-      isa<AccessorDecl>(decl))
+  auto &ctx = decl->getASTContext();
+  auto DiagLevel = ctx.LangOpts.RequireExplicitAvailability;
+  if (!DiagLevel || isa<AccessorDecl>(decl))
     return;
 
   // Only look at decls at module level or in extensions.
@@ -4335,8 +4342,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
     diag.limitBehavior(*DiagLevel);
 
-    auto suggestPlatform =
-      decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
+    auto suggestPlatform = ctx.LangOpts.RequireExplicitAvailabilityTarget;
     if (!suggestPlatform.empty()) {
       auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
       if (InsertLoc.isInvalid())
@@ -4349,7 +4355,6 @@ void swift::checkExplicitAvailability(Decl *decl) {
       {
          llvm::raw_string_ostream Out(AttrText);
 
-         auto &ctx = decl->getASTContext();
          StringRef OriginalIndent = Lexer::getIndentationForLine(
            ctx.SourceMgr, InsertLoc);
          Out << "@available(" << suggestPlatform << ", *)\n"
