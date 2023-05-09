@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
@@ -121,6 +122,11 @@ public:
 
         Type GP = typeVar->getImpl().getGenericParameter();
         return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
+      }
+
+      if (type->hasElementArchetype()) {
+        auto *env = getDC()->getGenericEnvironmentOfContext();
+        return env->mapElementTypeIntoPackContext(type);
       }
 
       if (auto *packType = type->getAs<PackType>()) {
