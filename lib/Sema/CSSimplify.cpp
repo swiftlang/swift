@@ -15155,8 +15155,8 @@ void ConstraintSystem::addContextualConversionConstraint(
     constraintKind = ConstraintKind::Bind;
     break;
 
-  case CTP_ForgetStmt:
-    // For the 'forget X', we always expect the contextual type to be
+  case CTP_DiscardStmt:
+    // For the 'discard X', we always expect the contextual type to be
     // equal to the type of 'self'.
     constraintKind = ConstraintKind::Equal;
     break;
