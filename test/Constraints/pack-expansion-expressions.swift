@@ -103,28 +103,28 @@ func returnEachPackReference<each T>(_ t: repeat each T) -> each T { // expected
   fatalError()
 }
 
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{63-63=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{63-63=each }}
 func returnRepeatTuple<each T>(_ t: repeat each T) -> (repeat T) {
   fatalError()
 }
 
 // expected-error@+2 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{55-55=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{55-55=each }}
 func parameterAsPackTypeWithoutExpansion<each T>(_ t: T) {
 }
 
 // expected-error@+2 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-// expected-error@+1 {{pack type 'T' must be referenced with 'each'}}{{57-57=each }}
+// expected-error@+1 {{type pack 'T' must be referenced with 'each'}}{{57-57=each }}
 func returnPackReference<each T>(_ t: repeat each T) -> T {
   fatalError()
 }
 
 func packTypeParameterOutsidePackExpansionType<each T>(_ t: T,
   // expected-error@-1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-  // expected-error@-2 {{pack type 'T' must be referenced with 'each'}}{{61-61=each }}
+  // expected-error@-2 {{type pack 'T' must be referenced with 'each'}}{{61-61=each }}
                                                        _ a: Array<T>) {
   // expected-error@-1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
-  // expected-error@-2 {{pack type 'T' must be referenced with 'each'}}{{67-67=each }}
+  // expected-error@-2 {{type pack 'T' must be referenced with 'each'}}{{67-67=each }}
 }
 
 func expansionOfNonPackType<T>(_ t: repeat each T) {}
