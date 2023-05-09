@@ -68,6 +68,7 @@ class MemBehaviorDumper : public SILModuleTransform {
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
+    case SILInstructionKind::BuiltinInst:
       return true;
     default:
       return false;

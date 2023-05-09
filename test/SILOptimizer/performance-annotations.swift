@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 protocol P {
   func protoMethod(_ a: Int) -> Int

@@ -95,6 +95,7 @@ public func registerSILClasses() {
   register(PreviousDynamicFunctionRefInst.self)
   register(GlobalAddrInst.self)
   register(GlobalValueInst.self)
+  register(AllocGlobalInst.self)
   register(IntegerLiteralInst.self)
   register(StringLiteralInst.self)
   register(TupleInst.self)

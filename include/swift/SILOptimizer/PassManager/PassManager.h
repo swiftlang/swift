@@ -203,6 +203,8 @@ class SILPassManager {
   /// Set to true when a pass invalidates an analysis.
   bool CurrentPassHasInvalidated = false;
 
+  bool currentPassDependsOnCalleeBodies = false;
+
   /// True if we need to stop running passes and restart again on the
   /// same function.
   bool RestartPipeline = false;
@@ -335,6 +337,10 @@ public:
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();
+  }
+
+  void setDependingOnCalleeBodies() {
+    currentPassDependsOnCalleeBodies = true;
   }
 
   /// Reset the state of the pass manager and remove all transformation

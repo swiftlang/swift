@@ -25,7 +25,7 @@ public struct CalleeAnalysis {
       // getMemBehaviorFn
       { (bridgedApply: BridgedInstruction, observeRetains: Bool, bca: BridgedCalleeAnalysis) -> swift.MemoryBehavior in
         let apply = bridgedApply.instruction as! ApplySite
-        let e = bca.analysis.getSideEffects(of: apply)
+        let e = bca.analysis.getSideEffects(ofApply: apply)
         return e.getMemBehavior(observeRetains: observeRetains)
       }
     )
@@ -60,8 +60,12 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the global (i.e. not argument specific) side effects of an apply.
-  public func getSideEffects(of apply: ApplySite) -> SideEffects.GlobalEffects {
-    guard let callees = getCallees(callee: apply.callee) else {
+  public func getSideEffects(ofApply apply: ApplySite) -> SideEffects.GlobalEffects {
+    return getSideEffects(ofCallee: apply.callee)
+  }
+
+  public func getSideEffects(ofCallee callee: Value) -> SideEffects.GlobalEffects {
+    guard let callees = getCallees(callee: callee) else {
       return .worstEffects
     }
 

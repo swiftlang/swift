@@ -34,6 +34,7 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 struct BridgedInstruction;
+struct OptionalBridgedInstruction;
 struct OptionalBridgedOperand;
 struct OptionalBridgedSuccessor;
 struct BridgedBasicBlock;
@@ -236,6 +237,14 @@ struct BridgedFunction {
     return getFunction()->isAvailableExternally();
   }
 
+  bool isGlobalInitFunction() const {
+    return getFunction()->isGlobalInit();
+  }
+
+  bool isGlobalInitOnceFunction() const {
+    return getFunction()->isGlobalInitOnceFunction();
+  }
+
   bool hasSemanticsAttr(llvm::StringRef attrName) const {
     return getFunction()->hasSemanticsAttr(attrName) ? 1 : 0;
   }
@@ -307,6 +316,23 @@ struct BridgedGlobalVar {
   llvm::StringRef getName() const { return getGlobal()->getName(); }
 
   bool isLet() const { return getGlobal()->isLet(); }
+
+  void setLet(bool value) const { getGlobal()->setLet(value); }
+
+  bool isPossiblyUsedExternally() const {
+    return getGlobal()->isPossiblyUsedExternally();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  inline OptionalBridgedInstruction getStaticInitializerValue() const;
+
+  bool canBeInitializedStatically() const;
+
+  static inline bool isValidStaticInitializer(BridgedInstruction inst);
+};
+
+struct OptionalBridgedGlobalVar {
+  OptionalSwiftObject obj;
 };
 
 struct BridgedMultiValueResult {
@@ -442,6 +468,11 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE
   BridgedGlobalVar GlobalAccessInst_getGlobal() const {
     return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedGlobalVar AllocGlobalInst_getGlobal() const {
+    return {getAs<swift::AllocGlobalInst>()->getReferencedGlobal()};
   }
 
   SWIFT_IMPORT_UNSAFE
@@ -1098,6 +1129,18 @@ OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
 
 OptionalBridgedBasicBlock BridgedFunction::getLastBlock() const {
   return {getFunction()->empty() ? nullptr : &*getFunction()->rbegin()};
+}
+
+OptionalBridgedInstruction BridgedGlobalVar::getStaticInitializerValue() const {
+  if (swift::SILInstruction *inst = getGlobal()->getStaticInitializerValue()) {
+    return {inst->asSILNode()};
+  }
+  return {nullptr};
+}
+
+bool BridgedGlobalVar::isValidStaticInitializer(BridgedInstruction inst) {
+  swift::SILInstruction *i = inst.getInst();
+  return swift::SILGlobalVariable::isValidStaticInitializerInst(i, i->getModule());
 }
 
 BridgedInstruction BridgedMultiValueResult::getParent() const {
