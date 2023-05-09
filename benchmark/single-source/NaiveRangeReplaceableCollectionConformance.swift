@@ -12,21 +12,21 @@
 
 import TestsUtils
 
-var contiguous:[UInt8]?
+var contiguous:[UInt8] = []
 
 public let benchmarks = [
-  BenchmarkInfo(name: "NaiveRRC.append.largeContiguous",
-                runFunction: runAppendLargeContiguous,
-                setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) },
-                tags: [.validation, .api]),
-  BenchmarkInfo(name: "NaiveRRC.append.smallContiguousRepeatedly",
-                runFunction: runAppendLargeContiguous,
-                setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1) },
-                tags: [.validation, .api]),
-  BenchmarkInfo(name: "NaiveRRC.init.largeContiguous",
-                runFunction: runInitContiguous,
-                setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) },
-                tags: [.validation, .api]),
+    BenchmarkInfo(name: "NaiveRRC.append.largeContiguous",
+                  runFunction: runAppendLargeContiguous,
+                  tags: [.validation, .api],
+                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) }),
+    BenchmarkInfo(name: "NaiveRRC.append.smallContiguousRepeatedly",
+                  runFunction: runAppendLargeContiguous,
+                  tags: [.validation, .api],
+                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1) }),
+    BenchmarkInfo(name: "NaiveRRC.init.largeContiguous",
+                  runFunction: runInitLargeContiguous,
+                  tags: [.validation, .api],
+                  setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000_000) })
 ]
 
 struct NaiveRRC : RangeReplaceableCollection {
@@ -78,7 +78,7 @@ public func runAppendLargeContiguous(N: Int) {
   for _ in 1...N {
     var rrc = NaiveRRC()
     rrc.append(contentsOf: contiguous)
-    blackHole(rrc.count + rrc.last)
+    blackHole(rrc.count + rrc[0])
   }
 }
 
@@ -89,7 +89,7 @@ public func runAppendSmallContiguousRepeatedly(N: Int) {
     for _ in 1...1_000_000 {
       rrc.append(contentsOf: contiguous)
     }
-    blackHole(rrc.count + rrc.last)
+    blackHole(rrc.count + rrc[0])
   }
 }
 
@@ -97,6 +97,6 @@ public func runAppendSmallContiguousRepeatedly(N: Int) {
 public func runInitLargeContiguous(N: Int) {
   for _ in 1...N {
     var rrc = NaiveRRC(contiguous)
-    blackHole(rrc.count + rrc.last)
+    blackHole(rrc.count + rrc[0])
   }
 }
