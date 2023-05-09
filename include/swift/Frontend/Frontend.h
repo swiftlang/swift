@@ -164,6 +164,10 @@ public:
     return LangOpts.Target.str();
   }
 
+  bool requiresCAS() const {
+    return FrontendOpts.EnableCaching || FrontendOpts.UseCASBackend;
+  }
+
   void setClangModuleCachePath(StringRef Path) {
     ClangImporterOpts.ModuleCachePath = Path.str();
   }

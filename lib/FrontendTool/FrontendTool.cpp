@@ -1672,6 +1672,7 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
       createTargetMachine(opts, Instance.getASTContext());
 
+  TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
   // Free up some compiler resources now that we have an IRModule.
   freeASTContextIfPossible(Instance);
 
