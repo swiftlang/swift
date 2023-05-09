@@ -22,7 +22,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/Types.h"
@@ -99,53 +98,7 @@ public:
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
-                   bool wantRValue = true) const {
-    rawType = rawType.transform([&](Type type) -> Type {
-      if (auto *typeVar = type->getAs<TypeVariableType>()) {
-        auto resolvedType = S.simplifyType(typeVar);
-
-        if (!resolvedType->hasUnresolvedType())
-          return resolvedType;
-
-        // If type variable was simplified to an unresolved pack expansion
-        // type, let's examine its original pattern type because it could
-        // contain type variables replaceable with their generic parameter
-        // types.
-        if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
-          auto *locator = typeVar->getImpl().getLocator();
-          auto *openedExpansionTy =
-              locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
-                  .getOpenedType();
-          auto patternType = resolveType(openedExpansionTy->getPatternType());
-          return PackExpansionType::get(patternType, expansion->getCountType());
-        }
-
-        Type GP = typeVar->getImpl().getGenericParameter();
-        return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
-      }
-
-      if (type->hasElementArchetype()) {
-        auto *env = getDC()->getGenericEnvironmentOfContext();
-        return env->mapElementTypeIntoPackContext(type);
-      }
-
-      if (auto *packType = type->getAs<PackType>()) {
-        if (packType->getNumElements() == 1) {
-          auto eltType = resolveType(packType->getElementType(0));
-          if (auto expansion = eltType->getAs<PackExpansionType>())
-            return expansion->getPatternType();
-        }
-      }
-
-      return type->isPlaceholder()
-                 ? Type(type->getASTContext().TheUnresolvedType)
-                 : type;
-    });
-
-    if (reconstituteSugar)
-      rawType = rawType->reconstituteSugar(/*recursive*/ true);
-    return wantRValue ? rawType->getRValueType() : rawType;
-  }
+                   bool wantRValue = true) const;
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
