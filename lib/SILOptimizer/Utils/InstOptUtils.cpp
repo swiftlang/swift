@@ -990,6 +990,14 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
     return false;
   }
 
+  // We must not introduce copies for move only types.
+  // TODO: in OSSA, instead of bailing, it's possible to destroy the arguments
+  //       without the need of copies.
+  for (Operand *argOp : argsToHandle) {
+    if (argOp->get()->getType().isMoveOnly())
+      return false;
+  }
+
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
 
