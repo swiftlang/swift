@@ -39,8 +39,12 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 }
 
 SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
+  SILFunctionConventions conventions = F.getConventionsInContext();
+
   // Emit the implicit 'self' argument.
-  SILType selfType = getLoweredType(selfDecl->getType());
+  SILType selfType = conventions.getSILArgumentType(
+      conventions.getNumSILArguments() - 1, F.getTypeExpansionContext());
+  selfType = F.mapTypeIntoContext(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
   // If we have a move only type, then mark it with mark_must_check so we can't
