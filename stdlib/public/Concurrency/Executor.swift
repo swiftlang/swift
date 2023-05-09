@@ -16,17 +16,19 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
 
+  // Since lack move-only type support in the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY configuration
+  // Do not deprecate the UnownedJob enqueue in that configuration just yet - as we cannot introduce the replacements.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(SwiftStdlib 5.1, *)
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 
+  // Cannot introduce these methods in SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // since it lacks move-only type support.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @available(*, deprecated, message: "Use enqueue(ExecutorJob) instead")
+  @available(SwiftStdlib 5.9, *)
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   func enqueue(_ job: __owned Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -45,10 +47,8 @@ public protocol SerialExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(macOS, introduced: 10.15, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(iOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(watchOS, introduced: 6.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
-  @available(tvOS, introduced: 13.0, deprecated: 9999, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(SwiftStdlib 5.1, *)
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 
@@ -58,8 +58,8 @@ public protocol SerialExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @available(*, deprecated, message: "Use enqueue(ExecutorJob) instead")
+  @available(SwiftStdlib 5.9, *)
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   func enqueue(_ job: __owned Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
