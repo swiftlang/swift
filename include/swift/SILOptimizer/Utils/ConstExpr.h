@@ -127,6 +127,10 @@ private:
   ConstExprStepEvaluator(const ConstExprStepEvaluator &) = delete;
   void operator=(const ConstExprStepEvaluator &) = delete;
 
+  /// Set all addresses that could be mutated by the instruction to an
+  /// unknown symbolic value if it is not already so.
+  void setMutableAddressesToUnknown(SILInstruction *inst);
+
 public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
