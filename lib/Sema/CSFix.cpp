@@ -2503,10 +2503,8 @@ bool AddExplicitExistentialCoercion::isRequired(
         if (!existentialType)
           return Action::SkipChildren;
 
-        // let's grab the dependent upper bound here instead of nondependent
         auto erasedMemberTy = typeEraseOpenedExistentialReference(
-            Type(member), *existentialType, typeVar, TypePosition::Covariant,
-            false);
+            Type(member), *existentialType, typeVar, TypePosition::Covariant);
 
         // If result is an existential type and the base has `where` clauses
         // associated with its associated types, the call needs a coercion.
@@ -2517,13 +2515,7 @@ bool AddExplicitExistentialCoercion::isRequired(
         }
 
         if (erasedMemberTy->isExistentialType() &&
-            (erasedMemberTy->hasDependentMember() ||
-             erasedMemberTy->hasTypeParameter())) {
-          RequiresCoercion = true;
-          return Action::Stop;
-        }
-
-        if (erasedMemberTy->hasTypeVariable()) {
+             erasedMemberTy->hasTypeParameter()) {
           RequiresCoercion = true;
           return Action::Stop;
         }
@@ -2575,7 +2567,6 @@ bool AddExplicitExistentialCoercion::isRequired(
         case RequirementKind::Layout: {
           if (isAnchoredOn(req.getFirstType(), member->getAssocType()))
             return true;
-          
           break;
         }
 

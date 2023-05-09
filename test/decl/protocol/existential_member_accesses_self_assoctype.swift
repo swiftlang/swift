@@ -637,7 +637,6 @@ do {
   let exist: any InvalidTypeParameters
 
   exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
-  // expected-error@-1 {{inferred result type '(any InvalidTypeParameters).A.A' requires explicit coercion due to loss of generic requirements}}
   exist.method2(false) // expected-error {{instance method 'method2' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   exist.method3(false, false) // expected-error {{instance method 'method3' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   // expected-error@-1 {{member 'method3' cannot be used on value of type 'any InvalidTypeParameters'; consider using a generic constraint instead}}
@@ -795,14 +794,14 @@ do {
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
-    ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.method4 // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}
+    ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.method4
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
     ) -> any Class<Struct<Bool>.Inner> & ConcreteAssocTypes = arg.property4
 
     let _: any Class<Struct<Bool>.Inner> & ConcreteAssocTypes =
-      arg[ // expected-error {{inferred result type 'any Class<Struct<(any ConcreteAssocTypes).A7>.Inner> & ConcreteAssocTypes' requires explicit coercion due to loss of generic requirements}}
+      arg[
         subscript4: Struct<Bool>(), (any ConcreteAssocTypes).self, { true }
       ]
   }
@@ -929,16 +928,14 @@ do {
   let _ = exist.method2()
   let _ = exist.method3()
   let _ = exist.method4()
-  let _ = exist.method5() // expected-error {{inferred result type 'Class2Base' requires explicit coercion due to loss of generic requirements}}{{24-24=as Class2Base}}
+  let _ = exist.method5()
   let _ = exist.method6()
-  let _ = exist.method7() // expected-error {{inferred result type 'any Class2Base & CovariantAssocTypeErasure' requires explicit coercion due to loss of generic requirements}}{{24-24=as any Class2Base & CovariantAssocTypeErasure}}
+  let _ = exist.method7()
   let _ = exist.method8()
   let _ = exist.method9()
   let _ = exist.method10()
   let _ = exist.method11()
-  let _ = exist.method12() // expected-error {{inferred result type 'Dictionary<String, Class2Base>' requires explicit coercion due to loss of generic requirements}}{{25-25=as Dictionary<String, Class2Base>}}
-  
-
+  let _ = exist.method12()
 }
 do {
   let exist: any CovariantAssocTypeErasureDerived
