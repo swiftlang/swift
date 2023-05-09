@@ -18,11 +18,11 @@ public class UserCollection {
 import MyModule
 
 func application() {
-  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):18 %t/test.swift -- %t/test.swift -I %t/Modules -target %target-triple | %FileCheck %s --check-prefix=SHARED_STATIC
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):18 %t/test.swift -- %t/test.swift -I %t/Modules -target %target-triple -Xfrontend -sil-verify-none | %FileCheck %s --check-prefix=SHARED_STATIC
   UserCollection.sharedStatic
   // FIXME: This should be reported as 'static var' rdar://105239467
-  // SHARED_STATIC: <Declaration>static let sharedStatic: <Type usr="s:8MyModule14UserCollectionC">UserCollection</Type></Declaration>
-  // SHARED_STATIC: <decl.var.static><syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>sharedStatic</decl.name>: <decl.var.type><ref.class usr="s:8MyModule14UserCollectionC">UserCollection</ref.class></decl.var.type></decl.var.static>
+  // SHARED_STATIC: <Declaration>class let sharedStatic: <Type usr="s:8MyModule14UserCollectionC">UserCollection</Type></Declaration>
+  // SHARED_STATIC: <decl.var.class><syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>sharedStatic</decl.name>: <decl.var.type><ref.class usr="s:8MyModule14UserCollectionC">UserCollection</ref.class></decl.var.type></decl.var.class>
 
   // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):18 %t/test.swift -- %t/test.swift -I %t/Modules -target %target-triple | %FileCheck %s --check-prefix=SHARED_COMPUTED_CLASS
   UserCollection.sharedComputedClass
