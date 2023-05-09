@@ -300,8 +300,14 @@ extension AllocRefInstBase {
 extension UseList {
   func replaceAll(with replacement: Value, _ context: some MutatingContext) {
     for use in self {
-      use.instruction.setOperand(at: use.index, to: replacement, context)
+      use.set(to: replacement, context)
     }
+  }
+}
+
+extension Operand {
+  func set(to value: Value, _ context: some MutatingContext) {
+    instruction.setOperand(at: index, to: value, context)
   }
 }
 
