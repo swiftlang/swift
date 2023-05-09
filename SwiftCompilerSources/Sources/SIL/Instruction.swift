@@ -251,16 +251,6 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
-final public class DeallocStackInst : Instruction, UnaryInstruction {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
-
-final public class DeallocStackRefInst : Instruction, UnaryInstruction {
-  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
-}
-
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 }
 
@@ -285,8 +275,6 @@ final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
 final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
-
-final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
@@ -319,6 +307,32 @@ final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstr
 }
 
 final public class UnimplementedRefCountingInst : RefCountingInst {}
+
+//===----------------------------------------------------------------------===//
+//                      no-value deallocation instructions
+//===----------------------------------------------------------------------===//
+
+public protocol Deallocation : Instruction { }
+
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocstack: AllocStackInst {
+    return operand.value as! AllocStackInst
+  }
+}
+
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
+}
+
+final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocPartialRefInst : Instruction, Deallocation {}
+
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
 
 //===----------------------------------------------------------------------===//
 //                           single-value instructions
