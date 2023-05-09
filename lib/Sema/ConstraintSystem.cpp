@@ -2053,10 +2053,8 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 ///
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
-static Type
-typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
-                                   TypePosition outermostPosition,
-                                   bool wantNonDependentBound = true) {
+static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
+                                               TypePosition outermostPosition) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
@@ -2159,9 +2157,7 @@ typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
       if (t->is<GenericTypeParamType>()) {
         erasedTy = baseTy;
       } else {
-        erasedTy = wantNonDependentBound
-                       ? existentialSig->getNonDependentUpperBounds(t)
-                       : existentialSig->getDependentUpperBounds(t);
+        erasedTy = existentialSig->getNonDependentUpperBounds(t);
       }
 
       if (metatypeDepth) {
@@ -2177,7 +2173,7 @@ typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
-    TypePosition outermostPosition, bool wantNonDependentBound) {
+    TypePosition outermostPosition) {
   Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
 
   // First, temporarily reconstitute the 'Self' generic parameter.
@@ -2194,8 +2190,8 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 
   // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(
-      type, existentialBaseType, outermostPosition, wantNonDependentBound);
+  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
+                                            outermostPosition);
 
   // Finally, swap the 'Self'-corresponding type variable back in.
   return type.transformRec([&](TypeBase *t) -> Optional<Type> {

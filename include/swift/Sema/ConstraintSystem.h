@@ -5579,12 +5579,7 @@ Expr *getArgumentLabelTargetExpr(Expr *fn);
 /// variable and anything that depends on it to their non-dependent bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
-                                         TypePosition outermostPosition,
-                                         bool wantNonDependentBound = true);
-
-Type transformFn(Type type, Type existentialBaseType,
-                            TypePosition initialPos);
-
+                                         TypePosition outermostPosition);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.

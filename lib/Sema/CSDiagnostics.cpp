@@ -8808,7 +8808,7 @@ bool MissingExplicitExistentialCoercion::fixItRequiresParens() const {
 void MissingExplicitExistentialCoercion::fixIt(
     InFlightDiagnostic &diagnostic) const {
 
-  if (ErasedResultType->hasDependentMember())
+  if (ErasedResultType->hasTypeParameter())
     return;
 
   bool requiresParens = fixItRequiresParens();
