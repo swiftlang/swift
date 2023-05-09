@@ -332,6 +332,15 @@ func test_pack_expansions_with_closures() {
     takesVariadicFunction { y in fn(x, y) } // Ok
     takesVariadicFunction { y, z in fn(y, z) } // Ok
   }
+
+  // rdar://108977234 - invalid error non-pack type instead of missing `Hashable` conformance
+  func testEscapingCapture<each T>(_ t: repeat each T) -> () -> [AnyHashable] {
+    return {
+      var result = [AnyHashable]()
+      repeat result.append(each t) // expected-error {{argument type 'each T' does not conform to expected type 'Hashable'}}
+      return result
+    }
+  }
 }
 
 // rdar://107151854 - crash on invalid due to specialized pack expansion
