@@ -614,6 +614,8 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
+
+  void getWithoutConstraintTypes();
 };
 
 } // end namespace ide
