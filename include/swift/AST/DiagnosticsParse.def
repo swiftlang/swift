@@ -1092,9 +1092,13 @@ NOTE(indent_expression_to_silence,none,
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
 
-// Forget Statement
-ERROR(expected_expr_forget,PointsToFirstBadToken,
-      "expected expression in 'forget' statement", ())
+// Discard Statement
+ERROR(expected_expr_discard,PointsToFirstBadToken,
+      "expected expression in 'discard' statement", ())
+WARNING(forget_is_deprecated,PointsToFirstBadToken,
+      "'_forget' keyword is deprecated and will be removed soon; "
+      "use 'discard' instead",
+      ())
 
 // Await/Async
 ERROR(expected_await_not_async,none,

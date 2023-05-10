@@ -14,28 +14,28 @@ struct FileDescriptor {
   var fd: Int
   static var nextFD: Int = 0
 
-  consuming func forget() { _forget self }
+  consuming func discard() { discard self }
 
   init() {
     self.fd = FileDescriptor.nextFD
     FileDescriptor.nextFD += 1
   }
 
-  init(doForget: Bool) throws {
+  init(doDiscard: Bool) throws {
     self.init()
-    if doForget {
-      forget()
+    if doDiscard {
+      discard()
       throw E.err
     }
   }
 
   __consuming func close() {
     posix_close(fd)
-    _forget self
+    discard self
   }
 
-  __consuming func justForget() {
-    _forget self
+  __consuming func justDiscard() {
+    discard self
   }
 
   __consuming func empty() {}
@@ -49,7 +49,7 @@ struct FileDescriptor {
   var takeFileDescriptorRight : Int {
     __consuming get {
       let x = fd
-      _forget self
+      discard self
       return x
     }
   }
@@ -63,18 +63,18 @@ struct FileDescriptor {
   case some(FileDescriptor)
   case nothing
 
-  consuming func forget() { _forget self }
+  consuming func discard() { discard self }
 
   init(reinit: Bool) {
     self = .some(FileDescriptor())
     if reinit {
-      forget()
+      discard()
       self = .some(FileDescriptor())
     }
   }
 
   __consuming func skipDeinit() {
-    _forget self
+    discard self
   }
 
   deinit {
@@ -97,7 +97,7 @@ func main() {
 
   let _ = {
     let x = FileDescriptor() // 2
-    x.justForget()
+    x.justDiscard()
   }()
 
   let _ = {
@@ -120,14 +120,14 @@ func main() {
   let _ = {
     do {
       // should throw before getting to close()
-      let x = try FileDescriptor(doForget: true) // 6
+      let x = try FileDescriptor(doDiscard: true) // 6
       x.close()
     } catch {}
   }()
 
   let _ = {
     do {
-      let x = try FileDescriptor(doForget: false) // 7
+      let x = try FileDescriptor(doDiscard: false) // 7
       x.close()
     } catch {}
     // CHECK: closing file descriptor: 7
