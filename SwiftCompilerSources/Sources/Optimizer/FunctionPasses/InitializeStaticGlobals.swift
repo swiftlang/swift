@@ -48,7 +48,7 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
     return
   }
 
-  guard let (allocInst, storeToGlobal) = function.getGlobalInitialization() else {
+  guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function) else {
     return
   }
 
@@ -62,69 +62,69 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
   context.erase(instruction: storeToGlobal)
 }
 
-private extension Function {
-  /// Analyses the global initializer function and returns the `alloc_global` and `store`
-  /// instructions which initialize the global.
-  ///
-  /// The function's single basic block must contain following code pattern:
-  /// ```
-  ///   alloc_global @the_global
-  ///   %a = global_addr @the_global
-  ///   %i = some_const_initializer_insts
-  ///   store %i to %a
-  /// ```
-  func getGlobalInitialization() -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+private func getGlobalInitialization(of function: Function) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
 
-    guard let block = singleBlock else {
-      return nil
-    }
-
-    var allocInst: AllocGlobalInst? = nil
-    var globalAddr: GlobalAddrInst? = nil
-    var store: StoreInst? = nil
-
-    for inst in block.instructions {
-      switch inst {
-      case is ReturnInst,
-           is DebugValueInst,
-           is DebugStepInst:
-        break
-      case let agi as AllocGlobalInst:
-        if allocInst != nil {
-          return nil
-        }
-        allocInst = agi
-      case let ga as GlobalAddrInst:
-        if globalAddr != nil {
-          return nil
-        }
-        guard let agi = allocInst, agi.global == ga.global else {
-          return nil
-        }
-        globalAddr = ga
-      case let si as StoreInst:
-        if store != nil {
-          return nil
-        }
-        guard let ga = globalAddr else {
-          return nil
-        }
-        if si.destination != ga {
-          return nil
-        }
-        store = si
-      default:
-        if !inst.isValidInStaticInitializerOfGlobal {
-          return nil
-        }
-      }
-    }
-    if let store = store {
-      return (allocInst: allocInst!, storeToGlobal: store)
-    }
+  guard let block = function.singleBlock else {
     return nil
   }
 
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst:
+      break
+    case let agi as AllocGlobalInst:
+      if allocInst != nil {
+        return nil
+      }
+      allocInst = agi
+    case let ga as GlobalAddrInst:
+      if globalAddr != nil {
+        return nil
+      }
+      guard let agi = allocInst, agi.global == ga.global else {
+        return nil
+      }
+      globalAddr = ga
+    case let si as StoreInst:
+      if store != nil {
+        return nil
+      }
+      guard let ga = globalAddr else {
+        return nil
+      }
+      if si.destination != ga {
+        return nil
+      }
+      store = si
+    default:
+      if !inst.isValidInStaticInitializerOfGlobal {
+        return nil
+      }
+    }
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
+}
+
+private extension Function {
   var singleBlock: BasicBlock? {
     let block = entryBlock
     if block.next != nil {
