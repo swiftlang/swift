@@ -5853,6 +5853,8 @@ ERROR(no_opaque_return_type_of,none,
 
 ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
+ERROR(objc_init_accessor, none,
+      "init accessors cannot be marked @objc", ())
 ERROR(objc_addressor, none,
       "addressors are not allowed to be marked @objc", ())
 ERROR(objc_coroutine_accessor, none,

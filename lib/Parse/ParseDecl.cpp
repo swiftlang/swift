@@ -6981,6 +6981,8 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     return "'willSet'";
   case AccessorKind::DidSet:
     return "'didSet'";
+  case AccessorKind::Init:
+    return article ? "an init accessor" : "init accessor";
   }
   llvm_unreachable("bad accessor kind");  
 }
@@ -7005,7 +7007,7 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
              /*already*/ true);
 }
 
-static bool isAllowedInLimitedSyntax(AccessorKind kind) {
+static bool isAllowedInProtocolRequirement(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Set:
@@ -7017,6 +7019,7 @@ static bool isAllowedInLimitedSyntax(AccessorKind kind) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     return false;
   }
   llvm_unreachable("bad accessor kind");
@@ -7350,7 +7353,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
     // For now, immediately reject illegal accessors in protocols just to
     // avoid having to deal with them everywhere.
-    if (parsingLimitedSyntax && !isAllowedInLimitedSyntax(Kind)) {
+    if (parsingLimitedSyntax && !isAllowedInProtocolRequirement(Kind)) {
       diagnose(Loc, diag::expected_getset_in_protocol);
       continue;
     }

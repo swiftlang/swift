@@ -341,6 +341,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify:
       OS << "!modify";
       break;
+    case AccessorKind::Init:
+      OS << "!init";
+      break;
     }
     break;
   }

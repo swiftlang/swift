@@ -2277,6 +2277,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::DidSet:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Init:
       // These accessors are never part of the opaque set. Bail out early
       // to avoid computing the overridden declarations of the storage.
       return noResults;

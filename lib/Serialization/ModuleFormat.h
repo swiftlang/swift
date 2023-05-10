@@ -330,6 +330,7 @@ enum AccessorKind : uint8_t {
   MutableAddress,
   Read,
   Modify,
+  Init,
 };
 using AccessorKindField = BCFixed<4>;
 

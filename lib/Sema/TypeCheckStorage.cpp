@@ -2058,6 +2058,9 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     break;
+
+  case AccessorKind::Init:
+    llvm_unreachable("init accessor not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2568,6 +2571,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     break;
 
   case AccessorKind::WillSet:

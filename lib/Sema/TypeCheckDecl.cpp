@@ -373,6 +373,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
         storage->getWriteImpl() == WriteImplKind::StoredWithObservers)
       return storage->isDynamic();
     return false;
+  case AccessorKind::Init:
+    return false;
   }
   llvm_unreachable("covered switch");
 }
@@ -1708,6 +1710,9 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 
       break;
     }
+
+    case AccessorKind::Init:
+      return SelfAccessKind::Mutating;
     }
   }
 
@@ -2118,6 +2123,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::DidSet:
     case AccessorKind::WillSet:
     case AccessorKind::Set:
+    case AccessorKind::Init:
       return TupleType::getEmpty(ctx);
 
     // Addressor result types can get complicated because of the owner.

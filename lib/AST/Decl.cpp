@@ -254,6 +254,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
 
      case AccessorKind::Modify:
        return DescriptiveDeclKind::ModifyAccessor;
+
+     case AccessorKind::Init:
+       return DescriptiveDeclKind::InitAccessor;
      }
      llvm_unreachable("bad accessor kind");
    }
@@ -354,6 +357,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(ReadAccessor, "_read accessor");
   ENTRY(ModifyAccessor, "_modify accessor");
+  ENTRY(InitAccessor, "init acecssor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(Missing, "missing decl");
@@ -8324,7 +8328,8 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
 
     case AccessorKind::Set:
     case AccessorKind::DidSet:
-    case AccessorKind::WillSet: {
+    case AccessorKind::WillSet:
+    case AccessorKind::Init: {
       SmallVector<Identifier, 4> argNames;
       // The implicit value/buffer parameter.
       argNames.push_back(Identifier());
@@ -9305,6 +9310,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
+  case AccessorKind::Init:
     return false;
   }
   llvm_unreachable("bad accessor kind");

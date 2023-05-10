@@ -2943,7 +2943,11 @@ namespace {
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
         llvm_unreachable("cannot use accessor directly to perform an access");
+
+      case AccessorKind::Init:
+        llvm_unreachable("init accessor not yet implemented");
       }
+
       llvm_unreachable("bad kind");
     }
   };

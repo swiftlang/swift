@@ -184,6 +184,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DistributedMethod,
   Getter,
   Setter,
+  InitAccessor,
   Addressor,
   MutableAddressor,
   ReadAccessor,
@@ -7561,6 +7562,10 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  bool isInitAccessor() const {
+    return (getAccessorKind() == AccessorKind::Init);
   }
 
   /// \returns true if this is non-mutating due to applying a 'mutating'

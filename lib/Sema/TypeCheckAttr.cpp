@@ -4901,6 +4901,8 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::Addressor;
   case AccessorKind::MutableAddress:
     return DescriptiveDeclKind::MutableAddressor;
+  case AccessorKind::Init:
+    return DescriptiveDeclKind::InitAccessor;
   }
 }
 
