@@ -25,7 +25,7 @@ func multiStatementInference() -> Int {
 
 // CHECK-SIL: sil {{.*}} @$s9MacroUser23multiStatementInferenceSiyFSiyXEfU_
 // CHECK-SIL-NOT: return
-// CHECK-SIL: %0 = integer_literal $Builtin.Int64, 10, loc "@__swiftmacro_9MacroUser23multiStatementInferenceSiyF0cD0fMf_.swift":2:14, scope [[S2]]
+// CHECK-SIL: %0 = integer_literal $Builtin.Int{{64|32}}, 10, loc "@__swiftmacro_9MacroUser23multiStatementInferenceSiyF0cD0fMf_.swift":2:14, scope [[S2]]
 
 // CHECK: 10
 print(multiStatementInference())
