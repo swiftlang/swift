@@ -2925,7 +2925,7 @@ public:
   /// Whether the argument \p Arg occurs after the code completion token and
   /// thus should be ignored and not generate any fixes.
   bool isArgumentIgnoredForCodeCompletion(Expr *Arg) const {
-    return IgnoredArguments.count(Arg) > 0;
+    return IgnoredArguments.count(Arg) > 0 && isForCodeCompletion();
   }
 
   /// Whether the constraint system has ignored any arguments for code

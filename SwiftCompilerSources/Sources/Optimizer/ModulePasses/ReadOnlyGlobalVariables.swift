@@ -27,7 +27,7 @@ let readOnlyGlobalVariablesPass = ModulePass(name: "read-only-global-variables")
   for f in moduleContext.functions {
     for inst in f.instructions {
       if let gAddr = inst as? GlobalAddrInst {
-        if gAddr.addressHasWrites {
+        if findWrites(toAddress: gAddr) {
           writtenGlobals.insert(gAddr.global)
         }
       }
@@ -43,11 +43,9 @@ let readOnlyGlobalVariablesPass = ModulePass(name: "read-only-global-variables")
   }
 }
 
-private extension Value {
-  var addressHasWrites: Bool {
-    var walker = FindWrites()
-    return walker.walkDownUses(ofAddress: self, path: UnusedWalkingPath()) == .abortWalk
-  }
+private func findWrites(toAddress: Value) -> Bool {
+  var walker = FindWrites()
+  return walker.walkDownUses(ofAddress: toAddress, path: UnusedWalkingPath()) == .abortWalk
 }
 
 private struct FindWrites : AddressDefUseWalker {

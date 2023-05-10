@@ -7039,8 +7039,9 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
-      "macro %2; the type must be public and provided via "
-      "'-load-plugin-library'", (StringRef, StringRef, DeclName))
+      "macro %2; the type must be public and provided by a macro target in a "
+      "Swift package, or via '-plugin-path' or '-load-plugin-library'",
+      (StringRef, StringRef, DeclName))
 ERROR(macro_must_be_defined,none,
       "macro %0 requires a definition", (DeclName))
 ERROR(external_macro_outside_macro_definition,none,
