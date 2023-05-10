@@ -228,3 +228,16 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
   "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
    and the os_signpost(3) API."
   "${SWIFT_STDLIB_CONCURRENCY_TRACING_default}")
+
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+endif()
+
+if(SWIFT_CONCURRENCY_USES_DISPATCH)
+  if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+    message(SEND_ERROR "Concurrency requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+  endif()
+endif()
