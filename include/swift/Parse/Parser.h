@@ -900,10 +900,14 @@ public:
   // Decl Parsing
 
   /// Returns true if parser is at the start of a Swift decl or decl-import.
-  bool isStartOfSwiftDecl(bool allowPoundIfAttributes = true);
+  bool isStartOfSwiftDecl(bool allowPoundIfAttributes = true,
+                          bool hadAttrsOrModifiers = false);
 
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
+
+  /// Returns true if the parser is at a freestanding macro expansion.
+  bool isStartOfFreestandingMacroExpansion();
 
   /// Parse the top-level Swift items into the provided vector.
   ///
