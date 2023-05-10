@@ -854,6 +854,17 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   // Destroy ivars
   auto *classMetadata = _swift_getClassOfAllocated(object)->getClassObject();
   assert(classMetadata && "Not a class?");
+
+#if SWIFT_OBJC_INTEROP
+  // If the object's class is already pure ObjC class, just release it and move
+  // on. There are no ivar destroyers. This avoids attempting to mutate
+  // placeholder objects statically created in read-only memory.
+  if (classMetadata->isPureObjC()) {
+    objc_release((id)object);
+    return;
+  }
+#endif
+
   while (classMetadata != metadata) {
 #if SWIFT_OBJC_INTEROP
     // If we have hit a pure Objective-C class, we won't see another ivar
