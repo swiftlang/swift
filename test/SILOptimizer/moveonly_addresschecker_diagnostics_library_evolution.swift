@@ -35,10 +35,7 @@ public struct DeinitTest : ~Copyable {
 
 public protocol P {}
 
-// Once rdar://109170600 is fixed (which tracks us being unable to do this), we
-// should be able to use the : ~Copyable syntax.
-@_moveOnly
-public struct GenericDeinitTest<T : P> {
+public struct GenericDeinitTest<T : P> : ~Copyable {
     deinit {}
 }
 
