@@ -53,7 +53,10 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     // Since not all function types are backed by declarations (e.g. closure
     // paramters), `DeclParam` might be `nullptr`.
     const AnyFunctionType::Param *TypeParam = &ParamsToPass[Idx];
-    const ParamDecl *DeclParam = getParameterAt(Res.FuncDeclRef, Idx);
+    const ParamDecl *DeclParam = nullptr;
+    if (Res.FuncDeclRef) {
+      DeclParam = getParameterAt(Res.FuncDeclRef, Idx);
+    }
 
     bool Required = true;
     if (DeclParam && DeclParam->isDefaultArgument()) {
