@@ -550,8 +550,10 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 /// \returns The set of macro declarations with the given name that
 /// fulfill any of the given macro roles.
-SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, MacroRoles roles);
+SmallVector<MacroDecl *, 1> lookupMacros(DeclContext *dc,
+                                         DeclNameRef moduleName,
+                                         DeclNameRef macroName,
+                                         MacroRoles roles);
 
 /// \returns Whether the given source location is inside an attached
 /// or freestanding macro argument.

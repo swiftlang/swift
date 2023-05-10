@@ -11479,11 +11479,16 @@ MacroExpansionDecl::create(
     ArgumentList *args
 ) {
   ASTContext &ctx = dc->getASTContext();
-  MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
-      poundLoc, macro, macroLoc,
-      leftAngleLoc, rightAngleLoc, genericArgs,
-      args ? args : ArgumentList::createImplicit(ctx, {})
-  };
+  MacroExpansionInfo *info = new (ctx)
+      MacroExpansionInfo{poundLoc,
+                         /*moduleName*/ DeclNameRef(),
+                         /*moduleNameLoc*/ DeclNameLoc(),
+                         macro,
+                         macroLoc,
+                         leftAngleLoc,
+                         rightAngleLoc,
+                         genericArgs,
+                         args ? args : ArgumentList::createImplicit(ctx, {})};
   return new (ctx) MacroExpansionDecl(dc, info);
 }
 
