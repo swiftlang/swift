@@ -29,8 +29,8 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     Type ExpectedCallType;
     /// True if this is a subscript rather than a function call.
     bool IsSubscript;
-    /// The reference to the FuncDecl or SubscriptDecl associated with the call.
-    ConcreteDeclRef FuncDeclRef;
+    /// The FuncDecl or SubscriptDecl associated with the call.
+    ValueDecl *FuncD;
     /// The type of the function being called.
     AnyFunctionType *FuncTy;
     /// The index of the argument containing the completion location
@@ -50,14 +50,18 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+    /// A bitfield to mark whether the parameter at a given index is optional.
+    /// Parameters can be optional if they have a default argument or belong to
+    /// a parameter pack.
+    /// Indices are based on the parameters in \c FuncTy. Note that the number
+    /// of parameters in \c FuncTy and \c FuncD is different when a parameter
+    /// pack has been exploded.
+    llvm::BitVector DeclParamIsOptional;
 
     /// Types of variables that were determined in the solution that produced
     /// this result. This in particular includes parameters of closures that
     /// were type-checked with the code completion expression.
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
-
-    /// Return the \c FuncDecl or \c SubscriptDecl associated with this call.
-    ValueDecl *getFuncD() const { return FuncDeclRef.getDecl(); }
   };
 
   CodeCompletionExpr *CompletionExpr;
