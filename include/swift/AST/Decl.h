@@ -8591,6 +8591,8 @@ public:
 /// declaration/expression nodes.
 struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
   SourceLoc SigilLoc;
+  DeclNameRef ModuleName;
+  DeclNameLoc ModuleNameLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
@@ -8601,12 +8603,15 @@ struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
   ConcreteDeclRef macroRef;
 
   MacroExpansionInfo(SourceLoc sigilLoc,
+                     DeclNameRef moduleName,
+                     DeclNameLoc moduleNameLoc,
                      DeclNameRef macroName,
                      DeclNameLoc macroNameLoc,
                      SourceLoc leftAngleLoc, SourceLoc rightAngleLoc,
                      ArrayRef<TypeRepr *> genericArgs,
                      ArgumentList *argList)
-    : SigilLoc(sigilLoc), MacroName(macroName), MacroNameLoc(macroNameLoc),
+    : SigilLoc(sigilLoc), ModuleName(moduleName), ModuleNameLoc(moduleNameLoc),
+      MacroName(macroName), MacroNameLoc(macroNameLoc),
       LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
       GenericArgs(genericArgs), ArgList(argList) { }
 };

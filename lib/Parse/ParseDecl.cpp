@@ -9806,7 +9806,6 @@ Parser::parseDeclMacroExpansion(ParseDeclOptions flags,
   return makeParserResult(
       status,
       new (Context) MacroExpansionDecl(
-        CurDeclContext, poundLoc, macroNameRef, macroNameLoc,
-        leftAngleLoc, Context.AllocateCopy(genericArgs), rightAngleLoc,
-        argList));
+        CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+        Context.AllocateCopy(genericArgs), rightAngleLoc, argList));
 }

@@ -6208,7 +6208,10 @@ public:
   }
 
   explicit MacroExpansionExpr(DeclContext *dc,
-                              SourceLoc sigilLoc, DeclNameRef macroName,
+                              SourceLoc sigilLoc,
+                              DeclNameRef moduleName,
+                              DeclNameLoc moduleNameLoc,
+                              DeclNameRef macroName,
                               DeclNameLoc macroNameLoc,
                               SourceLoc leftAngleLoc,
                               ArrayRef<TypeRepr *> genericArgs,
@@ -6218,6 +6221,8 @@ public:
                               bool isImplicit = false,
                               Type ty = Type());
 
+  DeclNameRef getModuleName() const { return info->ModuleName; }
+  DeclNameLoc getModuleNameLoc() const { return info->ModuleNameLoc; }
   DeclNameRef getMacroName() const { return info->MacroName; }
   DeclNameLoc getMacroNameLoc() const { return info->MacroNameLoc; }
 

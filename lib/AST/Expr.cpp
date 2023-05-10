@@ -2713,7 +2713,8 @@ TypeJoinExpr::forBranchesOfSingleValueStmtExpr(ASTContext &ctx, Type joinType,
 }
 
 MacroExpansionExpr::MacroExpansionExpr(
-    DeclContext *dc, SourceLoc sigilLoc, DeclNameRef macroName,
+    DeclContext *dc, SourceLoc sigilLoc, DeclNameRef moduleName,
+    DeclNameLoc moduleNameLoc, DeclNameRef macroName,
     DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
     ArrayRef<TypeRepr *> genericArgs, SourceLoc rightAngleLoc,
     ArgumentList *argList, MacroRoles roles, bool isImplicit,
@@ -2722,7 +2723,7 @@ MacroExpansionExpr::MacroExpansionExpr(
     Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
   ASTContext &ctx = dc->getASTContext();
   info = new (ctx) MacroExpansionInfo{
-      sigilLoc, macroName, macroNameLoc,
+      sigilLoc, moduleName, moduleNameLoc, macroName, macroNameLoc,
       leftAngleLoc, rightAngleLoc, genericArgs,
       argList ? argList : ArgumentList::createImplicit(ctx, {})
   };

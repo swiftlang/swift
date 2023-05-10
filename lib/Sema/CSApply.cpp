@@ -2938,9 +2938,10 @@ namespace {
         auto macro = cast<MacroDecl>(overload.choice.getDecl());
         ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
         auto expansion = new (ctx) MacroExpansionExpr(
-            dc, expr->getStartLoc(), DeclNameRef(macro->getName()),
-            DeclNameLoc(expr->getLoc()), SourceLoc(), {}, SourceLoc(), nullptr,
-            MacroRole::Expression, /*isImplicit=*/true, expandedType);
+            dc, expr->getStartLoc(), DeclNameRef(), DeclNameLoc(),
+            DeclNameRef(macro->getName()), DeclNameLoc(expr->getLoc()),
+            SourceLoc(), {}, SourceLoc(), nullptr, MacroRole::Expression,
+            /*isImplicit=*/true, expandedType);
         expansion->setMacroRef(macroRef);
         (void)evaluateOrDefault(
             ctx.evaluator, ExpandMacroExpansionExprRequest{expansion}, None);

@@ -3226,6 +3226,8 @@ public:
   }
 
   SourceLoc getSigilLoc() const;
+  DeclNameRef getModuleName() const;
+  DeclNameLoc getModuleNameLoc() const;
   DeclNameRef getMacroName() const;
   DeclNameLoc getMacroNameLoc() const;
   SourceRange getGenericArgsRange() const;

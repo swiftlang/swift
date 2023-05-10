@@ -37,10 +37,17 @@ macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition", type
 macro addCompletionHandlerArbitrarily(_: Int) = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
 
 struct S {
+#if IMPORT_MACRO_LIBRARY
+  @macro_library.addCompletionHandler // test module qualified macro lookup
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+#else
   @addCompletionHandler
   func f(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
+#endif
 
   // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_.swift
   // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {

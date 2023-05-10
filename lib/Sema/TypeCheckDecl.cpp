@@ -1606,17 +1606,17 @@ TypeChecker::lookupPrecedenceGroup(DeclContext *dc, Identifier name,
   return PrecedenceGroupLookupResult(dc, name, std::move(groups));
 }
 
-SmallVector<MacroDecl *, 1>
-TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                          SourceLoc loc, MacroRoles roles) {
+SmallVector<MacroDecl *, 1> TypeChecker::lookupMacros(DeclContext *dc,
+                                                      DeclNameRef moduleName,
+                                                      DeclNameRef macroName,
+                                                      SourceLoc loc,
+                                                      MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
-  UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-  for (const auto &found : lookup.allResults()) {
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+
+  auto addChoiceIfApplicable = [&](ValueDecl *decl) {
+    if (auto macro = dyn_cast<MacroDecl>(decl)) {
       auto candidateRoles = macro->getMacroRoles();
       if ((candidateRoles && roles.contains(candidateRoles)) ||
           // FIXME: `externalMacro` should have all roles.
@@ -1624,7 +1624,35 @@ TypeChecker::lookupMacros(DeclContext *dc, DeclNameRef macroName,
         choices.push_back(macro);
       }
     }
+  };
+
+  // When a module is specified, it's a module-qualified lookup.
+  if (moduleName) {
+    UnqualifiedLookupDescriptor moduleLookupDesc(
+        moduleName, moduleScopeDC, SourceLoc(),
+        UnqualifiedLookupFlags::TypeLookup);
+    auto moduleLookup = evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{moduleLookupDesc}, {});
+    auto foundTypeDecl = moduleLookup.getSingleTypeResult();
+    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(foundTypeDecl);
+    if (!moduleDecl)
+      return {};
+
+    ModuleQualifiedLookupRequest req{
+        moduleScopeDC, moduleDecl, macroName, NL_ExcludeMacroExpansions};
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    for (auto *found : lookup)
+      addChoiceIfApplicable(found);
   }
+  // Otherwise it's an unqualified lookup.
+  else {
+    UnqualifiedLookupDescriptor descriptor(macroName, moduleScopeDC);
+    auto lookup = evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+    for (const auto &found : lookup.allResults())
+      addChoiceIfApplicable(found.getValueDecl());
+  }
+
   return choices;
 }
 

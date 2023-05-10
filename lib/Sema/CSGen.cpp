@@ -1227,7 +1227,8 @@ namespace {
 
         auto macroIdent = ctx.getIdentifier(kind);
         auto macros = lookupMacros(
-            macroIdent, expr->getLoc(), FunctionRefKind::Unapplied,
+            Identifier(), macroIdent, expr->getLoc(),
+            FunctionRefKind::Unapplied,
             MacroRole::Expression);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
@@ -3886,12 +3887,12 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1>
-    lookupMacros(Identifier macroName, SourceLoc loc,
+    lookupMacros(Identifier moduleName, Identifier macroName, SourceLoc loc,
                  FunctionRefKind functionRefKind,
                  MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = TypeChecker::lookupMacros(
-          CurDC, DeclNameRef(macroName), loc, roles);
+          CurDC, DeclNameRef(moduleName), DeclNameRef(macroName), loc, roles);
       for (const auto &result : results) {
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
@@ -3913,10 +3914,11 @@ namespace {
       CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
+      auto moduleIdent = expr->getModuleName().getBaseIdentifier();
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
       FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
       auto macros = lookupMacros(
-          macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
+          moduleIdent, macroIdent, expr->getMacroNameLoc().getBaseNameLoc(),
           functionRefKind, expr->getMacroRoles());
       if (macros.empty()) {
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,

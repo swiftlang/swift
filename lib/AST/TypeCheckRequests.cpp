@@ -1680,20 +1680,6 @@ void swift::simple_display(
 // ResolveMacroRequest computation.
 //----------------------------------------------------------------------------//
 
-DeclNameRef UnresolvedMacroReference::getMacroName() const {
-  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
-    return med->getMacroName();
-  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
-    return mee->getMacroName();
-  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
-    if (!identTypeRepr)
-      return DeclNameRef();
-    return identTypeRepr->getNameRef();
-  }
-  llvm_unreachable("Unhandled case");
-}
-
 SourceLoc UnresolvedMacroReference::getSigilLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
     return med->getPoundLoc();
@@ -1704,16 +1690,79 @@ SourceLoc UnresolvedMacroReference::getSigilLoc() const {
   llvm_unreachable("Unhandled case");
 }
 
+/// Destructure a type repr for a macro reference.
+///
+/// For a 1-level member type repr whose base and member are both identifier
+/// types, e.g. `Foo.Bar`, return a pair of the base and the member.
+///
+/// For an identifier type repr, return a pair of `nullptr` and the identifier.
+static std::pair<IdentTypeRepr *, IdentTypeRepr *>
+destructureMacroRefTypeRepr(TypeRepr *typeRepr) {
+  if (!typeRepr)
+    return {nullptr, nullptr};
+  if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
+    return {nullptr, identType};
+  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
+    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
+      if (memType->getMemberComponents().size() == 1)
+        if (auto first = dyn_cast<IdentTypeRepr>(
+                memType->getMemberComponents().front()))
+          return {base, first};
+  return {nullptr, nullptr};
+}
+
+DeclNameRef UnresolvedMacroReference::getModuleName() const {
+  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
+    return DeclNameRef();
+  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
+    return mee->getModuleName();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto [base, _] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    if (!base)
+      return DeclNameRef();
+    return base->getNameRef();
+  }
+  llvm_unreachable("Unhandled case");
+}
+
+DeclNameLoc UnresolvedMacroReference::getModuleNameLoc() const {
+  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
+    return DeclNameLoc();
+  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
+    return mee->getModuleNameLoc();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto [base, _] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    if (!base)
+      return DeclNameLoc();
+    return base->getNameLoc();
+  }
+  llvm_unreachable("Unhandled case");
+}
+
+DeclNameRef UnresolvedMacroReference::getMacroName() const {
+  if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
+    return med->getMacroName();
+  if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
+    return mee->getMacroName();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
+    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    if (!member)
+      return DeclNameRef();
+    return member->getNameRef();
+  }
+  llvm_unreachable("Unhandled case");
+}
+
 DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *med = pointer.dyn_cast<MacroExpansionDecl *>())
     return med->getMacroNameLoc();
   if (auto *mee = pointer.dyn_cast<MacroExpansionExpr *>())
     return mee->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
-    if (!identTypeRepr)
+    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    if (!member)
       return DeclNameLoc();
-    return identTypeRepr->getNameLoc();
+    return member->getNameLoc();
   }
   llvm_unreachable("Unhandled case");
 }

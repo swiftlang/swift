@@ -3413,8 +3413,9 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   return makeParserResult(
       status,
       new (Context) MacroExpansionExpr(
-          CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
-          Context.AllocateCopy(genericArgs), rightAngleLoc, argList,
+          CurDeclContext, poundLoc, DeclNameRef(), DeclNameLoc(), macroNameRef,
+          macroNameLoc, leftAngleLoc, Context.AllocateCopy(genericArgs),
+          rightAngleLoc, argList,
           CurDeclContext->isTypeContext()
               ? MacroRole::Declaration
               : getFreestandingMacroRoles()));

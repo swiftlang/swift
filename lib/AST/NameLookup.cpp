@@ -3269,15 +3269,51 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
 
 void swift::findMacroForCustomAttr(CustomAttr *attr, DeclContext *dc,
                                    llvm::TinyPtrVector<ValueDecl *> &macros) {
-  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
-  if (!identTypeRepr)
-    return;
-
   // Look for macros at module scope. They can only occur at module scope, and
   // we need to be sure not to trigger name lookup into type contexts along
   // the way.
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
+
+  // Handle a module-qualified name.
+  if (auto *memTypeRepr = dyn_cast_or_null<MemberTypeRepr>(attr->getTypeRepr())) {
+    auto baseTypeRepr = memTypeRepr->getBaseComponent();
+    auto *moduleNameRepr = dyn_cast<IdentTypeRepr>(baseTypeRepr);
+    auto memberReprs = memTypeRepr->getMemberComponents();
+    if (!moduleNameRepr || memberReprs.size() != 1)
+      return;
+    auto moduleName = moduleNameRepr->getNameRef();
+        auto *macroNameRepr = dyn_cast<IdentTypeRepr>(memberReprs.front());
+    if (!macroNameRepr)
+      return;
+    auto macroName = macroNameRepr->getNameRef();
+
+    UnqualifiedLookupDescriptor moduleLookupDesc(
+        moduleName, moduleScopeDC, SourceLoc(),
+        UnqualifiedLookupFlags::TypeLookup);
+    auto moduleLookup = evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{moduleLookupDesc}, {});
+    auto foundTypeDecl = moduleLookup.getSingleTypeResult();
+    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(foundTypeDecl);
+    if (!moduleDecl)
+      return;
+
+    ModuleQualifiedLookupRequest req{
+        moduleScopeDC, moduleDecl, macroName, NL_ExcludeMacroExpansions};
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    for (auto *found : lookup)
+      // Only keep attached macros, which can be spelled as custom attributes.
+      if (auto macro = dyn_cast<MacroDecl>(found))
+        if (isAttachedMacro(macro->getMacroRoles()))
+          macros.push_back(macro);
+    return;
+  }
+
+  // Handle an unqualified name.
+  auto *identTypeRepr = dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr());
+  if (!identTypeRepr)
+    return;
+
   UnqualifiedLookupDescriptor descriptor(
       identTypeRepr->getNameRef(), moduleScopeDC
   );

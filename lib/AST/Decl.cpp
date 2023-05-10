@@ -10566,8 +10566,8 @@ MacroExpansionDecl::MacroExpansionDecl(
 ) : Decl(DeclKind::MacroExpansion, dc) {
   ASTContext &ctx = dc->getASTContext();
   info = new (ctx) MacroExpansionInfo{
-      poundLoc, macro, macroLoc,
-      leftAngleLoc, rightAngleLoc, genericArgs,
+      poundLoc, /*moduleName*/ DeclNameRef(), /*moduleNameLoc*/ DeclNameLoc(),
+      macro, macroLoc, leftAngleLoc, rightAngleLoc, genericArgs,
       args ? args : ArgumentList::createImplicit(ctx, {})
   };
   Bits.MacroExpansionDecl.Discriminator = InvalidDiscriminator;

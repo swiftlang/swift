@@ -1527,7 +1527,8 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
     auto foundMacros = TypeChecker::lookupMacros(
-        dc, macroRef.getMacroName(), SourceLoc(), roles);
+        dc, macroRef.getModuleName(), macroRef.getMacroName(),
+        SourceLoc(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }
@@ -1543,7 +1544,8 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   } else {
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = new (ctx) MacroExpansionExpr(
-      dc, macroRef.getSigilLoc(), macroRef.getMacroName(),
+      dc, macroRef.getSigilLoc(), macroRef.getModuleName(),
+      macroRef.getModuleNameLoc(), macroRef.getMacroName(),
       macroRef.getMacroNameLoc(), genericArgsRange.Start,
       macroRef.getGenericArgs(), genericArgsRange.End,
       macroRef.getArgs(), roles);
