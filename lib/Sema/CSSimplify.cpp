@@ -7282,22 +7282,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  // Matching types where one side is a pack expansion and the other is not
-  // means a pack expansion was used where it isn't supported.
-  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
-
-    if (type1->isPlaceholder() || type2->isPlaceholder())
-      return getTypeMatchSuccess();
-
-    auto *loc = getConstraintLocator(locator);
-    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
-      return getTypeMatchFailure(locator);
-
-    return getTypeMatchSuccess();
-  }
-
   if (kind >= ConstraintKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).  Note that we cannot get
@@ -7718,6 +7702,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             ConstraintLocator::LValueConversion));
       }
     }
+  }
+
+  // Matching types where one side is a pack expansion and the other is not
+  // means a pack expansion was used where it isn't supported.
+  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (type1->isPlaceholder() || type2->isPlaceholder())
+      return getTypeMatchSuccess();
+
+    auto *loc = getConstraintLocator(locator);
+    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
   }
 
   // Attempt fixes iff it's allowed, both types are concrete and

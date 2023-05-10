@@ -495,3 +495,8 @@ do {
     _ = (repeat overloaded(42, each v)) // Ok
   }
 }
+
+// rdar://108904190 - top-level 'repeat' not allowed in single-expression closures
+func test_pack_expansion_to_void_conv_for_closure_result<each T>(x: repeat each T) -> () -> () {
+  return { repeat print(each x) } // Ok
+}
