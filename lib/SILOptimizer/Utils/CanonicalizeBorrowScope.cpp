@@ -601,7 +601,7 @@ public:
     }
     // If it's not already dead, update this operand bypassing any copies.
     SILValue innerValue = use->get();
-    if (scope.getDeleter().deleteIfDead(user)) {
+    if (scope.getDeleter().deleteIfDead(user, /*fixLifetime=*/false)) {
       LLVM_DEBUG(llvm::dbgs() << "  Deleted " << *user);
     } else {
       use->set(scope.findDefInBorrowScope(use->get()));
@@ -692,7 +692,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
 
   auto incomingOuterVal = createOuterValues(incomingInnerVal);
 
-  auto *insertPt = incomingOuterVal->getNextInstruction();
+  auto *insertPt = innerValue->getDefiningInsertionPoint();
   auto *clone = innerInst->clone(insertPt);
   scope.getCallbacks().createdNewInst(clone);
   Operand *use = &clone->getOperandRef(0);

@@ -142,7 +142,12 @@ protected:
     assert(borrow && persistentCopies.empty() &&
            (!liveness || liveness->empty()));
 
+    borrowedValue = BorrowedValue();
+    defUseWorklist.clear();
+    blockWorklist.clear();
+    persistentCopies.clear();
     updatedCopies.clear();
+
     borrowedValue = borrow;
     if (liveness)
       liveness->initializeDef(borrowedValue.value);
