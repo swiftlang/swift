@@ -27,3 +27,8 @@ module StdPair {
   header "std-pair.h"
   requires cplusplus
 }
+
+module StdUniquePtr {
+  header "std-unique-ptr.h"
+  requires cplusplus
+}
