@@ -153,7 +153,68 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   }
 
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
+  // The Clang importer's Clang instance may be configured with a different
+  // (higher) OS version than the compilation target itself in order to be able
+  // to load pre-compiled Clang modules that are aligned with the broader SDK,
+  // and match the SDK deployment target against which Swift modules are also
+  // built. In this case, we must use the Swift compiler's OS version triple in
+  // order to generate the binary as-requested.
+  //
+  // The notion of using a different triple for loading Clang modules arises for
+  // the following reason:
+  //
+  // - Swift is able to load Swift modules built against a different target
+  //   triple than the source module that is being built. Swift relies on
+  //   availability annotations on the API within the loaded modules to ensure
+  //   that compilation for the current target only uses appropriately-available
+  //   API from its dependencies.
+  // - Clang, in contrast, requires that compilation only ever load modules
+  //   (.pcm) that are precisely aligned to the current source compilation.
+  //   Because the target triple (OS version in particular) between Swift source
+  //   compilation and Swift dependency module compilation may differ, this
+  //   would otherwise result in builtin multiple copies of the same Clang
+  //   module, against different OS versions, once for each different triple in
+  //   the build graph.
+  // Instead, with Explicitly-Built Modules, Swift sets a '-clang-target'
+  // argument that ensures that all Clang modules participating in the build are
+  // built against the SDK deployment target, matching the Swift modules in the
+  // SDK, which allows them to expose a maximally-available API surface as
+  // required by potentially-depending Swift modules' target OS version.
+  //
+  // --------------------------------------------
+  // For example:
+  // Suppose we are building a source module 'Foo', targeting
+  // 'macosx10.0', using an SDK with a deployment target of 'macosx12.0'. Swift
+  // modules in said SDK will be built for 'macosx12.0' (as hard-coded in their
+  // textual interfaces), meaning they may reference symbols expected to be
+  // present in dependency Clang modules at that target OS version.
+  //
+  // Suppose the source module 'Foo' depends on Swift module 'Bar', which then
+  // depends on Clang module `Baz`. 'Bar' must be built targeting 'macosx12.0'
+  // (SDK-matching deployment target is hard-coded into its textual interface).
+  // Which means that 'Bar' expects 'Baz' to expose symbols that may only be
+  // available when targeting at least 'macosx12.0'. e.g. 'Baz' may have symbols
+  // guarded with '__MAC_OS_X_VERSION_MIN_REQUIRED >= __MAC_12_0'.
+  // For this reason, we use '-clang-target' to ensure 'Baz' is built targeting
+  // 'macosx12.0', and can be loaded by both 'Foo' and 'Bar'.
+  //
+  // As a result, we cannot direclty use the Clang instance's target triple here
+  // and must check if we need to instead use the triple of the Swift compiler
+  // instance.
+  auto triple = ClangOpts.Triple;
+  if (Ctx.LangOpts.ClangTarget.hasValue() &&
+      Ctx.LangOpts.ClangTarget.getValue().getOSVersion() !=
+          Ctx.LangOpts.Target.getOSVersion()) {
+    assert(Ctx.LangOpts.ClangTarget.getValue().getArch() ==
+           Ctx.LangOpts.Target.getArch());
+    assert(Ctx.LangOpts.ClangTarget.getValue().getEnvironment() ==
+           Ctx.LangOpts.Target.getEnvironment());
+    assert(Ctx.LangOpts.ClangTarget.getValue().getOS() ==
+           Ctx.LangOpts.Target.getOS());
+    triple = Ctx.LangOpts.Target.str();
+  }
+
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, triple);
 }
 
 void setModuleFlags(IRGenModule &IGM) {
