@@ -218,8 +218,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   }
 
   P.addOptimizeHopToExecutor();
-  P.addMandatoryGenericSpecializer();
 
+  // These diagnostic passes must run before OnoneSimplification because
+  // they rely on completely unoptimized SIL.
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
@@ -231,11 +232,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDiagnoseLifetimeIssues();
   }
 
-  P.addOnoneSimplification();
-  P.addInitializeStaticGlobals();
-
-  P.addPerformanceDiagnostics();
-  
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 
@@ -243,6 +239,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
+
+  P.addMandatoryPerformanceOptimizations();
+  P.addOnoneSimplification();
+  P.addInitializeStaticGlobals();
+  P.addPerformanceDiagnostics();
 }
 
 SILPassPipelinePlan
@@ -757,6 +758,10 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
+
+  // The NamedReturnValueOptimization shouldn't be done before serialization.
+  // For details see the comment for `namedReturnValueOptimization`.
+  P.addNamedReturnValueOptimization();
 
   P.addDeadObjectElimination();
   P.addObjectOutliner();

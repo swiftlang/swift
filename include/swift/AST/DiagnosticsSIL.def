@@ -310,8 +310,6 @@ WARNING(warn_dead_weak_store,none,
         "deallocated here", ())
 
 // performance diagnostics
-ERROR(performance_annotations_not_enabled,none,
-      "use -experimental-performance-annotations to enable performance annotations", ())
 ERROR(performance_dynamic_casting,none,
       "dynamic casting can lock or allocate", ())
 ERROR(performance_metadata,none,

@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -202,10 +203,22 @@ struct BridgedPassContext {
     block.getBlock()->eraseFromParent();
   }
 
-  bool tryDeleteDeadClosure(BridgedInstruction closure) const;
+  bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
+
+  bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
+
+  struct DevirtResult {
+    OptionalBridgedInstruction newApply;
+    bool cfgChanged;
+  };
+
+  SWIFT_IMPORT_UNSAFE
+  DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
 
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+
+  bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
 
   void createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const;
 
@@ -216,6 +229,8 @@ struct BridgedPassContext {
 
   SWIFT_IMPORT_UNSAFE
   StaticInitCloneResult copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const;
+
+  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
 
   SWIFT_IMPORT_UNSAFE
   BridgedValue getSILUndef(swift::SILType type) const {
@@ -380,9 +395,18 @@ struct BridgedPassContext {
   }
 
   SWIFT_IMPORT_UNSAFE
-  OptionalBridgedFunction loadFunction(llvm::StringRef name) const {
+  OptionalBridgedFunction loadFunction(llvm::StringRef name, bool loadCalleesRecursively) const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
-    return {mod->loadFunction(name, swift::SILModule::LinkingMode::LinkNormal)};
+    return {mod->loadFunction(name, loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
+                                                           : swift::SILModule::LinkingMode::LinkNormal)};
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    mod->loadFunction(function.getFunction(),
+                      loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
+                                             : swift::SILModule::LinkingMode::LinkNormal);
   }
 
   SWIFT_IMPORT_UNSAFE
@@ -419,6 +443,17 @@ struct BridgedPassContext {
   bool enableMoveInoutStackProtection() const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
     return mod->getOptions().EnableMoveInoutStackProtection;
+  }
+
+  enum class AssertConfiguration {
+    Debug = swift::SILOptions::Debug,
+    Release = swift::SILOptions::Release,
+    Unchecked = swift::SILOptions::Unchecked
+  };
+
+  AssertConfiguration getAssertConfiguration() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return (AssertConfiguration)mod->getOptions().AssertConfig;
   }
 
   bool enableSimplificationFor(BridgedInstruction inst) const;

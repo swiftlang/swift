@@ -30,7 +30,10 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1427,14 +1430,45 @@ std::string BridgedPassContext::getModuleDescription() const {
   return str;
 }
 
-bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure) const {
-  return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks());
+bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
+  auto *pa = closure.getAs<PartialApplyInst>();
+  SILBuilder builder(pa);
+  return ::tryOptimizeApplyOfPartialApply(pa, builder.getBuilderContext(), InstModCallbacks());
+}
+
+bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const {
+  return ::tryDeleteDeadClosure(closure.getAs<SingleValueInstruction>(), InstModCallbacks(), needKeepArgsAlive);
+}
+
+BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
+                                                                          bool isMandatory) const {
+  auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
+  auto result = ::tryDevirtualizeApply(ApplySite(apply.getInst()), cha, nullptr, isMandatory);
+  if (result.first) {
+    OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());
+    return {newApply, result.second};
+  }
+  return {{nullptr}, false};
 }
 
 OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction builtin) const {
   auto bi = builtin.getAs<BuiltinInst>();
   Optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
+  SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
+  InstructionDeleter deleter;
+  SILInliner::inlineFullApply(FullApplySite(apply.getInst()),
+                              mandatoryInline ? SILInliner::InlineKind::MandatoryInline
+                                              : SILInliner::InlineKind::PerformanceInline,
+                              funcBuilder,
+                              deleter);
+}
+
+bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
+  return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }
 
 void BridgedPassContext::createStaticInitializer(BridgedGlobalVar global, BridgedInstruction initValue) const {

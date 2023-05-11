@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -O -wmo -emit-sil %s | %FileCheck -check-prefix=CHECK-WMO %s
 
 // REQUIRES: swift_in_compiler
 

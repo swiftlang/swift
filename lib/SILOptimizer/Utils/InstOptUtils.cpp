@@ -990,6 +990,14 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
     return false;
   }
 
+  // We must not introduce copies for move only types.
+  // TODO: in OSSA, instead of bailing, it's possible to destroy the arguments
+  //       without the need of copies.
+  for (Operand *argOp : argsToHandle) {
+    if (argOp->get()->getType().isMoveOnly())
+      return false;
+  }
+
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
 
@@ -1024,11 +1032,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
   if (pa && pa->isOnStack()) {
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {
-      if (isa<DeallocStackInst>(use->getUser())
-          || isa<DebugValueInst>(use->getUser()))
-        deleteInsts.push_back(use->getUser());
-      else if (!deadMarkDependenceUser(use->getUser(), deleteInsts))
+      SILInstruction *user = use->getUser();
+      if (isa<DeallocStackInst>(user)
+          || isa<DebugValueInst>(user)
+          || isa<DestroyValueInst>(user)) {
+        deleteInsts.push_back(user);
+      } else if (!deadMarkDependenceUser(user, deleteInsts)) {
         return false;
+      }
     }
     for (auto *inst : reverse(deleteInsts))
       callbacks.deleteInst(inst);
