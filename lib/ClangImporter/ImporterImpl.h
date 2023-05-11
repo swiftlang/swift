@@ -39,6 +39,7 @@
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/APSInt.h"
@@ -589,6 +590,29 @@ public:
   }
 
 private:
+  /// The Importer may be configured to load modules of a different OS Version
+  /// than the underlying Swift compilation. This is the `TargetOptions`
+  /// corresponding to the instantiating Swift compilation's triple. These are
+  /// to be used by all IRGen/CodeGen clients of `ClangImporter`.
+  std::unique_ptr<clang::TargetInfo> CodeGenTargetInfo;
+  std::unique_ptr<clang::CodeGenOptions> CodeGenOpts;
+
+public:
+  void setSwiftTargetInfo(clang::TargetInfo *SwiftTargetInfo) {
+    CodeGenTargetInfo.reset(SwiftTargetInfo);
+  }
+  clang::TargetInfo *getSwiftTargetInfo() const {
+    return CodeGenTargetInfo.get();
+  }
+
+  void setSwiftCodeGenOptions(clang::CodeGenOptions *SwiftCodeGenOpts) {
+    CodeGenOpts.reset(SwiftCodeGenOpts);
+  }
+  clang::CodeGenOptions *getSwiftCodeGenOptions() const {
+    return CodeGenOpts.get();
+  }
+
+private:
   /// Generation number that is used for crude versioning.
   ///
   /// This value is incremented every time a new module is imported.
@@ -835,7 +859,7 @@ public:
     return Instance->getPreprocessor();
   }
   
-  clang::CodeGenOptions &getClangCodeGenOpts() const {
+  clang::CodeGenOptions &getCodeGenOpts() const {
     return Instance->getCodeGenOpts();
   }
 
@@ -1814,7 +1838,8 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                                  ASTContext &ctx);
+                                  ASTContext &ctx,
+                                  bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
