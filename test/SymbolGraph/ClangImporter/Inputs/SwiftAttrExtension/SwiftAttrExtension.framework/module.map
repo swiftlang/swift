@@ -1,0 +1,4 @@
+framework module SwiftAttrExtension {
+  header "SwiftAttrExtension.h"
+  export *
+}

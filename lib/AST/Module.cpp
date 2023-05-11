@@ -757,8 +757,10 @@ void ModuleDecl::updateSourceFileLocationMap() {
   }
 
   // Next, add all of the macro expansion files.
-  for (auto *sourceFile : AuxiliaryFiles)
-    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+  for (auto *sourceFile : AuxiliaryFiles) {
+    if (sourceFile->getBufferID())
+      sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+  }
 
   // Finally, sort them all so we can do a binary search for lookup.
   std::sort(sourceFileLocationMap->allSourceFiles.begin(),
