@@ -236,10 +236,10 @@ final public class CopyAddrInst : Instruction {
   public var destination: Value { return destinationOperand.value }
   
   public var isTakeOfSrc: Bool {
-    bridged.CopyAddrInst_isTakeOfSrc() != 0
+    bridged.CopyAddrInst_isTakeOfSrc()
   }
   public var isInitializationOfDest: Bool {
-    bridged.CopyAddrInst_isInitializationOfDest() != 0
+    bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
 
@@ -250,16 +250,6 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 }
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
-
-final public class DeallocStackInst : Instruction, UnaryInstruction {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
-
-final public class DeallocStackRefInst : Instruction, UnaryInstruction {
-  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
-}
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
 }
@@ -285,8 +275,6 @@ final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
 final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
-
-final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
@@ -321,6 +309,32 @@ final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstr
 final public class UnimplementedRefCountingInst : RefCountingInst {}
 
 //===----------------------------------------------------------------------===//
+//                      no-value deallocation instructions
+//===----------------------------------------------------------------------===//
+
+public protocol Deallocation : Instruction { }
+
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocstack: AllocStackInst {
+    return operand.value as! AllocStackInst
+  }
+}
+
+final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
+  public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
+}
+
+final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocPartialRefInst : Instruction, Deallocation {}
+
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+
+final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
+
+//===----------------------------------------------------------------------===//
 //                           single-value instructions
 //===----------------------------------------------------------------------===//
 
@@ -350,6 +364,10 @@ final public class BuiltinInst : SingleValueInstruction {
 
   public var id: ID {
     return bridged.BuiltinInst_getID()
+  }
+
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged.BuiltinInst_getSubstitutionMap())
   }
 }
 
@@ -534,7 +552,7 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var instance: Value { operand.value }
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
-  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() != 0 }
+  public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -664,7 +682,7 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
-  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() != 0 }
+  public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
   public func calleeArgIndex(callerArgIndex: Int) -> Int {
     bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
@@ -719,13 +737,14 @@ class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation {
+  public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
-  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() != 0 }
+  final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
 
   final public var canAllocOnStack: Bool {
-    bridged.AllocRefInstBase_canAllocOnStack() != 0
+    bridged.AllocRefInstBase_canAllocOnStack()
   }
 }
 

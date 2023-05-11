@@ -248,8 +248,6 @@ PASS(RedundantLoadElimination, "redundant-load-elim",
      "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Dead Store Elimination")
-PASS(MandatoryGenericSpecializer, "mandatory-generic-specializer",
-     "Mandatory Generic Function Specialization on Static Types")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 PASS(ExistentialSpecializer, "existential-specializer",
@@ -382,6 +380,8 @@ SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
 SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
+SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
+     "Performs optimizations for performance-annotated functions")
 SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
      "Converts read-only var-globals to let-globals")
 SWIFT_MODULE_PASS(StackProtection, "stack-protection",
@@ -400,6 +400,8 @@ SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
     "Cleanup debug_step instructions for Onone")
+SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimization",
+    "Optimize copies to an indirect return value")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",

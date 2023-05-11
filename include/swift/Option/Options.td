@@ -935,7 +935,7 @@ def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
 
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
-  HelpText<"Enable experimental performance annotations">;
+  HelpText<"Deprecated, has no effect">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
