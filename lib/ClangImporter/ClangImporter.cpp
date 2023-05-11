@@ -3029,33 +3029,26 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     }
 
     // Macros.
-    if (auto *ppRec = ClangPP.getPreprocessingRecord()) {
-      clang::SourceLocation B = ClangSM.getLocForStartOfFile(FID);
-      clang::SourceLocation E = ClangSM.getLocForEndOfFile(FID);
-      clang::SourceRange R(B, E);
-      const auto &Entities = ppRec->getPreprocessedEntitiesInRange(R);
-      for (auto I = Entities.begin(), E = Entities.end(); I != E; ++I) {
-        if (!ppRec->isEntityInFileID(I, FID))
-          continue;
-        clang::PreprocessedEntity *PPE = *I;
-        if (!PPE)
-          continue;
-        if (auto *MDR = dyn_cast<clang::MacroDefinitionRecord>(PPE)) {
-          auto *II = const_cast<clang::IdentifierInfo*>(MDR->getName());
-          auto MD = ClangPP.getMacroDefinition(II);
-          if (auto macroNode = getClangNodeForMacroDefinition(MD)) {
-            if (filter(macroNode)) {
-              auto MI = macroNode.getAsMacro();
-              Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-              if (Decl *imported = Impl.importMacro(Name, macroNode))
-                receiver(imported);
-            }
-          }
-        }
-      }
+    for (const auto &Iter : ClangPP.macros()) {
+      auto *II = Iter.first;
+      auto MD = ClangPP.getMacroDefinition(II);
+      MD.forAllDefinitions([&](clang::MacroInfo *Info) {
+        if (Info->isBuiltinMacro())
+          return;
 
-      // FIXME: Module imports inside that header.
+        auto Loc = Info->getDefinitionLoc();
+        if (Loc.isInvalid() || ClangSM.getFileID(Loc) != FID)
+          return;
+
+        ClangNode MacroNode = Info;
+        if (filter(MacroNode)) {
+          auto Name = Impl.getNameImporter().importMacroName(II, Info);
+          if (auto *Imported = Impl.importMacro(Name, MacroNode))
+            receiver(Imported);
+        }
+      });
     }
+    // FIXME: Module imports inside that header.
     return false;
   }
 
