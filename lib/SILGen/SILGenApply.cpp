@@ -4267,7 +4267,8 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
 
   // If we have an indirect_guaranteed argument, move this using store_borrow
   // into an alloc_stack.
-  if (param.isIndirectInGuaranteed() && value.getType().isObject()) {
+  if (SGF.silConv.useLoweredAddresses() &&
+      param.isIndirectInGuaranteed() && value.getType().isObject()) {
     SILValue alloca = SGF.emitTemporaryAllocation(loc, value.getType());
     value = SGF.emitFormalEvaluationManagedStoreBorrow(loc, value.getValue(),
                                                        alloca);
