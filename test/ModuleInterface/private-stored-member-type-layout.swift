@@ -3,16 +3,19 @@
 // Check that importing this module creates the right types
 
 // RUN: %target-swift-frontend -emit-module-interface-path %t/private-stored-members.swiftinterface -module-name PrivateStoredMembers -emit-module -o %t/PrivateStoredMembers.swiftmodule %S/private-stored-members.swift
-// RUN: %target-swift-frontend -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT | %FileCheck %s --check-prefix CHECK-EXEC --check-prefix CHECK
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT | %FileCheck %s --check-prefix CHECK-EXEC --check-prefix CHECK
+// RUN: %target-swift-frontend -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT
 
 // Check that the types are also correct when importing a module created from an interface
 
 // RUN: %target-swift-frontend -emit-module -o %t/PrivateStoredMembers.swiftmodule -module-name PrivateStoredMembers %t/private-stored-members.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT | %FileCheck %s --check-prefix CHECK-EXEC --check-prefix CHECK
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT | %FileCheck %s --check-prefix CHECK-EXEC --check-prefix CHECK
+// RUN: %target-swift-frontend -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT
 
 // Check the types generated when the source file is the primary file, and ensure they're the same layout.
 
-// RUN: %target-swift-frontend -emit-ir %S/private-stored-members.swift %s 2>&1 -module-name main | %FileCheck %s --check-prefix CHECK-MAIN --check-prefix CHECK-EXEC
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %S/private-stored-members.swift %s 2>&1 -module-name main | %FileCheck %s --check-prefix CHECK-MAIN --check-prefix CHECK-EXEC
+// RUN: %target-swift-frontend -emit-ir %S/private-stored-members.swift %s 2>&1 -module-name main
 
 // These two appear out-of-order between run lines
 

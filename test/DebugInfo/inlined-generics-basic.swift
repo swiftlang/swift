@@ -3,7 +3,7 @@
 // RUN:      -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
 // RUN:    | %FileCheck %s --check-prefix=SIL
 // IR.
-// RUN: %target-swift-frontend -parse-as-library -module-name A \
+// RUN: %target-swift-frontend %use_no_opaque_pointers -parse-as-library -module-name A \
 // RUN:      %s -g -O -o - -emit-ir \
 // RUN:      | %FileCheck %s --check-prefix=IR
 

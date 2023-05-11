@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-endian
-// RUN: %target-swift-frontend -emit-ir -disable-concrete-type-metadata-mangled-name-accessors -parse-stdlib %s | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -parse-stdlib %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-endian
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -disable-concrete-type-metadata-mangled-name-accessors -parse-stdlib %s | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -emit-ir -parse-stdlib %s
+// RUN: %target-swift-frontend -emit-ir -disable-concrete-type-metadata-mangled-name-accessors -parse-stdlib %s
 
 // DISABLED-NOT: __swift_instantiateConcreteTypeFromMangledName
 // DISABLED-NOT: MD" = {{.*}} global

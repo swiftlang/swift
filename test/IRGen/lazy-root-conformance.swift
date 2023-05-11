@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -DA -parse-as-library -parse-stdlib -module-name A %s -o %t/A.swiftmodule
-// RUN: %target-swift-frontend -emit-ir -DB -I %t -parse-as-library -parse-stdlib -module-name B -o - %s | %FileCheck %s -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -DB -I %t -parse-as-library -parse-stdlib -module-name B -o - %s | %FileCheck %s -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend -emit-ir -DB -I %t -parse-as-library -parse-stdlib -module-name B -o - %s
 
 #if A
 public protocol P {

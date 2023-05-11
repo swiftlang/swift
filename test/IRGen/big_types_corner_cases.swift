@@ -1,6 +1,7 @@
 // XFAIL: CPU=powerpc64le
 // XFAIL: CPU=s390x
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: CPU=powerpc64le
 

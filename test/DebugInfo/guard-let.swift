@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -c -emit-ir -g -o - | \
 // RUN:   %FileCheck %s --check-prefix=CHECK1
-// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -c -emit-ir -g -o - | \
 // RUN:   %FileCheck %s --check-prefix=CHECK2
-// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | \
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -c -emit-ir -g -o - | \
 // RUN:   %FileCheck %s --check-prefix=CHECK3
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -c -emit-ir -g -o -
 
 // UNSUPPORTED: OS=watchos
 

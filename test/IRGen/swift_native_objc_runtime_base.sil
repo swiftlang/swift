@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s
 
 // CHECK-LABEL: @"$s30swift_native_objc_runtime_base1CCMm" = hidden global %objc_class {
 // -- metaclass "isa" is root metaclass

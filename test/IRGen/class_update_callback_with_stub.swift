@@ -3,7 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -I %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_objc_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_objc_class.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -target %target-next-stable-abi-triple %s > %t/out
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %use_no_opaque_pointers -I %t -emit-ir -enable-library-evolution -target %target-next-stable-abi-triple %s > %t/out
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -target %target-next-stable-abi-triple %s
 // RUN: %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize < %t/out
 // RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out
 

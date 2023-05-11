@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop
 
 // REQUIRES: concurrency
 

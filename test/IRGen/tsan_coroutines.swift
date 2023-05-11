@@ -1,6 +1,7 @@
 // REQUIRES: tsan_runtime
 // This test case used to crash when tsan ran before co-routine lowering.
-// RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -sanitize=thread %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -sanitize=thread %s
 
 // TSan is only supported on 64 bit.
 // REQUIRES: PTRSIZE=64

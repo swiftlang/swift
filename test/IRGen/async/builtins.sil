@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc,CHECK-%target-ptrsize
-// RUN: %target-swift-frontend  -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
+// RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
+// RUN: %target-swift-frontend  -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all
 
 // REQUIRES: concurrency
 // XFAIL: CPU=arm64e

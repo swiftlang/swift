@@ -9,7 +9,8 @@
 // RUN:   -emit-module-path=%t/OtherModule.swiftmodule \
 // RUN:   -module-name=OtherModule %S/Inputs/OtherModule.swift
 
-// RUN: %target-swift-frontend -module-name main -I %t -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name main -I %t -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -module-name main -I %t -emit-ir %s
 
 // rdar://39763787
 

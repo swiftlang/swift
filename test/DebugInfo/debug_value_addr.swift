@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o -
 // RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck -check-prefix=CHECK-SIL %s
 
 // Verify that -Onone shadow copies are emitted for debug_value_addr

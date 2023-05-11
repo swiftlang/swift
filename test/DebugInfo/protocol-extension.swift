@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o -
 
 public protocol P {
   var v : Int32 { get };

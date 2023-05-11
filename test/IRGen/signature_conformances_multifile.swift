@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-generic-metadata-prespecialization -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir -primary-file %s %S/Inputs/signature_conformances_other.swift
 
 // Make sure we correctly determine the witness table is dependent, even though
 // it was defined in a different file.

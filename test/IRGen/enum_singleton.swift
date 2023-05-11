@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -O %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir -O %s
 
 public enum Payload {
   case c1(Bool)

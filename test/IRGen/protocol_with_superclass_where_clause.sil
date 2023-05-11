@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name protocol_with_superclass | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -module-name protocol_with_superclass | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name protocol_with_superclass
 
 sil_stage canonical
 

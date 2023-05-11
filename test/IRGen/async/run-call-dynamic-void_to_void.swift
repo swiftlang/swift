@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -disable-availability-checking -g %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -emit-ir -parse-as-library -module-name main
 // RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -parse-as-library -module-name main -o %t/main %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s

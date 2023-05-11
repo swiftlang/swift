@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -module-name inout -o %t.ll
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -module-name inout -o %t.ll
+// RUN: %target-swift-frontend %s -emit-ir -g -module-name inout
 // RUN: cat %t.ll | %FileCheck %s
 // RUN: cat %t.ll | %FileCheck %s --check-prefix=PROMO-CHECK
 // RUN: cat %t.ll | %FileCheck %s --check-prefix=FOO-CHECK

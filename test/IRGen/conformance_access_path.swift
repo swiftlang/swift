@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 // RUN: %FileCheck %s < %t.ll
 
 

@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module
 
 // Ensure that same-type constraints between generic arguments get reflected
 // correctly in the type context descriptor.
