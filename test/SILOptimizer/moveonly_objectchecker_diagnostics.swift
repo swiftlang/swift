@@ -2787,9 +2787,7 @@ public func closureCaptureClassUseAfterConsume1(_ x: borrowing Klass) { // expec
 
 public func closureCaptureClassUseAfterConsume2(_ x2: inout Klass) {
     // expected-note @-1 {{'x2' is declared 'inout'}}
-    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
     let f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
-        // expected-note @-1 {{consuming use here}}
         borrowVal(x2) // expected-note {{captured here}}
         consumeVal(x2) // expected-note {{captured here}}
         consumeVal(x2)  // expected-note {{captured here}}
