@@ -125,7 +125,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-  P.addEarlyAllocBoxToStack();
+  P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
 
@@ -168,11 +168,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   //
   // End Ownership Optimizations
   //===---
-
-  // Now that we have finished checking noncopyable types, run later alloc box
-  // to stack, so that we promote to the stack any heap boxes that are captured
-  // by escaping closures where the closure does not actually escape.
-  P.addAllocBoxToStack();
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping
