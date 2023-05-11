@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name=Swift -I%S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -parse-stdlib -module-name=Swift -I%S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name=Swift -I%S/Inputs %s
 
 // This module contains an enum that gets imported by the compiler as an
 // OptionSet.  What we're trying to test here is that a *non-resilient*

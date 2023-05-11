@@ -1,4 +1,5 @@
-// RUN: %swift -target armv7-apple-ios10 -disable-legacy-type-info -module-name integer_literal %s -gnone -emit-ir | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -target armv7-apple-ios10 -disable-legacy-type-info -module-name integer_literal %s -gnone -emit-ir | %FileCheck %s
+// RUN: %swift -target armv7-apple-ios10 -disable-legacy-type-info -module-name integer_literal %s -gnone -emit-ir
 
 // REQUIRES: CODEGENERATOR=ARM
 

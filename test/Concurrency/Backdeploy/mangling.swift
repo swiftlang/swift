@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir -o %t/new.ir
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx12.0 -module-name main -emit-ir
 // RUN: %FileCheck %s --check-prefix=NEW < %t/new.ir
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -o %t/old.ir -disable-availability-checking
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -module-name main -emit-ir -disable-availability-checking
 // RUN: %FileCheck %s --check-prefix=OLD < %t/old.ir
 
 // Check that we add extra type metadata accessors for new kinds of functions

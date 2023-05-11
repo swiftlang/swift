@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
 
 // Resilient protocol definition
-// RUN: %target-swift-frontend -emit-ir -enable-library-evolution -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -DINT=i%target-ptrsize -check-prefix=CHECK-DEFINITION %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -enable-library-evolution -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -DINT=i%target-ptrsize -check-prefix=CHECK-DEFINITION %s
+// RUN: %target-swift-frontend -emit-ir -enable-library-evolution -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
 
 // Resilient protocol usage
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
 
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
+// RUN: %target-swift-frontend %use_no_opaque_pointers -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s
 
 // ----------------------------------------------------------------------------
 // Resilient protocol definition

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4
 
 struct Struct<T> {
     var x: T

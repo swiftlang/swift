@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -sil-verify-all -sil-combine %s | %FileCheck %s
-// RUN: %target-swift-frontend -g -O -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -g -O -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend -g -O -emit-ir -primary-file %s
 
 sil_stage canonical
 

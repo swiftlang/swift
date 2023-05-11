@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir
 
 // REQUIRES: objc_interop
 import Foundation

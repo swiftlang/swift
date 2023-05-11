@@ -1,4 +1,5 @@
-// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swiftxx-frontend %use_no_opaque_pointers -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s -Xcc -fignore-exceptions
 
 // https://github.com/apple/swift/issues/55575
 // We can't yet call member functions correctly on Windows.

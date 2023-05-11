@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o -
 // REQUIRES: objc_interop
 public struct Q<T> {
   let x: T

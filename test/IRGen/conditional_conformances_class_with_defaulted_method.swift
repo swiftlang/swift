@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s -module-name x | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -module-name x | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -module-name x
 
 // rdar://problem/40078863 - witness signatures get adjusted and the
 // ProtocolConformances accompanying them did not, resulting in an extra witness

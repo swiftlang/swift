@@ -1,8 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_classes.sil
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type,CHECK-%target-import-type-objc
-// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
-// RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
+// RUN: %target-swift-frontend %use_no_opaque_pointers %t/generic_classes.sil -emit-ir -enable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-objc,CHECK-%target-import-type,CHECK-%target-import-type-objc
+// RUN: %target-swift-frontend %use_no_opaque_pointers %t/generic_classes.sil -emit-ir -disable-objc-interop | %FileCheck %t/generic_classes.sil --check-prefixes=CHECK,CHECK-native,CHECK-%target-import-type
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Osize %t/generic_classes.sil -emit-ir | %FileCheck %t/generic_classes.sil --check-prefix=OSIZE
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -enable-objc-interop
+// RUN: %target-swift-frontend %t/generic_classes.sil -emit-ir -disable-objc-interop
+// RUN: %target-swift-frontend -Osize %t/generic_classes.sil -emit-ir
 
 // REQUIRES: PTRSIZE=64
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -enable-library-evolution
 
 // REQUIRES: concurrency

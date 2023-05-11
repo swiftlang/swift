@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -disable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -disable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -disable-objc-interop %s
 
 // Note: -disable-objc-interop is used to give consistent results on Darwin
 // and Linux, avoiding differences like %swift.refcounted -vs- %objc_object,

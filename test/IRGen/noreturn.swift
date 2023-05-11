@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -emit-ir -primary-file %s -import-objc-header %S/Inputs/noreturn.h
 
 
 // CHECK-LABEL: define {{.*}} void @"$s1A018testDirectReturnNoC0yyF"()

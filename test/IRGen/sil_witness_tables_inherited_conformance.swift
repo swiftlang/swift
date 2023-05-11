@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir
 
 // rdar://problem/20628295
 

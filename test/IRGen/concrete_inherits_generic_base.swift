@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -module-name foo -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name foo -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -module-name foo -emit-ir %s
 
 // CHECK: %swift.type = type { [[INT]] }
 
