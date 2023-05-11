@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -enable-copy-propagation -enable-lexical-lifetimes=false %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -enable-copy-propagation -enable-lexical-lifetimes=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-copy-propagation -enable-lexical-lifetimes=false %s
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-disable-pass=simplification -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir %s
 
 sil_stage canonical
 

@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -g -emit-sil -o - | %FileCheck --check-prefix=CHECK-SIL %s
-// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o -
 import Builtin
 import Swift
 

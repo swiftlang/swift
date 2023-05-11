@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -parse-stdlib %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -parse-stdlib %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib %s -emit-ir
 
 import Swift
 import _Differentiation

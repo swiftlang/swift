@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos12 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-OS
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos11 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-BACKDEPLOY
+// RUN: %target-swift-frontend %use_no_opaque_pointers -target %target-cpu-apple-macos12 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-OS
+// RUN: %target-swift-frontend %use_no_opaque_pointers -target %target-cpu-apple-macos11 -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix CHECK-BACKDEPLOY
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos12 -emit-ir -o - -primary-file %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos11 -emit-ir -o - -primary-file %s
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o %t
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -emit-ir -g -o %t
+// RUN: %target-swift-frontend %s -emit-ir -g
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK3

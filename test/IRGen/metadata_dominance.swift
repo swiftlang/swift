@@ -1,5 +1,8 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
-// RUN: %target-swift-frontend -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -primary-file %s
+// RUN: %target-swift-frontend -O -emit-ir -primary-file %s
+
 
 func use_metadata<F>(_ f: F) {}
 

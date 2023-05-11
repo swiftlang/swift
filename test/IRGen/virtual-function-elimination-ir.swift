@@ -1,8 +1,10 @@
 // Tests that under -enable-llvm-vfe, IRGen marks vtables and vcall sites with
 // the right attributes and intrinsics.
 
-// RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-vfe \
+// RUN: %target-build-swift %use_no_opaque_pointers -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-vfe \
 // RUN:    %s -emit-ir -o - | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-vfe \
+// RUN:    %s -emit-ir -o -
 
 // UNSUPPORTED: OS=windows-msvc
 

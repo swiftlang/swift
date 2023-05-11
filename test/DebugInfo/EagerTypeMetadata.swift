@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers %s -Onone -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o -
 
 public class C<T>
 {

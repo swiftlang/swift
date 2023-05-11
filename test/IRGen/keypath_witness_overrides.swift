@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name protocol_overrides -emit-module -enable-library-evolution -emit-module-path=%t/protocol_overrides.swiftmodule %S/../SILGen/Inputs/protocol_overrides.swift
-// RUN: %target-swift-frontend -module-name keypath_witness_overrides -emit-ir %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name keypath_witness_overrides -emit-ir %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -module-name keypath_witness_overrides -emit-ir %s -I %t
 
 import protocol_overrides
 

@@ -6,8 +6,10 @@
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 //
-// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-library-evolution %s \
+// RUN: %target-swift-frontend %use_no_opaque_pointers -g -I %t -emit-ir -enable-library-evolution %s \
 // RUN:    -o - | %FileCheck %s
+// RUN: %target-swift-frontend -g -I %t -emit-ir -enable-library-evolution %s \
+// RUN:    -o -
 //
 import resilient_struct
 

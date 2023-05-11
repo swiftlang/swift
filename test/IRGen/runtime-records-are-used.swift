@@ -1,4 +1,5 @@
-// RUN: %swift -target arm64-apple-macos11.0 -parse-stdlib %s -module-name Swift -emit-ir -o - | %FileCheck %s
+// RUN: %swift %use_no_opaque_pointers -target arm64-apple-macos11.0 -parse-stdlib %s -module-name Swift -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target arm64-apple-macos11.0 -parse-stdlib %s -module-name Swift -emit-ir -o -
 
 public protocol Simple {}
 

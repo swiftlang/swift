@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -module-name main %s -emit-ir | %FileCheck %s --check-prefix=CHECK-CACHE
-// RUN: %target-swift-frontend -module-name main %s -emit-ir -disable-preallocated-instantiation-caches | %FileCheck %s --check-prefix=CHECK-NOCACHE
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name main %s -emit-ir | %FileCheck %s --check-prefix=CHECK-CACHE
+// RUN: %target-swift-frontend %use_no_opaque_pointers -module-name main %s -emit-ir -disable-preallocated-instantiation-caches | %FileCheck %s --check-prefix=CHECK-NOCACHE
+// RUN: %target-swift-frontend -module-name main %s -emit-ir
+// RUN: %target-swift-frontend -module-name main %s -emit-ir -disable-preallocated-instantiation-caches
+
 
 public class Generic<T> {
   public func m1(t: T) -> T { return t }

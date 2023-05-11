@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s -g -o - \
+// RUN: %target-swift-frontend %use_no_opaque_pointers -emit-ir %s -g -o - \
 // RUN:    -parse-as-library -module-name a -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -g -o - \
+// RUN:    -parse-as-library -module-name a -disable-availability-checking
 
 public func f1<each T>(ts: repeat each T) {
   // CHECK: define {{.*}} @"$s1a2f12tsyxxQp_tRvzlF"(%swift.opaque** {{.*}}, i{{32|64}} [[COUNT1_1:.*]], %swift.type** {{.*}})

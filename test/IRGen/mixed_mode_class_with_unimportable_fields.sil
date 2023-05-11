@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 %S/Inputs/mixed_mode/UsingObjCStuff.swift
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize  -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize  -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %use_no_opaque_pointers -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=simplification -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s
 
 // REQUIRES: objc_interop
 

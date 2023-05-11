@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-ir -import-objc-header %S/../Inputs/objc_direct.h -o - %s | %FileCheck %s
+// RUN: %target-swift-emit-ir %use_no_opaque_pointers -import-objc-header %S/../Inputs/objc_direct.h -o - %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -import-objc-header %S/../Inputs/objc_direct.h -o - %s
 
 // REQUIRES: objc_interop
 

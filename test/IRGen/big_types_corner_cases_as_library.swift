@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir  -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -disable-type-layout %s -emit-ir  -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir  -parse-as-library
 
 public struct BigStruct {
   var i0 : Int32 = 0

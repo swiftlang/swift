@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -parse-stdlib -disable-access-control
 
 // REQUIRES: PTRSIZE=64
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %use_no_opaque_pointers -primary-file %s -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir
 
 // rdar://24121475
 //   Ideally, these wouldn't be in the v-table at all; but as long as they
