@@ -4261,7 +4261,19 @@ static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
     }
   }
 
+  // TODO: This does not take into account resilience, we should probably use
+  // getArgumentType()... but we do not have the SILFunctionType here...
   assert(param.getInterfaceType() == value.getType().getASTType());
+
+  // If we have an indirect_guaranteed argument, move this using store_borrow
+  // into an alloc_stack.
+  if (SGF.silConv.useLoweredAddresses() &&
+      param.isIndirectInGuaranteed() && value.getType().isObject()) {
+    SILValue alloca = SGF.emitTemporaryAllocation(loc, value.getType());
+    value = SGF.emitFormalEvaluationManagedStoreBorrow(loc, value.getValue(),
+                                                       alloca);
+  }
+
   args[argIndex++] = value;
 }
 
