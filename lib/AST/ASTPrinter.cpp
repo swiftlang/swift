@@ -3340,6 +3340,23 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Expression);
 }
 
+static bool usesFeatureLexicalLifetimes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<EagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<NoEagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<LexicalLifetimesAttr>();
+}
+
+static void
+suppressingFeatureLexicalLifetimes(PrintOptions &options,
+                                   llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_EagerMove);
+  options.ExcludeAttrList.push_back(DAK_NoEagerMove);
+  options.ExcludeAttrList.push_back(DAK_LexicalLifetimes);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
