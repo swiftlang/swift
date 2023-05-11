@@ -447,6 +447,26 @@ func test_partually_flattened_expansions() {
   _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
 }
 
+// rdar://109160060 - tuple with pack expansions is not convertible to Any
+do {
+  func test1<each T>(_: repeat (each T).Type) -> (repeat each T) {}
+  print(test1(Int.self, String.self))
+
+  func test2<each T>(_ s: [Any], t: repeat (each T).Type) -> (repeat each T) {
+    var iter = s.makeIterator()
+    return (repeat (iter.next()! as! (each T)))
+  }
+
+  print(test2([]))
+  print(test2([1], t: Int.self))
+  print(test2([1, "hi"], t: Int.self, String.self))
+  print(test2([1, "hi", false], t: Int.self, String.self, Bool.self))
+
+  func test3<each T>(v: Any) -> (Int, repeat each T) {
+    return v // expected-error {{cannot convert return expression of type 'Any' to return type '(Int, repeat each T)'}}
+  }
+}
+
 // rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
 do {
   func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
