@@ -669,9 +669,14 @@ importer::getNormalInvocationArguments(
   }
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
-  if (!moduleCachePath.empty()) {
+  if (!moduleCachePath.empty() && !importerOpts.DisableImplicitClangModules) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
+  }
+
+  if (importerOpts.DisableImplicitClangModules) {
+    invocationArgStrs.push_back("-fno-implicit-modules");
+    invocationArgStrs.push_back("-fno-implicit-module-maps");
   }
 
   if (ctx.SearchPathOpts.DisableModulesValidateSystemDependencies) {
