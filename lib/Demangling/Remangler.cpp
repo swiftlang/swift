@@ -2091,6 +2091,10 @@ ManglingError Remangler::mangleInitializer(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleInitAccessor(Node *node, unsigned depth) {
+  return mangleAbstractStorage(node->getFirstChild(), "i", depth + 1);
+}
+
 ManglingError
 Remangler::manglePropertyWrapperBackingInitializer(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
