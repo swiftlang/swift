@@ -2076,6 +2076,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto finishDiagProcessing = [&](int retValue, bool verifierEnabled) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
     PDC.setSuppressOutput(false);
+    if (auto *CDP = Instance->getCachingDiagnosticsProcessor()) {
+      // Don't cache if build failed.
+      if (retValue)
+        CDP->endDiagnosticCapture();
+    }
     bool diagnosticsError = Instance->getDiags().finishProcessing();
     // If the verifier is enabled and did not encounter any verification errors,
     // return 0 even if the compile failed. This behavior isn't ideal, but large
