@@ -3348,3 +3348,9 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
   lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
                      /*IncludeTopLevel=*/false, Loc);
 }
+
+void CompletionLookup::getWithoutConstraintTypes() {
+  // FIXME: Once we have a typealias declaration for copyable, we should be
+  // returning that instead of a keyword (rdar://109107817).
+  addKeyword("Copyable");
+}

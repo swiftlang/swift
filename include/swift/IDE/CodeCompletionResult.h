@@ -228,6 +228,9 @@ enum class CompletionKind : uint8_t {
   ForEachPatternBeginning,
   TypeAttrBeginning,
   OptionalBinding,
+
+  /// Completion after `~` in an inheritance clause.
+  WithoutConstraintType
 };
 
 enum class CodeCompletionDiagnosticSeverity : uint8_t {
