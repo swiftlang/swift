@@ -194,7 +194,8 @@ namespace {
         Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
       }
 
-      auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+      auto PCH =
+          Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash, /*Cached=*/true);
       if (PCH.has_value()) {
         Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
             PCH.value();
@@ -942,8 +943,9 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.str().str();
 }
 
-Optional<std::string> ClangImporter::getOrCreatePCH(
-    const ClangImporterOptions &ImporterOptions, StringRef SwiftPCHHash) {
+Optional<std::string>
+ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
+                              StringRef SwiftPCHHash, bool Cached) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -959,8 +961,8 @@ Optional<std::string> ClangImporter::getOrCreatePCH(
         << EC.message();
       return None;
     }
-    auto FailedToEmit =
-        emitBridgingPCH(ImporterOptions.BridgingHeader, PCHFilename.value());
+    auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
+                                        PCHFilename.value(), Cached);
     if (FailedToEmit) {
       return None;
     }
@@ -1702,13 +1704,13 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
 }
 
 bool ClangImporter::emitBridgingPCH(
-    StringRef headerPath, StringRef outputPCHPath) {
+    StringRef headerPath, StringRef outputPCHPath, bool cached) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
   auto LangOpts = invocation.getLangOpts();
   LangOpts->NeededByPCHOrCompilationUsesPCH = true;
-  LangOpts->CacheGeneratedPCH = true;
+  LangOpts->CacheGeneratedPCH = cached;
 
   auto language = getLanguageFromOptions(LangOpts);
   auto inputFile = clang::FrontendInputFile(headerPath, language);
