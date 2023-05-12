@@ -24,6 +24,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "ModuleFileSharedCore.h"
 
@@ -174,12 +175,10 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     if (dependencyTracker) {
       dependencyTracker->startTracking();
       dependencyTracker->trackFile(moduleInterfacePath);
-      RootID = cantFail(dependencyTracker->createTreeFromDependencies())
-                   .getID()
-                   .toString();
-      Args.push_back("-enable-cas");
-      Args.push_back("-cas-path");
-      Args.push_back(Ctx.ClangImporterOpts.CASPath);
+      auto RootOrError = dependencyTracker->createTreeFromDependencies();
+      if (!RootOrError)
+        return llvm::errorToErrorCode(RootOrError.takeError());
+      RootID = RootOrError->getID().toString();
     }
 
     std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());

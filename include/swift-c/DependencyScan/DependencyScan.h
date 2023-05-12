@@ -140,6 +140,10 @@ swiftscan_swift_textual_detail_get_command_line(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_textual_detail_get_bridging_pch_command_line(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_extra_pcm_args(
     swiftscan_module_details_t details);
 

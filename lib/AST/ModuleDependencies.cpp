@@ -210,6 +210,50 @@ Optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
   return Root;
 }
 
+Optional<std::string> ModuleDependencyInfo::getClangIncludeTree() const {
+  std::string Root;
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::Clang: {
+    auto clangModuleStorage = cast<ClangModuleDependencyStorage>(storage.get());
+    Root = clangModuleStorage->clangIncludeTreeRoot;
+    break;
+  }
+  default:
+    return None;
+  }
+  if (Root.empty())
+    return None;
+
+  return Root;
+}
+
+Optional<std::string>
+ModuleDependencyInfo::getBridgingHeaderIncludeTree() const {
+  std::string Root;
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    Root = swiftInterfaceStorage->textualModuleDetails
+               .bridgingHeaderIncludeTreeRoot;
+    break;
+  }
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    Root =
+        swiftSourceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot;
+    break;
+  }
+  default:
+    return None;
+  }
+  if (Root.empty())
+    return None;
+
+  return Root;
+}
+
 std::string ModuleDependencyInfo::getModuleOutputPath() const {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
@@ -281,6 +325,27 @@ void ModuleDependencyInfo::addBridgingSourceFile(StringRef bridgingSourceFile) {
   }
 }
 
+void ModuleDependencyInfo::addBridgingHeaderIncludeTree(StringRef ID) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    swiftInterfaceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot =
+        ID.str();
+    break;
+  }
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->textualModuleDetails.bridgingHeaderIncludeTreeRoot =
+        ID.str();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
 void ModuleDependencyInfo::addSourceFile(StringRef sourceFile) {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftSource: {
@@ -320,7 +385,7 @@ void ModuleDependencyInfo::addBridgingModuleDependency(
 SwiftDependencyScanningService::SwiftDependencyScanningService() {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::Full,
+      clang::tooling::dependencies::ScanningOutputFormat::FullTree,
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
@@ -341,20 +406,24 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   return FS->createTreeFromNewAccesses();
 }
 
-void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance) {
- auto existingFS = Instance.getSourceMgr().getFileSystem();
- llvm::IntrusiveRefCntPtr<
-     clang::tooling::dependencies::DependencyScanningWorkerFilesystem>
-     depFS =
-         new clang::tooling::dependencies::DependencyScanningWorkerFilesystem(
-             getSharedFilesystemCache(), existingFS);
- Instance.getSourceMgr().setFileSystem(depFS);
+void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
+    CompilerInstance &Instance) {
+  auto existingFS = Instance.getSourceMgr().getFileSystem();
+  llvm::IntrusiveRefCntPtr<
+      clang::tooling::dependencies::DependencyScanningWorkerFilesystem>
+      depFS =
+          new clang::tooling::dependencies::DependencyScanningWorkerFilesystem(
+              getSharedFilesystemCache(), existingFS);
+  Instance.getSourceMgr().setFileSystem(depFS);
 }
 
 void SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
   if (!Instance.getInvocation().getFrontendOptions().EnableCAS)
     return;
+
+  // Setup CAS.
+  CAS = Instance.getSharedCASInstance();
 
   // Add SDKSetting file.
   SmallString<256> SDKSettingPath;
@@ -376,7 +445,8 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
       CommonDependencyFiles.emplace_back(F->path().str());
   }
 
-  auto CachingFS = llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
+  auto CachingFS =
+      llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_create_cas,
                                  "CachingOnDiskFS",
@@ -389,11 +459,18 @@ void SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CASOpts.CASPath = Instance.getInvocation().getFrontendOptions().CASPath;
   CASOpts.ensurePersistentCAS();
 
+  UseClangIncludeTree =
+      Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
+  const clang::tooling::dependencies::ScanningOutputFormat ClangScanningFormat =
+      UseClangIncludeTree
+          ? clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree
+          : clang::tooling::dependencies::ScanningOutputFormat::FullTree;
+
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::FullTree, CASOpts,
-      Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      CacheFS,
+      ClangScanningFormat, CASOpts, Instance.getSharedCASInstance(),
+      Instance.getSharedCacheInstance(),
+      UseClangIncludeTree ? nullptr : CacheFS,
       /* ReuseFileManager */ false, /* OptimizeArgs */ false);
 }
 

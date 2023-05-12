@@ -240,14 +240,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
           extraPCMArgsArrayID, contextHashID, isFramework, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, overlayDependencyIDArrayID,
-          CASFileSystemRootID, moduleCacheKeyID;
+          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID;
       SwiftInterfaceModuleDetailsLayout::readRecord(
           Scratch, outputPathFileID, interfaceFileID,
           compiledModuleCandidatesArrayID, buildCommandLineArrayID,
           extraPCMArgsArrayID, contextHashID, isFramework, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, overlayDependencyIDArrayID,
-          CASFileSystemRootID, moduleCacheKeyID);
+          CASFileSystemRootID, bridgingHeaderIncludeTreeID, moduleCacheKeyID);
 
       auto outputModulePath = getIdentifier(outputPathFileID);
       if (!outputModulePath)
@@ -337,6 +337,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
         llvm::report_fatal_error("Bad overlay dependencies: no qualified dependencies");
       moduleDep.setOverlayDependencies(overlayModuleDependencyIDs.value());
 
+      // Add bridging header include tree
+      auto bridgingHeaderIncludeTree =
+          getIdentifier(bridgingHeaderIncludeTreeID);
+      if (!bridgingHeaderIncludeTree)
+        llvm::report_fatal_error("Bad bridging header include tree");
+      if (!bridgingHeaderIncludeTree->empty())
+        moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
+
       cache.recordDependency(currentModuleName, std::move(moduleDep),
                              getContextHash());
       hasCurrentModule = false;
@@ -355,12 +363,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       unsigned extraPCMArgsArrayID, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID,
           overlayDependencyIDArrayID, CASFileSystemRootID,
-          buildCommandLineArrayID;
+          bridgingHeaderIncludeTreeID, buildCommandLineArrayID,
+          bridgingHeaderBuildCommandLineArrayID;
       SwiftSourceModuleDetailsLayout::readRecord(
           Scratch, extraPCMArgsArrayID, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, overlayDependencyIDArrayID,
-          CASFileSystemRootID, buildCommandLineArrayID);
+          CASFileSystemRootID, bridgingHeaderIncludeTreeID,
+          buildCommandLineArrayID, bridgingHeaderBuildCommandLineArrayID);
 
       auto extraPCMArgs = getStringArray(extraPCMArgsArrayID);
       if (!extraPCMArgs)
@@ -378,10 +388,18 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       std::vector<StringRef> buildCommandRefs;
       for (auto &arg : *commandLine)
         buildCommandRefs.push_back(arg);
+      std::vector<StringRef> bridgingHeaderBuildCommandRefs;
+      auto bridgingHeaderCommandLine =
+          getStringArray(bridgingHeaderBuildCommandLineArrayID);
+      if (!bridgingHeaderCommandLine)
+        llvm::report_fatal_error("Bad bridging header command line");
+      for (auto &arg : *bridgingHeaderCommandLine)
+        bridgingHeaderBuildCommandRefs.push_back(arg);
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftSourceModule(
-          *rootFileSystemID, buildCommandRefs, extraPCMRefs);
+          *rootFileSystemID, buildCommandRefs, bridgingHeaderBuildCommandRefs,
+          extraPCMRefs);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleImports)
@@ -423,6 +441,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       if (!overlayModuleDependencyIDs.has_value())
         llvm::report_fatal_error("Bad overlay dependencies: no qualified dependencies");
       moduleDep.setOverlayDependencies(overlayModuleDependencyIDs.value());
+
+      // Add bridging header include tree
+      auto bridgingHeaderIncludeTree =
+          getIdentifier(bridgingHeaderIncludeTreeID);
+      if (!bridgingHeaderIncludeTree)
+        llvm::report_fatal_error("Bad bridging header include tree");
+      if (!bridgingHeaderIncludeTree->empty())
+        moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep),
                              getContextHash());
@@ -507,12 +533,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       cache.configureForContextHash(getContextHash());
       unsigned pcmOutputPathID, moduleMapPathID, contextHashID, commandLineArrayID,
                fileDependenciesArrayID, capturedPCMArgsArrayID, CASFileSystemRootID,
-               moduleCacheKeyID;
+               clangIncludeTreeRootID, moduleCacheKeyID;
       ClangModuleDetailsLayout::readRecord(Scratch, pcmOutputPathID, moduleMapPathID,
                                            contextHashID, commandLineArrayID,
                                            fileDependenciesArrayID,
                                            capturedPCMArgsArrayID,
                                            CASFileSystemRootID,
+                                           clangIncludeTreeRootID,
                                            moduleCacheKeyID);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
@@ -535,14 +562,18 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       auto rootFileSystemID = getIdentifier(CASFileSystemRootID);
       if (!rootFileSystemID)
         llvm::report_fatal_error("Bad CASFileSystem RootID");
+      auto clangIncludeTreeRoot = getIdentifier(clangIncludeTreeRootID);
+      if (!clangIncludeTreeRoot)
+        llvm::report_fatal_error("Bad clang include tree ID");
       auto moduleCacheKey = getIdentifier(moduleCacheKeyID);
       if (!moduleCacheKeyID)
         llvm::report_fatal_error("Bad moduleCacheKey");
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencyInfo::forClangModule(*pcmOutputPath,
-          *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies,
-          *capturedPCMArgs, *rootFileSystemID, *moduleCacheKey);
+      auto moduleDep = ModuleDependencyInfo::forClangModule(
+          *pcmOutputPath, *moduleMapPath, *contextHash, *commandLineArgs,
+          *fileDependencies, *capturedPCMArgs, *rootFileSystemID,
+          *clangIncludeTreeRoot, *moduleCacheKey);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleImports)
@@ -681,6 +712,7 @@ enum ModuleIdentifierArrayKind : uint8_t {
   BridgingSourceFiles,
   BridgingModuleDependencies,
   SwiftOverlayDependencyIDs,
+  BridgingHeaderBuildCommandLine,
   NonPathCommandLine,
   FileDependencies,
   CapturedPCMArgs,
@@ -899,6 +931,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         getArrayID(moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies),
         getArrayID(moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs),
         getIdentifier(swiftTextDeps->textualModuleDetails.CASFileSystemRootID),
+        getIdentifier(swiftTextDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot),
         getIdentifier(swiftTextDeps->moduleCacheKey));
     break;
   }
@@ -921,7 +954,9 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         getArrayID(moduleID, ModuleIdentifierArrayKind::BridgingModuleDependencies),
         getArrayID(moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs),
         getIdentifier(swiftSourceDeps->textualModuleDetails.CASFileSystemRootID),
-        getArrayID(moduleID, ModuleIdentifierArrayKind::BuildCommandLine));
+        getIdentifier(swiftSourceDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot),
+        getArrayID(moduleID, ModuleIdentifierArrayKind::BuildCommandLine),
+        getArrayID(moduleID, ModuleIdentifierArrayKind::BridgingHeaderBuildCommandLine));
     break;
   }
   case swift::ModuleDependencyKind::SwiftBinary: {
@@ -963,6 +998,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(ModuleDependencyID modul
         getArrayID(moduleID, ModuleIdentifierArrayKind::FileDependencies),
         getArrayID(moduleID, ModuleIdentifierArrayKind::CapturedPCMArgs),
         getIdentifier(clangDeps->CASFileSystemRootID),
+        getIdentifier(clangDeps->clangIncludeTreeRoot),
         getIdentifier(clangDeps->moduleCacheKey));
 
     break;
@@ -1097,6 +1133,8 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependencyIDs,
             swiftTextDeps->textualModuleDetails.swiftOverlayDependencies);
         addIdentifier(swiftTextDeps->textualModuleDetails.CASFileSystemRootID);
+        addIdentifier(
+            swiftTextDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot);
         addIdentifier(swiftTextDeps->moduleCacheKey);
         break;
       }
@@ -1140,6 +1178,10 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addStringArray(
             moduleID, ModuleIdentifierArrayKind::BuildCommandLine,
             swiftSourceDeps->textualModuleDetails.buildCommandLine);
+        addStringArray(
+            moduleID, ModuleIdentifierArrayKind::BridgingHeaderBuildCommandLine,
+            swiftSourceDeps->textualModuleDetails
+                .bridgingHeaderBuildCommandLine);
         addIdentifier(
             swiftSourceDeps->textualModuleDetails.CASFileSystemRootID);
         break;
@@ -1157,6 +1199,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addStringArray(moduleID, ModuleIdentifierArrayKind::CapturedPCMArgs,
                        clangDeps->capturedPCMArgs);
         addIdentifier(clangDeps->CASFileSystemRootID);
+        addIdentifier(clangDeps->clangIncludeTreeRoot);
         addIdentifier(clangDeps->moduleCacheKey);
         break;
       }

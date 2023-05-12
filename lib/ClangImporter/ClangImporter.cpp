@@ -1729,7 +1729,8 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
 
   auto &FrontendOpts = invocation->getFrontendOpts();
   FrontendOpts.DisableFree = false;
-  FrontendOpts.Inputs.clear();
+  if (FrontendOpts.CASIncludeTreeID.empty())
+    FrontendOpts.Inputs.clear();
 
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
     Impl.Instance->getPCHContainerOperations(),
@@ -1760,7 +1761,8 @@ bool ClangImporter::emitBridgingPCH(
   auto inputFile = clang::FrontendInputFile(headerPath, language);
 
   auto &FrontendOpts = invocation.getFrontendOpts();
-  FrontendOpts.Inputs = {inputFile};
+  if (invocation.getFrontendOpts().CASIncludeTreeID.empty())
+    FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OutputFile = outputPCHPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
@@ -1792,7 +1794,8 @@ bool ClangImporter::runPreprocessor(
   auto inputFile = clang::FrontendInputFile(inputPath, language);
 
   auto &FrontendOpts = invocation.getFrontendOpts();
-  FrontendOpts.Inputs = {inputFile};
+  if (invocation.getFrontendOpts().CASIncludeTreeID.empty())
+    FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OutputFile = outputPath.str();
   FrontendOpts.ProgramAction = clang::frontend::PrintPreprocessedInput;
 
@@ -1815,11 +1818,13 @@ bool ClangImporter::emitPrecompiledModule(
   auto language = getLanguageFromOptions(LangOpts);
 
   auto &FrontendOpts = invocation.getFrontendOpts();
-  auto inputFile = clang::FrontendInputFile(
-      moduleMapPath, clang::InputKind(
-          language, clang::InputKind::ModuleMap, false),
-      FrontendOpts.IsSystemModule);
-  FrontendOpts.Inputs = {inputFile};
+  if (invocation.getFrontendOpts().CASIncludeTreeID.empty()) {
+    auto inputFile = clang::FrontendInputFile(
+        moduleMapPath,
+        clang::InputKind(language, clang::InputKind::ModuleMap, false),
+        FrontendOpts.IsSystemModule);
+    FrontendOpts.Inputs = {inputFile};
+  }
   FrontendOpts.OriginalModuleMap = moduleMapPath.str();
   FrontendOpts.OutputFile = outputPath.str();
   FrontendOpts.ProgramAction = clang::frontend::GenerateModule;
@@ -1847,7 +1852,8 @@ bool ClangImporter::dumpPrecompiledModule(
           clang::Language::Unknown, clang::InputKind::Precompiled, false));
 
   auto &FrontendOpts = invocation.getFrontendOpts();
-  FrontendOpts.Inputs = {inputFile};
+  if (invocation.getFrontendOpts().CASIncludeTreeID.empty())
+    FrontendOpts.Inputs = {inputFile};
   FrontendOpts.OutputFile = outputPath.str();
 
   auto action = std::make_unique<clang::DumpModuleInfoAction>();

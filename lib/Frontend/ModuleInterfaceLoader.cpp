@@ -1577,6 +1577,20 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-clang-build-session-file");
     GenericArgs.push_back(clangImporterOpts.BuildSessionFilePath);
   }
+
+  if (!clangImporterOpts.CASPath.empty()) {
+    genericSubInvocation.getClangImporterOptions().CASPath =
+        clangImporterOpts.CASPath;
+    GenericArgs.push_back("-enable-cas");
+    GenericArgs.push_back("-cas-path");
+    GenericArgs.push_back(clangImporterOpts.CASPath);
+  }
+
+  if (clangImporterOpts.UseClangIncludeTree) {
+    genericSubInvocation.getClangImporterOptions().UseClangIncludeTree =
+        clangImporterOpts.UseClangIncludeTree;
+    GenericArgs.push_back("-clang-include-tree");
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -2227,6 +2241,7 @@ struct ExplicitCASModuleLoader::Implementation {
     for (auto &entry : ExplicitClangModuleMap) {
       const auto &moduleMapPath = entry.getValue().moduleMapPath;
       if (!moduleMapPath.empty() &&
+          !Ctx.ClangImporterOpts.UseClangIncludeTree &&
           moduleMapsSeen.find(moduleMapPath) == moduleMapsSeen.end()) {
         moduleMapsSeen.insert(moduleMapPath);
         extraClangArgs.push_back(

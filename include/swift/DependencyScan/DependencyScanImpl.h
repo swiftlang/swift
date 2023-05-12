@@ -86,6 +86,9 @@ typedef struct {
   /// Options to the compile command required to build this module interface
   swiftscan_string_set_t *command_line;
 
+  /// Options to the compile command required to build bridging header.
+  swiftscan_string_set_t *bridging_pch_command_line;
+
   /// To build a PCM to be used by this Swift module, we need to append these
   /// arguments to the generic PCM build arguments reported from the dependency
   /// graph.
@@ -99,6 +102,9 @@ typedef struct {
 
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
+
+  /// The CASID for bridging header include tree
+  swiftscan_string_ref_t bridging_header_include_tree;
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
@@ -151,6 +157,9 @@ typedef struct {
 
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
+
+  /// The CASID for CASFileSystemRoot
+  swiftscan_string_ref_t clang_include_tree;
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;

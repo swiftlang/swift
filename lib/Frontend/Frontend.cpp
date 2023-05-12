@@ -439,22 +439,6 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   ResultCache = std::move(MaybeCache->second);
 
   // create baseline key.
-  llvm::Optional<llvm::cas::ObjectRef> FSRef;
-  if (!Opts.CASFSRootID.empty()) {
-    auto CASFSID = CAS->parseID(Opts.CASFSRootID);
-    if (!CASFSID) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           toString(CASFSID.takeError()));
-      return true;
-    }
-    FSRef = CAS->getReference(*CASFSID);
-    if (!FSRef) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
-                           "-cas-fs value does not exist in CAS");
-      return true;
-    }
-  }
-
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
@@ -561,19 +545,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   if (Invocation.getFrontendOptions().EnableCAS &&
-      !Invocation.getFrontendOptions().CASFSRootID.empty()) {
+      (!Invocation.getFrontendOptions().CASFSRootIDs.empty() ||
+       !Invocation.getFrontendOptions().ClangIncludeTrees.empty())) {
     // Set up CASFS as BaseFS.
-    auto RootID = CAS->parseID(Invocation.getFrontendOptions().CASFSRootID);
-    if (!RootID) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
-                           Invocation.getFrontendOptions().CASFSRootID,
-                           toString(RootID.takeError()));
-      return true;
-    }
-    auto FS = llvm::cas::createCASFileSystem(*CAS, *RootID);
+    const auto &Opts = getInvocation().getFrontendOptions();
+    auto FS =
+        createCASFileSystem(*CAS, Opts.CASFSRootIDs, Opts.ClangIncludeTrees);
     if (!FS) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
-                           Invocation.getFrontendOptions().CASFSRootID,
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                            toString(FS.takeError()));
       return true;
     }
@@ -865,6 +844,12 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
+  // There is no input file when building PCM using ClangIncludeTree.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::EmitPCM &&
+      Invocation.getClangImporterOptions().UseClangIncludeTree)
+    return false;
+
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
   const Optional<unsigned> ideInspectionTargetBufferID =

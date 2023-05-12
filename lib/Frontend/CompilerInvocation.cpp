@@ -1436,12 +1436,15 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
       Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
-  if (!workingDirectory.empty()) {
-    // Provide a working directory to Clang as well if there are any -Xcc
-    // options, in case some of them are search-related. But do it at the
-    // beginning, so that an explicit -Xcc -working-directory will win.
-    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
-                          {"-working-directory", workingDirectory.str()});
+  if (FrontendOpts.CASFSRootIDs.empty() &&
+      FrontendOpts.ClangIncludeTrees.empty()) {
+    if (!workingDirectory.empty()) {
+      // Provide a working directory to Clang as well if there are any -Xcc
+      // options, in case some of them are search-related. But do it at the
+      // beginning, so that an explicit -Xcc -working-directory will win.
+      Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                            {"-working-directory", workingDirectory.str()});
+    }
   }
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
@@ -1473,6 +1476,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
+  Opts.UseClangIncludeTree |= Args.hasArg(OPT_clang_include_tree);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();

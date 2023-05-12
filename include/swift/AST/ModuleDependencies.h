@@ -26,8 +26,10 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -128,9 +130,12 @@ public:
 struct CommonSwiftTextualModuleDependencyDetails {
   CommonSwiftTextualModuleDependencyDetails(
       ArrayRef<StringRef> extraPCMArgs, ArrayRef<StringRef> buildCommandLine,
+      ArrayRef<StringRef> bridgingHeaderBuildCommandLine,
       const std::string &CASFileSystemRootID)
       : extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
         buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
+        bridgingHeaderBuildCommandLine(bridgingHeaderBuildCommandLine.begin(),
+                                       bridgingHeaderBuildCommandLine.end()),
         CASFileSystemRootID(CASFileSystemRootID) {}
 
   /// To build a PCM to be used by this Swift module, we need to append these
@@ -155,8 +160,14 @@ struct CommonSwiftTextualModuleDependencyDetails {
   /// interface.
   std::vector<std::string> buildCommandLine;
 
+  /// The Swift frontend invocation arguments to build bridging header.
+  std::vector<std::string> bridgingHeaderBuildCommandLine;
+
   /// CASID for the Root of CASFS. Empty if CAS is not used.
   std::string CASFileSystemRootID;
+
+  /// CASID for the Root of bridgingHeaderClangIncludeTree. Empty if not used.
+  std::string bridgingHeaderIncludeTreeRoot;
 };
 
 /// Describes the dependencies of a Swift module described by an Swift interface file.
@@ -202,7 +213,7 @@ public:
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
       contextHash(contextHash), isFramework(isFramework),
-      textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
+      textualModuleDetails(extraPCMArgs, buildCommandLine, {}, RootID),
       moduleCacheKey(ModuleCacheKey)
       {}
 
@@ -216,10 +227,6 @@ public:
 
   void updateCommandLine(const std::vector<std::string> &newCommandLine) {
     textualModuleDetails.buildCommandLine = newCommandLine;
-  }
-
-  void updateCASFileSystemID(const std::string &ID) {
-    textualModuleDetails.CASFileSystemRootID = ID;
   }
 
   void updateModuleCacheKey(const std::string &Key) {
@@ -243,11 +250,13 @@ public:
   /// Collection of module imports that were detected to be `@Testable`
   llvm::StringSet<> testableImports;
 
-  SwiftSourceModuleDependenciesStorage(const std::string &RootID,
-                                       ArrayRef<StringRef> buildCommandLine,
-                                       ArrayRef<StringRef> extraPCMArgs)
+  SwiftSourceModuleDependenciesStorage(
+      const std::string &RootID, ArrayRef<StringRef> buildCommandLine,
+      ArrayRef<StringRef> bridgingHeaderBuildCommandLine,
+      ArrayRef<StringRef> extraPCMArgs)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource),
-        textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
+        textualModuleDetails(extraPCMArgs, buildCommandLine,
+                             bridgingHeaderBuildCommandLine, RootID),
         testableImports(llvm::StringSet<>()) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -262,8 +271,9 @@ public:
     textualModuleDetails.buildCommandLine = newCommandLine;
   }
 
-  void updateCASFileSystemID(const std::string &ID) {
-    textualModuleDetails.CASFileSystemRootID = ID;
+  void updateBridgingHeaderCommandLine(
+      const std::vector<std::string> &newCommandLine) {
+    textualModuleDetails.bridgingHeaderBuildCommandLine = newCommandLine;
   }
 
   void addTestableImport(ImportPath::Module module) {
@@ -341,6 +351,9 @@ public:
   /// CASID for the Root of CASFS. Empty if CAS is not used.
   std::string CASFileSystemRootID;
 
+  /// CASID for the Root of ClangIncludeTree. Empty if not used.
+  std::string clangIncludeTreeRoot;
+
   /// The cache key for the produced module.
   std::string moduleCacheKey;
 
@@ -352,6 +365,7 @@ public:
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs,
       const std::string &CASFileSystemRootID,
+      const std::string &clangIncludeTreeRoot,
       const std::string &ModuleCacheKey
   ) : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang),
       pcmOutputPath(pcmOutputPath),
@@ -361,6 +375,7 @@ public:
       fileDependencies(fileDependencies),
       capturedPCMArgs(capturedPCMArgs),
       CASFileSystemRootID(CASFileSystemRootID),
+      clangIncludeTreeRoot(clangIncludeTreeRoot),
       moduleCacheKey(ModuleCacheKey) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -473,10 +488,12 @@ public:
   static ModuleDependencyInfo
   forSwiftSourceModule(const std::string &CASFileSystemRootID,
                        ArrayRef<StringRef> buildCommands,
+                       ArrayRef<StringRef> bridgingHeaderBuildCommands,
                        ArrayRef<StringRef> extraPCMArgs) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftSourceModuleDependenciesStorage>(
-            CASFileSystemRootID, buildCommands, extraPCMArgs));
+            CASFileSystemRootID, buildCommands, bridgingHeaderBuildCommands,
+            extraPCMArgs));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -489,12 +506,13 @@ public:
       const std::vector<std::string> &fileDependencies,
       const std::vector<std::string> &capturedPCMArgs,
       const std::string &CASFileSystemRootID,
+      const std::string &clangIncludeTreeRoot,
       const std::string &moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<ClangModuleDependencyStorage>(
           pcmOutputPath, moduleMapFile, contextHash,
           nonPathCommandLine, fileDependencies, capturedPCMArgs,
-          CASFileSystemRootID, moduleCacheKey));
+          CASFileSystemRootID, clangIncludeTreeRoot,  moduleCacheKey));
   }
 
   /// Describe a placeholder dependency swift module.
@@ -593,13 +611,17 @@ public:
     llvm_unreachable("Unexpected type");
   }
 
-  void updateCASFileSystemID(const std::string &ID) {
-    if (isSwiftInterfaceModule())
-      return cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
-          ->updateCASFileSystemID(ID);
-    else if (isSwiftSourceModule())
+  std::vector<std::string> getBridgingHeaderCommandline() const {
+    if (auto *detail = getAsSwiftSourceModule())
+      return detail->textualModuleDetails.bridgingHeaderBuildCommandLine;
+    return {};
+  }
+
+  void updateBridgingHeaderCommandLine(
+      const std::vector<std::string> &newCommandLine) {
+    if (isSwiftSourceModule())
       return cast<SwiftSourceModuleDependenciesStorage>(storage.get())
-          ->updateCASFileSystemID(ID);
+          ->updateBridgingHeaderCommandLine(newCommandLine);
     llvm_unreachable("Unexpected type");
   }
 
@@ -695,6 +717,12 @@ public:
   /// Get CAS Filesystem RootID.
   Optional<std::string> getCASFSRootID() const;
 
+  /// Get Clang Include Tree ID.
+  Optional<std::string> getClangIncludeTree() const;
+
+  /// Get bridging header Include Tree ID.
+  Optional<std::string> getBridgingHeaderIncludeTree() const;
+
   /// Get module output path.
   std::string getModuleOutputPath() const;
 
@@ -710,6 +738,9 @@ public:
   /// Add (Clang) module on which the bridging header depends.
   void addBridgingModuleDependency(StringRef module,
                                    llvm::StringSet<> &alreadyAddedModules);
+
+  /// Add bridging header include tree.
+  void addBridgingHeaderIncludeTree(StringRef ID);
 
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.
@@ -773,6 +804,12 @@ class SwiftDependencyScanningService {
   /// CachingOnDiskFileSystem for dependency tracking.
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS;
 
+  /// If use clang include tree.
+  bool UseClangIncludeTree = false;
+
+  /// CAS ObjectStore Instance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+
   /// The common dependencies that is needed for every swift compiler instance.
   std::vector<std::string> CommonDependencyFiles;
 
@@ -826,7 +863,7 @@ public:
     return getCacheForScanningContextHash(scanningContextHash)->alreadySeenClangModules;
   }
 
-  bool usingCachingFS() const { return (bool)CacheFS; }
+  bool usingCachingFS() const { return !UseClangIncludeTree && (bool)CacheFS; }
 
   llvm::cas::CachingOnDiskFileSystem &getSharedCachingFS() const {
     assert(CacheFS && "Expect CachingOnDiskFileSystem");
@@ -841,8 +878,12 @@ public:
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
-    if (CacheFS)
+    if (usingCachingFS())
       return CacheFS->createProxyFS();
+
+    if (UseClangIncludeTree)
+      return llvm::cas::createCASProvidingFileSystem(
+          CAS, llvm::vfs::createPhysicalFileSystem());
 
     return llvm::vfs::createPhysicalFileSystem();
   }

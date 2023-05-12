@@ -142,6 +142,7 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDArrayIDField,                  // bridgingModuleDependencies
                    DependencyIDArrayIDField,            // swiftOverlayDependencies
                    IdentifierIDField,                   // CASFileSystemRootID
+                   IdentifierIDField,                   // bridgingHeaderIncludeTree
                    IdentifierIDField                    // moduleCacheKey
                    >;
 
@@ -154,7 +155,9 @@ using SwiftSourceModuleDetailsLayout =
                    FileIDArrayIDField,               // bridgingModuleDependencies
                    DependencyIDArrayIDField,         // swiftOverlayDependencies
                    IdentifierIDField,                // CASFileSystemRootID
-                   FlagIDArrayIDField                // buildCommandLine
+                   IdentifierIDField,                // bridgingHeaderIncludeTree
+                   FlagIDArrayIDField,               // buildCommandLine
+                   FlagIDArrayIDField                // bridgingHeaderBuildCommandLine
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
@@ -182,6 +185,7 @@ using ClangModuleDetailsLayout =
                    FileIDArrayIDField,        // fileDependencies
                    FlagIDArrayIDField,        // capturedPCMArgs
                    IdentifierIDField,         // CASFileSystemRootID
+                   IdentifierIDField,         // clangIncludeTreeRoot
                    IdentifierIDField          // moduleCacheKey
                    >;
 } // namespace graph_block

@@ -354,8 +354,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableCAS = Args.hasArg(OPT_enable_cas);
   Opts.CASPath =
       Args.getLastArgValue(OPT_cas_path, llvm::cas::getDefaultOnDiskCASPath());
-  Opts.CASFSRootID = Args.getLastArgValue(OPT_cas_fs);
-  if (Opts.EnableCAS && Opts.CASFSRootID.empty() &&
+  Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
+  Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
+
+  if (Opts.EnableCAS && Opts.CASFSRootIDs.empty() &&
+      Opts.ClangIncludeTrees.empty() &&
       FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
     if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
         Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);

@@ -19,6 +19,7 @@
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/CASReference.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include <memory>
 
@@ -53,6 +54,10 @@ llvm::Error storeCachedCompilerOutput(llvm::cas::ObjectStore &CAS,
                                       llvm::cas::ObjectRef BaseKey,
                                       StringRef CorrespondingInput,
                                       file_types::ID OutputKind);
+
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots,
+                    ArrayRef<std::string> IncludeTreeRoots);
 
 namespace cas {
 /// Helper class to manage CAS/Caching from libSwiftScan C APIs.

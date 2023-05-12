@@ -31,6 +31,7 @@
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
+#include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -46,7 +47,6 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/CASReference.h"
-#include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
@@ -258,28 +258,6 @@ computeTransitiveClosureOfExplicitDependencies(
 }
 
 static llvm::Expected<llvm::cas::ObjectRef>
-mergeCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots) {
-  assert(!FSRoots.empty() && "no root ID provided");
-
-  llvm::cas::HierarchicalTreeBuilder Builder;
-  for (auto &Root : FSRoots) {
-    auto ID = CAS.parseID(Root);
-    if (!ID)
-      return ID.takeError();
-
-    auto Ref = CAS.getReference(*ID);
-    assert(Ref && "CASFSRootID is missing from the ObjectStore instance");
-    Builder.pushTreeContent(*Ref, "");
-  }
-
-  auto NewRoot = Builder.create(CAS);
-  if (!NewRoot)
-    return NewRoot.takeError();
-
-  return NewRoot->getRef();
-}
-
-static llvm::Expected<llvm::cas::ObjectRef>
 updateModuleCacheKey(ModuleDependencyInfo &depInfo,
                      llvm::cas::ObjectStore &CAS) {
   auto commandLine = depInfo.getCommandline();
@@ -324,6 +302,10 @@ static llvm::Error resolveExplicitModuleInputs(
   if (auto ID = resolvingDepInfo.getCASFSRootID())
     rootIDs.push_back(*ID);
 
+  std::vector<std::string> includeTrees;
+  if (auto ID = resolvingDepInfo.getClangIncludeTree())
+    includeTrees.push_back(*ID);
+
   std::vector<std::string> commandLine = resolvingDepInfo.getCommandline();
   for (const auto &depModuleID : dependencies) {
     const auto optionalDepInfo =
@@ -358,12 +340,18 @@ static llvm::Error resolveExplicitModuleInputs(
     case swift::ModuleDependencyKind::Clang: {
       auto clangDepDetails = depInfo->getAsClangModule();
       assert(clangDepDetails && "Expected Clang Module dependency.");
-      commandLine.push_back("-Xcc");
-      commandLine.push_back("-fmodule-file=" + depModuleID.first + "=" +
-                            clangDepDetails->pcmOutputPath);
-      commandLine.push_back("-Xcc");
-      commandLine.push_back("-fmodule-map-file=" +
-                            clangDepDetails->moduleMapFile);
+      if (!resolvingDepInfo.isClangModule()) {
+        commandLine.push_back("-Xcc");
+        commandLine.push_back("-fmodule-file=" + depModuleID.first + "=" +
+                              clangDepDetails->pcmOutputPath);
+        if (!instance.getInvocation()
+                 .getClangImporterOptions()
+                 .UseClangIncludeTree) {
+          commandLine.push_back("-Xcc");
+          commandLine.push_back("-fmodule-map-file=" +
+                                clangDepDetails->moduleMapFile);
+        }
+      }
       if (!clangDepDetails->moduleCacheKey.empty()) {
         auto appendXclang = [&]() {
           if (!resolvingDepInfo.isClangModule()) {
@@ -384,22 +372,31 @@ static llvm::Error resolveExplicitModuleInputs(
       // Only need to merge the CASFS from clang importer.
       if (auto ID = depInfo->getCASFSRootID())
         rootIDs.push_back(*ID);
+      if (auto ID = depInfo->getClangIncludeTree())
+        includeTrees.push_back(*ID);
     } break;
     case swift::ModuleDependencyKind::SwiftSource: {
       auto sourceDepDetails = depInfo->getAsSwiftSourceModule();
       assert(sourceDepDetails && "Expected source dependency");
-      if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles.empty()) {
-        if (auto tracker =
-                cache.getScanService().createSwiftDependencyTracker()) {
-          tracker->startTracking();
-          for (auto &file : sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
-            tracker->trackFile(file);
-          auto bridgeRoot = tracker->createTreeFromDependencies();
-          if (!bridgeRoot)
-            return bridgeRoot.takeError();
-          rootIDs.push_back(bridgeRoot->getID().toString());
+      if (sourceDepDetails->textualModuleDetails.bridgingHeaderIncludeTreeRoot
+              .empty()) {
+        if (!sourceDepDetails->textualModuleDetails.bridgingSourceFiles
+                 .empty()) {
+          if (auto tracker =
+                  cache.getScanService().createSwiftDependencyTracker()) {
+            tracker->startTracking();
+            for (auto &file :
+                 sourceDepDetails->textualModuleDetails.bridgingSourceFiles)
+              tracker->trackFile(file);
+            auto bridgeRoot = tracker->createTreeFromDependencies();
+            if (!bridgeRoot)
+              return bridgeRoot.takeError();
+            rootIDs.push_back(bridgeRoot->getID().toString());
+          }
         }
-      }
+      } else
+        includeTrees.push_back(sourceDepDetails->textualModuleDetails
+                                   .bridgingHeaderIncludeTreeRoot);
       break;
     }
     default:
@@ -419,21 +416,44 @@ static llvm::Error resolveExplicitModuleInputs(
     auto &CASFS = cache.getScanService().getSharedCachingFS();
     auto &CAS = CASFS.getCAS();
 
-    // Update CASFS RootID.
+    // Update build command line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isSwiftSourceModule()) {
-      auto NewRoot = mergeCASFileSystem(CAS, rootIDs);
-      if (!NewRoot)
-        return NewRoot.takeError();
-      auto NewID = CAS.getID(*NewRoot).toString();
-      dependencyInfoCopy.updateCASFileSystemID(NewID);
-
       // Update with casfs option.
       std::vector<std::string> newCommandLine =
           dependencyInfoCopy.getCommandline();
-      newCommandLine.push_back("-cas-fs");
-      newCommandLine.push_back(NewID);
+      for (auto rootID : rootIDs) {
+        newCommandLine.push_back("-cas-fs");
+        newCommandLine.push_back(rootID);
+      }
+
+      for (auto tree : includeTrees) {
+        newCommandLine.push_back("-clang-include-tree-root");
+        newCommandLine.push_back(tree);
+      }
       dependencyInfoCopy.updateCommandLine(newCommandLine);
+    }
+
+    if (auto *sourceDep = resolvingDepInfo.getAsSwiftSourceModule()) {
+      std::vector<std::string> newCommandLine =
+          dependencyInfoCopy.getBridgingHeaderCommandline();
+      for (auto bridgingDep :
+           sourceDep->textualModuleDetails.bridgingModuleDependencies) {
+        auto dep =
+            cache.findDependency(bridgingDep, ModuleDependencyKind::Clang);
+        assert(dep && "unknown clang dependency");
+        auto *clangDep = (*dep)->getAsClangModule();
+        assert(clangDep && "wrong module dependency kind");
+        if (!clangDep->moduleCacheKey.empty()) {
+          newCommandLine.push_back("-Xcc");
+          newCommandLine.push_back("-fmodule-file-cache-key");
+          newCommandLine.push_back("-Xcc");
+          newCommandLine.push_back(clangDep->pcmOutputPath);
+          newCommandLine.push_back("-Xcc");
+          newCommandLine.push_back(clangDep->moduleCacheKey);
+        }
+        dependencyInfoCopy.updateBridgingHeaderCommandLine(newCommandLine);
+      }
     }
 
     if (resolvingDepInfo.isClangModule() ||
@@ -528,11 +548,11 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleI
     // A record of all of the Clang modules referenced from this Swift module.
     std::vector<std::string> allClangModules;
     llvm::StringSet<> knownModules;
+    auto clangImporter =
+        static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
     // If the Swift module has a bridging header, add those dependencies.
     if (knownDependencies->getBridgingHeader()) {
-      auto clangImporter =
-          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
       if (!clangImporter->addBridgingHeaderDependencies(moduleID.first,
                                                         moduleID.second, cache)) {
         // Grab the updated module dependencies.
@@ -643,7 +663,7 @@ static void discoverCrossImportOverlayDependencies(
   // overlays.
   StringRef dummyMainName = "DummyMainModuleForResolvingCrossImportOverlays";
   auto dummyMainDependencies =
-      ModuleDependencyInfo::forSwiftSourceModule({}, {}, {});
+      ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {});
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
                   dummyMainDependencies.addModuleImport(modName.str());
@@ -1062,9 +1082,29 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(out, "sourceFiles",
                              swiftTextualDeps->bridging_source_files, 6,
                              /*trailingComma=*/true);
+        if (swiftTextualDeps->bridging_header_include_tree.length != 0) {
+          writeJSONSingleField(out, "includeTree",
+                               swiftTextualDeps->bridging_header_include_tree,
+                               6, /*trailingComma=*/true);
+        }
         writeJSONSingleField(out, "moduleDependencies",
                              swiftTextualDeps->bridging_module_dependencies, 6,
-                             /*trailingComma=*/false);
+                             /*trailingComma=*/true);
+        out.indent(6 * 2);
+        out << "\"commandLine\": [\n";
+        for (int i = 0,
+                 count = swiftTextualDeps->bridging_pch_command_line->count;
+             i < count; ++i) {
+          const auto &arg = get_C_string(
+              swiftTextualDeps->bridging_pch_command_line->strings[i]);
+          out.indent(7 * 2);
+          out << "\"" << quote(arg) << "\"";
+          if (i != count - 1)
+            out << ",";
+          out << "\n";
+        }
+        out.indent(6 * 2);
+        out << "]\n";
         out.indent(5 * 2);
         out << (hasOverlayDependencies ? "},\n" : "}\n");
       }
@@ -1142,6 +1182,10 @@ static void writeJSON(llvm::raw_ostream &out,
 
       if (clangDeps->cas_fs_root_id.length != 0)
         writeJSONSingleField(out, "casFSRootID", clangDeps->cas_fs_root_id, 5,
+                             /*trailingComma=*/true);
+      if (clangDeps->clang_include_tree.length != 0)
+        writeJSONSingleField(out, "clangIncludeTree",
+                             clangDeps->clang_include_tree, 5,
                              /*trailingComma=*/true);
       if (clangDeps->module_cache_key.length != 0)
         writeJSONSingleField(out, "moduleCacheKey", clangDeps->module_cache_key,
@@ -1298,10 +1342,12 @@ generateFullDependencyGraph(CompilerInstance &instance,
             create_set(swiftTextualDeps->textualModuleDetails.bridgingModuleDependencies),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
+            create_set(swiftTextualDeps->textualModuleDetails.bridgingHeaderBuildCommandLine),
             create_set(swiftTextualDeps->textualModuleDetails.extraPCMArgs),
             create_clone(swiftTextualDeps->contextHash.c_str()),
             swiftTextualDeps->isFramework,
             create_clone(swiftTextualDeps->textualModuleDetails.CASFileSystemRootID.c_str()),
+            create_clone(swiftTextualDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str())};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
@@ -1324,10 +1370,12 @@ generateFullDependencyGraph(CompilerInstance &instance,
             create_set(swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies),
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
+            create_set(swiftSourceDeps->textualModuleDetails.bridgingHeaderBuildCommandLine),
             create_set(swiftSourceDeps->textualModuleDetails.extraPCMArgs),
             /*contextHash*/create_null(),
             /*isFramework*/false,
             /*CASFS*/create_clone(swiftSourceDeps->textualModuleDetails.CASFileSystemRootID.c_str()),
+            /*IncludeTree*/create_clone(swiftSourceDeps->textualModuleDetails.bridgingHeaderIncludeTreeRoot.c_str()),
             /*CacheKey*/create_clone("")};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
@@ -1352,6 +1400,7 @@ generateFullDependencyGraph(CompilerInstance &instance,
             create_set(clangDeps->nonPathCommandLine),
             create_set(clangDeps->capturedPCMArgs),
             create_clone(clangDeps->CASFileSystemRootID.c_str()),
+            create_clone(clangDeps->clangIncludeTreeRoot.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())
         };
       }
@@ -1573,11 +1622,22 @@ static ModuleDependencyInfo identifyMainModuleDependencies(
     ExtraPCMArgs.insert(ExtraPCMArgs.begin(),
                         {"-Xcc", "-target", "-Xcc",
                          instance.getASTContext().LangOpts.Target.str()});
-  auto mainDependencies =
-      ModuleDependencyInfo::forSwiftSourceModule({}, {}, ExtraPCMArgs);
 
-  if (tracker)
+  std::string rootID;
+  if (tracker) {
     tracker->startTracking();
+    for (auto fileUnit : mainModule->getFiles()) {
+      auto sf = dyn_cast<SourceFile>(fileUnit);
+      if (!sf)
+        continue;
+      tracker->trackFile(sf->getFilename());
+    }
+    auto root = cantFail(tracker->createTreeFromDependencies());
+    rootID = root.getID().toString();
+  }
+
+  auto mainDependencies =
+      ModuleDependencyInfo::forSwiftSourceModule(rootID, {}, {}, ExtraPCMArgs);
 
   // Compute Implicit dependencies of the main module
   {
@@ -1588,8 +1648,6 @@ static ModuleDependencyInfo identifyMainModuleDependencies(
         continue;
 
       mainDependencies.addModuleImport(*sf, alreadyAddedModules);
-      if (tracker)
-        tracker->trackFile(sf->getFilename());
     }
 
     const auto &importInfo = mainModule->getImplicitImportInfo();
@@ -1635,11 +1693,6 @@ static ModuleDependencyInfo identifyMainModuleDependencies(
     for (const auto &tbdSymbolModule : instance.getInvocation().getTBDGenOptions().embedSymbolsFromModules) {
       mainDependencies.addModuleImport(tbdSymbolModule, &alreadyAddedModules);
     }
-  }
-
-  if (tracker) {
-    auto rootID = cantFail(tracker->createTreeFromDependencies());
-    mainDependencies.updateCASFileSystemID(rootID.getID().toString());
   }
 
   return mainDependencies;

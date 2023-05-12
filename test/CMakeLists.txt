@@ -71,6 +71,7 @@ function(get_test_dependencies SDK result_var_name)
       c-arcmt-test
       c-index-test
       clang
+      clang-cas-test
       count
       dsymutil
       FileCheck
