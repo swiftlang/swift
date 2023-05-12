@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature VariadicGenerics %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -enable-experimental-feature VariadicGenerics %s -debug-generic-signatures -disable-availability-checking 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 

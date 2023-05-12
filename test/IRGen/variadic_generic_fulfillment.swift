@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature VariadicGenerics | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature VariadicGenerics -disable-availability-checking | %FileCheck %s -DINT=i%target-ptrsize
 
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts

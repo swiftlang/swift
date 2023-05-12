@@ -2039,7 +2039,7 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
     return false;
 
   if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
-    return;
+    return false;
   
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
