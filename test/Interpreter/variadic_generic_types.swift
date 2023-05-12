@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors)
-// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics)
+// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-enable-experimental-feature VariadicGenerics -Xfrontend -disable-availability-checking)
 
 // REQUIRES: executable_test
 

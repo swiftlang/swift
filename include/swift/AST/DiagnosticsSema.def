@@ -6148,6 +6148,10 @@ ERROR(availability_parameterized_protocol_only_version_newer, none,
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
+ERROR(availability_variadic_type_only_version_newer, none,
+      "parameter packs in generic types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
