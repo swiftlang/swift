@@ -398,6 +398,7 @@ enum : Elf_Word {
 // Compression type
 typedef ELF_ENUM(Elf_Word, Elf_Chdr_Type) {
   ELFCOMPRESS_ZLIB   = 1,          // DEFLATE algorithm
+  ELFCOMPRESS_ZSTD   = 2,          // zstd algorithm
 
   ELFCOMPRESS_LOOS   = 0x60000000, // Operating system specific
   ELFCOMPRESS_HIOS   = 0x6fffffff,

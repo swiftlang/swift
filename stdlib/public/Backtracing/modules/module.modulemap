@@ -8,3 +8,7 @@ module Runtime {
 module FixedLayout {
   header "FixedLayout.h"
 }
+
+module Compression {
+  header "Compression.h"
+}

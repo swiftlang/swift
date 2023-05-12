@@ -31,8 +31,23 @@ private class FileImageSource: ImageSource {
 
   public var isMappedImage: Bool { return false }
 
-  public init?(path: String) {
+  private var _path: String
+  public var path: String? { return _path }
+
+  public lazy var bounds: Bounds? {
+    let size = lseek(fd, 0, SEEK_END)
+    if size < 0 {
+      return nil
+    }
+    return Bounds(base: 0, size: size)
+  }
+
+  public init(path: String) throws {
+    _path = path
     fd = _swift_open(path, O_RDONLY, 0)
+    if fd < 0 {
+      throw FileImageSourceError.posixError(_swift_get_errno())
+    }
   }
 
   deinit {

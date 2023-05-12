@@ -24,6 +24,7 @@ internal class MemoryImageSource<M: MemoryReader>: ImageSource {
   private var reader: M
 
   public var isMappedImage: Bool { return true }
+  public var path: String? { return nil }
 
   public init(with reader: M) {
     self.reader = reader

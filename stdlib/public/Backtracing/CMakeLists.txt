@@ -36,7 +36,6 @@ set(BACKTRACING_SOURCES
   MemoryReader.swift
   Registers.swift
   SymbolicatedBacktrace.swift
-  UnwindInfo.swift
   Utils.swift
   Win32Extras.cpp
 
@@ -48,6 +47,13 @@ set(BACKTRACING_COMPILE_FLAGS
   "-Xcc;-fbuiltin-module-map"
   "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/SwiftShims/swift/shims/module.modulemap"
   "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules/module.modulemap")
+
+###TODO: Add these when we add static linking support
+#
+#list(APPEND BACKTRACING_COMPILE_FLAGS
+#  "-Xcc;-I${SWIFT_PATH_TO_ZLIB_SOURCE}"
+#  "-Xcc;-I${SWIFT_PATH_TO_ZSTD_SOURCE}/lib"
+#  "-Xcc;-I${SWIFT_PATH_TO_LIBLZMA_SOURCE}/src/liblzma/api")
 
 if(SWIFT_ASM_AVAILABLE)
   list(APPEND BACKTRACING_SOURCES get-cpu-context.${SWIFT_ASM_EXT})

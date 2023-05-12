@@ -259,6 +259,17 @@ class BuildScriptInvocation(object):
         if args.build_early_swiftsyntax:
             impl_args += ["--swift-earlyswiftsyntax"]
 
+        # Add the paths of the compression libraries
+        zlib_src = os.path.join(self.workspace.source_root, "zlib")
+        zstd_src = os.path.join(self.workspace.source_root, "zstd")
+        liblzma_src = os.path.join(self.workspace.source_root, "liblzma")
+
+        args.extra_cmake_options += [
+            '-DSWIFT_PATH_TO_ZLIB_SOURCE:PATH={}'.format(zlib_src),
+            '-DSWIFT_PATH_TO_ZSTD_SOURCE:PATH={}'.format(zstd_src),
+            '-DSWIFT_PATH_TO_LIBLZMA_SOURCE:PATH={}'.format(liblzma_src),
+        ]
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.

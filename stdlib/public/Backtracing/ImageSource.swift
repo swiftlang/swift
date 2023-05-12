@@ -24,6 +24,18 @@ internal protocol ImageSource : MemoryReader {
   /// some information may not be available when the image is mapped into
   /// memory (an example is ELF section headers).
   var isMappedImage: Bool { get }
+
+  /// If this ImageSource knows its path, this will be non-nil.
+  var path: String? { get }
+
+  /// Holds the bounds of an ImageSource
+  struct Bounds {
+    var base: Address
+    var size: Size
+  }
+
+  /// If this ImageSource knows its bounds, this will be non-nil.
+  var bounds: Bounds? { get }
 }
 
 enum SubImageSourceError: Error {
@@ -37,6 +49,10 @@ internal struct SubImageSource<S: ImageSource>: ImageSource {
   var parent: S
   var baseAddress: S.Address
   var length: S.Size
+
+  var bounds: Bounds? {
+    return Bounds(base: 0, size: length)
+  }
 
   public init(parent: S, baseAddress: S.Address, length: S.Size) {
     self.parent = parent
