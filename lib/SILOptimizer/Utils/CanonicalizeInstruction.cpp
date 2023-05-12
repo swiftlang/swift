@@ -344,9 +344,8 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   for (auto *destroy : lifetimeEndingInsts)
     nextII = killInstruction(destroy, nextII, pass);
 
-  // FIXME: remove this temporary hack to advance the iterator beyond
-  // debug_value. A soon-to-be merged commit migrates CanonicalizeInstruction to
-  // use InstructionDeleter.
+  // TODO: remove this hack to advance the iterator beyond debug_value and check
+  // SILInstruction::isDeleted() in the caller instead.
   while (nextII != loadInst->getParent()->end()
          && nextII->isDebugInstruction()) {
     ++nextII;
