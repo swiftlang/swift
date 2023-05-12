@@ -2160,10 +2160,10 @@ NOTE(decl_import_via_here,none,
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
-      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
+      "a 'some' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
 NOTE(opaque_of_optional_rewrite,none,
-      "did you mean to write an optional of an 'opaque' type?", ())
+      "did you mean to write an optional of an 'some' type?", ())
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
