@@ -9,6 +9,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
+@available(*, deprecated, message: "Test type to verify deprecated API still works")
 final class InlineExecutor_UnownedJob: SerialExecutor, CustomStringConvertible {
   public func enqueue(_ job: UnownedJob) {
     job.runSynchronously(on: self.asUnownedSerialExecutor())
@@ -18,6 +19,8 @@ final class InlineExecutor_UnownedJob: SerialExecutor, CustomStringConvertible {
     "\(Self.self)()"
   }
 }
+
+@available(*, deprecated, message: "Test type to verify deprecated API still works")
 final class InlineExecutor_Job: SerialExecutor, CustomStringConvertible {
   public func enqueue(_ job: __owned Job) {
     job.runSynchronously(on: self.asUnownedSerialExecutor())
