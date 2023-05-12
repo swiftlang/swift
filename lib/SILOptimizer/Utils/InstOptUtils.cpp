@@ -1837,6 +1837,10 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
 }
 
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
+//
+// TODO: whenever a debug_value is inserted at a new location, check that no
+// other debug_value instructions exist between the old and new location for
+// the same variable.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
@@ -1856,7 +1860,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         }
       }
   }
-
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,
   // we need to make sure any of its related `debug_value` instruction
@@ -1918,6 +1921,23 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
+  }
+}
+
+void swift::salvageLoadDebugInfo(LoadOperation load) {
+  for (Operand *debugUse : getDebugUses(load.getLoadInst())) {
+    // Create a new debug_value rather than reusing the old one so the
+    // SILBuilder adds 'expr(deref)' to account for the indirection.
+    auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
+    auto varInfo = debugInst->getVarInfo();
+    if (!varInfo)
+      continue;
+
+    // The new debug_value must be "hoisted" to the load to ensure that the
+    // address is still valid.
+    SILBuilder(load.getLoadInst(), debugInst->getDebugScope())
+      .createDebugValueAddr(debugInst->getLoc(), load.getOperand(),
+                            varInfo.value());
   }
 }
 
