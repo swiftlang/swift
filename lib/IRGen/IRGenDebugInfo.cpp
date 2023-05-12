@@ -2792,7 +2792,8 @@ struct DbgIntrinsicEmitter {
                             llvm::Instruction *InsertBefore) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
-    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL,
+    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
                                             InsertBefore);
   }
 
@@ -2802,7 +2803,8 @@ struct DbgIntrinsicEmitter {
                             llvm::BasicBlock *Block) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
-    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL, Block);
+    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
 };
 
@@ -2896,15 +2898,15 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
         InsertPt = &EntryBlock;
       }
     } else {
-      // For llvm.dbg.addr, we just want to insert the intrinsic at the current
+      // For llvm.dbg.value, we just want to insert the intrinsic at the current
       // insertion point. This is because our contract with the coroutine
       // splitter is that the coroutine splitter just needs to emit the
-      // llvm.dbg.addr where we placed them. It shouldn't move them or do
+      // llvm.dbg.value where we placed them. It shouldn't move them or do
       // anything special with it. Instead, we have previously inserted extra
       // debug_value clones previously after each instruction at the SIL level
       // that corresponds with a funclet edge. This operation effectively sets
       // up the rest of the pipeline to be stupid and just emit the
-      // llvm.dbg.addr in the correct places. This is done by the SILOptimizer
+      // llvm.dbg.value in the correct places. This is done by the SILOptimizer
       // pass DebugInfoCanonicalizer.
       auto InsertBefore = Builder.GetInsertPoint();
       if (InsertBefore != ParentBlock->end()) {
@@ -2917,10 +2919,10 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // Ok, we now have our insert pt. Call the appropriate operations.
     assert(InsertPt);
     if (auto *InsertBefore = InsertPt.dyn_cast<llvm::Instruction *>()) {
-      inserter.insert(Storage, Var, Expr, DL, InsertBefore);
+      auto *Inst = inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
-      inserter.insert(Storage, Var, Expr, DL,
-                      InsertPt.get<llvm::BasicBlock *>());
+      auto *Inst = inserter.insert(Storage, Var, Expr, DL,
+                                   InsertPt.get<llvm::BasicBlock *>());
     }
     return;
   }
