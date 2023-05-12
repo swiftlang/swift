@@ -20,7 +20,7 @@ public let benchmarks = [
                   tags: [.validation, .api],
                   setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1_000) }),
     BenchmarkInfo(name: "NaiveRRC.append.smallContiguousRepeated",
-                  runFunction: runAppendLargeContiguous,
+                  runFunction: runAppendSmallContiguousRepeatedly,
                   tags: [.validation, .api],
                   setUpFunction: { contiguous = [UInt8](repeating: 7, count: 1) }),
     BenchmarkInfo(name: "NaiveRRC.init.largeContiguous",
@@ -88,8 +88,8 @@ public func runAppendSmallContiguousRepeatedly(N: Int) {
     var rrc = NaiveRRC()
     for _ in 1...10_000_000 {
       rrc.append(contentsOf: contiguous)
-      blackHole(rrc)
     }
+    blackHole(rrc)
   }
 }
 
