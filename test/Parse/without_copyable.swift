@@ -41,7 +41,19 @@ func takeNoncopyableGeneric<T: ~Copyable>(_ t: T) {} // expected-error {{expecte
                                   ~Copyable // expected-note {{attribute already specified here}}
                                   {}
 
-// basic test to ensure it's viewed as a noncopyable struct:
-struct HasADeinit: ~Copyable {
-  deinit {}
+// basic tests to ensure it's viewed as a noncopyable struct, by using 
+// capabilities only available to them
+struct HasADeinit: ~Copyable { deinit {} }
+
+public struct MoveOnlyS1<T> : ~Copyable { deinit {} }
+public struct MoveOnlyS2<T: Equatable> : ~Copyable { deinit {} }
+
+public enum MoveOnlyE1<T> : ~Copyable { 
+  case holding(s: MoveOnlyS1<T>)
+  consuming func x() {}
+}
+
+public enum MoveOnlyE2<T: Equatable> : ~Copyable { 
+  case holding(s: MoveOnlyS1<T>)
+  consuming func x() {}
 }
