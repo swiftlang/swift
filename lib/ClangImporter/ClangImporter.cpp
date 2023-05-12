@@ -976,9 +976,10 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 std::vector<std::string>
 ClangImporter::getClangArguments(ASTContext &ctx) {
   std::vector<std::string> invocationArgStrs;
-  // Clang expects this to be like an actual command line. So we need to pass in
-  // "clang" for argv[0]
-  invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
+  // When creating from driver commands, clang expects this to be like an actual
+  // command line. So we need to pass in "clang" for argv[0]
+  if (!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild)
+    invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
   if (ctx.ClangImporterOpts.ExtraArgsOnly) {
     invocationArgStrs.insert(invocationArgStrs.end(),
                              ctx.ClangImporterOpts.ExtraArgs.begin(),
