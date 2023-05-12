@@ -7088,7 +7088,10 @@ static bool parseAccessorIntroducer(Parser &P,
     }
   }
 
-  if (!P.Tok.is(tok::identifier) || P.Tok.isEscapedIdentifier()) {
+  bool isInitAccessor = (P.Context.LangOpts.hasFeature(Feature::InitAccessors)
+                         && P.Tok.is(tok::kw_init));
+  if (!(P.Tok.is(tok::identifier) || isInitAccessor) ||
+      P.Tok.isEscapedIdentifier()) {
     return true;
   }
 #define SUPPRESS_ARTIFICIAL_ACCESSORS 1
