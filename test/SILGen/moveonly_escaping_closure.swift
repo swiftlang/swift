@@ -126,14 +126,21 @@ func testGlobalClosureCaptureVar() {
 // CHECK: } // end sil function '$s16moveonly_closure29testLocalLetClosureCaptureVaryyFyycfU_'
 func testLocalLetClosureCaptureVar() {
     var x = SingleElt()
+    // expected-error @-1 {{'x' consumed more than once}}
+    // expected-error @-2 {{'x' used after consume}}
+    // expected-error @-3 {{'x' used after consume}}
     x = SingleElt()
     let f = {
         borrowVal(x)
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
-        borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+        borrowConsumeVal(x, x)
         // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
+        // expected-note @-3 {{non-consuming use here}}
+        // expected-note @-4 {{non-consuming use here}}
+        // expected-note @-5 {{consuming use here}}
     }
     f()
 }
@@ -409,11 +416,14 @@ func testGlobalClosureCaptureLet() {
 // CHECK: } // end sil function '$s16moveonly_closure026testLocalLetClosureCaptureE0yyFyycfU_'
 func testLocalLetClosureCaptureLet() {
     let x = SingleElt()
+    // expected-error @-1 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-2 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-3 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         borrowVal(x)
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
-        borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        borrowConsumeVal(x, x) // expected-note {{consuming use here}}
     }
     f()
 }
@@ -608,6 +618,7 @@ func testConsumingEscapeClosureCaptureLet(_ f: consuming @escaping () -> ()) {
 var globalClosureCaptureInOut: () -> () = {}
 func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
+    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     globalClosureCaptureInOut = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -697,6 +708,7 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_'
 func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
+    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     var f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -745,6 +757,7 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_'
 func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
+    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -797,6 +810,7 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_'
 func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
+    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -920,6 +934,24 @@ func testGlobalClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK:   end_access [[READ_ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure35testLocalLetClosureCaptureConsumingyyAA9SingleEltVnFyycfU_'
 func testLocalLetClosureCaptureConsuming(_ x: consuming SingleElt) {
+    // expected-error @-1 {{'x' consumed more than once}}
+    // expected-error @-2 {{'x' used after consume}}
+    // expected-error @-3 {{'x' used after consume}}
+    let f = {
+        borrowVal(x)
+        consumeVal(x) // expected-note {{consuming use here}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        // expected-note @-1 {{consuming use here}}
+        borrowConsumeVal(x, x) // expected-note {{non-consuming use here}}
+        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
+        // expected-note @-2 {{conflicting access is here}}
+        // expected-note @-3 {{consuming use here}}
+        // expected-note @-4 {{non-consuming use here}}
+    }
+    f()
+}
+
+func testLocalLetClosureCaptureConsuming2(_ x: consuming SingleElt) -> (() -> ()) {
     let f = {
         borrowVal(x)
         consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
@@ -929,7 +961,9 @@ func testLocalLetClosureCaptureConsuming(_ x: consuming SingleElt) {
         // expected-note @-2 {{conflicting access is here}}
     }
     f()
+    return f
 }
+
 
 // CHECK-LABEL: sil hidden [ossa] @$s16moveonly_closure35testLocalVarClosureCaptureConsumingyyAA9SingleEltVnF : $@convention(thin) (@owned SingleElt) -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
@@ -1136,11 +1170,14 @@ func testGlobalClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK:   apply {{%.*}}([[LOADED_READ]], [[LOADED_TAKE]])
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureOwnedyyAA9SingleEltVnFyycfU_'
 func testLocalLetClosureCaptureOwned(_ x: __owned SingleElt) {
+    // expected-error @-1 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-2 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+    // expected-error @-3 {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
     let f = {
         borrowVal(x)
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
-        consumeVal(x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
-        borrowConsumeVal(x, x) // expected-error {{'x' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        consumeVal(x) // expected-note {{consuming use here}}
+        borrowConsumeVal(x, x) // expected-note {{consuming use here}}
     }
     f()
 }
