@@ -261,6 +261,8 @@ public:
   virtual void completeTypeAttrBeginning() {};
 
   virtual void completeOptionalBinding(){};
+
+  virtual void completeWithoutConstraintType(){};
 };
 
 class DoneParsingCallback {

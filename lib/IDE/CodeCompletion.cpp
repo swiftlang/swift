@@ -305,6 +305,7 @@ public:
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
   void completeTypeAttrBeginning() override;
   void completeOptionalBinding() override;
+  void completeWithoutConstraintType() override;
 
   void doneParsing(SourceFile *SrcFile) override;
 
@@ -664,6 +665,11 @@ void CodeCompletionCallbacksImpl::completeOptionalBinding() {
   Kind = CompletionKind::OptionalBinding;
 }
 
+void CodeCompletionCallbacksImpl::completeWithoutConstraintType() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::WithoutConstraintType;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::TypeAttrBeginning;
@@ -975,6 +981,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtLabel:
   case CompletionKind::TypeAttrBeginning:
   case CompletionKind::OptionalBinding:
+  case CompletionKind::WithoutConstraintType:
     break;
 
   case CompletionKind::EffectsSpecifier:
@@ -2054,6 +2061,11 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::OptionalBinding: {
     SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getOptionalBindingCompletions(Loc);
+    break;
+  }
+
+  case CompletionKind::WithoutConstraintType: {
+    Lookup.getWithoutConstraintTypes();
     break;
   }
 

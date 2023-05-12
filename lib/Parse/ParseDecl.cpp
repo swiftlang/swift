@@ -5801,6 +5801,13 @@ ParserStatus Parser::parseInheritance(
             TildeCopyableLoc = tildeLoc;
 
           continue;
+        } else if (nextTok.is(tok::code_complete)) {
+          consumeToken(); // consume '~'
+          Status.setHasCodeCompletionAndIsError();
+          if (CodeCompletionCallbacks) {
+            CodeCompletionCallbacks->completeWithoutConstraintType();
+          }
+          consumeToken(tok::code_complete);
         }
 
         // can't suppress whatever is between '~' and ',' or '{'.
