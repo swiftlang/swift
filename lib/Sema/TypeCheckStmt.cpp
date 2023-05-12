@@ -1262,7 +1262,7 @@ public:
     // check the kind of type this discard statement appears within.
     if (!diagnosed) {
       auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
-      Type nominalType = nominalDecl->getDeclaredType();
+      Type nominalType = nominalDecl->getDeclaredTypeInContext();
 
       // must be noncopyable
       if (!nominalType->isPureMoveOnly()) {
