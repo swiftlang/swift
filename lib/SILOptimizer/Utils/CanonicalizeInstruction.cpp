@@ -36,10 +36,6 @@ using namespace swift;
 // Tracing within the implementation can also be activated by the pass.
 #define DEBUG_TYPE pass.debugType
 
-llvm::cl::opt<bool> EnableLoadSplittingDebugInfo(
-    "sil-load-splitting-debug-info", llvm::cl::init(false),
-    llvm::cl::desc("Create debug fragments at -O for partial loads"));
-
 // Vtable anchor.
 CanonicalizeInstruction::~CanonicalizeInstruction() {}
 
@@ -301,19 +297,6 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     }
     pass.notifyNewInstruction(**lastNewLoad);
 
-    // FIXME: This drops debug info at -Onone load-splitting is required at
-    // -Onone for exclusivity diagnostics. Fix this by
-    // 
-    // 1. At -Onone, preserve the original load when pass.preserveDebugInfo is
-    // true, but moving it out of its current access scope and into an "unknown"
-    // access scope, which won't be enforced as an exclusivity violation.
-    //
-    // 2. At -O, create "debug fragments" recover as much debug info as possible
-    // by creating debug_value fragments for each new partial load. Currently
-    // disabled because of LLVM back-end crashes.
-    if (!pass.preserveDebugInfo && EnableLoadSplittingDebugInfo) {
-      createDebugFragments(*loadInst, proj, lastNewLoad->getLoadInst());
-    }
     if (loadOwnership) {
       if (*loadOwnership == LoadOwnershipQualifier::Copy) {
         // Destroy the loaded value wherever the aggregate load was destroyed.
