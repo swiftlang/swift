@@ -1196,8 +1196,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       matchKind = MatchKind::RenamedMatch;
     else if (requiresNonSendable)
       matchKind = MatchKind::RequiresNonSendable;
-    else if (getEffects(witness).containsOnly(getEffects(req)))
+    else if (getEffects(req) - getEffects(witness))
+      // when the difference is non-empty, the witness has fewer effects.
       matchKind = MatchKind::FewerEffects;
+
+    assert(getEffects(req).contains(getEffects(witness))
+               && "witness has more effects than requirement?");
 
     // Success. Form the match result.
     RequirementMatch result(witness,
