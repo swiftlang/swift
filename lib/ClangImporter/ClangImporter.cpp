@@ -1964,12 +1964,16 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
 
-  // Look up the top-level module first, to see if it exists at all.
-  clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      realModuleName, /*ImportLoc=*/clang::SourceLocation(),
-      /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
-  if (!clangModule)
-    return nullptr;
+  // For explicit module build, module should always exist but module map might
+  // not be exist. Go straight to module loader.
+  if (Instance->getInvocation().getLangOpts()->ImplicitModules) {
+    // Look up the top-level module first, to see if it exists at all.
+    clang::Module *clangModule = clangHeaderSearch.lookupModule(
+        realModuleName, /*ImportLoc=*/clang::SourceLocation(),
+        /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
+    if (!clangModule)
+      return nullptr;
+  }
 
   // Convert the Swift import path over to a Clang import path.
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
@@ -2024,7 +2028,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // Now load the top-level module, so that we can check if the submodule
   // exists without triggering a fatal error.
-  clangModule = loadModule(clangPath.front(), clang::Module::AllVisible);
+  auto clangModule = loadModule(clangPath.front(), clang::Module::AllVisible);
   if (!clangModule)
     return nullptr;
 
