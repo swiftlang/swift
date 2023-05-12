@@ -547,8 +547,10 @@ importer::getNormalInvocationArguments(
     });
   }
 
-  if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
-    invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
+  if (LangOpts.EnableCXXInterop) {
+    if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
+      invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
+    }
   }
 
   // Set C language options.
