@@ -33,10 +33,11 @@
 #include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILUndef.h"
 
+#include "swift/SIL/OwnershipUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/DJB.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
 #include <type_traits>
@@ -970,20 +971,23 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     SILArgument *Arg;
     auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
+    auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0x7);
+    auto reborrow = (Args[I + 1] >> 11) & 0x1;
+    auto escaping = (Args[I + 1] >> 12) & 0x1;
     if (IsEntry) {
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
-      bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
+      bool isNoImplicitCopy = (Args[I + 1] >> 13) & 0x1;
       fArg->setNoImplicitCopy(isNoImplicitCopy);
-      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
+      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 14) & 0x3);
       fArg->setLifetimeAnnotation(lifetime);
-      bool isClosureCapture = (Args[I + 1] >> 19) & 0x1;
+      bool isClosureCapture = (Args[I + 1] >> 16) & 0x1;
       fArg->setClosureCapture(isClosureCapture);
-      bool isFormalParameterPack = (Args[I + 1] >> 20) & 0x1;
+      bool isFormalParameterPack = (Args[I + 1] >> 17) & 0x1;
       fArg->setFormalParameterPack(isFormalParameterPack);
       Arg = fArg;
     } else {
-      auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
-      Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
+      Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
+                                         /*decl*/ nullptr, reborrow, escaping);
     }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
