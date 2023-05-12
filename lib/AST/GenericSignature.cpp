@@ -724,16 +724,16 @@ Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
           argTypes.push_back(reducedType);
       }
 
-      // We should have either constrained all primary associated types,
-      // or none of them.
-      if (!argTypes.empty()) {
-        if (argTypes.size() != primaryAssocTypes.size()) {
-          llvm::errs() << "Not all primary associated types constrained?\n";
-          llvm::errs() << "Interface type: " << type << "\n";
-          llvm::errs() << GenericSignature(this) << "\n";
-          abort();
-        }
-
+      // If we have constrained all primary associated types, create a
+      // parameterized protocol type. During code completion, we might call
+      // `getExistentialType` (which calls this method) on a generic parameter
+      // that doesn't have all parameters specified, e.g. to get a consise
+      // description of the parameter type to the following function.
+      //
+      // func foo<P: Publisher>(p: P) where P.Failure == Never
+      //
+      // In that case just add the base type in the default branch below.
+      if (argTypes.size() == primaryAssocTypes.size()) {
         types.push_back(ParameterizedProtocolType::get(ctx, baseType, argTypes));
         continue;
       }
