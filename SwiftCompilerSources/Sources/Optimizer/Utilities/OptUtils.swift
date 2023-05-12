@@ -78,7 +78,7 @@ extension Value {
   }
 }
 
-private extension Instruction {
+extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
       return false

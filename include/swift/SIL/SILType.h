@@ -414,6 +414,10 @@ public:
     return getASTType()->hasOpenedExistential();
   }
 
+  TypeTraitResult canBeClass() const {
+    return getASTType()->canBeClass();
+  }
+
   /// Returns true if the referenced type is expressed in terms of one
   /// or more local archetypes.
   bool hasLocalArchetype() const {

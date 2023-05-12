@@ -24,6 +24,10 @@ extension BuiltinInst : OnoneSimplifyable {
         optimizeIsSameMetatype(context)
       case .Once:
         optimizeBuiltinOnce(context)
+      case .CanBeObjCClass:
+        optimizeCanBeClass(context)
+      case .AssertConf:
+        optimizeAssertConfig(context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -89,6 +93,43 @@ private extension BuiltinInst {
       return fri.referencedFunction
     }
     return nil
+  }
+
+  func optimizeCanBeClass(_ context: SimplifyContext) {
+    guard let ty = substitutionMap.replacementTypes[0] else {
+      return
+    }
+    let literal: IntegerLiteralInst
+    switch ty.canBeClass {
+    case .IsNot:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(0,  type: type)
+    case .Is:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(1,  type: type)
+    case .CanBe:
+      return
+    default:
+      fatalError()
+    }
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
+  }
+
+  func optimizeAssertConfig(_ context: SimplifyContext) {
+    let literal: IntegerLiteralInst
+    switch context.options.assertConfiguration {
+    case .enabled:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(1,  type: type)
+    case .disabled:
+      let builder = Builder(before: self, context)
+      literal = builder.createIntegerLiteral(0,  type: type)
+    default:
+      return
+    }
+    uses.replaceAll(with: literal, context)
+    context.erase(instruction: self)
   }
 }
 

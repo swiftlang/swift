@@ -61,6 +61,7 @@ private func registerForSILCombine<InstType: SILCombineSimplifyable>(
 
 private func registerSwiftPasses() {
   // Module passes
+  registerPass(mandatoryPerformanceOptimizations, { mandatoryPerformanceOptimizations.run($0) })
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
 
@@ -78,6 +79,7 @@ private func registerSwiftPasses() {
   registerPass(ononeSimplificationPass, { ononeSimplificationPass.run($0) })
   registerPass(lateOnoneSimplificationPass, { lateOnoneSimplificationPass.run($0) })
   registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
+  registerPass(namedReturnValueOptimization, { namedReturnValueOptimization.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
