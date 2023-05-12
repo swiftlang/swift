@@ -1441,7 +1441,6 @@ struct GatherUsesVisitor final : public TransitiveAddressWalker {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
-  bool emittedEarlyDiagnostic = false;
   DiagnosticEmitter &diagnosticEmitter;
 
   // Pruned liveness used to validate that load [take]/load [copy] can be
@@ -1616,14 +1615,13 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Found mark must check [nocopy] use of escaping box: " << *user);
-        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
-        emittedEarlyDiagnostic = true;
+        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
+            markedValue);
         return true;
       }
       LLVM_DEBUG(llvm::dbgs()
                  << "Found mark must check [nocopy] error: " << *user);
       diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1679,7 +1677,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                  .didEmitCheckerDoesntUnderstandDiagnostic());
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to perform borrow to destructure transform!\n");
-      emittedEarlyDiagnostic = true;
       return false;
     }
 
@@ -1687,7 +1684,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // mark that we emitted an early diagnostic and return true.
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1708,7 +1704,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1738,7 +1733,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1752,7 +1746,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1785,7 +1778,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       // succeeded.
       // Otherwise, emit the diagnostic.
       moveChecker.diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
-      emittedEarlyDiagnostic = true;
       LLVM_DEBUG(llvm::dbgs() << "Emitted early object level diagnostic.\n");
       return true;
     }
@@ -1794,7 +1786,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1843,7 +1834,6 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         moveChecker.diagnosticEmitter
             .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
       }
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
