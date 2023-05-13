@@ -263,3 +263,98 @@ func nestedType() throws -> Int {
     0
   }
 }
+
+// MARK: Bindings
+
+enum E {
+  case e(Int)
+}
+
+struct S {
+  var i: Int
+
+  mutating func testAssign1(_ x: E) {
+    i = if case .e(let y) = x { y } else { 0 }
+  }
+
+
+  mutating func testAssign2(_ x: E) {
+    i = if case .e(let y) = x { Int(y) } else { 0 }
+  }
+
+  func testAssign3(_ x: E) {
+    var i = 0
+    i = if case .e(let y) = x { y } else { 0 }
+    _ = i
+  }
+
+  func testAssign4(_ x: E) {
+    var i = 0
+    let _ = {
+      i = if case .e(let y) = x { y } else { 0 }
+    }
+    _ = i
+  }
+
+  mutating func testAssign5(_ x: E) {
+    i = switch Bool.random() {
+    case true:
+      if case .e(let y) = x { y } else { 0 }
+    case let z:
+      z ? 0 : 1
+    }
+  }
+
+  mutating func testAssign6(_ x: E) {
+    i = if case .e(let y) = x {
+      switch Bool.random() {
+      case true: y
+      case false: y
+      }
+    } else {
+      0
+    }
+  }
+
+  mutating func testAssign7(_ x: E?) {
+    i = if let x = x {
+      switch x {
+      case .e(let y): y
+      }
+    } else {
+      0
+    }
+  }
+
+  func testReturn1(_ x: E) -> Int {
+    if case .e(let y) = x { y } else { 0 }
+  }
+
+  func testReturn2(_ x: E) -> Int {
+    return if case .e(let y) = x { y } else { 0 }
+  }
+
+  func testReturn3(_ x: E) -> Int {
+    {
+      if case .e(let y) = x { y } else { 0 }
+    }()
+  }
+
+  func testReturn4(_ x: E) -> Int {
+    return {
+      if case .e(let y) = x { y } else { 0 }
+    }()
+  }
+
+  func testBinding1(_ x: E) -> Int {
+    let i = if case .e(let y) = x { y } else { 0 }
+    return i
+  }
+
+  func testBinding2(_ x: E) -> Int {
+    let i = {
+      if case .e(let y) = x { y } else { 0 }
+    }()
+    return i
+  }
+}
