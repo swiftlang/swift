@@ -2607,6 +2607,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
       } else if (version.equals("5.6")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
+      } else if (version.equals("5.8")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
