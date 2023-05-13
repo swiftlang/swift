@@ -406,6 +406,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
     } else if (value.equals("5.6")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
+    } else if (value.equals("5.8")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {
@@ -419,7 +421,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   if (runtimeCompatibilityVersion) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 BackDeployLibFilter filter,
-                                StringRef libraryName) {
+                                StringRef libraryName,
+                                bool forceLoad) {
       if (*runtimeCompatibilityVersion > version)
         return;
 
@@ -431,14 +434,16 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       llvm::sys::path::append(BackDeployLib, "lib" + libraryName + ".a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
-        Arguments.push_back("-force_load");
+        if (forceLoad)
+          Arguments.push_back("-force_load");
         Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
       }
     };
 
-    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName) \
-      addBackDeployLib(                                       \
-          llvm::VersionTuple Version, BackDeployLibFilter::Filter, LibraryName);
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+      addBackDeployLib(                                                  \
+          llvm::VersionTuple Version, BackDeployLibFilter::Filter,       \
+          LibraryName, ForceLoad);
     #include "swift/Frontend/BackDeploymentLibs.def"
   }
     
