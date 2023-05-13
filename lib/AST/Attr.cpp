@@ -1130,6 +1130,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
 
+  case DAK_Section:
+    Printer.printAttrName("@_section");
+    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
+    break;
+
   case DAK_ObjC: {
     Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
@@ -1602,6 +1607,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "backDeployed";
   case DAK_Expose:
     return "_expose";
+  case DAK_Section:
+    return "_section";
   case DAK_Documentation:
     return "_documentation";
   case DAK_MacroRole:

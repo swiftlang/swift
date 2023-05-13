@@ -3047,6 +3047,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Section: {
+      auto *theAttr = cast<SectionAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
+      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           theAttr->isImplicit(),
+                                           theAttr->Name);
+      return;
+    }
+
     case DAK_Documentation: {
       auto *theAttr = cast<DocumentationAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[DocumentationDeclAttrLayout::Code];
