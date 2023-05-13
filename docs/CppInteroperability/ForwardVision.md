@@ -195,21 +195,11 @@ C++ aims to provide sufficent tools to implement many features in The Standard L
 
 The reverse is also true; C++ interop may require library-level Swift utilties to assist in the import of various C++ language concepts, such as iterators. To support this case, a set of C++ interop specific Swift APIs will be imported implicitly whenever a C++ module is imported. These APIs do not have a depedency on the distinct C++ standard library or its overlay. 
 
-## Evolution as an Experimental Feature
-
-C++ interoperability is currently an expiremental language feature. Imported C++ APIs are not source or ABI stable until they have gone through evolution. The evolution posts for individual API patterns will need to address both source and ABI stability.
+## Evolution
 
 C++ interoperability is a huge feature that derives most of its benefit from the combination of its component features (for example, methods can't be used without types). C++ interop should be made useful to programmers before all component pieces have necessarily gone through evolution, both for the benefit of programmers wanting to use this feature, and for compiler developers designing and implementing the feature. 
 
-In its expiremental state, C++ interoperability should bring in as many APIs as possible, even if they haven't gone through evolution. Swift evolution will progressively work through these APIs, formalizing them, and eventually interop will become a stable feature. Until a critical mass of APIs have been brought through evolution, the feature will remain experemental, and the implementation will not nessisarily match what has been formalized. 
-
-### Impact on Swift Packages
-
-Swift packages are discouraged from using C++ interoperability as an expiremental language feature. Swift packages transitively apply both the compiler configuration and any risk associated with this configuration to their dependents. If their configuration enables expiremental features, then their dependents will take on the risk of these features as well, therefore Swift packages are discouraged from enabling any expiremental features, including C++ interoperability.  
-
-## Evolution process
-
-Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this document. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified.
+C++ interoperability should bring in as many APIs as possible, even if they haven't gone through evolution. Swift evolution will progressively work through these APIs, formalizing them, and eventually interop will become a stable feature. Until a critical mass of APIs have been brought Swift's evolution process, a versioning scheme will allow C++ interoperability to be adopted and remain source stable while being evolved. Versions may be rapidly deprecated, but will be independent of Swift compiler versions, allowing source breaks even in minor compiler updates without disturbing adopters. 
 
 This document allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
 
