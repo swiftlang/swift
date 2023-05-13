@@ -161,3 +161,9 @@ enum NoDeinitEnum: ~Copyable {
     discard self // expected-error {{'discard' has no effect for type 'NoDeinitEnum' unless it has a deinitializer}}{{5-18=}}
   }
 }
+
+struct HasGenericNotStored<T>: ~Copyable {
+  consuming func discard() { discard self }
+  func identity(_ t: T) -> T { return t }
+  deinit{}
+}

@@ -98,3 +98,15 @@ struct AllOK: ~Copyable {
   consuming func doDiscard() { discard self }
   deinit {}
 }
+
+struct HasGenericStored<T>: ~Copyable {
+  let t: T // expected-note {{type 'T' cannot be trivially destroyed}}
+  consuming func discard() { discard self } // expected-error {{can only 'discard' type 'HasGenericStored<T>' if it contains trivially-destroyed stored properties at this time}}
+  deinit{}
+}
+
+struct HasAny: ~Copyable {
+  var t: Any // expected-note {{type 'Any' cannot be trivially destroyed}}
+  consuming func discard() { discard self } // expected-error {{can only 'discard' type 'HasAny' if it contains trivially-destroyed stored properties at this time}}
+  deinit{}
+}
