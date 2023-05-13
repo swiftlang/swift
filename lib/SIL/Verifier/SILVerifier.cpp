@@ -1121,6 +1121,12 @@ public:
   void visitSILArgument(SILArgument *arg) {
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
+
+    // Ensure flags on the argument are not stale.
+    require(!arg->getFunction()->hasOwnership() ||
+                computeIsReborrow(arg) == arg->isReborrow(),
+            "Stale reborrow flag");
+
     if (checkLinearLifetime) {
       checkValueBaseOwnership(arg);
     }
