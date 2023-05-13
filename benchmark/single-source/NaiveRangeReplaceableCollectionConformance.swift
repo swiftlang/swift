@@ -86,7 +86,7 @@ public func runAppendLargeContiguous(N: Int) {
 public func runAppendSmallContiguousRepeatedly(N: Int) {
   for _ in 1...N {
     var rrc = NaiveRRC()
-    for _ in 1...50_000 {
+    for _ in 1...5_000 {
       rrc.append(contentsOf: contiguous)
     }
     blackHole(rrc)
