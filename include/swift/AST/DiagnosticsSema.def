@@ -7143,6 +7143,8 @@ ERROR(moveonly_cannot_conform_to_type, none,
      (DescriptiveDeclKind, DeclName, Type))
 ERROR(moveonly_parameter_missing_ownership, none,
       "noncopyable parameter must specify its ownership", ())
+ERROR(moveonly_parameter_subscript_unsupported, none,
+      "subscripts cannot have noncopyable parameters yet", ())
 NOTE(moveonly_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_copyable,none,

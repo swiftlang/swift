@@ -2307,31 +2307,39 @@ bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
   if (options.contains(TypeResolutionFlags::HasOwnership))
     return false;
 
-  // Do not run this on SIL files since there is currently a bug where we are
-  // trying to parse it in SILBoxes.
-  //
-  // To track what we want to do long term: rdar://105635373.
+  // Don't diagnose in SIL; ownership is already required there.
   if (options.contains(TypeResolutionFlags::SILType))
     return false;
 
-  diagnose(repr->getLoc(),
-           diag::moveonly_parameter_missing_ownership);
+  //////////////////
+  // At this point, we know we have a noncopyable parameter that is missing an
+  // ownership specifier, so we need to emit an error
 
-  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "borrowing", "for an immutable reference")
-      .fixItInsert(repr->getStartLoc(), "borrowing ");
+  // We don't yet support any ownership specifiers for parameters of subscript
+  // decls, give a tailored error message saying you simply can't use a
+  // noncopyable type here.
+  if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
+    diagnose(repr->getLoc(), diag::moveonly_parameter_subscript_unsupported);
+  } else {
+    // general error diagnostic
+    diagnose(repr->getLoc(),
+             diag::moveonly_parameter_missing_ownership);
 
-  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "inout", "for a mutable reference")
-      .fixItInsert(repr->getStartLoc(), "inout ");
+    diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+             "borrowing", "for an immutable reference")
+        .fixItInsert(repr->getStartLoc(), "borrowing ");
 
-  diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
-           "consuming", "to take the value from the caller")
-      .fixItInsert(repr->getStartLoc(), "consuming ");
+    diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+             "inout", "for a mutable reference")
+        .fixItInsert(repr->getStartLoc(), "inout ");
+
+    diagnose(repr->getLoc(), diag::moveonly_parameter_ownership_suggestion,
+             "consuming", "to take the value from the caller")
+        .fixItInsert(repr->getStartLoc(), "consuming ");
+  }
 
   // to avoid duplicate diagnostics
   repr->setInvalid();
-
   return true;
 }
 
