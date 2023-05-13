@@ -14,7 +14,18 @@ Swift has had great success as a successor language to Objective-C. This success
 
 First, Swift offers bidirectional interoperability; allowing incremental adoption of Swift in large codebases. When adopting Swift into an existing, large, C++ codebase, a small feature can be written in Swift. The cost of writing this new feature in Swift is low, because most or all of the C++ APIs will be available automatically as safe and idiomatic Swift APIs. The APIs that are not imported can easily be made available through the use of annotations. And the feature can be easily incorporated into the existing C++ code through the use of reverse interop. Bidirectional interoperability means that the stakes are low, and projects can adopt Swift at their own pace. Projects need not re-write large parts of their codebase, or even the whole thing to adopt Swift (a difficult processes that, even when successful, often leads to both technical issues, and problematic team dynamics). 
 
-Second, Swift imports C++ APIs safely and idiomatically. The lack of safety and strong idioms (i.e., complexity) are two common reasons to move away from C++. If using C++ APIs in Swift continued to incur both issues, then interoperability would make Swift a weaker language, and the reason for moving to Swift (especially in mixed language projects) would be less clear. So, Swift must do its best to import C++ APIs in a manner that respects Swift’s safety guarantees and Swift’s strong idioms. If APIs cannot be imported safely or idiomatically, the compiler should request more information from the users (likely through the use of annotations) so that the APIs can be imported in a way that meets Swift’s standards. 
+Second, Swift imports C++ APIs safely and idiomatically. The lack of safety and strong idioms (i.e., complexity) are two common reasons to move away from C++. If using C++ APIs in Swift continued to incur both issues, then interoperability would make Swift a weaker language, and the reason for moving to Swift (especially in mixed language projects) would be less clear. So, Swift must do its best to import C++ APIs in a manner that respects Swift’s safety guarantees and Swift’s strong idioms. If APIs cannot be imported safely or idiomatically, the compiler should request more information from the users (likely through the use of annotations) so that the APIs can be imported in a way that meets Swift’s standards.
+
+For example, Swift can recognize many different kinds of C++ iterators and ranges and map these into Swift `Collection`s. In C++, iterators travel in pairs forming a range. These iterators are highly unsafe and the inconsistent in their semantics: the contents of the range change, rendering the iterators invalid; the iterators may escape the lifetime of the range, causing a use-after-free, and so on. The semantics are also often unclear: does a range own its storage, or is merely a view? Is the storage mutable? Can elements of a range be accessed via indexing? When these C++ iterators and ranges are imported in Swift, the compiler can often map them to correct Swift idioms, such as `Collection`s. Swift collections largely (or entirely) side step both the unsafely and unclear semantics of C++ iterators and ranges. When using this Swift interface, even for C++ ranges, it is impossible mismatch iterators, outlive the lifetime of a backing collection, and so on. Taking `std::vector` for example, Swift can idiomatically and safely filter and map its contents using Swift’s `Collection` interface:
+
+```Swift
+images // "images" is of type std::vector<CxxImage>
+  .filter { $0.size > 256 }
+  .map(UIImage.init)
+```
+
+So Swift users can immediately see the benefits of adopting Swift, even when using C++ APIs. 
+ 
 
 ## Goals
 
