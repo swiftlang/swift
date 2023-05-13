@@ -2479,6 +2479,17 @@ public:
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
     */
+
+    SSAPrunedLiveness scopedAddressLiveness(BAI->getFunction());
+    ScopedAddressValue scopedAddress(BAI);
+    AddressUseKind useKind =
+        scopedAddress.computeTransitiveLiveness(scopedAddressLiveness);
+    bool success = useKind == AddressUseKind::NonEscaping;
+
+    require(!success || checkScopedAddressUses(
+              scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
+            "Ill formed begin_access scope");
+
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {

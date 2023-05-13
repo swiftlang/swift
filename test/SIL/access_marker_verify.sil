@@ -1,0 +1,76 @@
+// RUN: %target-sil-opt -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+
+class Id {
+}
+
+struct S {
+  var id: Id
+}
+
+class C {
+  let s : S
+}
+
+// CHECK: User found outside scope:   %4 = load [copy] %2 : $*S                       
+// CHECK: Begin Error in function test_begin_access_bad_scope1
+// CHECK: SIL verification failed: Ill formed begin_access scope
+// CHECK: Verifying instruction:
+// CHECK:      %1 = ref_element_addr %0 : $C, #C.s          
+// CHECK: ->   %2 = begin_access [read] [dynamic] %1 : $*S  
+// CHECK:      end_access %2 : $*S                          
+// CHECK:      %4 = load [copy] %2 : $*S                    
+// CHECK: End Error in function test_begin_access_bad_scope1
+sil [ossa] @test_begin_access_bad_scope1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.s
+  %2 = begin_access [read] [dynamic] %1 : $*S
+  end_access %2 : $*S
+  %4 = load [copy] %2 : $*S
+  destroy_value %4 : $S
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK: Begin Error in function test_begin_access_bad_scope2
+// CHECK: SIL verification failed: Ill formed begin_access scope
+// CHECK: Verifying instruction:
+// CHECK:      %1 = ref_element_addr %0 : $C, #C.s          
+// CHECK: ->   %2 = begin_access [read] [dynamic] %1 : $*S  
+// CHECK:      %3 = struct_element_addr %2 : $*S, #S.id     
+// CHECK:      end_access %2 : $*S                          
+// CHECK: End Error in function test_begin_access_bad_scope2
+sil [ossa] @test_begin_access_bad_scope2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.s
+  %2 = begin_access [read] [dynamic] %1 : $*S
+  %3 = struct_element_addr %2 : $*S, #S.id
+  end_access %2 : $*S
+  %5 = load [copy] %3 : $*Id
+  destroy_value %5 : $Id
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-NOT: Function: 'test_begin_access_good_scope1'
+sil [ossa] @test_begin_access_good_scope1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.s
+  %2 = begin_access [read] [dynamic] %1 : $*S
+  %3 = load [copy] %2 : $*S
+  end_access %2 : $*S
+  destroy_value %3 : $S
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-NOT: Function: 'test_begin_access_good_scope2'
+sil [ossa] @test_begin_access_good_scope2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.s
+  %2 = begin_access [modify] [dynamic] %1 : $*S
+  %3 = load [take] %2 : $*S
+  end_access %2 : $*S
+  destroy_value %3 : $S
+  %t = tuple ()
+  return %t : $()
+}
