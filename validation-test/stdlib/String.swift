@@ -2370,4 +2370,23 @@ StringTests.test("SmallString.zeroTrailingBytes") {
   }
 }
 
+StringTests.test("String.CoW.reserveCapacity") {
+  for _ in 0..<100 {
+    var str = String(repeating: "a", count: 100)
+    var copy = str
+    copy.reserveCapacity(20)
+    copy.append(contentsOf: String(repeating: "z", count: 50))
+  }
+}
+
+StringTests.test("NSString.CoW.reserveCapacity") {
+#if _runtime(_ObjC)
+  let nsstr = NSString(string: String(repeating: "a", count: 100))
+  var str = nsstr as String
+  var copy = str
+  copy.reserveCapacity(20)
+  copy.append(contentsOf: String(repeating: "z", count: 50))
+#endif
+}
+
 runAllTests()
