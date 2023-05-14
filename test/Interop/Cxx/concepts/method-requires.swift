@@ -1,6 +1,6 @@
 // RUN: %target-swiftxx-frontend -emit-ir -Xcc -std=gnu++20 -I %S/Inputs %s | %FileCheck %s
 //
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 import MethodRequires
 
