@@ -1319,3 +1319,71 @@ func testConsumingEscapeClosureCaptureOwned(_ f: consuming @escaping () -> (),
     }
     f()
 }
+
+//////////////////////////////////
+// MARK: Coroutine Closure Test //
+//////////////////////////////////
+
+struct ClosureHolder {
+    var f: () -> () = {}
+    var fCoroutine: () -> () {
+        _read {
+            yield f
+        }
+        _modify {
+            yield &f
+        }
+    }
+}
+
+func closureCoroutineAssignmentLetBorrowingArgument(_ e: borrowing Empty) { // expected-error {{'e' has guaranteed ownership but was consumed due to being captured by a closure}}
+    let f: () -> () = { // expected-note {{capture here}}
+        _ = e
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+func closureCoroutineAssignmentLetConsumingArgument(_ e: __owned Empty) {
+    let f: () -> () = {
+        _ = e
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+func closureCoroutineAssignmentVarConsumingArgument(_ e: consuming Empty) {
+    let f: () -> () = {
+        _ = e // expected-error {{'e' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+func closureCoroutineAssignmentLetBinding() {
+    let e = Empty()
+    let f: () -> () = {
+        _ = e
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+func closureCoroutineAssignmentVarBinding() {
+    var e = Empty()
+    e = Empty()
+    let f: () -> () = {
+        _ = e // expected-error {{'e' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
+
+func closureCoroutineAssignmentVarArgument(_ e: inout Empty) {
+    // expected-note @-1 {{'e' is declared 'inout'}}
+    let f: () -> () = { // expected-error {{escaping closure captures 'inout' parameter 'e'}}
+        _ = e // expected-note {{captured here}}
+    }
+    var c = ClosureHolder()
+    c.fCoroutine = f
+}
