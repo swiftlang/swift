@@ -2956,10 +2956,8 @@ public func closureVarCaptureClassUseAfterConsume1(_ x: borrowing Klass) { // ex
     f()
 }
 
-// TODO: MG
 public func closureVarCaptureClassUseAfterConsume2(_ x2: inout Klass) {
     // expected-note @-1 {{'x2' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     var f = {}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x2'}}
         borrowVal(x2) // expected-note {{captured here}}
