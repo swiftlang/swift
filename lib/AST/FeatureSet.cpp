@@ -772,6 +772,23 @@ static bool usesFeatureSensitive(Decl *decl) {
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 
+bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
+  if (auto cd = dyn_cast<ClassDecl>(decl)) {
+    return cd->getFormalAccess() == AccessLevel::Open &&
+           usesFeatureIsolatedDeinit(cd->getDestructor());
+  } else if (auto dd = dyn_cast<DestructorDecl>(decl)) {
+    if (dd->hasExplicitIsolationAttribute()) {
+      return true;
+    }
+    if (auto superDD = dd->getSuperDeinit()) {
+      return usesFeatureIsolatedDeinit(superDD);
+    }
+    return false;
+  } else {
+    return false;
+  }
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
