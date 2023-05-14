@@ -3,6 +3,7 @@
 .. _CallingConvention:
 
 The Swift Calling Convention
+
 ****************************
 
 .. contents::
