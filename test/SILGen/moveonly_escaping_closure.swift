@@ -618,7 +618,6 @@ func testConsumingEscapeClosureCaptureLet(_ f: consuming @escaping () -> ()) {
 var globalClosureCaptureInOut: () -> () = {}
 func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     globalClosureCaptureInOut = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -708,7 +707,6 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_'
 func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     var f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -757,7 +755,6 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_'
 func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}
@@ -810,7 +807,6 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_'
 func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _ x: inout SingleElt) {
     // expected-note @-1 {{'x' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check}}
     f = { // expected-error {{escaping closure captures 'inout' parameter 'x'}}
         borrowVal(x) // expected-note {{captured here}}
         consumeVal(x) // expected-note {{captured here}}

@@ -1892,6 +1892,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (fArg->getArgumentConvention().isInoutConvention() &&
           pas->getCalleeFunction()->hasSemanticsAttr(
               semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+        diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
+        return false;
       }
     }
 
@@ -2642,9 +2644,19 @@ bool MoveOnlyAddressChecker::check(
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // Perform our address check.
+    unsigned diagnosticEmittedByEarlierPassCount =
+      diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount();
     if (!pimpl.performSingleCheck(markedValue)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Failed to perform single check! Emitting error!\n");
+      if (diagnosticEmittedByEarlierPassCount !=
+          diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount()) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Failed to perform single check but found earlier emitted "
+               "error. Not emitting checker doesn't understand diagnostic!\n");
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "Failed to perform single check! Emitting "
+                                 "compiler doesn't understand diagnostic!\n");
       // If we fail the address check in some way, set the diagnose!
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }

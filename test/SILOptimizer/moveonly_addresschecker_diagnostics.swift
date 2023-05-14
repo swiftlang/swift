@@ -3235,13 +3235,8 @@ public func closureVarCaptureClassUseAfterConsumeError() {
     let _ = x3
 }
 
-// TODO: The reason why we emit the moveonly type is that correctly the checker
-// realizes that the partial_apply has escaped, but does not understand that
-// this case has already been diagnosed properly by the escaping inout
-// diagnostic, so we shouldn't try to process it.
 public func closureVarCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
     // expected-note @-1 {{'x2' is declared 'inout'}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     var f = {}
     f = {
         // expected-error @-1 {{escaping closure captures 'inout' parameter 'x2'}}
