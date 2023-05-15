@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// FIXME: also test this in C++20 mode once rdar://108810356 is fixed.
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=gnu++20)
 //
 // REQUIRES: executable_test
 //
