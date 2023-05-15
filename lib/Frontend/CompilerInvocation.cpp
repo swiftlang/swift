@@ -1460,6 +1460,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  if (FrontendOpts.DisableImplicitModules)
+    Opts.DisableImplicitClangModules = true;
+
   Opts.ValidateModulesOnce |= Args.hasArg(OPT_validate_clang_modules_once);
   if (auto *A = Args.getLastArg(OPT_clang_build_session_file))
     Opts.BuildSessionFilePath = A->getValue();
