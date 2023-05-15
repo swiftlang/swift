@@ -2776,3 +2776,17 @@ AllowValueExpansionWithoutPackReferences::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       AllowValueExpansionWithoutPackReferences(cs, locator);
 }
+
+bool IgnoreMissingEachKeyword::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  MissingEachForValuePackReference failure(solution, ValuePackType,
+                                           getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreMissingEachKeyword *
+IgnoreMissingEachKeyword::create(ConstraintSystem &cs, Type valuePackTy,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreMissingEachKeyword(cs, valuePackTy, locator);
+}

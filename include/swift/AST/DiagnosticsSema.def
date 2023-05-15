@@ -5440,6 +5440,9 @@ ERROR(pack_reference_must_be_in_expansion,none,
 ERROR(pack_type_requires_keyword_each,none,
       "type pack %0 must be referenced with 'each'",
       (TypeRepr*))
+ERROR(value_pack_requires_keyword_each,none,
+      "value pack %0 must be referenced with 'each'",
+      (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,

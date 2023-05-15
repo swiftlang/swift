@@ -3035,6 +3035,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where value pack is referenced without explicit 'each':
+///
+/// \code
+/// func compute<each T>(_: repeat each T) {}
+///
+/// func test<each T>(v: repeat each T) {
+///   repeat compute(v) // should be `repeat compute(each v)`
+/// }
+/// \endcode
+class MissingEachForValuePackReference final : public FailureDiagnostic {
+  Type ValuePackType;
+
+public:
+  MissingEachForValuePackReference(const Solution &solution, Type valuePackTy,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator),
+        ValuePackType(resolveType(valuePackTy)) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

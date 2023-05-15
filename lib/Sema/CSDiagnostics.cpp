@@ -8965,3 +8965,25 @@ bool ValuePackExpansionWithoutPackReferences::diagnoseAsError() {
   emitDiagnostic(diag::value_expansion_not_variadic);
   return true;
 }
+
+bool MissingEachForValuePackReference::diagnoseAsError() {
+  bool fixItNeedsParens = false;
+  // If 'each' is missing form a base of a member reference
+  // it has to be wrapped in parens.
+  if (auto anchor = getAsExpr(getAnchor())) {
+    fixItNeedsParens = isExpr<UnresolvedDotExpr>(findParentExpr(anchor));
+  }
+
+  {
+    auto diagnostic = emitDiagnostic(diag::value_pack_requires_keyword_each, ValuePackType);
+    if (fixItNeedsParens) {
+      auto range = getSourceRange();
+      diagnostic.fixItInsert(range.Start, "(each ")
+          .fixItInsertAfter(range.End, ")");
+    } else {
+      diagnostic.fixItInsert(getLoc(), "each ");
+    }
+  }
+
+  return true;
+}
