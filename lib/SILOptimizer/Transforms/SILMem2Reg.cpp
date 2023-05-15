@@ -1818,10 +1818,8 @@ void StackAllocationPromoter::run() {
       auto *si = it.second;
       auto stored = si->getOperand(CopyLikeInstruction::Src);
       valuesToComplete.push_back(stored);
-      if (lexicalLifetimeEnsured(asi)) {
-        if (auto lexical = getLexicalValueForStore(si, asi)) {
-          valuesToComplete.push_back(lexical);
-        }
+      if (auto lexical = getLexicalValueForStore(si, asi)) {
+        valuesToComplete.push_back(lexical);
       }
     }
   }
