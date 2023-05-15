@@ -855,7 +855,7 @@ OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
   auto *declFile = mod->getSourceFileContainingLocation(declLoc);
-  auto *attrFile = mod->getSourceFileContainingLocation(Attr->AtLoc);
+  auto *attrFile = mod->getSourceFileContainingLocation(Attr->getLocation());
   if (!declFile || !attrFile)
     return Attr;
 
