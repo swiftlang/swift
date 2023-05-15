@@ -1303,3 +1303,10 @@ func testMacroArg() {
 // MACRO_CALL_ARG-DAG: Literal[Boolean]/None:              true[#Bool#]; name=true
 // MACRO_CALL_ARG: End completions
 }
+
+func testParameterPack(intArray: [Int]) {
+  func myZip<each S>(_ sequence: repeat each S, otherParam: Int) where repeat each S: Sequence {}
+  myZip([1], #^PARAMETER_PACK_ARG^#)
+  // PARAMETER_PACK_ARG: Pattern/Local/Flair[ArgLabels]:     {#otherParam: Int#}[#Int#]; name=otherParam:
+  // PARAMETER_PACK_ARG: Decl[LocalVar]/Local/TypeRelation[Convertible]: intArray[#[Int]#]; name=intArray
+}
