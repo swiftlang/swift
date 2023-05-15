@@ -1176,7 +1176,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   if (Invocation.getLangOptions().EnableCXXInterop && canImportCxxShim()) {
-    pushImport(CXX_SHIM_NAME);
+    pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
