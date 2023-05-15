@@ -2160,10 +2160,10 @@ NOTE(decl_import_via_here,none,
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
-      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
+      "a 'some' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
 NOTE(opaque_of_optional_rewrite,none,
-      "did you mean to write an optional of an 'opaque' type?", ())
+      "did you mean to write an optional of an 'some' type?", ())
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
@@ -6146,6 +6146,10 @@ ERROR(availability_concurrency_only_version_newer, none,
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
+ERROR(availability_variadic_type_only_version_newer, none,
+      "parameter packs in generic types are only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,

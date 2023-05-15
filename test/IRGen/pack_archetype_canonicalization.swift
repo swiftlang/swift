@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature VariadicGenerics
+// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature VariadicGenerics -disable-availability-checking
 
 // Because of -enable-experimental-feature VariadicGenerics
 // REQUIRES: asserts

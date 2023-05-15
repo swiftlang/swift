@@ -929,6 +929,10 @@ public:
   /// needed to place array buffers into constant data sections.
   AvailabilityContext getImmortalRefCountSymbolsAvailability();
 
+  /// Get the runtime availability of runtime functions for
+  /// variadic generic types.
+  AvailabilityContext getVariadicGenericTypeAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
