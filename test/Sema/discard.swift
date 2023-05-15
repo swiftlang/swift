@@ -175,8 +175,20 @@ struct HasGenericNotStored<T>: ~Copyable { // expected-note 2{{arguments to gene
     let `self` = HasGenericNotStored<Int>()
     discard `self`
     // expected-error@-1 {{cannot convert value of type 'HasGenericNotStored<Int>' to expected discard type 'HasGenericNotStored<T>'}}
+    // expected-error@-2 {{you can only discard 'self'}}{{13-19=self}}
   }
 
   func identity(_ t: T) -> T { return t }
   deinit{}
+}
+
+struct Court: ~Copyable {
+  let x: Int
+
+  consuming func discard(_ other: consuming Court) {
+    let `self` = other
+    discard `self` // expected-error {{you can only discard 'self'}}{{13-19=self}}
+  }
+
+  deinit { print("deinit of \(self.x)") }
 }
