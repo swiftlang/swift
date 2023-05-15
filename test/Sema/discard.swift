@@ -162,8 +162,21 @@ enum NoDeinitEnum: ~Copyable {
   }
 }
 
-struct HasGenericNotStored<T>: ~Copyable {
+struct HasGenericNotStored<T>: ~Copyable { // expected-note 2{{arguments to generic parameter 'T' ('Int' and 'T') are expected to be equal}}
   consuming func discard() { discard self }
+
+  consuming func bad_discard1() {
+    discard HasGenericNotStored<Int>()
+    // expected-error@-1 {{cannot convert value of type 'HasGenericNotStored<Int>' to expected discard type 'HasGenericNotStored<T>'}}
+    // expected-error@-2 {{you can only discard 'self'}}
+  }
+
+  consuming func bad_discard2() {
+    let `self` = HasGenericNotStored<Int>()
+    discard `self`
+    // expected-error@-1 {{cannot convert value of type 'HasGenericNotStored<Int>' to expected discard type 'HasGenericNotStored<T>'}}
+  }
+
   func identity(_ t: T) -> T { return t }
   deinit{}
 }
