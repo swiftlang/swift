@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-feature VariadicGenerics -disable-availability-checking | %FileCheck %s
 
 // Experimental features require an asserts compiler
 // REQUIRES: asserts
