@@ -6831,9 +6831,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // becuase expansion could be defaulted to an empty pack which means
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
+  //
+  // Notable exception here is `Any` which doesn't require wrapping and
+  // would be handled by existental promotion in cases where it's allowed.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
-    if (desugar1->is<TupleType>() != desugar2->is<TupleType>()) {
+    if (desugar1->is<TupleType>() != desugar2->is<TupleType>() &&
+        (!desugar1->isAny() && !desugar2->isAny())) {
       return matchTypes(
           desugar1->is<TupleType>() ? type1
                                     : TupleType::get({type1}, getASTContext()),
@@ -14786,6 +14790,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddExplicitExistentialCoercion:
   case FixKind::DestructureTupleToMatchPackExpansionParameter:
   case FixKind::AllowValueExpansionWithoutPackReferences:
+  case FixKind::IgnoreMissingEachKeyword:
     llvm_unreachable("handled elsewhere");
   }
 
