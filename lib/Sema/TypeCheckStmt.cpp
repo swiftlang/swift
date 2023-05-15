@@ -1314,13 +1314,14 @@ public:
     if (!diagnosed) {
       bool isSelf = false;
       auto *checkE = DS->getSubExpr();
+      assert(fn->getImplicitSelfDecl() && "no self?");
 
       // Look through a load. Only expected if we're in an init.
       if (auto *load = dyn_cast<LoadExpr>(checkE))
           checkE = load->getSubExpr();
 
       if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
-        isSelf = DRE->getDecl()->getName().isSimpleName("self");
+        isSelf = DRE->getDecl() == fn->getImplicitSelfDecl();
 
       if (!isSelf) {
         ctx.Diags
