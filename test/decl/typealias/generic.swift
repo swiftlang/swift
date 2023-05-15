@@ -197,7 +197,7 @@ class GenericClass<T> {
   }
 
   // Stupid corner case -- underlying type is not dependent
-  typealias NotDependent<T> = Int
+  typealias NotDependent<U> = Int
 
   func misleadingCode(_: NotDependent<String>) {}
 }
@@ -367,7 +367,7 @@ typealias Id<T> = T
 extension Id {} // expected-error {{non-nominal type 'Id' cannot be extended}}
 
 class OuterGeneric<T> {
-  typealias Alias<T> = AnotherGeneric<T>
+  typealias Alias<U> = AnotherGeneric<U>
   // expected-note@-1 {{generic type 'Alias' declared here}}
   class InnerNonGeneric : Alias {}
   // expected-error@-1 {{reference to generic type 'OuterGeneric<T>.Alias' requires arguments in <...>}}

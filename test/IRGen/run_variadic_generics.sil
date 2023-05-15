@@ -8,8 +8,6 @@
 
 // REQUIRES: executable_test
 
-// REQUIRES: rdar108045677
-
 import Builtin
 import Swift
 import PrintShims

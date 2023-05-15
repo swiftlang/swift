@@ -368,7 +368,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
 }
 
 OrigDeclAttributes Decl::getOriginalAttrs() const {
-  return OrigDeclAttributes(getAttrs(), getModuleContext());
+  return OrigDeclAttributes(getAttrs(), this);
 }
 
 DeclAttributes Decl::getSemanticAttrs() const {
@@ -445,8 +445,7 @@ void Decl::forEachAttachedMacro(MacroRole role,
 MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
   auto declRef = evaluateOrDefault(
       getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, getDeclContext()},
-      ConcreteDeclRef());
+      ResolveMacroRequest{customAttr, getDeclContext()}, ConcreteDeclRef());
 
   return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
@@ -765,8 +764,22 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   return Range;
 }
 
-bool Decl::isInGeneratedBuffer() const {
-  return getModuleContext()->isInGeneratedBuffer(getStartLoc());
+bool Decl::isInMacroExpansionInContext() const {
+  auto *dc = getDeclContext();
+  auto parentFile = dc->getParentSourceFile();
+  auto *mod = getModuleContext();
+  auto *file = mod->getSourceFileContainingLocation(getStartLoc());
+
+  // Decls in macro expansions always have a source file. The source
+  // file can be null if the decl is implicit or has an invalid
+  // source location.
+  if (!parentFile || !file)
+    return false;
+
+  if (file->getBufferID() == parentFile->getBufferID())
+    return false;
+
+  return file->getFulfilledMacroRole() != None;
 }
 
 SourceLoc Decl::getLocFromSource() const {
@@ -1076,6 +1089,25 @@ bool Decl::isStdlibDecl() const {
   DeclContext *DC = getDeclContext();
   return DC->isModuleScopeContext() &&
          DC->getParentModule()->isStdlibModule();
+}
+
+LifetimeAnnotation Decl::getLifetimeAnnotationFromAttributes() const {
+  auto &attrs = getAttrs();
+  if (attrs.hasAttribute<EagerMoveAttr>())
+    return LifetimeAnnotation::EagerMove;
+  if (attrs.hasAttribute<NoEagerMoveAttr>())
+    return LifetimeAnnotation::Lexical;
+  return LifetimeAnnotation::None;
+}
+
+LifetimeAnnotation Decl::getLifetimeAnnotation() const {
+  if (auto *pd = dyn_cast<ParamDecl>(this)) {
+    return pd->getLifetimeAnnotation();
+  }
+  if (auto *fd = dyn_cast<FuncDecl>(this)) {
+    return fd->getLifetimeAnnotation();
+  }
+  return getLifetimeAnnotationFromAttributes();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -3939,11 +3971,17 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      // No package context was found; show diagnostics
-      auto &d = VD->getASTContext().Diags;
-      d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
-      // Instead of reporting and failing early, return the scope of
-      // resultDC to allow continuation (should still non-zero exit later)
+      auto srcFile = resultDC->getParentSourceFile();
+      // Check if the file containing package decls is an interface file; if a public
+      // interface contains package decls, they must be inlinable and do not need a
+      // package-name, so don't show diagnostics in that case.
+      if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
+        // No package context was found; show diagnostics
+        auto &d = VD->getASTContext().Diags;
+        d.diagnose(VD->getLoc(), diag::access_control_requires_package_name);
+      }
+      // Instead of reporting and failing early, return the scope of resultDC to
+      // allow continuation (should still non-zero exit later if in script mode)
       return AccessScope(resultDC);
     } else {
       return AccessScope(pkg);
@@ -4135,9 +4173,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-    auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
-    return usePkg->isSamePackageAs(srcPkg);
+    auto srcFile = sourceDC->getParentSourceFile();
+    if (srcFile && srcFile->Kind != SourceFileKind::Interface) {
+      auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+      auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
+      return usePkg->isSamePackageAs(srcPkg);
+    } else {
+      // If source file is interface, package decls must be inlinable,
+      // essentially treated public so return true (see AccessLevel::Public)
+      return true;
+    }
   }
   case AccessLevel::Public:
   case AccessLevel::Open:
@@ -5272,6 +5317,9 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 AbstractFunctionDecl *
 NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   auto &C = getASTContext();
+  StructDecl *executorJobDecl = C.getExecutorJobDecl();
+  if (!executorJobDecl)
+    return nullptr;
 
   auto proto = dyn_cast<ProtocolDecl>(this);
   if (!proto)
@@ -5289,11 +5337,91 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
       continue;
 
     if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
-      if (funcDecl->getParameters()->size() != 1)
+      auto params = funcDecl->getParameters();
+
+      if (params->size() != 1)
         continue;
 
+      if ((params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned ||
+           params->get(0)->getSpecifier() == ParamSpecifier::Consuming) &&
+          params->get(0)->getInterfaceType()->isEqual(executorJobDecl->getDeclaredInterfaceType())) {
+        return funcDecl;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
+  auto &C = getASTContext();
+  StructDecl *legacyJobDecl = C.getJobDecl();
+  if (!legacyJobDecl)
+    return nullptr;
+
+  auto proto = dyn_cast<ProtocolDecl>(this);
+  if (!proto)
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  lookupQualified(getSelfNominalTypeDecl(),
+                  DeclNameRef(C.Id_enqueue),
+                  NL_ProtocolMembers,
+                  results);
+
+  for (auto candidate: results) {
+    // we're specifically looking for the Executor protocol requirement
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
       auto params = funcDecl->getParameters();
-      if (params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned) { // TODO: make this Consuming
+
+      if (params->size() != 1)
+        continue;
+
+      if ((params->get(0)->getSpecifier() == ParamSpecifier::LegacyOwned ||
+          params->get(0)->getSpecifier() == ParamSpecifier::Consuming) &&
+          params->get(0)->getType()->isEqual(legacyJobDecl->getDeclaredInterfaceType())) {
+        return funcDecl;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
+  auto &C = getASTContext();
+  StructDecl *unownedJobDecl = C.getUnownedJobDecl();
+  if (!unownedJobDecl)
+    return nullptr;
+
+  auto proto = dyn_cast<ProtocolDecl>(this);
+  if (!proto)
+    return nullptr;
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  lookupQualified(getSelfNominalTypeDecl(),
+                  DeclNameRef(C.Id_enqueue),
+                  NL_ProtocolMembers,
+                  results);
+
+  for (auto candidate: results) {
+    // we're specifically looking for the Executor protocol requirement
+    if (!isa<ProtocolDecl>(candidate->getDeclContext()))
+      continue;
+
+    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(candidate)) {
+      auto params = funcDecl->getParameters();
+      if (params->size() != 1)
+        continue;
+
+      auto param = params->get(0);
+      if (param->getSpecifier() == ParamSpecifier::LegacyOwned ||
+          param->getSpecifier() == ParamSpecifier::Consuming) {
         return funcDecl;
       }
     }
@@ -6610,6 +6738,15 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   return !isTopLevelGlobal();
 }
 
+Expr *VarDecl::getParentExecutableInitializer() const {
+  if (auto *PBD = getParentPatternBinding()) {
+    const auto i = PBD->getPatternEntryIndexForVarDecl(this);
+    return PBD->getExecutableInit(i);
+  }
+
+  return nullptr;
+}
+
 SourceRange VarDecl::getSourceRange() const {
   if (auto Param = dyn_cast<ParamDecl>(this))
     return Param->getSourceRange();
@@ -7022,6 +7159,18 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
   return evaluateOrDefault(ctx.evaluator,
                            ParamSpecifierRequest{mutableThis},
                            ParamDecl::Specifier::Default);
+}
+
+LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
+  auto specifier = getSpecifier();
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (specifier == ParamDecl::Specifier::Consuming &&
+      !getType()->isPureMoveOnly()) {
+    if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::EagerMove;
+  }
+  return getLifetimeAnnotationFromAttributes();
 }
 
 StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
@@ -8214,6 +8363,14 @@ const ParamDecl *swift::getParameterAt(const ValueDecl *source,
   return nullptr;
 }
 
+const ParamDecl *swift::getParameterAt(const DeclContext *source,
+                                       unsigned index) {
+  if (auto *params = getParameterList(const_cast<DeclContext *>(source))) {
+    return index < params->size() ? params->get(index) : nullptr;
+  }
+  return nullptr;
+}
+
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
   assert(getDeclContext()->isTypeContext());
   auto Ty = getInterfaceType();
@@ -9209,6 +9366,19 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
                            SelfAccessKind::NonMutating);
 }
 
+LifetimeAnnotation FuncDecl::getLifetimeAnnotation() const {
+  // Copyable parameters which are consumed have eager-move semantics.
+  if (getSelfAccessKind() == SelfAccessKind::Consuming) {
+    auto *selfDecl = getImplicitSelfDecl();
+    if (selfDecl && !selfDecl->getType()->isPureMoveOnly()) {
+      if (getAttrs().hasAttribute<NoEagerMoveAttr>())
+        return LifetimeAnnotation::Lexical;
+      return LifetimeAnnotation::EagerMove;
+    }
+  }
+  return getLifetimeAnnotationFromAttributes();
+}
+
 bool FuncDecl::isCallAsFunctionMethod() const {
   return getBaseIdentifier() == getASTContext().Id_callAsFunction &&
          isInstanceMember();
@@ -10033,6 +10203,14 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
 
+std::vector<MacroRole> swift::getAllMacroRoles() {
+  return {
+      MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
+      MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
+      MacroRole::Conformance,     MacroRole::CodeItem,
+  };
+}
+
 StringRef swift::getMacroRoleString(MacroRole role) {
   switch (role) {
   case MacroRole::Expression:
@@ -10059,6 +10237,17 @@ StringRef swift::getMacroRoleString(MacroRole role) {
   case MacroRole::CodeItem:
     return "codeItem";
   }
+}
+
+std::vector<MacroIntroducedDeclNameKind>
+swift::getAllMacroIntroducedDeclNameKinds() {
+  return {
+      MacroIntroducedDeclNameKind::Named,
+      MacroIntroducedDeclNameKind::Overloaded,
+      MacroIntroducedDeclNameKind::Prefixed,
+      MacroIntroducedDeclNameKind::Suffixed,
+      MacroIntroducedDeclNameKind::Arbitrary,
+  };
 }
 
 bool swift::macroIntroducedNameRequiresArgument(
@@ -10122,6 +10311,21 @@ bool swift::isAttachedMacro(MacroRoles contexts) {
 
 MacroRoles swift::getAttachedMacroRoles() {
   return attachedMacroRoles;
+}
+
+bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
+  switch (role) {
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+  case MacroRole::Accessor:
+  case MacroRole::MemberAttribute:
+  case MacroRole::Member:
+  case MacroRole::Peer:
+  case MacroRole::Conformance:
+    return true;
+  case MacroRole::CodeItem:
+    return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
+  }
 }
 
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
@@ -10248,7 +10452,16 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   for (auto expandedName : attr->getNames()) {
     switch (expandedName.getKind()) {
     case MacroIntroducedDeclNameKind::Named: {
-      names.push_back(DeclName(expandedName.getIdentifier()));
+      names.push_back(DeclName(expandedName.getName()));
+
+      // Temporary hack: we previously allowed named(`init`) to mean the same
+      // thing as named(init), before the latter was supported. Smooth over the
+      // difference by treating the former as the latter, for a short time.
+      if (expandedName.getName().isSimpleName() &&
+          !expandedName.getName().getBaseName().isSpecial() &&
+          expandedName.getName().getBaseIdentifier().is("init"))
+        names.push_back(DeclName(DeclBaseName::createConstructor()));
+
       break;
     }
 
@@ -10268,7 +10481,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       std::string prefixedName;
       {
         llvm::raw_string_ostream out(prefixedName);
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
         out << baseName.getIdentifier();
       }
 
@@ -10286,7 +10499,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       {
         llvm::raw_string_ostream out(suffixedName);
         out << baseName.getIdentifier();
-        out << expandedName.getIdentifier();
+        out << expandedName.getName();
       }
 
       Identifier nameId = ctx.getIdentifier(suffixedName);
@@ -10423,9 +10636,53 @@ ArrayRef<CustomAttr *> Decl::getRuntimeDiscoverableAttrs() const {
                            nullptr);
 }
 
+/// Adjust the declaration context to find a point in the context hierarchy
+/// that the macro can be anchored on.
+DeclContext *
+MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
+  switch (dc->getContextKind()) {
+  case DeclContextKind::SubscriptDecl:
+    // For a subscript, return its parent context.
+    return getInnermostMacroContext(dc->getParent());
+
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Package:
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::MacroDecl:
+    // These contexts are always fine
+    return dc;
+
+  case DeclContextKind::TopLevelCodeDecl:
+    // For top-level code, use the enclosing source file as the context.
+    return getInnermostMacroContext(dc->getParent());
+
+  case DeclContextKind::AbstractClosureExpr: {
+    // For closures, we can mangle the closure if we're in a context we can
+    // mangle. Check that context.
+    auto adjustedParentDC = getInnermostMacroContext(dc->getParent());
+    if (adjustedParentDC == dc->getParent())
+      return dc;
+
+    return adjustedParentDC;
+  }
+
+  case DeclContextKind::Initializer:
+    // Initializers can be part of inferring types for variables, so we need
+    // their context.
+    return getInnermostMacroContext(dc->getParent());
+  }
+}
+
 /// Retrieve the parent discriminator context for the given macro.
 MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
     SourceLoc loc, DeclContext *origDC) {
+  origDC = getInnermostMacroContext(origDC);
+
   if (loc.isInvalid())
     return origDC;
 

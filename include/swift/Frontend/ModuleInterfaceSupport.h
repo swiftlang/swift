@@ -21,6 +21,7 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -49,6 +50,10 @@ struct ModuleInterfaceOptions {
   /// Flags that should be emitted to the .swiftinterface file but are OK to be
   /// ignored by the earlier version of the compiler.
   std::string IgnorableFlags;
+
+  /// Ignorable flags that should only be printed in .private.swiftinterface file;
+  /// e.g. -package-name PACKAGE_ID
+  std::string IgnorablePrivateFlags;
 
   /// Print for a private swiftinterface file, SPI decls and attributes.
   bool PrintPrivateInterfaceContent = false;

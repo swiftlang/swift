@@ -816,13 +816,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return foundSourceFile;
 }
 
-bool ModuleDecl::isInGeneratedBuffer(SourceLoc loc) {
-  SourceFile *file = getSourceFileContainingLocation(loc);
-  if (!file)
-    return false;
-  return file->Kind == SourceFileKind::MacroExpansion;
-}
-
 std::pair<unsigned, SourceLoc>
 ModuleDecl::getOriginalLocation(SourceLoc loc) const {
   assert(loc.isValid());
@@ -1447,7 +1440,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   Result.SourceFilePath = SM.getIdentifierForBuffer(BufferID);
   setLoc(Result.Loc, MainLoc);
   if (!InGeneratedBuffer) {
-    for (const auto &SRC : D->getRawComment(/*SerializedOK=*/false).Comments) {
+    for (const auto &SRC : D->getRawComment().Comments) {
       Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(),
                                     SRC.Range.getByteLength());
       setLoc(Result.DocRanges.back().first, SRC.Range.getStart());
@@ -1775,10 +1768,18 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
-  // All metatypes are Sendable and Copyable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    ASTContext &ctx = protocol->getASTContext();
+  ASTContext &ctx = protocol->getASTContext();
+
+  // Only metatypes of Copyable types are Copyable.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+      !metatypeType->getInstanceType()->isPureMoveOnly()) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
+  // All metatypes are Sendable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol, GenericSignature(), { },
                                   BuiltinConformanceKind::Synthesized));
@@ -3859,12 +3860,8 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
-Identifier
-SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
-  assert(D->getDeclContext()->getModuleScopeContext() == this ||
-         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
-
-  if (!PrivateDiscriminator.empty())
+Identifier SourceFile::getPrivateDiscriminator(bool createIfMissing) const {
+  if (!PrivateDiscriminator.empty() || !createIfMissing)
     return PrivateDiscriminator;
 
   StringRef name = getFilename();
@@ -3899,6 +3896,13 @@ SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
   buffer += hashString;
   PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
+}
+
+Identifier
+SourceFile::getDiscriminatorForPrivateDecl(const Decl *D) const {
+  assert(D->getDeclContext()->getModuleScopeContext() == this ||
+         D->getDeclContext()->getModuleScopeContext() == getSynthesizedFile());
+  return getPrivateDiscriminator(/*createIfMissing=*/true);
 }
 
 SynthesizedFileUnit *FileUnit::getSynthesizedFile() const {
@@ -4072,7 +4076,8 @@ void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
   getTopLevelDecls(nonExpandedDecls);
   for (auto *decl : nonExpandedDecls) {
     decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      results.push_back(auxDecl);
+      if (!isa<ExtensionDecl>(auxDecl))
+        results.push_back(auxDecl);
     });
     results.push_back(decl);
   }

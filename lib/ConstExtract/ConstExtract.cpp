@@ -312,7 +312,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
 
     case ExprKind::DotSelf: {
       auto dotSelfExpr = cast<DotSelfExpr>(expr);
-      return std::make_shared<TypeValue>(dotSelfExpr->getType());
+      auto dotSelfMetaType = dotSelfExpr->getType()->getAs<AnyMetatypeType>();
+      if (dotSelfMetaType)
+        return std::make_shared<TypeValue>(dotSelfMetaType->getInstanceType());
+      else
+        break;
     }
 
     case ExprKind::UnderlyingToOpaque: {

@@ -145,7 +145,8 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
     // In the address case, we forward the underlying value and store it
     // into memory and then create a +1 cleanup. since we assume here
     // that we have a +1 value since we are forwarding into memory.
-    assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
+    assert(value.isPlusOneOrTrivial(SGF) &&
+           "Can not store a +0 value into memory?!");
     CleanupCloner cloner(SGF, value);
     SILValue v = value.forward(SGF);
 
@@ -646,7 +647,8 @@ public:
 
     assert(!isa<ParamDecl>(vd)
            && "should not bind function params on this path");
-    if (vd->getParentPatternBinding() && !vd->getParentInitializer()) {
+    if (vd->getParentPatternBinding() &&
+        !vd->getParentExecutableInitializer()) {
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
@@ -1433,8 +1435,8 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
   // If the variable has no initial value, emit a mark_uninitialized instruction
   // so that DI tracks and enforces validity of it.
   bool isUninitialized =
-    vd->getParentPatternBinding() && !vd->getParentInitializer();
-  
+    vd->getParentPatternBinding() && !vd->getParentExecutableInitializer();
+
   // If this is a global variable, initialize it without allocations or
   // cleanups.
   InitializationPtr Result;

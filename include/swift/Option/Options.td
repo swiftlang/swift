@@ -56,6 +56,11 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
+// The option should be written into a .private.swiftinterface module interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option can be safely ignored by the older compiler.
+def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
+
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -530,7 +535,7 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
 def package_name : Separate<["-"], "package-name">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorablePrivate]>,
   HelpText<"Name of the package the module belongs to">;
 def export_as : Separate<["-"], "export-as">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
@@ -930,7 +935,7 @@ def disableCrossModuleOptimization : Flag<["-"], "disable-cmo">,
 
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
-  HelpText<"Enable experimental performance annotations">;
+  HelpText<"Deprecated, has no effect">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -1810,7 +1815,23 @@ def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
   MetaVarName<"<path>">,
   HelpText<"Specify a directory where the clang importer and clang linker can find headers and libraries">;
 
+def cas_path: Separate<["-"], "cas-path">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Path to CAS">, MetaVarName<"<path>">;
+
+def allow_unstable_cache_key_for_testing: Flag<["-"], "allow-unstable-cache-key-for-testing">,
+  Flags<[FrontendOption, HelpHidden, NoDriverOption]>,
+  HelpText<"Allow compilation caching with unstable inputs for testing purpose">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
+
+def enable_cas: Flag<["-"], "enable-cas">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Enable CAS for swift-frontend">;
+
+def cas_fs: Separate<["-"], "cas-fs">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
 
 def load_plugin_library:
   Separate<["-"], "load-plugin-library">,

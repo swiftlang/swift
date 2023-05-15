@@ -306,6 +306,41 @@ func testNested(_ e: E) throws -> Int {
 // CHECK:       dealloc_stack [[RESULT_STORAGE]] : $*Int
 // CHECK:       return [[VAL]] : $Int
 
+func testPoundIf1() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    #if true
+    1
+    #else
+    ""
+    #endif
+  case false:
+    #if false
+    ""
+    #else
+    2
+    #endif
+  }
+  return x
+}
+
+func testPoundIf2() -> Int {
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #else
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+    #endif
+  case false:
+    #if true
+    switch Bool.random() { case true: 0 case false: 1 }
+    #endif
+  }
+}
+
 func testAssignment() {
   var x = 0
   x = switch Bool.random() { case true: 0 case false: 1 }
@@ -321,5 +356,110 @@ func nestedType() throws -> Int {
     throw S()
   case false:
     0
+  }
+}
+
+// MARK: Bindings
+
+enum F {
+  case e(Int)
+}
+
+struct S {
+  var i: Int
+
+  mutating func testAssign1(_ x: F) {
+    i = switch x {
+    case .e(let y): y
+    }
+  }
+
+  mutating func testAssign2(_ x: F) {
+    i = switch x {
+    case .e(let y): Int(y)
+    }
+  }
+
+  func testAssign3(_ x: F) {
+    var i = 0
+    i = switch x {
+    case .e(let y): y
+    }
+    _ = i
+  }
+
+  func testAssign4(_ x: F) {
+    var i = 0
+    let _ = {
+      i = switch x {
+      case .e(let y): y
+      }
+    }
+    _ = i
+  }
+
+  mutating func testAssign5(_ x: F) {
+    i = switch Bool.random() {
+    case true:
+      switch x {
+      case .e(let y): y
+      }
+    case let z:
+      z ? 0 : 1
+    }
+  }
+
+  mutating func testAssign6(_ x: F) {
+    i = switch x {
+    case .e(let y):
+      switch Bool.random() {
+      case true: y
+      case false: y
+      }
+    }
+  }
+
+  func testReturn1(_ x: F) -> Int {
+    switch x {
+    case .e(let y): y
+    }
+  }
+
+  func testReturn2(_ x: F) -> Int {
+    return switch x {
+    case .e(let y): y
+    }
+  }
+
+  func testReturn3(_ x: F) -> Int {
+    {
+      switch x {
+      case .e(let y): y
+      }
+    }()
+  }
+
+  func testReturn4(_ x: F) -> Int {
+    return {
+      switch x {
+      case .e(let y): y
+      }
+    }()
+  }
+
+  func testBinding1(_ x: F) -> Int {
+    let i = switch x {
+    case .e(let y): y
+    }
+    return i
+  }
+
+  func testBinding2(_ x: F) -> Int {
+    let i = {
+      switch x {
+      case .e(let y): y
+      }
+    }()
+    return i
   }
 }

@@ -138,7 +138,8 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
 void TypeInfo::callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                                 SILType T, IsInitialization_t isInit,
                                 IsTake_t isTake) const {
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+  if (!T.hasLocalArchetype() &&
+      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);
@@ -340,7 +341,8 @@ void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
   if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
-  if (!IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
+  if (!T.hasLocalArchetype() &&
+      !IGF.IGM.getOptions().UseTypeLayoutValueHandling) {
     OutliningMetadataCollector collector(IGF);
     if (T.hasArchetype()) {
       collectMetadataForOutlining(collector, T);

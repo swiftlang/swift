@@ -18,10 +18,29 @@ public func makeEmptyTuple() {
   return makeTuple()
 }
 
-// FIXME: This crashes in SILGen
-/*public func makeOne<T>(_ t: T) -> T {
+// FIXME: Useless pack_element_set/pack_element_get
+
+// CHECK-LABEL: sil @$s17tuples_from_packs7makeOneyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK: [[PACK:%.*]] = alloc_pack $Pack{T}
+// CHECK-NEXT: [[IDX:%.*]] = scalar_pack_index 0 of $Pack{T}
+// CHECK-NEXT: pack_element_set %0 : $*T into [[IDX]] of [[PACK]] : $*Pack{T}
+// CHECK-NEXT: [[PACK2:%.*]] = alloc_pack $Pack{T}
+// CHECK-NEXT: [[BOX:%.*]] = alloc_stack $T
+// CHECK-NEXT: copy_addr %1 to [init] [[BOX]] : $*T
+// CHECK-NEXT: pack_element_set [[BOX]] : $*T into [[IDX]] of [[PACK2]] : $*Pack{T}
+// CHECK-NEXT: [[ELT:%.*]] = pack_element_get [[IDX]] of [[PACK]] : $*Pack{T} as $*T
+// CHECK-NEXT: [[ELT2:%.*]] = pack_element_get [[IDX]] of [[PACK2]] : $*Pack{T} as $*T
+// CHECK-NEXT: copy_addr [[ELT2]] to [init] [[ELT]] : $*T
+// CHECK-NEXT: destroy_addr [[BOX]] : $*T
+// CHECK-NEXT: dealloc_stack [[BOX]] : $*T
+// CHECK-NEXT: dealloc_pack [[PACK2]] : $*Pack{T}
+// CHECK-NEXT: dealloc_pack [[PACK]] : $*Pack{T}
+// CHECK-NEXT: [[RET:%.*]] = tuple ()
+// CHECK-NEXT: return [[RET]] : $()
+public func makeOne<T>(_ t: T) -> T {
   return makeTuple(t)
-}*/
+}
 
 // FIXME: Useless pack_element_set/pack_element_get
 

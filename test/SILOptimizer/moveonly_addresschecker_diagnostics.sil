@@ -59,12 +59,30 @@ public struct AggStruct {
     var pair: KlassPair
 }
 
+protocol P {
+    static var value: Self { get }
+    static var value2: any P { get }
+}
+
+@_moveOnly
+public struct AddressOnlyGeneric<T : P> {
+    var copyable: T
+    var moveOnly: NonTrivialStruct
+
+    init()
+    init(_ input1: T)
+}
+
 sil @get_aggstruct : $@convention(thin) () -> @owned AggStruct
 sil @nonConsumingUseKlass : $@convention(thin) (@guaranteed Klass) -> ()
 sil @nonConsumingUseNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @classConsume : $@convention(thin) (@owned Klass) -> () // user: %18
 sil @copyableClassConsume : $@convention(thin) (@owned CopyableKlass) -> () // user: %24
 sil @copyableClassUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed CopyableKlass) -> () // user: %16
+sil @getAddressOnlyGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out AddressOnlyGeneric<τ_0_0>
+sil @addressOnlyGenericInOutUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout AddressOnlyGeneric<τ_0_0>) -> ()
+sil @addressOnlyGenericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
+sil @addressOnlyGenericUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed AddressOnlyGeneric<τ_0_0>) -> ()
 
 ///////////
 // Tests //
@@ -315,4 +333,35 @@ bb0(%0 : $*Klass):
   dealloc_stack %3 : $*Klass
   %27 = tuple ()
   return %27 : $()
+}
+
+////////////////////////
+// Address Only Tests //
+////////////////////////
+
+sil [ossa] @inoutCaptureTestAddressOnlyGenericClosure2 : $@convention(thin) <T where T : P> (@guaranteed <τ_0_0 where τ_0_0 : P> { var AddressOnlyGeneric<τ_0_0> } <T>) -> () {
+bb0(%0 : @closureCapture @guaranteed $<τ_0_0 where τ_0_0 : P> { var AddressOnlyGeneric<τ_0_0> } <T>):
+  %1 = project_box %0 : $<τ_0_0 where τ_0_0 : P> { var AddressOnlyGeneric<τ_0_0> } <T>, 0
+  debug_value %1 : $*AddressOnlyGeneric<T>, var, name "x", argno 1, expr op_deref
+  %3 = alloc_stack $AddressOnlyGeneric<T>
+  %5 = function_ref @getAddressOnlyGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out AddressOnlyGeneric<τ_0_0>
+  %6 = apply %5<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out AddressOnlyGeneric<τ_0_0>
+  %7 = begin_access [modify] [dynamic] %1 : $*AddressOnlyGeneric<T>
+  %8 = mark_must_check [assignable_but_not_consumable] %7 : $*AddressOnlyGeneric<T>
+  copy_addr [take] %3 to %8 : $*AddressOnlyGeneric<T>
+  end_access %7 : $*AddressOnlyGeneric<T>
+  dealloc_stack %3 : $*AddressOnlyGeneric<T>
+  %12 = begin_access [modify] [dynamic] %1 : $*AddressOnlyGeneric<T>
+  %13 = mark_must_check [assignable_but_not_consumable] %12 : $*AddressOnlyGeneric<T>
+  %14 = function_ref @addressOnlyGenericInOutUse : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout AddressOnlyGeneric<τ_0_0>) -> ()
+  %15 = apply %14<T>(%13) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout AddressOnlyGeneric<τ_0_0>) -> ()
+  end_access %12 : $*AddressOnlyGeneric<T>
+  %17 = begin_access [deinit] [dynamic] %1 : $*AddressOnlyGeneric<T>
+  %18 = mark_must_check [assignable_but_not_consumable] %17 : $*AddressOnlyGeneric<T>
+  // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+  %19 = function_ref @addressOnlyGenericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
+  %20 = apply %19<T>(%18) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
+  end_access %17 : $*AddressOnlyGeneric<T>
+  %22 = tuple ()
+  return %22 : $()
 }

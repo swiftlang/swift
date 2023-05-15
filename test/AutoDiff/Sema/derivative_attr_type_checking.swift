@@ -496,7 +496,7 @@ extension Struct {
   }
 
   // expected-note @+1 {{candidate subscript does not have a setter}}
-  subscript<T: Differentiable>(x: T) -> T { x }
+  subscript<U: Differentiable>(x: U) -> U { x }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
   @derivative(of: subscript.get)
@@ -534,14 +534,14 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
   @derivative(of: subscript(_:).get, wrt: self)
-  func vjpSubscriptGenericGetter<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
+  func vjpSubscriptGenericGetter<U: Differentiable>(x: U) -> (value: U, pullback: (U.TangentVector) -> TangentVector)   {
     return (x, { _ in .zero })
   }
 
   // expected-error @+2 {{a derivative already exists for '_'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript(_:), wrt: self)
-  func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
+  func vjpSubscriptGeneric<U: Differentiable>(x: U) -> (value: U, pullback: (U.TangentVector) -> TangentVector)   {
     return (x, { _ in .zero })
   }
 
@@ -576,8 +576,8 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   // Error: original subscript has no setter.
   // expected-error @+1 {{referenced declaration 'subscript(_:)' could not be resolved}}
   @derivative(of: subscript(_:).set, wrt: self)
-  mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
-    value: T, pullback: (T.TangentVector) -> TangentVector
+  mutating func vjpSubscriptGeneric_NoSetter<U: Differentiable>(x: U) -> (
+    value: U, pullback: (U.TangentVector) -> TangentVector
   ) {
     return (x, { _ in .zero })
   }

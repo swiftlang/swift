@@ -545,6 +545,107 @@ func testThrowInference() {
   }
 }
 
+// MARK: Pound if
+
+func testPoundIf1() -> Int {
+  switch Bool.random() {
+  case true:
+    #if true
+    0
+    #else
+    ""
+    #endif
+  case false:
+    0
+  }
+}
+
+func testPoundIf2() -> String {
+  switch Bool.random() {
+  case true:
+    #if true
+    0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+    #else
+    ""
+    #endif
+  case false:
+    ""
+  }
+}
+
+func testPoundIf3() -> String {
+  switch Bool.random() {
+  case true:
+    #if false
+    0
+    #else
+    ""
+    #endif
+  case false:
+    ""
+  }
+}
+
+func testPoundIf4() -> String {
+  let x = switch Bool.random() {
+  case true:
+    #if true
+    0 // expected-error {{branches have mismatching types 'Int' and 'String'}}
+    #else
+    ""
+    #endif
+  case false:
+    ""
+  }
+  return x
+}
+
+func testPoundIf5() -> String {
+  let x = switch Bool.random() {
+  case true:
+    #if false
+    0
+    #else
+    ""
+    #endif
+  case false:
+    ""
+  }
+  return x
+}
+
+func testPoundIfClosure1() -> Int {
+  let fn = {
+    switch Bool.random() {
+    case true:
+      #if true
+        0
+      #else
+        ""
+      #endif
+    case false:
+      0
+    }
+  }
+  return fn()
+}
+
+func testPoundIfClosure2() -> String {
+  let fn: () -> String = {
+    switch Bool.random() {
+    case true:
+      #if true
+        0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+      #else
+        ""
+      #endif
+    case false:
+      ""
+    }
+  }
+  return fn()
+}
+
 // MARK: Subtyping
 
 class A {}

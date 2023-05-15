@@ -516,7 +516,7 @@ protocol Protocol2 {}
 // Base class is generic, derived class is concrete.
 
 class Base1<T> {
-  func foo<T: Protocol1>(arg: T) {}
+  func foo<U: Protocol1>(arg: U) {}
 }
 class Derived1: Base1<Protocol2> {
   override func foo<T>(arg: T) {} // Ok?
@@ -528,14 +528,14 @@ class Base2 {
   func foo() {}
 }
 class Derived2<T>: Base2 {
-  override func foo<T>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
+  override func foo<U>(arg: U) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Base class generic w/ method generic, derived class generic w/ method not
 // generic.
 
 class Base3<T> {
-  func foo<T>(arg: T) {}
+  func foo<U>(arg: U) {}
 }
 class Derived3<T>: Base3<T> {
   override func foo() {} // expected-error {{method does not override any method from its superclass}}
@@ -545,10 +545,10 @@ class Derived3<T>: Base3<T> {
 // but different requirement.
 
 class Base4<T> {
-  func foo<T>(arg: T) {}
+  func foo<U>(arg: U) {}
 }
 class Derived4<T>: Base4<T> {
-  override func foo<T: Protocol1>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
+  override func foo<U: Protocol1>(arg: U) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Base class not generic w/ method generic, derived class not generic w/ method
@@ -578,7 +578,7 @@ class Base7 {
   func foo<T: Protocol2>(arg: T) {}
 }
 class Derived7<T>: Base7 {
-  override func foo<T: Protocol1>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
+  override func foo<U: Protocol1>(arg: U) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Override with orthogonal requirement on contextual generic parameter.

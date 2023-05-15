@@ -17,12 +17,8 @@ import EWrapper
 // CHECK: "modulePath": "{{.*}}EWrapper.swiftmodule"
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
-// CHECK-NEXT:     "swift": "E"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "swift": "Swift"
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     "swift": "SwiftOnoneSupport"
+// CHECK-DAG:     "swift": "E"
+// CHECK-DAG:     "swift": "Swift"
+// CHECK-DAG:     "swift": "SwiftOnoneSupport"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],

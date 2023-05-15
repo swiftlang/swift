@@ -198,7 +198,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
 
 ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
   // Handle occurrences in any preceding doc comments
-  RawComment R = D->getRawComment(/*SerializedOK=*/false);
+  RawComment R = D->getRawComment();
   if (!R.isEmpty()) {
     for(SingleRawComment C: R.Comments) {
       while(!shouldSkip(C.Range))

@@ -120,6 +120,12 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
   return {lowered, IGM.getTypeInfo(lowered)};
 }
 
+static std::pair<SILType, const TypeInfo &>
+getMaximallyAbstractedLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
+  auto lowered = IGM.getLoweredType(AbstractionPattern::getOpaque(), unloweredType);
+  return {lowered, IGM.getTypeInfo(lowered)};
+}
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             BuiltinInst *Inst, ArrayRef<SILType> argTypes,
@@ -144,7 +150,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   // These builtins don't care about their argument:
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getSize(IGF, valueTy.first));
     return;
@@ -152,7 +158,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getStride(IGF, valueTy.first));
     return;
@@ -160,7 +166,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     (void)args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+    auto valueTy = getMaximallyAbstractedLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     // The alignof value is one greater than the alignment mask.
     out.add(IGF.Builder.CreateAdd(

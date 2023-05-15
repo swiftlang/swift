@@ -229,6 +229,9 @@ private:
   /// Protocol conformances referenced by this module.
   ArrayRef<RawBitOffset> Conformances;
 
+  /// Pack conformances referenced by this module.
+  ArrayRef<RawBitOffset> PackConformances;
+
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;
 

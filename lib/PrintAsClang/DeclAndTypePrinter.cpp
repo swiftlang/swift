@@ -100,6 +100,20 @@ static bool looksLikeInitMethod(ObjCSelector selector) {
   return !(firstPiece.size() > 4 && clang::isLowercase(firstPiece[4]));
 }
 
+// Enters and leaves a new lexical scope when emitting
+// members of a Swift type.
+struct CxxEmissionScopeRAII {
+  DeclAndTypePrinter &printer;
+  CxxDeclEmissionScope &prevScope;
+  CxxDeclEmissionScope scope;
+
+  CxxEmissionScopeRAII(DeclAndTypePrinter &printer)
+      : printer(printer), prevScope(printer.getCxxDeclEmissionScope()) {
+    printer.setCxxDeclEmissionScope(scope);
+  }
+  ~CxxEmissionScopeRAII() { printer.setCxxDeclEmissionScope(prevScope); }
+};
+
 class DeclAndTypePrinter::Implementation
     : private DeclVisitor<DeclAndTypePrinter::Implementation>,
       private TypeVisitor<DeclAndTypePrinter::Implementation, void,
@@ -188,6 +202,12 @@ public:
   }
 
 private:
+  void recordEmittedDeclInCurrentCxxLexicalScope(const ValueDecl *vd) {
+    assert(outputLang == OutputLanguageMode::Cxx);
+    owningPrinter.getCxxDeclEmissionScope().emittedDeclarationNames.insert(
+        cxx_translation::getNameForCxx(vd));
+  }
+
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
   /// This method filters out non-ObjC protocols.
@@ -215,6 +235,11 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
+    CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+    // FIXME: Actually track emitted members in nested
+    // lexical scopes.
+    // FIXME: Emit unavailable C++ decls for not emitted
+    // nested members.
     bool protocolMembersOptional = false;
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
@@ -301,6 +326,7 @@ private:
       ClangValueTypePrinter::forwardDeclType(os, CD, owningPrinter);
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
+      recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
 
@@ -363,6 +389,7 @@ private:
           }
         },
         owningPrinter);
+    recordEmittedDeclInCurrentCxxLexicalScope(SD);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -406,7 +433,6 @@ private:
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
 
-    // FIXME: Print enum's availability
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
     ClangSyntaxPrinter syntaxPrinter(os);
@@ -844,6 +870,7 @@ private:
           printMembers(ED->getMembers());
         },
         owningPrinter);
+    recordEmittedDeclInCurrentCxxLexicalScope(ED);
   }
 
   void visitEnumDecl(EnumDecl *ED) {
@@ -985,6 +1012,39 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns true if the given function overload is safe to emit in the current
+  /// C++ lexical scope.
+  bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
+    assert(outputLang == OutputLanguageMode::Cxx);
+    auto &overloads =
+        owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
+    auto cxxName = cxx_translation::getNameForCxx(funcDecl);
+    auto overloadIt = overloads.find(cxxName);
+    if (overloadIt == overloads.end()) {
+      overloads.insert(std::make_pair(
+          cxxName,
+          llvm::SmallVector<const AbstractFunctionDecl *>({funcDecl})));
+      return true;
+    }
+    auto selfArity =
+        funcDecl->getParameters() ? funcDecl->getParameters()->size() : 0;
+    for (const auto *overload : overloadIt->second) {
+      auto arity =
+          overload->getParameters() ? overload->getParameters()->size() : 0;
+      // Avoid printing out an overload with the same and arity, as that might
+      // be an ambiguous overload on the C++ side.
+      // FIXME: we should take types into account, not all overloads with the
+      // same arity are ambiguous in C++.
+      if (selfArity == arity) {
+        owningPrinter.getCxxDeclEmissionScope()
+            .additionalUnrepresentableDeclarations.push_back(funcDecl);
+        return false;
+      }
+    }
+    overloadIt->second.push_back(funcDecl);
+    return true;
+  }
+
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
@@ -1024,6 +1084,12 @@ private:
         if (!dispatchInfo)
           return;
       }
+      // FIXME: handle getters/setters ambiguities here too.
+      if (!isa<AccessorDecl>(AFD)) {
+        if (!canPrintOverloadOfFunction(AFD))
+          return;
+      }
+
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
@@ -1747,10 +1813,16 @@ private:
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
       auto funcABI = Implementation(cFuncPrologueOS, owningPrinter, outputLang)
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
-      if (!funcABI)
+      if (!funcABI) {
+        owningPrinter.getCxxDeclEmissionScope()
+            .additionalUnrepresentableDeclarations.push_back(FD);
+        return;
+      }
+      if (!canPrintOverloadOfFunction(FD))
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
       printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
+      recordEmittedDeclInCurrentCxxLexicalScope(FD);
       return;
     }
     if (FD->getDeclContext()->isTypeContext())
@@ -2793,16 +2865,53 @@ static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
   return exposedModules.count(mc->getName().str());
 }
 
+static bool isEnumExposableToCxx(const ValueDecl *VD,
+                                 DeclAndTypePrinter &printer) {
+  auto *enumDecl = dyn_cast<EnumDecl>(VD);
+  if (!enumDecl)
+    return true;
+  // The supported set of enum elements is restricted by
+  // the types that can be represented in C++. We already
+  // check for different type categories in `getDeclRepresentation`, however,
+  // we also need to perform additional check on whether the type can be
+  // emitted here as well, to ensure that we don't emit types from dependent
+  // modules that do not have a C++ representation.
+  for (const auto *enumCase : enumDecl->getAllCases()) {
+    for (const auto *elementDecl : enumCase->getElements()) {
+      if (!elementDecl->hasAssociatedValues())
+        continue;
+      if (auto *params = elementDecl->getParameterList()) {
+        for (const auto *param : *params) {
+          auto paramType = param->getInterfaceType();
+          if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                  printer.getTypeMapping(), printer.getInteropContext(),
+                  printer, enumDecl->getModuleContext(), paramType)
+                  .isUnsupported())
+            return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
                     isExposedToThisModule(M, VD, exposedModules) &&
-                    cxx_translation::isExposableToCxx(VD)
+                    cxx_translation::isExposableToCxx(VD) &&
+                    isEnumExposableToCxx(VD, *this)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
          !isAsyncAlternativeOfOtherDecl(VD) &&
          !excludeForObjCImplementation(VD);
+}
+
+bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
+  return outputLang == OutputLanguageMode::Cxx
+             ? cxx_translation::isVisibleToCxx(vd, minRequiredAccess)
+             : isVisibleToObjC(vd, minRequiredAccess);
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {

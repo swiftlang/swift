@@ -53,12 +53,19 @@ public:
   /// Insert a lifetime-ending instruction on every path to complete the OSSA
   /// lifetime of \p value. Lifetime completion is only relevant for owned
   /// values or borrow introducers.
-  ///
+  /// For lexical values lifetime is completed at unreachable instructions.
+  /// For non-lexical values lifetime is completed at the lifetime boundary.
+  /// When \p forceBoundaryCompletion is true, the client is able to guarantee
+  /// that lifetime completion of lexical values at the lifetime boundary is
+  /// sufficient.
+  /// Currently \p forceBoundaryCompletion is used by mem2reg and temprvalueopt
+  /// to complete lexical enum values on trivial paths.
   /// Returns true if any new instructions were created to complete the
   /// lifetime.
   ///
   /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
-  LifetimeCompletion completeOSSALifetime(SILValue value) {
+  LifetimeCompletion
+  completeOSSALifetime(SILValue value, bool forceBoundaryCompletion = false) {
     if (value->getOwnershipKind() == OwnershipKind::None)
       return LifetimeCompletion::NoLifetime;
 
@@ -73,13 +80,13 @@ public:
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
-    return analyzeAndUpdateLifetime(value)
-      ? LifetimeCompletion::WasCompleted
-      : LifetimeCompletion::AlreadyComplete;
+    return analyzeAndUpdateLifetime(value, forceBoundaryCompletion)
+               ? LifetimeCompletion::WasCompleted
+               : LifetimeCompletion::AlreadyComplete;
   }
 
 protected:
-  bool analyzeAndUpdateLifetime(SILValue value);
+  bool analyzeAndUpdateLifetime(SILValue value, bool forceBoundaryCompletion);
 };
 
 //===----------------------------------------------------------------------===//

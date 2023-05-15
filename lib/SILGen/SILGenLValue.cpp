@@ -1102,18 +1102,16 @@ namespace {
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
                                     takeActorIsolation());
-          // LValue accesses to a `let` box are only ever going to make through
-          // definite initialization if they are initializations, which don't
-          // require checking since there's no former value to potentially
-          // misuse yet.
-          if (!box || box->getOperand()->getType().castTo<SILBoxType>()
-                ->getLayout()->isMutable()) {
-            addr = SGF.B.createMarkMustCheckInst(
-                loc, addr,
-                isReadAccess(getAccessKind())
+          // Mark all move only as having mark_must_check.
+          //
+          // DISCUSSION: LValue access to let boxes must have a mark_must_check
+          // to allow for DI to properly handle delayed initialization of the
+          // boxes and convert those to initable_but_not_consumable.
+          addr = SGF.B.createMarkMustCheckInst(
+              loc, addr,
+              isReadAccess(getAccessKind())
                   ? MarkMustCheckInst::CheckKind::NoConsumeOrAssign
                   : MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-          }
           return ManagedValue::forLValue(addr);
         }
       }
@@ -1146,6 +1144,28 @@ namespace {
       if (hasActorIsolation()) OS << " requires actor-hop";
       OS << "):\n";
       Value.dump(OS, indent + 2);
+    }
+  };
+  
+  class BorrowValueComponent : public PhysicalPathComponent {
+  public:
+    BorrowValueComponent(LValueTypeData typeData)
+      : PhysicalPathComponent(typeData, BorrowValueKind, None) {}
+
+    virtual bool isLoadingPure() const override { return true; }
+
+    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                         ManagedValue base) && override {
+      assert(base
+             && base.getType().isAddress()
+             && "should have an address base to borrow from");
+      auto result = SGF.B.createLoadBorrow(loc, base.getValue());
+      return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
+         base.getValue(), result);
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "BorrowValueComponent\n";
     }
   };
 } // end anonymous namespace
@@ -2760,7 +2780,7 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
       }
     }
   }
-
+  
   if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType())) {
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
@@ -2787,6 +2807,22 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // return.
   if (e->getType()->is<LValueType>() || e->isSemanticallyInOutExpr()) {
     return visitRecInOut(*this, e, accessKind, options, orig);
+  }
+  
+  // If the base is a load of a noncopyable type (or, eventually, when we have
+  // a `borrow x` operator, the operator is used on the base here), we want to
+  // apply the lvalue within a formal access to the original value instead of
+  // an actual loaded copy.
+  if (e->getType()->isPureMoveOnly()) {
+    if (auto load = dyn_cast<LoadExpr>(e)) {
+      LValue lv = visitRec(load->getSubExpr(), SGFAccessKind::BorrowedAddressRead,
+                               options, orig);
+      CanType formalType = getSubstFormalRValueType(e);
+      LValueTypeData typeData{accessKind, AbstractionPattern(formalType),
+                              formalType, lv.getTypeOfRValue().getASTType()};
+      lv.add<BorrowValueComponent>(typeData);
+      return lv;
+    }
   }
 
   // Otherwise we have a non-lvalue type (references, values, metatypes,
@@ -3147,7 +3183,8 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     SILValue accessAddr = UnenforcedFormalAccess::enter(*this, loc, destAddr,
                                                         SILAccessKind::Read);
 
-    if (accessAddr->getType().isMoveOnly()) {
+    if (accessAddr->getType().isMoveOnly() &&
+        !isa<MarkMustCheckInst>(accessAddr)) {
       // When loading an rvalue, we should never need to modify the place
       // we're loading from.
       accessAddr = B.createMarkMustCheckInst(
@@ -3493,7 +3530,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
           SGF.F.getResilienceExpansion());
     }
   }
-
+  
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, var, accessKind, strategy,
                                          getBaseFormalType(e->getBase())),
@@ -4490,28 +4527,6 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     rvalue = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, rvalue);
   }
 
-  // See if our rvalue is a box whose boxed type matches the destTL type. In
-  // that case, emit a project_box eagerly. This can happen for escaping
-  // captured move only arguments.
-  if (auto boxType = rvalue->getType().getAs<SILBoxType>()) {
-    auto fieldType = rvalue->getType().getSILBoxFieldType(&F, 0);
-    assert(fieldType.isMoveOnly());
-    if (fieldType.getObjectType() == destTL.getLoweredType()) {
-      SILValue box = rvalue;
-      rvalue = B.createProjectBox(loc, rvalue, 0);
-      // If we have a let, we rely on the typechecker to error if we attempt to
-      // assign to it.
-      bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
-      if (isMutable)
-        rvalue = B.createMarkMustCheckInst(
-            loc, rvalue,
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
-      B.emitCopyAddrOperation(loc, rvalue, dest, IsNotTake, isInit);
-      B.emitDestroyValueOperation(loc, box);
-      return;
-    }
-  }
-
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
     assert(!silConv.useLoweredAddresses()
@@ -4665,7 +4680,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
       } else if (isReadAccessResultOwned(src.getAccessKind()) &&
-          !projection.isPlusOne(*this)) {
+          !projection.isPlusOneOrTrivial(*this)) {
 
         // Before we copy, if we have a move only wrapped value, unwrap the
         // value using a guaranteed moveonlywrapper_to_copyable.

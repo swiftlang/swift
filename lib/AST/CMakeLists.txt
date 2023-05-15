@@ -72,6 +72,7 @@ add_swift_host_library(swiftAST STATIC
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
+  PluginLoader.cpp
   PluginRegistry.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp

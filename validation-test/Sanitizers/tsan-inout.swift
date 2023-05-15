@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cd %t
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
-// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
-// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
+// RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
+// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: stress_test

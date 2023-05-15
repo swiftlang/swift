@@ -33,11 +33,11 @@ do {
 
   // CHECK: ---Initial constraints for the given expression---
   // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
-  // CHECK: (attempting type variable [[CLOSURE:\$T[0-9]+]] := () -> {{.*}}
-  // CHECK-NOT: (attempting type variable [[LITERAL_VAR]] := {{.*}}
+  // CHECK: (attempting type variable binding [[CLOSURE:\$T[0-9]+]] := () -> {{.*}}
+  // CHECK-NOT: (attempting type variable binding [[LITERAL_VAR]] := {{.*}}
   // CHECK: (attempting conjunction element pattern binding element @ 0
   // CHECK: (applying conjunction result to outer context
-  // CHECK: (attempting type variable [[LITERAL_VAR]] := Int
+  // CHECK: (attempting type variable binding [[LITERAL_VAR]] := Int
   test(42) {
     1
     ""
@@ -49,7 +49,7 @@ do {
 
   // CHECK: ---Initial constraints for the given expression---
   // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
-  // CHECK: (attempting type variable [[LITERAL_VAR]] := Int
+  // CHECK: (attempting type variable binding [[LITERAL_VAR]] := Int
   // CHECK: (attempting conjunction element pattern binding element @ 0
   test(42) { v in
     v

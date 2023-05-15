@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -early-allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
 
 sil_stage raw
 

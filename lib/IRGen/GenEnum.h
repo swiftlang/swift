@@ -449,9 +449,13 @@ public:
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,
-                        IsTake_t isTake) const;
+                        IsTake_t isTake) const {
+    TI->callOutlinedCopy(IGF, dest, src, T, isInit, isTake);
+  }
 
-  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const {
+    TI->callOutlinedDestroy(IGF, addr, T);
+  }
 
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const = 0;

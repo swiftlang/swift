@@ -20,6 +20,7 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Tracing.h"
 
+#include "swift/AST/PluginLoader.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
@@ -106,6 +107,10 @@ struct SwiftInvocation::Implementation {
 
 SwiftInvocation::~SwiftInvocation() {
   delete &Impl;
+}
+
+ArrayRef<std::string> SwiftInvocation::getArgs() const {
+  return ArrayRef(Impl.Opts.Args);
 }
 
 void SwiftInvocation::applyTo(swift::CompilerInvocation &CompInvok) const {
@@ -1077,7 +1082,8 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     }
     return nullptr;
   }
-  CompIns.getASTContext().setPluginRegistry(ASTManager->Impl.Plugins.get());
+  CompIns.getASTContext().getPluginLoader().setRegistry(
+      ASTManager->Impl.Plugins.get());
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
@@ -1086,7 +1092,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
 
   CloseClangModuleFiles scopedCloseFiles(
       *CompIns.getASTContext().getClangModuleLoader());
-  Consumer.setInputBufferIDs(ASTRef->getCompilerInstance().getInputBufferIDs());
   CompIns.performSema();
 
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;

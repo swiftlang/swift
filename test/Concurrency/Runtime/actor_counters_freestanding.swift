@@ -4,9 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: freestanding
 
-// rdar://101938326
-// UNSUPPORTED: freestanding
-
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime

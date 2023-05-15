@@ -264,8 +264,7 @@ default:
 
 do {} catch /x/ {}
 // expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
-// expected-error@-2 {{binary operator '~=' cannot be applied to two 'any Error' operands}}
-// expected-warning@-3 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+// expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {
 default:

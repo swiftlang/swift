@@ -643,6 +643,12 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
 
+  auto sourceFile = decl->getDeclContext()->getParentSourceFile();
+  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface) {
+    // Don't diagnose properties in swiftinterfaces.
+    return;
+  }
+
   if (isa<ProtocolDecl>(decl)) {
     // protocols don't matter for stored property checking
     return;

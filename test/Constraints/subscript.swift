@@ -104,7 +104,6 @@ extension Int {
 let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'}}
 
 let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
-  // expected-warning@-1 {{empty collection literal requires an explicit type}}
   var dict = dict
   dict[n] = n * n
   return dict

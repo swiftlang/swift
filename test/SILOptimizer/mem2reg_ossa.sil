@@ -489,10 +489,10 @@ bb0:
   return %16 : $((), ())
 }
 
-// CHECK-LABEL: sil [ossa] @dont_optimize_optional_in_multiple_blocks :
-// CHECK:         alloc_stack
-// CHECK:       } // end sil function 'dont_optimize_optional_in_multiple_blocks'
-sil [ossa] @dont_optimize_optional_in_multiple_blocks : $@convention(method) (@guaranteed Optional<Klass>) -> () {
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks'
+sil [ossa] @test_optional_in_multiple_blocks : $@convention(method) (@guaranteed Optional<Klass>) -> () {
 bb0(%0 : @guaranteed $Optional<Klass>):
   %1 = copy_value %0 : $Optional<Klass>
   %32 = alloc_stack $Optional<Klass>
@@ -504,8 +504,62 @@ bb5:
   br bb7
 
 bb6(%50 : @guaranteed $Klass):
-  %53 = load [take] %32 : $*Optional<Klass>
+  %53 = load [copy] %32 : $*Optional<Klass>
   destroy_value %53 : $Optional<Klass>
+  destroy_addr %32 : $*Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical'
+sil [ossa] @test_optional_in_multiple_blocks_lexical : $@convention(method) (@guaranteed Optional<Klass>) -> () {
+bb0(%0 : @guaranteed $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %32 = alloc_stack [lexical] $Optional<Klass>
+  store %1 to [init] %32 : $*Optional<Klass>
+  switch_enum %0 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb6(%50 : @guaranteed $Klass):
+  %53 = load [copy] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  destroy_addr %32 : $*Optional<Klass>
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue :
+// CHECK-NOT:         alloc_stack
+// CHECK:       } // end sil function 'test_optional_in_multiple_blocks_lexical_storedvalue'
+sil [ossa] @test_optional_in_multiple_blocks_lexical_storedvalue : $@convention(method) (@owned Optional<Klass>) -> () {
+bb0(%0 : @owned $Optional<Klass>):
+  %1 = copy_value %0 : $Optional<Klass>
+  %32 = alloc_stack $Optional<Klass>
+  store %0 to [init] %32 : $*Optional<Klass>
+  switch_enum %1 : $Optional<Klass>, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  dealloc_stack %32 : $*Optional<Klass>
+  br bb7
+
+bb6(%50 : @owned $Klass):
+  %53 = load [copy] %32 : $*Optional<Klass>
+  destroy_value %53 : $Optional<Klass>
+  destroy_value %50 : $Klass
+  destroy_addr %32 : $*Optional<Klass>
   dealloc_stack %32 : $*Optional<Klass>
   br bb7
 

@@ -25,11 +25,11 @@ three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
-- ``-O``: This is meant for most production code. The compiler performs
+- ``-Osize``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Osize``: This is a special optimization mode where the compiler prioritizes
-  code size over performance.
+- ``-O``: This is a special optimization mode where the compiler prioritizes
+  performance over code size.
 
 In the Xcode UI, one can modify the current optimization level as follows:
 

@@ -429,7 +429,7 @@ bb5(%10 : $X):
 }
 
 // CHECK-LABEL: sil @load_from_global_var
-// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  [global: read,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @load_from_global_var : $@convention(thin) () -> Int32 {
 bb0:

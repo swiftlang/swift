@@ -425,7 +425,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto def = MD->definition) {
       // Don't walk into unchecked definitions.
       if (auto expansion = dyn_cast<MacroExpansionExpr>(def)) {
-        if (!expansion->getType().isNull()) {
+        if (!expansion->getType().isNull() ||
+            Walker.shouldWalkIntoUncheckedMacroDefinitions()) {
           if (auto newDef = doIt(def))
             MD->definition = newDef;
           else
@@ -1481,7 +1482,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInGeneratedBuffer())
+        D->isInMacroExpansionInContext())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -1654,10 +1655,10 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
-Stmt *Traversal::visitForgetStmt(ForgetStmt *FS) {
-  if (Expr *E = doIt(FS->getSubExpr())) {
-    FS->setSubExpr(E);
-    return FS;
+Stmt *Traversal::visitDiscardStmt(DiscardStmt *DS) {
+  if (Expr *E = doIt(DS->getSubExpr())) {
+    DS->setSubExpr(E);
+    return DS;
   }
   return nullptr;
 }

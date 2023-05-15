@@ -216,6 +216,10 @@ public:
   const TypeRef *subst(TypeRefBuilder &Builder,
                        const GenericArgumentMap &Subs) const;
 
+  const TypeRef *subst(TypeRefBuilder &Builder,
+                       const GenericArgumentMap &Subs,
+                       bool &DidSubstitute) const;
+
   llvm::Optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;

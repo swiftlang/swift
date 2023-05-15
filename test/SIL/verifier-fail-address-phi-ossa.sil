@@ -2,6 +2,8 @@
 // RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
 // RUN: %FileCheck %s < %t/err.txt
 
+// REQUIRES: asserts
+
 class Klass {}
 
 struct MyStruct {

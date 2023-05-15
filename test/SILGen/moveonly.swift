@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature NoImplicitCopy %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -44,16 +44,30 @@ public enum NonTrivialEnum {
     case third(NonTrivialStruct)
 }
 
+@_moveOnly
+public struct AddressOnlyGeneric<T> {
+    var t: T
+}
+
+public protocol P {}
+
+@_moveOnly
+public struct AddressOnlyProtocol {
+    var t: P
+}
+
 var varGlobal = NonTrivialStruct()
 let letGlobal = NonTrivialStruct()
 
-public func borrowVal(_ e : __shared NonTrivialEnum) {}
-public func borrowVal(_ e : __shared FD) {}
-public func borrowVal(_ k: __shared CopyableKlass) {}
-public func borrowVal(_ k: __shared NonTrivialCopyableStruct) {}
-public func borrowVal(_ k: __shared NonTrivialCopyableStruct2) {}
-public func borrowVal(_ s: __shared NonTrivialStruct) {}
-public func borrowVal(_ s: __shared NonTrivialStruct2) {}
+public func borrowVal(_ e : borrowing NonTrivialEnum) {}
+public func borrowVal(_ e : borrowing FD) {}
+public func borrowVal(_ k: borrowing CopyableKlass) {}
+public func borrowVal(_ k: borrowing NonTrivialCopyableStruct) {}
+public func borrowVal(_ k: borrowing NonTrivialCopyableStruct2) {}
+public func borrowVal(_ s: borrowing NonTrivialStruct) {}
+public func borrowVal(_ s: borrowing NonTrivialStruct2) {}
+public func borrowVal<T>(_ s: borrowing AddressOnlyGeneric<T>) {}
+public func borrowVal(_ s: borrowing AddressOnlyProtocol) {}
 
 public func consumeVal(_ e : __owned NonTrivialEnum) {}
 public func consumeVal(_ e : __owned FD) {}
@@ -62,6 +76,10 @@ public func consumeVal(_ k: __owned NonTrivialCopyableStruct) {}
 public func consumeVal(_ k: __owned NonTrivialCopyableStruct2) {}
 public func consumeVal(_ s: __owned NonTrivialStruct) {}
 public func consumeVal(_ s: __owned NonTrivialStruct2) {}
+public func consumeVal<T>(_ s: __owned AddressOnlyGeneric<T>) {}
+public func consumeVal(_ s: __owned AddressOnlyProtocol) {}
+
+var bool: Bool { false }
 
 ///////////
 // Tests //
@@ -71,12 +89,12 @@ public func consumeVal(_ s: __owned NonTrivialStruct2) {}
 // Function Arguments
 //
 
-// CHECK-LABEL: sil [ossa] @$s8moveonly19useNonTrivialStructyyAA0cdE0VhF : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+// CHECK-LABEL: sil [ossa] @$s8moveonly19useNonTrivialStructyyAA0cdE0VF : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialStruct):
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
-// CHECK: } // end sil function '$s8moveonly19useNonTrivialStructyyAA0cdE0VhF'
-public func useNonTrivialStruct(_ s: __shared NonTrivialStruct) {
+// CHECK: } // end sil function '$s8moveonly19useNonTrivialStructyyAA0cdE0VF'
+public func useNonTrivialStruct(_ s: borrowing NonTrivialStruct) {
     borrowVal(s)
     let s2 = s
     let k = s.fd
@@ -101,12 +119,12 @@ public func useNonTrivialOwnedStruct(_ s: __owned NonTrivialStruct) {
     let _ = s2
 }
 
-// CHECK-LABEL: sil [ossa] @$s8moveonly17useNonTrivialEnumyyAA0cdE0OhF : $@convention(thin) (@guaranteed NonTrivialEnum) -> () {
+// CHECK-LABEL: sil [ossa] @$s8moveonly17useNonTrivialEnumyyAA0cdE0OF : $@convention(thin) (@guaranteed NonTrivialEnum) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialEnum):
 // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   mark_must_check [no_consume_or_assign] [[COPIED_ARG]]
-// CHECK: } // end sil function '$s8moveonly17useNonTrivialEnumyyAA0cdE0OhF'
-public func useNonTrivialEnum(_ s: __shared NonTrivialEnum) {
+// CHECK: } // end sil function '$s8moveonly17useNonTrivialEnumyyAA0cdE0OF'
+public func useNonTrivialEnum(_ s: borrowing NonTrivialEnum) {
     borrowVal(s)
     let s2 = s
     switch s {
@@ -131,6 +149,58 @@ public func useNonTrivialOwnedEnum(_ s: __owned NonTrivialEnum) {
     case _:
         break
     }
+    borrowVal(s)
+    let _ = s2
+}
+
+// CHECK-LABEL: sil [ossa] @$s8moveonly21useAddressOnlyGenericyyAA0cdE0VyxGhlF : $@convention(thin) <T> (@in_guaranteed AddressOnlyGeneric<T>) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   mark_must_check [no_consume_or_assign] [[ARG]]
+// CHECK: } // end sil function '$s8moveonly21useAddressOnlyGenericyyAA0cdE0VyxGhlF'
+public func useAddressOnlyGeneric<T>(_ s: __shared AddressOnlyGeneric<T>) {
+    borrowVal(s)
+    let s2 = s
+    let k = s.t
+    let _ = k
+    borrowVal(s)
+    let _ = s2
+}
+
+// CHECK-LABEL: sil [ossa] @$s8moveonly26useOwnedAddressOnlyGenericyyAA0deF0VyxGnlF : $@convention(thin) <T> (@in AddressOnlyGeneric<T>) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   mark_must_check [consumable_and_assignable] [[ARG]]
+// CHECK: } // end sil function '$s8moveonly26useOwnedAddressOnlyGenericyyAA0deF0VyxGnlF'
+public func useOwnedAddressOnlyGeneric<T>(_ s: __owned AddressOnlyGeneric<T>) {
+    borrowVal(s)
+    let s2 = s
+    let k = s.t
+    let _ = k
+    borrowVal(s)
+    let _ = s2
+}
+
+// CHECK-LABEL: sil [ossa] @$s8moveonly22useAddressOnlyProtocolyyAA0cdE0VhF : $@convention(thin) (@in_guaranteed AddressOnlyProtocol) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   mark_must_check [no_consume_or_assign] [[ARG]]
+// CHECK: } // end sil function '$s8moveonly22useAddressOnlyProtocolyyAA0cdE0VhF'
+public func useAddressOnlyProtocol(_ s: __shared AddressOnlyProtocol) {
+    borrowVal(s)
+    let s2 = s
+    let k = s.t
+    let _ = k
+    borrowVal(s)
+    let _ = s2
+}
+
+// CHECK-LABEL: sil [ossa] @$s8moveonly27useOwnedAddressOnlyProtocolyyAA0deF0VnF : $@convention(thin) (@in AddressOnlyProtocol) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   mark_must_check [consumable_and_assignable] [[ARG]]
+// CHECK: } // end sil function '$s8moveonly27useOwnedAddressOnlyProtocolyyAA0deF0VnF'
+public func useOwnedAddressOnlyProtocol(_ s: __owned AddressOnlyProtocol) {
+    borrowVal(s)
+    let s2 = s
+    let k = s.t
+    let _ = k
     borrowVal(s)
     let _ = s2
 }
@@ -164,6 +234,73 @@ extension NonTrivialEnum {
     func testNoUseSelf() {
         let x = self
         let _ = x
+    }
+}
+
+extension AddressOnlyGeneric {
+    // CHECK-LABEL: sil hidden [ossa] @$s8moveonly18AddressOnlyGenericV13testNoUseSelfyyF : $@convention(method) <T> (@in_guaranteed AddressOnlyGeneric<T>) -> () {
+    // CHECK: bb0([[ARG_IN:%.*]] :
+    // CHECK:   [[ARG:%.*]] = mark_must_check [no_consume_or_assign] [[ARG_IN]] :
+    //
+    // CHECK:   [[ALLOC_X:%.*]] = alloc_box $<τ_0_0> { let AddressOnlyGeneric<τ_0_0> } <T>, let, name "x"
+    // CHECK:   [[X:%.*]] = begin_borrow [lexical] [[ALLOC_X]]
+    // CHECK:   [[PROJECT_X:%.*]] = project_box [[X]]
+    // CHECK:   copy_addr [[ARG]] to [init] [[PROJECT_X]]
+    // CHECK:   [[MARKED_X:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT_X]]
+    // CHECK:   [[BLACKHOLE_ADDR:%.*]] = alloc_stack $AddressOnlyGeneric<T>
+    // CHECK:   copy_addr [[MARKED_X]] to [init] [[BLACKHOLE_ADDR]]
+    // CHECK:   destroy_addr [[BLACKHOLE_ADDR]]
+    // CHECK:   dealloc_stack [[BLACKHOLE_ADDR]]
+    //
+    // CHECK:   [[ALLOC_Y:%.*]] = alloc_box $<τ_0_0> { let AddressOnlyGeneric<τ_0_0> } <T>, let, name "y"
+    // CHECK:   [[Y:%.*]] = begin_borrow [lexical] [[ALLOC_Y]]
+    // CHECK:   [[PROJECT_Y:%.*]] = project_box [[Y]]
+    // CHECK:   copy_addr [[ARG]] to [init] [[PROJECT_Y]]
+    // CHECK:   [[MARKED_Y:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT_Y]]
+    // CHECK:   [[BLACKHOLE_ADDR:%.*]] = alloc_stack $AddressOnlyGeneric<T>
+    // CHECK:   copy_addr [[MARKED_Y]] to [init] [[BLACKHOLE_ADDR]]
+    // CHECK:   destroy_addr [[BLACKHOLE_ADDR]]
+    // CHECK:   dealloc_stack [[BLACKHOLE_ADDR]]
+    //
+    // CHECK: } // end sil function '$s8moveonly18AddressOnlyGenericV13testNoUseSelfyyF'
+    func testNoUseSelf() {
+        let x = self
+        let _ = x
+        let y = self
+        let _ = y
+    }
+}
+
+extension AddressOnlyProtocol {
+    // CHECK-LABEL: sil hidden [ossa] @$s8moveonly19AddressOnlyProtocolV13testNoUseSelfyyF : $@convention(method) (@in_guaranteed AddressOnlyProtocol) -> () {
+    // CHECK: bb0([[ARG_IN:%.*]] :
+    // CHECK:   [[ARG:%.*]] = mark_must_check [no_consume_or_assign] [[ARG_IN]] :
+    //
+    // CHECK:   [[ALLOC_X:%.*]] = alloc_box ${ let AddressOnlyProtocol }, let, name "x"
+    // CHECK:   [[X:%.*]] = begin_borrow [lexical] [[ALLOC_X]]
+    // CHECK:   [[PROJECT_X:%.*]] = project_box [[X]]
+    // CHECK:   copy_addr [[ARG]] to [init] [[PROJECT_X]]
+    // CHECK:   [[MARKED_X:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT_X]]
+    // CHECK:   [[BLACKHOLE_ADDR:%.*]] = alloc_stack $AddressOnlyProtocol
+    // CHECK:   copy_addr [[MARKED_X]] to [init] [[BLACKHOLE_ADDR]]
+    // CHECK:   destroy_addr [[BLACKHOLE_ADDR]]
+    // CHECK:   dealloc_stack [[BLACKHOLE_ADDR]]
+    //
+    // CHECK:   [[ALLOC_Y:%.*]] = alloc_box ${ let AddressOnlyProtocol }, let, name "y"
+    // CHECK:   [[Y:%.*]] = begin_borrow [lexical] [[ALLOC_Y]]
+    // CHECK:   [[PROJECT_Y:%.*]] = project_box [[Y]]
+    // CHECK:   copy_addr [[ARG]] to [init] [[PROJECT_Y]]
+    // CHECK:   [[MARKED_Y:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT_Y]]
+    // CHECK:   [[BLACKHOLE_ADDR:%.*]] = alloc_stack $AddressOnlyProtocol
+    // CHECK:   copy_addr [[MARKED_Y]] to [init] [[BLACKHOLE_ADDR]]
+    // CHECK:   destroy_addr [[BLACKHOLE_ADDR]]
+    // CHECK:   dealloc_stack [[BLACKHOLE_ADDR]]
+    // CHECK: } // end sil function '$s8moveonly19AddressOnlyProtocolV13testNoUseSelfyyF'
+    func testNoUseSelf() {
+        let x = self
+        let _ = x
+        let y = self
+        let _ = y
     }
 }
 
@@ -286,7 +423,7 @@ func blackHoleVarInitialization3() {
 //
 // CHECK: [[CLS:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
 // CHECK: [[BORROW:%.*]] = load_borrow [[CLS]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVhF :
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVF :
 // CHECK: apply [[FN]]([[BORROW]])
 // CHECK: end_borrow [[BORROW]]
 // CHECK: } // end sil function '$s8moveonly24borrowObjectFunctionCallyyF'
@@ -307,10 +444,10 @@ func borrowObjectFunctionCall() {
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARKED_ADDR:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[BORROW:%.*]] = load_borrow [[MARKED_ADDR]]
-// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA16NonTrivialStructVhF :
+// CHECK: [[BORROW:%.*]] = load [copy] [[MARKED_ADDR]]
+// CHECK: [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA16NonTrivialStructVF :
 // CHECK: apply [[FN]]([[BORROW]])
-// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[BORROW]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s8moveonly29moveOnlyStructNonConsumingUseyyF'
 func moveOnlyStructNonConsumingUse() {
@@ -330,10 +467,10 @@ func moveOnlyStructNonConsumingUse() {
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[MARKED_ADDR:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARKED_ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
-// CHECK:   [[BORROW:%.*]] = load_borrow [[GEP]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA17NonTrivialStruct2VhF : $@convention(thin) (@guaranteed NonTrivialStruct2) -> ()
+// CHECK:   [[BORROW:%.*]] = load [copy] [[GEP]]
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA17NonTrivialStruct2VF : $@convention(thin) (@guaranteed NonTrivialStruct2) -> ()
 // CHECK:   apply [[FN]]([[BORROW]])
-// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[BORROW]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovecD15NonConsumingUseyyF'
 func moveOnlyStructMoveOnlyStructNonConsumingUse() {
@@ -356,7 +493,7 @@ func moveOnlyStructMoveOnlyStructNonConsumingUse() {
 // CHECK:   [[GEP2:%.*]] = struct_element_addr [[GEP1]] : $*NonTrivialStruct2, #NonTrivialStruct2.copyableKlass
 // CHECK:   [[COPY:%.*]] = load [copy] [[GEP2]] : $*CopyableKlass
 // CHECK:   end_access [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassChF : $@convention(thin) (@guaranteed CopyableKlass) -> ()
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassCF : $@convention(thin) (@guaranteed CopyableKlass) -> ()
 // CHECK:   apply [[FN]]([[COPY]])
 // CHECK:   destroy_value [[COPY]] : $CopyableKlass
 // CHECK: } // end sil function '$s8moveonly018moveOnlyStructMovecD28CopyableKlassNonConsumingUseyyF'
@@ -404,7 +541,7 @@ func moveOnlyStructSetMoveOnlyField() {
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARKED_ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialCopyableStruct
 // CHECK:   [[COPY:%.*]] = load [copy] [[GEP]] : $*NonTrivialCopyableStruct
 // CHECK:   end_access [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA24NonTrivialCopyableStructVhF :
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA24NonTrivialCopyableStructVF :
 // CHECK:   apply [[FN]]([[COPY]])
 // CHECK:   destroy_value [[COPY]] : $NonTrivialCopyableStruct
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyableD15NonConsumingUseyyF'
@@ -428,7 +565,7 @@ func moveOnlyStructCopyableStructNonConsumingUse() {
 // CHECK:   [[GEP2:%.*]] = struct_element_addr [[GEP1]] : $*NonTrivialCopyableStruct, #NonTrivialCopyableStruct.copyableKlass
 // CHECK:   [[COPY:%.*]] = load [copy] [[GEP2]] : $*CopyableKlass
 // CHECK:   end_access [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassChF :
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassCF :
 // CHECK:   apply [[FN]]([[COPY]])
 // CHECK:   destroy_value [[COPY]] : $CopyableKlass
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyabledE20KlassNonConsumingUseyyF'
@@ -452,7 +589,7 @@ func moveOnlyStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   [[GEP2:%.*]] = struct_element_addr [[GEP1]] : $*NonTrivialCopyableStruct, #NonTrivialCopyableStruct.nonTrivialCopyableStruct2
 // CHECK:   [[COPY:%.*]] = load [copy] [[GEP2]] : $*NonTrivialCopyableStruct2
 // CHECK:   end_access [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA25NonTrivialCopyableStruct2VhF :
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA25NonTrivialCopyableStruct2VF :
 // CHECK:   apply [[FN]]([[COPY]])
 // CHECK:   destroy_value [[COPY]] : $NonTrivialCopyableStruct2
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyabledeD15NonConsumingUseyyF'
@@ -477,7 +614,7 @@ func moveOnlyStructCopyableStructCopyableStructNonConsumingUse() {
 // CHECK:   [[GEP3:%.*]] = struct_element_addr [[GEP2]] : $*NonTrivialCopyableStruct2, #NonTrivialCopyableStruct2.copyableKlass
 // CHECK:   [[COPY:%.*]] = load [copy] [[GEP3]] : $*CopyableKlass
 // CHECK:   end_access [[ACCESS]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassChF :
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA13CopyableKlassCF :
 // CHECK:   apply [[FN]]([[COPY]])
 // CHECK:   destroy_value [[COPY]] : $CopyableKlass
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyablededE20KlassNonConsumingUseyyF'
@@ -508,10 +645,10 @@ func moveOnlyStructCopyableStructCopyableStructCopyableKlassNonConsumingUse() {
 // CHECK:   [[FIELD:%.*]] = ref_element_addr [[BORROWED_COPYABLE_KLASS]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
 // CHECK:   [[ACCESS_MARK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load_borrow [[ACCESS_MARK]]
-// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVhF :
+// CHECK:   [[BORROWED_MOVEONLY_KLASS:%.*]] = load [copy] [[ACCESS_MARK]]
+// CHECK:   [[FN:%.*]] = function_ref @$s8moveonly9borrowValyyAA2FDVF :
 // CHECK:   apply [[FN]]([[BORROWED_MOVEONLY_KLASS]])
-// CHECK:   end_borrow [[BORROWED_MOVEONLY_KLASS]]
+// CHECK:   destroy_value [[BORROWED_MOVEONLY_KLASS]]
 // CHECK:   destroy_value [[COPYABLE_KLASS]]
 // CHECK: } // end sil function '$s8moveonly022moveOnlyStructCopyabledede9KlassMovecF15NonConsumingUseyyF'
 func moveOnlyStructCopyableStructCopyableStructCopyableKlassMoveOnlyKlassNonConsumingUse() {
@@ -561,7 +698,7 @@ func consumeVal(_ e: __owned EnumSwitchTests.E2) {}
 var booleanGuard: Bool { false }
 var booleanGuard2: Bool { false }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOhF : $@convention(thin) (@guaranteed EnumSwitchTests.E) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOF : $@convention(thin) (@guaranteed EnumSwitchTests.E) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[MARKED_VALUE:%.*]] = mark_must_check [no_consume_or_assign] [[COPY_ARG]]
@@ -618,8 +755,8 @@ var booleanGuard2: Bool { false }
 //
 // CHECK: [[BB_CONT]]:
 // CHECK:   destroy_value [[MARKED_VALUE]]
-// CHECK: } // end sil function '$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOhF'
-func enumSwitchTest1(_ e: __shared EnumSwitchTests.E) {
+// CHECK: } // end sil function '$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOF'
+func enumSwitchTest1(_ e: borrowing EnumSwitchTests.E) {
     switch e {
     case .first:
         break
@@ -649,25 +786,25 @@ func enumSwitchTest1(_ e: __shared EnumSwitchTests.E) {
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: end_access [[ACCESS]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9varGlobalAA16NonTrivialStructVvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[MARKED_GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[GEP]] : $*NonTrivialStruct2
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[GEP]] : $*NonTrivialStruct2
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 // CHECK: end_access [[ACCESS]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
-// CHECK: [[LOADED_VAL:%.*]] = load_borrow [[MARKED_GLOBAL]] : $*NonTrivialStruct
+// CHECK: [[LOADED_VAL:%.*]] = load [copy] [[MARKED_GLOBAL]] : $*NonTrivialStruct
 // CHECK: apply {{%.*}}([[LOADED_VAL]])
-// CHECK: end_borrow [[LOADED_VAL]]
+// CHECK: destroy_value [[LOADED_VAL]]
 //
 // CHECK: [[GLOBAL:%.*]] = global_addr @$s8moveonly9letGlobalAA16NonTrivialStructVvp :
 // CHECK: [[MARKED_GLOBAL:%.*]] = mark_must_check [no_consume_or_assign] [[GLOBAL]]
@@ -802,4 +939,47 @@ struct EmptyStruct {
   // CHECK: } // end sil function '$s8moveonly11EmptyStructVACycfC'
   init() {
   }
+}
+
+///////////////////////////////
+// Conditionally Initialized //
+///////////////////////////////
+
+// CHECK: sil hidden [ossa] @$s8moveonly31testConditionallyInitializedLetyyF : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box ${ let NonTrivialStruct }, let, name "x"
+// CHECK: [[MARK_UNINIT:%.*]] = mark_uninitialized [var] [[BOX]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+// CHECK: [[PROJECT:%.*]] = project_box [[BORROW]]
+// CHECK: cond_br {{%.*}}, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
+//
+// CHECK: [[LHS_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [[MARKED]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[RHS_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   assign {{%.*}} to [[MARKED]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// CHECK:   [[BORROW_LOAD:%.*]] = load [copy] [[MARKED]]
+// CHECK:   apply {{%.*}}([[BORROW_LOAD]])
+// CHECK:   destroy_value [[BORROW_LOAD]]
+// CHECK:   [[MARKED:%.*]] = mark_must_check [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   [[TAKE_LOAD:%.*]] = load [take] [[MARKED]]
+// CHECK:   apply {{%.*}}([[TAKE_LOAD]])
+// CHECK: } // end sil function '$s8moveonly31testConditionallyInitializedLetyyF'
+func testConditionallyInitializedLet() {
+    let x: NonTrivialStruct
+
+    if bool {
+        x = NonTrivialStruct()
+    } else {
+        x = NonTrivialStruct()
+    }
+
+    borrowVal(x)
+    consumeVal(x)
 }

@@ -198,11 +198,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
-
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    assert(typeSizeAlign && "unknown layout for non-resilient type!");
-    if (typeSizeAlign->size == 0) {
+    // typeSizeAlign can be null if this is not a fixed-layout type,
+    // e.g. it has resilient fields.
+    if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       return;
     }
@@ -308,11 +308,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   // FIXME: implement the move constructor.
   os << "  [[noreturn]] ";
-  printer.printInlineForThunk();
+  // NOTE: Do not apply attribute((used))
+  // here to ensure the linker error isn't
+  // forced, so just mark this an inline
+  // helper function instead.
+  printer.printInlineForHelperFunction();
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
-  os << " &&) noexcept { abort(); }\n";
+  StringRef moveErrorMessage = "C++ does not support moving a Swift value yet";
+  os << " &&) noexcept {\n  "
+        "swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_"
+        "yet();\n  swift::_impl::_swift_stdlib_reportFatalError(\"swift\", 5, "
+        "\""
+     << moveErrorMessage << "\", " << moveErrorMessage.size()
+     << ", 0);\n  abort();\n  }\n";
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())

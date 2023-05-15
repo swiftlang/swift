@@ -99,11 +99,19 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
       llvm::StringSwitch<Optional<DriverKind>>(DriverName)
           .Case("swift", DriverKind::Interactive)
           .Case("swiftc", DriverKind::Batch)
+          .Case("sil-opt", DriverKind::SILOpt)
+          .Case("sil-func-extractor", DriverKind::SILFuncExtractor)
+          .Case("sil-nm", DriverKind::SILNM)
+          .Case("sil-llvm-gen", DriverKind::SILLLVMGen)
+          .Case("sil-passpipeline-dumper", DriverKind::SILPassPipelineDumper)
+          .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
+          .Case("swift-llvm-opt", DriverKind::SwiftLLVMOpt)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
           .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
           .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
+          .Case("swift-cache-tool", DriverKind::CacheTool)
           .Default(None);
 
   if (Kind.has_value())
@@ -2084,6 +2092,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_JSONFeatures:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_ConstValues:
+      case file_types::TY_SwiftFixIt:
+      case file_types::TY_ModuleSemanticInfo:
+      case file_types::TY_CachedDiagnostics:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -3555,11 +3566,19 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= options::NoInteractiveOption;
     break;
   case DriverKind::Batch:
+  case DriverKind::SILOpt:
+  case DriverKind::SILFuncExtractor:
+  case DriverKind::SILNM:
+  case DriverKind::SILLLVMGen:
+  case DriverKind::SILPassPipelineDumper:
+  case DriverKind::SwiftDependencyTool:
+  case DriverKind::SwiftLLVMOpt:
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
   case DriverKind::APIExtract:
   case DriverKind::APIDigester:
+  case DriverKind::CacheTool:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

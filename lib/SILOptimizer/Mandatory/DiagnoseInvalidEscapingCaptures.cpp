@@ -15,9 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -198,6 +201,8 @@ bool isUseOfSelfInInitializer(Operand *oper) {
 }
 
 static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking for escaping partial apply uses.\n");
+
   // Avoid exponential path exploration.
   SmallVector<Operand *, 8> uses;
   llvm::SmallDenseSet<Operand *, 8> visited;
@@ -214,10 +219,16 @@ static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
   bool foundEscapingUse = false;
   while (!uses.empty()) {
     Operand *oper = uses.pop_back_val();
-    foundEscapingUse |= checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *oper->getUser());
+    bool localFoundEscapingUse = checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
       for (Operand *use : V->getUses())
         uselistInsert(use);
     });
+    LLVM_DEBUG(
+        if (localFoundEscapingUse)
+          llvm::dbgs() << "    Escapes!\n";
+    );
+    foundEscapingUse |= localFoundEscapingUse;
   }
 
   // If there aren't any, we're fine.
@@ -349,6 +360,8 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   if (isPartialApplyOfReabstractionThunk(PAI))
     return;
 
+  LLVM_DEBUG(llvm::dbgs() << "Checking Partial Apply: " << *PAI);
+
   ApplySite apply(PAI);
 
   // Collect any non-escaping captures.
@@ -396,18 +409,24 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
   }
+
+  bool emittedError = false;
+
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
     Optional<Identifier> paramName = None;
     if (isUseOfSelfInInitializer(inoutCapture)) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                functionKind);
     } else {
       auto *param = getParamDeclFromOperand(inoutCapture->get());
-      if (param->isSelfParameter())
+      if (param->isSelfParameter()) {
+        emittedError = true;
         diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                  functionKind);
-      else {
+      } else {
+        emittedError = true;
         paramName = param->getName();
         diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
                  functionKind, param->getName());
@@ -416,30 +435,45 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
     if (functionKind != EscapingAutoClosure) {
+      emittedError = true;
       diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
       continue;
     }
     // For an autoclosure capture, present a way to fix the problem.
-    if (paramName)
+    if (paramName) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_inout_captured_by_autoclosure,
                paramName.value());
-    else
+    } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_self_captured_by_autoclosure);
+    }
   }
 
   // Finally, diagnose captures of values with noescape type.
   for (auto noEscapeCapture : noEscapeCaptures) {
     if (auto *param = getParamDeclFromOperand(noEscapeCapture->get())) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_param_capture,
                functionKind, param->getName());
       diagnose(Context, param->getLoc(), diag::noescape_param_defined_here,
                param->getName());
     } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture,
                functionKind);
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, noEscapeCapture);
+  }
+
+  // If we emitted an error, mark the closure function as not being suitable for
+  // noncopyable diagnostics. The user can fix the issue and then recompile.
+  if (emittedError) {
+    if (auto *f = apply.getCalleeFunction()) {
+      auto s = semantics::NO_MOVEONLY_DIAGNOSTICS;
+      f->addSemanticsAttr(s);
+    }
   }
 }
 
@@ -539,7 +573,7 @@ static void checkEscapingCaptures(SILFunction *F) {
   if (F->empty())
     return;
 
-  auto &Context =F->getASTContext();
+  auto &Context = F->getASTContext();
   auto *DC = F->getDeclContext();
 
   for (auto &BB : *F) {
@@ -562,6 +596,8 @@ private:
     if (F->wasDeserializedCanonical())
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "*** Diagnosing escaping captures in function: "
+                            << F->getName() << '\n');
     checkEscapingCaptures(F);
   }
 };

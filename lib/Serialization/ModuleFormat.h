@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 758; // drop_deinit instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 782; // reborrow, escaped SIL flags
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -139,6 +139,21 @@ public:
 // in the same way.
 using ProtocolConformanceID = DeclID;
 using ProtocolConformanceIDField = DeclIDField;
+
+// The low two bits of the ProtocolConformanceID determine the kind:
+// 00 -- abstract conformance
+// 01 -- concrete conformance
+// 10 -- pack conformance
+struct SerializedProtocolConformanceKind {
+  enum  {
+    Abstract = 0,
+    Concrete = 1,
+    Pack = 2,
+
+    Shift = 2,
+    Mask = 3
+  };
+};
 
 // GenericSignatureID must be the same as DeclID because it is stored in the
 // same way.
@@ -868,6 +883,10 @@ namespace options_block {
     IS_CONCURRENCY_CHECKED,
     MODULE_PACKAGE_NAME,
     MODULE_EXPORT_AS_NAME,
+    PLUGIN_SEARCH_PATH,
+    EXTERNAL_SEARCH_PLUGIN_PATH,
+    COMPILER_PLUGIN_LIBRARY_PATH,
+    COMPILER_PLUGIN_EXECUTABLE_PATH,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -878,6 +897,26 @@ namespace options_block {
   using XCCLayout = BCRecordLayout<
     XCC,
     BCBlob // -Xcc flag, as string
+  >;
+
+  using PluginSearchPathLayout = BCRecordLayout<
+    PLUGIN_SEARCH_PATH,
+    BCBlob // -plugin-path value
+  >;
+
+  using ExternalPluginSearchPathLayout = BCRecordLayout<
+    EXTERNAL_SEARCH_PLUGIN_PATH,
+    BCBlob // -external-plugin-path value
+  >;
+
+  using CompilerPluginLibraryPathLayout = BCRecordLayout<
+    COMPILER_PLUGIN_LIBRARY_PATH,
+    BCBlob // -load-plugin-library value
+  >;
+
+  using CompilerPluginExecutablePathLayout = BCRecordLayout<
+    COMPILER_PLUGIN_EXECUTABLE_PATH,
+    BCBlob // -load-plugin-executable value
   >;
 
   using IsSIBLayout = BCRecordLayout<
@@ -1327,13 +1366,9 @@ namespace decls_block {
   );
 
   TYPE_LAYOUT(PackTypeLayout,
-    PACK_TYPE
+    PACK_TYPE,
+    BCArray<TypeIDField>  // component types
   );
-
-  using PackTypeEltLayout = BCRecordLayout<
-    PACK_TYPE_ELT,
-    TypeIDField         // type
-  >;
 
   TYPE_LAYOUT(SILPackTypeLayout,
     SIL_PACK_TYPE,
@@ -1914,6 +1949,13 @@ namespace decls_block {
     BCArray<BCVBR<6>> // conditional requirements
   >;
 
+  using PackConformanceLayout = BCRecordLayout<
+    PACK_CONFORMANCE,
+    TypeIDField,                         // pattern type
+    DeclIDField,                         // the protocol
+    BCArray<ProtocolConformanceIDField>  // pattern conformances
+  >;
+
   using ProtocolConformanceXrefLayout = BCRecordLayout<
     PROTOCOL_CONFORMANCE_XREF,
     DeclIDField, // the protocol being conformed to
@@ -2259,7 +2301,11 @@ namespace decls_block {
     BCFixed<1>,                // macro syntax
     MacroRoleField,            // macro role
     BCVBR<5>,                  // number of names
-    BCArray<IdentifierIDField> // introduced decl name kind and identifier pairs
+    BCArray<IdentifierIDField> // introduced names, where each is encoded as
+                               //   - introduced kind
+                               //   - base name
+                               //   - # of argument labels + 1 (or 0 if none)
+                               //   - argument labels
   >;
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
@@ -2348,6 +2394,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
     PRECEDENCE_GROUPS,

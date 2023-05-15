@@ -39,7 +39,7 @@ enum Maybe<T> {
 }
 
 struct CerebralValley<T> {
-  struct GenericBro<T> {}
+  struct GenericBro<U> {}
   struct TechBro {}
 }
 

@@ -117,8 +117,11 @@ unsigned TupleType::getNumScalarElements() const {
 }
 
 bool TupleType::containsPackExpansionType() const {
+  assert(!hasTypeVariable());
   for (auto elt : getElements()) {
-    if (elt.getType()->is<PackExpansionType>())
+    auto eltTy = elt.getType();
+    assert(!eltTy->hasTypeVariable());
+    if (eltTy->is<PackExpansionType>())
       return true;
   }
 
@@ -134,9 +137,19 @@ bool CanTupleType::containsPackExpansionTypeImpl(CanTupleType tuple) {
   return false;
 }
 
+bool TupleType::isSingleUnlabeledPackExpansion() const {
+  if (getNumElements() != 1)
+    return false;
+
+  const auto &elt = getElement(0);
+  return !elt.hasName() && elt.getType()->is<PackExpansionType>();
+}
+
 bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
   for (auto param : params) {
-    if (param.getPlainType()->is<PackExpansionType>())
+    auto paramTy = param.getPlainType();
+    assert(!paramTy->hasTypeVariable());
+    if (paramTy->is<PackExpansionType>())
       return true;
   }
 
@@ -301,7 +314,12 @@ PackType *PackType::getSingletonPackExpansion(Type param) {
 }
 
 CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
-  return CanPackType(PackType::getSingletonPackExpansion(param));
+  // Note: You can't just wrap the result in CanPackType() here because
+  // PackExpansionType has the additional requirement that the count type
+  // must be a reduced shape.
+  return cast<PackType>(
+    PackType::getSingletonPackExpansion(param)
+      ->getCanonicalType());
 }
 
 PackExpansionType *PackType::unwrapSingletonPackExpansion() const {

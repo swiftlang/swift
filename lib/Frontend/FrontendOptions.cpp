@@ -215,6 +215,50 @@ bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::supportCompilationCaching(ActionType action) {
+  // TODO: need to audit this list to make sure everything marked as true are
+  // all supported and tested.
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::PrintVersion:
+  case ActionType::PrintFeature:
+  case ActionType::DumpPCM:
+  case ActionType::REPL:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::ScanDependencies:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::PrintASTDecl:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::MergeModules:
+  case ActionType::Immediate:
+  case ActionType::DumpTypeInfo:
+    return false;
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::EmitPCH:
+  case ActionType::EmitPCM:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+    return true;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
 void FrontendOptions::forAllOutputPaths(
     const InputFile &input, llvm::function_ref<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&

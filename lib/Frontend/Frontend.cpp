@@ -22,10 +22,13 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Frontend/CachingUtils.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -41,6 +44,9 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -203,6 +209,32 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   }
 
+  // '-plugin-path' options.
+  for (const auto &path : getSearchPathOptions().PluginSearchPaths) {
+    serializationOpts.PluginSearchPaths.push_back(path);
+  }
+  // '-external-plugin-path' options.
+  for (const ExternalPluginSearchPathAndServerPath &pair :
+       getSearchPathOptions().ExternalPluginSearchPaths) {
+    serializationOpts.ExternalPluginSearchPaths.push_back(
+        pair.SearchPath + "#" +
+        pair.ServerPath);
+  }
+  // '-load-plugin-library' options.
+  for (const auto &path :
+       getSearchPathOptions().getCompilerPluginLibraryPaths()) {
+    serializationOpts.CompilerPluginLibraryPaths.push_back(path);
+  }
+  // '-load-plugin-executable' options.
+  for (const PluginExecutablePathAndModuleNames &pair :
+       getSearchPathOptions().getCompilerPluginExecutablePaths()) {
+    std::string optStr = pair.ExecutablePath + "#";
+    llvm::interleave(
+        pair.ModuleNames, [&](auto &name) { optStr += name; },
+        [&]() { optStr += ","; });
+    serializationOpts.CompilerPluginLibraryPaths.push_back(optStr);
+  }
+
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
 
@@ -282,6 +314,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     Invocation.getLangOptions().EnableDeserializationSafety = false;
 
   if (setUpModuleLoaders())
+    return true;
+  if (setUpPluginLoader())
     return true;
 
   return false;
@@ -388,11 +422,47 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
     return;
 
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
+}
 
-  // Collect compiler plugin dependencies.
-  auto &searchPathOpts = Invocation.getSearchPathOptions();
-  for (auto &path : searchPathOpts.getCompilerPluginLibraryPaths())
-    DepTracker->addDependency(path, /*isSystem=*/false);
+bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
+  const auto &Opts = getInvocation().getFrontendOptions();
+  if (!Opts.EnableCAS)
+    return false;
+
+  auto MaybeCache = llvm::cas::createOnDiskUnifiedCASDatabases(Opts.CASPath);
+  if (!MaybeCache) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_create_cas, Opts.CASPath,
+                         toString(MaybeCache.takeError()));
+    return true;
+  }
+  CAS = std::move(MaybeCache->first);
+  ResultCache = std::move(MaybeCache->second);
+
+  // create baseline key.
+  llvm::Optional<llvm::cas::ObjectRef> FSRef;
+  if (!Opts.CASFSRootID.empty()) {
+    auto CASFSID = CAS->parseID(Opts.CASFSRootID);
+    if (!CASFSID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           toString(CASFSID.takeError()));
+      return true;
+    }
+    FSRef = CAS->getReference(*CASFSID);
+    if (!FSRef) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                           "-cas-fs value does not exist in CAS");
+      return true;
+    }
+  }
+
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  if (!BaseKey) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         toString(BaseKey.takeError()));
+    return true;
+  }
+  CompileJobBaseKey = *BaseKey;
+  return false;
 }
 
 void CompilerInstance::setupOutputBackend() {
@@ -402,6 +472,15 @@ void CompilerInstance::setupOutputBackend() {
 
   OutputBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
+  // Mirror the output into CAS.
+  if (supportCaching()) {
+    auto CASOutputBackend = createSwiftCachingOutputBackend(
+        *CAS, *ResultCache, *CompileJobBaseKey,
+        Invocation.getFrontendOptions().InputsAndOutputs);
+    OutputBackend =
+        llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
+  }
 
   // Setup verification backend.
   // Create a mirroring outputbackend to produce hash for output files.
@@ -414,9 +493,23 @@ void CompilerInstance::setupOutputBackend() {
   }
 }
 
+void CompilerInstance::setupCachingDiagnosticsProcessorIfNeeded() {
+  if (!supportCaching())
+    return;
+
+  // Only setup if using CAS.
+  CDP = std::make_unique<CachingDiagnosticsProcessor>(*this);
+  CDP->startDiagnosticCapture();
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
-                             std::string &Error) {
+                             std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
+
+  if (setupCASIfNeeded(Args)) {
+    Error = "Setting up CAS failed";
+    return true;
+  }
 
   setupDependencyTrackerIfNeeded();
   setupOutputBackend();
@@ -449,6 +542,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
+  // Setup caching diagnostics processor. It should be setup after all other
+  // DiagConsumers are added.
+  setupCachingDiagnosticsProcessorIfNeeded();
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
@@ -463,6 +560,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  if (Invocation.getFrontendOptions().EnableCAS &&
+      !Invocation.getFrontendOptions().CASFSRootID.empty()) {
+    // Set up CASFS as BaseFS.
+    auto RootID = CAS->parseID(Invocation.getFrontendOptions().CASFSRootID);
+    if (!RootID) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(RootID.takeError()));
+      return true;
+    }
+    auto FS = llvm::cas::createCASFileSystem(*CAS, *RootID);
+    if (!FS) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                           Invocation.getFrontendOptions().CASFSRootID,
+                           toString(FS.takeError()));
+      return true;
+    }
+    SourceMgr.setFileSystem(std::move(*FS));
+  }
+
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
           SourceMgr.getFileSystem());
@@ -670,6 +787,14 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(PSMS));
   }
 
+  return false;
+}
+
+bool CompilerInstance::setUpPluginLoader() {
+  /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
+  auto loader =
+      std::make_unique<PluginLoader>(*Context, getDependencyTracker());
+  Context->setPluginLoader(std::move(loader));
   return false;
 }
 
@@ -973,6 +1098,14 @@ bool CompilerInstance::canImportCxxShim() const {
          !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
 }
 
+bool CompilerInstance::supportCaching() const {
+  if (!Invocation.getFrontendOptions().EnableCAS)
+    return false;
+
+  return FrontendOptions::supportCompilationCaching(
+      Invocation.getFrontendOptions().RequestedAction);
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -1155,8 +1288,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
           Invocation.getFrontendOptions().ModuleABIName));
     }
     if (!Invocation.getLangOptions().PackageName.empty()) {
-      MainModule->setPackageName(getASTContext().getIdentifier(
-          Invocation.getLangOptions().PackageName));
+      auto pkgName = Invocation.getLangOptions().PackageName;
+      MainModule->setPackageName(getASTContext().getIdentifier(pkgName));
     }
     if (!Invocation.getFrontendOptions().ExportAsName.empty()) {
       MainModule->setExportAsName(getASTContext().getIdentifier(

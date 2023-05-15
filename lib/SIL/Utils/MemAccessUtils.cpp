@@ -406,13 +406,15 @@ bool swift::isLetAddress(SILValue address) {
 bool swift::mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
-  bool isUnidentified = false;
-  visitAccessedAddress(instruction, [&isUnidentified](Operand *operand) {
+  bool retval = false;
+  visitAccessedAddress(instruction, [&retval](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
-    if (accessStorage.getKind() == AccessRepresentation::Kind::Unidentified)
-      isUnidentified = true;
+    auto kind = accessStorage.getKind();
+    if (kind == AccessRepresentation::Kind::Unidentified ||
+        kind == AccessRepresentation::Kind::Global)
+      retval = true;
   });
-  return isUnidentified;
+  return retval;
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {

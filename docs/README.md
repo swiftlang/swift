@@ -343,6 +343,9 @@ provide greater clarity to contributors wanting to add new documentation.
   Swift entities.
   TODO: Not clear if this is intended to be language documentation
   (for Swift developers), an explanation or a reference guide.
+- [Modules.md](/docs/Modules.md): was written for Swift pre-1.0, but is still
+  relevant and covers behavior that's underspecified in either TSPL or the
+  language reference.
 - [OptimizerCountersAnalysis.md](/docs/OptimizerCountersAnalysis.md):
   TODO: Consider breaking up into a how-to guide
   on dumping and analyzing the counters
@@ -365,7 +368,6 @@ provide greater clarity to contributors wanting to add new documentation.
   `@_hasMissingDesignatedInitializers`. Some of this is covered in
   [TSPL's initialization section][] but that doesn't include newly added
   attributes.
-- [Modules.rst](/docs/Modules.rst): for Swift pre-1.0.
 - [Swift3Compatibility.md](/docs/Swift3Compatibility.md):
   Discusses the Swift 3 -> Swift 4 migration.
 - [StoredAndComputedVariables.rst](/docs/StoredAndComputedVariables.rst): for Swift pre-1.0.

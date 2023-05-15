@@ -98,7 +98,7 @@ struct ResultPlanBuilder {
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanType substType);
-  ResultPlanPtr buildForPackExpansion(Optional<MutableArrayRef<InitializationPtr>> inits,
+  ResultPlanPtr buildForPackExpansion(Optional<ArrayRef<Initialization*>> inits,
                                       AbstractionPattern origExpansionType,
                                       CanTupleEltTypeArrayRef substTypes);
   ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,

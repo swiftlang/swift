@@ -490,7 +490,7 @@ public:
 
   /// Create a null-terminated string, copying \p Str into \p A .
   template <typename Allocator>
-  NullTerminatedStringRef(StringRef Str, Allocator &A) : Ref() {
+  NullTerminatedStringRef(StringRef Str, Allocator &A) : Ref("") {
     if (Str.empty())
       return;
 

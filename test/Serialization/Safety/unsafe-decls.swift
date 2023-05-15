@@ -34,12 +34,12 @@
 public protocol PublicProto {}
 // SAFETY-PRIVATE: Serialization safety, safe: 'PublicProto'
 internal protocol InternalProto {}
-// SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalProto'
+// SAFETY-INTERNAL: Serialization safety, safe: 'InternalProto'
 // NO-SAFETY-INTERNAL: Serialization safety, safe: 'InternalProto'
 private protocol PrivateProto {}
-// SAFETY-PRIVATE: Serialization safety, unsafe: 'PrivateProto'
+// SAFETY-PRIVATE: Serialization safety, safe: 'PrivateProto'
 fileprivate protocol FileprivateProto {}
-// SAFETY-PRIVATE: Serialization safety, unsafe: 'FileprivateProto'
+// SAFETY-PRIVATE: Serialization safety, safe: 'FileprivateProto'
 
 internal struct InternalStruct : PublicProto {
 // SAFETY-INTERNAL: Serialization safety, unsafe: 'InternalStruct'

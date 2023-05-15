@@ -466,7 +466,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   }
 
   auto DC = FD->getDeclContext();
-  // mutation attributes may only appear in type context.
+  // self-ownership attributes may only appear in type context.
   if (auto contextTy = DC->getDeclaredInterfaceType()) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
@@ -487,6 +487,27 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
         break;
       }
     }
+
+    // Unless we have the experimental no-implicit-copy feature enabled, Copyable
+    // types can't use 'consuming' or 'borrowing' ownership specifiers.
+    if (!Ctx.LangOpts.hasFeature(Feature::NoImplicitCopy)) {
+      if (!contextTy->isPureMoveOnly()) {
+        switch (attrModifier) { // check the modifier for the Copyable type.
+        case SelfAccessKind::NonMutating:
+        case SelfAccessKind::Mutating:
+        case SelfAccessKind::LegacyConsuming:
+          // already checked
+          break;
+
+        case SelfAccessKind::Consuming:
+        case SelfAccessKind::Borrowing:
+          diagnoseAndRemoveAttr(attr, diag::self_ownership_specifier_copyable,
+                                attrModifier, FD->getDescriptiveKind());
+          break;
+        }
+      }
+    }
+
   } else {
     diagnoseAndRemoveAttr(attr, diag::mutating_invalid_global_scope,
                           attrModifier);
@@ -2034,41 +2055,9 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
 
   // Verify that the declaration is exposable.
   auto repr = cxx_translation::getDeclRepresentation(VD);
-  if (repr.isUnsupported()) {
-    using namespace cxx_translation;
-    switch (*repr.error) {
-    case UnrepresentableObjC:
-      diagnose(attr->getLocation(), diag::expose_unsupported_objc_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableAsync:
-      diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableIsolatedInActor:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_actor_isolated_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableRequiresClientEmission:
-      diagnose(attr->getLocation(),
-               diag::expose_unsupported_client_emission_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGeneric:
-      diagnose(attr->getLocation(), diag::expose_generic_decl_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableGenericRequirements:
-      diagnose(attr->getLocation(), diag::expose_generic_requirement_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    case UnrepresentableThrows:
-      diagnose(attr->getLocation(), diag::expose_throwing_to_cxx,
-               VD->getDescriptiveKind(), VD);
-      break;
-    }
-  }
+  if (repr.isUnsupported())
+    diagnose(attr->getLocation(),
+             cxx_translation::diagnoseRepresenationError(*repr.error, VD));
 
   // Verify that the name mentioned in the expose
   // attribute matches the supported name pattern.
@@ -6667,9 +6656,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // The synthesized "id" and "actorSystem" are the only exceptions,
         // because the implementation mirrors them.
         if (nominal->isDistributedActor() &&
-            !(var->isImplicit() &&
-              (var->getName() == Ctx.Id_id ||
-               var->getName() == Ctx.Id_actorSystem))) {
+            !(var->getName() == Ctx.Id_id ||
+              var->getName() == Ctx.Id_actorSystem)) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
@@ -6888,6 +6876,25 @@ bool AttributeChecker::visitLifetimeAttr(DeclAttribute *attr) {
 void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
   if (visitLifetimeAttr(attr))
     return;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (nominal->getDeclaredInterfaceType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
+  if (auto *func = dyn_cast<FuncDecl>(D)) {
+    auto *self = func->getImplicitSelfDecl();
+    if (self && self->getType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
+  if (auto *pd = dyn_cast<ParamDecl>(D)) {
+    if (pd->getType()->isPureMoveOnly()) {
+      diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitNoEagerMoveAttr(NoEagerMoveAttr *attr) {

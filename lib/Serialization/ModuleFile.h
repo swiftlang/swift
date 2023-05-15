@@ -254,6 +254,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Pack conformances referenced by this module.
+  MutableArrayRef<Serialized<PackConformance *>> PackConformances;
+
   /// SILLayouts referenced by this module.
   MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
@@ -880,6 +883,7 @@ public:
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  bool hasLoadedSwiftDoc() const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
   Optional<ExternalSourceLocs::RawLocs>
@@ -986,13 +990,11 @@ public:
 
   /// Returns the protocol conformance for the given ID.
   ProtocolConformanceRef
-  getConformance(serialization::ProtocolConformanceID id,
-                 GenericEnvironment *genericEnv = nullptr);
+  getConformance(serialization::ProtocolConformanceID id);
 
   /// Returns the protocol conformance for the given ID.
   llvm::Expected<ProtocolConformanceRef>
-  getConformanceChecked(serialization::ProtocolConformanceID id,
-                        GenericEnvironment *genericEnv = nullptr);
+  getConformanceChecked(serialization::ProtocolConformanceID id);
 
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);

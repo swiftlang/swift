@@ -1255,6 +1255,9 @@ ClangImporter::create(ASTContext &ctx,
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 
+  // Clang implicitly enables this by default in C++20 mode.
+  instance.getLangOpts().ModulesLocalVisibility = false;
+
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
@@ -1855,7 +1858,8 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    ModuleVersionInfo *versionInfo) {
+                                    ModuleVersionInfo *versionInfo,
+                                    bool isTestableDependencyLookup) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
@@ -3028,33 +3032,26 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     }
 
     // Macros.
-    if (auto *ppRec = ClangPP.getPreprocessingRecord()) {
-      clang::SourceLocation B = ClangSM.getLocForStartOfFile(FID);
-      clang::SourceLocation E = ClangSM.getLocForEndOfFile(FID);
-      clang::SourceRange R(B, E);
-      const auto &Entities = ppRec->getPreprocessedEntitiesInRange(R);
-      for (auto I = Entities.begin(), E = Entities.end(); I != E; ++I) {
-        if (!ppRec->isEntityInFileID(I, FID))
-          continue;
-        clang::PreprocessedEntity *PPE = *I;
-        if (!PPE)
-          continue;
-        if (auto *MDR = dyn_cast<clang::MacroDefinitionRecord>(PPE)) {
-          auto *II = const_cast<clang::IdentifierInfo*>(MDR->getName());
-          auto MD = ClangPP.getMacroDefinition(II);
-          if (auto macroNode = getClangNodeForMacroDefinition(MD)) {
-            if (filter(macroNode)) {
-              auto MI = macroNode.getAsMacro();
-              Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-              if (Decl *imported = Impl.importMacro(Name, macroNode))
-                receiver(imported);
-            }
-          }
-        }
-      }
+    for (const auto &Iter : ClangPP.macros()) {
+      auto *II = Iter.first;
+      auto MD = ClangPP.getMacroDefinition(II);
+      MD.forAllDefinitions([&](clang::MacroInfo *Info) {
+        if (Info->isBuiltinMacro())
+          return;
 
-      // FIXME: Module imports inside that header.
+        auto Loc = Info->getDefinitionLoc();
+        if (Loc.isInvalid() || ClangSM.getFileID(Loc) != FID)
+          return;
+
+        ClangNode MacroNode = Info;
+        if (filter(MacroNode)) {
+          auto Name = Impl.getNameImporter().importMacroName(II, Info);
+          if (auto *Imported = Impl.importMacro(Name, MacroNode))
+            receiver(Imported);
+        }
+      });
     }
+    // FIXME: Module imports inside that header.
     return false;
   }
 
@@ -6389,9 +6386,7 @@ static bool hasIteratorAPIAttr(const clang::Decl *decl) {
 static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   // Probably a class template that has not yet been specialized:
   if (!decl->getDefinition())
-    // If the definition is unknown, there is no way to determine if the type
-    // stores pointers. Stay on the safe side and assume that it does.
-    return true;
+    return false;
 
   auto checkType = [](clang::QualType t) {
     if (t->isPointerType())
@@ -6561,7 +6556,6 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
-  auto &clangSema = desc.ctx.getClangModuleLoader()->getClangSema();
 
   if (hasImportAsRefAttr(decl)) {
     return CxxRecordSemanticsKind::Reference;
@@ -6686,10 +6680,9 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return false;
         }
 
+        // Mark this as safe to help our diganostics down the road.
         if (!cxxRecordReturnType->getDefinition()) {
-          // This is a templated type that has not been instantiated yet. We do
-          // not know if it is safe. Assume that it isn't.
-          return false;
+          return true;
         }
 
         if (!cxxRecordReturnType->hasUserDeclaredCopyConstructor() &&
@@ -6763,8 +6756,10 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
-      swiftDecl->getClangDecl()->getOwningModule());
+  auto *clangMod = swiftDecl->getClangDecl()->getOwningModule();
+  if (clangMod && clangMod->isSubModule())
+    clangMod = clangMod->getTopLevelModule();
+  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
   ctx.lookupInModule(parentModule, name, results);
 
   if (results.size() == 1)
@@ -6833,4 +6828,16 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+llvm::Optional<clang::QualType>
+importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
+  if (type->isReferenceType())
+    return type->getPointeeType();
+  return {};
+}
+
+bool importer::isCxxConstReferenceType(const clang::Type *type) {
+  auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
+  return pointeeType && pointeeType->isConstQualified();
 }

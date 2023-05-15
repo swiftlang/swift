@@ -600,18 +600,19 @@ public:
             cast<AccessorDecl>(CurDeclContext)->isCoroutine());
   }
 
-  /// `forget self` is the only valid phrase, but we peek ahead for just any
-  /// identifier after `forget` to determine if it's the statement. This helps
-  /// us avoid interpreting `forget(self)` as the statement and not a call.
-  /// We also want to be mindful of statements like `forget ++ something` where
+  /// `discard self` is the only valid phrase, but we peek ahead for just any
+  /// identifier after `discard` to determine if it's the statement. This helps
+  /// us avoid interpreting `discard(self)` as the statement and not a call.
+  /// We also want to be mindful of statements like `discard ++ something` where
   /// folks have defined a custom operator returning void.
   ///
-  /// Later, type checking will verify that you're forgetting the right thing
-  /// so that when people make a mistake, thinking they can `forget x` we give
+  /// Later, type checking will verify that you're discarding the right thing
+  /// so that when people make a mistake, thinking they can `discard x` we give
   /// a nice diagnostic.
-  bool isContextualForgetKeyword() {
-    // must be `forget` ...
-    if (!Tok.isContextualKeyword("_forget"))
+  bool isContextualDiscardKeyword() {
+    // must be `discard` ...
+    if (!(Tok.isContextualKeyword("_forget") // NOTE: support for deprecated _forget
+        || Tok.isContextualKeyword("discard")))
       return false;
 
     // followed by either an identifier, `self`, or `Self`.
@@ -691,11 +692,6 @@ public:
   /// \param DiagText name for the string literal in the diagnostic.
   Optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
-  
-  /// Returns true when body elements are eligible as single-expression implicit returns.
-  ///
-  /// \param Body elements to search for implicit single-expression returns.
-  bool shouldReturnSingleExpressionElement(ArrayRef<ASTNode> Body); 
 
   /// Returns true to indicate that experimental concurrency syntax should be
   /// parsed if the parser is generating only a syntax tree or if the user has
@@ -1024,9 +1020,10 @@ public:
                                       PatternBindingInitializer *initContext);
 
   /// Parse the optional modifiers before a declaration.
-  bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
-                             StaticSpellingKind &StaticSpelling,
-                             bool isFromClangAttribute = false);
+  ParserStatus parseDeclModifierList(DeclAttributes &Attributes,
+                                     SourceLoc &StaticLoc,
+                                     StaticSpellingKind &StaticSpelling,
+                                     bool isFromClangAttribute = false);
 
   /// Parse an availability attribute of the form
   /// @available(*, introduced: 1.0, deprecated: 3.1).
@@ -1138,9 +1135,9 @@ public:
   ParserResult<CustomAttr> parseCustomAttribute(
       SourceLoc atLoc, PatternBindingInitializer *&initContext);
 
-  bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
-                             DeclAttrKind DK,
-                             bool isFromClangAttribute = false);
+  ParserStatus parseNewDeclAttribute(DeclAttributes &Attributes,
+                                     SourceLoc AtLoc, DeclAttrKind DK,
+                                     bool isFromClangAttribute = false);
 
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
@@ -1199,9 +1196,18 @@ public:
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
+
+  /// Parse an inheritance clause into a vector of InheritedEntry's.
+  ///
+  /// \param allowClassRequirement whether to permit parsing of 'class'
+  /// \param allowAnyObject whether to permit parsing of 'AnyObject'
+  /// \param parseTildeCopyable if non-null, permits parsing of `~Copyable`
+  ///   and writes out a valid source location if it was parsed. If null, then a
+  ///   parsing error will be emitted upon the appearance of `~` in the clause.
   ParserStatus parseInheritance(SmallVectorImpl<InheritedEntry> &Inherited,
                                 bool allowClassRequirement,
-                                bool allowAnyObject);
+                                bool allowAnyObject,
+                                SourceLoc *parseTildeCopyable = nullptr);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
@@ -1855,7 +1861,7 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtYield(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
-  ParserResult<Stmt> parseStmtForget();
+  ParserResult<Stmt> parseStmtDiscard();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus
   parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,

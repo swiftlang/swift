@@ -108,7 +108,7 @@ struct StringFauxUTF16Collection: RangeReplaceableCollection, RandomAccessCollec
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
   expectEqual(12, MemoryLayout<String>.size)
 #else
   expectEqual(16, MemoryLayout<String>.size)
@@ -964,7 +964,7 @@ StringTests.test("stringGutsReserve")
     case 0: (base, startedNative) = (String(), true)
     case 1: (base, startedNative) = (asciiString("x"), true)
     case 2: (base, startedNative) = ("Ξ", true)
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
 #else

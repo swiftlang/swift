@@ -553,8 +553,8 @@ func rdar_48114578() {
   struct S<T> {
     var value: T
 
-    static func valueOf<T>(_ v: T) -> S<T> {
-      return S<T>(value: v)
+    static func valueOf<U>(_ v: U) -> S<U> {
+      return S<U>(value: v)
     }
   }
 

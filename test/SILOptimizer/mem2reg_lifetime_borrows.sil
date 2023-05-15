@@ -526,3 +526,38 @@ bb0(%0 : @guaranteed $WrapperStruct):
   return %33 : $()
 }
 
+// Ensure we don't have an ownership verification error
+sil [ossa] @test_store_borrow_phi : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %1 = apply undef() : $@convention(thin) () -> @owned Klass
+  %2 = begin_borrow %1 : $Klass
+  %3 = alloc_stack [lexical] $Klass
+  %4 = store_borrow %2 to %3 : $*Klass
+  %5 = load_borrow %4 : $*Klass
+  %6 = apply undef(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5 : $Klass
+  end_borrow %4 : $*Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %3 : $*Klass
+  end_borrow %2 : $Klass
+  destroy_value %1 : $Klass
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}

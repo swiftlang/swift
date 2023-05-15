@@ -307,12 +307,12 @@ resolveExplicitModuleInputs(ModuleDependencyID moduleID,
 
 /// Resolve the direct dependencies of the given module.
 static ArrayRef<ModuleDependencyID>
-resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
+resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID moduleID,
                           ModuleDependenciesCache &cache,
                           InterfaceSubContextDelegate &ASTDelegate) {
-  PrettyStackTraceStringAction trace("Resolving direct dependencies of: ", module.first);
+  PrettyStackTraceStringAction trace("Resolving direct dependencies of: ", moduleID.first);
   auto &ctx = instance.getASTContext();
-  auto optionalKnownDependencies = cache.findDependency(module.first, module.second);
+  auto optionalKnownDependencies = cache.findDependency(moduleID.first, moduleID.second);
   assert(optionalKnownDependencies.has_value());
   auto knownDependencies = optionalKnownDependencies.value();
 
@@ -329,16 +329,33 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
   ModuleDependencyIDSetVector result;
   for (auto dependsOn : knownDependencies->getModuleImports()) {
     // Figure out what kind of module we need.
-    bool onlyClangModule = !isSwift || module.first == dependsOn;
+    bool onlyClangModule = !isSwift || moduleID.first == dependsOn;
+    bool isTestable = knownDependencies->isTestableImport(dependsOn);
+
     if (onlyClangModule) {
       if (auto found =
               ctx.getClangModuleDependencies(dependsOn, cache, ASTDelegate))
         result.insert({dependsOn, ModuleDependencyKind::Clang});
     } else {
       if (auto found =
-              ctx.getModuleDependencies(dependsOn, cache, ASTDelegate, module))
+              ctx.getModuleDependencies(dependsOn, cache, ASTDelegate,
+                                        /* optionalDependencyLookup */ false,
+                                        isTestable,
+                                        moduleID))
         result.insert({dependsOn, found.value()->getKind()});
     }
+  }
+
+  // We may have a set of optional dependencies for this module, such as `@_implementationOnly`
+  // imports of a `@Testable` import. Attempt to locate those, but do not fail if they
+  // cannot be found.
+  for (auto optionallyDependsOn : knownDependencies->getOptionalModuleImports()) {
+    if (auto found =
+            ctx.getModuleDependencies(optionallyDependsOn, cache, ASTDelegate,
+                                      /* optionalDependencyLookup */ true,
+                                      /* isTestableDependency */ false,
+                                      moduleID))
+      result.insert({optionallyDependsOn, found.value()->getKind()});
   }
 
   if (isSwiftInterfaceOrSource) {
@@ -350,11 +367,11 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     if (knownDependencies->getBridgingHeader()) {
       auto clangImporter =
           static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-      if (!clangImporter->addBridgingHeaderDependencies(module.first,
-                                                        module.second, cache)) {
+      if (!clangImporter->addBridgingHeaderDependencies(moduleID.first,
+                                                        moduleID.second, cache)) {
         // Grab the updated module dependencies.
         // FIXME: This is such a hack.
-        knownDependencies = *cache.findDependency(module.first, module.second);
+        knownDependencies = *cache.findDependency(moduleID.first, moduleID.second);
 
         // Add the Clang modules referenced from the bridging header to the
         // set of Clang modules we know about.
@@ -389,15 +406,15 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     for (const auto &clangDep : allClangModules) {
       if (auto found =
               ctx.getSwiftModuleDependencies(clangDep, cache, ASTDelegate)) {
-        if (clangDep != module.first)
+        if (clangDep != moduleID.first)
           result.insert({clangDep, found.value()->getKind()});
       }
     }
   }
 
   // Resolve the dependnecy info
-  cache.resolveDependencyImports(module, result.takeVector());
-  return cache.findDependency(module.first, module.second).value()->getModuleDependencies();
+  cache.resolveDependencyImports(moduleID, result.takeVector());
+  return cache.findDependency(moduleID.first, moduleID.second).value()->getModuleDependencies();
 }
 
 static void discoverCrossImportOverlayDependencies(

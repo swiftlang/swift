@@ -53,6 +53,11 @@ struct UInt8 {
   var _value : Builtin.Int8
 }
 
+enum KlassOptional {
+  case some(Klass)
+  case none
+}
+
 sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
 sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
@@ -1026,16 +1031,10 @@ bb12:
   return %39 : $()
 }
 
-enum KlassOptional {
-  case some(Klass)
-  case none
-}
-
 sil @return_optional_or_error : $@convention(thin) () -> (@owned KlassOptional, @error Error)
 
 // CHECK-LABEL: sil [ossa] @test_deadphi4 :
-// mem2reg cannot optimize an enum location which spans over multiple blocks.
-// CHECK:         alloc_stack
+// CHECK-NOT:         alloc_stack
 // CHECK-LABEL: } // end sil function 'test_deadphi4'
 sil [ossa] @test_deadphi4 : $@convention(thin) (@owned KlassOptional) -> () {
 bb0(%0 : @owned $KlassOptional):

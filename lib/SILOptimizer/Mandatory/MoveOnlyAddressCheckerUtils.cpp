@@ -433,7 +433,7 @@ static bool memInstMustConsume(Operand *memOper) {
       return false;
     ApplySite applySite(pai);
     auto convention = applySite.getArgumentConvention(*memOper);
-    return convention.isInoutConvention();
+    return !convention.isInoutConvention();
   }
   case SILInstructionKind::DestroyAddrInst:
     return true;
@@ -1168,30 +1168,16 @@ namespace {
 /// An early transform that we run to convert any load_borrow that are copied
 /// directly or that have any subelement that is copied to a load [copy]. This
 /// lets the rest of the optimization handle these as appropriate.
-struct CopiedLoadBorrowEliminationVisitor : public AccessUseVisitor {
+struct CopiedLoadBorrowEliminationVisitor final
+    : public TransitiveAddressWalker {
   SILFunction *fn;
   StackList<LoadBorrowInst *> targets;
 
-  CopiedLoadBorrowEliminationVisitor(SILFunction *fn)
-      : AccessUseVisitor(AccessUseType::Inner,
-                         NestedAccessType::IgnoreAccessBegin),
-        fn(fn), targets(fn) {}
+  CopiedLoadBorrowEliminationVisitor(SILFunction *fn) : fn(fn), targets(fn) {}
 
-  bool visitUse(Operand *op, AccessUseType useTy) override {
-    LLVM_DEBUG(
-      llvm::dbgs() << "CopiedLBElim visiting ";
-      switch (useTy) {
-      case AccessUseType::Exact:
-        llvm::dbgs() << "exact      ";
-        break;
-      case AccessUseType::Inner:
-        llvm::dbgs() << "inner      ";
-        break;
-      case AccessUseType::Overlapping:
-        llvm::dbgs() << "overlapping";
-        break;
-      }
-      llvm::dbgs() << " use: " << *op->getUser());
+  bool visitUse(Operand *op) override {
+    LLVM_DEBUG(llvm::dbgs() << "CopiedLBElim visiting ";
+               llvm::dbgs() << " User: " << *op->getUser());
     auto *lbi = dyn_cast<LoadBorrowInst>(op->getUser());
     if (!lbi)
       return true;
@@ -1318,7 +1304,6 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
   LLVM_DEBUG(llvm::dbgs() << "    DestructureNeedingUse: " << *use->getUser());
 
   SILFunction *fn = rootAddress->getFunction();
-  SILModule &mod = fn->getModule();
 
   // We walk down from our ancestor to our projection, emitting an error if any
   // of our types have a deinit.
@@ -1365,27 +1350,23 @@ checkForDestructureThroughDeinit(MarkMustCheckInst *rootAddress, Operand *use,
 namespace {
 
 /// Visit all of the uses of value in preparation for running our algorithm.
-struct GatherUsesVisitor : public AccessUseVisitor {
+struct GatherUsesVisitor final : public TransitiveAddressWalker {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
   MarkMustCheckInst *markedValue;
-  bool emittedEarlyDiagnostic = false;
   DiagnosticEmitter &diagnosticEmitter;
 
   // Pruned liveness used to validate that load [take]/load [copy] can be
   // converted to load_borrow without violating exclusivity.
-  SSAPrunedLiveness &liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   GatherUsesVisitor(MoveOnlyAddressCheckerPImpl &moveChecker,
                     UseState &useState, MarkMustCheckInst *markedValue,
-                    DiagnosticEmitter &diagnosticEmitter,
-                    SSAPrunedLiveness &gatherUsesLiveness)
-      : AccessUseVisitor(AccessUseType::Inner,
-                         NestedAccessType::IgnoreAccessBegin),
-        moveChecker(moveChecker), useState(useState), markedValue(markedValue),
-        diagnosticEmitter(diagnosticEmitter), liveness(gatherUsesLiveness) {}
+                    DiagnosticEmitter &diagnosticEmitter)
+      : moveChecker(moveChecker), useState(useState), markedValue(markedValue),
+        diagnosticEmitter(diagnosticEmitter) {}
 
-  bool visitUse(Operand *op, AccessUseType useTy) override;
+  bool visitUse(Operand *op) override;
   void reset(MarkMustCheckInst *address) { useState.address = address; }
   void clear() { useState.clear(); }
 
@@ -1400,7 +1381,8 @@ struct GatherUsesVisitor : public AccessUseVisitor {
 
   /// Returns true if we emitted an error.
   bool checkForExclusivityHazards(LoadInst *li) {
-    SWIFT_DEFER { liveness.invalidate(); };
+    BitfieldRef<SSAPrunedLiveness>::StackState state(liveness,
+                                                     li->getFunction());
 
     LLVM_DEBUG(llvm::dbgs() << "Checking for exclusivity hazards for: " << *li);
 
@@ -1421,10 +1403,10 @@ struct GatherUsesVisitor : public AccessUseVisitor {
     }
 
     bool emittedError = false;
-    liveness.initializeDef(bai);
-    liveness.computeSimple();
+    liveness->initializeDef(bai);
+    liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness.isWithinBoundary(consumingUse->getUser())) {
+      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -1442,7 +1424,7 @@ struct GatherUsesVisitor : public AccessUseVisitor {
 // mayWriteToMemory and just call that instead. Possibly add additional
 // verification that visitAccessPathUses recognizes all instructions that may
 // propagate pointers (even though they don't write).
-bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
+bool GatherUsesVisitor::visitUse(Operand *op) {
   // If this operand is for a dependent type, then it does not actually access
   // the operand's address value. It only uses the metatype defined by the
   // operation (e.g. open_existential).
@@ -1453,19 +1435,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // For convenience, grab the user of op.
   auto *user = op->getUser();
 
-  LLVM_DEBUG(
-    switch (useTy) {
-    case AccessUseType::Exact:
-      llvm::dbgs() << "Visiting exact       user: ";
-      break;
-    case AccessUseType::Inner:
-      llvm::dbgs() << "Visiting inner       user: ";
-      break;
-    case AccessUseType::Overlapping:
-      llvm::dbgs() << "Visiting overlapping user: ";
-      break;
-    }
-    llvm::dbgs() << *user);
+  LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *user;);
 
   // First check if we have init/reinit. These are quick/simple.
   if (::memInstMustInitialize(op)) {
@@ -1540,25 +1510,38 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
            "Should have dest above in memInstMust{Rei,I}nitialize");
 
-    if (markedValue->getCheckKind() ==
-        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Found mark must check [nocopy] error: " << *user);
-      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
-      emittedEarlyDiagnostic = true;
-      return true;
-    }
-
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
+
+    // If we have a non-move only type, just treat this as a liveness use.
+    if (!copyAddr->getSrc()->getType().isMoveOnly()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found copy of copyable type. Treating as liveness use! "
+                 << *user);
+      useState.livenessUses.insert({user, *leafRange});
+      return true;
+    }
+
+    if (markedValue->getCheckKind() ==
+        MarkMustCheckInst::CheckKind::NoConsumeOrAssign) {
+      if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Found mark must check [nocopy] use of escaping box: " << *user);
+        diagnosticEmitter.emitAddressEscapingClosureCaptureLoadedAndConsumed(
+            markedValue);
+        return true;
+      }
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Found mark must check [nocopy] error: " << *user);
+      diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue, copyAddr);
+      return true;
+    }
 
     // TODO: Add borrow checking here like below.
 
     // TODO: Add destructure deinit checking here once address only checking is
     // completely brought up.
-
-    // TODO: Add check here that we don't error on trivial/copyable types.
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -1607,7 +1590,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
                  .didEmitCheckerDoesntUnderstandDiagnostic());
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed to perform borrow to destructure transform!\n");
-      emittedEarlyDiagnostic = true;
       return false;
     }
 
@@ -1615,7 +1597,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     // mark that we emitted an early diagnostic and return true.
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs() << "Emitting borrow to destructure error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1636,7 +1617,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");
-      emittedEarlyDiagnostic = true;
       return true;
     }
 
@@ -1661,7 +1641,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1675,7 +1654,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1708,7 +1686,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       // succeeded.
       // Otherwise, emit the diagnostic.
       moveChecker.diagnosticEmitter.emitObjectOwnedDiagnostic(markedValue);
-      emittedEarlyDiagnostic = true;
       LLVM_DEBUG(llvm::dbgs() << "Emitted early object level diagnostic.\n");
       return true;
     }
@@ -1717,7 +1694,6 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       LLVM_DEBUG(llvm::dbgs() << "Found potential borrow inst: " << *user);
       if (checkForExclusivityHazards(li)) {
         LLVM_DEBUG(llvm::dbgs() << "Found exclusivity violation?!\n");
-        emittedEarlyDiagnostic = true;
         return true;
       }
 
@@ -1750,9 +1726,29 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // Now that we have handled or loadTakeOrCopy, we need to now track our
   // additional pure takes.
   if (::memInstMustConsume(op)) {
+    // If we don't have a consumeable and assignable check kind, then we can't
+    // consume. Emit an error.
+    //
+    // NOTE: Since SILGen eagerly loads loadable types from memory, this
+    // generally will only handle address only types.
+    if (markedValue->getCheckKind() !=
+        MarkMustCheckInst::CheckKind::ConsumableAndAssignable) {
+      auto *fArg = dyn_cast<SILFunctionArgument>(
+          stripAccessMarkers(markedValue->getOperand()));
+      if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+        moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(markedValue,
+                                                                   fArg);
+      } else {
+        moveChecker.diagnosticEmitter
+            .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+      }
+      return true;
+    }
+
     auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
     if (!leafRange)
       return false;
+
     LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
     useState.takeInsts.insert({user, *leafRange});
     return true;
@@ -1796,8 +1792,9 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   }
 
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
-    if (pas->isOnStack()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply!\n");
+    if (pas->isOnStack() ||
+        ApplySite(pas).getArgumentConvention(*op).isInoutConvention()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
       // On-stack partial applications and their final consumes are always a
       // liveness use of their captures.
       auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
@@ -2427,20 +2424,13 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
 
-  auto accessPathWithBase = AccessPathWithBase::computeInScope(markedAddress);
-  auto accessPath = accessPathWithBase.accessPath;
-  if (!accessPath.isValid()) {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid access path: " << *markedAddress);
-    return false;
-  }
-
   // Before we do anything, canonicalize load_borrow + copy_value into load
   // [copy] + begin_borrow for further processing. This just eliminates a case
   // that the checker doesn't need to know about.
   {
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(fn);
-    if (!visitAccessPathBaseUses(copiedLoadBorrowEliminator, accessPathWithBase,
-                                 fn)) {
+    if (AddressUseKind::Unknown ==
+        std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
                               << *markedAddress);
       return false;
@@ -2451,17 +2441,14 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   // Then gather all uses of our address by walking from def->uses. We use this
   // to categorize the uses of this address into their ownership behavior (e.x.:
   // init, reinit, take, destroy, etc.).
-  SmallVector<SILBasicBlock *, 32> gatherUsesDiscoveredBlocks;
-  SSAPrunedLiveness gatherUsesLiveness(fn, &gatherUsesDiscoveredBlocks);
   GatherUsesVisitor visitor(*this, addressUseState, markedAddress,
-                            diagnosticEmitter, gatherUsesLiveness);
+                            diagnosticEmitter);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(markedAddress);
-  if (!visitAccessPathBaseUses(visitor, accessPathWithBase, fn)) {
+  if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
     LLVM_DEBUG(llvm::dbgs() << "Failed access path visit: " << *markedAddress);
     return false;
   }
-  addressUseState.initializeInOutTermUsers();
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an
   // exclusivity error, then we emitted an early error. Bail now and allow the
@@ -2476,9 +2463,14 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   if (diagCount != diagnosticEmitter.getDiagnosticCount())
     return true;
 
-  // Then check if we emitted an error. If we did not, return true.
-  if (diagCount != diagnosticEmitter.getDiagnosticCount())
-    return true;
+  // Now that we know that we have run our visitor and did not emit any errors
+  // and successfully visited everything, see if have any
+  // assignable_but_not_consumable of address only types that are consumed.
+  //
+  // DISCUSSION: For non address only types, this is not an issue since we
+  // eagerly load
+
+  addressUseState.initializeInOutTermUsers();
 
   //===---
   // Liveness Checking

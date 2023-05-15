@@ -88,7 +88,7 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
     of node: Node,
     at position: PositionInSyntaxNode,
     filePathMode: SourceLocationFilePathMode
-  ) -> SourceLocation? {
+  ) -> AbstractSourceLocation? {
     guard let (sourceFile, rootPosition) = sourceManager.rootSourceFile(of: node),
         let exportedSourceFile =
             sourceManager.exportedSourceFilesBySyntax[sourceFile]?.pointee
@@ -127,6 +127,6 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
 
     // Do the location lookup.
     let converter = SourceLocationConverter(file: fileName, tree: sourceFile)
-    return converter.location(for: rootPosition.advanced(by: offsetWithinSyntaxNode))
+    return AbstractSourceLocation(converter.location(for: rootPosition.advanced(by: offsetWithinSyntaxNode)))
   }
 }

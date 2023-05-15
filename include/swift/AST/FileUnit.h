@@ -161,11 +161,15 @@ public:
   ///
   /// This function is an implementation detail for comment serialization.
   /// If you just want to get a comment attached to a decl, use
-  /// \c Decl::getRawComment() or \c Decl::getBriefComment().
+  /// \c Decl::getRawComment() or \c Decl::getSemanticBriefComment().
   virtual Optional<CommentInfo>
   getCommentForDecl(const Decl *D) const {
     return None;
   }
+
+  /// For a serialized AST file, returns \c true if an adjacent swiftdoc has been
+  /// loaded. Otherwise, returns \c false.
+  virtual bool hasLoadedSwiftDoc() const { return false; }
 
   virtual Optional<StringRef>
   getGroupNameForDecl(const Decl *D) const {

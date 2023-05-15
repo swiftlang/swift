@@ -169,6 +169,14 @@ Solution ConstraintSystem::finalize() {
     solution.OpenedExistentialTypes.insert(openedExistential);
   }
 
+  for (const auto &expansion : OpenedPackExpansionTypes) {
+    assert(solution.OpenedPackExpansionTypes.count(expansion.first) == 0 ||
+           solution.OpenedPackExpansionTypes[expansion.first] ==
+                   expansion.second &&
+               "Already recorded");
+    solution.OpenedPackExpansionTypes.insert(expansion);
+  }
+
   // Remember the defaulted type variables.
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
@@ -271,6 +279,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     OpenedExistentialTypes.insert(openedExistential);
   }
 
+  // Register the solution's opened pack expansion types.
+  for (const auto &expansion : solution.OpenedPackExpansionTypes) {
+    OpenedPackExpansionTypes.insert(expansion);
+  }
+
   // Register the solutions's pack expansion environments.
   for (const auto &expansion : solution.PackExpansionEnvironments) {
     PackExpansionEnvironments.insert(expansion);
@@ -369,7 +382,7 @@ bool ConstraintSystem::simplify() {
     if (isDebugMode()) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent());
-      log << "(considering -> ";
+      log << "(considering: ";
       constraint->print(log, &getASTContext().SourceMgr,
                         solverState->getCurrentIndent());
       log << "\n";
@@ -594,6 +607,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
+  numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
   numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
@@ -671,6 +685,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
+
+  // Remove any opened pack expansion types.
+  truncate(cs.OpenedPackExpansionTypes, numOpenedPackExpansionTypes);
 
   // Remove any pack expansion environments.
   truncate(cs.PackExpansionEnvironments, numPackExpansionEnvironments);
@@ -1485,7 +1502,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Constraint solving at ";
+    log << "\n---Constraint solving at ";
     auto R = target.getSourceRange();
     if (R.isValid()) {
       R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);

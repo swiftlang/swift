@@ -363,51 +363,6 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
 }
 
-static void setMetadataRef(IRGenFunction &IGF,
-                           ArchetypeType *archetype,
-                           llvm::Value *metadata,
-                           MetadataState metadataState) {
-  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
-  IGF.setUnscopedLocalTypeMetadata(CanType(archetype),
-                         MetadataResponse::forBounded(metadata, metadataState));
-}
-
-static void setWitnessTable(IRGenFunction &IGF,
-                            ArchetypeType *archetype,
-                            unsigned protocolIndex,
-                            llvm::Value *wtable) {
-  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
-  assert(protocolIndex < archetype->getConformsTo().size());
-  auto protocol = archetype->getConformsTo()[protocolIndex];
-  IGF.setUnscopedLocalTypeData(CanType(archetype),
-                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
-                               wtable);
-}
-
-/// Inform IRGenFunction that the given archetype has the given value
-/// witness value within this scope.
-void IRGenFunction::bindArchetype(ArchetypeType *archetype,
-                                  llvm::Value *metadata,
-                                  MetadataState metadataState,
-                                  ArrayRef<llvm::Value*> wtables) {
-  // Set the metadata pointer.
-  setTypeMetadataName(IGM, metadata, CanType(archetype));
-  setMetadataRef(*this, archetype, metadata, metadataState);
-
-  // Set the protocol witness tables.
-
-  unsigned wtableI = 0;
-  for (unsigned i = 0, e = archetype->getConformsTo().size(); i != e; ++i) {
-    auto proto = archetype->getConformsTo()[i];
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      continue;
-    auto wtable = wtables[wtableI++];
-    setProtocolWitnessTableName(IGM, wtable, CanType(archetype), proto);
-    setWitnessTable(*this, archetype, i, wtable);
-  }
-  assert(wtableI == wtables.size());
-}
-
 llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                      Address addr,
                                                      SILType type) {

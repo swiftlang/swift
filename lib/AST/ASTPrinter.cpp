@@ -1732,11 +1732,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
-          if (param->isParameterPack())
-            Printer << "each ";
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
+            if (param->isParameterPack())
+              Printer << "each ";
             Printer.callPrintStructurePre(PrintStructureKind::GenericParameter,
                                           GP);
             Printer.printName(GP->getName(),
@@ -1835,9 +1835,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    Printer << "(repeat (each ";
+    Printer << "(repeat (";
     printTransformedType(req.getFirstType());
-    Printer << ", each ";
+    Printer << ", ";
     printTransformedType(req.getSecondType());
     Printer << ")) : Any";
     return;
@@ -3275,6 +3275,10 @@ static bool usesFeatureMoveOnlyClasses(Decl *decl) {
   return isa<ClassDecl>(decl) && usesFeatureMoveOnly(decl);
 }
 
+static bool usesFeatureMoveOnlyTuples(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNoImplicitCopy(Decl *decl) {
   return decl->isNoImplicitCopy();
 }
@@ -3336,12 +3340,21 @@ static bool usesFeatureFreestandingExpressionMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Expression);
 }
 
+static bool usesFeatureLexicalLifetimes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<EagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<NoEagerMoveAttr>()
+         || decl->getAttrs().hasAttribute<LexicalLifetimesAttr>();
+}
+
 static void
-suppressingFeatureFreestandingExpressionMacros(PrintOptions &options,
-                                        llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.SuppressingFreestandingExpression = true;
+suppressingFeatureLexicalLifetimes(PrintOptions &options,
+                                   llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_EagerMove);
+  options.ExcludeAttrList.push_back(DAK_NoEagerMove);
+  options.ExcludeAttrList.push_back(DAK_LexicalLifetimes);
   action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
@@ -5407,8 +5420,8 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   visit(stmt->getSubExpr());
 }
 
-void PrintAST::visitForgetStmt(ForgetStmt *stmt) {
-  Printer << "_forget" << " ";
+void PrintAST::visitDiscardStmt(DiscardStmt *stmt) {
+  Printer << "discard" << " ";
   visit(stmt->getSubExpr());
 }
 
@@ -5710,10 +5723,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getInstanceType());
     } else if (auto param = dyn_cast<GenericTypeParamType>(T.getPointer())) {
-      if (param->isParameterPack() && Options.PrintExplicitEach)
+      if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack() && Options.PrintExplicitEach)
+      if (archetype->isParameterPack())
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -6049,11 +6062,8 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    PrintOptions innerOptions = Options;
-    innerOptions.PrintExplicitEach = true;
-
     Printer << "repeat ";
-    TypePrinter(Printer, innerOptions).visit(T->getPatternType());
+    visit(T->getPatternType());
   }
 
   void visitTupleType(TupleType *T) {
@@ -6963,8 +6973,7 @@ public:
   }
 
   void printEach() {
-    if (Options.PrintExplicitEach)
-      Printer << "each ";
+    Printer << "each ";
   }
 
   void printArchetypeCommon(ArchetypeType *T) {

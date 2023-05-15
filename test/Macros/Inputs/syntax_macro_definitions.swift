@@ -26,7 +26,7 @@ public struct ColorLiteralMacro: ExpressionMacro {
       of: macro.argumentList, with: "_colorLiteralRed"
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
-    return initSyntax.with(\.leadingTrivia, macro.leadingTrivia)
+    return initSyntax
   }
 }
 
@@ -38,14 +38,25 @@ public struct FileIDMacro: ExpressionMacro {
     of macro: Node,
     in context: Context
   ) throws -> ExprSyntax {
-    guard let sourceLoc = context.location(of: macro),
-      let fileID = sourceLoc.file
-    else {
+    guard let sourceLoc = context.location(of: macro) else {
       throw CustomError.message("can't find location for macro")
     }
 
-    let fileLiteral: ExprSyntax = "\(literal: fileID)"
-    return fileLiteral.with(\.leadingTrivia, macro.leadingTrivia)
+    let fileLiteral: ExprSyntax = "\(sourceLoc.file)"
+    return fileLiteral
+  }
+}
+
+public struct AssertMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    guard let argument = macro.argumentList.first?.expression else {
+      fatalError("boom")
+    }
+
+    return "assert(\(argument))"
   }
 }
 
@@ -395,6 +406,29 @@ extension PropertyWrapperMacro: AccessorMacro, Macro {
   }
 }
 
+extension PropertyWrapperMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let varDecl = declaration.as(VariableDeclSyntax.self),
+      let binding = varDecl.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier,
+      binding.accessor == nil,
+      let type = binding.typeAnnotation?.type
+    else {
+      return []
+    }
+
+    return [
+      """
+      var _\(raw: identifier.trimmedDescription): MyWrapperThingy<\(type)>
+      """
+    ]
+  }
+}
+
 public struct WrapAllProperties: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -554,7 +588,7 @@ public struct AddExtMembers: MemberMacro {
     providingMembersOf decl: some DeclGroupSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let uniqueClassName = context.createUniqueName("uniqueClass")
+    let uniqueClassName = context.makeUniqueName("uniqueClass")
 
     let instanceMethod: DeclSyntax =
       """
@@ -633,7 +667,6 @@ public struct WrapStoredPropertiesMacro: MemberAttributeMacro {
           name: .identifier(wrapperName.content.text)
         )
       )
-      .with(\.leadingTrivia, [.newlines(1), .spaces(2)])
     ]
   }
 }
@@ -711,7 +744,7 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
         fatalError("missing source location information")
       }
 
-      print("Source range for LHS is \(lhsStartLoc.file!): \(lhsStartLoc.line!):\(lhsStartLoc.column!)-\(lhsEndLoc.line!):\(lhsEndLoc.column!)")
+      print("Source range for LHS is \(lhsStartLoc.file): \(lhsStartLoc.line):\(lhsStartLoc.column)-\(lhsEndLoc.line):\(lhsEndLoc.column)")
 
       return .visitChildren
     }
@@ -753,7 +786,7 @@ public struct AddCompletionHandler: PeerMacro {
     let completionHandlerParam =
       FunctionParameterSyntax(
         firstName: .identifier("completionHandler"),
-        colon: .colonToken(trailingTrivia: .space),
+        colon: .colonToken(),
         type: "@escaping (\(resultType ?? "")) -> Void" as TypeSyntax
       )
 
@@ -766,7 +799,7 @@ public struct AddCompletionHandler: PeerMacro {
         .appending(
           lastParam.with(
             \.trailingComma,
-            .commaToken(trailingTrivia: .space)
+            .commaToken()
           )
         )
         .appending(completionHandlerParam)
@@ -791,11 +824,9 @@ public struct AddCompletionHandler: PeerMacro {
     // so that the full body could go here.
     let newBody: ExprSyntax =
       """
-
         Task {
           completionHandler(await \(call))
         }
-
       """
 
     // Drop the @addCompletionHandler attribute from the new declaration.
@@ -831,15 +862,14 @@ public struct AddCompletionHandler: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(newBody))]
           ),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
-      .with(\.leadingTrivia, .newlines(2))
 
     return [DeclSyntax(newFunc)]
   }
@@ -883,6 +913,15 @@ public struct InvalidMacro: PeerMacro, DeclarationMacro {
     return [
       "var value: Int"
     ]
+  }
+}
+
+public struct CoerceToIntMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    "\(node.argumentList.first!.expression) as Int"
   }
 }
 
@@ -941,12 +980,11 @@ public struct WrapInType: PeerMacro {
       .with(
         \.body,
         CodeBlockSyntax(
-          leftBrace: .leftBraceToken(leadingTrivia: .space),
+          leftBrace: .leftBraceToken(),
           statements: CodeBlockItemListSyntax(
             [CodeBlockItemSyntax(item: .expr(call))]
-          )
-          .with(\.leadingTrivia, [.newlines(1), .spaces(2)]),
-          rightBrace: .rightBraceToken(leadingTrivia: .newline)
+          ),
+          rightBrace: .rightBraceToken()
         )
       )
       .with(\.attributes, newAttributeList)
@@ -1358,5 +1396,20 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
       print("from expr")
       """)),
     ]
+  }
+}
+
+public struct MultiStatementClosure: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+      {
+        let temp = 10
+        let result = temp
+        return result
+      }()
+      """
   }
 }

@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -674,6 +675,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
       case SILInstructionKind::MarkMustCheckInst:
+      case SILInstructionKind::PackElementGetInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
           llvm::copy(result->getUses(), std::back_inserter(worklist));
@@ -692,6 +694,25 @@ struct ImmutableAddressUseVerifier {
         llvm_unreachable("invoking standard assertion failure");
         break;
       }
+      case SILInstructionKind::TuplePackElementAddrInst: {
+        if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
+              TuplePackElementAddrInst::TupleOperand) == use) {
+          for (auto result : inst->getResults()) {
+            llvm::copy(result->getUses(), std::back_inserter(worklist));
+          }
+
+          break;
+        }
+
+        return false;
+      }
+      case SILInstructionKind::PackElementSetInst: {
+        if (&cast<PackElementSetInst>(inst)->getOperandRef(
+              PackElementSetInst::PackOperand) == use)
+          return true;
+
+        return false;
+      }
       default:
         llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
         llvm_unreachable("invoking standard assertion failure");
@@ -702,11 +723,28 @@ struct ImmutableAddressUseVerifier {
   }
 };
 
+static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
+  struct Visitor final : TransitiveAddressWalker {
+    bool visitUse(Operand *use) override { return true; }
+    void onError(Operand *use) override {}
+  };
+
+  Visitor visitor;
+  if (std::move(visitor).walk(address) != AddressUseKind::Unknown)
+    return;
+
+  llvm::errs() << "TransitiveAddressWalker walker failed to know how to visit "
+                  "a user when visiting: "
+               << *address << '\n';
+  llvm::report_fatal_error("invoking standard assertion failure");
+}
+
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
+  SILPassManager *passManager;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
 
@@ -976,8 +1014,10 @@ public:
     return numInsts;
   }
 
-  SILVerifier(const SILFunction &F, bool SingleFunction, bool checkLinearLifetime)
+  SILVerifier(const SILFunction &F, SILPassManager *passManager,
+              bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
+        passManager(passManager),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
@@ -1079,6 +1119,12 @@ public:
   void visitSILArgument(SILArgument *arg) {
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
+
+    // Ensure flags on the argument are not stale.
+    require(!arg->getFunction()->hasOwnership() ||
+                computeIsReborrow(arg) == arg->isReborrow(),
+            "Stale reborrow flag");
+
     if (checkLinearLifetime) {
       checkValueBaseOwnership(arg);
     }
@@ -1098,6 +1144,9 @@ public:
     // If we are not in lowered SIL and have an in_guaranteed function argument,
     // verify that we do not mutate or consume it.
     auto *fArg = cast<SILFunctionArgument>(arg);
+    if (fArg->getType().isAddress())
+      checkAddressWalkerCanVisitAllTransitiveUses(fArg);
+
     if (fArg->getModule().getStage() == SILStage::Lowered ||
         !fArg->getType().isAddress() ||
         !fArg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
@@ -1547,6 +1596,8 @@ public:
 
     require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
             "AllocStack Var Info should be None if invalidated");
+
+    checkAddressWalkerCanVisitAllTransitiveUses(AI);
 
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
     // range. But apparently it can be the case that ASI has uses after the
@@ -2200,6 +2251,7 @@ public:
     require(!GAI->getReferencedGlobal()->isInitializedObject(),
             "global_addr cannot refer to a statically initialized object");
     checkGlobalAccessInst(GAI);
+    checkAddressWalkerCanVisitAllTransitiveUses(GAI);
   }
 
   void checkGlobalValueInst(GlobalValueInst *GVI) {
@@ -2968,6 +3020,7 @@ public:
                     }),
             "project_box with more than one user when a user is a "
             "mark_uninitialized");
+    checkAddressWalkerCanVisitAllTransitiveUses(I);
   }
 
   void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
@@ -3464,6 +3517,7 @@ public:
           "result of ref_element_addr does not match type of field");
     }
     EI->getFieldIndex();  // Make sure we can access the field without crashing.
+    checkAddressWalkerCanVisitAllTransitiveUses(EI);
   }
 
   void checkRefTailAddrInst(RefTailAddrInst *RTAI) {
@@ -3477,6 +3531,7 @@ public:
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
+    checkAddressWalkerCanVisitAllTransitiveUses(RTAI);
   }
 
   void checkDestructureStructInst(DestructureStructInst *DSI) {
@@ -5934,6 +5989,8 @@ public:
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
+    if (i->getType().isAddress())
+      checkAddressWalkerCanVisitAllTransitiveUses(i);
   }
 
   void checkMarkUnresolvedReferenceBindingInst(
@@ -6283,6 +6340,15 @@ public:
       // inherit the sourrounding scope in IRGenSIL.
       if (SI.getLoc().getKind() == SILLocation::MandatoryInlinedKind)
         continue;
+      // FIXME: There are situations where the execution legitimately goes
+      //        backwards, such as
+      //
+      //            while case let w: String? = Optional.some("b") {}
+      //
+      //        where the RHS of the assignment gets run first and then the
+      //        result is copied into the LHS.
+      if (!llvm::isa<BeginBorrowInst>(&SI) || !llvm::isa<CopyValueInst>(&SI))
+        continue;
 
       // If we haven't seen this debug scope yet, update the
       // map and go on.
@@ -6495,7 +6561,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !mod.getASTContext().hadError()) {
-      F->verifyMemoryLifetime();
+      F->verifyMemoryLifetime(passManager);
     }
   }
 
@@ -6535,7 +6601,8 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(bool SingleFunction, bool isCompleteOSSA,
+void SILFunction::verify(SILPassManager *passManager,
+                         bool SingleFunction, bool isCompleteOSSA,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
@@ -6543,14 +6610,16 @@ void SILFunction::verify(bool SingleFunction, bool isCompleteOSSA,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier(*this, SingleFunction, checkLinearLifetime).verify(isCompleteOSSA);
+  SILVerifier verifier(*this, passManager, SingleFunction, checkLinearLifetime);
+  verifier.verify(isCompleteOSSA);
 }
 
 void SILFunction::verifyCriticalEdges() const {
   if (!verificationEnabled(getModule()))
     return;
 
-  SILVerifier(*this, /*SingleFunction=*/true,
+  SILVerifier(*this, /*passManager=*/nullptr,
+                     /*SingleFunction=*/true,
                      /*checkLinearLifetime=*/ false).verifyBranches(this);
 }
 
@@ -6668,7 +6737,8 @@ void SILVTable::verify(const SILModule &M) const {
     }
 
     if (M.getStage() != SILStage::Lowered) {
-      SILVerifier(*entry.getImplementation(), /*SingleFunction=*/true,
+      SILVerifier(*entry.getImplementation(), /*passManager=*/nullptr,
+                                              /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
@@ -6813,8 +6883,14 @@ void SILGlobalVariable::verify() const {
   }
 }
 
-/// Verify the module.
 void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
+  SILPassManager pm(const_cast<SILModule *>(this), /*isMandatory=*/false, /*IRMod=*/nullptr);
+  verify(&pm, isCompleteOSSA, checkLinearLifetime);
+}
+
+/// Verify the module.
+void SILModule::verify(SILPassManager *passManager,
+                       bool isCompleteOSSA, bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
 
@@ -6829,7 +6905,7 @@ void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(/*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
+    f.verify(passManager, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

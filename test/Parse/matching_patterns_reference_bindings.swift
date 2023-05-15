@@ -328,8 +328,6 @@ do {
   while case let _ as [Derived] = arr {}
   // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
 
-  // FIXME: https://github.com/apple/swift/issues/61850
-  // expected-warning@+1 {{heterogeneous collection literal could only be inferred to '[[Base]]'; add explicit type annotation if this is intentional}}
   for case _ as [Derived] in [arr] {}
 
   if case is [Derived] = arr {}

@@ -496,7 +496,7 @@ public:
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
-  Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
+  Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 

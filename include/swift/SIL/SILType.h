@@ -414,10 +414,20 @@ public:
     return getASTType()->hasOpenedExistential();
   }
 
+  TypeTraitResult canBeClass() const {
+    return getASTType()->canBeClass();
+  }
+
   /// Returns true if the referenced type is expressed in terms of one
   /// or more local archetypes.
   bool hasLocalArchetype() const {
     return getASTType()->hasLocalArchetype();
+  }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more parameterized protocol types.
+  bool hasParameterizedExistential() const {
+    return getASTType()->hasParameterizedExistential();
   }
   
   /// Returns the representation used by an existential type. If the concrete
@@ -461,6 +471,13 @@ public:
   bool isFunctionTypeWithContext() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
       return fTy->getExtInfo().hasContext();
+    }
+    return false;
+  }
+
+  bool isNoEscapeFunction() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->isNoEscape();
     }
     return false;
   }

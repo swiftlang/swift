@@ -1,5 +1,5 @@
 // REQUIRES: rdar64809726
-// RUN: %target-swiftc_driver -target %sanitizers-target-triple -sanitize=thread %import-libdispatch %s -o %t_binary
+// RUN: %target-swiftc_driver -sanitize=thread %import-libdispatch %s -o %t_binary
 // RUN: %env-TSAN_OPTIONS=halt_on_error=1 %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test

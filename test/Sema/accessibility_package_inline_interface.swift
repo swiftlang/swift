@@ -9,8 +9,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Utils.swiftinterface) -I%t
 
 // RUN: %FileCheck %s -check-prefix CHECK-UTILS < %t/Utils.swiftinterface
-// CHECK-UTILS: -module-name Utils -enable-library-evolution
-// CHECK-UTILS: swift-module-flags-ignorable: -package-name myLib
+// CHECK-UTILS-NOT: -package-name myLib
+// CHECK-UTILS: -module-name Utils
 // CHECK-UTILS: @usableFromInline
 // CHECK-UTILS: package class PackageKlassProto {
 // CHECK-UTILS:   @usableFromInline

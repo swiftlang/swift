@@ -157,7 +157,7 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    // If allocbox to stack told use to not emit diagnostics for this function,
+    // If an earlier pass told use to not emit diagnostics for this function,
     // clean up any copies, invalidate the analysis, and return early.
     if (getFunction()->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
       if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction()))

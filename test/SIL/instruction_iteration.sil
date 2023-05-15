@@ -2,6 +2,10 @@
 // RUN: %target-sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
+// Use this testfile to check if the `swift-frontend -sil-opt` option works.
+// RUN: %swift_frontend_plain -sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %FileCheck %s < %t/out.sil
+
 // REQUIRES: swift_in_compiler
 
 sil_stage canonical

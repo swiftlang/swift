@@ -68,7 +68,6 @@ static VarDecl*
    if (!var->getInterfaceType()->isEqual(expectedType))
      return nullptr;
 
-   assert(var->isSynthesized() && "Expected compiler synthesized property");
    return var;
  }
 

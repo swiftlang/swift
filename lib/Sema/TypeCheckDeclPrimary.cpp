@@ -454,11 +454,10 @@ static void diagnoseDuplicateDecls(T &&decls) {
         other->diagnose(diag::invalid_redecl_prev, other->getName());
       });
 
-      // Mark the decl as invalid, unless it's a GenericTypeParamDecl, which is
-      // expected to maintain its type of GenericTypeParamType.
-      // This is needed to avoid emitting a duplicate diagnostic when running
-      // redeclaration checking in the case where the VarDecl is part of the
-      // enclosing context, e.g `let (x, x) = (0, 0)`.
+      // Mark the decl as invalid. This is needed to avoid emitting a
+      // duplicate diagnostic when running redeclaration checking in
+      // the case where the VarDecl is part of the enclosing context,
+      // e.g `let (x, x) = (0, 0)`.
       if (!isa<GenericTypeParamDecl>(current))
         current->setInvalid();
     }
@@ -472,14 +471,24 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   if (!genericParams)
     return;
 
+  auto *decl = ownerCtx->getAsDecl();
+  bool isGenericType = isa<GenericTypeDecl>(decl);
+  bool hasPack = false;
+
   for (auto gp : *genericParams) {
     // Diagnose generic types with a parameter packs if VariadicGenerics
     // is not enabled.
-    auto *decl = ownerCtx->getAsDecl();
     auto &ctx = decl->getASTContext();
-    if (gp->isParameterPack() && isa<GenericTypeDecl>(decl) &&
-        !ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-      decl->diagnose(diag::experimental_type_with_parameter_pack);
+    if (gp->isParameterPack() && isGenericType) {
+      if (!ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+        decl->diagnose(diag::experimental_type_with_parameter_pack);
+      }
+
+      if (hasPack) {
+        gp->diagnose(diag::more_than_one_pack_in_type);
+      }
+
+      hasPack = true;
     }
 
     TypeChecker::checkDeclAttributes(gp);
@@ -492,7 +501,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
                          [](Requirement, RequirementRepr *) { return false; });
 
   // Check for duplicate generic parameter names.
-  diagnoseDuplicateDecls(*genericParams);
+  TypeChecker::checkShadowedGenericParams(ownerCtx);
 }
 
 template <typename T>
@@ -2546,6 +2555,17 @@ public:
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
 
+    // Temporary restriction until we figure out pattern matching and
+    // enum case construction with packs.
+    if (auto genericSig = ED->getGenericSignature()) {
+      for (auto paramTy : genericSig.getGenericParams()) {
+        if (paramTy->isParameterPack()) {
+          ED->diagnose(diag::enum_with_pack);
+          break;
+        }
+      }
+    }
+
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
@@ -2755,10 +2775,14 @@ public:
   /// check to see if a move-only type can ever conform to the given type.
   /// \returns true iff a diagnostic was emitted because it was not compatible
   static bool diagnoseIncompatibleWithMoveOnlyType(SourceLoc loc,
-                                                 NominalTypeDecl *moveonlyType,
-                                                 Type type) {
+                                                   NominalTypeDecl *moveonlyType,
+                                                   Type type) {
     assert(type && "got an empty type?");
     assert(moveonlyType->isMoveOnly());
+
+    // no need to emit a diagnostic if the type itself is already problematic.
+    if (type->hasError())
+      return false;
 
     auto canType = type->getCanonicalType();
     if (auto prot = canType->getAs<ProtocolType>()) {
@@ -2821,6 +2845,18 @@ public:
       else if (superclass->isActor())
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
+
+      // Enforce a temporary restriction on inheriting from a superclass
+      // type with a pack, until we figure out the semantics of method
+      // overrides in these situations.
+      if (auto genericSig = superclass->getGenericSignature()) {
+        for (auto paramTy : genericSig.getGenericParams()) {
+          if (paramTy->isParameterPack()) {
+            CD->diagnose(diag::superclass_with_pack);
+            break;
+          }
+        }
+      }
     }
 
     if (CD->isDistributedActor()) {
@@ -3795,9 +3831,8 @@ ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
   auto *dc = MED->getDeclContext();
 
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(
-      ctx.evaluator, ResolveMacroRequest{MED, dc},
-      ConcreteDeclRef());
+  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
+                                 ConcreteDeclRef());
   if (!macro)
     return None;
   MED->setMacroRef(macro);

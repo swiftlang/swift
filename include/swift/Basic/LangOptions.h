@@ -112,6 +112,12 @@ namespace swift {
     /// resulting binary by default in this mode.
     None,
 
+    /// Stub out code associated with unavailable declarations.
+    ///
+    /// For example, the bodies of unavailable functions should be compiled as
+    /// if they just contained a call to fatalError().
+    Stub,
+
     /// Avoid generating any code for unavailable declarations.
     ///
     /// NOTE: This optimization can be ABI breaking for a library evolution
@@ -803,6 +809,9 @@ namespace swift {
     /// The optimization setting.  This doesn't typically matter for
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
+
+    /// clang CASOptions.
+    std::string CASPath;
 
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;

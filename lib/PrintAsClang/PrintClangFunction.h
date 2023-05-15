@@ -164,6 +164,12 @@ public:
                               ModuleDecl *emittedModule,
                               raw_ostream &outOfLineOS);
 
+  static ClangRepresentation
+  getTypeRepresentation(PrimitiveTypeMapping &typeMapping,
+                        SwiftToClangInteropContext &interopContext,
+                        DeclAndTypePrinter &declPrinter,
+                        const ModuleDecl *emittedModule, Type ty);
+
 private:
   void printCxxToCFunctionParameterUse(Type type, StringRef name,
                                        const ModuleDecl *moduleContext,

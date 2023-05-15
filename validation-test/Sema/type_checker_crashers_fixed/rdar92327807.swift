@@ -10,7 +10,7 @@ func test(result: MyEnum, optResult: MyEnum?) {
   }
 
   if let .co(42) = result { // expected-error {{pattern matching in a condition requires the 'case' keyword}}
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{type 'MyEnum' has no member 'co'}}
   }
 
   if let .co = optResult { // expected-error {{pattern matching in a condition requires the 'case' keyword}}

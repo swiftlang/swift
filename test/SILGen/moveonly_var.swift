@@ -24,7 +24,7 @@ public class Klass {
     }
 }
 
-public func nonConsumingUseKlass(_ k: __shared Klass) {}
+public func nonConsumingUseKlass(_ k: borrowing Klass) {}
 
 ///////////
 // Tests //

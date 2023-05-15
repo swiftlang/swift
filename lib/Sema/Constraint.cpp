@@ -82,6 +82,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -171,6 +172,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -319,6 +321,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::ApplicableFunction:
@@ -380,9 +383,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " (isolated)";
 
     if (Locator) {
-      Out << " [[";
+      Out << " @ ";
       Locator->dump(sm, Out);
-      Out << "]]";
     }
     Out << ":\n";
     
@@ -479,7 +481,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -487,7 +489,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
       Out << getSecondType()->getString(PO);
-      Out << " -> ";
+      Out << " → ";
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
@@ -569,6 +571,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     Out << " shape of ";
     break;
 
+  case ConstraintKind::SameShape:
+    Out << " same-shape ";
+    break;
+
   case ConstraintKind::ExplicitGenericArguments:
     Out << " explicit generic argument binding ";
     break;
@@ -608,9 +614,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   }
 
   if (Locator && !skipLocator) {
-    Out << " [[";
+    Out << " @ ";
     Locator->dump(sm, Out);
-    Out << "]];";
   }
 }
 
@@ -742,6 +747,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::ExplicitGenericArguments:
+  case ConstraintKind::SameShape:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;

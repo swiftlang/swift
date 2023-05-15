@@ -641,15 +641,17 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
                   "Expected an underlying uint8_t type");
     // This is 31 bits in size.
     unsigned packedMetadata = 0;
-    packedMetadata |= unsigned(SA->getType().getCategory());  // 8 bits
-    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;  // 8 bits
+    packedMetadata |= unsigned(SA->getType().getCategory()); // 8 bits
+    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8; // 3 bits
+    packedMetadata |= unsigned(SA->isReborrow()) << 11;      // 1 bit
+    packedMetadata |= unsigned(SA->isEscaping()) << 12;      // 1 bit
     if (auto *SFA = dyn_cast<SILFunctionArgument>(SA)) {
-      packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 16; // 1 bit
-      packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 17; // 2 bits
-      packedMetadata |= unsigned(SFA->isClosureCapture()) << 19;      // 1 bit
-      packedMetadata |= unsigned(SFA->isFormalParameterPack()) << 20; // 1 bit
+      packedMetadata |= unsigned(SFA->isNoImplicitCopy()) << 13;      // 1 bit
+      packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 14; // 2 bits
+      packedMetadata |= unsigned(SFA->isClosureCapture()) << 16;      // 1 bit
+      packedMetadata |= unsigned(SFA->isFormalParameterPack()) << 17; // 1 bit
     }
-    // Used: 19 bits. Free: 13.
+    // Used: 17 bits. Free: 15.
     //
     // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
@@ -1680,6 +1682,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(PEGI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         packTypeRef,
@@ -1721,6 +1724,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto indexRef = addValueRef(TPEAI->getIndex());
     SILPackElementGetLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILPackElementGetLayout::Code],
+        (unsigned)SI.getKind(),
         elementTypeRef,
         (unsigned) elementType.getCategory(),
         tupleTypeRef,
@@ -1867,7 +1871,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto &opei = cast<OpenPackElementInst>(SI);
     auto envRef =
       S.addGenericEnvironmentRef(opei.getOpenedGenericEnvironment());
-    writeOneOperandLayout(SI.getKind(), envRef, opei.getIndexOperand());
+    auto operand = opei.getIndexOperand();
+    auto operandRef = addValueRef(operand);
+    auto operandType = operand->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+
+    SILOpenPackElementLayout::emitRecord(Out, ScratchRecord,
+          SILAbbrCodes[SILOpenPackElementLayout::Code],
+          envRef,
+          operandTypeRef, unsigned(operandType.getCategory()),
+          operandRef);
     break;
   }
   case SILInstructionKind::GetAsyncContinuationAddrInst: {
@@ -3057,6 +3070,9 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
   registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
   registerSILAbbr<SILInstHasSymbolLayout>();
+  registerSILAbbr<SILOpenPackElementLayout>();
+  registerSILAbbr<SILPackElementGetLayout>();
+  registerSILAbbr<SILPackElementSetLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

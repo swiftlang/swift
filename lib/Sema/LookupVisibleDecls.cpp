@@ -255,17 +255,22 @@ static void doGlobalExtensionLookup(Type BaseType,
 
     // Expand member macros.
     ASTContext &ctx = nominal->getASTContext();
-    (void)evaluateOrDefault(
-        ctx.evaluator,
-        ExpandSynthesizedMemberMacroRequest{extension},
-        false);
+    if (!ctx.evaluator.hasActiveRequest(
+            ExpandSynthesizedMemberMacroRequest{extension})) {
+      (void)evaluateOrDefault(
+          ctx.evaluator,
+          ExpandSynthesizedMemberMacroRequest{extension},
+          false);
+    }
 
     // Expand peer macros.
     for (auto *member : extension->getMembers()) {
-      (void)evaluateOrDefault(
-          ctx.evaluator,
-          ExpandPeerMacroRequest{member},
-          {});
+      if (!ctx.evaluator.hasActiveRequest(ExpandPeerMacroRequest{member})) {
+        (void)evaluateOrDefault(
+            ctx.evaluator,
+            ExpandPeerMacroRequest{member},
+            {});
+      }
     }
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
@@ -622,16 +627,21 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
 
   // Expand synthesized member macros.
   auto &ctx = NTD->getASTContext();
-  (void)evaluateOrDefault(ctx.evaluator,
-                          ExpandSynthesizedMemberMacroRequest{NTD},
-                          false);
+  if (!ctx.evaluator.hasActiveRequest(
+          ExpandSynthesizedMemberMacroRequest{NTD})) {
+    (void)evaluateOrDefault(ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{NTD},
+                            false);
+  }
 
   // Expand peer macros.
   for (auto *member : NTD->getMembers()) {
-    (void)evaluateOrDefault(
-        ctx.evaluator,
-        ExpandPeerMacroRequest{member},
-        {});
+    if (!ctx.evaluator.hasActiveRequest(ExpandPeerMacroRequest{member})) {
+      (void)evaluateOrDefault(
+          ctx.evaluator,
+          ExpandPeerMacroRequest{member},
+          {});
+    }
   }
 
   synthesizePropertyWrapperVariables(NTD);

@@ -42,6 +42,7 @@ namespace options {
     SwiftAPIDigesterOption = (1 << 17),
     NewDriverOnlyOption = (1 << 18),
     ModuleInterfaceOptionIgnorable = (1 << 19),
+    ModuleInterfaceOptionIgnorablePrivate = (1 << 20),
   };
 
   enum ID {

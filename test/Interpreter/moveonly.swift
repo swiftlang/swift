@@ -45,12 +45,9 @@ Tests.test("global destroyed once") {
   do {
     global = FD()
   }
-  expectEqual(0, LifetimeTracked.instances)    
+  expectEqual(0, LifetimeTracked.instances)
 }
 
-// TODO (rdar://107494072): Move-only types with deinits declared inside
-// functions sometimes lose their deinit function.
-// When that's fixed, FD2 can be moved back inside the test closure below.
 @_moveOnly
 struct FD2 {
   var field = 5
@@ -84,6 +81,10 @@ Tests.test("deinit not called in init when assigned") {
   }
 
   do {
+    let haver = FDHaver()
+    let _ = haver
+  }
+  do {
     let haver = FDHaver2()
     let _ = haver
   }
@@ -103,3 +104,31 @@ Tests.test("empty struct") {
     let _ = consume e
   }
 }
+
+protocol P {
+   var name: String { get }
+}
+
+Tests.test("AddressOnly") {
+    class Klass : P {
+        var name: String { "myName" }
+    }
+
+    @_moveOnly
+    struct S<T : P> {
+        var t: T
+    }
+
+    let e = S(t: Klass())
+    expectEqual(e.t.name, "myName")
+
+    func testGeneric<T : P>(_ x: borrowing S<T>) {
+        expectEqual(x.t.name, "myName")
+    }
+    testGeneric(e)
+
+    if e.t.name.count == 5 {
+        let _ = consume e
+    }
+}
+

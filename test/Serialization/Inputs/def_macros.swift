@@ -34,3 +34,5 @@ public struct Builder {
 }
 @freestanding(expression)
 public macro macroWithBuilderArgs(@Builder _: () -> Void) = #externalMacro(module: "A", type: "B")
+
+@attached(member, names: named(init(coding:))) public macro ArbitraryMembers() = #externalMacro(module: "MacroDefinition", type: "ArbitraryMembersMacro")

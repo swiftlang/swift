@@ -349,7 +349,7 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
-              ConcreteDeclRef(UnresolvedMacroReference, DeclContext *),
+              ConcreteDeclRef(UnresolvedMacroReference, const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
@@ -439,6 +439,9 @@ SWIFT_REQUEST(TypeChecker, ExternalMacroDefinitionRequest,
 SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionDeclRequest,
               ArrayRef<Decl *>(MacroExpansionDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionExprRequest,
+              ArrayRef<Decl *>(MacroExpansionExpr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandMemberAttributeMacros,
               ArrayRef<unsigned>(Decl *),
               Cached, NoLocationInfo)
@@ -465,6 +468,12 @@ SWIFT_REQUEST(TypeChecker, GetRuntimeDiscoverableAttributes,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RawCommentRequest,
+              RawComment(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticBriefCommentRequest,
+              StringRef(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
               bool(ModuleDecl *),

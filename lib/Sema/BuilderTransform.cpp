@@ -730,7 +730,7 @@ protected:
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(Return)
   UNSUPPORTED_STMT(Yield)
-  UNSUPPORTED_STMT(Forget)
+  UNSUPPORTED_STMT(Discard)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(Guard)
   UNSUPPORTED_STMT(While)
@@ -1174,13 +1174,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
       if (auto *closure =
               getAsExpr<ClosureExpr>(fn.getAbstractClosureExpr())) {
-        auto closureTy = getClosureType(closure);
-        simplifyType(closureTy).visit([&](Type componentTy) {
-          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
-            assignFixedType(typeVar,
-                            PlaceholderType::get(getASTContext(), typeVar));
-          }
-        });
+        recordTypeVariablesAsHoles(getClosureType(closure));
       }
 
       return getTypeMatchSuccess();

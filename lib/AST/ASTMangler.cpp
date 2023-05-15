@@ -1097,9 +1097,9 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Direct_Owned: return 'x';
     case ParameterConvention::Direct_Unowned: return 'y';
     case ParameterConvention::Direct_Guaranteed: return 'g';
-    case ParameterConvention::Pack_Owned: return 'x';
-    case ParameterConvention::Pack_Inout: return 'y';
-    case ParameterConvention::Pack_Guaranteed: return 'g';
+    case ParameterConvention::Pack_Owned: return 'v';
+    case ParameterConvention::Pack_Inout: return 'm';
+    case ParameterConvention::Pack_Guaranteed: return 'p';
   }
   llvm_unreachable("bad parameter convention");
 }
@@ -3156,15 +3156,15 @@ void ASTMangler::appendGenericSignatureParts(
                                      ArrayRef<CanGenericTypeParamType> params,
                                      unsigned initialParamDepth,
                                      ArrayRef<Requirement> requirements) {
-  // Mangle the requirements.
-  for (const Requirement &reqt : requirements) {
-    appendRequirement(reqt, sig);
-  }
-
   // Mangle which generic parameters are pack parameters.
   for (auto param : params) {
     if (param->isParameterPack())
       appendOpWithGenericParamIndex("Rv", param);
+  }
+
+  // Mangle the requirements.
+  for (const Requirement &reqt : requirements) {
+    appendRequirement(reqt, sig);
   }
 
   if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)
@@ -3845,6 +3845,8 @@ std::string ASTMangler::mangleRuntimeAttributeGeneratorEntity(
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC
 ) {
+  origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
+
   if (loc.isInvalid())
     return appendContext(origDC, StringRef());
 
@@ -3992,10 +3994,41 @@ void ASTMangler::appendMacroExpansionOperator(
   }
 }
 
+static StringRef getPrivateDiscriminatorIfNecessary(
+      const MacroExpansionExpr *expansion) {
+  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
+      expansion->getDeclContext());
+  auto decl = dc->getAsDecl();
+  if (decl && !decl->isOutermostPrivateOrFilePrivateScope())
+    return StringRef();
+
+  // Mangle non-local private declarations with a textual discriminator
+  // based on their enclosing file.
+  auto topLevelSubcontext = dc->getModuleScopeContext();
+  SourceFile *sf = dyn_cast<SourceFile>(topLevelSubcontext);
+  if (!sf)
+    return StringRef();
+
+  Identifier discriminator =
+      sf->getPrivateDiscriminator(/*createIfMissing=*/true);
+  assert(!discriminator.empty());
+  assert(!isNonAscii(discriminator.str()) &&
+         "discriminator contains non-ASCII characters");
+  (void)&isNonAscii;
+  assert(!clang::isDigit(discriminator.str().front()) &&
+         "not a valid identifier");
+  return discriminator.str();
+}
+
 std::string ASTMangler::mangleMacroExpansion(
     const MacroExpansionExpr *expansion) {
   beginMangling();
   appendMacroExpansionContext(expansion->getLoc(), expansion->getDeclContext());
+  auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
   appendMacroExpansionOperator(
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Expression,
@@ -4029,7 +4062,42 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   // dependencies.
   const Decl *attachedTo = decl;
   DeclBaseName attachedToName;
-  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto storage = accessor->getStorage();
+    appendContextOf(storage);
+
+    // Introduce an identifier mangling that includes var/subscript, accessor
+    // kind, and static.
+    // FIXME: THIS IS A HACK. We need something different.
+    {
+      llvm::SmallString<16> name;
+      {
+        llvm::raw_svector_ostream out(name);
+        out << storage->getName().getBaseName().userFacingName()
+            << "__";
+        if (isa<VarDecl>(storage)) {
+          out << "v";
+        } else {
+          assert(isa<SubscriptDecl>(storage));
+          out << "i";
+        }
+
+        out << getCodeForAccessorKind(accessor->getAccessorKind());
+        if (storage->isStatic())
+          out << "Z";
+      }
+
+      attachedToName = decl->getASTContext().getIdentifier(name);
+    }
+
+    appendDeclName(storage, attachedToName);
+
+    // For member attribute macros, the attribute is attached to the enclosing
+    // declaration.
+    if (role == MacroRole::MemberAttribute) {
+      attachedTo = storage->getDeclContext()->getAsDecl();
+    }
+  } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     appendContextOf(valueDecl);
 
     // Mangle the name, replacing special names with their user-facing names.

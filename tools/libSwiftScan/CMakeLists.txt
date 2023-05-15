@@ -6,7 +6,8 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
-  c-include-check.c)
+  c-include-check.c
+  HAS_SWIFT_MODULES)
 
 if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
   # Workaround for a linker crash related to autolinking: rdar://77839981
@@ -23,7 +24,7 @@ target_link_libraries(libSwiftScan PRIVATE
     swiftDriverTool
     swiftStaticMirror
     swiftRemoteInspection
-    swiftCompilerStub)
+    swiftCompilerModules)
 
 set_target_properties(libSwiftScan
     PROPERTIES

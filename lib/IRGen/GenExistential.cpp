@@ -798,6 +798,7 @@ namespace {
   class Name##ClassExistentialTypeInfo final \
     : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
                                            LoadableTypeInfo> { \
+  bool IsOptional; \
   public: \
     Name##ClassExistentialTypeInfo( \
         ArrayRef<const ProtocolDecl *> storedProtocols, \
@@ -807,7 +808,8 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize) {} \
+                                      IsCopyable, IsFixedSize), \
+        IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
                           SILType T, \
@@ -823,6 +825,25 @@ namespace {
         return IGM.getNativeObjectTypeInfo(); \
       else \
         return IGM.getUnknownObjectTypeInfo(); \
+    } \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantCount(IGM) - IsOptional; \
+    } \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
+                                       unsigned bits, \
+                                       unsigned index) const override { \
+      /* Note that we pass down the original bit-width. */ \
+      return getValueTypeInfoForExtraInhabitants(IGM) \
+                  .getFixedExtraInhabitantValue(IGM, bits, \
+                                                index + IsOptional); \
+    } \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, \
+                                         Address src, SILType T, \
+                                         bool isOutlined) const override { \
+      return PointerInfo::forHeapObject(IGF.IGM) \
+        .withNullable(IsNullable_t(IsOptional)) \
+        .getExtraInhabitantIndex(IGF, src); \
     } \
     /* FIXME -- Use REF_STORAGE_HELPER and make */ \
     /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
@@ -1688,6 +1709,52 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
                                              baseTI);
 }
 
+static void setMetadataRef(IRGenFunction &IGF,
+                           ArchetypeType *archetype,
+                           llvm::Value *metadata,
+                           MetadataState metadataState) {
+  assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
+  IGF.setUnscopedLocalTypeMetadata(CanType(archetype),
+                         MetadataResponse::forBounded(metadata, metadataState));
+}
+
+static void setWitnessTable(IRGenFunction &IGF,
+                            ArchetypeType *archetype,
+                            unsigned protocolIndex,
+                            llvm::Value *wtable) {
+  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
+  assert(protocolIndex < archetype->getConformsTo().size());
+  auto protocol = archetype->getConformsTo()[protocolIndex];
+  IGF.setUnscopedLocalTypeData(CanType(archetype),
+                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+                               wtable);
+}
+
+/// Inform IRGenFunction that the given archetype has the given value
+/// witness value within this scope.
+static void bindArchetype(IRGenFunction &IGF,
+                          ArchetypeType *archetype,
+                          llvm::Value *metadata,
+                          MetadataState metadataState,
+                          ArrayRef<llvm::Value*> wtables) {
+  // Set the metadata pointer.
+  setTypeMetadataName(IGF.IGM, metadata, CanType(archetype));
+  setMetadataRef(IGF, archetype, metadata, metadataState);
+
+  // Set the protocol witness tables.
+
+  unsigned wtableI = 0;
+  for (unsigned i = 0, e = archetype->getConformsTo().size(); i != e; ++i) {
+    auto proto = archetype->getConformsTo()[i];
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+    auto wtable = wtables[wtableI++];
+    setProtocolWitnessTableName(IGF.IGM, wtable, CanType(archetype), proto);
+    setWitnessTable(IGF, archetype, i, wtable);
+  }
+  assert(wtableI == wtables.size());
+}
+
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(
@@ -1766,8 +1833,8 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
                                                  2 * IGF.IGM.getPointerSize());
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
   
-  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
-                    witness);
+  bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
+                witness);
   return box.getAddress();
 }
 
@@ -2093,8 +2160,8 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                               baseTy,
                                               sigFn,
                                               /*allow artificial*/ false);
-  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
-                    wtables);
+  bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
+                wtables);
 
   return value;
 }
@@ -2143,8 +2210,8 @@ irgen::emitExistentialMetatypeProjection(IRGenFunction &IGF,
   }
 
   auto openedArchetype = cast<ArchetypeType>(targetType.getInstanceType());
-  IGF.bindArchetype(openedArchetype, metatype, MetadataState::Complete,
-                    wtables);
+  bindArchetype(IGF, openedArchetype, metatype, MetadataState::Complete,
+                wtables);
 
   return value;
 }
@@ -2484,8 +2551,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         wtables.push_back(IGF.Builder.CreateLoad(wtableAddr));
       }
 
-      IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
-                        wtables);
+      bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
+                    wtables);
     }
 
     return valueAddr;
@@ -2503,8 +2570,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
     for (unsigned i = 0, n = layout.getNumTables(); i != n; ++i) {
       wtables.push_back(layout.loadWitnessTable(IGF, base, i));
     }
-    IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
-                      wtables);
+    bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
+                  wtables);
   }
 
   auto *projectFunc =

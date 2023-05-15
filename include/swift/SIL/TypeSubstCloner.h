@@ -187,8 +187,10 @@ protected:
             .shouldLookThroughOpaqueTypeArchetypes())
       return substTy;
     // Remap types containing opaque result types in the current context.
-    return getBuilder().getModule().Types.getLoweredRValueType(
-        TypeExpansionContext(getBuilder().getFunction()), substTy);
+    return substOpaqueTypesWithUnderlyingTypes(
+        substTy,
+        TypeExpansionContext(getBuilder().getFunction()),
+        /*allowLoweredTypes=*/false);
   }
 
   ProtocolConformanceRef remapConformance(Type ty,

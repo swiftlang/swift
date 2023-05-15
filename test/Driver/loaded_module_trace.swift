@@ -1,3 +1,4 @@
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
 // RUN: %target-build-swift -emit-module -module-name Module %S/Inputs/loaded_module_trace_empty.swift -o %t/Module.swiftmodule -module-cache-path %t/cache
@@ -34,3 +35,5 @@
 // CHECK-CONFIRM-ONELINE: {"name":{{.*}}]}
 
 import Module2
+
+@freestanding(expression) macro echo<T>(_: T) -> T = #externalMacro(module: "Plugin", type: "EchoMacro")

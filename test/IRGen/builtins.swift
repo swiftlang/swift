@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib  -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
 import Swift
 
@@ -208,6 +208,16 @@ func sizeof_alignof_test() {
   // CHECK: store i64 1, i64*
   var ya = Builtin.alignof(Bool.self) 
 
+}
+
+// CHECK: define hidden {{.*}}void @"$s8builtins28sizeof_alignof_metatype_testyyF"()
+func sizeof_alignof_metatype_test() {
+  // CHECK: store i64 8, i64*
+  var xs = Builtin.sizeof(Int.Type.self) 
+  // CHECK: store i64 8, i64*
+  var xa = Builtin.alignof(Int.Type.self) 
+  // CHECK: store i64 8, i64*
+  var xt = Builtin.strideof(Int.Type.self) 
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"

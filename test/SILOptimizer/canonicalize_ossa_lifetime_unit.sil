@@ -3,6 +3,7 @@
 class C {}
 sil @getOwned : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
+struct S {}
 
 // When access scopes are respected, the lifetime which previously extended
 // beyond the access scope still extends beyond it.
@@ -112,6 +113,24 @@ bb0(%0 : $*C, %instance : @owned $C):
   store %copy to [init] %0 : $*C
   apply %barrier() : $@convention(thin) () -> ()
   destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Don't crash on an adjacent phi with an incoming undef.
+sil [ossa] @adjacent_phi_with_incoming_undef : $@convention(thin) () -> () {
+entry:
+  %getC = function_ref @getOwned : $@convention(thin) () -> @owned C
+  %c2 = apply %getC() : $@convention(thin) () -> @owned C
+  br right2(%c2 : $C)
+
+right2(%c2p : @owned $C):
+  br exit(%c2p : $C, undef : $S)
+
+exit(%phi : @owned $C, %typhi : $S):
+  debug_value [trace] %phi : $C
+  test_specification "canonicalize-ossa-lifetime true false true @trace"
+  destroy_value %phi : $C
   %retval = tuple ()
   return %retval : $()
 }

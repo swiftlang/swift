@@ -172,8 +172,9 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     }
   }
   
-  // `Any` can bridge to `AnyObject` (`id` in ObjC).
-  if (t->isAny())
+  // Existentials consisting of only marker protocols can bridge to
+  // `AnyObject` (`id` in ObjC).
+  if (t->isMarkerExistential())
     return Context.getAnyObjectType();
   
   if (auto funTy = t->getAs<FunctionType>()) {

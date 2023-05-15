@@ -163,6 +163,117 @@ var inAComputedVar: String {
   if .random() { "a" } else { "b" }
 }
 
+// MARK: Outer pound if
+
+func withPoundIf() -> Int {
+  #if true
+  if .random() { 0 } else { 1 }
+  #endif
+}
+
+func withPoundIfClosure() -> Int {
+  let fn = {
+    #if true
+    if .random() { 0 } else { 1 }
+    #endif
+  }
+  return fn()
+}
+
+func withPoundIfElse1() -> Int {
+  #if true
+  if .random() { 0 } else { 1 }
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElse2() -> Int {
+  #if true
+  0
+  #else
+  if .random() { 0 } else { 1 }
+  #endif
+}
+
+func withPoundIfElseIf1() -> Int {
+  #if true
+  if .random() { 0 } else { 1 }
+  #elseif true
+  0
+  #endif
+}
+
+
+func withPoundIfElseIf2() -> Int {
+  #if true
+  0
+  #elseif true
+  if .random() { 0 } else { 1 }
+  #endif
+}
+
+func withPoundIfElseIfElse1() -> Int {
+  #if true
+  if .random() { 0 } else { 1 }
+  #elseif true
+  0
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElseIfElse2() -> Int {
+  #if true
+  0
+  #elseif true
+  if .random() { 0 } else { 1 }
+  #else
+  0
+  #endif
+}
+
+func withPoundIfElseIfElse3() -> Int {
+  #if true
+  0
+  #elseif true
+  0
+  #else
+  if .random() { 0 } else { 1 }
+  #endif
+}
+
+func withVeryNestedPoundIf() -> Int {
+  #if true
+    #if true
+      #if false
+      ""
+      #else
+      if .random() { 0 } else { 1 }
+      #endif
+    #elseif true
+    0
+    #endif
+  #endif
+}
+
+func withVeryNestedPoundIfClosure() -> Int {
+  let fn = {
+    #if true
+      #if true
+        #if false
+            ""
+        #else
+            if .random() { 0 } else { 1 }
+        #endif
+      #elseif true
+          0
+      #endif
+    #endif
+  }
+  return fn()
+}
+
 // MARK: Explicit returns
 
 func explicitReturn1() -> Int {
@@ -547,6 +658,32 @@ func returnBranches6() -> Int {
   return i
 }
 
+func returnBranches6PoundIf() -> Int {
+  // We don't allow multiple expressions.
+  let i = if .random() {
+    #if true
+    print("hello")
+    0 // expected-warning {{integer literal is unused}}
+    #endif
+  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    1
+  }
+  return i
+}
+
+func returnBranches6PoundIf2() -> Int {
+  // We don't allow multiple expressions.
+  let i = if .random() {
+    #if false
+    print("hello")
+    0
+    #endif
+  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    1
+  }
+  return i
+}
+
 func returnBranches7() -> Int {
   let i = if .random() {
     print("hello")
@@ -643,6 +780,116 @@ func nestedType() -> Int {
     return S(x: 0).x
   } else {
     0 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testEmptyBranch() -> Int {
+  let x = if .random() {} else { 0 }
+  // expected-error@-1:24 {{expected expression in branch of 'if' expression}}
+  return x
+}
+
+// MARK: Pound if branches
+
+func testPoundIfBranch1() -> Int {
+  if .random() {
+    #if true
+    0
+    #endif
+  } else {
+    0
+  }
+}
+
+func testPoundIfBranch2() -> Int {
+  if .random() {
+    #if false
+    0
+    #endif
+  } else {
+    0 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testPoundIfBranch3() -> Int {
+  let x = if .random() {
+    #if false
+    0
+    #endif
+  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    0
+  }
+  return x
+}
+
+func testPoundIfBranch4() -> Int {
+  if .random() {
+    #if true
+    0
+    #endif
+  } else {
+    #if true
+    0
+    #endif
+  }
+}
+
+func testPoundIfBranch5() -> Int {
+  // Not allowed (matches the behavior of implict expression returns)
+  if .random() {
+    #if false
+    0
+    #endif
+    0 // expected-warning {{integer literal is unused}}
+  } else {
+    1 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func testPoundIfBranch6() -> Int {
+  // Not allowed (matches the behavior of implict expression returns)
+  let x = if .random() {
+    #if false
+    0
+    #endif
+    0 // expected-warning {{integer literal is unused}}
+  } else {  // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    1
+  }
+  return x
+}
+
+func testPoundIfBranch7() -> Int {
+  if .random() {
+    #if true
+      #if true
+        #if false
+            ""
+        #else
+            0
+        #endif
+      #elseif true
+          ""
+      #endif
+    #endif
+  } else {
+    0
+  }
+}
+
+func testPoundIfBranch8() -> Int {
+  if .random() {
+    #if false
+    0
+    #else
+    #if true
+    if .random() { 0 } else { 1 }
+    #endif
+    #endif
+  } else {
+    #if true
+    if .random() { 0 } else { 1 }
+    #endif
   }
 }
 

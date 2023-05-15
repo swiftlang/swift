@@ -105,6 +105,7 @@ public:
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     PhysicalKeyPathApplicationKind, // applying a key path
+    BorrowValueKind,            // load_borrow the base rvalue for a projection
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
@@ -114,6 +115,7 @@ public:
     WritebackPseudoKind,        // a fake component to customize writeback
     OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     LogicalKeyPathApplicationKind, // applying a key path
+    
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution

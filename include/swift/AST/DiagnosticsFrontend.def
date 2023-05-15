@@ -189,9 +189,9 @@ ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
       (StringRef))
 
-ERROR(error_bad_package_name,none,
-      "package name \"%0\" is not a valid identifier",
-      (StringRef))
+ERROR(error_empty_package_name,none,
+      "package-name is empty",
+      ())
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_module_alias_invalid_format,none,
@@ -484,6 +484,18 @@ ERROR(error_output_missing,none,
       (StringRef, /*SecondRun=*/bool))
 REMARK(matching_output_produced,none,
       "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
+
+// Caching related diagnostics
+ERROR(error_caching_no_cas_fs, none,
+    "caching is enabled without -cas-fs option, input is not immutable", ())
+
+// CAS related diagnostics
+ERROR(error_create_cas, none, "failed to create CAS '%0' (%1)", (StringRef, StringRef))
+ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
+ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
+
+ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
+ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,

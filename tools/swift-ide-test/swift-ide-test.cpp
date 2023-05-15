@@ -397,6 +397,11 @@ DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"),
     llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+EnableDeserializationSafety("enable-deserialization-safety",
+    llvm::cl::desc("Avoid reading potentially unsafe decls from swiftmodules"),
+    llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     "code-complete-inits-in-postfix-expr",
     llvm::cl::desc(
@@ -1178,10 +1183,10 @@ static int printTypeContextInfo(
             VD->getName().print(llvm::outs());
             llvm::outs() << "\n";
 
-            StringRef BriefDoc = VD->getBriefComment();
+            StringRef BriefDoc = VD->getSemanticBriefComment();
             if (!BriefDoc.empty()) {
               llvm::outs() << "     DocBrief: \"";
-              llvm::outs() << VD->getBriefComment();
+              llvm::outs() << VD->getSemanticBriefComment();
               llvm::outs() << "\"\n";
             }
           }
@@ -1246,10 +1251,10 @@ static int printConformingMethodList(
           resultTy.print(llvm::outs());
           llvm::outs() << "\n";
 
-          StringRef BriefDoc = VD->getBriefComment();
+          StringRef BriefDoc = VD->getSemanticBriefComment();
           if (!BriefDoc.empty()) {
             llvm::outs() << "     DocBrief: \"";
-            llvm::outs() << VD->getBriefComment();
+            llvm::outs() << VD->getSemanticBriefComment();
             llvm::outs() << "\"\n";
           }
         }
@@ -3523,7 +3528,7 @@ public:
       OS << " ";
       printRawComment(D->getRawComment());
       OS << " ";
-      printBriefComment(D->getBriefComment());
+      printBriefComment(D->getSemanticBriefComment());
       OS << " ";
       printDocComment(D);
       OS << "\n";
@@ -3538,7 +3543,7 @@ public:
       OS << " ";
       printRawComment(D->getRawComment());
       OS << " ";
-      printBriefComment(D->getBriefComment());
+      printBriefComment(D->getSemanticBriefComment());
       OS << " ";
       printDocComment(D);
       OS << "\n";
@@ -4305,8 +4310,7 @@ int main(int argc, char *argv[]) {
         auto contextualResult = new CodeCompletionResult(
             *contextFreeResult, SemanticContextKind::OtherModule,
             CodeCompletionFlair(),
-            /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-            /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+            /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
             ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
       }
@@ -4464,6 +4468,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().EnableDeserializationSafety =
+    options::EnableDeserializationSafety;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=

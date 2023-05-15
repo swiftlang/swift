@@ -747,6 +747,7 @@ protected:
   friend class IterableDeclContext;
   friend class MemberLookupTable;
   friend class DeclDeserializer;
+  friend class RawCommentRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -935,9 +936,14 @@ public:
 
   SourceLoc TrailingSemiLoc;
 
-  /// Whether this declaration is within a generated buffer, \c false if this
-  /// declaration was constructed from a serialized module.
-  bool isInGeneratedBuffer() const;
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context. If the decl context is itself in a macro expansion,
+  /// the method returns \c true if this decl is in a different macro
+  /// expansion buffer than the context.
+  ///
+  /// \Note this method returns \c false if this declaration was
+  /// constructed from a serialized module.
+  bool isInMacroExpansionInContext() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -1010,7 +1016,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment(bool SerializedOK = false) const;
+  RawComment getRawComment() const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -1018,8 +1024,9 @@ public:
 
   Optional<unsigned> getSourceOrder() const;
 
-  /// \returns the brief comment attached to this declaration.
-  StringRef getBriefComment() const;
+  /// \returns The brief comment attached to this declaration, or the brief
+  /// comment attached to the comment providing decl.
+  StringRef getSemanticBriefComment() const;
 
   /// Returns true if there is a Clang AST node associated
   /// with self.
@@ -1094,14 +1101,19 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<NoEagerMoveAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
+  /// The effective lifetime resulting from the decorations on the declaration.
+  ///
+  /// Usually, this, not getLifetimeAnnotationFromAttributes should be used.
+  LifetimeAnnotation getLifetimeAnnotation() const;
+
+  /// The source-level lifetime attribute, either @_eagerMove or @_noEagerMove
+  /// that the declaration bears.
+  ///
+  /// Usually getLifetimeAnnotation should be used.
+  ///
+  /// Needed to access the attributes before the AST has been fully formed, such
+  /// as when printing.
+  LifetimeAnnotation getLifetimeAnnotationFromAttributes() const;
 
   bool isNoImplicitCopy() const {
     return getAttrs().hasAttribute<NoImplicitCopyAttr>();
@@ -1421,6 +1433,10 @@ public:
 
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
+  }
+
+  bool isTestable() const {
+    return getAttrs().hasAttribute<TestableAttr>();
   }
 
   ModuleDecl *getModule() const { return Mod; }
@@ -3863,8 +3879,13 @@ public:
   /// Find the 'RemoteCallArgument(label:name:value:)' initializer function.
   ConstructorDecl *getDistributedRemoteCallArgumentInitFunction() const;
 
-  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  /// Get the move-only `enqueue(ExecutorJob)` protocol requirement function on the `Executor` protocol.
   AbstractFunctionDecl *getExecutorOwnedEnqueueFunction() const;
+  /// This method should be deprecated and removed
+  /// Get the move-only `enqueue(Job)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyOwnedEnqueueFunction() const;
+  /// Get the move-only `enqueue(UnownedJob)` protocol requirement function on the `Executor` protocol.
+  AbstractFunctionDecl *getExecutorLegacyUnownedEnqueueFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -5726,6 +5747,16 @@ public:
     return false;
   }
 
+  /// Return the initializer that will initializer this VarDecl at runtime.
+  /// This is equivalent to `getParentInitializer()`, but returns `null` if the
+  /// initializer itself was subsumed, e.g., by a macro or property wrapper.
+  Expr *getParentExecutableInitializer() const;
+
+  /// Whether this variable has an initializer that will be code-generated.
+  bool isParentExecutabledInitialized() const {
+    return getParentExecutableInitializer() != nullptr;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
@@ -6317,6 +6348,8 @@ public:
   /// Return the raw specifier value for this parameter.
   Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
+
+  LifetimeAnnotation getLifetimeAnnotation() const;
 
   /// Is the type of this parameter 'inout'?
   bool isInOut() const { return getSpecifier() == Specifier::InOut; }
@@ -7328,6 +7361,8 @@ public:
   bool isMainTypeMainMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
@@ -8840,6 +8875,10 @@ const ParamDecl *getParameterAt(ConcreteDeclRef declRef, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
+const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);

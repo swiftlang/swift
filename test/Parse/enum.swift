@@ -364,6 +364,25 @@ enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declar
   case Foo = "Bar" // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
+enum DuplicateMembers8 : String { // expected-error {{'DuplicateMembers8' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  case Foo // expected-note {{'Foo' previously declared here}}
+  // expected-note@-1 {{raw value previously used here}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
+  // expected-error@-1 {{raw value for enum case is not unique}}
+}
+
+enum DuplicateMembers9 : String { // expected-error {{'DuplicateMembers9' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  case Foo = "Foo" // expected-note {{'Foo' previously declared here}}
+  // expected-note@-1 {{raw value previously used here}}
+  case Foo = "Foo"// expected-error {{invalid redeclaration of 'Foo'}}
+  // expected-error@-1 {{raw value for enum case is not unique}}
+}
+
+enum DuplicateMembers10 : String {
+  case Foo // expected-note {{raw value previously used here}}
+  case Bar = "Foo" // expected-error {{raw value for enum case is not unique}}
+}
+
 // Refs to duplicated enum cases shouldn't crash the compiler.
 // rdar://problem/20922401
 func check20922401() -> String {

@@ -237,8 +237,8 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
-/// Whether \p instruction accesses storage whose representation is unidentified
-/// such as by reading a pointer.
+/// Whether \p instruction accesses storage whose representation is either (1)
+/// unidentified such as by reading a pointer or (2) global.
 bool mayAccessPointer(SILInstruction *instruction);
 
 /// Whether this instruction loads or copies a value whose storage does not

@@ -23,6 +23,10 @@ struct TestStruct {
   @myWrapper var x: Int
 }
 
+@ArbitraryMembers
+struct OtherTestStruct {
+}
+
 // CHECK: MACRO_DECL
 
 // CHECK-NOT: UnknownCode

@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -module-name MacrosTest
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature FreestandingMacros -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 2{{'stringify' declared here}}
@@ -137,7 +137,7 @@ func shadow(a: Int, b: Int, stringify: Int) {
 }
 
 func testMissing() {
-  #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; the type must be public and provided via '-load-plugin-library'}}
+  #missingMacro1("hello") // expected-error{{external macro implementation type 'MissingModule.MissingType' could not be found for macro 'missingMacro1'; the type must be public and provided by a macro target in a Swift package, or via '-plugin-path' or '-load-plugin-library'}}
 }
 
 @freestanding(expression) macro undefined() // expected-error{{macro 'undefined()' requires a definition}}
@@ -185,3 +185,7 @@ struct MyStruct<T: MyProto> {
 
 @freestanding(expression) macro myMacro<T : MyProto>(_ value: MyStruct<T>) -> MyStruct<T> = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type}}
+
+#undefinedMacro { definitelyNotDefined }
+// expected-error@-1{{cannot find 'definitelyNotDefined' in scope}}
+// expected-error@-2{{no macro named 'undefinedMacro'}}

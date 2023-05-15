@@ -33,10 +33,11 @@
 #include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILUndef.h"
 
+#include "swift/SIL/OwnershipUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/DJB.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
 #include <type_traits>
@@ -48,6 +49,8 @@ using namespace llvm::support;
 
 const char SILEntityError::ID = '\0';
 void SILEntityError::anchor() {}
+const char SILFunctionTypeMismatch::ID = '\0';
+void SILFunctionTypeMismatch::anchor() {}
 
 STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
 
@@ -615,8 +618,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // If we have an existing function, verify that the types match up.
   if (fn) {
-    if (fn->getLoweredType() != ty)
-      return MF->diagnoseFatal("SILFunction type mismatch");
+    if (fn->getLoweredType() != ty) {
+      auto error = llvm::make_error<SILFunctionTypeMismatch>(
+                     name,
+                     fn->getLoweredType().getDebugDescription(),
+                     ty.getDebugDescription());
+      return MF->diagnoseFatal(std::move(error));
+    }
 
     fn->setSerialized(IsSerialized_t(isSerialized));
 
@@ -650,7 +658,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     }
 
     if (fn->isDynamicallyReplaceable() != isDynamic)
-      return MF->diagnoseFatal("SILFunction type mismatch");
+      return MF->diagnoseFatal("SILFunction dynamic replaceable mismatch");
 
   } else {
     // Otherwise, create a new function.
@@ -963,20 +971,23 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     SILArgument *Arg;
     auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
+    auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0x7);
+    auto reborrow = (Args[I + 1] >> 11) & 0x1;
+    auto escaping = (Args[I + 1] >> 12) & 0x1;
     if (IsEntry) {
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
-      bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
+      bool isNoImplicitCopy = (Args[I + 1] >> 13) & 0x1;
       fArg->setNoImplicitCopy(isNoImplicitCopy);
-      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
+      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 14) & 0x3);
       fArg->setLifetimeAnnotation(lifetime);
-      bool isClosureCapture = (Args[I + 1] >> 19) & 0x1;
+      bool isClosureCapture = (Args[I + 1] >> 16) & 0x1;
       fArg->setClosureCapture(isClosureCapture);
-      bool isFormalParameterPack = (Args[I + 1] >> 20) & 0x1;
+      bool isFormalParameterPack = (Args[I + 1] >> 17) & 0x1;
       fArg->setFormalParameterPack(isFormalParameterPack);
       Arg = fArg;
     } else {
-      auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
-      Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
+      Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
+                                         /*decl*/ nullptr, reborrow, escaping);
     }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
@@ -1284,12 +1295,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILInstHasSymbolLayout::readRecord(scratch, ValID, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::HasSymbolInst;
     break;
+  case SIL_OPEN_PACK_ELEMENT:
+    SILOpenPackElementLayout::readRecord(scratch, Attr,
+                                         TyID, TyCategory, ValID);
+    RawOpCode = (unsigned)SILInstructionKind::OpenPackElementInst;
+    break;
   case SIL_PACK_ELEMENT_GET:
-    SILPackElementGetLayout::readRecord(scratch,
+    SILPackElementGetLayout::readRecord(scratch, RawOpCode,
                                         TyID, TyCategory,
                                         TyID2, TyCategory2, ValID2,
                                         ValID3);
-    RawOpCode = (unsigned)SILInstructionKind::PackElementGetInst;
     break;
   case SIL_PACK_ELEMENT_SET:
     SILPackElementSetLayout::readRecord(scratch,
@@ -1332,7 +1347,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::AllocPackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
-    ResultInst = Builder.createAllocStack(
+    ResultInst = Builder.createAllocPack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
   }
@@ -1425,7 +1440,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::OpenPackElementInst: {
-    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand");
+    assert(RecordKind == SIL_OPEN_PACK_ELEMENT && "Layout should be OpenPackElement");
     auto index = getLocalValue(ValID,
         getSILType(MF->getType(TyID), (SILValueCategory) TyCategory, Fn));
     auto env = MF->getGenericEnvironmentChecked(Attr);

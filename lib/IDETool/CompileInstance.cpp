@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
@@ -303,7 +304,7 @@ bool CompileInstance::setupCI(
     assert(Diags.hadAnyError());
     return false;
   }
-  CI->getASTContext().setPluginRegistry(Plugins.get());
+  CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
 
   return true;
 }

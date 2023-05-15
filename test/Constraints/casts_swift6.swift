@@ -57,7 +57,6 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // The array can also be inferred to be [Any].
   _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
-  // expected-warning@-1 {{empty collection literal requires an explicit type}}
 
   // Cases from rdar://88334481
   typealias Magic<T> = T

@@ -41,7 +41,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PluginRegistry.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -67,7 +67,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Config/config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
@@ -317,12 +316,6 @@ struct ASTContext::Implementation {
   /// actual \c SourceLocs that require opening their external buffer.
   llvm::DenseMap<const Decl *, ExternalSourceLocs *> ExternalSourceLocs;
 
-  /// Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
-
-  /// Map from Swift declarations to brief comments.
-  llvm::DenseMap<const Decl *, StringRef> BriefComments;
-
   /// Map from declarations to foreign error conventions.
   /// This applies to both actual imported functions and to @objc functions.
   llvm::DenseMap<const AbstractFunctionDecl *,
@@ -437,6 +430,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, InOutType*> InOutTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
+    llvm::DenseMap<void *, PlaceholderType *> PlaceholderTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
@@ -526,17 +520,8 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
-  /// Plugin registry. Lazily populated by get/setPluginRegistry().
-  /// NOTE: Do not reference this directly. Use ASTContext::getPluginRegistry().
-  PluginRegistry *Plugins = nullptr;
-
-  /// `Plugins` storage if this ASTContext owns it.
-  std::unique_ptr<PluginRegistry> OwnedPluginRegistry = nullptr;
-
-  /// Map a module name to an executable plugin path that provides the module.
-  llvm::DenseMap<Identifier, StringRef> ExecutablePluginPaths;
-
-  llvm::StringSet<> LoadedPluginLibraryPaths;
+  /// Plugin loader.
+  std::unique_ptr<swift::PluginLoader> Plugins;
 
   /// The permanent arena.
   Arena Permanent;
@@ -712,8 +697,6 @@ ASTContext::ASTContext(
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
 
-  createModuleToExecutablePluginMap();
-  
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
     OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
@@ -1829,9 +1812,8 @@ bool ASTContext::hadError() const {
 
 /// Retrieve the arena from which we should allocate storage for a type.
 static AllocationArena getArena(RecursiveTypeProperties properties) {
-  bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable ? AllocationArena::ConstraintSolver
-                         : AllocationArena::Permanent;
+  return properties.isSolverAllocated() ? AllocationArena::ConstraintSolver
+                                        : AllocationArena::Permanent;
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
@@ -2023,6 +2005,8 @@ static void diagnoseScannerFailure(StringRef moduleName,
 Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
     InterfaceSubContextDelegate &delegate,
+    bool optionalDependencyLookup,
+    bool isTestableImport,
     llvm::Optional<ModuleDependencyID> dependencyOf) {
   // Retrieve the dependencies for this module.
   // Check whether we've cached this result.
@@ -2044,12 +2028,14 @@ Optional<const ModuleDependencyInfo*> ASTContext::getModuleDependencies(
 
   for (auto &loader : getImpl().ModuleLoaders) {
     if (auto dependencies =
-        loader->getModuleDependencies(moduleName, cache, delegate))
+        loader->getModuleDependencies(moduleName, cache, delegate,
+                                      isTestableImport))
       return dependencies;
   }
 
-  diagnoseScannerFailure(moduleName, Diags, cache,
-                         dependencyOf);
+  if (!optionalDependencyLookup)
+    diagnoseScannerFailure(moduleName, Diags, cache,
+                           dependencyOf);
   return None;
 }
 
@@ -2618,30 +2604,6 @@ void ASTContext::setExternalSourceLocs(const Decl *D,
   getImpl().ExternalSourceLocs[D] = Locs;
 }
 
-Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {
-  auto Known = getImpl().RawComments.find(D);
-  if (Known == getImpl().RawComments.end())
-    return None;
-
-  return Known->second;
-}
-
-void ASTContext::setRawComment(const Decl *D, RawComment RC, bool FromSerialized) {
-  getImpl().RawComments[D] = std::make_pair(RC, FromSerialized);
-}
-
-Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
-  auto Known = getImpl().BriefComments.find(D);
-  if (Known == getImpl().BriefComments.end())
-    return None;
-
-  return Known->second;
-}
-
-void ASTContext::setBriefComment(const Decl *D, StringRef Comment) {
-  getImpl().BriefComments[D] = Comment;
-}
-
 NormalProtocolConformance *
 ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
@@ -2944,8 +2906,6 @@ size_t ASTContext::getTotalMemory() const {
     getImpl().Allocator.getTotalMemory() +
     getImpl().Cleanups.capacity() +
     llvm::capacity_in_bytes(getImpl().ModuleLoaders) +
-    llvm::capacity_in_bytes(getImpl().RawComments) +
-    llvm::capacity_in_bytes(getImpl().BriefComments) +
     llvm::capacity_in_bytes(getImpl().ModuleTypes) +
     llvm::capacity_in_bytes(getImpl().GenericParamTypes) +
     // getImpl().GenericFunctionTypes ?
@@ -3157,15 +3117,43 @@ Type ErrorType::get(Type originalType) {
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
   RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
-  if (originalProperties.hasTypeVariable())
-    properties |= RecursiveTypeProperties::HasTypeVariable;
+
+  // We need to preserve the solver allocated bit, to ensure any wrapping
+  // types are solver allocated too.
+  if (originalProperties.isSolverAllocated())
+    properties |= RecursiveTypeProperties::SolverAllocated;
+
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
 Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-  return new (ctx, AllocationArena::Permanent)
-      PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
+
+  auto originatorProps = [&]() -> RecursiveTypeProperties {
+    if (auto *tv = originator.dyn_cast<TypeVariableType *>())
+      return tv->getRecursiveProperties();
+
+    if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
+      return depTy->getRecursiveProperties();
+
+    return RecursiveTypeProperties();
+  }();
+  auto arena = getArena(originatorProps);
+
+  auto &cache = ctx.getImpl().getArena(arena).PlaceholderTypes;
+  auto &entry = cache[originator.getOpaqueValue()];
+  if (entry)
+    return entry;
+
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPlaceholder;
+
+  // We need to preserve the solver allocated bit, to ensure any wrapping
+  // types are solver allocated too.
+  if (originatorProps.isSolverAllocated())
+    properties |= RecursiveTypeProperties::SolverAllocated;
+
+  entry = new (ctx, arena) PlaceholderType(ctx, originator, properties);
+  return entry;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -3983,7 +3971,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 16,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4594,8 +4582,9 @@ CanSILFunctionType SILFunctionType::get(
     ProtocolConformanceRef witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
-  assert(!ext.isPseudogeneric() || genericSig);
-  
+  assert(!ext.isPseudogeneric() || genericSig ||
+         coroutineKind != SILCoroutineKind::None);
+
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 
@@ -4643,7 +4632,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 15,
+  static_assert(RecursiveTypeProperties::BitWidth == 16,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -6276,34 +6265,33 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
-void ASTContext::setPluginRegistry(PluginRegistry *newValue) {
-  assert(getImpl().Plugins == nullptr &&
-         "Too late to set a new plugin registry");
-  getImpl().Plugins = newValue;
+void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {
+  getImpl().Plugins = std::move(loader);
 }
 
-PluginRegistry *ASTContext::getPluginRegistry() const {
-  PluginRegistry *&registry = getImpl().Plugins;
+PluginLoader &ASTContext::getPluginLoader() { return *getImpl().Plugins; }
 
-  // Create a new one if it hasn't been set.
-  if (!registry) {
-    registry = new PluginRegistry();
-    getImpl().OwnedPluginRegistry.reset(registry);
-  }
-
-  assert(registry != nullptr);
-  return registry;
+Optional<std::string>
+ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupLibraryPluginByModuleName(moduleName);
 }
 
-void ASTContext::createModuleToExecutablePluginMap() {
-  for (auto &arg : SearchPathOpts.getCompilerPluginExecutablePaths()) {
-    // Create a moduleName -> pluginPath mapping.
-    assert(!arg.ExecutablePath.empty() && "empty plugin path");
-    auto pathStr = AllocateCopy(arg.ExecutablePath);
-    for (auto moduleName : arg.ModuleNames) {
-      getImpl().ExecutablePluginPaths[getIdentifier(moduleName)] = pathStr;
-    }
-  }
+Optional<StringRef>
+ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupExecutablePluginByModuleName(moduleName);
+}
+
+Optional<std::pair<std::string, std::string>>
+ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
+  return getImpl().Plugins->lookupExternalLibraryPluginByModuleName(moduleName);
+}
+
+LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
+  return getImpl().Plugins->loadLibraryPlugin(path);
+}
+
+LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
+  return getImpl().Plugins->loadExecutablePlugin(path);
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
@@ -6339,103 +6327,6 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
-}
-
-Optional<std::string>
-ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
-  auto fs = SourceMgr.getFileSystem();
-
-  // Look for 'lib${module name}(.dylib|.so)'.
-  SmallString<64> expectedBasename;
-  expectedBasename.append("lib");
-  expectedBasename.append(moduleName.str());
-  expectedBasename.append(LTDL_SHLIB_EXT);
-
-  // Try '-plugin-path'.
-  for (const auto &searchPath : SearchPathOpts.PluginSearchPaths) {
-    SmallString<128> fullPath(searchPath);
-    llvm::sys::path::append(fullPath, expectedBasename);
-    if (fs->exists(fullPath)) {
-      return std::string(fullPath);
-    }
-  }
-
-  // Try '-load-plugin-library'.
-  for (const auto &libPath : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    if (llvm::sys::path::filename(libPath) == expectedBasename) {
-      return libPath;
-    }
-  }
-
-  return None;
-}
-
-Optional<StringRef>
-ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
-  auto &execPluginPaths = getImpl().ExecutablePluginPaths;
-  auto found = execPluginPaths.find(moduleName);
-  if (found == execPluginPaths.end())
-    return None;
-  return found->second;
-}
-
-Optional<std::pair<std::string, std::string>>
-ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
-  auto fs = this->SourceMgr.getFileSystem();
-  for (auto &pair : SearchPathOpts.ExternalPluginSearchPaths) {
-    SmallString<128> fullPath(pair.SearchPath);
-    llvm::sys::path::append(fullPath, "lib" + moduleName.str() + LTDL_SHLIB_EXT);
-
-    if (fs->exists(fullPath)) {
-      return {{std::string(fullPath), pair.ServerPath}};
-    }
-  }
-  return None;
-}
-
-LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
-  SmallString<128> resolvedPath;
-  auto fs = this->SourceMgr.getFileSystem();
-  if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   err.message());
-    return nullptr;
-  }
-
-  // Load the plugin.
-  auto plugin = getPluginRegistry()->loadExecutablePlugin(resolvedPath);
-  if (!plugin) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   llvm::toString(plugin.takeError()));
-  }
-
-  return plugin.get();
-}
-
-LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
-  // Remember the path (even if it fails to load.)
-  getImpl().LoadedPluginLibraryPaths.insert(path);
-
-  SmallString<128> resolvedPath;
-  auto fs = this->SourceMgr.getFileSystem();
-  if (auto err = fs->getRealPath(path, resolvedPath)) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   err.message());
-    return nullptr;
-  }
-
-  // Load the plugin.
-  auto plugin = getPluginRegistry()->loadLibraryPlugin(resolvedPath);
-  if (!plugin) {
-    Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
-                   llvm::toString(plugin.takeError()));
-  }
-
-  return plugin.get();
-}
-
-const llvm::StringSet<> &ASTContext::getLoadedPluginLibraryPaths() const {
-  return getImpl().LoadedPluginLibraryPaths;
 }
 
 bool ASTContext::supportsMoveOnlyTypes() const {

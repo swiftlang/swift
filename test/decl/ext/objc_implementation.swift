@@ -276,6 +276,30 @@
   }
 }
 
+@_objcImplementation(Effects) extension ObjCClass {
+  @available(SwiftStdlib 5.1, *)
+  public func doSomethingAsynchronous() async throws -> Any {
+    return self
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  public func doSomethingElseAsynchronous() async -> Any {
+    return self
+  }
+
+  public func doSomethingFunAndAsynchronous(completionHandler: @escaping (Any?, Error?) -> Void) {
+  }
+}
+
+@_objcImplementation(Conformance) extension ObjCClass {
+  // expected-error@-1 {{extension for category 'Conformance' should provide implementation for instance method 'requiredMethod2()'}}
+  // no-error concerning 'optionalMethod2()'
+
+  func requiredMethod1() {}
+
+  func optionalMethod1() {}
+}
+
 @_objcImplementation extension ObjCClass {}
 // expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
 

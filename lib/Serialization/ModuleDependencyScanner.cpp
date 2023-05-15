@@ -22,6 +22,9 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Subsystems.h"
+#include "ModuleFileSharedCore.h"
+
+#include <algorithm>
 using namespace swift;
 using llvm::ErrorOr;
 
@@ -32,7 +35,8 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework) {
+    bool skipBuildingInterface, bool IsFramework,
+    bool isTestableDependencyLookup) {
   using namespace llvm::sys;
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -61,7 +65,8 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
   if (fs.exists(PrivateInPath)) {
     InPath = PrivateInPath;
   }
-  auto dependencies = scanInterfaceFile(InPath, IsFramework);
+  auto dependencies = scanInterfaceFile(InPath, IsFramework,
+                                        isTestableDependencyLookup);
   if (dependencies) {
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
@@ -76,7 +81,8 @@ bool PlaceholderSwiftModuleScanner::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
+    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool &isFramework, bool &isSystemModule) {
   StringRef moduleName = Ctx.getRealModuleName(moduleID.Item).str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
   if (it == PlaceholderDependencyModuleMap.end()) {
@@ -101,7 +107,7 @@ static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
 }
 
 ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
-    Twine moduleInterfacePath, bool isFramework) {
+    Twine moduleInterfacePath, bool isFramework, bool isTestableImport) {
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
@@ -110,6 +116,8 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencyInfo> Result;
+
+  // FIXME: Consider not spawning a sub-instance for this
   std::error_code code =
     astDelegate.runInSubContext(realModuleName.str(),
                                               moduleInterfacePath.str(),
@@ -177,6 +185,55 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
     for (auto import: imInfo.AdditionalUnloadedImports) {
       Result->addModuleImport(import.module.getModulePath(), &alreadyAddedModules);
     }
+
+    // For a `@testable` direct dependency, read in the dependencies
+    // from an adjacent binary module, for completeness.
+    if (isTestableImport) {
+      auto adjacentBinaryModule = std::find_if(
+          compiledCandidates.begin(), compiledCandidates.end(),
+          [moduleInterfacePath](const std::string &candidate) {
+            return llvm::sys::path::parent_path(candidate) ==
+                   llvm::sys::path::parent_path(moduleInterfacePath.str());
+          });
+      if (adjacentBinaryModule != compiledCandidates.end()) {
+        // Required modules.
+        auto adjacentBinaryModuleRequiredImports = getModuleImportsOfModule(
+            *adjacentBinaryModule, ModuleLoadingBehavior::Required, isFramework,
+            isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+            Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
+            Ctx.SearchPathOpts.DeserializedPathRecoverer);
+        if (!adjacentBinaryModuleRequiredImports)
+          return adjacentBinaryModuleRequiredImports.getError();
+
+#ifndef NDEBUG
+        //  Verify that the set of required modules read out from the binary
+        //  module is a super-set of module imports identified in the
+        //  textual interface.
+        for (const auto &requiredImport : Result->getModuleImports()) {
+          assert(adjacentBinaryModuleRequiredImports->contains(requiredImport) &&
+                 "Expected adjacent binary module's import set to contain all "
+                 "textual interface imports.");
+        }
+#endif
+
+        for (const auto &requiredImport : *adjacentBinaryModuleRequiredImports)
+          Result->addModuleImport(requiredImport.getKey(),
+                                  &alreadyAddedModules);
+
+        // Optional modules. Will be looked-up on a best-effort basis
+        auto adjacentBinaryModuleOptionalImports = getModuleImportsOfModule(
+            *adjacentBinaryModule, ModuleLoadingBehavior::Optional, isFramework,
+            isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+            Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
+            Ctx.SearchPathOpts.DeserializedPathRecoverer);
+        if (!adjacentBinaryModuleOptionalImports)
+          return adjacentBinaryModuleOptionalImports.getError();
+        for (const auto &optionalImport : *adjacentBinaryModuleOptionalImports)
+          Result->addOptionalModuleImport(optionalImport.getKey(),
+                                          &alreadyAddedModules);
+      }
+    }
+
     return std::error_code();
   });
 
@@ -188,7 +245,7 @@ ErrorOr<ModuleDependencyInfo> ModuleDependencyScanner::scanInterfaceFile(
 
 Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDependencies(
     StringRef moduleName, ModuleDependenciesCache &cache,
-    InterfaceSubContextDelegate &delegate) {
+    InterfaceSubContextDelegate &delegate, bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
@@ -209,7 +266,7 @@ Optional<const ModuleDependencyInfo*> SerializedModuleLoaderBase::getModuleDepen
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
          "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, nullptr)) {
+    if (scanner->canImportModule(modulePath, nullptr, isTestableDependencyLookup)) {
       // Record the dependencies.
       cache.recordDependency(moduleName, *(scanner->dependencies));
       return cache.findDependency(moduleName, scanner->dependencies->getKind());

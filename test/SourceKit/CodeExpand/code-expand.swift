@@ -10,6 +10,22 @@ foo(x: <#T##() -> Void#>, y: <#T##Int#>)
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }, y: Int)
 
+try foo(x: <#T##() -> Void#>)
+// CHECK:      try foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+await foo(x: <#T##() -> Void#>)
+// CHECK:      await foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+!foo(x: <#T##() -> Void#>)
+// CHECK:      !foo {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
+
+
 anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
 // CHECK:      anArr.indexOfObjectPassingTest { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
 // CHECK-NEXT: <#code#>

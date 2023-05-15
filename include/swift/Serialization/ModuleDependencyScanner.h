@@ -34,7 +34,8 @@ namespace swift {
 
       /// Scan the given interface file to determine dependencies.
       llvm::ErrorOr<ModuleDependencyInfo> scanInterfaceFile(
-          Twine moduleInterfacePath, bool isFramework);
+          Twine moduleInterfacePath, bool isFramework,
+          bool isTestableImport);
 
       InterfaceSubContextDelegate &astDelegate;
 
@@ -61,7 +62,8 @@ namespace swift {
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-          bool skipBuildingInterface, bool IsFramework) override;
+          bool SkipBuildingInterface, bool IsFramework,
+          bool IsTestableDependencyLookup) override;
 
       virtual void collectVisibleTopLevelModuleNames(
           SmallVectorImpl<Identifier> &names) const override {
@@ -125,8 +127,8 @@ namespace swift {
                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                 bool skipBuildingInterface, bool &isFramework,
-                 bool &isSystemModule) override;
+                 bool skipBuildingInterface, bool isTestableDependencyLookup,
+                 bool &isFramework, bool &isSystemModule) override;
 
       static bool classof(const ModuleDependencyScanner *MDS) {
         return MDS->getKind() == MDS_placeholder;

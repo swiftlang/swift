@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -sanitize=address -g -target %sanitizers-target-triple -o %t
+// RUN: %target-build-swift %s -sanitize=address -g -o %t
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0                           not %target-run %t 2>&1 | %FileCheck %s -check-prefix=OOP
 // RUN: env %env-ASAN_OPTIONS=abort_on_error=0,external_symbolizer_path= not %target-run %t 2>&1 | %FileCheck %s -check-prefix=IP
 // REQUIRES: executable_test
@@ -35,7 +35,7 @@ bar()
 
 // Out-of-process
 // FIXME: There is no instruction with the location of the failing `.` operator and it's used inside implicit setup code, thus the crash is associated with the previous line.
-// OOP:      #0 0x{{[0-9a-f]+}} in foo() symbolication.swift:[[@LINE-14]]
+// OOP:      #0 0x{{[0-9a-f]+}} in foo() symbolication.swift
 // OOP-NEXT: #1 0x{{[0-9a-f]+}} in bar() symbolication.swift:[[@LINE-9]]
 // OOP-NEXT: #2 0x{{[0-9a-f]+}} in main symbolication.swift:[[@LINE-6]]
 

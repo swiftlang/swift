@@ -247,6 +247,8 @@
 // RUN:             -e _ZNSt6vectorIjSaIjEE12emplace_backIJjEEERjDpOT_ \
 // RUN:             -e _ZNSt7__cxx119to_stringEi \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_S9_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EOS6_PKS3_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EPKS3_OS6_ \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
@@ -492,6 +494,8 @@
 // RUN:             -e _ZNSt6vectorImSaImEE12emplace_backIJmEEERmDpOT_ \
 // RUN:             -e _ZNSt7__cxx119to_stringEi \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_S9_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EOS6_PKS3_ \
+// RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EPKS3_OS6_ \
 // RUN:   > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
 // RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt

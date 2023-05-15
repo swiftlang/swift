@@ -106,6 +106,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::AnyPatternDecl:
   case ConstraintLocator::GlobalActorType:
   case ConstraintLocator::CoercionOperand:
+  case ConstraintLocator::PackExpansionType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -501,6 +502,12 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   case ConstraintLocator::CoercionOperand: {
     out << "coercion operand";
     break;
+
+  case ConstraintLocator::PackExpansionType:
+    auto expansionElt = elt.castTo<LocatorPathElt::PackExpansionType>();
+    out << "pack expansion type ("
+        << expansionElt.getOpenedType()->getString(PO) << ")";
+    break;
   }
   }
 }
@@ -662,6 +669,14 @@ ConstraintLocator::isForSingleValueStmtBranch() const {
   return SingleValueStmtBranchKind::Regular;
 }
 
+NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {
+  auto matchElt = findLast<LocatorPathElt::PatternMatch>();
+  if (!matchElt)
+    return nullptr;
+
+  return matchElt->getPattern();
+}
+
 bool ConstraintLocator::isMemberRef() const {
   if (isLastElement<LocatorPathElt::Member>()) {
     return true;
@@ -707,7 +722,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   constraints::dumpAnchor(anchor, sm, out);
 
   for (auto elt : getPath()) {
-    out << " -> ";
+    out << " → ";
     elt.dump(out);
   }
   out << ']';

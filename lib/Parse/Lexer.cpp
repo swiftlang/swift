@@ -214,7 +214,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
     // inserted to mark the code completion token. If the IDE inspection offset
     // points to a normal character, no code completion token should be
     // inserted.
-    if (Ptr >= BufferStart && Ptr <= BufferEnd && *Ptr == '\0') {
+    if (Ptr >= BufferStart && Ptr < BufferEnd && *Ptr == '\0') {
       CodeCompletionPtr = Ptr;
     }
   }
@@ -693,6 +693,11 @@ void Lexer::lexHash() {
   .Case(#id, tok::pound_##id)
 #include "swift/AST/TokenKinds.def"
   .Default(tok::pound);
+
+  // If we found '#assert' but that experimental feature is not enabled,
+  // treat it as '#'.
+  if (Kind == tok::pound_assert && !LangOpts.hasFeature(Feature::StaticAssert))
+    Kind = tok::pound;
 
   // If we didn't find a match, then just return tok::pound.  This is highly
   // dubious in terms of error recovery, but is useful for code completion and

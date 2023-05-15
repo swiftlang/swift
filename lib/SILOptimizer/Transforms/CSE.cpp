@@ -523,7 +523,8 @@ public:
 
   hash_code visitDynamicPackIndexInst(DynamicPackIndexInst *X) {
     return llvm::hash_combine(
-        X->getKind(), X->getIndexedPackType(), &X->getOperandRef());
+        X->getKind(), X->getIndexedPackType(),
+        tryLookThroughOwnershipInsts(&X->getOperandRef()));
   }
 
   hash_code visitTuplePackElementAddrInst(TuplePackElementAddrInst *X) {
@@ -585,7 +586,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   };
   bool isEqual =
       LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
-#ifdef NDEBUG
+#ifndef NDEBUG
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
     LHSI->dump();
@@ -1186,11 +1187,17 @@ bool CSE::canHandle(SILInstruction *Inst) {
     return false;
   }
   if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-    // Although the onFastPath builtin has no side-effects we don't want to
-    // (re-)move it.
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
+    switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::OnFastPath:
+      // Although the onFastPath builtin has no side-effects we don't want to
+      // (re-)move it.
       return false;
-    return !BI->mayReadOrWriteMemory();
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+      return true;
+    default:
+      return !BI->mayReadOrWriteMemory();
+    }
   }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
     return !EMI->getOperand()->getType().isAddress();

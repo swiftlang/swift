@@ -48,3 +48,8 @@ public func passVoidReturnVoid() { print("passVoidReturnVoid") }
 // CHECK: SWIFT_INLINE_THUNK void passVoidReturnVoid() noexcept SWIFT_SYMBOL("s:9Functions014passVoidReturnC0yyF") {
 // CHECK: return _impl::$s9Functions014passVoidReturnC0yyF();
 // CHECK: }
+
+// CHECK: SWIFT_INLINE_THUNK void varFunctionSameName
+public func varFunctionSameName(_ x: CInt) {}
+
+public var varFunctionSameName: CInt = 0

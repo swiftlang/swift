@@ -31,64 +31,6 @@ func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 
   // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
 }
 
-// Test preventing overrides (but allowing shadowing) of unavailable methods.
-class ClassWithUnavailable {
-  @available(*, unavailable)
-  func doNotOverride() {} // expected-note {{'doNotOverride()' has been explicitly marked unavailable here}}
-
-  // FIXME: extraneous diagnostic here
-  @available(*, unavailable)
-  init(int _: Int) {} // expected-note 3 {{'init(int:)' has been explicitly marked unavailable here}}
-
-  @available(*, unavailable)
-  convenience init(otherInt: Int) {
-    self.init(int: otherInt) // expected-error {{'init(int:)' is unavailable}}
-  }
-
-  @available(*, unavailable)
-  required init(necessaryInt: Int) {}
-
-  @available(*, unavailable)
-  subscript (i: Int) -> Int { // expected-note 2 {{'subscript(_:)' has been explicitly marked unavailable here}}
-    return i
-  }
-}
-
-class ClassWithOverride : ClassWithUnavailable {
-  override func doNotOverride() {}
-  // expected-error@-1 {{cannot override 'doNotOverride' which has been marked unavailable}}
-  // expected-note@-2 {{remove 'override' modifier to declare a new 'doNotOverride'}} {{3-12=}}
-
-  override init(int: Int) {}
-  // expected-error@-1 {{cannot override 'init' which has been marked unavailable}}
-  // expected-note@-2 {{remove 'override' modifier to declare a new 'init'}} {{3-12=}}
-
-  // can't override convenience inits
-  // can't override required inits
-
-  override subscript (i: Int) -> Int { return i }
-  // expected-error@-1 {{cannot override 'subscript' which has been marked unavailable}}
-  // expected-note@-2 {{remove 'override' modifier to declare a new 'subscript'}} {{3-12=}}
-}
-
-class ClassWithShadowing : ClassWithUnavailable {
-  func doNotOverride() {} // no-error
-  init(int: Int) {} // no-error
-  convenience init(otherInt: Int) { self.init(int: otherInt) } // no-error
-  required init(necessaryInt: Int) {} // no-error
-  subscript (i: Int) -> Int { return i } // no-error
-}
-
-func testInit() {
-  ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}} // expected-warning{{unused}}
-  ClassWithShadowing(int: 0) // expected-warning {{unused}}
-}
-
-func testSubscript(cwu: ClassWithUnavailable, cws: ClassWithShadowing) {
-  _ = cwu[5] // expected-error{{'subscript(_:)' is unavailable}}
-  _ = cws[5] // no-error
-}
-
 /* FIXME 'nil == a' fails to type-check with a bogus error message
  * <rdar://problem/17540796>
 func markUsed<T>(t: T) {}

@@ -379,6 +379,7 @@ class NameMatcher: public ASTWalker {
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
+  bool shouldWalkIntoUncheckedMacroDefinitions() override { return true; }
 
   PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;

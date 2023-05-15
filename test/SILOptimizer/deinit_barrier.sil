@@ -2,6 +2,13 @@
 
 // REQUIRES: swift_in_compiler
 
+import Builtin
+
+typealias Int32 = Builtin.Int32
+
+sil_global public @my_errno : $Int32
+sil_global shared @global_var : $Int32
+
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
 sil [ossa] @unknown_caller : $@convention(thin) () -> () {
@@ -90,10 +97,10 @@ actor A {}
 sil @getA : $() -> (@owned A)
 sil @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
 
-// CHECK-LABEL: begin running test 1 of 1 on test_hop_to_executor: is-deinit-barrier
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_hop_to_executor: is-deinit-barrier
 // CHECK:  hop_to_executor
 // CHECK:  true
-// CHECK-LABEL: end running test 1 of 1 on test_hop_to_executor: is-deinit-barrier
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_hop_to_executor: is-deinit-barrier
 sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
   %borrowA = function_ref @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
   (%a, %token) = begin_apply %borrowA() : $@yield_once @convention(thin) () -> @yields @guaranteed A
@@ -104,14 +111,31 @@ sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on test_instructions_1: is-deinit-barrier
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
 // CHECK:  debug_step
 // CHECK:  false
-// CHECK-LABEL: end running test 1 of 1 on test_instructions_1: is-deinit-barrier
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
+// CHECK:  load [trivial] {{%[^,]+}} : $*Builtin.Int32
+// CHECK:  true
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
+// CHECK-LABEL: begin running test 3 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
+// CHECK:  load [trivial] {{%[^,]+}} : $*Builtin.Int32
+// CHECK:  true
+// CHECK-LABEL: end running test 3 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
 sil [ossa] @test_instructions_1 : $@convention(thin) () -> () {
 entry:
   test_specification "is-deinit-barrier @instruction"
   debug_step
+
+  %my_errno = global_addr @my_errno : $*Builtin.Int32
+  test_specification "is-deinit-barrier @instruction"
+  %my_errno_value = load [trivial] %my_errno : $*Int32
+
+  %global_var = global_addr @global_var : $*Builtin.Int32
+  test_specification "is-deinit-barrier @instruction"
+  %global_var_value = load [trivial] %global_var : $*Int32
+
   %retval = tuple ()
   return %retval : $()
 }

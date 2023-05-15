@@ -14,7 +14,8 @@
 // RUN: %target-swift-frontend -typecheck -primary-file %t/x.swift -emit-reference-dependencies-path %t/x.swiftdeps -module-name main
 // RUN: %S/../Inputs/process_fine_grained_swiftdeps_with_fingerprints.sh %swift-dependency-tool %t/x.swiftdeps %t/b-processed.swiftdeps
 
-// RUN: cmp %t/{a,b}-processed.swiftdeps 
+// We can use `diff` here because this test isn't run on Windows
+// RUN: diff %t/{a,b}-processed.swiftdeps
 
 // BEGIN a.swift
 class C {

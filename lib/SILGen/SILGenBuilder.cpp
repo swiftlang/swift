@@ -323,6 +323,18 @@ ManagedValue SILGenBuilder::createFormalAccessLoadTake(SILLocation loc,
   return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
 }
 
+ManagedValue SILGenBuilder::createFormalAccessLoadCopy(SILLocation loc,
+                                                       ManagedValue base) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = createLoad(loc, base.getValue(), LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  SILValue baseValue = base.getValue();
+  auto i = emitLoadValueOperation(loc, baseValue, LoadOwnershipQualifier::Copy);
+  return SGF.emitFormalAccessManagedRValueWithCleanup(loc, i);
+}
+
 ManagedValue
 SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
@@ -766,7 +778,17 @@ ManagedValue SILGenBuilder::createStoreBorrow(SILLocation loc,
                                               SILValue address) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
   auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  SGF.Cleanups.pushCleanup<EndBorrowCleanup>(sbi);
   return ManagedValue(sbi, CleanupHandle::invalid());
+}
+
+ManagedValue SILGenBuilder::createFormalAccessStoreBorrow(SILLocation loc,
+                                                          ManagedValue value,
+                                                          SILValue address) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  return SGF.emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+      loc, value.getValue(), sbi);
 }
 
 ManagedValue SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,

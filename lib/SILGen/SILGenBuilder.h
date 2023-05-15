@@ -197,10 +197,13 @@ public:
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadTake(SILLocation loc, ManagedValue base);
+  ManagedValue createFormalAccessLoadCopy(SILLocation loc, ManagedValue base);
 
   using SILBuilder::createStoreBorrow;
   ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
                                  SILValue address);
+  ManagedValue createFormalAccessStoreBorrow(SILLocation loc, ManagedValue value,
+                                             SILValue address);
 
   /// Create a store_borrow if we have a non-trivial value and a store [trivial]
   /// otherwise.

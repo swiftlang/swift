@@ -3937,6 +3937,66 @@ public func _createOffsetBasedKeyPath(
   }
 }
 
+@_spi(ObservableRerootKeyPath)
+@available(SwiftStdlib 5.9, *)
+public func _rerootKeyPath<NewRoot>(
+  _ existingKp: AnyKeyPath,
+  to newRoot: NewRoot.Type
+) -> PartialKeyPath<NewRoot> {
+  let (isTrivial, hasReferencePrefix, componentSize) = existingKp.withBuffer {
+    ($0.trivial, $0.hasReferencePrefix, $0.data.count)
+  }
+
+  let existingKpTy = type(of: existingKp)
+
+  func openedRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
+    func openedValue<Value>(_: Value.Type) -> AnyKeyPath.Type {
+      if existingKpTy == ReferenceWritableKeyPath<Root, Value>.self {
+        return ReferenceWritableKeyPath<NewRoot, Value>.self
+      } else if existingKpTy == KeyPath<Root, Value>.self {
+        return KeyPath<NewRoot, Value>.self
+      } else {
+        fatalError("Unsupported KeyPath type to be rerooted")
+      }
+    }
+
+    return _openExistential(existingKpTy.valueType, do: openedValue(_:))
+  }
+
+  let newKpTy = _openExistential(existingKpTy.rootType, do: openedRoot(_:))
+
+  return newKpTy._create(
+    // This is the buffer header + padding (if needed) + size of components
+    capacityInBytes: MemoryLayout<Int>.size + componentSize
+  ) {
+    var builder = KeyPathBuffer.Builder($0)
+    let header = KeyPathBuffer.Header(
+      size: componentSize,
+      trivial: isTrivial,
+      hasReferencePrefix: hasReferencePrefix
+    )
+
+    builder.pushHeader(header)
+
+    existingKp.withBuffer {
+      var existingBuffer = $0
+
+      while true {
+        let (rawComponent, componentTy) = existingBuffer.next()
+
+        rawComponent.clone(
+          into: &builder.buffer,
+          endOfReferencePrefix: rawComponent.header.endOfReferencePrefix
+        )
+
+        if componentTy == nil {
+          break
+        }
+      }
+    }
+  } as! PartialKeyPath<NewRoot>
+}
+
 #if SWIFT_ENABLE_REFLECTION
 
 @_silgen_name("swift_keyPath_copySymbolName")

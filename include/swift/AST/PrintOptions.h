@@ -293,9 +293,6 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
-  /// Whether to print the \c each keyword for pack archetypes.
-  bool PrintExplicitEach = false;
-
   /// Whether to print the \c any keyword for existential
   /// types.
   bool PrintExplicitAny = false;
@@ -322,9 +319,6 @@ struct PrintOptions {
   /// Whether to print the real layout name instead of AnyObject
   /// for class layout
   bool PrintClassLayoutName = false;
-
-  /// Replace @freestanding(expression) with @expression.
-  bool SuppressingFreestandingExpression = false;
 
   /// Suppress emitting @available(*, noasync)
   bool SuppressNoAsyncAvailabilityAttr = false;

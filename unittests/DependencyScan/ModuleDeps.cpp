@@ -182,3 +182,70 @@ export *\n\
 
   swiftscan_dependency_graph_dispose(Dependencies);
 }
+
+TEST_F(ScanTest, TestModuleDepsHash) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleDepsHash", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n"));
+
+  // Create includes
+  std::string IncludeDirPath = createFilename(tempDir, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
+  std::string SwiftDirPath = createFilename(IncludeDirPath, "Swift");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(SwiftDirPath));
+
+  // Create imported module Swift interface files
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name A\n\
+import Swift\n\
+public func overlayFuncA() { }\n"));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  std::vector<std::string> BaseCommandStrArr = {
+    TestPathStr,
+    std::string("-I ") + SwiftDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
+  };
+
+  std::vector<std::string> CommandStrArrA = BaseCommandStrArr;
+  CommandStrArrA.push_back("-module-name");
+  CommandStrArrA.push_back("A");
+  std::vector<std::string> CommandStrArrB = BaseCommandStrArr;
+  CommandStrArrB.push_back("-module-name");
+  CommandStrArrB.push_back("B");
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStrArrA.size(); ++i) {
+    std::replace(CommandStrArrA[i].begin(), CommandStrArrA[i].end(), '\\', '/');
+  }
+  std::vector<const char*> CommandA;
+  for (auto &command : CommandStrArrA) {
+    CommandA.push_back(command.c_str());
+  }
+
+  for (size_t i = 0; i < CommandStrArrB.size(); ++i) {
+    std::replace(CommandStrArrB[i].begin(), CommandStrArrB[i].end(), '\\', '/');
+  }
+  std::vector<const char*> CommandB;
+  for (auto &command : CommandStrArrB) {
+    CommandB.push_back(command.c_str());
+  }
+
+  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA);
+  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB);
+  // Ensure that scans that only differ in module name have distinct scanning context hashes
+  ASSERT_NE(instanceA->get()->getInvocation().getModuleScanningHash(),
+            instanceB->get()->getInvocation().getModuleScanningHash());
+}

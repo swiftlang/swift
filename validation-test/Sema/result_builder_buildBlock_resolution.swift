@@ -13,12 +13,12 @@ struct ActionLookup<Identifier: ActionIdentifier> {
 }
 
 @resultBuilder
-enum ActionLookupBuilder<Identifier: ActionIdentifier> {
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> {
+enum ActionLookupBuilder<Identifier: ActionIdentifier> { // expected-note 3{{'Identifier' previously declared here}}
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
     fatalError()
   }
 
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] {
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
     []
   }
 
@@ -26,7 +26,7 @@ enum ActionLookupBuilder<Identifier: ActionIdentifier> {
     []
   }
 
-  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] {
+  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in Swift 6}}
     []
   }
 }

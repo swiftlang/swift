@@ -91,7 +91,7 @@ static void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
               memberElem.BriefComment = RC->getBriefText(ClangContext);
           }
         } else {
-          memberElem.BriefComment = member->getBriefComment();
+          memberElem.BriefComment = member->getSemanticBriefComment();
         }
       }
 

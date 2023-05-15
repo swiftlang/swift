@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Frontend/CachedDiagnostics.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -44,6 +45,8 @@
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
@@ -447,11 +450,20 @@ public:
 /// times on a single CompilerInstance is not permitted.
 class CompilerInstance {
   CompilerInvocation Invocation;
+
+  /// CAS Instances.
+  /// This needs to be declared before SourceMgr because when using CASFS,
+  /// the file buffer provided by CAS needs to outlive the SourceMgr.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+  Optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
+  std::unique_ptr<CachingDiagnosticsProcessor> CDP;
 
   /// A cache describing the set of inter-module dependencies that have been queried.
   /// Null if not present.
@@ -516,9 +528,6 @@ public:
   llvm::vfs::FileSystem &getFileSystem() const {
     return *SourceMgr.getFileSystem();
   }
-  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
-    SourceMgr.setFileSystem(FS);
-  }
 
   llvm::vfs::OutputBackend &getOutputBackend() const {
     return *OutputBackend;
@@ -529,6 +538,21 @@ public:
   }
   using HashingBackendPtrTy = llvm::IntrusiveRefCntPtr<HashBackendTy>;
   HashingBackendPtrTy getHashingBackend() { return HashBackend; }
+
+  llvm::cas::ObjectStore &getObjectStore() const { return *CAS; }
+  llvm::cas::ActionCache &getActionCache() const { return *ResultCache; }
+  std::shared_ptr<llvm::cas::ActionCache> getSharedCacheInstance() const {
+    return ResultCache;
+  }
+  std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
+    return CAS;
+  }
+  Optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
+    return CompileJobBaseKey;
+  }
+  CachingDiagnosticsProcessor *getCachingDiagnosticsProcessor() const {
+    return CDP.get();
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }
@@ -614,6 +638,9 @@ public:
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
 
+  /// Whether this compiler instance supports caching.
+  bool supportCaching() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
@@ -631,7 +658,8 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation, std::string &Error);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error,
+             ArrayRef<const char *> Args = {});
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -648,11 +676,14 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
+  bool setUpPluginLoader();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
+  bool setupCASIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
+  void setupCachingDiagnosticsProcessorIfNeeded();
 
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();

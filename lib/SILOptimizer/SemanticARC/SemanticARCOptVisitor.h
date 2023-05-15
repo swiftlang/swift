@@ -202,6 +202,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool optimize();
   bool optimizeWithoutFixedPoint();
 
+  bool performLoadCopyToLoadBorrowOptimization(LoadInst *li, SILValue original);
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);

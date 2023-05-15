@@ -2313,7 +2313,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
   std::string InstanceSetupError;
-  if (Instance->setup(Invocation, InstanceSetupError)) {
+  if (Instance->setup(Invocation, InstanceSetupError, Args)) {
     int ReturnCode = 1;
     if (Invocation.getFrontendOptions().FrontendParseableOutput)
       emitParseableFinishedMessage(ReturnCode);
@@ -2339,7 +2339,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
         std::make_unique<CompilerInstance>();
     std::string InstanceSetupError;
     // This should not fail because it passed already.
-    (void)VerifyInstance->setup(Invocation, InstanceSetupError);
+    (void)VerifyInstance->setup(Invocation, InstanceSetupError, Args);
 
     // Run the first time without observer and discard return value;
     int ReturnValueTest = 0;
