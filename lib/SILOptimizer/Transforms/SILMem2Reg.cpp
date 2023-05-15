@@ -1816,6 +1816,12 @@ void StackAllocationPromoter::run() {
   // Use the lifetime completion utility to complete such lifetimes.
   // First, collect the stored values to complete.
   if (asi->getType().isOrHasEnum()) {
+    for (auto *block : livePhiBlocks) {
+      SILPhiArgument *argument = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      assert(argument->isPhi());
+      valuesToComplete.push_back(argument);
+    }
     for (auto it : initializationPoints) {
       auto *si = it.second;
       auto stored = si->getOperand(CopyLikeInstruction::Src);

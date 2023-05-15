@@ -610,3 +610,50 @@ bb7:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @switch_enum_out_of_new_phi_block : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'switch_enum_out_of_new_phi_block'
+sil [ossa] @switch_enum_out_of_new_phi_block : $() -> () {
+entry:
+  %addr = alloc_stack $FakeOptional<Klass>
+  cond_br undef, store_none, agg_either
+
+store_none:
+  %none1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none1 to [init] %addr : $*FakeOptional<Klass>
+  br switcheroo
+
+agg_either:
+  cond_br undef, agg_some, agg_none
+
+agg_some:
+  %Klass = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %Klass : $Klass
+  br store_maybe(%some : $FakeOptional<Klass>)
+
+agg_none:
+  %none2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br store_maybe(%none2 : $FakeOptional<Klass>)
+
+store_maybe(%maybe : @owned $FakeOptional<Klass>):
+  store %maybe to [init] %addr : $*FakeOptional<Klass>
+  br switcheroo
+
+switcheroo:
+  %borrow = load_borrow %addr : $*FakeOptional<Klass>
+  switch_enum %borrow : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb14, case #FakeOptional.none!enumelt: bb15
+
+bb14(%some_borrowed : @guaranteed $Klass):
+  end_borrow %borrow : $FakeOptional<Klass>
+  destroy_addr %addr : $*FakeOptional<Klass>
+  br bb16
+
+bb15:
+  end_borrow %borrow : $FakeOptional<Klass>
+  br bb16
+
+bb16:
+  dealloc_stack %addr : $*FakeOptional<Klass>
+  %retval = tuple ()
+  return %retval : $()
+}
