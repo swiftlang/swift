@@ -459,8 +459,6 @@ extension RangeReplaceableCollection {
     }
       
     if done == nil {
-      let approximateCapacity = self.count + newElements.underestimatedCount
-      self.reserveCapacity(approximateCapacity)
       for element in newElements {
         append(element)
       }
