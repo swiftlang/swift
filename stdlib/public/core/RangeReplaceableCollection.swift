@@ -455,7 +455,6 @@ extension RangeReplaceableCollection {
     where S.Element == Element {
     
     let done:Void? = newElements.withContiguousStorageIfAvailable {
-      _onFastPath()
       replaceSubrange(endIndex..<endIndex, with: $0)
     }
       
