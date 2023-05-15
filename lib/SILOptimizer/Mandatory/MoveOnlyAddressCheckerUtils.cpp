@@ -225,6 +225,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -490,6 +491,92 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(MarkMustCheckInst *markedAd
 
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                       MARK: Partial Apply Utilities
+//===----------------------------------------------------------------------===//
+
+static bool findNonEscapingPartialApplyUses(
+    PartialApplyInst *pai, TypeTreeLeafTypeRange leafRange,
+    llvm::SmallMapVector<SILInstruction *, TypeTreeLeafTypeRange, 4>
+        &livenessUses) {
+  StackList<Operand *> worklist(pai->getFunction());
+  for (auto *use : pai->getUses())
+    worklist.push_back(use);
+
+  LLVM_DEBUG(llvm::dbgs() << "Searching for partial apply uses!\n");
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+
+    if (use->isTypeDependent())
+      continue;
+
+    auto *user = use->getUser();
+
+    // These instructions do not cause us to escape.
+    if (isIncidentalUse(user) || isa<DestroyValueInst>(user))
+      continue;
+
+    // Look through these instructions.
+    if (isa<BeginBorrowInst>(user) || isa<CopyValueInst>(user) ||
+        isa<MoveValueInst>(user) ||
+        // If we capture this partial_apply in another partial_apply, then we
+        // know that said partial_apply must not have escaped the value since
+        // otherwise we could not have an inout_aliasable argument or be
+        // on_stack. Process it recursively so that we treat uses of that
+        // partial_apply and applies of that partial_apply as uses of our
+        // partial_apply.
+        //
+        // We have this separately from the other look through sections so that
+        // we can make it clearer what we are doing here.
+        isa<PartialApplyInst>(user)) {
+      for (auto *use : cast<SingleValueInstruction>(user)->getUses())
+        worklist.push_back(use);
+      continue;
+    }
+
+    // If we have a mark_dependence and are the value, look through the
+    // mark_dependence.
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      if (mdi->getValue() == use->get()) {
+        for (auto *use : mdi->getUses())
+          worklist.push_back(use);
+        continue;
+      }
+    }
+
+    if (auto apply = FullApplySite::isa(user)) {
+      // If we apply the function or pass the function off to an apply, then we
+      // need to treat the function application as a liveness use of the
+      // variable since if the partial_apply is invoked within the function
+      // application, we may access the captured variable.
+      livenessUses.insert({user, leafRange});
+      if (apply.beginsCoroutineEvaluation()) {
+        // If we have a coroutine, we need to treat the abort_apply and
+        // end_apply as liveness uses since once we execute one of those
+        // instructions, we have returned control to the coroutine which means
+        // that we could then access the captured variable again.
+        auto *bai = cast<BeginApplyInst>(user);
+        SmallVector<EndApplyInst *, 4> endApplies;
+        SmallVector<AbortApplyInst *, 4> abortApplies;
+        bai->getCoroutineEndPoints(endApplies, abortApplies);
+        for (auto *eai : endApplies)
+          livenessUses.insert({eai, leafRange});
+        for (auto *aai : abortApplies)
+          livenessUses.insert({aai, leafRange});
+      }
+      continue;
+    }
+
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "Found instruction we did not understand... returning false!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Instruction: " << *user);
+    return false;
+  }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1634,10 +1721,15 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
                    << "Found mark must check [nocopy] error: " << *user);
         auto *fArg = dyn_cast<SILFunctionArgument>(
             stripAccessMarkers(markedValue->getOperand()));
-        if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
-          moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
-              markedValue, fArg);
+        // If we have a closure captured that we specialized, we should have a
+        // no consume or assign and should emit a normal guaranteed diagnostic.
+        if (fArg && fArg->isClosureCapture() &&
+            fArg->getArgumentConvention().isInoutConvention()) {
+          assert(checkKind == MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
         } else {
+          // Otherwise, we need to emit an escaping closure error.
           moveChecker.diagnosticEmitter
               .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
         }
@@ -1792,6 +1884,19 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   }
 
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(
+            stripAccessMarkers(markedValue->getOperand()))) {
+      // If we are processing an inout convention and we emitted an error on the
+      // partial_apply, we shouldn't process this mark_must_check, but squelch
+      // the compiler doesn't understand error.
+      if (fArg->getArgumentConvention().isInoutConvention() &&
+          pas->getCalleeFunction()->hasSemanticsAttr(
+              semantics::NO_MOVEONLY_DIAGNOSTICS)) {
+        diagnosticEmitter.emitEarlierPassEmittedDiagnostic(markedValue);
+        return false;
+      }
+    }
+
     if (pas->isOnStack() ||
         ApplySite(pas).getArgumentConvention(*op).isInoutConvention()) {
       LLVM_DEBUG(llvm::dbgs() << "Found on stack partial apply or inout usage!\n");
@@ -1803,13 +1908,18 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return false;
       }
 
-      useState.livenessUses.insert({user, *leafRange});
-      for (auto *use : pas->getConsumingUses()) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "Adding consuming use of partial apply as liveness use: "
-                   << *use->getUser());
-        useState.livenessUses.insert({use->getUser(), *leafRange});
+      // Attempt to find calls of the non-escaping partial apply and places
+      // where the partial apply is passed to a function. We treat those as
+      // liveness uses. If we find a use we don't understand, we return false
+      // here.
+      if (!findNonEscapingPartialApplyUses(pas, *leafRange,
+                                           useState.livenessUses)) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Failed to understand use of a non-escaping partial apply?!\n");
+        return false;
       }
+
       return true;
     }
   }
@@ -2534,9 +2644,19 @@ bool MoveOnlyAddressChecker::check(
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // Perform our address check.
+    unsigned diagnosticEmittedByEarlierPassCount =
+      diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount();
     if (!pimpl.performSingleCheck(markedValue)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Failed to perform single check! Emitting error!\n");
+      if (diagnosticEmittedByEarlierPassCount !=
+          diagnosticEmitter.getDiagnosticEmittedByEarlierPassCount()) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "Failed to perform single check but found earlier emitted "
+               "error. Not emitting checker doesn't understand diagnostic!\n");
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "Failed to perform single check! Emitting "
+                                 "compiler doesn't understand diagnostic!\n");
       // If we fail the address check in some way, set the diagnose!
       diagnosticEmitter.emitCheckerDoesntUnderstandDiagnostic(markedValue);
     }
