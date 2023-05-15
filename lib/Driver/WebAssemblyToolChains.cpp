@@ -158,10 +158,6 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
     llvm::report_fatal_error(linkFile + " not found");
   }
 
-  // Explicitly pass the target to the linker
-  Arguments.push_back(
-      context.Args.MakeArgString("--target=" + getTriple().str()));
-
   // Delegate to Clang for sanitizers. It will figure out the correct linker
   // options.
   if (job.getKind() == LinkKind::Executable && context.OI.SelectedSanitizers) {
