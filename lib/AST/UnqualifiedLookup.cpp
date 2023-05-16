@@ -397,21 +397,29 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
     return false;
   }
 
-  // Find the condition that defined the self decl,
-  // and check that both its LHS and RHS are 'self'
-  for (auto cond : conditionalStmt->getCond()) {
-    if (auto pattern = cond.getPattern()) {
-      if (pattern->getBoundName() != Ctx.Id_self) {
-        continue;
-      }
-    }
+  return conditionalStmt->rebindsSelf(Ctx);
+}
 
-    if (auto selfDRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
-      return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-    }
+// Finds the nearest parent closure, which would define the
+// permitted usage of implicit self. In closures this is most
+// often just `dc` itself, but in functions defined in the
+// closure body this would be some parent context.
+ClosureExpr *closestParentClosure(DeclContext *dc) {
+  if (!dc) {
+    return nullptr;
   }
 
-  return false;
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
+    return closure;
+  }
+
+  // Stop searching if we find a type decl, since types always
+  // redefine what 'self' means, even when nested inside a closure.
+  if (dc->getContextKind() == DeclContextKind::GenericTypeDecl) {
+    return nullptr;
+  }
+
+  return closestParentClosure(dc->getParent());
 }
 
 ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
@@ -425,7 +433,7 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   // self _always_ refers to the context's self `ParamDecl`, even if there
   // is another local decl with the name `self` that would be found by
   // `lookupSingleLocalDecl`.
-  auto closureExpr = dyn_cast<ClosureExpr>(factory->DC);
+  auto closureExpr = closestParentClosure(factory->DC);
   if (!closureExpr) {
     return nullptr;
   }

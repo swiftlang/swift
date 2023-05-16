@@ -1689,23 +1689,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return false;
       }
 
-      // Find the condition that defined the self decl,
-      // and check that both its LHS and RHS are 'self'
-      for (auto cond : conditionalStmt->getCond()) {
-        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
-            continue;
-          }
-
-          if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
-            if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
-              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-            }
-          }
-        }
-      }
-
-      return false;
+      // Require `LoadExpr`s when validating the self binding.
+      // This lets us reject invalid examples like:
+      //
+      //   let `self` = self ?? .somethingElse
+      //   guard let self = self else { return }
+      //   method() // <- implicit self is not allowed
+      //
+      return conditionalStmt->rebindsSelf(Ctx, /*requireLoadExpr*/ true);
     }
 
     /// Return true if this is a closure expression that will require explicit
