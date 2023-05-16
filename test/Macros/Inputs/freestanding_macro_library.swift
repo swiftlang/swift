@@ -12,3 +12,6 @@ public macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module
 
 @freestanding(expression)
 public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@freestanding(declaration, names: named(value))
+public macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")

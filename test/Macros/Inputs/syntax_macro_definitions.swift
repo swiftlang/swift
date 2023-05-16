@@ -1413,3 +1413,24 @@ public struct MultiStatementClosure: ExpressionMacro {
       """
   }
 }
+
+public struct VarValueMacro: DeclarationMacro, PeerMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> [DeclSyntax] {
+    return [
+      "var value: Int { 1 }"
+    ]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "var value: Int { 1 }"
+    ]
+  }
+}
