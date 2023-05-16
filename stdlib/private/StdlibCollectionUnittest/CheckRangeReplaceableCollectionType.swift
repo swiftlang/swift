@@ -12,6 +12,59 @@
 
 import StdlibUnittest
 
+// A minimal RRC conformance, to test default implementations with
+struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
+  
+  // we're trying to move away from calling reserveCapacity inside most mutating
+  // methods, this will let us verify that we don't
+  internal var allowReserveCapacity = true
+  var storage:[UInt8] = []
+  
+  init() {}
+  
+  init(arrayLiteral elements: Element...) {
+    storage.append(contentsOf: elements)
+  }
+  
+  func index(after i: Int) -> Int {
+    i + 1
+  }
+  
+  func index(before i: Int) -> Int {
+    i - 1
+  }
+  
+  var startIndex: Int {
+    0
+  }
+  
+  var endIndex: Int {
+    count
+  }
+  
+  var count: Int {
+    storage.count
+  }
+  
+  subscript(position: Int) -> UInt8 {
+    get {
+      storage[position]
+    }
+    set(newValue) {
+      storage[position] = newValue
+    }
+  }
+  
+  mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<UInt8>) {
+    storage.replaceSubrange(subrange, with: newElements)
+  }
+  
+  mutating func reserveCapacity(_ n: Int) {
+    precondition(allowReserveCapacity)
+    storage.reserveCapacity(n)
+  }
+}
+
 internal enum IndexSelection {
   case start
   case middle
@@ -264,6 +317,46 @@ let removeLastTests: [RemoveLastNTest] = [
     numberToRemove: 5,
     expectedCollection: []
   ),
+  RemoveLastNTest(
+    collection: [1010] as NaiveRRC,
+    numberToRemove: 0,
+    expectedCollection: [1010] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010] as NaiveRRC,
+    numberToRemove: 1,
+    expectedCollection: [] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 0,
+    expectedCollection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 1,
+    expectedCollection: [1010, 2020, 3030, 4040] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 2,
+    expectedCollection: [1010, 2020, 3030] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 3,
+    expectedCollection: [1010, 2020] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 4,
+    expectedCollection: [1010] as NaiveRRC
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
+    numberToRemove: 5,
+    expectedCollection: [] as NaiveRRC
+  ),
 ]
 
 let appendContentsOfTests: [AppendContentsOfTest] = [
@@ -301,6 +394,78 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     collection: [1010, 2020, 3030, 4040],
     newElements: [5050, 6060, 7070, 8080],
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
+  
+  // NaiveRRC doesn't implement withContiguousStorageIfAvailable, so this tests discontiguous appendees
+  AppendContentsOfTest(
+    collection: [] as NaiveRRC,
+    newElements: [] as NaiveRRC,
+    expected: [] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [] as NaiveRRC,
+    expected: [1010] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
+    newElements: [] as NaiveRRC,
+    expected: [1010, 2020, 3030, 4040] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [] as NaiveRRC,
+    newElements: [1010] as NaiveRRC,
+    expected: [1010] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [2020] as NaiveRRC,
+    expected: [1010, 2020] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [2020, 3030, 4040] as NaiveRRC,
+    expected: [1010, 2020, 3030, 4040] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
+    newElements: [5050, 6060, 7070, 8080] as NaiveRRC,
+    expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080] as NaiveRRC),
+  
+  // Here we use Array to catch the contiguous cases
+  AppendContentsOfTest(
+    collection: [] as NaiveRRC,
+    newElements: [],
+    expected: [] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [],
+    expected: [1010] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
+    newElements: [],
+    expected: [1010, 2020, 3030, 4040] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [] as NaiveRRC,
+    newElements: [1010],
+    expected: [1010] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [2020],
+    expected: [1010, 2020] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010] as NaiveRRC,
+    newElements: [2020, 3030, 4040],
+    expected: [1010, 2020, 3030, 4040] as NaiveRRC),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
+    newElements: [5050, 6060, 7070, 8080],
+    expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080] as NaiveRRC),
 ]
 
 // Also used in RangeReplaceable.swift.gyb to test `replaceSubrange()`
@@ -392,6 +557,8 @@ public let replaceRangeTests: [ReplaceSubrangeTest] = [
     rangeSelection: .offsets(1, 2),
     expected: [1010, 8080, 9090, 3030],
     closedExpected: [1010, 8080, 9090]),
+  
+  //replaceSubrange is the protocol requirement, so we don't test NaiveRRC here
 ]
 
 public let removeRangeTests: [RemoveSubrangeTest] = [
@@ -434,6 +601,46 @@ public let removeRangeTests: [RemoveSubrangeTest] = [
     collection: [1010, 2020, 3030, 4040, 5050, 6060],
     rangeSelection: .middle,
     expected: [1010, 6060]),
+  
+  RemoveSubrangeTest(
+    collection: [] as NaiveRRC),
+    rangeSelection: .emptyRange,
+    expected: []) as NaiveRRC),
+
+  RemoveSubrangeTest(
+    collection: [1010] as NaiveRRC),
+    rangeSelection: .middle,
+    expected: [] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC),
+    rangeSelection: .leftHalf,
+    expected: [3030, 4040] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC),
+    rangeSelection: .rightHalf,
+    expected: [1010, 2020] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC),
+    rangeSelection: .middle,
+    expected: [1010, 5050] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    rangeSelection: .leftHalf,
+    expected: [4040, 5050, 6060] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    rangeSelection: .rightHalf,
+    expected: [1010, 2020, 3030] as NaiveRRC)),
+
+  RemoveSubrangeTest(
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    rangeSelection: .middle,
+    expected: [1010, 6060] as NaiveRRC)),
 ]
 
 extension TestSuite {
