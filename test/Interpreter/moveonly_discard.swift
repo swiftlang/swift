@@ -9,8 +9,7 @@ func print_closing_MFD() { print("closing MaybeFileDescriptor") }
 
 enum E: Error { case err }
 
-@_moveOnly
-struct FileDescriptor {
+struct FileDescriptor: ~Copyable {
   var fd: Int
   static var nextFD: Int = 0
 
@@ -59,7 +58,7 @@ struct FileDescriptor {
   }
 }
 
-@_moveOnly enum MaybeFileDescriptor {
+enum MaybeFileDescriptor: ~Copyable {
   case some(FileDescriptor)
   case nothing
 
@@ -81,6 +80,14 @@ struct FileDescriptor {
     // we can't do a borrowed switch yet so this is just printing some message
     print_closing_MFD()
   }
+}
+
+struct SillyEmptyGeneric<T>: ~Copyable {
+  consuming func identity(_ t: T) -> T {
+    discard self
+    return t
+  }
+  deinit { fatalError("ran unexpectedly!") }
 }
 
 func main() {
@@ -159,6 +166,13 @@ func main() {
     let x = MaybeFileDescriptor(reinit: false) // 13
     x.skipDeinit() // this skips the enum's deinit, not the file descriptor's!
     // CHECK: closing file descriptor: 13
+  }()
+
+  let _ = {
+    let x = SillyEmptyGeneric<[Int]>()
+    let z = [1, 2]
+    let ans = x.identity(z)
+    assert(z == ans)
   }()
 
 }
