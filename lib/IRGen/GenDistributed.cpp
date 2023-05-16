@@ -591,9 +591,10 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
   }
 
   // Destroy loaded arguments.
-  llvm::for_each(LoadedArguments, [&](const auto &argInfo) {
+  for (auto argInfo = LoadedArguments.rbegin();
+       argInfo != LoadedArguments.rend(); ++argInfo) {
     emitDestroyCall(IGF, argInfo.second, argInfo.first);
-  });
+  }
 
   Explosion voidResult;
 
