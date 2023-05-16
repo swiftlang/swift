@@ -18,12 +18,12 @@ import Swift
 
 @_implementationOnly import OS.Libc
 
-private enum FileImageSourceError: Error {
+enum FileImageSourceError: Error {
   case posixError(Int32)
   case truncatedRead
 }
 
-private class FileImageSource: ImageSource {
+class FileImageSource: ImageSource {
   typealias Address = UInt64
   typealias Size = UInt64
 
@@ -34,13 +34,13 @@ private class FileImageSource: ImageSource {
   private var _path: String
   public var path: String? { return _path }
 
-  public lazy var bounds: Bounds? {
+  public lazy var bounds: Bounds? = {
     let size = lseek(fd, 0, SEEK_END)
     if size < 0 {
       return nil
     }
-    return Bounds(base: 0, size: size)
-  }
+    return Bounds(base: 0, size: Size(size))
+  }()
 
   public init(path: String) throws {
     _path = path

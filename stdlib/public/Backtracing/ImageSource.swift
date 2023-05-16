@@ -18,7 +18,19 @@
 
 import Swift
 
-internal protocol ImageSource : MemoryReader {
+struct ImageBounds<Address: FixedWidthInteger,
+                            Size: FixedWidthInteger> {
+  var base: Address
+  var size: Size
+
+  func adjusted(by offset: some FixedWidthInteger) -> Self {
+    return Self(base: base + Address(offset), size: size - Size(offset))
+  }
+}
+
+protocol ImageSource: MemoryReader {
+  typealias Bounds = ImageBounds<Address, Size>
+
   /// Says whether we are looking at a loaded image in memory or not.
   /// The layout in memory may differ from the on-disk layout; in particular,
   /// some information may not be available when the image is mapped into
@@ -28,27 +40,37 @@ internal protocol ImageSource : MemoryReader {
   /// If this ImageSource knows its path, this will be non-nil.
   var path: String? { get }
 
-  /// Holds the bounds of an ImageSource
-  struct Bounds {
-    var base: Address
-    var size: Size
-  }
-
   /// If this ImageSource knows its bounds, this will be non-nil.
   var bounds: Bounds? { get }
+}
+
+extension ImageSource {
+  /// Fetch all the data from this image source (which must be bounded)
+  func fetchAllBytes() -> [UInt8]? {
+    guard let bounds = self.bounds else {
+      return nil
+    }
+    if let data = try? fetch(from: bounds.base,
+                             count: Int(bounds.size),
+                             as: UInt8.self) {
+      return data
+    }
+    return nil
+  }
 }
 
 enum SubImageSourceError: Error {
   case outOfRangeFetch(UInt64, Int)
 }
 
-internal struct SubImageSource<S: ImageSource>: ImageSource {
+struct SubImageSource<S: ImageSource>: ImageSource {
   typealias Address = S.Address
   typealias Size = S.Size
 
   var parent: S
   var baseAddress: S.Address
   var length: S.Size
+  var path: String? { return parent.path }
 
   var bounds: Bounds? {
     return Bounds(base: 0, size: length)

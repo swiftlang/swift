@@ -29,7 +29,12 @@ extern "C" {
 
 // The Swift importer can't cope with complex macros; it will do inline
 // functions, however.
-static inline lzma_stream lzma_stream_init() { return LZMA_STREAM_INIT; }
+static inline lzma_stream lzma_stream_init() {
+  return (lzma_stream)LZMA_STREAM_INIT;
+}
+static inline z_stream zlib_stream_init() {
+  return (z_stream){ 0 };
+}
 
 #ifdef __cplusplus
 } // extern "C"

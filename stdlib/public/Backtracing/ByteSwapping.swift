@@ -19,7 +19,7 @@
 
 import Swift
 
-internal protocol ByteSwappable {
+protocol ByteSwappable {
   var byteSwapped: Self { get }
   var bigEndian: Self { get }
   var littleEndian: Self { get }

@@ -17,7 +17,7 @@
 
 import Swift
 
-internal class MemoryImageSource<M: MemoryReader>: ImageSource {
+class MemoryImageSource<M: MemoryReader>: ImageSource {
   typealias Address = M.Address
   typealias Size = M.Size
 
@@ -25,6 +25,7 @@ internal class MemoryImageSource<M: MemoryReader>: ImageSource {
 
   public var isMappedImage: Bool { return true }
   public var path: String? { return nil }
+  public var bounds: Bounds? { return nil }
 
   public init(with reader: M) {
     self.reader = reader

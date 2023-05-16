@@ -90,6 +90,7 @@ extension MemoryReader {
 
     return String(decoding: bytes, as: UTF8.self)
   }
+
 }
 
 @_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {

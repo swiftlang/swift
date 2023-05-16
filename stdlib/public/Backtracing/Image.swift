@@ -30,7 +30,6 @@ internal protocol Image {
 
   var source: Source { get }
   var uuid: UUID? { get }
-  var unwindInfo: UnwindInfo { get }
   var shouldByteSwap: Bool { get }
 
   func swapIfRequired<T: FixedWidthInteger>(_ x: T) -> T

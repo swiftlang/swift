@@ -25,6 +25,7 @@ set(BACKTRACING_SOURCES
   BacktraceFormatter.swift
   ByteSwapping.swift
   Context.swift
+  Compression.swift
   CoreSymbolication.swift
   Dwarf.swift
   Elf.swift
@@ -43,6 +44,7 @@ set(BACKTRACING_SOURCES
 )
 
 set(BACKTRACING_COMPILE_FLAGS
+  "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-fno-implicit-module-maps"
   "-Xcc;-fbuiltin-module-map"
   "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/SwiftShims/swift/shims/module.modulemap"
