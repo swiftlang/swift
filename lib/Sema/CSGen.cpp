@@ -2442,7 +2442,7 @@ namespace {
     /// for the types of each variable declared within the pattern, along
     /// with a one-way constraint binding that to the type to which the
     /// variable will be ascribed or inferred.
-    Type getTypeForPattern(
+    Optional<Type> getTypeForPattern(
        Pattern *pattern, ConstraintLocatorBuilder locator,
        bool bindPatternVarsOneWay,
        PatternBindingDecl *patternBinding = nullptr,
@@ -2466,14 +2466,21 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(ParenType::get(CS.getASTContext(), underlyingType));
+        if (!underlyingType)
+          return None;
+
+        return setType(ParenType::get(CS.getASTContext(), *underlyingType));
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
         auto type = getTypeForPattern(subPattern, locator,
                                       bindPatternVarsOneWay);
+
+        if (!type)
+          return None;
+
         // Var doesn't affect the type.
-        return setType(type);
+        return setType(*type);
       }
       case PatternKind::Any: {
         Type type;
@@ -2653,6 +2660,9 @@ namespace {
 
         Type type = TypeChecker::typeCheckPattern(contextualPattern);
 
+        if (!type)
+          return None;
+
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
@@ -2664,16 +2674,19 @@ namespace {
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
         // Determine the subpattern type. It will be convertible to the
         // ascribed type.
-        Type subPatternType = getTypeForPattern(
+        auto subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
+
+        if (!subPatternType)
+          return None;
 
         // NOTE: The order here is important! Pattern matching equality is
         // not symmetric (we need to fix that either by using a different
         // constraint, or actually making it symmetric).
         CS.addConstraint(
-            ConstraintKind::Equal, openedType, subPatternType,
+            ConstraintKind::Equal, openedType, *subPatternType,
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
 
         // FIXME [OPAQUE SUPPORT]: the distinction between where we want opaque
@@ -2693,12 +2706,15 @@ namespace {
           auto &tupleElt = tuplePat->getElement(i);
 
           auto *eltPattern = tupleElt.getPattern();
-          Type eltTy = getTypeForPattern(
+          auto eltTy = getTypeForPattern(
               eltPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
               bindPatternVarsOneWay);
 
-          tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
+          if (!eltTy)
+            return None;
+
+          tupleTypeElts.push_back(TupleTypeElt(*eltTy, tupleElt.getLabel()));
         }
 
         return setType(TupleType::get(tupleTypeElts, CS.getASTContext()));
@@ -2707,12 +2723,15 @@ namespace {
       case PatternKind::OptionalSome: {
         auto *subPattern = cast<OptionalSomePattern>(pattern)->getSubPattern();
         // The subpattern must have optional type.
-        Type subPatternType = getTypeForPattern(
+        auto subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(OptionalType::get(subPatternType));
+        if (!subPatternType)
+          return None;
+
+        return setType(OptionalType::get(*subPatternType));
       }
 
       case PatternKind::Is: {
@@ -2742,12 +2761,14 @@ namespace {
               subPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
               bindPatternVarsOneWay);
+          if (!subPatternType)
+            return None;
 
           // NOTE: The order here is important! Pattern matching equality is
           // not symmetric (we need to fix that either by using a different
           // constraint, or actually making it symmetric).
           CS.addConstraint(
-              ConstraintKind::Equal, castType, subPatternType,
+              ConstraintKind::Equal, castType, *subPatternType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));
         }
         return setType(isType);
@@ -2811,6 +2832,9 @@ namespace {
                 TypeResolverContext::InExpression, patternMatchLoc);
           }();
 
+          if (!parentType)
+            return None;
+
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
           CS.addValueMemberConstraint(parentMetaType, enumPattern->getName(),
@@ -2838,13 +2862,13 @@ namespace {
           // When there is a subpattern, the member will have function type,
           // and we're matching the type of that subpattern to the parameter
           // types.
-          Type subPatternType = getTypeForPattern(
+          auto subPatternType = getTypeForPattern(
               subPattern,
               locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
               bindPatternVarsOneWay);
 
           SmallVector<AnyFunctionType::Param, 4> params;
-          decomposeTuple(subPatternType, params);
+          decomposeTuple(*subPatternType, params);
 
           // Remove parameter labels; they aren't used when matching cases,
           // but outright conflicts will be checked during coercion.
@@ -2877,10 +2901,24 @@ namespace {
       }
 
       case PatternKind::Expr: {
-        // We generate constraints for ExprPatterns in a separate pass. For
-        // now, just create a type variable.
-        return setType(CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                             TVO_CanBindToNoEscape));
+        auto *EP = cast<ExprPattern>(pattern);
+        Type patternTy = CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                               TVO_CanBindToNoEscape);
+
+        auto target = SyntacticElementTarget::forExprPattern(EP);
+
+        if (CS.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
+                              /*leaveClosureBodyUnchecked=*/false)) {
+          return None;
+        }
+        CS.setType(EP->getMatchVar(), patternTy);
+
+        if (CS.generateConstraints(target))
+          return None;
+
+        CS.setTargetFor(EP, target);
+        CS.setExprPatternFor(EP->getSubExpr(), EP);
+        return setType(patternTy);
       }
       }
 
@@ -4318,11 +4356,19 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
       initializer, LocatorPathElt::ContextualType(CTP_Initialization));
 
   Type patternType;
+  bool forExprPattern = false;
   if (auto pattern = target.getInitializationPattern()) {
-    patternType = cs.generateConstraints(
+    auto *semanticPattern =
+        pattern->getSemanticsProvidingPattern(/*allowTypedPattern*/ false);
+    forExprPattern = isa<ExprPattern>(semanticPattern);
+    auto ty = cs.generateConstraints(
         pattern, locator, target.shouldBindPatternVarsOneWay(),
         target.getInitializationPatternBindingDecl(),
         target.getInitializationPatternBindingIndex());
+    if (!ty)
+      return true;
+
+    patternType = *ty;
   } else {
     patternType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
   }
@@ -4331,9 +4377,15 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
     return cs.generateWrappedPropertyTypeConstraints(
         wrappedVar, cs.getType(target.getAsExpr()), patternType);
 
-  // Add a conversion constraint between the types.
-  cs.addConstraint(ConstraintKind::Conversion, cs.getType(target.getAsExpr()),
-                   patternType, locator, /*isFavored*/true);
+  // Add a constraint between the types. For ExprPatterns, we want an equality
+  // constraint, because we want to propagate the type of the initializer directly
+  // into the implicit '~=' call. We'll then allow conversions when matching that as
+  // an argument. This avoids producing bad diagnostics where we try and apply fixes
+  // to the conversion outside of the call.
+  auto kind = forExprPattern ? ConstraintKind::Equal
+                             : ConstraintKind::Conversion;
+  cs.addConstraint(kind, cs.getType(target.getAsExpr()),
+                  patternType, locator, /*isFavored*/true);
 
   return false;
 }
@@ -4481,7 +4533,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   // Collect constraints from the element pattern.
   auto elementLocator = cs.getConstraintLocator(
       sequenceExpr, ConstraintLocator::SequenceElementType);
-  Type initType =
+  auto initType =
       cs.generateConstraints(pattern, elementLocator,
                              target.shouldBindPatternVarsOneWay(), nullptr, 0);
   if (!initType)
@@ -4500,7 +4552,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
     // resolving `optional object` constraint which is sometimes too eager.
     cs.addConstraint(ConstraintKind::Conversion, nextType,
                      OptionalType::get(elementType), elementTypeLoc);
-    cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
+    cs.addConstraint(ConstraintKind::Conversion, elementType, *initType,
                      elementLocator);
   }
 
@@ -4526,7 +4578,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
 
   // Populate all of the information for a for-each loop.
   forEachStmtInfo.elementType = elementType;
-  forEachStmtInfo.initType = initType;
+  forEachStmtInfo.initType = *initType;
   target.setPattern(pattern);
   target.getForEachStmtInfo() = forEachStmtInfo;
   return target;
@@ -4706,7 +4758,7 @@ bool ConstraintSystem::generateConstraints(
 
       // Generate constraints to bind all of the internal declarations
       // and verify the pattern.
-      Type patternType = generateConstraints(
+      auto patternType = generateConstraints(
           pattern, locator, /*shouldBindPatternVarsOneWay*/ true,
           target.getPatternBindingOfUninitializedVar(),
           target.getIndexOfUninitializedVar());
@@ -4735,25 +4787,13 @@ Expr *ConstraintSystem::generateConstraints(
   return generateConstraintsFor(*this, expr, dc);
 }
 
-Type ConstraintSystem::generateConstraints(
+Optional<Type> ConstraintSystem::generateConstraints(
     Pattern *pattern, ConstraintLocatorBuilder locator,
     bool bindPatternVarsOneWay, PatternBindingDecl *patternBinding,
     unsigned patternIndex) {
   ConstraintGenerator cg(*this, nullptr);
-  auto ty = cg.getTypeForPattern(pattern, locator, bindPatternVarsOneWay,
-                                 patternBinding, patternIndex);
-  assert(ty);
-
-  // Gather the ExprPatterns, and form a conjunction for their expressions.
-  SmallVector<ExprPattern *, 4> exprPatterns;
-  pattern->forEachNode([&](Pattern *P) {
-    if (auto *EP = dyn_cast<ExprPattern>(P))
-      exprPatterns.push_back(EP);
-  });
-  if (!exprPatterns.empty())
-    generateConstraints(exprPatterns, getConstraintLocator(pattern));
-
-  return ty;
+  return cg.getTypeForPattern(pattern, locator, bindPatternVarsOneWay,
+                              patternBinding, patternIndex);
 }
 
 bool ConstraintSystem::generateConstraints(StmtCondition condition,

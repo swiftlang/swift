@@ -140,9 +140,11 @@ public:
   /// equivalent to matching this pattern.
   ///
   /// Looks through ParenPattern, BindingPattern, and TypedPattern.
-  Pattern *getSemanticsProvidingPattern();
-  const Pattern *getSemanticsProvidingPattern() const {
-    return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
+  Pattern *getSemanticsProvidingPattern(bool allowTypedPattern = true);
+  const Pattern *
+  getSemanticsProvidingPattern(bool allowTypedPattern = true) const {
+    return const_cast<Pattern *>(this)->getSemanticsProvidingPattern(
+        allowTypedPattern);
   }
 
   /// Returns whether this pattern has been type-checked yet.
@@ -799,14 +801,26 @@ public:
   }
 };
 
-inline Pattern *Pattern::getSemanticsProvidingPattern() {
-  if (auto *pp = dyn_cast<ParenPattern>(this))
-    return pp->getSubPattern()->getSemanticsProvidingPattern();
-  if (auto *tp = dyn_cast<TypedPattern>(this))
-    return tp->getSubPattern()->getSemanticsProvidingPattern();
-  if (auto *vp = dyn_cast<BindingPattern>(this))
-    return vp->getSubPattern()->getSemanticsProvidingPattern();
-  return this;
+inline Pattern *Pattern::getSemanticsProvidingPattern(bool allowTypedPattern) {
+  auto *P = this;
+  while (true) {
+    if (auto *PP = dyn_cast<ParenPattern>(P)) {
+      P = PP->getSubPattern();
+      continue;
+    }
+    if (auto *BP = dyn_cast<BindingPattern>(P)) {
+      P = BP->getSubPattern();
+      continue;
+    }
+    if (allowTypedPattern) {
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        P = TP->getSubPattern();
+        continue;
+      }
+    }
+    break;
+  }
+  return P;
 }
 
 /// Describes a pattern and the context in which it occurs.

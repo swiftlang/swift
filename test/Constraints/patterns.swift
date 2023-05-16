@@ -573,19 +573,14 @@ func testMultiStmtClosureExprPattern(_ x: Int) {
   if case { (); return x }() = x {}
 }
 
-func testExprPatternIsolation() {
-  // We type-check ExprPatterns separately, so these are illegal.
-  if case 0 = nil {} // expected-error {{'nil' requires a contextual type}}
+func testExprPatternInference() {
+  if case 0 = nil {}
   let _ = {
-    if case 0 = nil {} // expected-error {{'nil' requires a contextual type}}
+    if case 0 = nil {}
   }
   for case 0 in nil {} // expected-error {{'nil' requires a contextual type}}
   for case 0 in [nil] {}
-  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{requirement from conditional conformance of 'Any?' to 'Equatable'}}
 
-  // Though we will try Double for an integer literal...
   let d: Double = 0
   if case d = 0 {}
   let _ = {
@@ -593,13 +588,12 @@ func testExprPatternIsolation() {
   }
   for case d in [0] {}
 
-  // But not Float
   let f: Float = 0
-  if case f = 0 {} // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+  if case f = 0 {}
   let _ = {
-    if case f = 0 {} // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+    if case f = 0 {}
   }
-  for case f in [0] {}  // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+  for case f in [0] {}
 
   enum MultiPayload<T: Equatable>: Equatable {
     case e(T, T)
@@ -613,33 +607,24 @@ func testExprPatternIsolation() {
 
   func produceMultiPayload<T>() -> MultiPayload<T> { fatalError() }
 
-  // We type-check ExprPatterns left to right, so only one of these works.
   if case .e(0.0, 0) = produceMultiPayload() {}
-  if case .e(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+  if case .e(0, 0.0) = produceMultiPayload() {}
 
   for case .e(0.0, 0) in [produceMultiPayload()] {}
-  for case .e(0, 0.0) in [produceMultiPayload()] {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+  for case .e(0, 0.0) in [produceMultiPayload()] {}
 
-  // Same, because although it's a top-level ExprPattern, we don't resolve
-  // that until during solving.
   if case .f(0.0, 0) = produceMultiPayload() {}
-  if case .f(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+  if case .f(0, 0.0) = produceMultiPayload() {}
 
-  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in Swift 6}}
-
-  // FIXME: Bad error (https://github.com/apple/swift/issues/64279)
+  if case .e(5, nil) = produceMultiPayload() {}
   if case .e(nil, 0) = produceMultiPayload() {}
-  // expected-error@-1 {{expression pattern of type 'String' cannot match values of type 'Substring'}}
-  // expected-note@-2 {{overloads for '~=' exist with these partially matching parameter lists}}
 
   if case .e(5, nil) = produceMultiPayload() as MultiPayload<Int?> {}
   if case .e(nil, 0) = produceMultiPayload() as MultiPayload<Int?> {}
 
-  // Enum patterns are solved together.
   if case .e(E.a, .b) = produceMultiPayload() {}
   if case .e(.a, E.b) = produceMultiPayload() {}
 
-  // These also work because they start life as EnumPatterns.
   if case .e(E.c, .d) = produceMultiPayload() {}
   if case .e(.c, E.d) = produceMultiPayload() {}
   for case .e(E.c, .d) in [produceMultiPayload()] {}
