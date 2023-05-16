@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics -disable-availability-checking
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // Disallowed cases
 struct MultiplePack<each T, each U> {} // expected-error {{generic type cannot declare more than one type pack}}
