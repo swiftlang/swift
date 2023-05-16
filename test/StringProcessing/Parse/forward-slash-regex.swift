@@ -131,7 +131,6 @@ _ = /x/.../y/
 
 _ = /x/...
 // expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
-// expected-note@-2 {{overloads for '...' exist with these partially matching parameter lists}}
 
 do {
   _ = /x /...

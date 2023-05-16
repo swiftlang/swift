@@ -2785,6 +2785,23 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
         impact += choiceImpact - 1;
     }
   }
+
+  // If this requirement is associated with a call that is itself
+  // incorrect, let's increase impact to indicate that this failure
+  // has a compounding effect on viability of the overload choice it
+  // comes from.
+  if (locator.endsWith<LocatorPathElt::AnyRequirement>()) {
+    if (auto *expr = getAsExpr(anchor)) {
+      if (auto *call = getAsExpr<ApplyExpr>(cs.getParentExpr(expr))) {
+        if (call->getFn() == expr &&
+            llvm::any_of(cs.getFixes(), [&](const auto &fix) {
+              return getAsExpr(fix->getAnchor()) == call;
+            }))
+          impact += 2;
+      }
+    }
+  }
+
   return impact;
 }
 
@@ -8434,6 +8451,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto *fix = ContextualMismatch::create(*this, protocolTy, type, loc);
       if (!recordFix(fix))
         return SolutionKind::Solved;
+    }
+
+    // Conformance constraint that is introduced by an implicit conversion
+    // for example to `AnyHashable`.
+    if (kind == ConstraintKind::ConformsTo &&
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      auto *fix = AllowArgumentMismatch::create(*this, type, protocolTy, loc);
+      return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                          : SolutionKind::Solved;
     }
 
     // If this is an implicit Hashable conformance check generated for each
