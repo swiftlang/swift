@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature VariadicGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 func tuplify<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)
