@@ -455,6 +455,7 @@ do {
   func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
     return (repeat each value.makeA())
     // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
+    // expected-error@-2 {{pack reference 'each T.A' can only appear in pack expansion}}
   }
 }
 
