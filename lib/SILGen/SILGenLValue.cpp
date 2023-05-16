@@ -334,6 +334,8 @@ public:
                                      LValueOptions options);
   LValue visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
                        LValueOptions options);
+  LValue visitCopyExpr(CopyExpr *e, SGFAccessKind accessKind,
+                       LValueOptions options);
   LValue visitABISafeConversionExpr(ABISafeConversionExpr *e,
                                     SGFAccessKind accessKind,
                                     LValueOptions options);
@@ -4025,6 +4027,30 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
   } else {
     SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
   }
+  temp->finishInitialization(SGF);
+
+  // Now return the temporary in a value component.
+  return LValue::forValue(SGFAccessKind::BorrowedAddressRead,
+                          temp->getManagedAddress(),
+                          toAddr->getType().getASTType());
+}
+
+LValue SILGenLValue::visitCopyExpr(CopyExpr *e, SGFAccessKind accessKind,
+                                   LValueOptions options) {
+  // Do formal evaluation of the base l-value.
+  LValue baseLV = visitRec(e->getSubExpr(), SGFAccessKind::BorrowedAddressRead,
+                           options.forComputedBaseLValue());
+
+  ManagedValue addr = SGF.emitAddressOfLValue(e, std::move(baseLV));
+
+  // Now create the temporary and copy our value into there using an explicit
+  // copy_value. This ensures that the rest of the move checker views this as a
+  // liveness requiring use rather than a copy that must be eliminated.
+  auto temp =
+      SGF.emitFormalAccessTemporary(e, SGF.F.getTypeLowering(addr.getType()));
+  auto toAddr = temp->getAddressForInPlaceInitialization(SGF, e);
+  SGF.B.createExplicitCopyAddr(e, addr.getValue(), toAddr, IsNotTake,
+                               IsInitialization);
   temp->finishInitialization(SGF);
 
   // Now return the temporary in a value component.

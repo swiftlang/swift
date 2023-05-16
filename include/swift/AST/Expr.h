@@ -2077,6 +2077,33 @@ public:
   static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
 };
 
+/// CopyExpr - A 'copy' surrounding an lvalue expression marking the lvalue as
+/// needing a semantic copy. Used to force a copy of a no implicit copy type.
+class CopyExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc CopyLoc;
+
+public:
+  CopyExpr(SourceLoc copyLoc, Expr *sub, Type type = Type(),
+           bool implicit = false)
+      : Expr(ExprKind::Copy, implicit, type), SubExpr(sub), CopyLoc(copyLoc) {}
+
+  static CopyExpr *createImplicit(ASTContext &ctx, SourceLoc copyLoc, Expr *sub,
+                                  Type type = Type()) {
+    return new (ctx) CopyExpr(copyLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return CopyLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return CopyLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Copy; }
+};
+
 /// BorrowExpr - A 'borrow' surrounding an lvalue/accessor expression at an
 /// apply site marking the lvalue/accessor as being borrowed when passed to the
 /// callee.
