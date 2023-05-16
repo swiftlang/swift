@@ -2873,12 +2873,16 @@ ImportedType ClangImporter::Implementation::importEffectfulPropertyType(
 
   // Import the parameter list and result type.
   ParameterList *bodyParams = nullptr;
-  ImportedType importedType;
-
   auto methodReturnType = importMethodParamsAndReturnType(
       dc, decl, decl->parameters(), false,
       isFromSystemModule, &bodyParams, name,
       asyncConvention, errorConvention, kind);
+
+  // was there a problem during import?
+  if (!methodReturnType)
+    return ImportedType();
+
+  assert(bodyParams);
 
   // getter mustn't have any parameters!
   if (bodyParams->size() != 0) {
