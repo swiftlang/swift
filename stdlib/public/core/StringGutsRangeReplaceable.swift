@@ -84,7 +84,7 @@ extension _StringGuts {
   internal init(_initialCapacity capacity: Int) {
     self.init()
     if _slowPath(capacity > _SmallString.capacity) {
-      self.grow(capacity)
+      self.grow(capacity) // TODO: no factor should be applied
     }
   }
 
@@ -94,7 +94,7 @@ extension _StringGuts {
     if let currentCap = self.uniqueNativeCapacity, currentCap >= n { return }
 
     // Grow
-    self.grow(n)
+    self.grow(n) // TODO: no factor should be applied
   }
 
   // Grow to accommodate at least `n` code units
@@ -109,13 +109,19 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
-    // We're non-unique OR smaller than requested, so as we copy to new storage,
-    // choose a size that at least stores the current contents.
-    let growthTarget = Swift.max(n, self.utf8Count)
+    // If unique and native, apply a 2x growth factor to avoid problematic
+    // performance when used in a loop. If one if those doesn't apply, we
+    // can just use the requested capacity (at least the current utf-8 count).
+    // TODO: Don't do this! Growth should only happen for append...
+    let growthTarget: Int
+    if let capacity = self.uniqueNativeCapacity {
+      growthTarget = Swift.max(n, capacity * 2)
+    } else {
+      growthTarget = Swift.max(n, self.utf8Count)
+    }
 
     // `isFastUTF8` is not the same as `isNative`. It can include small
-    // strings or foreign strings that provide contiguous UTF-8 access, so
-    // we fall back to `utf8Count` if necessary.
+    // strings or foreign strings that provide contiguous UTF-8 access.
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
       let storage = self.withFastUTF8 {
