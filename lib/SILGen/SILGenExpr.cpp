@@ -552,6 +552,7 @@ namespace {
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitMoveExpr(MoveExpr *E, SGFContext C);
+    RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
   };
 } // end anonymous namespace
@@ -6152,6 +6153,64 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
   } else {
     SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
   }
+  optTemp->finishInitialization(SGF);
+  return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+}
+
+RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
+  auto *subExpr = E->getSubExpr();
+  auto subASTType = subExpr->getType()->getCanonicalType();
+  auto subType = SGF.getLoweredType(subASTType);
+
+  if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
+
+    FormalEvaluationScope writeback(SGF);
+    LValue lv =
+        SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
+    auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
+
+    if (subType.isLoadable(SGF.F)) {
+      // Use a formal access load borrow so this closes in the writeback scope
+      // above.
+      ManagedValue value = SGF.B.createFormalAccessLoadBorrow(E, address);
+
+      // We purposely, use a lexical cleanup here so that the cleanup lasts
+      // through the formal evaluation scope.
+      ManagedValue copy = SGF.B.createExplicitCopyValue(E, value);
+
+      return RValue(SGF, {copy}, subType.getASTType());
+    }
+
+    auto optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
+    SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
+    SGF.B.createExplicitCopyAddr(subExpr, address.getLValueAddress(), toAddr,
+                                 IsNotTake, IsInitialization);
+    optTemp->finishInitialization(SGF);
+    return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+  }
+
+  if (subType.isLoadable(SGF.F)) {
+    ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
+    if (mv.getType().isTrivial(SGF.F))
+      return RValue(SGF, {mv}, subType.getASTType());
+    mv = SGF.B.createExplicitCopyValue(E, mv);
+    return RValue(SGF, {mv}, subType.getASTType());
+  }
+
+  // If we aren't loadable, then create a temporary initialization and
+  // explicit_copy_addr into that.
+  std::unique_ptr<TemporaryInitialization> optTemp;
+  optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
+  SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
+  assert(!isa<LValueType>(E->getType()->getCanonicalType()) &&
+         "Shouldn't see an lvalue type here");
+
+  ManagedValue mv =
+      SGF.emitRValue(subExpr, SGFContext(SGFContext::AllowImmediatePlusZero))
+          .getAsSingleValue(SGF, subExpr);
+  assert(mv.getType().isAddress());
+  SGF.B.createExplicitCopyAddr(subExpr, mv.getValue(), toAddr, IsNotTake,
+                               IsInitialization);
   optTemp->finishInitialization(SGF);
   return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
 }

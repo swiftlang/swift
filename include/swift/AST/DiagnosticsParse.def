@@ -1386,6 +1386,8 @@ ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
 ERROR(expected_expr_after_move, none,
       "expected expression after 'consume'", ())
+ERROR(expected_expr_after_copy, none,
+      "expected expression after 'copy'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
 

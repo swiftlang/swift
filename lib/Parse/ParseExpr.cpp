@@ -422,6 +422,21 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return sub;
   }
 
+  if (Tok.isContextualKeyword("copy") &&
+      peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                        tok::code_complete) &&
+      !peekToken().isAtStartOfLine()) {
+    Tok.setKind(tok::contextual_keyword);
+
+    SourceLoc copyLoc = consumeToken();
+    ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_copy, isExprBasic);
+    if (!sub.isNull()) {
+      sub = makeParserResult(new (Context) CopyExpr(copyLoc, sub.get()));
+    }
+    return sub;
+  }
+
   if (Context.LangOpts.hasFeature(Feature::OldOwnershipOperatorSpellings)) {
     if (Tok.isContextualKeyword("_move")) {
       Tok.setKind(tok::contextual_keyword);

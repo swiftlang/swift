@@ -5000,6 +5000,11 @@ void PrintAST::visitMoveExpr(MoveExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitCopyExpr(CopyExpr *expr) {
+  Printer << "copy ";
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitBorrowExpr(BorrowExpr *expr) {
   Printer << "borrow ";
   visit(expr->getSubExpr());

@@ -2200,6 +2200,12 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitCopyExpr(CopyExpr *E) {
+    printCommon(E, "copy_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitBorrowExpr(BorrowExpr *E) {
     printCommon(E, "borrow_expr");
     OS << '\n';

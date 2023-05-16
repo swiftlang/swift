@@ -690,6 +690,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
+
+  Expr *visitCopyExpr(CopyExpr *E) {
+    if (Expr *subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitTupleExpr(TupleExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (E->getElement(i)) {
