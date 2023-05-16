@@ -723,11 +723,11 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void
 importer::addCommonInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx) {
+    ASTContext &ctx, bool ignoreClangTarget) {
   using ImporterImpl = ClangImporter::Implementation;
   llvm::Triple triple = ctx.LangOpts.Target;
   // Use clang specific target triple if given.
-  if (ctx.LangOpts.ClangTarget.has_value()) {
+  if (ctx.LangOpts.ClangTarget.has_value() && !ignoreClangTarget) {
     triple = ctx.LangOpts.ClangTarget.value();
   }
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
@@ -975,7 +975,7 @@ Optional<std::string> ClangImporter::getOrCreatePCH(
 }
 
 std::vector<std::string>
-ClangImporter::getClangArguments(ASTContext &ctx) {
+ClangImporter::getClangArguments(ASTContext &ctx, bool ignoreClangTarget) {
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
@@ -996,7 +996,7 @@ ClangImporter::getClangArguments(ASTContext &ctx) {
     getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
     break;
   }
-  addCommonInvocationArguments(invocationArgStrs, ctx);
+  addCommonInvocationArguments(invocationArgStrs, ctx, ignoreClangTarget);
   return invocationArgStrs;
 }
 
@@ -1099,15 +1099,6 @@ ClangImporter::create(ASTContext &ctx,
   std::unique_ptr<ClangImporter> importer{
       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
   auto &importerOpts = ctx.ClangImporterOpts;
-  importer->Impl.ClangArgs = getClangArguments(ctx);
-  ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
-  if (importerOpts.DumpClangDiagnostics) {
-    llvm::errs() << "'";
-    llvm::interleave(
-                     invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
-                     [] { llvm::errs() << "' '"; });
-    llvm::errs() << "'\n";
-  }
 
   if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
     importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
@@ -1147,6 +1138,15 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create a new Clang compiler invocation.
   {
+    importer->Impl.ClangArgs = getClangArguments(ctx);
+    ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
+    if (importerOpts.DumpClangDiagnostics) {
+      llvm::errs() << "'";
+      llvm::interleave(
+                       invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
+                       [] { llvm::errs() << "' '"; });
+      llvm::errs() << "'\n";
+    }
     importer->Impl.Invocation = createClangInvocation(
         importer.get(), importerOpts, VFS, invocationArgStrs);
     if (!importer->Impl.Invocation)
@@ -1222,6 +1222,27 @@ ClangImporter::create(ASTContext &ctx,
                          clang::SourceLocation());
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
+  // Use Clang to configure/save options for Swift IRGen/CodeGen
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    // If '-clang-target' is set, create a mock invocation with the Swift triple
+    // to configure CodeGen and Target options for Swift compilation.
+    auto swiftTargetClangArgs = getClangArguments(ctx, true);
+    ArrayRef<std::string> invocationArgStrs = swiftTargetClangArgs;
+    auto swiftTargetClangInvocation = createClangInvocation(
+        importer.get(), importerOpts, VFS, invocationArgStrs);
+    if (!swiftTargetClangInvocation)
+      return nullptr;
+    importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
+        clangDiags, swiftTargetClangInvocation->TargetOpts));
+    importer->Impl.setSwiftCodeGenOptions(new clang::CodeGenOptions(
+        swiftTargetClangInvocation->getCodeGenOpts()));
+  } else {
+    // Just use the existing Invocation's directly
+    importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
+        clangDiags, importer->Impl.Invocation->TargetOpts));
+    importer->Impl.setSwiftCodeGenOptions(
+        new clang::CodeGenOptions(importer->Impl.Invocation->getCodeGenOpts()));
+  }
 
   // Create the associated action.
   importer->Impl.Action.reset(new ParsingAction(ctx, *importer,
@@ -1880,7 +1901,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
   clang::Module *m;
   auto &ctx = Impl.getClangASTContext();
   auto &lo = ctx.getLangOpts();
-  auto &ti = getTargetInfo();
+  auto &ti = getModuleAvailabilityTarget();
 
   auto available = clangModule->isAvailable(lo, ti, r, mh, m);
   if (!available)
@@ -3688,8 +3709,12 @@ StringRef ClangModuleUnit::getLoadedFilename() const {
   return StringRef();
 }
 
-clang::TargetInfo &ClangImporter::getTargetInfo() const {
+clang::TargetInfo &ClangImporter::getModuleAvailabilityTarget() const {
   return Impl.Instance->getTarget();
+}
+
+clang::TargetInfo &ClangImporter::getTargetInfo() const {
+  return *Impl.getSwiftTargetInfo();
 }
 
 clang::ASTContext &ClangImporter::getClangASTContext() const {
@@ -3721,8 +3746,8 @@ clang::Sema &ClangImporter::getClangSema() const {
   return Impl.getClangSema();
 }
 
-clang::CodeGenOptions &ClangImporter::getClangCodeGenOpts() const {
-  return Impl.getClangCodeGenOpts();
+clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
+  return *Impl.getSwiftCodeGenOptions();
 }
 
 std::string ClangImporter::getClangModuleHash() const {
