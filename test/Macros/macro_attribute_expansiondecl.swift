@@ -57,6 +57,26 @@ public struct LocalFuncAndVarMacro: DeclarationMacro {
   }
 }
 
+public struct FuncFromClosureMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard
+      let closure = node.trailingClosure,
+      let arg1 = node.argumentList.first?.expression else {
+      return []
+    }
+
+    return ["""
+      func fromClosure() {
+        print(\(arg1))
+        \(closure.statements)
+      }
+      """]
+  }
+}
+
 //--- test.swift
 
 @freestanding(declaration, names: named(globalFunc), named(globalVar)) macro globalDecls() = #externalMacro(module: "MacroDefinition", type: "GlobalFuncAndVarMacro")
@@ -96,4 +116,45 @@ func testLocal() {
   do {
   }
 #endif
+}
+
+@freestanding(declaration, names: named(fromClosure)) macro funcFromClosureMacro(_: String, _: () -> Void) = #externalMacro(module: "MacroDefinition", type: "FuncFromClosureMacro")
+
+@available(macOS 99, *)
+func APIFrom99() -> String { "" }
+@available(macOS 999, *)
+func APIFrom999() -> String { "" }
+
+@available(macOS 99, *)
+#funcFromClosureMacro(APIFrom99()) {
+  _ = APIFrom99()
+  if #available(macOS 999, *) {
+    _ = APIFrom99()
+    _ = APIFrom999()
+  }
+}
+
+struct S1 {
+  @available(macOS 99, *)
+  #funcFromClosureMacro(APIFrom99()) {
+    _ = APIFrom99()
+    if #available(macOS 999, *) {
+      _ = APIFrom99()
+      _ = APIFrom999()
+    }
+  }
+}
+
+// FIXME: Diagnostics could be better.
+struct S2 { // expected-note 4 {{add @available attribute to enclosing struct}}
+  // expected-note@+3 6 {{in expansion of macro 'funcFromClosureMacro' here}}
+  // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}}
+  // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+2 {{add 'if #available' version check}}
+  #funcFromClosureMacro(APIFrom99()) {
+    _ = APIFrom99()
+    if #available(macOS 999, *) {
+      _ = APIFrom99()
+      _ = APIFrom999()
+    }
+  }
 }
