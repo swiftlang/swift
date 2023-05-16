@@ -1,4 +1,4 @@
-if (SWIFT_SWIFT_PARSER)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   # _swiftCSwiftPluginServer is just a C support library for swift-plugin-server
   # Don't bother to create '.a' for that.
   add_swift_host_library(_swiftCSwiftPluginServer OBJECT
@@ -17,9 +17,9 @@ if (SWIFT_SWIFT_PARSER)
       swiftDemangling
       $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
     SWIFT_DEPENDENCIES
-      SwiftSyntax::SwiftSyntaxMacros
-      SwiftSyntax::SwiftSyntaxMacroExpansion
-      SwiftSyntax::SwiftCompilerPluginMessageHandling
+      SwiftSyntaxMacros
+      SwiftSyntaxMacroExpansion
+      SwiftCompilerPluginMessageHandling
       swiftLLVMJSON
   )
   target_include_directories(swift-plugin-server PRIVATE

@@ -442,7 +442,7 @@ endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   if(NOT BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
       set(ASRLF_BOOTSTRAPPING_MODE "HOSTTOOLS")
     else()
       return()
@@ -575,10 +575,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
-    # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -656,7 +653,7 @@ function(add_swift_host_library name)
   translate_flags(ASHL "${options}")
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND ASHL_SHARED)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND ASHL_SHARED)
     set(ASHL_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -702,7 +699,7 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
-  target_link_directories(${name} PUBLIC ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  target_link_directories(${name} PUBLIC "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
@@ -889,7 +886,7 @@ function(add_swift_host_tool executable)
   endif()
 
   # Once the new Swift parser is linked in, every host tool has Swift modules.
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_BUILD_SWIFT_SYNTAX)
     set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -928,7 +925,7 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     set(extra_relative_rpath "")
     if(NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "")
       if(executable MATCHES "-bootstrapping")

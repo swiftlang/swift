@@ -251,13 +251,15 @@ class BuildScriptInvocation(object):
             args.extra_cmake_options.append(
                 '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
 
-        swift_syntax_src = os.path.join(self.workspace.source_root,
-                                        "swift-syntax")
-        args.extra_cmake_options.append(
-            '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
 
         if args.build_early_swiftsyntax:
-            impl_args += ["--swift-earlyswiftsyntax"]
+            swift_syntax_src = os.path.join(self.workspace.source_root,
+                                            "swift-syntax")
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+            args.extra_cmake_options.append('-DSWIFT_BUILD_SWIFT_SYNTAX:BOOL=TRUE')
+            if self.args.assertions:
+              args.extra_cmake_options.append('-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
@@ -567,9 +569,6 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
-
-        builder.add_product(products.EarlySwiftSyntax,
-                            is_enabled=self.args.build_early_swiftsyntax)
 
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.

@@ -167,7 +167,7 @@ elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':
 elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING-WITH-HOSTLIBS':
   config.available_features.add('bootstrapping_with_hostlibs_mode')
 
-if '@SWIFT_SWIFT_PARSER@' == 'TRUE':
+if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
 
 # Let the main config do the real work.

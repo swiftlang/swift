@@ -25,7 +25,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   # to do it.
   set(ASKD_BOOTSTRAPPING_MODE ${BOOTSTRAPPING_MODE})
   if (NOT ASKD_BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
       set(ASKD_BOOTSTRAPPING_MODE HOSTTOOLS)
     endif()
   endif()
@@ -154,10 +154,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
-    # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     # Add rpath to the host Swift libraries.
     if (NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
@@ -268,7 +265,7 @@ macro(add_sourcekit_library name)
   endif()
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND SOURCEKITLIB_SHARED)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND SOURCEKITLIB_SHARED)
     set(SOURCEKITLIB_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -352,7 +349,7 @@ macro(add_sourcekit_executable name)
 
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     set(SKEXEC_HAS_SWIFT_MODULES TRUE)
   else()
     set(SKEXEC_HAS_SWIFT_MODULES FALSE)
@@ -381,7 +378,7 @@ macro(add_sourcekit_framework name)
   set(framework_location "${lib_dir}/${name}.framework")
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_BUILD_SWIFT_SYNTAX)
     set(SOURCEKITFW_HAS_SWIFT_MODULES ON)
   endif()
 

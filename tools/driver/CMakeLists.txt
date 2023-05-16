@@ -4,7 +4,7 @@
 # Add additional libraries to which we need to link when the Swift Swift
 # parser is built in.
 function(add_swift_parser_link_libraries target)
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     target_link_libraries(${target}
                           PRIVATE swiftCore)
 

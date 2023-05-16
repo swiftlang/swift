@@ -557,7 +557,7 @@ public:
 
     // Check whether this is any one of the known compiler features.
     const auto &langOpts = Ctx.LangOpts;
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     const bool hasSwiftSwiftParser = true;
 #else
     const bool hasSwiftSwiftParser = false;

@@ -89,7 +89,7 @@ extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *handle, const char *libraryPath, const char *moduleName,
     void *diagEngine);
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Look for macro's type metadata given its external module and type name.
 static void const *
 lookupMacroTypeMetadataByExternalName(ASTContext &ctx, StringRef moduleName,
@@ -185,7 +185,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   auto sourceFile = macro->getParentSourceFile();
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   char *externalMacroNamePtr;
   ptrdiff_t externalMacroNameLength;
   ptrdiff_t *replacements;
@@ -291,7 +291,7 @@ initializeExecutablePlugin(ASTContext &ctx,
   // FIXME: Ideally this should be done right after invoking the plugin.
   // But plugin loading is in libAST and it can't link ASTGen symbols.
   if (!executablePlugin->isInitialized()) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
       return nullptr;
     }
@@ -312,7 +312,7 @@ initializeExecutablePlugin(ASTContext &ctx,
 
   // If this is a plugin server, load the library.
   if (!libraryPath.empty()) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
     auto fs = ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
@@ -375,7 +375,7 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
 static llvm::Optional<ExternalMacroDefinition>
 resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName, LoadedLibraryPlugin *plugin) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   /// Look for the type metadata given the external module and type names.
   auto macroMetatype = lookupMacroTypeMetadataByExternalName(
       ctx, moduleName.str(), typeName.str(), plugin);
@@ -399,7 +399,7 @@ static llvm::Optional<ExternalMacroDefinition>
 resolveExecutableMacro(ASTContext &ctx,
                        LoadedExecutablePlugin *executablePlugin,
                        Identifier moduleName, Identifier typeName) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
           moduleName.str().data(), moduleName.str().size(),
           typeName.str().data(), typeName.str().size(), executablePlugin)) {
@@ -970,7 +970,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
   LazyValue<std::string> discriminator([&]() -> std::string {
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     Mangle::ASTMangler mangler;
     return mangler.mangleMacroExpansion(expansion);
 #else
@@ -1031,7 +1031,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
     }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     PrettyStackTraceFreestandingMacroExpansion debugStack(
         "expanding freestanding macro", expansion);
 
@@ -1210,7 +1210,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   LazyValue<std::string> discriminator([&]() -> std::string {
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     Mangle::ASTMangler mangler;
     return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
 #else
@@ -1288,7 +1288,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
       return nullptr;
     }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     PrettyStackTraceDecl debugStack("expanding attached macro", attachedTo);
 
     auto *astGenAttrSourceFile = attrSourceFile->getExportedSourceFile();

@@ -1150,7 +1150,7 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
     Builder.addRightParen();
   });
 
-#ifndef SWIFT_SWIFT_PARSER
+#ifndef SWIFT_BUILD_SWIFT_SYNTAX
   addWithName("warning", CodeCompletionKeywordKind::pound_warning,
               [&] (CodeCompletionResultBuilder &Builder) {
     Builder.addLeftParen();

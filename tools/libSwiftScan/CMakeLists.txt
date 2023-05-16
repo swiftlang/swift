@@ -30,7 +30,7 @@ set_target_properties(libSwiftScan
     PROPERTIES
     OUTPUT_NAME ${SWIFT_SCAN_LIB_NAME})
 
-if(SWIFT_SWIFT_PARSER)
+if(SWIFT_BUILD_SWIFT_SYNTAX)
   # Ensure that we can find the host shared libraries.
   set_property(
     TARGET libSwiftScan

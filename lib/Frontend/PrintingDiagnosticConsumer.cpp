@@ -964,7 +964,7 @@ static void annotateSnippetWithInfo(SourceManager &SM,
   }
 }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void enqueueDiagnostic(
     void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
@@ -1038,7 +1038,7 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
   }
 }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 void PrintingDiagnosticConsumer::queueBuffer(
     SourceManager &sourceMgr, unsigned bufferID) {
   QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
@@ -1103,7 +1103,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 
   switch (FormattingStyle) {
   case DiagnosticOptions::FormattingStyle::Swift: {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
     auto bufferStack = getSourceBufferStack(SM, Info.Loc);
     if (!bufferStack.empty()) {
@@ -1190,7 +1190,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
     currentSnippet.reset();
   }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
     char *renderedString = nullptr;
     ptrdiff_t renderedStringLen = 0;
