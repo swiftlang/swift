@@ -22,7 +22,6 @@ public func borrowVal(_ x: borrowing EmptyStruct) {}
 
 // CHECK-LABEL: sil [ossa] @$s26moveonly_library_evolution10DeinitTestVfD : $@convention(method) (@in DeinitTest) -> () {
 // CHECK: bb0([[ARG:%.*]] : $*DeinitTest):
-// CHECK:   drop_deinit [[ARG]]
 // CHECK: } // end sil function '$s26moveonly_library_evolution10DeinitTestVfD'
 public struct DeinitTest : ~Copyable {
     deinit {
