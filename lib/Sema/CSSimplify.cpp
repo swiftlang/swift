@@ -6989,6 +6989,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return formUnsolvedResult();
       }
 
+      // Closure result is allowed to convert to Void in certain circumstances,
+      // let's forego tuple matching because it is guaranteed to fail and jump
+      // to `() -> T` to `() -> Void` rule.
+      if (locator.endsWith<LocatorPathElt::ClosureBody>()) {
+        if (containsPackExpansionType(tuple1) && tuple2->isVoid())
+          break;
+      }
+
       // Add each tuple type to the locator before matching the element types.
       // This is useful for diagnostics, because the error message can use the
       // full tuple type for several element mismatches. Use the original types
@@ -7284,22 +7292,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                      locator);
     }
     }
-  }
-
-  // Matching types where one side is a pack expansion and the other is not
-  // means a pack expansion was used where it isn't supported.
-  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
-
-    if (type1->isPlaceholder() || type2->isPlaceholder())
-      return getTypeMatchSuccess();
-
-    auto *loc = getConstraintLocator(locator);
-    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
-      return getTypeMatchFailure(locator);
-
-    return getTypeMatchSuccess();
   }
 
   if (kind >= ConstraintKind::Conversion) {
@@ -7722,6 +7714,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             ConstraintLocator::LValueConversion));
       }
     }
+  }
+
+  // Matching types where one side is a pack expansion and the other is not
+  // means a pack expansion was used where it isn't supported.
+  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (type1->isPlaceholder() || type2->isPlaceholder())
+      return getTypeMatchSuccess();
+
+    auto *loc = getConstraintLocator(locator);
+    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
   }
 
   // Attempt fixes iff it's allowed, both types are concrete and
