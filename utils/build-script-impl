@@ -2326,7 +2326,7 @@ for host in "${ALL_HOSTS[@]}"; do
                       XCTEST_BUILD_ARGS="--release"
                   fi
 
-                  call "${XCTEST_SOURCE_DIR}"/build_script.py \
+                  call python3 "${XCTEST_SOURCE_DIR}"/build_script.py \
                       --swiftc="${SWIFTC_BIN}" \
                       --build-dir="${XCTEST_BUILD_DIR}" \
                       --foundation-build-dir="${FOUNDATION_BUILD_DIR}" \
@@ -2825,7 +2825,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   echo "--- Running tests for ${product} ---"
                   FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                   XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-                  call "${XCTEST_SOURCE_DIR}"/build_script.py test \
+                  call python3 "${XCTEST_SOURCE_DIR}"/build_script.py test \
                       --swiftc="${SWIFTC_BIN}" \
                       --lit="${LLVM_SOURCE_DIR}/utils/lit/lit.py" \
                       --foundation-build-dir="${FOUNDATION_BUILD_DIR}" \
