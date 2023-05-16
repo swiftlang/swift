@@ -121,7 +121,7 @@ endfunction()
 # source1 ...
 #   Sources to add into this library.
 function(add_pure_swift_host_library name)
-  if (NOT SWIFT_SWIFT_PARSER)
+  if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     message(STATUS "Not building ${name} because swift-syntax is not available")
     return()
   endif()
@@ -196,13 +196,15 @@ function(add_pure_swift_host_library name)
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+  target_link_directories(${name} PUBLIC
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
 
   if(APSHL_EMIT_MODULE)
     # Determine where Swift modules will be built and installed.
 
-    set(module_triple ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE})
-    set(module_dir ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    set(module_triple "${SWIFT_HOST_MODULE_TRIPLE}")
+    set(module_dir "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
     set(module_base "${module_dir}/${name}.swiftmodule")
     set(module_file "${module_base}/${module_triple}.swiftmodule")
     set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
@@ -234,6 +236,12 @@ function(add_pure_swift_host_library name)
         >)
   endif()
 
+  if(LLVM_USE_LINKER)
+    target_link_options(${name} PRIVATE
+      "-use-ld=${LLVM_USE_LINKER}"
+    )
+  endif()
+
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
@@ -241,7 +249,7 @@ endfunction()
 # Add a new "pure" Swift host tool.
 #
 # "Pure" Swift host tools can only contain Swift code, and will be built
-# with the host compiler. 
+# with the host compiler.
 #
 # Usage:
 #   add_pure_swift_host_tool(name
@@ -262,7 +270,7 @@ endfunction()
 # source1 ...
 #   Sources to add into this tool.
 function(add_pure_swift_host_tool name)
-  if (NOT SWIFT_SWIFT_PARSER)
+  if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     message(STATUS "Not building ${name} because swift-syntax is not available")
     return()
   endif()
@@ -322,7 +330,15 @@ function(add_pure_swift_host_tool name)
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+  target_link_directories(${name} PUBLIC
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+
+  if(LLVM_USE_LINKER)
+    target_link_options(${name} PRIVATE
+      "-use-ld=${LLVM_USE_LINKER}"
+    )
+  endif()
 
   # Workaround to touch the library and its objects so that we don't
   # continually rebuild (again, see corresponding change in swift-syntax).

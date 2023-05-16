@@ -25,35 +25,35 @@ target_link_libraries(swiftParse PRIVATE
   swiftAST
 )
 
-if (SWIFT_SWIFT_PARSER)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftParse
     PRIVATE
-    SwiftSyntax::SwiftBasicFormat
-    SwiftSyntax::SwiftParser
-    SwiftSyntax::SwiftParserDiagnostics
-    SwiftSyntax::SwiftDiagnostics
-    SwiftSyntax::SwiftSyntax
-    SwiftSyntax::SwiftOperators
-    SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::SwiftSyntaxMacros
+    SwiftBasicFormat
+    SwiftParser
+    SwiftParserDiagnostics
+    SwiftDiagnostics
+    SwiftSyntax
+    SwiftOperators
+    SwiftSyntaxBuilder
+    SwiftSyntaxMacros
     swiftASTGen
   )
 
   add_dependencies(swiftParse
-    SwiftSyntax::SwiftBasicFormat
-    SwiftSyntax::SwiftParser
-    SwiftSyntax::SwiftParserDiagnostics
-    SwiftSyntax::SwiftDiagnostics
-    SwiftSyntax::SwiftSyntax
-    SwiftSyntax::SwiftOperators
-    SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::SwiftSyntaxMacros
+    SwiftBasicFormat
+    SwiftParser
+    SwiftParserDiagnostics
+    SwiftDiagnostics
+    SwiftSyntax
+    SwiftOperators
+    SwiftSyntaxBuilder
+    SwiftSyntaxMacros
     swiftASTGen
   )
 
   target_compile_definitions(swiftParse
     PRIVATE
-    SWIFT_SWIFT_PARSER
+    SWIFT_BUILD_SWIFT_SYNTAX
   )
 endif()
 
