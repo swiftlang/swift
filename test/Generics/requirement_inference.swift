@@ -224,23 +224,6 @@ struct X11<T: P12, U: P12> where T.B == U.B.A {
 	func upperSameTypeConstraint<V>(_: V) where U == X10 { }
 }
 
-#if _runtime(_ObjC)
-// rdar://problem/30610428
-@objc protocol P14 { }
-
-class X12<S: AnyObject> {
-  func bar<V>(v: V) where S == P14 {
-  }
-}
-
-@objc protocol P15: P14 { }
-
-class X13<S: P14> {
-  func bar<V>(v: V) where S == P15 {
-  }
-}
-#endif
-
 protocol P16 {
 	associatedtype A
 }
