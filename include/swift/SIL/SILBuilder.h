@@ -956,6 +956,13 @@ public:
         getSILDebugLocation(Loc), Src, Dest, Initializer, Setter, mode));
   }
 
+  AssignOrInitInst *createAssignOrInit(SILLocation Loc, SILValue Src,
+                                       SILValue Initializer,
+                                       SILValue Setter) {
+    return insert(new (getModule()) AssignOrInitInst(
+        getSILDebugLocation(Loc), Src, Initializer, Setter));
+  }
+
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
                                      SILValue DestAddr) {
     return insert(new (getModule())

@@ -1776,6 +1776,12 @@ public:
           << ", set " << getIDAndType(AI->getSetter());
   }
 
+  void visitAssignOrInitInst(AssignOrInitInst *AI) {
+    *this << getIDAndType(AI->getSrc());
+    *this << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
+  }
+
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     switch (MU->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;

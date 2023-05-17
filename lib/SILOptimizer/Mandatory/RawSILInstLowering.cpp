@@ -323,6 +323,10 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         continue;
       }
 
+      if (auto *ai = dyn_cast<AssignOrInitInst>(inst)) {
+        llvm_unreachable("AssignOrInitInst not yet implemented");
+      }
+
       // mark_uninitialized just becomes a noop, resolving to its operand.
       if (auto *mui = dyn_cast<MarkUninitializedInst>(inst)) {
         mui->replaceAllUsesWith(mui->getOperand());

@@ -2722,6 +2722,10 @@ public:
     checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
+  void checkAssignOrInitInst(AssignOrInitInst *AI) {
+    llvm_unreachable("not yet implemented for AssignOrInitInst");
+  };
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
   void checkLoad##Name##Inst(Load##Name##Inst *LWI) {                          \
     require(LWI->getType().isObject(), "Result of load must be an object");    \

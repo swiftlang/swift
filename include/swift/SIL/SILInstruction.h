@@ -4935,6 +4935,35 @@ public:
   }
 };
 
+/// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
+/// which may either be an initialization or a store sequence.  This is only
+/// valid in Raw SIL.
+///
+/// Note that this instruction does not inherit from AssignInstBase because
+/// there is no physical destination of the assignment. Both the init
+/// and the setter are factored into functions.
+class AssignOrInitInst
+    : public InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>,
+      public CopyLikeInstruction {
+  friend SILBuilder;
+  USE_SHARED_UINT8;
+
+  FixedOperandList<3> Operands;
+
+private:
+  AssignOrInitInst(SILDebugLocation DebugLoc,
+                   SILValue Src, SILValue Initializer,
+                   SILValue Setter);
+
+public:
+  SILValue getSrc() const { return Operands[0].get(); }
+  SILValue getInitializer() { return Operands[1].get(); }
+  SILValue getSetter() { return  Operands[2].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
 /// Indicates that a memory location is uninitialized at this point and needs to
 /// be initialized by the end of the function and before any escape point for
 /// this instruction. This is only valid in Raw SIL.
