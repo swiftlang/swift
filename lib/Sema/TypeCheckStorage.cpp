@@ -640,7 +640,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::moveonly_effectful_getter,
+        getter->diagnose(diag::noncopyable_effectful_getter,
                          getter->getDescriptiveKind());
         break;
       case DiagKind::BorrowedAttr:

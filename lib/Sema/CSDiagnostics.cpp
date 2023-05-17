@@ -6083,7 +6083,7 @@ bool NotCompileTimeConstFailure::diagnoseAsError() {
 }
 
 bool NotCopyableFailure::diagnoseAsError() {
-  emitDiagnostic(diag::moveonly_generics, noncopyableTy);
+  emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
   return true;
 }
 
