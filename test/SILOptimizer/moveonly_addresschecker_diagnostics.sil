@@ -304,7 +304,7 @@ sil [ossa] @classSimpleChainArgTest : $@convention(thin) (@inout Klass) -> () {
 bb0(%0 : $*Klass):
   %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
   // expected-error @-1 {{'x2' consumed more than once}}
-  // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+  // expected-error @-2 {{missing reinitialization of 'x2' after consume}}
   debug_value %1 : $*Klass, var, name "x2", argno 1, expr op_deref
   %3 = alloc_stack [lexical] $Klass, var, name "y2"
   %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass
@@ -359,7 +359,7 @@ bb0(%0 : @closureCapture @guaranteed $<τ_0_0 where τ_0_0 : P> { var AddressOnl
   end_access %12 : $*AddressOnlyGeneric<T>
   %17 = begin_access [deinit] [dynamic] %1 : $*AddressOnlyGeneric<T>
   %18 = mark_must_check [assignable_but_not_consumable] %17 : $*AddressOnlyGeneric<T>
-  // expected-error @-1 {{'x' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it}}
+  // expected-error @-1 {{captured 'x' cannot be consumed within a closure}}
   %19 = function_ref @addressOnlyGenericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
   %20 = apply %19<T>(%18) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in AddressOnlyGeneric<τ_0_0>) -> ()
   end_access %17 : $*AddressOnlyGeneric<T>

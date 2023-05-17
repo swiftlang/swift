@@ -260,7 +260,7 @@ extension DeferTestProtocol {
         let _ = (consume self)
         defer {
             self = selfType.getP()
-            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support checking}}
+            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support}}
         }
         print("123")
     }
@@ -588,7 +588,7 @@ public func nonEscapingpartialApplyTest<T : P>(_ x: __owned T) {
 public func partialApplyTest<T : P>(_ x: __owned T) -> () -> () {
     var x2 = x
     x2 = x
-    let _ = consume x2 // expected-error {{'consume' applied to value that the compiler does not support checking}}
+    let _ = consume x2 // expected-error {{'consume' applied to value that the compiler does not support}}
     let f = {
         print(x2)
     }
@@ -694,7 +694,7 @@ func reinitInPieces1<T : P>(_ k: ProtPair<T>) {
     var k2 = k
     k2 = k
 
-    let _ = consume k2 // expected-error {{'consume' applied to value that the compiler does not support checking}}
+    let _ = consume k2 // expected-error {{'consume' applied to value that the compiler does not support}}
     k2.lhs = selfType.getP()
     k2.rhs = selfType.getP()
 }

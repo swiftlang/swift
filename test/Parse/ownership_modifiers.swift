@@ -18,13 +18,13 @@ func worst(x: (borrowing consuming Foo) -> ()) {} // expected-error{{at most one
 
 func zim(x: borrowing) {}
 func zang(x: consuming) {}
-func zung(x: borrowing consuming) {} // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
-func zip(x: consuming borrowing) {}  // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func zung(x: borrowing consuming) {} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func zip(x: consuming borrowing) {}  // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
 func zap(x: (borrowing, consuming) -> ()) {}
-func zoop(x: (borrowing consuming, consuming borrowing) -> ()) {} // expected-error 2{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func zoop(x: (borrowing consuming, consuming borrowing) -> ()) {} // expected-error 2{{copyable types cannot be 'consuming' or 'borrowing' yet}}
 
-func worster(x: borrowing borrowing borrowing) {} // expected-error{{at most one}} // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
-func worstest(x: (borrowing borrowing borrowing) -> ()) {} // expected-error{{at most one}} // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func worster(x: borrowing borrowing borrowing) {} // expected-error{{at most one}} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func worstest(x: (borrowing borrowing borrowing) -> ()) {} // expected-error{{at most one}} // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
 
 // Parameter specifier names are regular identifiers in other positions,
 // including argument labels.
@@ -61,15 +61,15 @@ struct MethodModifiers: ~Copyable {
 }
 
 
-func chalk(_ a: consuming String, // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
-           _ b: borrowing [Int], // expected-error{{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func chalk(_ a: consuming String, // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
+           _ b: borrowing [Int], // expected-error{{copyable types cannot be 'consuming' or 'borrowing' yet}}
            _ c: __shared [String],
            _ d: __owned Int?)
            {}
 
 struct Stepping {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods in a Copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods in a Copyable type}}
+    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
+    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
   mutating func change() {}
   var ex: Int {
     __consuming get { 0 }
@@ -77,16 +77,16 @@ struct Stepping {
 }
 
 class Clapping {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods in a Copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods in a Copyable type}}
+    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
+    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
   var ex: Int {
     __consuming get { 0 }
   }
 }
 
 protocol Popping {
-    consuming func perform() // expected-error {{'consuming' is not yet valid on instance methods in a Copyable type}}
-    borrowing func doIt() // expected-error {{'borrowing' is not yet valid on instance methods in a Copyable type}}
+    consuming func perform() // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
+    borrowing func doIt() // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
   mutating func change()
   var ex: Int {
     __consuming get
@@ -94,8 +94,8 @@ protocol Popping {
 }
 
 enum Exercising {
-    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods in a Copyable type}}
-    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods in a Copyable type}}
+    consuming func perform() {} // expected-error {{'consuming' is not yet valid on instance methods of a copyable type}}
+    borrowing func doIt() {} // expected-error {{'borrowing' is not yet valid on instance methods of a copyable type}}
   mutating func change() {}
   var ex: Int {
     __consuming get { 0 }
@@ -103,7 +103,7 @@ enum Exercising {
 }
 
 func consumingClosure1(_ f: consuming () -> ()) { } // expected-error {{'consuming' cannot be applied to nonescaping closure}}
-func consumingClosure2(_ f: consuming @escaping () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func consumingClosure2(_ f: consuming @escaping () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
 
-func borrowingClosure1(_ f: borrowing () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
-func borrowingClosure2(_ f: borrowing @escaping () -> ()) { } // expected-error {{Copyable types cannot be 'consuming' or 'borrowing' yet}}
+func borrowingClosure1(_ f: borrowing () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}
+func borrowingClosure2(_ f: borrowing @escaping () -> ()) { } // expected-error {{copyable types cannot be 'consuming' or 'borrowing' yet}}

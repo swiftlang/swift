@@ -77,12 +77,12 @@ func c2(x: consuming M) {
     consume(x)
 }
 
-func d(x: __owned M) { // expected-error {{'x' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations}}
+func d(x: __owned M) { // expected-error {{captured 'x' cannot be consumed within a closure}}
     clodger({ consume(x) })
     // expected-note @-1 {{consuming use here}}
 }
 
-func d2(x: consuming M) { // expected-error {{'x' consumed in closure but not reinitialized before end of closure}}
+func d2(x: consuming M) { // expected-error {{missing reinitialization of 'x' after consume}}
     clodger({ consume(x) })
     // expected-note @-1 {{consuming use here}}
 }
@@ -129,7 +129,7 @@ func k(x: borrowing M) {
 }
 
 
-func l(x: inout M) { // expected-error {{'x' consumed in closure but not reinitialized before end of closure}}
+func l(x: inout M) { // expected-error {{missing reinitialization of 'x' after consume}}
     clodger({ consume(x) }) // expected-note {{consuming use here}}
 }
 

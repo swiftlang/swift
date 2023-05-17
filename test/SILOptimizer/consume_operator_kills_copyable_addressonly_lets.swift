@@ -147,7 +147,7 @@ public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
 
 // This is ok, no uses after.
 public func simpleMoveOfParameter<T>(_ x: T) -> () {
-    let _ = consume x // expected-error {{'consume' applied to value that the compiler does not support checking}}
+    let _ = consume x // expected-error {{'consume' applied to value that the compiler does not support}}
 }
 
 public func simpleMoveOfOwnedParameter<T>(_ x: __owned T) -> () {

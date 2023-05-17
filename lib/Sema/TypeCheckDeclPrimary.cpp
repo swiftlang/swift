@@ -2609,7 +2609,7 @@ public:
     //
 
     if (ED->isObjC() && ED->isMoveOnly()) {
-      ED->diagnose(diag::moveonly_objc_enum_banned);
+      ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
     diagnoseCopyableTypeContainingMoveOnlyType(ED);
@@ -2625,11 +2625,11 @@ public:
     // indirect cases.
     if (ED->getAttrs().hasAttribute<MoveOnlyAttr>()) {
       if (ED->isIndirect())
-        ED->diagnose(diag::moveonly_enums_do_not_support_indirect,
+        ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
       for (auto *elt : ED->getAllElements()) {
         if (elt->isIndirect()) {
-          elt->diagnose(diag::moveonly_enums_do_not_support_indirect,
+          elt->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                         ED->getBaseIdentifier());
         }
       }
@@ -2797,7 +2797,7 @@ public:
 
     auto &ctx = moveonlyType->getASTContext();
     ctx.Diags.diagnose(loc,
-                       diag::moveonly_cannot_conform_to_type,
+                       diag::noncopyable_cannot_conform_to_type,
                        moveonlyType->getDescriptiveKind(),
                        moveonlyType->getBaseName(),
                        type);
@@ -3646,7 +3646,7 @@ public:
     if (CD->isFailable()) {
       if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (nom->isMoveOnly()) {
-          CD->diagnose(diag::moveonly_failable_init);
+          CD->diagnose(diag::noncopyable_failable_init);
         }
       }
     }

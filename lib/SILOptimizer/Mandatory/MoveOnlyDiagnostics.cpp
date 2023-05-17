@@ -187,7 +187,7 @@ void DiagnosticEmitter::emitCheckerDoesntUnderstandDiagnostic(
 
 void DiagnosticEmitter::emitCheckedMissedCopyError(SILInstruction *copyInst) {
   diagnose(copyInst->getFunction()->getASTContext(), copyInst,
-           diag::sil_moveonlychecker_missed_copy);
+           diag::sil_moveonlychecker_bug_missed_copy);
 }
 
 //===----------------------------------------------------------------------===//
@@ -221,7 +221,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
           lookThroughCopyValueInsts(markedValue->getOperand()))) {
     if (fArg->isClosureCapture()) {
       diagnose(astContext, markedValue,
-               diag::sil_moveonlychecker_let_value_consumed_in_closure,
+               diag::sil_moveonlychecker_capture_consumed_in_closure,
                varName);
       emitObjectDiagnosticsForGuaranteedUses(
           true /*ignore partial apply uses*/);
@@ -417,7 +417,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
   LLVM_DEBUG(llvm::dbgs() << "    Consuming use: " << *consumingUser);
 
   diagnose(astContext, markedValue,
-           diag::sil_moveonlychecker_exclusivity_violation, varName);
+           diag::sil_moveonlychecker_bug_exclusivity_violation, varName);
   diagnose(astContext, consumingUser,
            diag::sil_moveonlychecker_consuming_use_here);
 }
@@ -453,32 +453,6 @@ void DiagnosticEmitter::emitAddressDiagnostic(MarkMustCheckInst *markedValue,
   }
 
   if (isInOutEndOfFunction) {
-    if (auto *pbi = dyn_cast<ProjectBoxInst>(markedValue->getOperand())) {
-      if (auto *fArg = dyn_cast<SILFunctionArgument>(pbi->getOperand())) {
-        if (fArg->isClosureCapture()) {
-          diagnose(
-              astContext, markedValue,
-              diag::
-                  sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
-              varName);
-          diagnose(astContext, violatingUser,
-                   diag::sil_moveonlychecker_consuming_use_here);
-          return;
-        }
-      }
-    }
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
-      if (fArg->isClosureCapture()) {
-        diagnose(
-            astContext, markedValue,
-            diag::
-                sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
-            varName);
-        diagnose(astContext, violatingUser,
-                 diag::sil_moveonlychecker_consuming_use_here);
-        return;
-      }
-    }
     diagnose(
         astContext, markedValue,
         diag::
@@ -531,18 +505,6 @@ void DiagnosticEmitter::emitInOutEndOfFunctionDiagnostic(
 
   // Otherwise, we need to do no implicit copy semantics. If our last use was
   // consuming message:
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(markedValue->getOperand())) {
-    if (fArg->isClosureCapture()) {
-      diagnose(
-          astContext, markedValue,
-          diag::
-              sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure,
-          varName);
-      diagnose(astContext, violatingUser,
-               diag::sil_moveonlychecker_consuming_use_here);
-      return;
-    }
-  }
   diagnose(
       astContext, markedValue,
       diag::sil_moveonlychecker_inout_not_reinitialized_before_end_of_function,
@@ -590,9 +552,9 @@ void DiagnosticEmitter::emitObjectDestructureNeededWithinBorrowBoundary(
                           << *destructureNeedingUser);
 
   diagnose(astContext, markedValue,
-           diag::sil_moveonlychecker_moveonly_field_consumed, varName);
+           diag::sil_moveonlychecker_use_after_partial_consume, varName);
   diagnose(astContext, destructureNeedingUser,
-           diag::sil_moveonlychecker_consuming_use_here);
+           diag::sil_moveonlychecker_partial_consume_here);
 
   // Only emit errors for last users that overlap with our needed destructure
   // bits.
@@ -665,62 +627,30 @@ void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
 
   SILValue operand = stripAccessMarkers(markedValue->getOperand());
 
-  using DiagType =
-      decltype(diag::
-                   sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let);
-  Optional<DiagType> diag;
-
-  if (auto *reai = dyn_cast<RefElementAddrInst>(operand)) {
-    auto *field = reai->getField();
-    if (field->isLet()) {
-      diag = diag::
-          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let;
-    } else {
-      diag = diag::
-          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_var;
-    }
-  } else if (auto *globalAddr = dyn_cast<GlobalAddrInst>(operand)) {
-    auto inst = VarDeclCarryingInst(globalAddr);
-    if (auto *decl = inst.getDecl()) {
-      if (decl->isLet()) {
-        diag = diag::
-            sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_let;
-      } else {
-        diag = diag::
-            sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_var;
-      }
-    }
-  } else if (auto *pbi = dyn_cast<ProjectBoxInst>(operand)) {
-    auto boxType = pbi->getOperand()->getType().castTo<SILBoxType>();
-    if (boxType->getLayout()->isMutable()) {
-      diag = diag::
-          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var;
-    } else {
-      diag = diag::sil_moveonlychecker_let_capture_consumed;
-    }
-  } else if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
-    if (auto boxType = fArg->getType().getAs<SILBoxType>()) {
-      if (boxType->getLayout()->isMutable()) {
-        diag = diag::
-            sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var;
-      } else {
-        diag = diag::sil_moveonlychecker_let_capture_consumed;
-      }
-    } else if (fArg->getType().isAddress() &&
-               markedValue->getCheckKind() ==
-                   MarkMustCheckInst::CheckKind::AssignableButNotConsumable) {
-      diag = diag::
-          sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var;
-    }
+  // is it a class?
+  if (isa<RefElementAddrInst>(operand)) {
+    diagnose(markedValue->getModule().getASTContext(),
+             markedValue,
+             diag::sil_moveonlychecker_notconsumable_but_assignable_was_consumed,
+             varName, /*isGlobal=*/false);
+    registerDiagnosticEmitted(markedValue);
+    return;
   }
 
-  if (!diag) {
-    llvm::errs() << "Unknown address assignable but not consumable case!\n";
-    llvm::errs() << "MarkMustCheckInst: " << *markedValue;
-    llvm::report_fatal_error("error!");
+  // is it a global?
+  if (isa<GlobalAddrInst>(operand)) {
+    diagnose(markedValue->getModule().getASTContext(),
+             markedValue,
+             diag::sil_moveonlychecker_notconsumable_but_assignable_was_consumed,
+             varName, /*isGlobal=*/true);
+    registerDiagnosticEmitted(markedValue);
+    return;
   }
 
-  diagnose(markedValue->getModule().getASTContext(), markedValue, *diag,
+  // remaining cases must be a closure capture.
+  diagnose(markedValue->getModule().getASTContext(),
+           markedValue,
+           diag::sil_moveonlychecker_capture_consumed_in_closure,
            varName);
   registerDiagnosticEmitted(markedValue);
 }
@@ -733,13 +663,11 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
 
   registerDiagnosticEmitted(markedValue);
 
-  auto diag = diag::sil_moveonlychecker_let_capture_consumed;
-  if (markedValue->getCheckKind() ==
-      MarkMustCheckInst::CheckKind::AssignableButNotConsumable)
-    diag = diag::
-        sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var;
-
-  diagnose(astContext, arg->getDecl()->getLoc(), diag, varName);
+  // diagnose consume of capture within a closure
+  diagnose(astContext,
+           arg->getDecl()->getLoc(),
+           diag::sil_moveonlychecker_capture_consumed_in_closure,
+           varName);
 
   // Now for each consuming use that needs a copy...
   for (auto *user : getCanonicalizer().consumingUsesNeedingCopy) {

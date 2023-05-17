@@ -753,39 +753,26 @@ ERROR(sil_moveonlychecker_owned_value_consumed_and_used_at_same_time, none,
 ERROR(sil_moveonlychecker_value_used_after_consume, none,
       "'%0' used after consume", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
-      "'%0' has guaranteed ownership but was consumed", (StringRef))
+      "'%0' is borrowed and cannot be consumed", (StringRef))
+
+// FIXME: this diagnostic shouldn't ever be emitted now. rdar://109742587 (closures may still try to consume captures, e.g., borrowed parameters)
 ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
-      "'%0' has guaranteed ownership but was consumed due to being captured by a closure", (StringRef))
-ERROR(sil_moveonlychecker_let_value_consumed_in_closure, none,
-      "'%0' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations", (StringRef))
+      "'%0' is borrowed and cannot be consumed by closure capture", (StringRef))
+
+ERROR(sil_moveonlychecker_capture_consumed_in_closure, none,
+      "captured '%0' cannot be consumed within a closure", (StringRef))
 ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
-      "'%0' consumed but not reinitialized before end of function", (StringRef))
-ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure, none,
-      "'%0' consumed in closure but not reinitialized before end of closure", (StringRef))
+      "missing reinitialization of '%0' after consume", (StringRef))
 ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
       "'%0' consumed by a use in a loop", (StringRef))
-ERROR(sil_moveonlychecker_exclusivity_violation, none,
-      "'%0' has consuming use that cannot be eliminated due to a tight exclusivity scope", (StringRef))
-ERROR(sil_moveonlychecker_moveonly_field_consumed, none,
-      "'%0' has a move only field that was consumed before later uses", (StringRef))
 
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_let, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable class let field. One can only read from it",
-      (StringRef))
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_classfield_var, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable class var field. One can only read from it or assign to it",
-      (StringRef))
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_var, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable global var. One can only read from it or assign to it",
-      (StringRef))
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_global_let, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable global let. One can only read from it",
-      (StringRef))
-ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed_escaping_var, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable mutable capture of an escaping closure. One can only read from it or assign over it",
-      (StringRef))
-ERROR(sil_moveonlychecker_let_capture_consumed, none,
-      "'%0' was consumed but it is illegal to consume a noncopyable immutable capture of an escaping closure. One can only read from it", (StringRef))
+ERROR(sil_moveonlychecker_use_after_partial_consume, none,
+      "cannot use '%0' after partial consume", (StringRef))
+
+ERROR(sil_moveonlychecker_notconsumable_but_assignable_was_consumed, none,
+      "cannot consume noncopyable stored property '%0' %select{of a class|that is global}1",
+      (StringRef, bool))
+
 ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_self, none,
       "Cannot partially consume '%0' since it has a user defined deinit",
       (StringRef))
@@ -793,8 +780,8 @@ ERROR(sil_moveonlychecker_cannot_destructure_deinit_nominal_type_field, none,
       "Cannot partially consume '%0' since it contains field '%1.%2' whose type %3 has a user defined deinit",
       (StringRef, StringRef, StringRef, DeclBaseName))
 
-NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
-     "move only field consumed here", ())
+NOTE(sil_moveonlychecker_partial_consume_here, none,
+     "partial consume here", ())
 NOTE(sil_moveonlychecker_boundary_use, none,
      "boundary use here", ())
 NOTE(sil_moveonlychecker_consuming_use_here, none,
@@ -814,15 +801,6 @@ NOTE(sil_movekillscopyablevalue_value_cyclic_consumed_in_loop_here, none,
 NOTE(sil_moveonlychecker_deinit_here, none,
      "deinit declared here", ())
 
-ERROR(sil_moveonlychecker_not_understand_consumable_and_assignable, none,
-      "Usage of @noImplicitCopy that the move checker does not know how to "
-      "check!", ())
-ERROR(sil_moveonlychecker_not_understand_moveonly, none,
-      "Usage of a move only type that the move checker does not know how to "
-      "check!", ())
-ERROR(sil_moveonlychecker_missed_copy, none,
-      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
-
 // move kills copyable values checker diagnostics
 ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,
       "'%0' used after being consumed", (StringRef))
@@ -832,9 +810,21 @@ NOTE(sil_movekillscopyablevalue_use_here, none,
      "use here", ())
 NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
      "consume here would occur multiple times in loop", ())
+
+// errors involving noncopyables that are considered to be bugs in the compiler
+ERROR(sil_moveonlychecker_not_understand_consumable_and_assignable, none,
+      "usage of no-implicit-copy value that the compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_moveonlychecker_not_understand_moveonly, none,
+      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug"
+      "check!", ())
+ERROR(sil_moveonlychecker_bug_missed_copy, none,
+      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_moveonlychecker_bug_exclusivity_violation, none,
+      "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
-      "'consume' applied to value that the compiler does not support checking",
+      "'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug",
       ())
+
 
 // Implicit inout-to-UnsafeRawPointer conversions
 WARNING(nontrivial_to_rawpointer_conversion,none,

@@ -319,7 +319,7 @@ extension KlassWrapper {
         let _ = (consume self)
         defer {
             self = KlassWrapper(k: Klass())
-            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support checking}}
+            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support}}
         }
         print("123")
     }
@@ -725,7 +725,7 @@ func reinitInPieces1(_ k: KlassPair) {
     var k2 = k
     k2 = k
 
-    let _ = consume k2 // expected-error {{'consume' applied to value that the compiler does not support checking}}
+    let _ = consume k2 // expected-error {{'consume' applied to value that the compiler does not support}}
     k2.lhs = Klass()
     k2.rhs = Klass()
 }
