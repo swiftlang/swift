@@ -1482,7 +1482,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInMacroExpansionInContext())
+        D->isInMacroExpansionInContext() && !Walker.Parent.isNull())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {

@@ -2060,10 +2060,6 @@ public:
   }
 
   void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
-    // TODO: Type check attributes.
-    // Type checking arguments should reflect the attributes.
-    // e.g. '@available(macOS 999) #Future { newAPIFrom999() }'.
-
     // Assign a discriminator.
     (void)MED->getDiscriminator();
     // Decls in expansion already visited as auxiliary decls.

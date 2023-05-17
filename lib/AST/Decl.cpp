@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
@@ -10078,6 +10079,13 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
       typeRepr->print(out);
     else
       ext->getSelfNominalTypeDecl()->dumpRef(out);
+  } else if (auto med = dyn_cast<MacroExpansionDecl>(decl)) {
+    out << '#' << med->getMacroName() << " in ";
+    printContext(out, med->getDeclContext());
+    if (med->getLoc().isValid()) {
+      out << '@';
+      med->getLoc().print(out, med->getASTContext().SourceMgr);
+    }
   } else {
     out << "(unknown decl)";
   }
