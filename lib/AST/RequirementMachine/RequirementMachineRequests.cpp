@@ -770,7 +770,7 @@ InferredGenericSignatureRequest::evaluate(
   }();
 
   for (const auto &req : parentSig.getRequirements())
-    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
+    requirements.push_back({req, loc, /*wasInferred=*/false});
 
   DeclContext *lookupDC = nullptr;
 
