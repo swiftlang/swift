@@ -2052,17 +2052,14 @@ public:
 
 /// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
 /// lvalue as needing to be moved.
-///
-/// getSemanticsProvidingExpr() looks through this because it doesn't
-/// provide the value and only very specific clients care where the
-/// 'move' was written.
-class ConsumeExpr final : public IdentityExpr {
+class ConsumeExpr final : public Expr {
+  Expr *SubExpr;
   SourceLoc ConsumeLoc;
 
 public:
   ConsumeExpr(SourceLoc consumeLoc, Expr *sub, Type type = Type(),
               bool implicit = false)
-      : IdentityExpr(ExprKind::Consume, sub, type, implicit),
+      : Expr(ExprKind::Consume, implicit, type), SubExpr(sub),
         ConsumeLoc(consumeLoc) {}
 
   static ConsumeExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc,
@@ -2072,7 +2069,10 @@ public:
 
   SourceLoc getLoc() const { return ConsumeLoc; }
 
-  SourceLoc getStartLoc() const { return ConsumeLoc; }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return getLoc(); }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
   static bool classof(const Expr *e) {
