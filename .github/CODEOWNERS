@@ -111,6 +111,7 @@
 # TODO: /lib/SILGen/
 /lib/SILGen/*Distributed*                           @ktoso
 # TODO: /lib/SILOptimizer/
+/lib/SILOptimizer/Mandatory/FlowIsolation.cpp       @kavon
 /lib/SILOptimizer/Utils/Distributed*                @ktoso
 /lib/Sema/                                          @hborla @slavapestov @xedin
 /lib/Sema/*Availability*                            @tshortli
