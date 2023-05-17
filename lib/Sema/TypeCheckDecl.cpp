@@ -1789,6 +1789,7 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
   case AccessorKind::Set:
+  case AccessorKind::Init:
     if (param == accessorParams->get(0)) {
       // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;

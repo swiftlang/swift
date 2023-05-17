@@ -6863,7 +6863,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
   if (Kind != AccessorKind::Set && Kind != AccessorKind::WillSet &&
-      Kind != AccessorKind::DidSet)
+      Kind != AccessorKind::DidSet && Kind != AccessorKind::Init)
     return nullptr;
 
   SourceLoc StartLoc, NameLoc, EndLoc;
