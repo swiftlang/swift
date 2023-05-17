@@ -667,6 +667,9 @@ public:
   getTransitiveLoadingBehavior(const Dependency &dependency,
                                bool forTestable) const;
 
+  /// Generate a \c SourceLoc pointing at the loaded swiftmodule file.
+  SourceLoc getSourceLoc() const;
+
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate
   /// that the object must be kept alive as long as the diagnostics exist.

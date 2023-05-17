@@ -179,6 +179,15 @@ void ModuleFile::fatal(llvm::Error error) const {
   Core->fatal(diagnoseFatal(std::move(error)));
 }
 
+SourceLoc ModuleFile::getSourceLoc() const {
+  auto &SourceMgr = getContext().Diags.SourceMgr;
+  auto filename = getModuleFilename();
+  auto bufferID = SourceMgr.getIDForBufferIdentifier(filename);
+  if (!bufferID)
+    bufferID = SourceMgr.addMemBufferCopy(StringRef(), filename);
+  return SourceMgr.getLocForBufferStart(*bufferID);
+}
+
 llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
   if (FileContext)
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal,
