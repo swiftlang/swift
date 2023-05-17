@@ -2723,7 +2723,25 @@ public:
   }
 
   void checkAssignOrInitInst(AssignOrInitInst *AI) {
-    llvm_unreachable("not yet implemented for AssignOrInitInst");
+    SILValue Src = AI->getSrc();
+    require(AI->getModule().getStage() == SILStage::Raw,
+            "assign_or_init can only exist in raw SIL");
+
+    // The init and set functions have the same type: (Src type) -> Void
+
+    SILValue initFn = AI->getInitializer();
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions initConv(initTy, AI->getModule());
+    require(initConv.getNumIndirectSILResults() == 0,
+            "init function has indirect results");
+    checkAssignByWrapperArgs(Src->getType(), initConv);
+
+    SILValue setterFn = AI->getSetter();
+    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    require(setterConv.getNumIndirectSILResults() == 0,
+            "set function has indirect results");
+    checkAssignByWrapperArgs(Src->getType(), setterConv);
   };
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \

@@ -1509,6 +1509,33 @@ namespace {
       return false;
     }
 
+    /// Whether an assignment 'x = y' can be re-written as a call to an
+    /// init accessor declared by 'x'.
+    bool canRewriteSetAsInitAccessor(SILGenFunction &SGF) const {
+      auto *varDecl = dyn_cast<VarDecl>(Storage);
+      if (!varDecl || varDecl->isStatic() ||
+          varDecl->getDeclContext()->isLocalContext())
+        return false;
+
+      auto *fnDecl = SGF.FunctionDC->getAsDecl();
+      bool isAssignmentToSelfParamInInit =
+          IsOnSelfParameter && isa<ConstructorDecl>(fnDecl) &&
+          // Convenience initializers only contain assignments and not
+          // initializations.
+          !(cast<ConstructorDecl>(fnDecl)->isConvenienceInit());
+
+      // Assignment to a wrapped property can only be re-written to initialization for
+      // members of `self` in an initializer, and for local variables.
+      if (!isAssignmentToSelfParamInInit)
+        return false;
+
+      auto *initAccessor = varDecl->getAccessor(AccessorKind::Init);
+      if (!initAccessor)
+        return false;
+
+      return true;
+    }
+
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
       assert(getAccessorDecl()->isSetter());
@@ -1674,6 +1701,45 @@ namespace {
 
         return Mval;
       };
+
+      if (canRewriteSetAsInitAccessor(SGF)) {
+        // Emit an assign_or_init with the allocating initializer function and the
+        // setter function as arguments. DefiniteInitialization will then decide
+        // between the two functions, depending if it's an init call or a
+        // set call.
+        VarDecl *field = cast<VarDecl>(Storage);
+        auto FieldType = field->getValueInterfaceType();
+        if (!Substitutions.empty()) {
+          FieldType = FieldType.subst(Substitutions);
+        }
+
+        // Emit the init accessor function partially applied to the base.
+        auto *initAccessor = field->getOpaqueAccessor(AccessorKind::Init);
+        auto initConstant = SGF.getAccessorDeclRef(initAccessor);
+        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
+
+        SmallVector<SILValue, 1> capturedArgs;
+        SILValue capturedBase = base.getValue();
+        capturedArgs.push_back(capturedBase);
+
+        PartialApplyInst *initPAI =
+          SGF.B.createPartialApply(loc, initFRef,
+                                   Substitutions, capturedArgs,
+                                   ParameterConvention::Direct_Guaranteed);
+        ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
+
+        // Emit the set accessor function partially applied to the base.
+        auto setterFRef = getSetterFRef();
+        auto setterTy = getSetterType(setterFRef);
+        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+        auto setterFn = emitPartialSetterApply(setterFRef, setterConv);
+
+        // Create the assign_or_init with the initializer and setter.
+        auto value = emitValue(field, FieldType, setterTy, setterConv);
+        SGF.B.createAssignOrInit(
+            loc, value.forward(SGF), initFn.getValue(), setterFn.getValue());
+        return;
+      }
 
       if (canRewriteSetAsPropertyWrapperInit(SGF) &&
           !Storage->isStatic() &&
@@ -5031,7 +5097,8 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   }
 
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
-  if (setterComponent.canRewriteSetAsPropertyWrapperInit(SGF))
+  if (setterComponent.canRewriteSetAsPropertyWrapperInit(SGF) ||
+      setterComponent.canRewriteSetAsInitAccessor(SGF))
     return false;
 
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
