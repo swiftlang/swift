@@ -7561,7 +7561,6 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   auto sourceFile = new (SwiftContext) SourceFile(
       module, SourceFileKind::Library, None);
   ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
-  module.addAuxiliaryFile(*sourceFile);
   return *sourceFile;
 }
 
