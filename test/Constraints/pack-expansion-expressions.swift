@@ -66,18 +66,16 @@ func outerArchetype<each T, U>(t: repeat each T, u: U) where repeat each T: P {
 func sameElement<each T, U>(t: repeat each T, u: U) where repeat each T: P, repeat each T == U {
 // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   let _: (repeat each T) = (repeat (each t).f(u))
-  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'τ_1_0'}}
+  // expected-error@-1 {{cannot convert value of type 'U' to expected argument type 'each T'}}
 }
 
 func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     where repeat each C: Collection, repeat (each C).Element == U {
     // expected-error@-1{{same-element requirements are not yet supported}}
 
-  // FIXME: Opened element archetypes in diagnostics
   _ = (repeat (each c).forEach(function))
-  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(τ_1_0.Element) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(each C.Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
@@ -333,6 +331,15 @@ func test_pack_expansions_with_closures() {
     takesVariadicFunction { y in fn(x, y) } // Ok
     takesVariadicFunction { y, z in fn(y, z) } // Ok
   }
+
+  // rdar://108977234 - invalid error non-pack type instead of missing `Hashable` conformance
+  func testEscapingCapture<each T>(_ t: repeat each T) -> () -> [AnyHashable] {
+    return {
+      var result = [AnyHashable]()
+      repeat result.append(each t) // expected-error {{argument type 'each T' does not conform to expected type 'Hashable'}}
+      return result
+    }
+  }
 }
 
 // rdar://107151854 - crash on invalid due to specialized pack expansion
@@ -446,6 +453,26 @@ func test_partually_flattened_expansions() {
   _ = S<Int, String>().fn(t: 1, "hi", u: false, 1.0) // Ok
 }
 
+// rdar://109160060 - tuple with pack expansions is not convertible to Any
+do {
+  func test1<each T>(_: repeat (each T).Type) -> (repeat each T) {}
+  print(test1(Int.self, String.self))
+
+  func test2<each T>(_ s: [Any], t: repeat (each T).Type) -> (repeat each T) {
+    var iter = s.makeIterator()
+    return (repeat (iter.next()! as! (each T)))
+  }
+
+  print(test2([]))
+  print(test2([1], t: Int.self))
+  print(test2([1, "hi"], t: Int.self, String.self))
+  print(test2([1, "hi", false], t: Int.self, String.self, Bool.self))
+
+  func test3<each T>(v: Any) -> (Int, repeat each T) {
+    return v // expected-error {{cannot convert return expression of type 'Any' to return type '(Int, repeat each T)'}}
+  }
+}
+
 // rdar://107675464 - misplaced `each` results in `type of expression is ambiguous without more context`
 do {
   func test_correct_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
@@ -454,7 +481,8 @@ do {
 
   func test_misplaced_each<each T: P>(_ value: repeat each T) -> (repeat each T.A) {
     return (repeat each value.makeA())
-    // expected-error@-1 {{pack reference 'each T' can only appear in pack expansion}}
+    // expected-error@-1 {{value pack 'each T' must be referenced with 'each'}} {{25-25=(each }} {{30-30=)}}
+    // expected-error@-2 {{pack expansion requires that '()' and 'each T' have the same shape}}
   }
 }
 
@@ -479,4 +507,25 @@ do {
     f(repeat each x, y: repeat [S(y)])
     // expected-error@-1:25 {{value pack expansion must contain at least one pack reference}}
   }
+}
+
+// missing 'each' keyword before value pack references
+do {
+  func overloaded<each U>(_: String, _: repeat each U) -> Int { 42 }
+  func overloaded<each T>(_: Int, _ b: repeat each T) -> (repeat each T) {
+    fatalError()
+  }
+
+  func test<each T>(v: repeat each T) {
+    _ = (repeat overloaded(42, v)) // expected-error {{value pack 'each T' must be referenced with 'each'}} {{32-32=each }}
+    _ = (repeat overloaded(42, each v)) // Ok
+  }
+}
+
+// rdar://108904190 - top-level 'repeat' not allowed in single-expression closures
+func test_pack_expansion_to_void_conv_for_closure_result<each T>(x: repeat each T) {
+  let _: () -> Void = { repeat print(each x) } // Ok
+  let _: () -> Void = { (repeat print(each x)) } // Ok
+  let _: (Int) -> Void = { repeat ($0, print(each x)) } // expected-warning {{'repeat (Int, ())' is unused}}
+  let _: (Int, String) -> Void = { ($0, repeat ($1, print(each x))) } // expected-warning {{'(Int, repeat (String, ()))' is unused}}
 }

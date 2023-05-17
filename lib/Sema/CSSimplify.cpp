@@ -2792,6 +2792,23 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
         impact += choiceImpact - 1;
     }
   }
+
+  // If this requirement is associated with a call that is itself
+  // incorrect, let's increase impact to indicate that this failure
+  // has a compounding effect on viability of the overload choice it
+  // comes from.
+  if (locator.endsWith<LocatorPathElt::AnyRequirement>()) {
+    if (auto *expr = getAsExpr(anchor)) {
+      if (auto *call = getAsExpr<ApplyExpr>(cs.getParentExpr(expr))) {
+        if (call->getFn() == expr &&
+            llvm::any_of(cs.getFixes(), [&](const auto &fix) {
+              return getAsExpr(fix->getAnchor()) == call;
+            }))
+          impact += 2;
+      }
+    }
+  }
+
   return impact;
 }
 
@@ -6868,9 +6885,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // becuase expansion could be defaulted to an empty pack which means
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
+  //
+  // Notable exception here is `Any` which doesn't require wrapping and
+  // would be handled by existental promotion in cases where it's allowed.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
-    if (desugar1->is<TupleType>() != desugar2->is<TupleType>()) {
+    if (desugar1->is<TupleType>() != desugar2->is<TupleType>() &&
+        (!desugar1->isAny() && !desugar2->isAny())) {
       return matchTypes(
           desugar1->is<TupleType>() ? type1
                                     : TupleType::get({type1}, getASTContext()),
@@ -7020,6 +7041,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto *tuple2 = cast<TupleType>(desugar2);
       if (delayMatching(tuple1) || delayMatching(tuple2)) {
         return formUnsolvedResult();
+      }
+
+      // Closure result is allowed to convert to Void in certain circumstances,
+      // let's forego tuple matching because it is guaranteed to fail and jump
+      // to `() -> T` to `() -> Void` rule.
+      if (locator.endsWith<LocatorPathElt::ClosureBody>()) {
+        if (containsPackExpansionType(tuple1) && tuple2->isVoid())
+          break;
       }
 
       // Add each tuple type to the locator before matching the element types.
@@ -7317,22 +7346,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                      locator);
     }
     }
-  }
-
-  // Matching types where one side is a pack expansion and the other is not
-  // means a pack expansion was used where it isn't supported.
-  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
-
-    if (type1->isPlaceholder() || type2->isPlaceholder())
-      return getTypeMatchSuccess();
-
-    auto *loc = getConstraintLocator(locator);
-    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
-      return getTypeMatchFailure(locator);
-
-    return getTypeMatchSuccess();
   }
 
   if (kind >= ConstraintKind::Conversion) {
@@ -7755,6 +7768,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             ConstraintLocator::LValueConversion));
       }
     }
+  }
+
+  // Matching types where one side is a pack expansion and the other is not
+  // means a pack expansion was used where it isn't supported.
+  if (type1->is<PackExpansionType>() != type2->is<PackExpansionType>()) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    if (type1->isPlaceholder() || type2->isPlaceholder())
+      return getTypeMatchSuccess();
+
+    auto *loc = getConstraintLocator(locator);
+    if (recordFix(AllowInvalidPackExpansion::create(*this, loc)))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
   }
 
   // Attempt fixes iff it's allowed, both types are concrete and
@@ -8459,6 +8488,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       auto *fix = ContextualMismatch::create(*this, protocolTy, type, loc);
       if (!recordFix(fix))
         return SolutionKind::Solved;
+    }
+
+    // Conformance constraint that is introduced by an implicit conversion
+    // for example to `AnyHashable`.
+    if (kind == ConstraintKind::ConformsTo &&
+        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      auto *fix = AllowArgumentMismatch::create(*this, type, protocolTy, loc);
+      return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                          : SolutionKind::Solved;
     }
 
     // If this is an implicit Hashable conformance check generated for each
@@ -14822,6 +14860,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddExplicitExistentialCoercion:
   case FixKind::DestructureTupleToMatchPackExpansionParameter:
   case FixKind::AllowValueExpansionWithoutPackReferences:
+  case FixKind::IgnoreMissingEachKeyword:
     llvm_unreachable("handled elsewhere");
   }
 
