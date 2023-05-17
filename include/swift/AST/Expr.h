@@ -2050,31 +2050,34 @@ public:
   }
 };
 
-/// MoveExpr - A 'move' surrounding an lvalue expression marking the lvalue as
-/// needing to be moved.
+/// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
+/// lvalue as needing to be moved.
 ///
 /// getSemanticsProvidingExpr() looks through this because it doesn't
 /// provide the value and only very specific clients care where the
 /// 'move' was written.
-class MoveExpr final : public IdentityExpr {
-  SourceLoc MoveLoc;
+class ConsumeExpr final : public IdentityExpr {
+  SourceLoc ConsumeLoc;
 
 public:
-  MoveExpr(SourceLoc moveLoc, Expr *sub, Type type = Type(),
-           bool implicit = false)
-      : IdentityExpr(ExprKind::Move, sub, type, implicit), MoveLoc(moveLoc) {}
+  ConsumeExpr(SourceLoc consumeLoc, Expr *sub, Type type = Type(),
+              bool implicit = false)
+      : IdentityExpr(ExprKind::Consume, sub, type, implicit),
+        ConsumeLoc(consumeLoc) {}
 
-  static MoveExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc, Expr *sub,
-                                  Type type = Type()) {
-    return new (ctx) MoveExpr(moveLoc, sub, type, /*implicit=*/true);
+  static ConsumeExpr *createImplicit(ASTContext &ctx, SourceLoc moveLoc,
+                                     Expr *sub, Type type = Type()) {
+    return new (ctx) ConsumeExpr(moveLoc, sub, type, /*implicit=*/true);
   }
 
-  SourceLoc getLoc() const { return MoveLoc; }
+  SourceLoc getLoc() const { return ConsumeLoc; }
 
-  SourceLoc getStartLoc() const { return MoveLoc; }
+  SourceLoc getStartLoc() const { return ConsumeLoc; }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
 
-  static bool classof(const Expr *e) { return e->getKind() == ExprKind::Move; }
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Consume;
+  }
 };
 
 /// CopyExpr - A 'copy' surrounding an lvalue expression marking the lvalue as

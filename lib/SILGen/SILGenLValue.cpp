@@ -332,8 +332,8 @@ public:
   LValue visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
                                      SGFAccessKind accessKind,
                                      LValueOptions options);
-  LValue visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
-                       LValueOptions options);
+  LValue visitConsumeExpr(ConsumeExpr *e, SGFAccessKind accessKind,
+                          LValueOptions options);
   LValue visitCopyExpr(CopyExpr *e, SGFAccessKind accessKind,
                        LValueOptions options);
   LValue visitABISafeConversionExpr(ABISafeConversionExpr *e,
@@ -4004,8 +4004,8 @@ LValue SILGenLValue::visitInOutExpr(InOutExpr *e, SGFAccessKind accessKind,
   return visitRec(e->getSubExpr(), accessKind, options);
 }
 
-LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
-                                   LValueOptions options) {
+LValue SILGenLValue::visitConsumeExpr(ConsumeExpr *e, SGFAccessKind accessKind,
+                                      LValueOptions options) {
   // Do formal evaluation of the base l-value.
   LValue baseLV = visitRec(e->getSubExpr(), SGFAccessKind::ReadWrite,
                            options.forComputedBaseLValue());
