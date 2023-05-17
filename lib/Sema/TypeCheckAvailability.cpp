@@ -473,6 +473,7 @@ public:
 
 private:
   MacroWalking getMacroWalkingBehavior() const override {
+    // Expansion buffers will have their type refinement contexts built lazily.
     return MacroWalking::Arguments;
   }
 
@@ -558,7 +559,7 @@ private:
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
-    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
+    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<MacroExpansionDecl>(D))
       return nullptr;
 
     // Only introduce for an AbstractStorageDecl if it is not local. We
@@ -1430,7 +1431,9 @@ public:
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    // This is SourceRange based finder. 'SM.rangeContains()' fails anyway when
+    // crossing source buffers.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -3192,7 +3195,8 @@ public:
   bool shouldWalkIntoTapExpression() override { return false; }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    // Expanded source should be type checked and diagnosed separately.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
