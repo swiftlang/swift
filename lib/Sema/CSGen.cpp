@@ -1899,6 +1899,16 @@ namespace {
       return valueTy;
     }
 
+    Type visitConsumeExpr(ConsumeExpr *expr) {
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                           TVO_PrefersSubtypeBinding |
+                                               TVO_CanBindToNoEscape);
+      CS.addConstraint(ConstraintKind::Equal, valueTy,
+                       CS.getType(expr->getSubExpr()),
+                       CS.getConstraintLocator(expr));
+      return valueTy;
+    }
+
     Type visitAnyTryExpr(AnyTryExpr *expr) {
       return CS.getType(expr->getSubExpr());
     }

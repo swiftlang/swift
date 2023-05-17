@@ -6116,27 +6116,47 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
-  auto *subExpr = cast<DeclRefExpr>(E->getSubExpr());
+  auto *subExpr = E->getSubExpr();
   auto subASTType = subExpr->getType()->getCanonicalType();
-
   auto subType = SGF.getLoweredType(subASTType);
 
+  if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
+    FormalEvaluationScope writeback(SGF);
+    LValue lv =
+      SGF.emitLValue(li->getSubExpr(), SGFAccessKind::ReadWrite);
+    auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
+    auto optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
+    SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
+    if (address.getType().isMoveOnly()) {
+      SGF.B.createCopyAddr(subExpr, address.getLValueAddress(), toAddr, IsNotTake,
+                           IsInitialization);
+    } else {
+      SGF.B.createMarkUnresolvedMoveAddr(subExpr, address.getLValueAddress(), toAddr);
+    }
+    optTemp->finishInitialization(SGF);
+
+    if (subType.isLoadable(SGF.F)) {
+      ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
+      if (value.getType().isTrivial(SGF.F))
+        return RValue(SGF, {value}, subType.getASTType());
+      return RValue(SGF, {value}, subType.getASTType());
+    }
+
+    return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+  }
+
   if (subType.isLoadable(SGF.F)) {
-    auto mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
+    ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
       return RValue(SGF, {mv}, subType.getASTType());
     mv = SGF.B.createMoveValue(E, mv);
-    auto *movedValue = cast<MoveValueInst>(mv.getValue());
-    movedValue->setAllowsDiagnostics(true /*set allows diagnostics*/);
+    // Set the flag so we check this.
+    cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
     return RValue(SGF, {mv}, subType.getASTType());
   }
 
   // If we aren't loadable, then create a temporary initialization and
-  // mark_unresolved_move into that if we have a copyable type if we have a move
-  // only, just add a copy_addr init.
-  //
-  // The reason why we do this is that we only use mark_unresolved_move_addr and
-  // the move operator checker for copyable values.
+  // explicit_copy_addr into that.
   std::unique_ptr<TemporaryInitialization> optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
@@ -6163,7 +6183,6 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
   auto subType = SGF.getLoweredType(subASTType);
 
   if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
-
     FormalEvaluationScope writeback(SGF);
     LValue lv =
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedAddressRead);

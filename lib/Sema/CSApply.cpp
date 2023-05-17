@@ -3546,6 +3546,27 @@ namespace {
       return expr;
     }
 
+    Expr *visitConsumeExpr(ConsumeExpr *expr) {
+      auto toType = simplifyType(cs.getType(expr));
+      cs.setType(expr, toType);
+
+      auto *subExpr = expr->getSubExpr();
+      auto type = simplifyType(cs.getType(subExpr));
+
+      // Let's load the value associated with this consume.
+      if (type->hasLValueType()) {
+        subExpr = coerceToType(subExpr, type->getRValueType(),
+                               cs.getConstraintLocator(subExpr));
+
+        if (!subExpr)
+          return nullptr;
+      }
+
+      expr->setSubExpr(subExpr);
+
+      return expr;
+    }
+
     Expr *visitAnyTryExpr(AnyTryExpr *expr) {
       auto *subExpr = expr->getSubExpr();
       auto type = simplifyType(cs.getType(subExpr));

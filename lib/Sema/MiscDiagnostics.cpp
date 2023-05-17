@@ -422,7 +422,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      if (!isa<DeclRefExpr>(consumeExpr->getSubExpr())) {
+      auto *subExpr = consumeExpr->getSubExpr();
+      if (auto *li = dyn_cast<LoadExpr>(subExpr))
+        subExpr = li->getSubExpr();
+      if (!isa<DeclRefExpr>(subExpr)) {
         Ctx.Diags.diagnose(consumeExpr->getLoc(),
                            diag::consume_expression_not_passed_lvalue);
       }
