@@ -409,14 +409,15 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   }
 
   if (Tok.isContextualKeyword("consume")
-      && peekToken().isAny(tok::identifier, tok::kw_self)
+      && peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                           tok::code_complete)
       && !peekToken().isAtStartOfLine()) {
     Tok.setKind(tok::contextual_keyword);
 
     SourceLoc consumeLoc = consumeToken();
     ParserResult<Expr> sub =
         parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
-    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+    if (!sub.isNull()) {
       sub = makeParserResult(new (Context) MoveExpr(consumeLoc, sub.get()));
     }
     return sub;
