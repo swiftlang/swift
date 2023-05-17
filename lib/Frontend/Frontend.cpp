@@ -818,6 +818,26 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
   return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .endswith(file_types::getExtension(file_types::TY_PCH));
+}
+
+std::string CompilerInstance::getBridgingHeaderPath() const {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+  if (!isPCHFilenameExtension(opts.ImplicitObjCHeaderPath))
+    return opts.ImplicitObjCHeaderPath;
+
+  auto clangImporter =
+      static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
+
+  // No clang importer created. Report error?
+  if (!clangImporter)
+    return std::string();
+
+  return clangImporter->getOriginalSourceFile(opts.ImplicitObjCHeaderPath);
+}
+
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
