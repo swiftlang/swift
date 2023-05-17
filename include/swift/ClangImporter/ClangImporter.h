@@ -404,6 +404,9 @@ public:
   /// if we need to persist a PCH for later reuse.
   bool canReadPCH(StringRef PCHFilename);
 
+  /// Reads the original source file name from PCH.
+  std::string getOriginalSourceFile(StringRef PCHFilename);
+
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads a
   /// module map into the replica and emits a PCM file for one of the modules it
   /// declares. Delegates to clang for everything except construction of the
