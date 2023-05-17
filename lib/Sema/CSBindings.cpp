@@ -150,7 +150,8 @@ bool BindingSet::isDelayed() const {
 bool BindingSet::involvesTypeVariables() const {
   // This type variable always depends on a pack expansion variable
   // which should be inferred first if possible.
-  if (TypeVar->getImpl().canBindToPack())
+  if (TypeVar->getImpl().getGenericParameter() &&
+      TypeVar->getImpl().canBindToPack())
     return true;
 
   // This is effectively O(1) right now since bindings are re-computed
