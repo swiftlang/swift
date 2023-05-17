@@ -10,6 +10,7 @@ extension Int: P {
 
 public protocol ProtocolWithDep {
   associatedtype Element
+  func getElement() -> Element
 }
 
 public class C1 {
@@ -94,7 +95,7 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(where T == FloatElement)
-@_specialize(where T == IntElement) // FIXME e/xpected-error{{'T.Element' cannot be equal to both 'IntElement.Element' (aka 'Int') and 'Float'}}
+@_specialize(where T == IntElement) // expected-error{{generic signature requires types 'IntElement.Element' (aka 'Int') and 'Float' to be the same}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
@@ -333,3 +334,26 @@ public func testAvailability3<T>(_ t: T) {}
 // CHECK: public func testAvailability4<T>(_ t: T)
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func testAvailability4<T>(_ t: T) {}
+
+public struct ExpectedElement {
+  @inline(never)
+  public func hello() {}
+}
+
+public struct ConformerElement {}
+
+public struct Conformer : ProtocolWithDep {
+  public typealias Element = ConformerElement
+  public func getElement() -> ConformerElement { return ConformerElement() }
+}
+
+@inline(never)
+@_specialize(where T == Conformer) // expected-error{{generic signature requires types 'Conformer.Element' (aka 'ConformerElement') and 'ExpectedElement' to be the same}}
+public func foo<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement {
+  t.getElement().hello()
+}
+
+@_specialize(where T == Conformer) // expected-error{{generic signature requires types 'Conformer.Element' (aka 'ConformerElement') and 'ExpectedElement' to be the same}}
+public func bar<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement {
+  foo(t)
+}
