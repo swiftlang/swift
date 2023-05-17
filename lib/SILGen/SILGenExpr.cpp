@@ -551,7 +551,7 @@ namespace {
         LinearFunctionExtractOriginalExpr *E, SGFContext C);
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
-    RValue visitMoveExpr(MoveExpr *E, SGFContext C);
+    RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
   };
@@ -6115,7 +6115,7 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
   llvm::report_fatal_error("Found an ErrorExpr but didn't emit an error?");
 }
 
-RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
+RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
   auto *subExpr = cast<DeclRefExpr>(E->getSubExpr());
   auto subASTType = subExpr->getType()->getCanonicalType();
 

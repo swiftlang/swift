@@ -4995,8 +4995,8 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   visit(expr->getSubExpr());
 }
 
-void PrintAST::visitMoveExpr(MoveExpr *expr) {
-  Printer << "move ";
+void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
+  Printer << "consume ";
   visit(expr->getSubExpr());
 }
 

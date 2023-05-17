@@ -418,7 +418,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     ParserResult<Expr> sub =
         parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
     if (!sub.isNull()) {
-      sub = makeParserResult(new (Context) MoveExpr(consumeLoc, sub.get()));
+      sub = makeParserResult(new (Context) ConsumeExpr(consumeLoc, sub.get()));
     }
     return sub;
   }
@@ -448,7 +448,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       ParserResult<Expr> sub =
           parseExprSequenceElement(diag::expected_expr_after_move, isExprBasic);
       if (!sub.hasCodeCompletion() && !sub.isNull()) {
-        sub = makeParserResult(new (Context) MoveExpr(awaitLoc, sub.get()));
+        sub = makeParserResult(new (Context) ConsumeExpr(awaitLoc, sub.get()));
       }
       return sub;
     }

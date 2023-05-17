@@ -340,8 +340,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // Diagnose move expression uses where the sub expression is not a declref
       // expr.
-      if (auto *moveExpr = dyn_cast<MoveExpr>(E)) {
-        checkMoveExpr(moveExpr);
+      if (auto *consumeExpr = dyn_cast<ConsumeExpr>(E)) {
+        checkConsumeExpr(consumeExpr);
       }
 
       // Diagnose copy expression uses where the sub expression is not a declref
@@ -421,10 +421,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
     }
 
-    void checkMoveExpr(MoveExpr *moveExpr) {
-      if (!isa<DeclRefExpr>(moveExpr->getSubExpr())) {
-        Ctx.Diags.diagnose(moveExpr->getLoc(),
-                           diag::move_expression_not_passed_lvalue);
+    void checkConsumeExpr(ConsumeExpr *consumeExpr) {
+      if (!isa<DeclRefExpr>(consumeExpr->getSubExpr())) {
+        Ctx.Diags.diagnose(consumeExpr->getLoc(),
+                           diag::consume_expression_not_passed_lvalue);
       }
     }
 
