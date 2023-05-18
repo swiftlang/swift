@@ -1237,11 +1237,9 @@ witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
   assert(requirement->isProtocolRequirement());
   auto *PD = cast<ProtocolDecl>(requirement->getDeclContext());
   if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
-    if (Type T = A->getProtocolType()) {
-      if (auto ProtoTy = T->getAs<ProtocolType>()) {
-        if (ProtoTy->getDecl() == PD) {
-          return A->getMemberName() == requirement->getName();
-        }
+    if (auto *OtherPD = A->getProtocol(witness->getDeclContext())) {
+      if (OtherPD == PD) {
+        return A->getMemberName() == requirement->getName();
       }
     }
   }
