@@ -6269,29 +6269,9 @@ void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {
   getImpl().Plugins = std::move(loader);
 }
 
-PluginLoader &ASTContext::getPluginLoader() { return *getImpl().Plugins; }
-
-Optional<std::string>
-ASTContext::lookupLibraryPluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupLibraryPluginByModuleName(moduleName);
-}
-
-Optional<StringRef>
-ASTContext::lookupExecutablePluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupExecutablePluginByModuleName(moduleName);
-}
-
-Optional<std::pair<std::string, std::string>>
-ASTContext::lookupExternalLibraryPluginByModuleName(Identifier moduleName) {
-  return getImpl().Plugins->lookupExternalLibraryPluginByModuleName(moduleName);
-}
-
-LoadedLibraryPlugin *ASTContext::loadLibraryPlugin(StringRef path) {
-  return getImpl().Plugins->loadLibraryPlugin(path);
-}
-
-LoadedExecutablePlugin *ASTContext::loadExecutablePlugin(StringRef path) {
-  return getImpl().Plugins->loadExecutablePlugin(path);
+PluginLoader &ASTContext::getPluginLoader() {
+  assert(getImpl().Plugins && "PluginLoader must be setup before using");
+  return *getImpl().Plugins;
 }
 
 Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
