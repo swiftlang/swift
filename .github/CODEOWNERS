@@ -97,7 +97,7 @@
 /lib/DependencyScan                                 @artemcm
 /lib/Driver                                         @artemcm
 /lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus
-/lib/DriverTool/autolink_extract_main.cpp           @MaxDesiatov
+/lib/DriverTool/autolink_extract_main.cpp           @MaxDesiatov @etcwilde
 /lib/Frontend/*ModuleInterface*                     @artemcm @tshortli
 # TODO: /lib/IRGen/
 /lib/IDE/                                           @ahoppen @bnbarham @rintaro
@@ -150,7 +150,7 @@
 /test/DebugInfo/                                    @adrian-prantl
 /test/Distributed/                                  @ktoso
 /test/Driver/                                       @artemcm
-/test/Driver/static*                                @MaxDesiatov
+/test/Driver/static*                                @MaxDesiatov @etcwilde
 /test/Generics/                                     @hborla @slavapestov
 # TODO: /test/IRGen/
 /test/IDE/                                          @ahoppen @bnbarham @rintaro
