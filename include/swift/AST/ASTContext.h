@@ -1501,39 +1501,6 @@ public:
   /// Get the plugin loader.
   PluginLoader &getPluginLoader();
 
-  /// Lookup a library plugin that can handle \p moduleName and return the path
-  /// to it.
-  /// The path is valid within the VFS, use `FS.getRealPath()` for the
-  /// underlying path.
-  Optional<std::string> lookupLibraryPluginByModuleName(Identifier moduleName);
-
-  /// Load the specified dylib plugin path resolving the path with the
-  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
-  /// returns a nullptr.
-  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
-  /// instance is simply returned.
-  LoadedLibraryPlugin *loadLibraryPlugin(StringRef path);
-
-  /// Lookup an executable plugin that is declared to handle \p moduleName
-  /// module by '-load-plugin-executable'.
-  /// The path is valid within the VFS, use `FS.getRealPath()` for the
-  /// underlying path.
-  Optional<StringRef> lookupExecutablePluginByModuleName(Identifier moduleName);
-
-  /// Look for dynamic libraries in paths from `-external-plugin-path` and
-  /// return a pair of `(library path, plugin server executable)` if found.
-  /// These paths are valid within the VFS, use `FS.getRealPath()` for their
-  /// underlying path.
-  Optional<std::pair<std::string, std::string>>
-  lookupExternalLibraryPluginByModuleName(Identifier moduleName);
-
-  /// Launch the specified executable plugin path resolving the path with the
-  /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
-  /// returns a nullptr.
-  /// NOTE: This method is idempotent. If the plugin is already loaded, the same
-  /// instance is simply returned.
-  LoadedExecutablePlugin *loadExecutablePlugin(StringRef path);
-
   /// Get the output backend. The output backend needs to be initialized via
   /// constructor or `setOutputBackend`.
   llvm::vfs::OutputBackend &getOutputBackend() const {
