@@ -480,9 +480,11 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     auto &ctx = decl->getASTContext();
     if (gp->isParameterPack() && isGenericType) {
-      if (!ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-        decl->diagnose(diag::experimental_type_with_parameter_pack);
-      }
+      TypeChecker::checkAvailability(
+          gp->getSourceRange(),
+          ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+          diag::availability_variadic_type_only_version_newer,
+          ownerCtx);
 
       if (hasPack) {
         gp->diagnose(diag::more_than_one_pack_in_type);

@@ -518,6 +518,11 @@ ASTContext::getImmortalRefCountSymbolsAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext
+ASTContext::getVariadicGenericTypeAvailability() {
+  return getSwift59Availability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 

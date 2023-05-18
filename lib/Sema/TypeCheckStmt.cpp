@@ -1262,7 +1262,8 @@ public:
     // check the kind of type this discard statement appears within.
     if (!diagnosed) {
       auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
-      Type nominalType = nominalDecl->getDeclaredTypeInContext();
+      Type nominalType =
+          fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
       if (!nominalType->isPureMoveOnly()) {
@@ -1288,17 +1289,16 @@ public:
         // if the modules differ, so that you can discard a @frozen type from a
         // resilient module. But for now the proposal simply says that it has to
         // be the same module, which is probably better for everyone.
-        auto *typeDecl = nominalType->getAnyNominal();
         auto *fnModule = fn->getModuleContext();
-        auto *typeModule = typeDecl->getModuleContext();
+        auto *typeModule = nominalDecl->getModuleContext();
         if (fnModule != typeModule) {
           ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_module,
                              nominalType);
           diagnosed = true;
         } else {
           assert(
-              !typeDecl->isResilient(fnModule, ResilienceExpansion::Maximal) &&
-              "trying to discard a type resilient to us!");
+              !nominalDecl->isResilient(fnModule, ResilienceExpansion::Maximal)
+                  && "trying to discard a type resilient to us!");
         }
       }
     }
@@ -1314,13 +1314,14 @@ public:
     if (!diagnosed) {
       bool isSelf = false;
       auto *checkE = DS->getSubExpr();
+      assert(fn->getImplicitSelfDecl() && "no self?");
 
       // Look through a load. Only expected if we're in an init.
       if (auto *load = dyn_cast<LoadExpr>(checkE))
           checkE = load->getSubExpr();
 
       if (auto DRE = dyn_cast<DeclRefExpr>(checkE))
-        isSelf = DRE->getDecl()->getName().isSimpleName("self");
+        isSelf = DRE->getDecl() == fn->getImplicitSelfDecl();
 
       if (!isSelf) {
         ctx.Diags

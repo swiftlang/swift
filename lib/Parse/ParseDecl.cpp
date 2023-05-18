@@ -4786,7 +4786,8 @@ static void skipAttribute(Parser &P) {
   }
 }
 
-bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
+bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
+                                bool hadAttrsOrModifiers) {
   if (Tok.is(tok::at_sign) && peekToken().is(tok::kw_rethrows)) {
     // @rethrows does not follow the general rule of @<identifier> so
     // it is needed to short circuit this else there will be an infinite
@@ -4835,13 +4836,25 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
         (Tok.is(tok::pound_endif) && !allowPoundIfAttributes))
       return true;
 
-    return isStartOfSwiftDecl(allowPoundIfAttributes);
+    return isStartOfSwiftDecl(allowPoundIfAttributes,
+                              /*hadAttrsOrModifiers=*/true);
   }
 
-  if (Tok.is(tok::pound) && peekToken().is(tok::identifier)) {
-    // Macro expansions at the top level are declarations.
-    return !isInSILMode() && SF.Kind != SourceFileKind::Interface &&
-        CurDeclContext->isModuleScopeContext() && !allowTopLevelCode();
+  if (Tok.is(tok::pound)) {
+    if (isStartOfFreestandingMacroExpansion()) {
+      if (isInSILMode() || SF.Kind == SourceFileKind::Interface)
+        return false;
+
+      // Parse '#<identifier>' after attrs/modifiers as a macro expansion decl.
+      if (hadAttrsOrModifiers)
+        return true;
+
+      // Macro expansions at the top level of non-script file are declarations.
+      return CurDeclContext->isModuleScopeContext() && !allowTopLevelCode();
+    }
+
+    // Otherwise, prefer parsing it as an expression.
+    return false;
   }
 
   // Skip a #if that contains only attributes in all branches. These will be
@@ -4849,8 +4862,14 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   if (Tok.is(tok::pound_if) && allowPoundIfAttributes) {
     BacktrackingScope backtrack(*this);
     bool sawAnyAttributes = false;
-    return skipIfConfigOfAttributes(sawAnyAttributes) &&
-        (Tok.is(tok::eof) || (sawAnyAttributes && isStartOfSwiftDecl()));
+    if (!skipIfConfigOfAttributes(sawAnyAttributes))
+      return false;
+    if (Tok.is(tok::eof))
+      return true;
+    if (!sawAnyAttributes)
+      return false;
+    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/true,
+                              /*hadAttrsOrModifiers=*/true);
   }
 
   // If we have a decl modifying keyword, check if the next token is a valid
@@ -4872,13 +4891,15 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
           // If we found the start of a decl while trying to skip over the
           // paren, then we have something incomplete like 'private('. Return
           // true for better recovery.
-          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false))
+          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                 /*hadAttrsOrModifiers=*/true))
             return true;
 
           skipSingle();
         }
       }
-      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                /*hadAttrsOrModifiers=*/true);
     }
   }
 
@@ -4905,7 +4926,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);
     consumeToken(tok::r_paren);
-    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
+    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                              /*hadAttrsOrModifiers=*/true);
   }
 
   if (Tok.isContextualKeyword("actor")) {
@@ -4917,7 +4939,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
     // it's an actor declaration, otherwise, it isn't.
     do {
       consumeToken();
-    } while (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false));
+    } while (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                /*hadAttrsOrModifiers=*/true));
     return Tok.is(tok::identifier);
   }
 
@@ -4960,12 +4983,14 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
           // If we found the start of a decl while trying to skip over the
           // paren, then we have something incomplete like 'package('. Return
           // true for better recovery.
-          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false))
+          if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                 /*hadAttrsOrModifiers=*/true))
             return true;
           skipSingle();
         }
       }
-      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                /*hadAttrsOrModifiers=*/true);
     }
   }
 
@@ -4976,7 +5001,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes) {
   // Otherwise, do a recursive parse.
   Parser::BacktrackingScope Backtrack(*this);
   consumeToken(tok::identifier);
-  return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false);
+  return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                            /*hadAttrsOrModifiers=*/true);
 }
 
 bool Parser::isStartOfSILDecl() {
@@ -5002,6 +5028,19 @@ bool Parser::isStartOfSILDecl() {
 #include "swift/AST/TokenKinds.def"
   }
   llvm_unreachable("Unhandled case in switch");
+}
+
+bool Parser::isStartOfFreestandingMacroExpansion() {
+  // Check if "'#' <identifier>" without any whitespace between them.
+  if (!Tok.is(tok::pound))
+    return false;
+  if (Tok.getRange().getEnd() != peekToken().getLoc())
+    return false;
+  if (!peekToken().isAny(tok::identifier, tok::code_complete) &&
+      // allow keywords right after '#' so we can diagnose it when parsing.
+      !peekToken().isKeyword())
+    return false;
+  return true;
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
@@ -5256,9 +5295,15 @@ Parser::parseDecl(ParseDeclOptions Flags,
     // Handled below.
     break;
   case tok::pound:
-    if (Tok.isAtStartOfLine() &&
-        peekToken().is(tok::code_complete) &&
-        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+    if (!isStartOfFreestandingMacroExpansion()) {
+      consumeToken(tok::pound);
+      diagnose(Tok.getLoc(),
+               diag::macro_expansion_decl_expected_macro_identifier);
+      DeclResult = makeParserError();
+      break;
+    }
+
+    if (peekToken().is(tok::code_complete)) {
       consumeToken();
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeAfterPoundDirective();
@@ -5270,6 +5315,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     // Parse as a macro expansion.
     DeclResult = parseDeclMacroExpansion(Flags, Attributes);
+    StaticLoc = SourceLoc(); // Ignore 'static' on macro expansion
     break;
 
   case tok::pound_if:
@@ -9810,10 +9856,10 @@ Parser::parseDeclMacroExpansion(ParseDeclOptions flags,
     }
   }
 
-  return makeParserResult(
-      status,
-      new (Context) MacroExpansionDecl(
-        CurDeclContext, poundLoc, macroNameRef, macroNameLoc,
-        leftAngleLoc, Context.AllocateCopy(genericArgs), rightAngleLoc,
-        argList));
+  auto *med = new (Context) MacroExpansionDecl(
+      CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+      Context.AllocateCopy(genericArgs), rightAngleLoc, argList);
+  med->getAttrs() = attributes;
+
+  return makeParserResult(status, med);
 }

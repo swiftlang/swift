@@ -473,6 +473,7 @@ public:
 
 private:
   MacroWalking getMacroWalkingBehavior() const override {
+    // Expansion buffers will have their type refinement contexts built lazily.
     return MacroWalking::Arguments;
   }
 
@@ -558,7 +559,7 @@ private:
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
-    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
+    if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<MacroExpansionDecl>(D))
       return nullptr;
 
     // Only introduce for an AbstractStorageDecl if it is not local. We
@@ -1430,7 +1431,9 @@ public:
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    // This is SourceRange based finder. 'SM.rangeContains()' fails anyway when
+    // crossing source buffers.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -2008,8 +2011,9 @@ static void fixAvailability(SourceRange ReferenceRange,
   }
 }
 
-void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+void TypeChecker::diagnosePotentialUnavailability(
+    SourceRange ReferenceRange, Diag<StringRef, llvm::VersionTuple> Diag,
+    const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
@@ -2017,58 +2021,46 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
   {
     auto Err =
       Context.Diags.diagnose(
-               ReferenceRange.Start, diag::availability_opaque_types_only_version_newer,
+               ReferenceRange.Start, Diag,
                prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
-                                                     ReferenceDC,
-                                                     RequiredRange, Context, Err))
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(
+        ReferenceRange, ReferenceDC, RequiredRange, Context, Err))
       return;
   }
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
-static void diagnosePotentialConcurrencyUnavailability(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const UnavailabilityReason &Reason) {
-  ASTContext &Context = ReferenceDC->getASTContext();
-
-  auto RequiredRange = Reason.getRequiredOSVersionRange();
-  {
-    auto Err =
-      Context.Diags.diagnose(
-          ReferenceRange.Start,
-          diag::availability_concurrency_only_version_newer,
-          prettyPlatformString(targetPlatform(Context.LangOpts)),
-          Reason.getRequiredOSVersionRange().getLowerEndpoint());
-
-    // Direct a fixit to the error if an existing guard is nearly-correct
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
-                                                     ReferenceDC,
-                                                     RequiredRange, Context, Err))
-      return;
-  }
-  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
-}
-
-void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
-                                               const DeclContext *ReferenceDC) {
-  // Check the availability of concurrency runtime support.
+bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
+                                    AvailabilityContext Availability,
+                                    Diag<StringRef, llvm::VersionTuple> Diag,
+                                    const DeclContext *ReferenceDC) {
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
-    return;
+    return false;
 
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
-  auto availability = ctx.getBackDeployedConcurrencyAvailability();
-  if (!runningOS.isContainedIn(availability)) {
-    diagnosePotentialConcurrencyUnavailability(
-      ReferenceRange, ReferenceDC,
-      UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+  if (!runningOS.isContainedIn(Availability)) {
+    diagnosePotentialUnavailability(
+      ReferenceRange, Diag, ReferenceDC,
+      UnavailabilityReason::requiresVersionRange(Availability.getOSVersion()));
+    return true;
   }
+
+  return false;
+}
+
+void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                               const DeclContext *ReferenceDC) {
+  checkAvailability(
+      ReferenceRange,
+      ReferenceDC->getASTContext().getBackDeployedConcurrencyAvailability(),
+      diag::availability_concurrency_only_version_newer,
+      ReferenceDC);
 }
 
 /// Returns the diagnostic to emit for the potentially unavailable decl and sets
@@ -2996,45 +2988,13 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   return resultTy->isString();
 }
 
-static bool diagnosePotentialParameterizedProtocolUnavailability(
-    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const UnavailabilityReason &Reason) {
-  ASTContext &Context = ReferenceDC->getASTContext();
-
-  auto RequiredRange = Reason.getRequiredOSVersionRange();
-  {
-    auto Err = Context.Diags.diagnose(
-        ReferenceRange.Start,
-        diag::availability_parameterized_protocol_only_version_newer,
-        prettyPlatformString(targetPlatform(Context.LangOpts)),
-        Reason.getRequiredOSVersionRange().getLowerEndpoint());
-
-    // Direct a fixit to the error if an existing guard is nearly-correct
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(
-            ReferenceRange, ReferenceDC, RequiredRange, Context, Err))
-      return true;
-  }
-  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
-  return true;
-}
-
 bool swift::diagnoseParameterizedProtocolAvailability(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
-  // Check the availability of parameterized existential runtime support.
-  ASTContext &ctx = ReferenceDC->getASTContext();
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return false;
-
-  auto runningOS = TypeChecker::overApproximateAvailabilityAtLocation(
-      ReferenceRange.Start, ReferenceDC);
-  auto availability = ctx.getParameterizedExistentialRuntimeAvailability();
-  if (!runningOS.isContainedIn(availability)) {
-    return diagnosePotentialParameterizedProtocolUnavailability(
-        ReferenceRange, ReferenceDC,
-        UnavailabilityReason::requiresVersionRange(
-            availability.getOSVersion()));
-  }
-  return false;
+  return TypeChecker::checkAvailability(
+      ReferenceRange,
+      ReferenceDC->getASTContext().getParameterizedExistentialRuntimeAvailability(),
+      diag::availability_parameterized_protocol_only_version_newer,
+      ReferenceDC);
 }
 
 static void
@@ -3235,7 +3195,8 @@ public:
   bool shouldWalkIntoTapExpression() override { return false; }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
+    // Expanded source should be type checked and diagnosed separately.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {

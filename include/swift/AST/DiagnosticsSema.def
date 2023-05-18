@@ -2160,10 +2160,10 @@ NOTE(decl_import_via_here,none,
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
-      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
+      "a 'some' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
 NOTE(opaque_of_optional_rewrite,none,
-      "did you mean to write an optional of an 'opaque' type?", ())
+      "did you mean to write an optional of an 'some' type?", ())
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
@@ -5408,9 +5408,6 @@ ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
 
-ERROR(experimental_type_with_parameter_pack,none,
-      "generic types with parameter packs are experimental",
-      ())
 ERROR(more_than_one_pack_in_type,none,
       "generic type cannot declare more than one type pack", ())
 ERROR(enum_with_pack,none,
@@ -5440,6 +5437,9 @@ ERROR(pack_reference_must_be_in_expansion,none,
 ERROR(pack_type_requires_keyword_each,none,
       "type pack %0 must be referenced with 'each'",
       (TypeRepr*))
+ERROR(value_pack_requires_keyword_each,none,
+      "value pack %0 must be referenced with 'each'",
+      (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(multiple_ellipsis_in_tuple,none,
@@ -6146,6 +6146,10 @@ ERROR(availability_concurrency_only_version_newer, none,
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
+ERROR(availability_variadic_type_only_version_newer, none,
+      "parameter packs in generic types are only available in %0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,

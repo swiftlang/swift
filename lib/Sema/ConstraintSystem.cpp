@@ -4338,9 +4338,28 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
     if (overloadType->hasTypeVariable())
       continue;
 
-    if (auto *fnType = overloadType->getAs<FunctionType>())
-      parameters.insert(
-          FunctionType::getParamListAsString(fnType->getParams()));
+    auto overloadFnTy = overloadType->getAs<FunctionType>();
+    if (!overloadFnTy)
+      continue;
+
+    // If arguments to all parameters have been fixed then there is nothing
+    // to note about in this overload.
+    std::set<unsigned> fixedParams;
+    llvm::for_each(solution.Fixes, [&](const ConstraintFix *fix) {
+      auto *locator = fix->getLocator();
+      if (getAsExpr(locator->getAnchor()) != applyExpr)
+        return;
+
+      if (auto argLoc = locator->findLast<LocatorPathElt::ApplyArgToParam>()) {
+        fixedParams.insert(argLoc->getParamIdx());
+      }
+    });
+
+    if (fixedParams.size() == overloadFnTy->getNumParams())
+      continue;
+
+    parameters.insert(
+        FunctionType::getParamListAsString(overloadFnTy->getParams()));
   }
 
   // All of the overload choices had generic parameters like `Self`.
