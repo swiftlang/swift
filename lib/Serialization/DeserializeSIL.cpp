@@ -3961,7 +3961,7 @@ void SILDeserializer::getAllWitnessTables() {
         // import, it is safe to ignore for this function's purpose.
         consumeError(maybeTable.takeError());
       } else {
-        MF->fatal(maybeTable.takeError());
+        MF->diagnoseAndConsumeFatal(maybeTable.takeError());
       }
     }
   }
