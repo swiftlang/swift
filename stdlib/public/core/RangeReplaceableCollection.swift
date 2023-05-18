@@ -107,10 +107,10 @@ where SubSequence: RangeReplaceableCollection {
   ///   *m* is the length of `newElements`. If the call to this method simply
   ///   appends the contents of `newElements` to the collection, this method is
   ///   equivalent to `append(contentsOf:)`.
-  mutating func replaceSubrange<C>(
+  mutating func replaceSubrange(
     _ subrange: Range<Index>,
-    with newElements: __owned C
-  ) where C: Collection, C.Element == Element
+    with newElements: __owned some Collection<Element>
+  )
 
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
@@ -147,8 +147,7 @@ where SubSequence: RangeReplaceableCollection {
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   ///   `elements` must be finite.
-  init<S: Sequence>(_ elements: S)
-    where S.Element == Element
+  init(_ elements: some Sequence<Element>)
 
   /// Adds an element to the end of the collection.
   ///
@@ -185,8 +184,7 @@ where SubSequence: RangeReplaceableCollection {
   /// - Parameter newElements: The elements to append to the collection.
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
-  mutating func append<S: Sequence>(contentsOf newElements: __owned S)
-    where S.Element == Element
+  mutating func append(contentsOf newElements: __owned some Sequence<Element>)
   // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   // suggestion in SE-91
 
@@ -240,8 +238,7 @@ where SubSequence: RangeReplaceableCollection {
   /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
   ///   *m* is the length of `newElements`. If `i == endIndex`, this method
   ///   is equivalent to `append(contentsOf:)`.
-  mutating func insert<S: Collection>(contentsOf newElements: __owned S, at i: Index)
-    where S.Element == Element
+  mutating func insert(contentsOf newElements: __owned some Collection<Element>, at i: Index)
 
   /// Removes and returns the element at the specified position.
   ///
@@ -406,8 +403,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   @inlinable
-  public init<S: Sequence>(_ elements: S)
-    where S.Element == Element {
+  public init(_ elements: some Sequence<Element>) {
     self.init()
     append(contentsOf: elements)
   }
@@ -451,9 +447,9 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @inlinable
-  public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
-    where S.Element == Element {
-
+  public mutating func append(
+    contentsOf newElements: __owned some Sequence<Element>
+  ) {
     let approximateCapacity = self.count + newElements.underestimatedCount
     self.reserveCapacity(approximateCapacity)
     for element in newElements {
@@ -517,9 +513,9 @@ extension RangeReplaceableCollection {
   ///   *m* is the length of `newElements`. If `i == endIndex`, this method
   ///   is equivalent to `append(contentsOf:)`.
   @inlinable
-  public mutating func insert<C: Collection>(
-    contentsOf newElements: __owned C, at i: Index
-  ) where C.Element == Element {
+  public mutating func insert(
+    contentsOf newElements: __owned some Collection<Element>, at i: Index
+  ) {
     replaceSubrange(i..<i, with: newElements)
   }
 
@@ -750,10 +746,10 @@ extension RangeReplaceableCollection {
   ///   appends the contents of `newElements` to the collection, the complexity
   ///   is O(*m*).
   @inlinable
-  public mutating func replaceSubrange<C: Collection, R: RangeExpression>(
-    _ subrange: R,
-    with newElements: __owned C
-  ) where C.Element == Element, R.Bound == Index {
+  public mutating func replaceSubrange(
+    _ subrange: some RangeExpression<Index>,
+    with newElements: __owned some Collection<Element>
+  ) {
     self.replaceSubrange(subrange.relative(to: self), with: newElements)
   }
 
@@ -767,10 +763,10 @@ extension RangeReplaceableCollection {
   // due to the absence of a better option.
   @available(*, unavailable)
   @_alwaysEmitIntoClient
-  public mutating func replaceSubrange<C>(
+  public mutating func replaceSubrange(
     _ subrange: Range<Index>,
-    with newElements: C
-  ) where C: Collection, C.Element == Element {
+    with newElements: some Collection<Element>
+  ) {
     fatalError()
   }
 
@@ -793,9 +789,9 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public mutating func removeSubrange<R: RangeExpression>(
-    _ bounds: R
-  ) where R.Bound == Index  {
+  public mutating func removeSubrange(
+    _ bounds: some RangeExpression<Index>
+  ) {
     removeSubrange(bounds.relative(to: self))
   }
 }
@@ -1000,10 +996,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A range-replaceable collection.
   ///   - rhs: A collection or finite sequence.
   @inlinable
-  public static func + <
-    Other: Sequence
-  >(lhs: Self, rhs: Other) -> Self
-  where Element == Other.Element {
+  public static func + (lhs: Self, rhs: some Sequence<Element>) -> Self {
     var lhs = lhs
     // FIXME: what if lhs is a reference type?  This will mutate it.
     lhs.append(contentsOf: rhs)
@@ -1029,10 +1022,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A collection or finite sequence.
   ///   - rhs: A range-replaceable collection.
   @inlinable
-  public static func + <
-    Other: Sequence
-  >(lhs: Other, rhs: Self) -> Self
-  where Element == Other.Element {
+  public static func + (lhs: some Sequence<Element>, rhs: Self) -> Self {
     var result = Self()
     result.reserveCapacity(rhs.count + lhs.underestimatedCount)
     result.append(contentsOf: lhs)
@@ -1058,10 +1048,7 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(*m*), where *m* is the length of the right-hand-side
   ///   argument.
   @inlinable
-  public static func += <
-    Other: Sequence
-  >(lhs: inout Self, rhs: Other)
-  where Element == Other.Element {
+  public static func += (lhs: inout Self, rhs: some Sequence<Element>) {
     lhs.append(contentsOf: rhs)
   }
 
@@ -1084,10 +1071,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: A range-replaceable collection.
   ///   - rhs: Another range-replaceable collection.
   @inlinable
-  public static func + <
-    Other: RangeReplaceableCollection
-  >(lhs: Self, rhs: Other) -> Self
-  where Element == Other.Element {
+  public static func + (lhs: Self, rhs: some RangeReplaceableCollection<Element>) -> Self {
     var lhs = lhs
     // FIXME: what if lhs is a reference type?  This will mutate it.
     lhs.append(contentsOf: rhs)
