@@ -418,6 +418,10 @@ public:
   /// error is returned.
   llvm::Error consumeExpectedError(llvm::Error &&error);
 
+  /// Report project errors as remarks if desired, otherwise drop the error
+  /// silently.
+  void diagnoseAndConsumeError(llvm::Error error) const;
+
   /// Report an unexpected format error that could happen only from a
   /// memory-level inconsistency. Please prefer passing an error to
   /// `fatal(llvm::Error error)` when possible.
