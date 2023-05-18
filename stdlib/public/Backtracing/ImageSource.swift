@@ -19,9 +19,12 @@
 import Swift
 
 struct ImageBounds<Address: FixedWidthInteger,
-                            Size: FixedWidthInteger> {
+                   Size: FixedWidthInteger> {
   var base: Address
   var size: Size
+  var end: Address {
+    return base + Address(size)
+  }
 
   func adjusted(by offset: some FixedWidthInteger) -> Self {
     return Self(base: base + Address(offset), size: size - Size(offset))
