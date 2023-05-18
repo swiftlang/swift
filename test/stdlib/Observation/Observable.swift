@@ -29,6 +29,11 @@ class ContainsWeak {
 }
 
 @Observable
+public class PublicContainsWeak {
+  public weak var obj: AnyObject? = nil
+}
+
+@Observable
 class ContainsUnowned {
   unowned var obj: AnyObject? = nil
 }
