@@ -920,6 +920,12 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   llvm_unreachable("unhandled result");
 }
 
+std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
+  return clang::ASTReader::getOriginalSourceFile(
+      PCHFilename.str(), Impl.Instance->getFileManager(),
+      Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
+}
+
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
