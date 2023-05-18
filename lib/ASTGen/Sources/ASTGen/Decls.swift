@@ -25,6 +25,28 @@ extension ASTGenVisitor {
     )
   }
 
+  public func visit(_ node: EnumDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
+    let decl = EnumDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.enumKeyword),
+      name,
+      nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue,
+      self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+    )
+
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
+
+    return .decl(decl.asDecl)
+  }
+
   public func visit(_ node: StructDeclSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 

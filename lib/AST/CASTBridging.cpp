@@ -573,6 +573,27 @@ convertToInheritedEntries(BridgedArrayRef cInheritedTypes) {
   return inheritedEntries;
 }
 
+BridgedDeclContextAndDecl EnumDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange) {
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *decl = new (context)
+      EnumDecl(convertSourceLoc(cEnumKeywordLoc), convertIdentifier(cName),
+               convertSourceLoc(cNameLoc),
+               context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+               static_cast<GenericParamList *>(opaqueGenericParamList),
+               convertDeclContext(cDeclContext));
+  decl->setTrailingWhereClause(
+      static_cast<TrailingWhereClause *>(opaqueGenericWhereClause));
+  decl->setBraces(convertSourceRange(cBraceRange));
+
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
+}
+
 BridgedDeclContextAndDecl StructDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,

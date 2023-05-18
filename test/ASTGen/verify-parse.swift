@@ -104,6 +104,11 @@ Alias<T>
 =
 String where T: Proto1
 
+enum
+Enum<T>: Proto1 where T: Proto1 {
+  func method(_ b: Bool) {}
+}
+
 struct
 Struct
 <

@@ -358,6 +358,13 @@ void *TypeAliasDecl_create(BridgedASTContext cContext,
 void IterableDeclContext_setParsedMembers(BridgedArrayRef members,
                                           void *opaqueDecl);
 
+BridgedDeclContextAndDecl EnumDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange);
+
 BridgedDeclContextAndDecl StructDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
