@@ -16,7 +16,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
@@ -87,18 +86,6 @@ static bool useCaptured(Operand *UI) {
 
   return true;
 }
-
-namespace {
-
-enum class AllocBoxToStackFlags {
-  InAppliedFunction = 0x1,
-  CanPromoteNonCopyableCapturedByEscapingClosure = 0x2,
-  HasMoveOnlyBox = 0x4,
-};
-
-using AllocBoxToStackOptions = OptionSet<AllocBoxToStackFlags>;
-
-} // namespace
 
 //===----------------------------------------------------------------------===//
 //                 Liveness for alloc_box Promotion
@@ -314,7 +301,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 }
 
 static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
-    SILValue Box, AllocBoxToStackOptions Options, SmallVectorImpl<Operand *> &,
+    SILValue Box, bool inAppliedFunction, SmallVectorImpl<Operand *> &,
     SmallPtrSetImpl<SILFunction *> &, unsigned CurrentRecurDepth);
 
 /// checkLocalApplyBody - Check the body of an apply's callee to see
@@ -324,8 +311,7 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
 static bool checkLocalApplyBody(Operand *O,
                                 SmallVectorImpl<Operand *> &PromotedOperands,
                                 SmallPtrSetImpl<SILFunction *> &VisitedCallees,
-                                unsigned CurrentRecurDepth,
-                                AllocBoxToStackOptions Options) {
+                                unsigned CurrentRecurDepth) {
   SILFunction *F = ApplySite(O->getUser()).getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
@@ -337,11 +323,10 @@ static bool checkLocalApplyBody(Operand *O,
   if (!iter.second)
     return false;
 
-  Options |= {AllocBoxToStackFlags::InAppliedFunction};
-
   auto calleeArg = F->getArgument(ApplySite(O->getUser()).getCalleeArgIndex(*O));
   auto res = !recursivelyFindBoxOperandsPromotableToAddress(
-      calleeArg, Options, PromotedOperands, VisitedCallees,
+      calleeArg,
+      /* inAppliedFunction = */ true, PromotedOperands, VisitedCallees,
       CurrentRecurDepth + 1);
   return res;
 }
@@ -385,7 +370,7 @@ static bool isOptimizableApplySite(ApplySite Apply) {
 /// box is passed don't have any unexpected uses, `PromotedOperands` will be
 /// populated with the box arguments in DFS order.
 static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
-    SILValue Box, AllocBoxToStackOptions Options,
+    SILValue Box, bool inAppliedFunction,
     SmallVectorImpl<Operand *> &PromotedOperands,
     SmallPtrSetImpl<SILFunction *> &VisitedCallees,
     unsigned CurrentRecurDepth = 0) {
@@ -409,8 +394,7 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
     // Projections are fine as well.
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
         isa<ProjectBoxInst>(User) || isa<DestroyValueInst>(User) ||
-        (!Options.contains(AllocBoxToStackFlags::InAppliedFunction) &&
-         isa<DeallocBoxInst>(User)) ||
+        (!inAppliedFunction && isa<DeallocBoxInst>(User)) ||
         isa<EndBorrowInst>(User))
       continue;
 
@@ -429,17 +413,8 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
       }
       switch (Apply.getKind()) {
       case ApplySiteKind::PartialApplyInst: {
-        // If we have a noncopyable type in a box and we were passed in the
-        // option that tells us that we should not promote any boxes that are
-        // captured by an escaping closure (even if we can prove the closure
-        // does not escape), treat the partial apply use as an escape.
-        if (Box->getType().isBoxedNonCopyableType(Box->getFunction()) &&
-            !Options.contains(
-                AllocBoxToStackFlags::
-                    CanPromoteNonCopyableCapturedByEscapingClosure))
-          break;
         if (checkLocalApplyBody(Op, LocalPromotedOperands, VisitedCallees,
-                                CurrentRecurDepth, Options) &&
+                                CurrentRecurDepth) &&
             !partialApplyEscapes(cast<PartialApplyInst>(User),
                                  /* examineApply = */ true)) {
           LocalPromotedOperands.push_back(Op);
@@ -452,7 +427,7 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
       case ApplySiteKind::TryApplyInst:
         if (isOptimizableApplySite(Apply) &&
             checkLocalApplyBody(Op, LocalPromotedOperands, VisitedCallees,
-                                CurrentRecurDepth, Options)) {
+                                CurrentRecurDepth)) {
           LocalPromotedOperands.push_back(Op);
           continue;
         }
@@ -475,13 +450,13 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
-                               SmallVectorImpl<Operand *> &PromotedOperands,
-                               AllocBoxToStackOptions Options) {
+                               SmallVectorImpl<Operand *> &PromotedOperands) {
   SmallPtrSet<SILFunction *, 8> VisitedCallees;
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted to the stack.
   if (auto *User = recursivelyFindBoxOperandsPromotableToAddress(
-          ABI, Options, PromotedOperands, VisitedCallees,
+          ABI,
+          /* inAppliedFunction = */ false, PromotedOperands, VisitedCallees,
           /* CurrentRecurDepth = */ 0)) {
     (void)User;
     // Otherwise, we have an unexpected use.
@@ -1066,7 +1041,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
         auto boxType = F->getArgument(index)->getType().castTo<SILBoxType>();
         bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
         auto checkKind =
-            isMutable ? MarkMustCheckInst::CheckKind::AssignableButNotConsumable
+            isMutable ? MarkMustCheckInst::CheckKind::ConsumableAndAssignable
                       : MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
         hoistMarkMustCheckInsts(ClonedFn->getArgument(index), checkKind);
       }
@@ -1246,8 +1221,6 @@ static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
 }
 
 namespace {
-
-template <bool CanPromoteMoveOnlyCapturedByEscapingClosure>
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
@@ -1256,16 +1229,10 @@ class AllocBoxToStack : public SILFunctionTransform {
       return;
 
     AllocBoxToStackState pass(this);
-
-    AllocBoxToStackOptions Options;
-    if (CanPromoteMoveOnlyCapturedByEscapingClosure)
-      Options |=
-          AllocBoxToStackFlags::CanPromoteNonCopyableCapturedByEscapingClosure;
-
     for (auto &BB : *getFunction()) {
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
-          if (canPromoteAllocBox(ABI, pass.PromotedOperands, Options))
+          if (canPromoteAllocBox(ABI, pass.PromotedOperands))
             pass.Promotable.push_back(ABI);
     }
 
@@ -1284,13 +1251,8 @@ class AllocBoxToStack : public SILFunctionTransform {
     }
   }
 };
-
 } // end anonymous namespace
 
 SILTransform *swift::createAllocBoxToStack() {
-  return new AllocBoxToStack<true>();
-}
-
-SILTransform *swift::createEarlyAllocBoxToStack() {
-  return new AllocBoxToStack<false>();
+  return new AllocBoxToStack();
 }

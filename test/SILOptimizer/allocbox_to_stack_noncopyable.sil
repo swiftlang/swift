@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -early-allocbox-to-stack -enable-copy-propagation=requested-passes-only | %FileCheck -check-prefix=EARLY %s
 
 sil_stage raw
 
@@ -162,13 +161,6 @@ bb3:
   return %30 : $()
 }
 
-// Make sure that if our box is captured by a partial_apply, we do not process
-// it with the early allocbox to stack, but we do with the normal allocbox to
-// stack.
-// EARLY: sil hidden [ossa] @earlyallocbox_to_stack_partial_apply_test_caller : $@convention(thin) (@owned NonTrivialStruct) -> () {
-// EARLY: alloc_box ${ var NonTrivialStruct }, var, name "x"
-// EARLY: } // end sil function 'earlyallocbox_to_stack_partial_apply_test_caller'
-//
 // CHECK: sil hidden [ossa] @earlyallocbox_to_stack_partial_apply_test_caller : $@convention(thin) (@owned NonTrivialStruct) -> () {
 // CHECK: alloc_stack [lexical] $NonTrivialStruct, var, name "x"
 // CHECK: } // end sil function 'earlyallocbox_to_stack_partial_apply_test_caller'
