@@ -875,16 +875,16 @@ ERROR(need_hermetic_seal_to_import_module,none,
 ERROR(modularization_issue_decl_moved,Fatal,
       "reference to %select{top-level|type}0 %1 broken by a context change; "
       "%1 was expected to be in %2, but now a candidate is found only in %3",
-      (bool, DeclName, Identifier, Identifier))
+      (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
       "reference to %select{top-level|type}0 %1 broken by a context change; "
       "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
-      "%select{|, it was in %2 and is now found in %4}5",
-      (bool, DeclName, Identifier, StringRef, Identifier, bool))
+      "%select{|, it was in %2 and is now a candidate is found only in %4}5",
+      (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
       "reference to %select{top-level|type}0 %1 broken by a context change; "
       "%1 is not found, it was expected to be in %2",
-      (bool, DeclName, Identifier))
+      (bool, DeclName, const ModuleDecl*))
 
 NOTE(modularization_issue_side_effect_extension_error,none,
      "could not deserialize extension",

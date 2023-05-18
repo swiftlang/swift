@@ -197,18 +197,21 @@ ModularizationError::diagnose(const ModuleFile *MF,
   auto diagnoseError = [&](Kind errorKind) {
     switch (errorKind) {
     case Kind::DeclMoved:
-      return ctx.Diags.diagnose(MF->getSourceLoc(), diag::modularization_issue_decl_moved,
-                                declIsType, name, expectedModuleName,
-                                foundModuleName);
+      return ctx.Diags.diagnose(getSourceLoc(),
+                                diag::modularization_issue_decl_moved,
+                                declIsType, name, expectedModule,
+                                foundModule);
     case Kind::DeclKindChanged:
       return
-        ctx.Diags.diagnose(MF->getSourceLoc(), diag::modularization_issue_decl_type_changed,
-                           declIsType, name, expectedModuleName,
-                           referencedFromModuleName, foundModuleName,
-                           foundModuleName != expectedModuleName);
+        ctx.Diags.diagnose(getSourceLoc(),
+                           diag::modularization_issue_decl_type_changed,
+                           declIsType, name, expectedModule,
+                           referenceModule->getName(), foundModule,
+                           foundModule != expectedModule);
     case Kind::DeclNotFound:
-      return ctx.Diags.diagnose(MF->getSourceLoc(), diag::modularization_issue_decl_not_found,
-                                declIsType, name, expectedModuleName);
+      return ctx.Diags.diagnose(getSourceLoc(),
+                                diag::modularization_issue_decl_not_found,
+                                declIsType, name, expectedModule);
     }
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
@@ -1957,7 +1960,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     SmallVector<char, 64> strScratch;
 
     auto errorKind = ModularizationError::Kind::DeclNotFound;
-    Identifier foundIn;
+    ModuleDecl *foundIn = nullptr;
     bool isType = false;
 
     if (recordID == XREF_TYPE_PATH_PIECE ||
@@ -2011,7 +2014,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           // one because otherwise it would have succeeded on the first search.
           // This is usually caused by the use of poorly modularized headers.
           errorKind = ModularizationError::Kind::DeclMoved;
-          foundIn = otherModule->getName();
+          foundIn = otherModule;
           break;
         } else if (hadAMatchBeforeFiltering) {
           // Found a match that was filtered out. This may be from the same
@@ -2019,20 +2022,18 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           // by the use of different Swift language versions between a library
           // with serialized SIL and a client.
           errorKind = ModularizationError::Kind::DeclKindChanged;
-          foundIn = otherModule->getName();
+          foundIn = otherModule;
           break;
         }
       }
     }
 
     auto declName = getXRefDeclNameForError();
-    auto expectedIn = baseModule->getName();
-    auto referencedFrom = getName();
     auto error = llvm::make_error<ModularizationError>(declName,
                                                        isType,
                                                        errorKind,
-                                                       expectedIn,
-                                                       referencedFrom,
+                                                       baseModule,
+                                                       this,
                                                        foundIn,
                                                        pathTrace);
 
