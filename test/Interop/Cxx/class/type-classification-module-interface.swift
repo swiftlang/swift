@@ -42,8 +42,7 @@
 // CHECK: }
 
 // CHECK: struct HasMethodThatReturnsTemplatedBox {
-// FIXME: This is unfortunate, we should be able to recognize that TemplatedBox<Int32> does not store any pointers as fields.
-// CHECK:   func __getIntBoxUnsafe() -> TemplatedBox<Int32>
+// CHECK:   func getIntBox() -> TemplatedBox<Int32>
 // CHECK:   func __getIntPtrBoxUnsafe()
 // CHECK: }
 
