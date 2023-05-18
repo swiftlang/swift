@@ -27,6 +27,8 @@ import macro_library
 macro addCompletionHandler() = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
 @attached(peer, names: suffixed(Builder))
 macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition", type: "AddClassReferencingSelfMacro")
+@attached(peer, names: named(value))
+macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
 #endif
 
 @attached(peer, names: arbitrary)
@@ -162,8 +164,6 @@ struct S2 {
 macro myPropertyWrapper() =
     #externalMacro(module: "MacroDefinition", type: "PropertyWrapperMacro")
 
-struct Date { }
-
 struct MyWrapperThingy<T> {
   var storage: T
 
@@ -187,4 +187,15 @@ struct S3 {
   init(x: Int) {
     self._x = MyWrapperThingy(storage: x)
   }
+}
+
+@declareVarValuePeer
+struct Date {
+  @declareVarValuePeer
+  func foo() {}
+}
+
+func testVarPeer() {
+  _ = value
+  _ = Date().value
 }
