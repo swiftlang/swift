@@ -2053,10 +2053,8 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 ///
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
-static Type
-typeEraseExistentialSelfReferences(
-    Type refTy, Type baseTy,
-    TypePosition outermostPosition) {
+static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
+                                               TypePosition outermostPosition) {
   assert(baseTy->isExistentialType());
   if (!refTy->hasTypeParameter()) {
     return refTy;
@@ -2170,7 +2168,6 @@ typeEraseExistentialSelfReferences(
       return erasedTy;
     });
   };
-
   return transformFn(refTy, outermostPosition);
 }
 
@@ -2299,8 +2296,16 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
+
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
                                                TypePosition::Covariant);
+
+    Type contextualTy;
+
+    if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {
+      contextualTy =
+          getContextualType(getParentExpr(anchor), /*forConstraint=*/false);
+    }
 
     if (!hasFixFor(locator) &&
         AddExplicitExistentialCoercion::isRequired(
@@ -2308,7 +2313,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
             [&](TypeVariableType *typeVar) {
               return openedTypeVar == typeVar ? baseObjTy : Optional<Type>();
             },
-            locator)) {
+            locator) &&
+        !contextualTy) {
       recordFix(AddExplicitExistentialCoercion::create(
           *this, getResultType(type), locator));
     }

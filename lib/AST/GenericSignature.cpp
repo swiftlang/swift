@@ -626,59 +626,36 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
 }
 
 Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
+  return getUpperBound(type);
+}
+
+Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
+  return getUpperBound(type, /*wantDependentBound=*/true);
+}
+
+Type GenericSignatureImpl::getUpperBound(Type type,
+                                         bool wantDependentBound) const {
   assert(type->isTypeParameter());
 
   bool hasExplicitAnyObject = requiresClass(type);
 
   llvm::SmallVector<Type, 2> types;
+
   if (Type superclass = getSuperclassBound(type)) {
-    // If the class contains a type parameter, try looking for a non-dependent
-    // superclass.
-    while (superclass && superclass->hasTypeParameter()) {
-      superclass = superclass->getSuperclass();
-    }
+    do {
+      superclass = getReducedType(superclass);
+      if (wantDependentBound || !superclass->hasTypeParameter()) {
+        break;
+      }
+    } while ((superclass = superclass->getSuperclass()));
 
     if (superclass) {
       types.push_back(superclass);
       hasExplicitAnyObject = false;
     }
   }
+
   for (auto *proto : getRequiredProtocols(type)) {
-    if (proto->requiresClass())
-      hasExplicitAnyObject = false;
-
-    types.push_back(proto->getDeclaredInterfaceType());
-  }
-
-  auto constraint = ProtocolCompositionType::get(
-      getASTContext(), types,
-      hasExplicitAnyObject);
-
-  if (!constraint->isConstraintType()) {
-    assert(constraint->getClassOrBoundGenericClass());
-    return constraint;
-  }
-
-  return ExistentialType::get(constraint);
-}
-
-Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
-  assert(type->isTypeParameter());
-
-  llvm::SmallVector<Type, 2> types;
-
-  auto &ctx = type->getASTContext();
-
-  bool hasExplicitAnyObject = requiresClass(type);
-
-  // FIXME: If the superclass bound is implied by one of our protocols, we
-  // shouldn't add it to the constraint type.
-  if (Type superclass = getSuperclassBound(type)) {
-    types.push_back(superclass);
-    hasExplicitAnyObject = false;
-  }
-
-  for (auto proto : getRequiredProtocols(type)) {
     if (proto->requiresClass())
       hasExplicitAnyObject = false;
 
@@ -734,16 +711,15 @@ Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
       //
       // In that case just add the base type in the default branch below.
       if (argTypes.size() == primaryAssocTypes.size()) {
-        types.push_back(ParameterizedProtocolType::get(ctx, baseType, argTypes));
+        types.push_back(ParameterizedProtocolType::get(getASTContext(), baseType, argTypes));
         continue;
       }
     }
-
     types.push_back(baseType);
   }
 
-  auto constraint = ProtocolCompositionType::get(
-     ctx, types, hasExplicitAnyObject);
+  auto constraint = ProtocolCompositionType::get(getASTContext(), types,
+                                                 hasExplicitAnyObject);
 
   if (!constraint->isConstraintType()) {
     assert(constraint->getClassOrBoundGenericClass());
