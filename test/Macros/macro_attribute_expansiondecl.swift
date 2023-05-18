@@ -86,10 +86,9 @@ public struct FuncFromClosureMacro: DeclarationMacro {
 @available(SwiftStdlib 9999, *)
 #globalDecls
 
-func testGlobal() { // expected-note {{add @available attribute to enclosing global function}}
+func testGlobal() { // expected-note 2 {{add @available attribute to enclosing global function}}
   globalFunc() // expected-error {{'globalFunc()' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
-  // FIXME(109376568): Global variable introduced by macro expansion not found
-  _ = globalVar // expected-error {{cannot find 'globalVar' in scope}}
+  _ = globalVar // expected-error {{'globalVar' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
 }
 
 struct S {

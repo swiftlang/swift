@@ -32,6 +32,7 @@ macro anonymousTypes(public: Bool = false, _: () -> String) = #externalMacro(mod
 macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
 @freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+@freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
 #endif
 
 // Test unqualified lookup from within a macro expansion
@@ -79,3 +80,9 @@ func testArbitraryAtGlobal() {
 
 // DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf1_{{.*}}warning: 'deprecated()' is deprecated
 // DIAG_BUFFERS: @__swiftmacro_9MacroUser33_{{.*}}9stringifyfMf2_{{.*}}warning: 'deprecated()' is deprecated
+
+#varValue
+
+func testGlobalVariable() {
+  _ = value
+}

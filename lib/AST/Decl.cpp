@@ -10341,9 +10341,12 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
   auto *baseDecl = unexpandedMacro.baseDecl;
   if (!macroRef || !baseDecl)
     return;
+  auto *module = getModuleContext();
 
   baseDecl->visitAuxiliaryDecls([&](Decl *auxiliaryDecl) {
-    auto *sf = auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
+    SourceFile *sf = auxiliaryDecl->getLoc()
+        ? module->getSourceFileContainingLocation(auxiliaryDecl->getLoc())
+        : auxiliaryDecl->getInnermostDeclContext()->getParentSourceFile();
     // We only visit auxiliary decls that are macro expansions associated with
     // this macro reference.
     if (auto *med = macroRef.dyn_cast<MacroExpansionDecl *>()) {
