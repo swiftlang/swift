@@ -3644,6 +3644,28 @@ bool TypeBase::hasDynamicCallableAttribute() {
   });
 }
 
+ProtocolDecl *ImplementsAttrProtocolRequest::evaluate(
+    Evaluator &evaluator, const ImplementsAttr *attr, DeclContext *dc) const {
+
+  auto typeRepr = attr->getProtocolTypeRepr();
+
+  ASTContext &ctx = dc->getASTContext();
+  DirectlyReferencedTypeDecls referenced =
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc);
+
+  // Resolve those type declarations to nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
+  auto nominalTypes
+    = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
+                                anyObject);
+
+  if (nominalTypes.empty())
+    return nullptr;
+
+  return dyn_cast<ProtocolDecl>(nominalTypes.front());
+}
+
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
   Pat->forEachVariable([&](VarDecl *VD) { checkValueDecl(VD, Reason); });
 }

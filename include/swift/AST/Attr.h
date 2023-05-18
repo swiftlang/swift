@@ -1551,25 +1551,28 @@ public:
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
-  TypeExpr *ProtocolType;
+  TypeRepr *TyR;
   DeclName MemberName;
   DeclNameLoc MemberNameLoc;
 
-public:
   ImplementsAttr(SourceLoc atLoc, SourceRange Range,
-                 TypeExpr *ProtocolType,
+                 TypeRepr *TyR,
                  DeclName MemberName,
                  DeclNameLoc MemberNameLoc);
 
+public:
   static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range,
-                                TypeExpr *ProtocolType,
+                                TypeRepr *TyR,
                                 DeclName MemberName,
                                 DeclNameLoc MemberNameLoc);
 
-  void setProtocolType(Type ty);
-  Type getProtocolType() const;
-  TypeRepr *getProtocolTypeRepr() const;
+  static ImplementsAttr *create(DeclContext *DC,
+                                ProtocolDecl *Proto,
+                                DeclName MemberName);
+
+  ProtocolDecl *getProtocol(DeclContext *dc) const;
+  TypeRepr *getProtocolTypeRepr() const { return TyR; }
 
   DeclName getMemberName() const { return MemberName; }
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
