@@ -478,7 +478,6 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   for (auto gp : *genericParams) {
     // Diagnose generic types with a parameter packs if VariadicGenerics
     // is not enabled.
-    auto &ctx = decl->getASTContext();
     if (gp->isParameterPack() && isGenericType) {
       TypeChecker::checkAvailability(
           gp->getSourceRange(),
