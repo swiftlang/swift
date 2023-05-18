@@ -210,6 +210,9 @@ EXPERIMENTAL_FEATURE(ReferenceBindings, false)
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
 EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
+// Enable strict concurrency.
+EXPERIMENTAL_FEATURE(StrictConcurrency, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

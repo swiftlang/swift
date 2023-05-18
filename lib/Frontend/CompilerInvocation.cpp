@@ -509,6 +509,15 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
+static llvm::Optional<StrictConcurrency>
+parseStrictConcurrency(StringRef value) {
+  return llvm::StringSwitch<llvm::Optional<StrictConcurrency>>(value)
+      .Case("minimal", StrictConcurrency::Minimal)
+      .Case("targeted", StrictConcurrency::Targeted)
+      .Case("complete", StrictConcurrency::Complete)
+      .Default(llvm::None);
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -763,9 +772,33 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     addFutureFeatureIfNotImplied(Feature::BareSlashRegexLiterals);
 
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
+    // Allow StrictConcurrency to have a value that corresponds to the
+    // -strict-concurrency=<blah> settings.
+    StringRef value = A->getValue();
+    if (value.startswith("StrictConcurrency")) {
+      auto decomposed = value.split("=");
+      if (decomposed.first == "StrictConcurrency") {
+        bool handled;
+        if (decomposed.second == "") {
+          Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+          handled = true;
+        } else if (auto level = parseStrictConcurrency(decomposed.second)) {
+          Opts.StrictConcurrencyLevel = *level;
+          handled = true;
+        } else {
+          handled = false;
+        }
+
+        if (handled) {
+          Opts.Features.insert(Feature::StrictConcurrency);
+          continue;
+        }
+      }
+    }
+
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
-    if (auto feature = getExperimentalFeature(A->getValue())) {
+    if (auto feature = getExperimentalFeature(value)) {
 #ifdef NDEBUG
       if (!isFeatureAvailableInProduction(*feature)) {
         Diags.diagnose(SourceLoc(),
@@ -928,6 +961,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+  } else if (Opts.hasFeature(Feature::StrictConcurrency)) {
+    // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
     Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
