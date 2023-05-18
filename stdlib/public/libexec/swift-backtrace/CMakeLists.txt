@@ -22,7 +22,9 @@ if(NOT SWIFT_BUILD_STDLIB)
 endif()
 
 set(BACKTRACING_COMPILE_FLAGS
-  "-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules")
+  "-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
+  "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
+  "-Xcc;-I${CMAKE_BINARY_DIR}/include")
 
 add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   main.swift

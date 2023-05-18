@@ -21,6 +21,7 @@ import Swift
 
 @_implementationOnly import OS.Libc
 @_implementationOnly import ImageFormats.Elf
+@_implementationOnly import Runtime
 
 // .. Utilities ................................................................
 
@@ -1175,14 +1176,14 @@ class ElfImage<S: ImageSource, Traits: ElfTraits>: ElfImageProtocol {
         _debugImage = try ElfImage<LZMACompressedImageSource,
                                    Traits>(source: source)
         return _debugImage
-      } catch CompressedImageSourceError.libraryNotFound {
-        // ###TODO: Standard error
-        print("swift-runtime: warning: liblzma not found, unable to decode "
-                + "the .gnu_debugdata section in \(imageName)")
+      } catch let CompressedImageSourceError.libraryNotFound(library) {
+        swift_reportWarning(0,
+                            """
+                              swift-runtime: warning: \(library) not found, \
+                              unable to decode the .gnu_debugdata section in \
+                              \(imageName)
+                              """)
       } catch {
-        // ###TODO: Standard error
-        print("swift-runtime: warning: unable to decode the .gnu_debugdata "
-                + "section in \(imageName)")
       }
     }
 
@@ -1228,10 +1229,14 @@ class ElfImage<S: ImageSource, Traits: ElfTraits>: ElfImageProtocol {
             return try ElfGNUCompressedImageSource(source: subSource)
           }
         }
+      } catch let CompressedImageSourceError.libraryNotFound(library) {
+        swift_reportWarning(0,
+                            """
+                              swift-runtime: warning: \(library) not found, \
+                              unable to decode the \(name) section in \
+                              \(imageName)
+                              """)
       } catch {
-        // ###TODO: Remove this
-        print("EXCEPTION")
-        print(error)
       }
     }
 

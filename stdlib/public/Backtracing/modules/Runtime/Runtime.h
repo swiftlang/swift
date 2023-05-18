@@ -17,6 +17,10 @@
 #ifndef SWIFT_BACKTRACING_RUNTIME_H
 #define SWIFT_BACKTRACING_RUNTIME_H
 
-#include "../../../../../include/swift/Runtime/CrashInfo.h"
+#include "swift/Runtime/CrashInfo.h"
+
+// Can't import swift/Runtime/Debug.h because it assumes C++
+void swift_reportWarning(uint32_t flags, const char *message);
+
 
 #endif // SWIFT_BACKTRACING_RUNTIME_H

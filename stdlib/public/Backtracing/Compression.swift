@@ -38,7 +38,7 @@ enum CompressedImageSourceError: Error {
   case outOfRangeFetch(Int, Int)
   case badCompressedData
   case unsupportedFormat
-  case libraryNotFound
+  case libraryNotFound(String)
   case outputOverrun
 }
 
@@ -122,7 +122,7 @@ struct ZLibStream: CompressedStream {
   func decompress(input: InputSource, output: OutputSink) throws -> UInt {
 
     if zlibHandle == nil {
-      throw CompressedImageSourceError.libraryNotFound
+      throw CompressedImageSourceError.libraryNotFound("libz")
     }
 
     var stream = zlib_stream_init()
@@ -182,7 +182,7 @@ struct ZStdStream: CompressedStream {
   func decompress(input: InputSource, output: OutputSink) throws -> UInt {
 
     if zstdHandle == nil {
-      throw CompressedImageSourceError.libraryNotFound
+      throw CompressedImageSourceError.libraryNotFound("libzstd")
     }
 
     guard let stream = Sym.ZSTD_createDStream!() else {
@@ -252,7 +252,7 @@ struct LZMAStream: CompressedStream {
   func decompress(input: InputSource, output: OutputSink) throws -> UInt {
 
     if lzmaHandle == nil {
-      throw CompressedImageSourceError.libraryNotFound
+      throw CompressedImageSourceError.libraryNotFound("liblzma")
     }
 
     var stream = lzma_stream_init()

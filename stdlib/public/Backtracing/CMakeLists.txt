@@ -45,6 +45,8 @@ set(BACKTRACING_SOURCES
 
 set(BACKTRACING_COMPILE_FLAGS
   "-Xfrontend;-experimental-spi-only-imports"
+  "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
+  "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-Xcc;-fno-implicit-module-maps"
   "-Xcc;-fbuiltin-module-map"
   "-Xcc;-fmodule-map-file=${SWIFT_STDLIB_SOURCE_DIR}/public/SwiftShims/swift/shims/module.modulemap"
@@ -74,7 +76,6 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   ### Need to fix this so _StringProcessing is used for Linux
   ### Either that, or don't use regexes to parse things
-
   SWIFT_MODULE_DEPENDS ${concurrency} _StringProcessing
 
   LINK_LIBRARIES ${swift_backtracing_link_libraries}
