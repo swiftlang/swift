@@ -13,40 +13,40 @@
 import StdlibUnittest
 
 // A minimal RRC conformance, to test default implementations with
-struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
+public struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
   
   // we're trying to move away from calling reserveCapacity inside most mutating
   // methods, this will let us verify that we don't
   internal var allowReserveCapacity = true
-  var storage:[UInt8] = []
+  var storage:[Int] = []
   
-  init() {}
+  public init() {}
   
-  init(arrayLiteral elements: Element...) {
+  public init(arrayLiteral elements: Element...) {
     storage.append(contentsOf: elements)
   }
   
-  func index(after i: Int) -> Int {
+  public func index(after i: Int) -> Int {
     i + 1
   }
   
-  func index(before i: Int) -> Int {
+  public func index(before i: Int) -> Int {
     i - 1
   }
   
-  var startIndex: Int {
+  public var startIndex: Int {
     0
   }
   
-  var endIndex: Int {
+  public var endIndex: Int {
     count
   }
   
-  var count: Int {
+  public var count: Int {
     storage.count
   }
   
-  subscript(position: Int) -> UInt8 {
+  public subscript(position: Int) -> Int {
     get {
       storage[position]
     }
@@ -55,11 +55,11 @@ struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
     }
   }
   
-  mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<UInt8>) {
+  public mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<Int>) {
     storage.replaceSubrange(subrange, with: newElements)
   }
   
-  mutating func reserveCapacity(_ n: Int) {
+  public mutating func reserveCapacity(_ n: Int) {
     precondition(allowReserveCapacity)
     storage.reserveCapacity(n)
   }
@@ -81,17 +81,18 @@ internal enum IndexSelection {
   }
 }
 
-public struct ReplaceSubrangeTest {
+public struct ReplaceSubrangeTest<C: RangeReplaceableCollection> where C.Element == Int {
   public let collection: [OpaqueValue<Int>]
   public let newElements: [OpaqueValue<Int>]
   public let rangeSelection: RangeSelection
-  public let expected: [Int]
-  public let closedExpected: [Int]?  // Expected array for closed ranges
+  public let expected: C
+  public let closedExpected: C?  // Expected array for closed ranges
   public let loc: SourceLoc
 
   internal init(
-    collection: [Int], newElements: [Int],
-    rangeSelection: RangeSelection, expected: [Int], closedExpected: [Int]? = nil,
+    collection: some RangeReplaceableCollection<Int>,
+    newElements: some Collection<Int>,
+    rangeSelection: RangeSelection, expected: C, closedExpected: C? = nil,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -103,14 +104,15 @@ public struct ReplaceSubrangeTest {
   }
 }
 
-internal struct AppendTest {
+internal struct AppendTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let newElement: OpaqueValue<Int>
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], newElement: Int, expected: [Int],
+    collection: some RangeReplaceableCollection<Int>,
+    newElement: Int, expected: C,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -120,14 +122,15 @@ internal struct AppendTest {
   }
 }
 
-internal struct AppendContentsOfTest {
+internal struct AppendContentsOfTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], newElements: [Int], expected: [Int],
+    collection: some RangeReplaceableCollection<Int>,
+    newElements: some RangeReplaceableCollection<Int>, expected: C,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -137,16 +140,17 @@ internal struct AppendContentsOfTest {
   }
 }
 
-internal struct InsertTest {
+internal struct InsertTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let newElement: OpaqueValue<Int>
   let indexSelection: IndexSelection
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], newElement: Int, indexSelection: IndexSelection,
-    expected: [Int], file: String = #file, line: UInt = #line
+    collection: some RangeReplaceableCollection<Int>,
+    newElement: Int, indexSelection: IndexSelection,
+    expected: C, file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElement = OpaqueValue(newElement)
@@ -156,16 +160,18 @@ internal struct InsertTest {
   }
 }
 
-internal struct InsertContentsOfTest {
+internal struct InsertContentsOfTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
   let indexSelection: IndexSelection
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], newElements: [Int], indexSelection: IndexSelection,
-    expected: [Int], file: String = #file, line: UInt = #line
+    collection: some RangeReplaceableCollection<Int>,
+    newElements: some RangeReplaceableCollection<Int>,
+    indexSelection: IndexSelection,
+    expected: C, file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.newElements = newElements.map(OpaqueValue.init)
@@ -175,17 +181,17 @@ internal struct InsertContentsOfTest {
   }
 }
 
-internal struct RemoveAtIndexTest {
+internal struct RemoveAtIndexTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let indexSelection: IndexSelection
   let expectedRemovedElement: Int
-  let expectedCollection: [Int]
+  let expectedCollection: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], indexSelection: IndexSelection,
-    expectedRemovedElement: Int, expectedCollection: [Int],
-    file: String = #file, line: UInt = #line
+    collection: some RangeReplaceableCollection<Int>,
+    indexSelection: IndexSelection, expectedRemovedElement: Int,
+    expectedCollection: C, file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
     self.indexSelection = indexSelection
@@ -195,14 +201,15 @@ internal struct RemoveAtIndexTest {
   }
 }
 
-internal struct RemoveLastNTest {
+internal struct RemoveLastNTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
   let numberToRemove: Int
-  let expectedCollection: [Int]
+  let expectedCollection: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], numberToRemove: Int, expectedCollection: [Int],
+    collection: some RangeReplaceableCollection<Int>,
+    numberToRemove: Int, expectedCollection: C,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -212,14 +219,15 @@ internal struct RemoveLastNTest {
   }
 }
 
-public struct RemoveSubrangeTest {
+public struct RemoveSubrangeTest<C: RangeReplaceableCollection> where C.Element == Int {
   public let collection: [OpaqueValue<Int>]
   public let rangeSelection: RangeSelection
-  public let expected: [Int]
+  public let expected: C
   public let loc: SourceLoc
 
   internal init(
-    collection: [Int], rangeSelection: RangeSelection, expected: [Int],
+    collection: some RangeReplaceableCollection<Int>,
+    rangeSelection: RangeSelection, expected: C,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -229,13 +237,13 @@ public struct RemoveSubrangeTest {
   }
 }
 
-internal struct RemoveAllTest {
+internal struct RemoveAllTest<C: RangeReplaceableCollection> where C.Element == Int {
   let collection: [OpaqueValue<Int>]
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], expected: [Int],
+    collection: some RangeReplaceableCollection<Int>, expected: C,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -250,7 +258,7 @@ internal struct ReserveCapacityTest {
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], requestedCapacity: Int,
+    collection: some RangeReplaceableCollection<Int>, requestedCapacity: Int,
     file: String = #file, line: UInt = #line
   ) {
     self.collection = collection.map(OpaqueValue.init)
@@ -259,14 +267,16 @@ internal struct ReserveCapacityTest {
   }
 }
 
-internal struct OperatorPlusTest {
+internal struct OperatorPlusTest<C: RangeReplaceableCollection> where C.Element == Int {
   let lhs: [OpaqueValue<Int>]
   let rhs: [OpaqueValue<Int>]
-  let expected: [Int]
+  let expected: C
   let loc: SourceLoc
 
   internal init(
-    lhs: [Int], rhs: [Int], expected: [Int],
+    lhs: some RangeReplaceableCollection<Int>,
+    rhs: some RangeReplaceableCollection<Int>,
+    expected: C,
     file: String = #file, line: UInt = #line
   ) {
     self.lhs = lhs.map(OpaqueValue.init)
@@ -603,44 +613,44 @@ public let removeRangeTests: [RemoveSubrangeTest] = [
     expected: [1010, 6060]),
   
   RemoveSubrangeTest(
-    collection: [] as NaiveRRC),
+    collection: [] as NaiveRRC,
     rangeSelection: .emptyRange,
-    expected: []) as NaiveRRC),
+    expected: [] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010] as NaiveRRC),
+    collection: [1010] as NaiveRRC,
     rangeSelection: .middle,
-    expected: [] as NaiveRRC)),
+    expected: [] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
     rangeSelection: .leftHalf,
-    expected: [3030, 4040] as NaiveRRC)),
+    expected: [3030, 4040] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040] as NaiveRRC,
     rangeSelection: .rightHalf,
-    expected: [1010, 2020] as NaiveRRC)),
+    expected: [1010, 2020] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040, 5050] as NaiveRRC,
     rangeSelection: .middle,
-    expected: [1010, 5050] as NaiveRRC)),
+    expected: [1010, 5050] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC,
     rangeSelection: .leftHalf,
-    expected: [4040, 5050, 6060] as NaiveRRC)),
+    expected: [4040, 5050, 6060] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC,
     rangeSelection: .rightHalf,
-    expected: [1010, 2020, 3030] as NaiveRRC)),
+    expected: [1010, 2020, 3030] as NaiveRRC),
 
   RemoveSubrangeTest(
-    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC),
+    collection: [1010, 2020, 3030, 4040, 5050, 6060] as NaiveRRC,
     rangeSelection: .middle,
-    expected: [1010, 6060] as NaiveRRC)),
+    expected: [1010, 6060] as NaiveRRC),
 ]
 
 extension TestSuite {
