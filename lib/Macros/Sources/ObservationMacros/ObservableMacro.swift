@@ -95,7 +95,7 @@ extension DiagnosticsError {
 
 extension ModifierListSyntax {
   func privatePrefixed(_ prefix: String) -> ModifierListSyntax {
-    let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private")
+    let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private", trailingTrivia: .space)
     return ModifierListSyntax([modifier] + filter {
       switch $0.name.tokenKind {
       case .keyword(let keyword):
