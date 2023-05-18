@@ -20,3 +20,6 @@ public class C {}
 // CHECK: public class C {
 // CHECK: deinit
 // CHECK: }
+
+// Globals
+public var year = 2023
