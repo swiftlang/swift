@@ -667,6 +667,9 @@ public:
   /// file.
   SourceFile *getIDEInspectionFile() const;
 
+  /// Retrieve the printing path for bridging header.
+  std::string getBridgingHeaderPath() const;
+
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
   /// files. If the process of validating VFS files failed, or the overlay
