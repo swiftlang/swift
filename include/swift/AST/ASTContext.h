@@ -1347,11 +1347,14 @@ public:
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// Get the lazy data for the given declaration.
+  LazyContextData *getLazyContextData(const Decl *decl) const;
+
+  /// Get or otherwise allocate the lazy data for the given declaration.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
   /// lazy data. The pointer must either be null or be consistent
-  /// across all calls for the same \p func.
-  LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
+  /// across all calls for the same \p decl.
+  LazyContextData *getOrCreateLazyContextData(const Decl *decl,
                                               LazyMemberLoader *lazyLoader);
 
   /// Get the lazy iterable context for the given iterable declaration context.

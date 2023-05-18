@@ -57,6 +57,12 @@ public:
   uint64_t allConformancesData = 0;
 };
 
+class LazyAssociatedTypeData : public LazyContextData {
+public:
+  /// The context data used for loading the default type.
+  uint64_t defaultDefinitionTypeData = 0;
+};
+
 /// Context data for protocols.
 class LazyProtocolData : public LazyIterableDeclContextData {
 public:

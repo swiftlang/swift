@@ -372,6 +372,14 @@ BridgedDeclContextAndDecl ProtocolDecl_create(
     BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
     BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
 
+void *AssociatedTypeDecl_create(BridgedASTContext cContext,
+                                BridgedDeclContext cDeclContext,
+                                BridgedSourceLoc cAssociatedtypeKeywordLoc,
+                                BridgedIdentifier cName,
+                                BridgedSourceLoc cNameLoc,
+                                BridgedArrayRef cInheritedTypes,
+                                void *_Nullable opaqueDefaultType);
+
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,
                               BridgedArrayRef params,

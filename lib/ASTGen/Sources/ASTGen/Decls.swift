@@ -89,6 +89,22 @@ extension ASTGenVisitor {
 
     return .decl(decl.asDecl)
   }
+
+  func visit(_ node: AssociatedTypeDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
+    return .decl(
+      AssociatedTypeDecl_create(
+        self.ctx,
+        self.declContext,
+        self.bridgedSourceLoc(for: node.associatedtypeKeyword),
+        name,
+        nameLoc,
+        self.visit(node.inheritanceClause?.inheritedTypes),
+        self.visit(node.initializer?.value)?.rawValue
+      )
+    )
+  }
 }
 
 extension ASTGenVisitor {

@@ -1110,9 +1110,14 @@ namespace {
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl, StringRef label) {
       printCommon(decl, "associated_type_decl", label);
-      if (auto defaultDef = decl->getDefaultDefinitionType()) {
-        printFieldQuoted(defaultDef, "default");
+
+      StringRef fieldName("default");
+      if (auto defaultDef = decl->getCachedDefaultDefinitionType()) {
+        printFieldQuoted(*defaultDef, fieldName);
+      } else {
+        printField("<not computed>", fieldName);
       }
+
       printWhereRequirements(decl);
       if (decl->overriddenDeclsComputed()) {
         printFieldQuotedRaw([&](raw_ostream &OS) {

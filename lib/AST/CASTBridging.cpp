@@ -625,6 +625,26 @@ BridgedDeclContextAndDecl ProtocolDecl_create(
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
+void *AssociatedTypeDecl_create(BridgedASTContext cContext,
+                                BridgedDeclContext cDeclContext,
+                                BridgedSourceLoc cAssociatedtypeKeywordLoc,
+                                BridgedIdentifier cName,
+                                BridgedSourceLoc cNameLoc,
+                                BridgedArrayRef cInheritedTypes,
+                                void *_Nullable opaqueDefaultType) {
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *decl = AssociatedTypeDecl::createParsed(
+      context, convertDeclContext(cDeclContext),
+      convertSourceLoc(cAssociatedtypeKeywordLoc), convertIdentifier(cName),
+      convertSourceLoc(cNameLoc), static_cast<TypeRepr *>(opaqueDefaultType),
+      nullptr);
+  decl->setInherited(
+      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)));
+
+  return static_cast<Decl *>(decl);
+}
+
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
                               BridgedSourceLoc cQuestionLoc) {
   ASTContext &context = convertASTContext(cContext);

@@ -1024,11 +1024,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 Type
 DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
                                        AssociatedTypeDecl *assocType) const {
-  if (assocType->Resolver) {
-    auto defaultType = assocType->Resolver->loadAssociatedTypeDefault(
-                                    assocType, assocType->ResolverContextData);
-    assocType->Resolver = nullptr;
-    return defaultType;
+  auto &ctx = assocType->getASTContext();
+  if (auto *data = static_cast<LazyAssociatedTypeData *>(
+          ctx.getLazyContextData(assocType))) {
+    return data->loader->loadAssociatedTypeDefault(
+        assocType, data->defaultDefinitionTypeData);
   }
 
   TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();

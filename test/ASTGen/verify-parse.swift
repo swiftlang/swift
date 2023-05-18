@@ -85,7 +85,17 @@ protocol Proto1 {}
 protocol Proto2 {}
 
 protocol
-Proto3: Proto1 {
+Proto3
+<
+  A,
+  B
+>: Proto1 {
+  associatedtype
+    A
+  associatedtype B: Equatable
+    =
+    Int
+
   func method(_ b: Bool)
 }
 
