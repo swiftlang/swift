@@ -19,7 +19,7 @@ extension ASTGenVisitor {
     let rAngle = self.base.advanced(by: generics.rightAngleBracket.position.utf8Offset).raw
     return .type(
       generics.arguments.map({
-        self.visit($0.argumentType)
+        self.visit($0.argumentType).rawValue
       }).withBridgedArrayRef {
           genericArgs in
           GenericIdentTypeRepr_create(
@@ -46,7 +46,7 @@ extension ASTGenVisitor {
         let lAngle = self.base.advanced(by: generics.leftAngleBracket.position.utf8Offset).raw
         let rAngle = self.base.advanced(by: generics.rightAngleBracket.position.utf8Offset).raw
         reverseMemberComponents.append(
-          generics.arguments.map({ self.visit($0.argumentType) }).withBridgedArrayRef {
+          generics.arguments.map({ self.visit($0.argumentType).rawValue }).withBridgedArrayRef {
             genericArgs in
             GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
           })
