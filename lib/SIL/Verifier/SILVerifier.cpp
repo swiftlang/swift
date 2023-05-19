@@ -4499,6 +4499,7 @@ public:
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand()->getType(),
             "can't upcast to same type");
+    require(UI->getType().isObject(), "cannot upcast address types");
     checkNoTrivialToReferenceCast(UI);
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());

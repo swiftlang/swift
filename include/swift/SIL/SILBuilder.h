@@ -1155,6 +1155,7 @@ public:
 
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty,
                            ValueOwnershipKind forwardingOwnershipKind) {
+    assert(Ty.isObject());
     return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
                                      getFunction(), forwardingOwnershipKind));
   }
