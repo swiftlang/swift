@@ -868,6 +868,16 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
     symdata.withUnsafeBufferPointer{
       $0.withMemoryRebound(to: Traits.Sym.self) { symbols in
         for symbol in symbols {
+          // Ignore things that are not functions
+          if symbol.st_type != .STT_FUNC && symbol.st_type != .STT_NOTYPE {
+            continue
+          }
+
+          // Ignore anything undefined
+          if symbol.st_shndx == SHN_UNDEF {
+            continue
+          }
+
           _symbols.append(
             Symbol(
               name: (stringSect.getStringAt(index: Int(symbol.st_name))
@@ -1557,7 +1567,8 @@ class ElfImage<SomeImageSource: ImageSource,
     }
 
     // Check if we have a debug image; if we do, get its symbol table and
-    // merge it with this one.
+    // merge it with this one.  This means that it doesn't matter which
+    // symbols have been stripped in both images.
     if let debugTable = debugTable {
       let merged = localTable.merged(with: debugTable)
       _symbolTable = merged
