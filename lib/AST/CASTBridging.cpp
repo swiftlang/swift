@@ -556,7 +556,18 @@ void IterableDeclContext_setParsedMembers(BridgedArrayRef bridgedMembers,
                                           void *opaqueDecl) {
   auto *decl = static_cast<Decl *>(opaqueDecl);
   auto &ctx = decl->getASTContext();
-  auto members = convertArrayRef<Decl *>(bridgedMembers);
+
+  SmallVector<Decl *> members;
+  for (auto *decl : convertArrayRef<Decl *>(bridgedMembers)) {
+    members.push_back(decl);
+    // Each enum case element is also part of the members list according to the
+    // legacy parser.
+    if (auto *ECD = dyn_cast<EnumCaseDecl>(decl)) {
+      for (auto *EED : ECD->getElements()) {
+        members.push_back(EED);
+      }
+    }
+  }
 
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{cast<IterableDeclContext>(decl)},
@@ -592,6 +603,42 @@ BridgedDeclContextAndDecl EnumDecl_create(
   decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
+}
+
+void *EnumCaseDecl_create(BridgedDeclContext cDeclContext,
+                          BridgedSourceLoc cCaseKeywordLoc,
+                          BridgedArrayRef cElements) {
+  auto *decl =
+      EnumCaseDecl::create(convertSourceLoc(cCaseKeywordLoc),
+                           convertArrayRef<EnumElementDecl *>(cElements),
+                           convertDeclContext(cDeclContext));
+
+  return static_cast<Decl *>(decl);
+}
+
+void *EnumElementDecl_create(BridgedASTContext cContext,
+                             BridgedDeclContext cDeclContext,
+                             BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                             void *_Nullable opaqueParameterList,
+                             BridgedSourceLoc cEqualsLoc,
+                             void *_Nullable opaqueRawValue) {
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *parameterList = static_cast<ParameterList *>(opaqueParameterList);
+  DeclName declName;
+  {
+    auto identifier = convertIdentifier(cName);
+    if (parameterList) {
+      declName = DeclName(context, identifier, parameterList);
+    } else {
+      declName = identifier;
+    }
+  }
+
+  return new (context) EnumElementDecl(
+      convertSourceLoc(cNameLoc), declName, parameterList,
+      convertSourceLoc(cEqualsLoc), static_cast<LiteralExpr *>(opaqueRawValue),
+      convertDeclContext(cDeclContext));
 }
 
 BridgedDeclContextAndDecl StructDecl_create(

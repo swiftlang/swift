@@ -105,7 +105,14 @@ Alias<T>
 String where T: Proto1
 
 enum
-Enum<T>: Proto1 where T: Proto1 {
+Enum<T>: Int, Proto1 where T: Proto1 {
+  case
+  a
+    =
+    1
+  case b = 2,
+       c
+
   func method(_ b: Bool) {}
 }
 

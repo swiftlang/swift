@@ -365,6 +365,17 @@ BridgedDeclContextAndDecl EnumDecl_create(
     BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
     BridgedSourceRange cBraceRange);
 
+void *EnumCaseDecl_create(BridgedDeclContext cDeclContext,
+                          BridgedSourceLoc cCaseKeywordLoc,
+                          BridgedArrayRef cElements);
+
+void *EnumElementDecl_create(BridgedASTContext cContext,
+                             BridgedDeclContext cDeclContext,
+                             BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                             void *_Nullable opaqueParameterList,
+                             BridgedSourceLoc cEqualsLoc,
+                             void *_Nullable opaqueRawValue);
+
 BridgedDeclContextAndDecl StructDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,

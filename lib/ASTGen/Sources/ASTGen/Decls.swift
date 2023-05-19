@@ -158,6 +158,36 @@ extension ASTGenVisitor {
   }
 }
 
+// MARK: - EnumCaseDecl
+
+extension ASTGenVisitor {
+  func visit(_ node: EnumCaseElementSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
+    return .decl(
+      EnumElementDecl_create(
+        self.ctx,
+        self.declContext,
+        name,
+        nameLoc,
+        self.visit(node.parameterClause)?.rawValue,
+        self.bridgedSourceLoc(for: node.rawValue?.equal),
+        self.visit(node.rawValue?.value)?.rawValue
+      )
+    )
+  }
+
+  func visit(_ node: EnumCaseDeclSyntax) -> ASTNode {
+    .decl(
+      EnumCaseDecl_create(
+        self.declContext,
+        self.bridgedSourceLoc(for: node.caseKeyword),
+        node.elements.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self)
+      )
+    )
+  }
+}
+
 extension ASTGenVisitor {
   public func visit(_ node: VariableDeclSyntax) -> ASTNode {
     let pattern = visit(node.bindings.first!.pattern).rawValue
