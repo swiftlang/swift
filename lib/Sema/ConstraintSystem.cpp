@@ -5302,12 +5302,10 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 /// provided set.
 static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   llvm::SmallPtrSet<void *, 4> uniqueChoices;
-  unsigned result = 0;
   for (auto choice : choices) {
-    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
-      ++result;
+    uniqueChoices.insert(choice.getOpaqueChoiceSimple());
   }
-  return result;
+  return uniqueChoices.size();
 }
 
 /// Determine the name of the overload in a set of overload choices.
