@@ -18,6 +18,7 @@
 - (void)methodFromHeader2:(int)param;
 - (void)methodFromHeader3:(int)param;
 - (void)methodFromHeader4:(int)param;
+- (int)methodFromHeader5;
 
 @property int propertyFromHeader1;
 @property int propertyFromHeader2;
@@ -28,6 +29,7 @@
 @property int propertyFromHeader7;
 @property int propertyFromHeader8;
 @property int propertyFromHeader9;
+@property int propertyFromHeader10;
 
 @property (readonly) int readonlyPropertyFromHeader1;
 @property (readonly) int readonlyPropertyFromHeader2;
