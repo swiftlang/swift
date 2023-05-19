@@ -190,7 +190,7 @@ ongoing.
 
 ## DSO
 
-Dynamic shared object, an shared library file (.so/.dylib/.dll, the extension of
+Dynamic shared object, a shared library file (.so/.dylib/.dll, the extension of
 which depends on the platform) to be used by multiple applications while they
 are executing.
 
@@ -264,6 +264,9 @@ independently of the memory address where it is loaded at runtime. Entries
 in GOT directly point to absolute addresses of symbols. The format of GOT
 is platform-dependent. Loaders update GOT relocations either on
 startup or on symbol access.
+
+Additionally, IRGen makes heavy usage of "GOT" as in "GOT-equivalent variable"
+to describe the way it forms references to global objects that may or may not be external references. 
 
 ## iff
 
