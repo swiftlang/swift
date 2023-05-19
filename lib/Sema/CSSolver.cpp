@@ -925,6 +925,23 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
         return std::nullopt;
       }
 
+      auto solutionsRef = std::move(solution).takeAmbiguousSolutions();
+      SmallVector<Solution, 4> ambiguity(
+          std::make_move_iterator(solutionsRef.begin()),
+          std::make_move_iterator(solutionsRef.end()));
+
+      {
+        SolverState state(*this, FreeTypeVariableBinding::Disallow);
+
+        // Constraint generator is allowed to introduce fixes to the
+        // contraint system.
+        if (diagnoseAmbiguityWithFixes(ambiguity) ||
+            diagnoseAmbiguity(ambiguity)) {
+          solution.markAsDiagnosed();
+          return std::nullopt;
+        }
+      }
+
       LLVM_FALLTHROUGH;
     }
 
@@ -1024,7 +1041,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Filter deduced solutions, try to figure out if there is
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
-  filterSolutions(solutions);
+  filterSolutions(solutions, /*minimize=*/true);
 
   // We fail if there is no solution or the expression was too complex.
   return solutions.empty() || isTooComplex(solutions);
