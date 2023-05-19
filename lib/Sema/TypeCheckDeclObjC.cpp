@@ -2892,15 +2892,6 @@ class ObjCImplementationChecker {
   /// Candidates with their explicit ObjC names, if any.
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
 
-  /// Key that can be used to uniquely identify a particular Objective-C
-  /// method.
-  using ObjCMethodKey = std::pair<ObjCSelector, char>;
-
-  /// Mapping from Objective-C methods to the set of requirements within this
-  /// protocol that have the same selector and instance/class designation.
-  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
-    objcMethodRequirements;
-
 public:
   ObjCImplementationChecker(ExtensionDecl *ext)
       : diags(ext->getASTContext().Diags)
@@ -2922,8 +2913,30 @@ public:
   }
 
 private:
-  auto getObjCMethodKey(AbstractFunctionDecl *func) const -> ObjCMethodKey {
-    return ObjCMethodKey(func->getObjCSelector(), func->isInstanceMember());
+  static bool hasAsync(ValueDecl *member) {
+    if (!member)
+      return false;
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member))
+      return func->hasAsync();
+
+    if (auto storage = dyn_cast<AbstractStorageDecl>(member))
+      return hasAsync(storage->getEffectfulGetAccessor());
+
+    return false;
+  }
+
+  static ValueDecl *getAsyncAlternative(ValueDecl *req) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
+      auto asyncFunc = func->getAsyncAlternative();
+
+      if (auto asyncAccessor = dyn_cast<AccessorDecl>(asyncFunc))
+        return asyncAccessor->getStorage();
+
+      return asyncFunc;
+    }
+
+    return nullptr;
   }
 
   void addRequirements(IterableDeclContext *idc) {
@@ -2939,12 +2952,13 @@ private:
       if (member->getAttrs().isUnavailable(member->getASTContext()))
         continue;
 
+      // Skip async versions of members. We'll match against the completion
+      // handler versions, hopping over to `getAsyncAlternative()` if needed.
+      if (hasAsync(member))
+        continue;
+
       auto inserted = unmatchedRequirements.insert(member);
       assert(inserted && "objc interface member added twice?");
-
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-        objcMethodRequirements[getObjCMethodKey(func)].push_back(func);
-      }
     }
   }
 
@@ -3041,19 +3055,6 @@ private:
     }
   };
 
-  /// Determine whether the set of matched requirements are ambiguous for the
-  /// given candidate.
-  bool areRequirementsAmbiguous(const BestMatchList &reqs, ValueDecl *cand) {
-    if (reqs.matches.size() != 2)
-      return reqs.matches.size() > 2;
-
-    bool firstIsAsyncAlternative =
-      matchesAsyncAlternative(reqs.matches[0], cand);
-    bool secondIsAsyncAlternative =
-      matchesAsyncAlternative(reqs.matches[1], cand);
-    return firstIsAsyncAlternative == secondIsAsyncAlternative;
-  }
-
   void matchRequirementsAtThreshold(MatchOutcome threshold) {
     SmallString<32> scratch;
 
@@ -3113,14 +3114,11 @@ private:
       // removing them.
       requirementsToRemove.set_union(matchedRequirements.matches);
 
-      if (!areRequirementsAmbiguous(matchedRequirements, cand)) {
+      if (matchedRequirements.matches.size() == 1) {
         // Note that this is BestMatchList::insert(), so it'll only keep the
         // matches with the best outcomes.
-        for (auto req : matchedRequirements.matches) {
-          matchesByRequirement[req]
-            .insert(cand, matchedRequirements.currentOutcome);
-        }
-
+        matchesByRequirement[matchedRequirements.matches.front()]
+          .insert(cand, matchedRequirements.currentOutcome);
         continue;
       }
 
@@ -3202,35 +3200,6 @@ private:
       unmatchedCandidates.erase(cand);
   }
 
-  /// Whether the candidate matches the async alternative of the given
-  /// requirement.
-  bool matchesAsyncAlternative(ValueDecl *req, ValueDecl *cand) const {
-    auto reqFunc = dyn_cast<AbstractFunctionDecl>(req);
-    if (!reqFunc)
-      return false;
-
-    auto candFunc = dyn_cast<AbstractFunctionDecl>(cand);
-    if (!candFunc)
-      return false;
-
-    if (reqFunc->hasAsync() == candFunc->hasAsync())
-      return false;
-
-    auto otherReqFuncs =
-      objcMethodRequirements.find(getObjCMethodKey(reqFunc));
-    if (otherReqFuncs == objcMethodRequirements.end())
-      return false;
-
-    for (auto otherReqFunc : otherReqFuncs->second) {
-      if (otherReqFunc->getName() == cand->getName() &&
-          otherReqFunc->hasAsync() == candFunc->hasAsync() &&
-          req->getObjCRuntimeName() == cand->getObjCRuntimeName())
-        return true;
-    }
-
-    return false;
-  }
-
   static bool areSwiftNamesEqual(DeclName lhs, DeclName rhs) {
     // Conflate `foo()` and `foo`. This allows us to diagnose
     // method-vs.-property mistakes more nicely.
@@ -3244,8 +3213,8 @@ private:
     return lhs == rhs;
   }
 
-  MatchOutcome matches(ValueDecl *req, ValueDecl *cand,
-                       ObjCSelector explicitObjCName) const {
+  MatchOutcome matchesImpl(ValueDecl *req, ValueDecl *cand,
+                           ObjCSelector explicitObjCName) const {
     bool hasObjCNameMatch =
         req->getObjCRuntimeName() == cand->getObjCRuntimeName();
     bool hasSwiftNameMatch = areSwiftNamesEqual(req->getName(), cand->getName());
@@ -3261,10 +3230,7 @@ private:
           && req->getObjCRuntimeName() != explicitObjCName)
       return MatchOutcome::WrongExplicitObjCName;
 
-    // If the ObjC selectors matched but the Swift names do not, and these are
-    // functions with mismatched 'async', check whether the "other" requirement
-    // (the completion-handler or async version)'s Swift name matches.
-    if (!hasSwiftNameMatch && !matchesAsyncAlternative(req, cand))
+    if (!hasSwiftNameMatch)
       return MatchOutcome::WrongSwiftName;
 
     if (!hasObjCNameMatch)
@@ -3292,6 +3258,17 @@ private:
       return MatchOutcome::MatchWithExplicitObjCName;
 
     return MatchOutcome::Match;
+  }
+
+  MatchOutcome matches(ValueDecl *req, ValueDecl *cand,
+                       ObjCSelector explicitObjCName) const {
+    // If the candidate we're considering is async, see if the requirement has
+    // an async alternate and try to match against that instead.
+    if (hasAsync(cand))
+      if (auto asyncAltReq = getAsyncAlternative(req))
+        return matchesImpl(asyncAltReq, cand, explicitObjCName);
+
+    return matchesImpl(req, cand, explicitObjCName);
   }
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
