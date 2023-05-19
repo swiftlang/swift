@@ -241,6 +241,10 @@ struct BridgedFunction {
     return getFunction()->isTransparent() == swift::IsTransparent;
   }
 
+  bool isAsync() const {
+    return getFunction()->isAsync();
+  }
+
   bool isGlobalInitFunction() const {
     return getFunction()->isGlobalInit();
   }
@@ -269,6 +273,14 @@ struct BridgedFunction {
 
   InlineStrategy getInlineStrategy() const {
     return (InlineStrategy)getFunction()->getInlineStrategy();
+  }
+
+  bool isSerialized() const {
+    return getFunction()->isSerialized();
+  }
+
+  bool hasValidLinkageForFragileRef() const {
+    return getFunction()->hasValidLinkageForFragileRef();
   }
 
   bool needsStackProtection() const {
@@ -1208,6 +1220,11 @@ struct BridgedBuilder{
 
 struct BridgedNominalTypeDecl {
   swift::NominalTypeDecl * _Nonnull decl;
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef getName() const {
+    return decl->getName().str();
+  }
 };
 
 // Passmanager and Context

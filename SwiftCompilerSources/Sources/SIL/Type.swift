@@ -19,6 +19,9 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
+  public var addressType: Type { bridged.getAddressType().type }
+  public var objectType: Type { bridged.getObjectType().type }
+
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged.getFunction())
   }
@@ -51,6 +54,19 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
+
+  public var isBuiltinInteger: Bool { bridged.isBuiltinInteger() }
+  public var isBuiltinFloat: Bool { bridged.isBuiltinFloat() }
+  public var isBuiltinVector: Bool { bridged.isBuiltinVector() }
+  public var builtinVectorElementType: Type { bridged.getBuiltinVectorElementType().type }
+
+  public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
+    bridged.isBuiltinFixedWidthInteger(UInt32(width))
+  }
+
+  public func isExactSuperclass(of type: Type) -> Bool {
+    bridged.isExactSuperclassOf(type.bridged)
+  }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
@@ -166,6 +182,8 @@ extension swift.SILType {
 // TODO: use an AST type for this once we have it
 public struct NominalTypeDecl : Equatable {
   let bridged: BridgedNominalTypeDecl
+
+  public var name: StringRef { StringRef(bridged: bridged.getName()) }
 
   public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
     lhs.bridged.decl == rhs.bridged.decl
