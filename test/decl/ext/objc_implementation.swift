@@ -38,6 +38,9 @@
     // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
   }
 
+  var methodFromHeader5: CInt
+  // expected-error@-1 {{property 'methodFromHeader5' does not match the instance method declared by the header}}
+
   var propertyFromHeader1: CInt
   // OK, provides an implementation with a stored property
 
@@ -57,15 +60,20 @@
   }
 
   @objc let propertyFromHeader5: CInt
-  // FIXME: bad, needs to be settable
+  // expected-error@-1 {{property 'propertyFromHeader5' should be settable to match the settable property declared by the header}}
 
   @objc var propertyFromHeader6: CInt {
-    // FIXME: bad, needs a setter
+    // expected-error@-1 {{property 'propertyFromHeader6' should be settable to match the settable property declared by the header}}
     get { return 1 }
   }
 
   final var propertyFromHeader8: CInt
   // FIXME: Should complain about final not fulfilling the @objc requirement
+
+  func propertyFromHeader10() -> CInt {
+    // expected-error@-1 {{instance method 'propertyFromHeader10()' does not match the property declared by the header}}
+    return 1
+  }
 
   var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable

@@ -3005,6 +3005,9 @@ private:
     WrongImplicitObjCName,
     WrongStaticness,
     WrongCategory,
+    WrongDeclKind,
+//    WrongType,
+    WrongWritability,
 
     Match,
     MatchWithExplicitObjCName,
@@ -3228,11 +3231,24 @@ private:
     return false;
   }
 
+  static bool areSwiftNamesEqual(DeclName lhs, DeclName rhs) {
+    // Conflate `foo()` and `foo`. This allows us to diagnose
+    // method-vs.-property mistakes more nicely.
+
+    if (lhs.isCompoundName() && lhs.getArgumentNames().empty())
+      lhs = lhs.getBaseName();
+
+    if (rhs.isCompoundName() && rhs.getArgumentNames().empty())
+      rhs = rhs.getBaseName();
+
+    return lhs == rhs;
+  }
+
   MatchOutcome matches(ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) const {
     bool hasObjCNameMatch =
         req->getObjCRuntimeName() == cand->getObjCRuntimeName();
-    bool hasSwiftNameMatch = req->getName() == cand->getName();
+    bool hasSwiftNameMatch = areSwiftNamesEqual(req->getName(), cand->getName());
 
     // If neither the ObjC nor Swift names match, there's absolutely no reason
     // to think these two methods are related.
@@ -3261,9 +3277,15 @@ private:
           != req->getDeclContext())
       return MatchOutcome::WrongCategory;
 
-    // FIXME: Diagnose candidate without a required setter
-    // FIXME: Diagnose declaration kind mismatches
+    if (cand->getKind() != req->getKind())
+      return MatchOutcome::WrongDeclKind;
+
     // FIXME: Diagnose type mismatches (with allowance for extra optionality)
+
+    if (auto reqVar = dyn_cast<AbstractStorageDecl>(req))
+      if (reqVar->isSettable(nullptr) &&
+            !cast<AbstractStorageDecl>(cand)->isSettable(nullptr))
+        return MatchOutcome::WrongWritability;
 
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
@@ -3324,6 +3346,16 @@ private:
                getCategoryName(req->getDeclContext()),
                getCategoryName(cand->getDeclContext()->
                                  getImplementedObjCContext()));
+      return;
+
+    case MatchOutcome::WrongDeclKind:
+      diagnose(cand, diag::objc_implementation_wrong_decl_kind,
+               cand->getDescriptiveKind(), cand, req->getDescriptiveKind());
+      return;
+
+    case MatchOutcome::WrongWritability:
+      diagnose(cand, diag::objc_implementation_must_be_settable,
+               cand->getDescriptiveKind(), cand, req->getDescriptiveKind());
       return;
     }
 
