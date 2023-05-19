@@ -363,8 +363,6 @@ struct BridgedGlobalVar {
   inline OptionalBridgedInstruction getStaticInitializerValue() const;
 
   bool canBeInitializedStatically() const;
-
-  static inline bool isValidStaticInitializer(BridgedInstruction inst);
 };
 
 struct OptionalBridgedGlobalVar {
@@ -1283,11 +1281,6 @@ OptionalBridgedInstruction BridgedGlobalVar::getStaticInitializerValue() const {
     return {inst->asSILNode()};
   }
   return {nullptr};
-}
-
-bool BridgedGlobalVar::isValidStaticInitializer(BridgedInstruction inst) {
-  swift::SILInstruction *i = inst.getInst();
-  return swift::SILGlobalVariable::isValidStaticInitializerInst(i, i->getModule());
 }
 
 BridgedInstruction BridgedMultiValueResult::getParent() const {

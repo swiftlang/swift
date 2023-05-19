@@ -21,10 +21,14 @@ extension LoadInst : OnoneSimplifyable {
     guard let globalInitVal = getGlobalInitValue(address: address) else {
       return
     }
-    let builder = Builder(before: self, context)
-    guard let initVal = context.copyStaticInitializer(fromInitValue: globalInitVal, to: builder) else {
+    if !globalInitVal.canBeCopied(into: parentFunction, context) {
       return
     }
+    var cloner = StaticInitCloner(cloneBefore: self, context)
+    defer { cloner.deinitialize() }
+
+    let initVal = cloner.clone(globalInitVal)
+
     uses.replaceAll(with: initVal, context)
     transitivelyErase(load: self, context)
   }
@@ -77,3 +81,36 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
     inst = operandInst
   }
 }
+
+private extension Value {
+  func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
+    if !function.isSerialized {
+      return true
+    }
+
+    // Can't use `ValueSet` because the this value is inside a global initializer and
+    // not inside a function.
+    var worklist = Stack<Value>(context)
+    defer { worklist.deinitialize() }
+
+    var handled = Set<ObjectIdentifier>()
+
+    worklist.push(self)
+    handled.insert(ObjectIdentifier(self))
+
+    while let value = worklist.pop() {
+      if let fri = value as? FunctionRefInst {
+        if !fri.referencedFunction.hasValidLinkageForFragileRef {
+          return false
+        }
+      }
+      for op in value.definingInstruction!.operands {
+        if handled.insert(ObjectIdentifier(op.value)).inserted {
+          worklist.push(op.value)
+        }
+      }
+    }
+    return true
+  }
+}
+
