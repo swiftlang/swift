@@ -17,6 +17,11 @@
 
 import Swift
 
+struct ImageSymbol {
+  var name: String
+  var offset: Int
+}
+
 internal protocol Image {
   associatedtype Source: ImageSource
 
@@ -60,6 +65,8 @@ internal protocol Image {
                          into pointer: UnsafeMutablePointer<T>) throws
   func fetchUnswapped<T>(from addr: Address, count: Int, as: T.Type) throws -> [T]
   func fetchUnswapped<T>(from addr: Address, as type: T.Type) throws -> T
+
+  func lookupSymbol(address: Address) -> ImageSymbol?
 }
 
 extension Image {

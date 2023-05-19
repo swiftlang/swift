@@ -425,6 +425,67 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
         }
       }
     }
+    #elseif os(Linux)
+    if let images = images {
+      var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
+      var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
+
+      for frame in backtrace.frames {
+        let address = FileImageSource.Address(frame.adjustedProgramCounter)
+        if let imageNdx = images.firstIndex(
+             where: { address >= $0.baseAddress
+                        && address < $0.endOfText }
+           ) {
+          let relativeAddress = address - FileImageSource.Address(images[imageNdx].baseAddress)
+          var symbol: Symbol = Symbol(imageIndex: imageNdx,
+                            imageName: images[imageNdx].name,
+                            rawName: "<unknown>",
+                            offset: 0,
+                            sourceLocation: nil)
+          var elf32Image = elf32Cache[imageNdx]
+          var elf64Image = elf64Cache[imageNdx]
+
+          if elf32Image == nil && elf64Image == nil {
+            if let source = try? FileImageSource(path: images[imageNdx].path) {
+              if let elfImage = try? Elf32Image(source: source) {
+                elf32Image = elfImage
+                elf32Cache[imageNdx] = elfImage
+              } else if let elfImage = try? Elf64Image(source: source) {
+                elf64Image = elfImage
+                elf64Cache[imageNdx] = elfImage
+              }
+            }
+          }
+
+          if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
+            symbol = Symbol(imageIndex: imageNdx,
+                            imageName: images[imageNdx].name,
+                            rawName: theSymbol.name,
+                            offset: theSymbol.offset,
+                            sourceLocation: nil)
+          } else if let theSymbol = elf64Image?.lookupSymbol(address: relativeAddress) {
+            symbol = Symbol(imageIndex: imageNdx,
+                            imageName: images[imageNdx].name,
+                            rawName: theSymbol.name,
+                            offset: theSymbol.offset,
+                            sourceLocation: nil)
+          } else {
+            symbol = Symbol(imageIndex: imageNdx,
+                            imageName: images[imageNdx].name,
+                            rawName: "<unknown>",
+                            offset: 0,
+                            sourceLocation: nil)
+          }
+
+          frames.append(Frame(captured: frame, symbol: symbol))
+          continue
+        }
+
+        frames.append(Frame(captured: frame, symbol: nil))
+      }
+    } else {
+      frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
+    }
     #else
     frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
     #endif
