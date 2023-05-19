@@ -24,6 +24,7 @@
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
@@ -1329,6 +1330,49 @@ public:
 
   /// Get the location for a type error.
   SourceLoc getTypeErrorLoc() const;
+
+  /// Callback function used for creating a C++ AST from the syntax node at the given source location.
+  ///
+  /// The arguments to this callback are the source file to pass into ASTGen (the exported source file)
+  /// and the source location pointer to pass into ASTGen (to find the syntax node).
+  ///
+  /// The callback returns the new AST node and the ending location of the syntax node. If the AST node
+  /// is NULL, something went wrong.
+  template<typename T>
+  using ASTFromSyntaxTreeCallback = std::pair<T*, const void *>(
+      void *sourceFile, const void *sourceLoc
+  );
+
+  /// Parse by constructing a C++ AST node from the Swift syntax tree via ASTGen.
+  template<typename T>
+  ParserResult<T> parseASTFromSyntaxTree(
+      llvm::function_ref<ASTFromSyntaxTreeCallback<T>> body
+  ) {
+    if (!Context.LangOpts.hasFeature(Feature::ASTGenTypes))
+      return nullptr;
+
+    auto exportedSourceFile = SF.exportedSourceFile;
+    if (!exportedSourceFile)
+      return nullptr;
+
+    // Perform the translation.
+    auto sourceLoc = Tok.getLoc().getOpaquePointerValue();
+    T* astNode;
+    const void *endLocPtr;
+    std::tie(astNode, endLocPtr) = body(exportedSourceFile, sourceLoc);
+
+    if (!astNode) {
+      assert(false && "Could not build AST node from syntax tree");
+      return nullptr;
+    }
+
+    // Spin the lexer until we get to the ending location.
+    while (Tok.getLoc().getOpaquePointerValue() < endLocPtr &&
+           !Tok.is(tok::eof))
+      consumeToken();
+
+    return makeParserResult(astNode);
+  }
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

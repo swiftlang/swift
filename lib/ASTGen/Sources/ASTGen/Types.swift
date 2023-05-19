@@ -207,3 +207,37 @@ extension ASTGenVisitor {
     }
   }
 }
+
+@_cdecl("swift_ASTGen_buildTypeRepr")
+@usableFromInline
+func buildTypeRepr(
+  sourceFilePtr: UnsafeRawPointer,
+  typeLocPtr: UnsafePointer<UInt8>,
+  dc: UnsafeMutableRawPointer,
+  ctx: UnsafeMutableRawPointer,
+  endTypeLocPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>
+) -> UnsafeMutableRawPointer? {
+  let sourceFile = sourceFilePtr.bindMemory(
+    to: ExportedSourceFile.self, capacity: 1
+  )
+
+  // Find the type syntax node.
+  guard let typeSyntax = findSyntaxNodeInSourceFile(
+    sourceFilePtr: sourceFilePtr,
+    sourceLocationPtr: typeLocPtr,
+    type: TypeSyntax.self,
+    wantOutermost: true
+  ) else {
+    // FIXME: Produce an error
+    return nil
+  }
+
+  // Fill in the end location.
+  endTypeLocPtr.pointee = sourceFile.pointee.buffer.baseAddress!.advanced(by: typeSyntax.endPosition.utf8Offset)
+
+  // Convert the type syntax node.
+  let typeReprNode = ASTGenVisitor(ctx: ctx, base: sourceFile.pointee.buffer.baseAddress!, declContext: dc)
+    .visit(typeSyntax)
+
+  return typeReprNode.rawValue
+}

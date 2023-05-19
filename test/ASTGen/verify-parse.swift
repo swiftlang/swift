@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-enable-experimental-feature ASTGenTypes)
 
 // REQUIRES: executable_test
 
@@ -25,11 +26,11 @@ func test3(y: Int) -> Int {
   return x
 }
 
-func test4(_ b: Bool) -> Int {
-  if b { 0 } else { 1 }
+func test4(_ b: [Bool]) -> Int {
+  if b.isEmpty { 0 } else { 1 }
 }
 
-func test5(_ b: Bool) -> Int {
+func test5(_ b: Swift.Bool) -> Int {
   return if b { 0 } else { 1 }
 }
 

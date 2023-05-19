@@ -586,10 +586,11 @@ func expandFreestandingMacroInProcess(
 }
 
 /// Retrieve a syntax node in the given source file, with the given type.
-private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
+func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
-  type: Node.Type
+  type: Node.Type,
+  wantOutermost: Bool = false
 ) -> Node? {
   guard let sourceLocationPtr = sourceLocationPtr else {
     return nil
@@ -615,16 +616,35 @@ private func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   var currentSyntax = Syntax(token)
+  var resultSyntax: Node? = nil
   while let parentSyntax = currentSyntax.parent {
     if let typedParent = parentSyntax.as(type) {
-      return typedParent
+      resultSyntax = typedParent
+      break
     }
 
     currentSyntax = parentSyntax
   }
 
-  print("unable to find node: \(token.debugDescription)")
-  return nil
+  // If we didn't find anything, complain and fail.
+  guard var resultSyntax else {
+    print("unable to find node: \(token.debugDescription)")
+    return nil
+  }
+
+  // If we want the outermost node, keep looking.
+  if wantOutermost {
+    while let parentSyntax = resultSyntax.parent {
+      guard let typedParent = parentSyntax.as(type),
+            typedParent.position == resultSyntax.position else {
+        break;
+      }
+
+      resultSyntax = typedParent
+    }
+  }
+
+  return resultSyntax
 }
 
 @_cdecl("swift_ASTGen_expandAttachedMacro")
