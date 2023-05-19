@@ -405,6 +405,15 @@ struct BridgedTypeArray {
   }
 };
 
+struct BridgedSILTypeArray {
+  llvm::ArrayRef<swift::SILType> typeArray;
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.size()); }
+
+  SWIFT_IMPORT_UNSAFE
+  swift::SILType getAt(SwiftInt index) const { return typeArray[index]; }
+};
+
 struct BridgedInstruction {
   SwiftObject obj;
 
@@ -533,8 +542,17 @@ struct BridgedInstruction {
   }
 
   SWIFT_IMPORT_UNSAFE
+  llvm::APFloat FloatLiteralInst_getValue() const {
+    return getAs<swift::FloatLiteralInst>()->getValue();
+  }
+
+  SWIFT_IMPORT_UNSAFE
   llvm::StringRef StringLiteralInst_getValue() const {
     return getAs<swift::StringLiteralInst>()->getValue();
+  }
+
+  int StringLiteralInst_getEncoding() const {
+    return (int)getAs<swift::StringLiteralInst>()->getEncoding();
   }
 
   SwiftInt TupleExtractInst_fieldIndex() const {
@@ -559,6 +577,10 @@ struct BridgedInstruction {
 
   SwiftInt ProjectBoxInst_fieldIndex() const {
     return getAs<swift::ProjectBoxInst>()->getFieldIndex();
+  }
+
+  bool EndCOWMutationInst_doKeepUnique() const {
+    return getAs<swift::EndCOWMutationInst>()->doKeepUnique();
   }
 
   SwiftInt EnumInst_caseIndex() const {
@@ -612,6 +634,10 @@ struct BridgedInstruction {
     return getAs<swift::ApplyInst>()->getSpecializationInfo();
   }
 
+  SwiftInt ObjectInst_getNumBaseElements() const {
+    return getAs<swift::ObjectInst>()->getNumBaseElements();
+  }
+
   SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg() const {
     return swift::ApplySite(getInst()).getCalleeArgIndexOfFirstAppliedArg();
   }
@@ -630,6 +656,19 @@ struct BridgedInstruction {
 
   bool AllocRefInstBase_canAllocOnStack() const {
     return getAs<swift::AllocRefInstBase>()->canAllocOnStack();
+  }
+
+  SwiftInt AllocRefInstBase_getNumTailTypes() const {
+    return getAs<swift::AllocRefInstBase>()->getNumTailTypes();
+  }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedSILTypeArray AllocRefInstBase_getTailAllocatedTypes() const {
+    return {getAs<const swift::AllocRefInstBase>()->getTailAllocatedTypes()};
+  }
+
+  bool AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
+    return getAs<swift::AllocRefDynamicInst>()->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType();
   }
 
   SwiftInt BeginApplyInst_numArguments() const {

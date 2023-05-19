@@ -84,6 +84,26 @@ extension Type: Equatable {
   }
 }
 
+public struct TypeArray : RandomAccessCollection, CustomReflectable {
+  private let bridged: BridgedSILTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedSILTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type {
+    bridged.getAt(index).type
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0) }
+    return Mirror(self, children: c)
+  }
+}
+
 public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
   private let bridged: BridgedTypeArray
 
