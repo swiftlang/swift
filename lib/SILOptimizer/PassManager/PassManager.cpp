@@ -1477,7 +1477,7 @@ void BridgedPassContext::createStaticInitializer(BridgedGlobalVar global, Bridge
 
 BridgedPassContext::StaticInitCloneResult BridgedPassContext::
 copyStaticInitializer(BridgedValue initValue, BridgedBuilder b) const {
-  swift::SILBuilder builder(b.insertBefore.getInst(), b.insertAtEnd.getBlock(), b.loc.getScope());
+  swift::SILBuilder builder = b.builder();
   StaticInitCloner cloner(builder);
   if (!cloner.add(initValue.getSILValue())) {
     return {{nullptr}, {nullptr}};

@@ -61,7 +61,7 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     hasher.combine(ObjectIdentifier(self))
   }
 
-  public var bridged: BridgedGlobalVar { BridgedGlobalVar(obj: SwiftObject(self)) }
+  public var bridged: BridgedGlobalVar { BridgedGlobalVar(SwiftObject(self)) }
 }
 
 extension Instruction {
@@ -78,4 +78,8 @@ extension BridgedGlobalVar {
 
 extension OptionalBridgedGlobalVar {
   public var globalVar: GlobalVariable? { obj.getAs(GlobalVariable.self) }
+
+  public static var none: OptionalBridgedGlobalVar {
+    OptionalBridgedGlobalVar(obj: nil)
+  }
 }
