@@ -12877,6 +12877,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // `as` coercion.
       if (AddExplicitExistentialCoercion::isRequired(
               *this, func2->getResult(), openedExistentials, locator)) {
+
         if (!shouldAttemptFixes())
           return SolutionKind::Error;
 
