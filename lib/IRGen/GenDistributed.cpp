@@ -582,8 +582,10 @@ void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
 
 void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
   // Destroy loaded arguments.
-  // This MUST be done before deallocating, as otherwise we'd try to swift_release freed memory,
-  // which will be a no-op, however that also would mean we never drop retain counts to 0 and miss to run deinitializers of classes!
+  // This MUST be done before deallocating, as otherwise we'd try to
+  // swift_release freed memory, which will be a no-op, however that also would
+  // mean we never drop retain counts to 0 and miss to run deinitializers of
+  // classes!
   llvm::for_each(LoadedArguments, [&](const auto &argInfo) {
     emitDestroyCall(IGF, argInfo.second, argInfo.first);
   });
@@ -595,12 +597,6 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
          alloca != AllocatedArguments.rend(); ++alloca) {
       IGF.emitDeallocateDynamicAlloca(*alloca);
     }
-  }
-
-  // Destroy loaded arguments.
-  for (auto argInfo = LoadedArguments.rbegin();
-       argInfo != LoadedArguments.rend(); ++argInfo) {
-    emitDestroyCall(IGF, argInfo.second, argInfo.first);
   }
 
   Explosion voidResult;
