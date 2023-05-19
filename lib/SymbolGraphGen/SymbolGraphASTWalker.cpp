@@ -205,6 +205,9 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
                 dyn_cast_or_null<ProtocolDecl>(Ty->getAnyNominal())) {
           UnexpandedProtocols.push_back(Proto);
           return;
+        } else if (Ty->is<ClassType>()) {
+          // Don't deal with class inheritance requirements - those are handled elsewhere.
+          return;
         }
 
         SmallVector<const ProtocolCompositionType *, 4> UnexpandedCompositions;
