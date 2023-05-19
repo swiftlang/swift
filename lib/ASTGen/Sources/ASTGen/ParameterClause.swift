@@ -18,18 +18,65 @@ import SwiftSyntax
 
 // MARK: - ParamDecl
 
+fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
+  /// The `firstName` with optional type.
+  ///
+  /// This is the lowest denominator between `FunctionParameterSyntax` and `EnumCaseParameterSyntax`.
+  // FIXME: Rename once we support covariant witnesses.
+  var optionalFirstName: TokenSyntax? { get }
+
+  var secondName: TokenSyntax? { get }
+
+  /// The `firstName` with optional type.
+  ///
+  /// This is the lowest denominator between `FunctionParameterSyntax` and `EnumCaseParameterSyntax`.
+  // FIXME: Rename once we support covariant witnesses.
+  var optionalType: TypeSyntax? { get }
+
+  var defaultValue: InitializerClauseSyntax? { get }
+}
+
+extension FunctionParameterSyntax: ValueParameterSyntax {
+  fileprivate var optionalFirstName: TokenSyntax? {
+    firstName
+  }
+
+  fileprivate var optionalType: TypeSyntax? {
+    type
+  }
+}
+
+extension EnumCaseParameterSyntax: ValueParameterSyntax {
+  fileprivate var optionalFirstName: TokenSyntax? {
+    firstName
+  }
+
+  fileprivate var optionalType: TypeSyntax? {
+    type
+  }
+}
+
 extension ASTGenVisitor {
   func visit(_ node: FunctionParameterSyntax) -> ASTNode {
+    self.makeParamDecl(node)
+  }
+
+  func visit(_ node: EnumCaseParameterSyntax) -> ASTNode {
+    self.makeParamDecl(node)
+  }
+
+  private func makeParamDecl(_ node: some ValueParameterSyntax) -> ASTNode {
     // FIXME: This location should be derived from the type repr.
     let specifierLoc: BridgedSourceLoc = nil
 
     let firstName: BridgedIdentifier
-    if node.firstName.tokenKind != .wildcard {
-      // Swift AST represents "_" as nil.
-      firstName = node.firstName.bridgedIdentifier(in: self)
-    } else {
+    if node.optionalFirstName?.tokenKind == .wildcard {
+      // Swift AST represents "_" as a null identifier.
       firstName = nil
+    } else {
+      firstName = node.optionalFirstName.bridgedIdentifier(in: self)
     }
+
     let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
     return .decl(
@@ -38,10 +85,10 @@ extension ASTGenVisitor {
         self.declContext,
         specifierLoc,
         firstName,
-        self.bridgedSourceLoc(for: node.firstName),
+        self.bridgedSourceLoc(for: node.optionalFirstName),
         secondName,
         secondNameLoc,
-        self.visit(node.type).rawValue,
+        self.visit(node.optionalType)?.rawValue,
         self.visit(node.defaultValue?.value)?.rawValue
       )
     )
@@ -62,6 +109,19 @@ extension ASTGenVisitor {
     )
   }
 
+  func visit(_ node: EnumCaseParameterClauseSyntax) -> ASTNode {
+    .misc(
+      ParameterList_create(
+        self.ctx,
+        self.bridgedSourceLoc(for: node.leftParen),
+        node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
+        self.bridgedSourceLoc(for: node.rightParen)
+      )
+    )
+  }
+}
+
+extension ASTGenVisitor {
   @inline(__always)
   func visit(_ node: FunctionParameterListSyntax) -> BridgedArrayRef {
     node.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self)

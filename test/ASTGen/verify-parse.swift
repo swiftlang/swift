@@ -116,6 +116,14 @@ Enum<T>: Int, Proto1 where T: Proto1 {
   func method(_ b: Bool) {}
 }
 
+enum WithPayload {
+  case a(
+    b: Int
+  ), c(
+    d: Bool = false
+  )
+}
+
 struct
 Struct
 <
