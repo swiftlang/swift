@@ -2507,6 +2507,12 @@ bool AddExplicitExistentialCoercion::isRequired(
           return Action::Stop;
         }
 
+        if (erasedMemberTy->isExistentialType() &&
+             erasedMemberTy->hasTypeParameter()) {
+          RequiresCoercion = true;
+          return Action::Stop;
+        }
+
         return Action::SkipChildren;
       }
 
