@@ -6967,11 +6967,12 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
 
   // The intrinsic returns a pointer to the address of the result value inside
   // the async let task context.
-  emitApplyOfLibraryIntrinsic(loc, asyncLetGet, {},
-                   {ManagedValue::forTrivialObjectRValue(childTask.asyncLet),
-                    ManagedValue::forTrivialObjectRValue(childTask.resultBuf)},
-                   SGFContext());
-  
+  emitApplyOfLibraryIntrinsic(
+      loc, asyncLetGet, {},
+      {ManagedValue::forObjectRValueWithoutOwnership(childTask.asyncLet),
+       ManagedValue::forObjectRValueWithoutOwnership(childTask.resultBuf)},
+      SGFContext());
+
   auto resultAddr = B.createPointerToAddress(loc, childTask.resultBuf,
                 loweredOpaquePatternType.getAddressType(),
                 /*strict*/ true,
@@ -7054,10 +7055,11 @@ void SILGenFunction::emitFinishAsyncLet(
     SILLocation loc, SILValue asyncLet, SILValue resultPtr) {
   // This runtime function cancels the task, awaits its completion, and
   // destroys the value in the result buffer if necessary.
-  emitApplyOfLibraryIntrinsic(loc, SGM.getFinishAsyncLet(), {},
-                             {ManagedValue::forTrivialObjectRValue(asyncLet),
-                              ManagedValue::forTrivialObjectRValue(resultPtr)},
-                             SGFContext());
+  emitApplyOfLibraryIntrinsic(
+      loc, SGM.getFinishAsyncLet(), {},
+      {ManagedValue::forObjectRValueWithoutOwnership(asyncLet),
+       ManagedValue::forObjectRValueWithoutOwnership(resultPtr)},
+      SGFContext());
   // This builtin ends the lifetime of the allocation for the async let.
   auto &ctx = getASTContext();
   B.createBuiltin(loc,

@@ -2374,7 +2374,7 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
       return ManagedValue::forBorrowedAddressRValue(value);
     }
     if (value->getType().isTrivial(SGF.F)) {
-      return ManagedValue::forTrivialObjectRValue(value);
+      return ManagedValue::forObjectRValueWithoutOwnership(value);
     }
     return ManagedValue::forBorrowedObjectRValue(value);
   }

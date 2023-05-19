@@ -1540,12 +1540,16 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
-  auto futureResultMetadata = SGF.emitExistentialErasure(
-      loc, futureResultType, futureResultTL, anyTypeTL, { }, C,
-      [&](SGFContext C) -> ManagedValue {
-    return ManagedValue::forTrivialObjectRValue(
-      SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
-  }).borrow(SGF, loc).forward(SGF);
+  auto futureResultMetadata =
+      SGF.emitExistentialErasure(
+             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
+             [&](SGFContext C) -> ManagedValue {
+               return ManagedValue::forObjectRValueWithoutOwnership(
+                   SGF.B.createMetatype(loc,
+                                        SGF.getLoweredType(futureResultType)));
+             })
+          .borrow(SGF, loc)
+          .forward(SGF);
 
   // Ensure that the closure has the appropriate type.
   auto extInfo =
@@ -1598,12 +1602,16 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
-  auto futureResultMetadata = SGF.emitExistentialErasure(
-      loc, futureResultType, futureResultTL, anyTypeTL, { }, C,
-      [&](SGFContext C) -> ManagedValue {
-    return ManagedValue::forTrivialObjectRValue(
-      SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
-  }).borrow(SGF, loc).forward(SGF);
+  auto futureResultMetadata =
+      SGF.emitExistentialErasure(
+             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
+             [&](SGFContext C) -> ManagedValue {
+               return ManagedValue::forObjectRValueWithoutOwnership(
+                   SGF.B.createMetatype(loc,
+                                        SGF.getLoweredType(futureResultType)));
+             })
+          .borrow(SGF, loc)
+          .forward(SGF);
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
                                                              futureResultType);

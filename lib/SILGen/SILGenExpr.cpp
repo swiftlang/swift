@@ -5955,7 +5955,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   pointer = B.createMarkDependence(loc, pointer, owner.getValue());
 
   // The owner's already in its own cleanup.  Return the pointer.
-  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
+  return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
 }
 
 RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
@@ -5989,7 +5989,7 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   auto pointer = results[1].forward(*this);
   pointer = B.createMarkDependence(loc, pointer, owner.getValue());
 
-  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
+  return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
 }
 
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
