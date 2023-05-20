@@ -3,7 +3,7 @@
 
 // REQUIRES: executable_test
 
-// -enable-experimental-feature requires and asserts build
+// -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
 
 func test1(x: Int, fn: (Int) -> Int) -> Int {
