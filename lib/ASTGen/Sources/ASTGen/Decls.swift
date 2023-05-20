@@ -53,6 +53,7 @@ extension ASTGenVisitor {
       self.bridgedSourceLoc(for: node.classKeyword),
       name,
       nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue,
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 

@@ -576,12 +576,15 @@ StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
 BridgedDeclContextAndDecl
 ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
-                 BridgedSourceLoc cNameLoc, BridgedSourceRange cBraceRange) {
+                 BridgedSourceLoc cNameLoc,
+                 void *_Nullable opaqueGenericParamList,
+                 BridgedSourceRange cBraceRange) {
   ASTContext &context = convertASTContext(cContext);
 
   auto *decl = new (context)
       ClassDecl(convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
-                convertSourceLoc(cNameLoc), {}, nullptr,
+                convertSourceLoc(cNameLoc), {},
+                static_cast<GenericParamList *>(opaqueGenericParamList),
                 convertDeclContext(cDeclContext), false);
   decl->setBraces(convertSourceRange(cBraceRange));
 

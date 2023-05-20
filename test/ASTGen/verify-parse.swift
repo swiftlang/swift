@@ -97,6 +97,6 @@ Struct
 }
 
 class
-Class {
+Class<T> {
   func method(_ b: Bool) {}
 }

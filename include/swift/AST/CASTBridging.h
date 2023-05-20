@@ -359,7 +359,9 @@ StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
 BridgedDeclContextAndDecl
 ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
-                 BridgedSourceLoc cNameLoc, BridgedSourceRange cBraceRange);
+                 BridgedSourceLoc cNameLoc,
+                 void *_Nullable opaqueGenericParamList,
+                 BridgedSourceRange cBraceRange);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,
