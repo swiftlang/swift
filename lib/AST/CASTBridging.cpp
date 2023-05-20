@@ -591,6 +591,29 @@ ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
+BridgedDeclContextAndDecl
+ProtocolDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                    BridgedSourceLoc cProtocolKeywordLoc,
+                    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                    BridgedArrayRef cPrimaryAssociatedTypeNames,
+                    BridgedSourceRange cBraceRange) {
+  SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
+  for (auto &pair : convertArrayRef<BridgedIdentifierAndSourceLoc>(
+           cPrimaryAssociatedTypeNames)) {
+    primaryAssociatedTypeNames.emplace_back(convertIdentifier(pair.name),
+                                            convertSourceLoc(pair.nameLoc));
+  }
+
+  ASTContext &context = convertASTContext(cContext);
+  auto *decl = new (context) ProtocolDecl(
+      convertDeclContext(cDeclContext), convertSourceLoc(cProtocolKeywordLoc),
+      convertSourceLoc(cNameLoc), convertIdentifier(cName),
+      context.AllocateCopy(primaryAssociatedTypeNames), {}, nullptr);
+  decl->setBraces(convertSourceRange(cBraceRange));
+
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
+}
+
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
                               BridgedSourceLoc cQuestionLoc) {
   ASTContext &context = convertASTContext(cContext);

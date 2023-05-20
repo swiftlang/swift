@@ -76,6 +76,16 @@ extension TokenSyntax {
   func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
     return (self.bridgedIdentifier(in: astgen), astgen.bridgedSourceLoc(for: self))
   }
+
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// source buffer provided by `astgen`.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @inline(__always)
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> BridgedIdentifierAndSourceLoc {
+    let (name, nameLoc) = self.bridgedIdentifierAndSourceLoc(in: astgen)
+    return .init(name: name, nameLoc: nameLoc)
+  }
 }
 
 extension Optional<TokenSyntax> {

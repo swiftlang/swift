@@ -215,6 +215,11 @@ typedef struct BridgedTypeAttributes {
   void *raw;
 } BridgedTypeAttributes;
 
+struct BridgedIdentifierAndSourceLoc {
+  BridgedIdentifier name;
+  BridgedSourceLoc nameLoc;
+};
+
 #ifdef __cplusplus
 extern "C" {
 
@@ -362,6 +367,13 @@ ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  BridgedSourceLoc cNameLoc,
                  void *_Nullable opaqueGenericParamList,
                  BridgedSourceRange cBraceRange);
+
+BridgedDeclContextAndDecl
+ProtocolDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                    BridgedSourceLoc cProtocolKeywordLoc,
+                    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                    BridgedArrayRef cPrimaryAssociatedTypeNames,
+                    BridgedSourceRange cBraceRange);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,

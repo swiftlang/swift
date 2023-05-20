@@ -63,6 +63,29 @@ extension ASTGenVisitor {
 
     return .decl(decl.asDecl)
   }
+
+  func visit(_ node: ProtocolDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
+      $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
+    }
+
+    let decl = ProtocolDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.protocolKeyword),
+      name,
+      nameLoc,
+      primaryAssociatedTypeNames.bridgedArray(in: self),
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+    )
+
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
+
+    return .decl(decl.asDecl)
+  }
 }
 
 extension ASTGenVisitor {

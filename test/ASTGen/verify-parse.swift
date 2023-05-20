@@ -81,6 +81,14 @@ func test9(_ value: Any) { }
 
 func test10<T>(t: T) {}
 
+protocol Proto1 {}
+protocol Proto2 {}
+
+protocol
+Proto3 {
+  func method(_ b: Bool)
+}
+
 typealias
 Alias<T>
 =
@@ -89,8 +97,10 @@ String
 struct
 Struct
 <
-  T1,
-  T2
+  T1:
+  Proto1,
+  T2:
+  Proto2
 >
 {
   /*static*/ func method(_ b: Bool) {}
