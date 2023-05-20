@@ -38,3 +38,10 @@ func test6(_ b: Bool) -> Int {
   let x = if b { 0 } else { 1 }
   return x
 }
+
+func test7(_ b: inout Bool) {
+  // b = true
+}
+
+func test8(_ i: _const Int) {
+}

@@ -112,6 +112,17 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : long {
   BridgedBuiltinExternalMacro
 } BridgedMacroDefinitionKind;
 
+/// Bridged parameter specifiers
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : long {
+  BridgedAttributedTypeSpecifierInOut,
+  BridgedAttributedTypeSpecifierBorrowing,
+  BridgedAttributedTypeSpecifierConsuming,
+  BridgedAttributedTypeSpecifierLegacyShared,
+  BridgedAttributedTypeSpecifierLegacyOwned,
+  BridgedAttributedTypeSpecifierConst,
+  BridgedAttributedTypeSpecifierIsolated,
+} BridgedAttributedTypeSpecifier;
+
 #ifdef __cplusplus
 extern "C" {
 
@@ -261,6 +272,8 @@ void *ImplicitlyUnwrappedOptionalTypeRepr_create(void *ctx, void *base,
                                                  void *exclamationLoc);
 void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc);
 void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
+void *AttributedTypeSpecifierRepr_create(
+    void *ctx, void *base, BridgedAttributedTypeSpecifier specifier, void *specifierLoc);
 void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc);
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc);

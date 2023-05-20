@@ -484,6 +484,30 @@ void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc) {
       getSourceLocFromPointer(repeatLoc), (TypeRepr *)base);
 }
 
+void *AttributedTypeSpecifierRepr_create(
+    void *ctx, void *base, BridgedAttributedTypeSpecifier specifier, void *specifierLoc
+) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc loc = getSourceLocFromPointer(specifierLoc);
+  TypeRepr *baseType = (TypeRepr *)base;
+  switch (specifier) {
+  case BridgedAttributedTypeSpecifierInOut:
+    return new (Context) OwnershipTypeRepr(baseType, ParamSpecifier::InOut, loc);
+  case BridgedAttributedTypeSpecifierBorrowing:
+    return new (Context) OwnershipTypeRepr(baseType, ParamSpecifier::Borrowing, loc);
+  case BridgedAttributedTypeSpecifierConsuming:
+    return new (Context) OwnershipTypeRepr(baseType, ParamSpecifier::Consuming, loc);
+  case BridgedAttributedTypeSpecifierLegacyShared:
+    return new (Context) OwnershipTypeRepr(baseType, ParamSpecifier::LegacyShared, loc);
+  case BridgedAttributedTypeSpecifierLegacyOwned:
+    return new (Context) OwnershipTypeRepr(baseType, ParamSpecifier::LegacyOwned, loc);
+  case BridgedAttributedTypeSpecifierConst:
+    return new (Context) CompileTimeConstTypeRepr(baseType, loc);
+  case BridgedAttributedTypeSpecifierIsolated:
+    return new (Context) IsolatedTypeRepr(baseType, loc);
+  }
+}
+
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);

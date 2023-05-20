@@ -161,8 +161,30 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: AttributedTypeSyntax) -> ASTNode {
+    var type = visit(node.baseType)
+
+    // Handle specifiers.
+    if let specifier = node.specifier {
+      let specifierLoc = self.base.advanced(by: specifier.position.utf8Offset).raw
+
+      let kind: BridgedAttributedTypeSpecifier
+      switch specifier.tokenKind {
+        case .keyword(.inout): kind = .inOut
+        case .keyword(.borrowing): kind = .borrowing
+        case .keyword(.consuming): kind = .consuming
+        case .keyword(.__shared): kind = .legacyShared
+        case .keyword(.__owned): kind = .legacyOwned
+        case .keyword(._const): kind = .const
+        case .keyword(.isolated): kind = .isolated
+        default: fatalError("unhandled specifier \(specifier.debugDescription)")
+      }
+
+      type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, specifierLoc))
+    }
+
     // FIXME: Respect the attributes
-    return visit(node.baseType)
+
+    return type
   }
 }
 
