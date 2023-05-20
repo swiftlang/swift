@@ -276,6 +276,17 @@ struct InternalGeneric<T> {
     let y: Int
 }
 
+public enum SinglePayloadAnyObjectEnum {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case nonEmpty(AnyObject)
+}
+
 public enum SinglePayloadEnum<T> {
     case empty
     case nonEmpty(T?)

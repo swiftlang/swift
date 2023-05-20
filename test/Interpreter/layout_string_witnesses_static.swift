@@ -42,7 +42,7 @@ func testSimple() {
 
         // CHECK-NEXT: Before deinit
         print("Before deinit")
-        
+
         // CHECK-NEXT: SimpleClass deinitialized!
         testAssign(ptr, from: y)
     }
@@ -52,11 +52,11 @@ func testSimple() {
 
     // CHECK-NEXT: Before deinit
     print("Before deinit")
-        
+
 
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
-    
+
     ptr.deallocate()
 }
 
@@ -85,9 +85,9 @@ func testWeakNative() {
 
     do {
         let ref = SimpleClass(x: 34)
-        
+
         withExtendedLifetime(ref) {
-            
+
             // CHECK-NEXT: SimpleClass deinitialized!
             testAssign(ptr, from: WeakNativeWrapper(x: ref))
 
@@ -131,7 +131,7 @@ func testUnownedNative() {
 
     do {
         let ref = SimpleClass(x: 34)
-        
+
         withExtendedLifetime(ref) {
             // CHECK-NEXT: SimpleClass deinitialized!
             testAssign(ptr, from: UnownedNativeWrapper(x: ref))
@@ -230,7 +230,7 @@ class ClassWithSomeClassProtocol: SomeClassProtocol {
 
 func testExistentialReference() {
     let ptr = UnsafeMutablePointer<ExistentialRefWrapper>.allocate(capacity: 1)
-    
+
     do {
         let x = ClassWithSomeClassProtocol()
         testInit(ptr, to: ExistentialRefWrapper(x: x))
@@ -257,6 +257,36 @@ func testExistentialReference() {
 
 testExistentialReference()
 
+func testSinglePayloadAnyObjectEnum() {
+    let ptr = UnsafeMutablePointer<SinglePayloadAnyObjectEnum>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadAnyObjectEnum.nonEmpty(SimpleClass(x: 23))
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadAnyObjectEnum.nonEmpty(SimpleClass(x: 28))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadAnyObjectEnum()
+
 func testMultiPayloadEnum() {
     let ptr = UnsafeMutablePointer<MultiPayloadEnumWrapper>.allocate(capacity: 1)
 
@@ -270,7 +300,7 @@ func testMultiPayloadEnum() {
 
         // CHECK: Before deinit
         print("Before deinit")
-        
+
         // CHECK-NEXT: SimpleClass deinitialized!
         testAssign(ptr, from: y)
     }
@@ -482,7 +512,7 @@ func testUnownedObjc() {
 
     do {
         let ref = ObjcClass(x: 34)
-        
+
         withExtendedLifetime(ref) {
             // CHECK-macosx-NEXT: ObjcClass deinitialized!
             testAssign(ptr, from: UnownedObjcWrapper(x: ref))
