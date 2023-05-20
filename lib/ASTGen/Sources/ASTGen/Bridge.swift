@@ -41,6 +41,13 @@ extension BridgedSourceLoc {
   }
 }
 
+extension BridgedSourceRange {
+  @inline(__always)
+  init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
+    self.init(startLoc: astgen.bridgedSourceLoc(for: startToken), endLoc: astgen.bridgedSourceLoc(for: endToken))
+  }
+}
+
 extension String {
   mutating func withBridgedString<R>(_ body: (BridgedString) throws -> R) rethrows -> R {
     try withUTF8 { buffer in

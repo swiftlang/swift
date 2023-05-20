@@ -70,6 +70,11 @@ static inline SourceLoc convertSourceLoc(BridgedSourceLoc cLoc) {
   return SourceLoc(smLoc);
 }
 
+static inline SourceRange convertSourceRange(BridgedSourceRange cRange) {
+  return SourceRange(convertSourceLoc(cRange.startLoc),
+                     convertSourceLoc(cRange.endLoc));
+}
+
 static inline Identifier convertIdentifier(BridgedIdentifier cIdentifier) {
   return Identifier::getFromOpaquePointer(const_cast<void *>(cIdentifier.raw));
 }
@@ -533,7 +538,8 @@ BridgedDeclContextAndDecl
 StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                   BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
                   BridgedSourceLoc cNameLoc,
-                  void *_Nullable opaqueGenericParamList) {
+                  void *_Nullable opaqueGenericParamList,
+                  BridgedSourceRange cBraceRange) {
   ASTContext &context = convertASTContext(cContext);
 
   auto *decl = new (context)
@@ -541,21 +547,22 @@ StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                  convertSourceLoc(cNameLoc), {},
                  static_cast<GenericParamList *>(opaqueGenericParamList),
                  convertDeclContext(cDeclContext));
+  decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
-BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
-                                           BridgedDeclContext cDeclContext,
-                                           BridgedSourceLoc cClassKeywordLoc,
-                                           BridgedIdentifier cName,
-                                           BridgedSourceLoc cNameLoc) {
+BridgedDeclContextAndDecl
+ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                 BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+                 BridgedSourceLoc cNameLoc, BridgedSourceRange cBraceRange) {
   ASTContext &context = convertASTContext(cContext);
 
   auto *decl = new (context)
       ClassDecl(convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
                 convertSourceLoc(cNameLoc), {}, nullptr,
                 convertDeclContext(cDeclContext), false);
+  decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }

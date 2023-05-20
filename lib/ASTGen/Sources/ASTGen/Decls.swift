@@ -33,7 +33,8 @@ extension ASTGenVisitor {
       self.bridgedSourceLoc(for: node.structKeyword),
       name,
       nameLoc,
-      self.visit(node.genericParameterClause)?.rawValue
+      self.visit(node.genericParameterClause)?.rawValue,
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
     self.withDeclContext(decl.asDeclContext) {
@@ -51,7 +52,8 @@ extension ASTGenVisitor {
       self.declContext,
       self.bridgedSourceLoc(for: node.classKeyword),
       name,
-      nameLoc
+      nameLoc,
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
     self.withDeclContext(decl.asDeclContext) {

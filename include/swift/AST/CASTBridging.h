@@ -47,6 +47,11 @@ typedef struct BridgedSourceLoc {
   const void *_Nullable raw;
 } BridgedSourceLoc;
 
+typedef struct {
+  BridgedSourceLoc startLoc;
+  BridgedSourceLoc endLoc;
+} BridgedSourceRange;
+
 typedef struct BridgedIdentifier {
   const void *_Nullable raw;
 } BridgedIdentifier;
@@ -344,13 +349,13 @@ BridgedDeclContextAndDecl
 StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                   BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
                   BridgedSourceLoc cNameLoc,
-                  void *_Nullable opaqueGenericParamList);
+                  void *_Nullable opaqueGenericParamList,
+                  BridgedSourceRange cBraceRange);
 
-BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
-                                           BridgedDeclContext cDeclContext,
-                                           BridgedSourceLoc cClassKeywordLoc,
-                                           BridgedIdentifier cName,
-                                           BridgedSourceLoc cNameLoc);
+BridgedDeclContextAndDecl
+ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                 BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+                 BridgedSourceLoc cNameLoc, BridgedSourceRange cBraceRange);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,

@@ -83,3 +83,18 @@ typealias
 Alias<T>
 =
 String
+
+struct
+Struct
+<
+  T1,
+  T2
+>
+{
+  /*static*/ func method(_ b: Bool) {}
+}
+
+class
+Class {
+  func method(_ b: Bool) {}
+}
