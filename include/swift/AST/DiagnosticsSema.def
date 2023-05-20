@@ -872,6 +872,27 @@ ERROR(need_hermetic_seal_to_import_module,none,
       "current compilation does not have -experimental-hermetic-seal-at-link",
       (Identifier))
 
+ERROR(modularization_issue_decl_moved,Fatal,
+      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "%1 was expected to be in %2, but now a candidate is found only in %3",
+      (bool, DeclName, Identifier, Identifier))
+ERROR(modularization_issue_decl_type_changed,Fatal,
+      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "the details of %1 %select{from %2|}5 changed since building '%3'"
+      "%select{|, it was in %2 and is now found in %4}5",
+      (bool, DeclName, Identifier, StringRef, Identifier, bool))
+ERROR(modularization_issue_decl_not_found,Fatal,
+      "reference to %select{top-level|type}0 %1 broken by a context change; "
+      "%1 is not found, it was expected to be in %2",
+      (bool, DeclName, Identifier))
+
+NOTE(modularization_issue_side_effect_extension_error,none,
+     "could not deserialize extension",
+     ())
+NOTE(modularization_issue_side_effect_type_error,none,
+     "could not deserialize type for %0",
+     (DeclName))
+
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
@@ -6992,10 +7013,14 @@ ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
 
 ERROR(moveOnly_not_allowed_here,none,
       "'moveOnly' only applies to structs or enums", ())
-ERROR(move_expression_not_passed_lvalue,none,
+ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to lvalues", ())
 ERROR(borrow_expression_not_passed_lvalue,none,
       "'borrow' can only be applied to lvalues", ())
+ERROR(copy_expression_not_passed_lvalue,none,
+      "'copy' can only be applied to lvalues", ())
+ERROR(copy_expression_cannot_be_used_with_noncopyable_types,none,
+      "'copy' cannot be applied to noncopyable types", ())
 
 ERROR(moveOnly_requires_lexical_lifetimes,none,
       "noncopyable types require lexical borrow scopes "

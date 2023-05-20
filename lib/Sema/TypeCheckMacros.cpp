@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckMacros.h"
+#include "../AST/InlinableText.h"
 #include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -23,9 +24,9 @@
 #include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
-#include "../AST/InlinableText.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
@@ -272,42 +273,10 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 #endif
 }
 
-/// Load a plugin library based on a module name.
-static LoadedLibraryPlugin *loadLibraryPluginByName(ASTContext &ctx,
-                                                    Identifier moduleName) {
-  std::string libraryPath;
-  if (auto found = ctx.lookupLibraryPluginByModuleName(moduleName)) {
-    libraryPath = *found;
-  } else {
-    return nullptr;
-  }
-
-  // Load the plugin.
-  return ctx.loadLibraryPlugin(libraryPath);
-}
-
 static LoadedExecutablePlugin *
-loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
-  // Find an executable plugin.
-  std::string libraryPath;
-  std::string executablePluginPath;
-
-  if (auto found = ctx.lookupExternalLibraryPluginByModuleName(moduleName)) {
-    // Found in '-external-plugin-path'.
-    std::tie(libraryPath, executablePluginPath) = found.value();
-  } else if (auto found = ctx.lookupExecutablePluginByModuleName(moduleName)) {
-    // Found in '-load-plugin-executable'.
-    executablePluginPath = found->str();
-  }
-  if (executablePluginPath.empty())
-    return nullptr;
-
-  // Launch the plugin.
-  LoadedExecutablePlugin *executablePlugin =
-      ctx.loadExecutablePlugin(executablePluginPath);
-  if (!executablePlugin)
-    return nullptr;
-
+initializeExecutablePlugin(ASTContext &ctx,
+                           LoadedExecutablePlugin *executablePlugin,
+                           StringRef libraryPath, Identifier moduleName) {
   // Lock the plugin while initializing.
   // Note that'executablePlugn' can be shared between multiple ASTContext.
   executablePlugin->lock();
@@ -333,7 +302,7 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
     auto fs = ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded,
-                         executablePluginPath, err.message());
+                         executablePlugin->getExecutablePath(), err.message());
       return nullptr;
     }
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
@@ -369,16 +338,41 @@ loadExecutablePluginByName(ASTContext &ctx, Identifier moduleName) {
 LoadedCompilerPlugin
 CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
-  // Check dynamic link library plugins.
-  // i.e. '-plugin-path', and '-load-plugin-library'.
-  if (auto found = loadLibraryPluginByName(*ctx, moduleName)) {
-    return found;
+  PluginLoader &loader = ctx->getPluginLoader();
+
+  std::string libraryPath;
+  std::string executablePath;
+
+  // '-load-plugin-libarary'.
+  if (auto found = loader.lookupExplicitLibraryPluginByModuleName(moduleName)) {
+    libraryPath = found.value();
+  }
+  // '-load-plugin-executable'.
+  else if (auto found = loader.lookupExecutablePluginByModuleName(moduleName)) {
+    executablePath = found->str();
+  }
+  // '-plugin-path'.
+  else if (auto found =
+               loader.lookupLibraryPluginInSearchPathByModuleName(moduleName)) {
+    libraryPath = found.value();
+  }
+  // '-external-plugin-path'.
+  else if (auto found =
+               loader.lookupExternalLibraryPluginByModuleName(moduleName)) {
+    std::tie(libraryPath, executablePath) = found.value();
   }
 
-  // Fall back to executable plugins.
-  // i.e. '-external-plugin-path', and '-load-plugin-executable'.
-  if (auto *found = loadExecutablePluginByName(*ctx, moduleName)) {
-    return found;
+  if (!executablePath.empty()) {
+    if (LoadedExecutablePlugin *executablePlugin =
+            loader.loadExecutablePlugin(executablePath)) {
+      return initializeExecutablePlugin(*ctx, executablePlugin, libraryPath,
+                                        moduleName);
+    }
+  } else if (!libraryPath.empty()) {
+    if (LoadedLibraryPlugin *libraryPlugin =
+            loader.loadLibraryPlugin(libraryPath)) {
+      return libraryPlugin;
+    }
   }
 
   return nullptr;
