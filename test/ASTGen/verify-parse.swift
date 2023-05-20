@@ -45,3 +45,5 @@ func test7(_ b: inout Bool) {
 
 func test8(_ i: _const Int) {
 }
+
+func test9(_ value: Any) { }

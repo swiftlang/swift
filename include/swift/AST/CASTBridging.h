@@ -282,6 +282,7 @@ void *MemberTypeRepr_create(void *ctx, void *baseComponent,
 void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name,
                                   void *nameLoc, BridgedArrayRef genericArgs,
                                   void *lAngle, void *rAngle);
+void *EmptyCompositionTypeRepr_create(void *ctx, void *anyLoc);
 void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,
                                  void *firstTypeLoc);
 void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc,

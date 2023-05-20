@@ -6,6 +6,11 @@ extension ASTGenVisitor {
   public func visit(_ node: SimpleTypeIdentifierSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
+    // If this is the bare 'Any' keyword, produce an empty composition type.
+    if node.name.tokenKind == .keyword(.Any) && node.genericArgumentClause == nil {
+      return .type(EmptyCompositionTypeRepr_create(self.ctx, loc))
+    }
+
     var text = node.name.text
     let id = text.withUTF8 { buf in
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)

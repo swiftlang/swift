@@ -542,6 +542,12 @@ void *MemberTypeRepr_create(void *ctx, void *baseComponent,
                                 memberComponents);
 }
 
+void *EmptyCompositionTypeRepr_create(void *ctx, void *anyLocPtr) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc anyLoc = getSourceLocFromPointer(anyLocPtr);
+  return CompositionTypeRepr::createEmptyComposition(Context, anyLoc);
+}
+
 void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,
                                  void *firstTypeLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
