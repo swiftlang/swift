@@ -511,7 +511,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // harmless aside from code size.
   if (!IRGen.Opts.UseJIT) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
-                                StringRef libraryName) {
+                                StringRef libraryName,
+                                bool forceLoad) {
       Optional<llvm::VersionTuple> compatibilityVersion;
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
@@ -532,11 +533,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
       this->addLinkLibrary(LinkLibrary(libraryName,
                                        LibraryKind::Library,
-                                       /*forceLoad*/ true));
+                                       forceLoad));
     };
 
-    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName)         \
-      addBackDeployLib(llvm::VersionTuple Version, LibraryName);
+    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \
+      addBackDeployLib(llvm::VersionTuple Version, LibraryName, ForceLoad);
     #include "swift/Frontend/BackDeploymentLibs.def"
   }
 }

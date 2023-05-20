@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature VariadicGenerics -disable-availability-checking %s | %FileCheck %s
 
 // rdar://107459964
 // rdar://107478603
