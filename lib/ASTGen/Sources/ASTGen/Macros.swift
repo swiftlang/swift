@@ -633,8 +633,18 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   // If we want the outermost node, keep looking.
+  // FIXME: This is VERY SPECIFIC to handling of types. We must be able to
+  // do better.
   if wantOutermost {
     while let parentSyntax = resultSyntax.parent {
+      // Look through type compositions.
+      if let compositionElement = parentSyntax.as(CompositionTypeElementSyntax.self),
+         let compositionList = compositionElement.parent?.as(CompositionTypeElementListSyntax.self),
+         let typedParent = compositionList.parent?.as(type) {
+        resultSyntax = typedParent
+        continue
+      }
+
       guard let typedParent = parentSyntax.as(type),
             typedParent.position == resultSyntax.position else {
         break

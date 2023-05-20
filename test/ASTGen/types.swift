@@ -3,6 +3,9 @@
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
 
+protocol P { }
+protocol Q { }
+typealias PQ = P & Q
 
 func test7(_ b: inout Bool) {
   b = true

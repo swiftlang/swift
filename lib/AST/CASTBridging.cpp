@@ -611,12 +611,15 @@ void *EmptyCompositionTypeRepr_create(void *ctx, void *anyLocPtr) {
   return CompositionTypeRepr::createEmptyComposition(Context, anyLoc);
 }
 
-void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,
-                                 void *firstTypeLoc) {
+void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef typesPtr,
+                                 void *firstTypeLoc, void *firstAmpLocPtr) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   SourceLoc firstType = getSourceLocFromPointer(firstTypeLoc);
-  return CompositionTypeRepr::create(Context, getArrayRef<TypeRepr *>(types),
-                                     firstType, SourceRange{});
+  SourceLoc firstAmpLoc = getSourceLocFromPointer(firstAmpLocPtr);
+  auto types = getArrayRef<TypeRepr *>(typesPtr);
+  return CompositionTypeRepr::create(
+      Context, types, firstType,
+      SourceRange{firstAmpLoc, types.back()->getEndLoc()});
 }
 
 void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc,

@@ -348,7 +348,7 @@ void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name,
                                   void *lAngle, void *rAngle);
 void *EmptyCompositionTypeRepr_create(void *ctx, void *anyLoc);
 void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types,
-                                 void *firstTypeLoc);
+                                 void *firstTypeLoc, void *firstAmpLoc);
 void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc,
                               void *_Nullable throwsLoc, void *arrowLoc,
                               void *returnType);

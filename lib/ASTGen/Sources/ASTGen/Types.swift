@@ -128,9 +128,11 @@ extension ASTGenVisitor {
     assert(node.elements.count > 1)
     let types = node.elements.map { visit($0.type) }.map { $0.rawValue }
     let firstTypeLoc = self.base.advanced(by: node.elements.first!.type.position.utf8Offset).raw
+    let firstAmpOffset = node.elements.first?.ampersand.map { $0.position.utf8Offset } ?? 0
+    let firstAmpLoc = self.base.advanced(by: firstAmpOffset).raw
     return .type(
       types.withBridgedArrayRef { types in
-        return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc)
+        return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc, firstAmpLoc)
       })
   }
 
