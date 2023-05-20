@@ -6,11 +6,17 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   public func visit(_ node: TypeAliasDeclSyntax) -> ASTNode {
-    let aliasLoc = bridgedSourceLoc(for: node.typealiasKeyword)
-    let equalLoc = bridgedSourceLoc(for: node.initializer.equal)
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
     let out = TypeAliasDecl_create(
-      self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, self.visit(node.genericParameterClause)?.rawValue)
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.typealiasKeyword),
+      name,
+      nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue,
+      self.bridgedSourceLoc(for: node.initializer.equal)
+    )
 
     let oldDeclContext = declContext
     declContext = out.declContext
@@ -23,10 +29,17 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: StructDeclSyntax) -> ASTNode {
-    let loc = bridgedSourceLoc(for: node)
-    let name = node.name.bridgedIdentifier(in: self)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = StructDecl_create(ctx, loc, name, loc, self.visit(node.genericParameterClause)?.rawValue, declContext)
+    let out = StructDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.structKeyword),
+      name,
+      nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue
+    )
+
     let oldDeclContext = declContext
     declContext = out.declContext
     defer { declContext = oldDeclContext }
@@ -37,10 +50,15 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: ClassDeclSyntax) -> ASTNode {
-    let loc = bridgedSourceLoc(for: node)
-    let name = node.name.bridgedIdentifier(in: self)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let out = ClassDecl_create(ctx, loc, name, loc, declContext)
+    let out = ClassDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.classKeyword),
+      name,
+      nameLoc
+    )
     let oldDeclContext = declContext
     declContext = out.declContext
     defer { declContext = oldDeclContext }
@@ -54,19 +72,25 @@ extension ASTGenVisitor {
     let pattern = visit(node.bindings.first!.pattern).rawValue
     let initializer = visit(node.bindings.first!.initializer!).rawValue
 
-    let loc = bridgedSourceLoc(for: node)
     let isStatic = false  // TODO: compute this
     let isLet = node.bindingSpecifier.tokenKind == .keyword(.let)
 
-    // TODO: don't drop "initializer" on the floor.
     return .decl(
       VarDecl_create(
-        ctx, pattern, initializer, loc, isStatic,
-        isLet, declContext))
+        self.ctx,
+        self.declContext,
+        self.bridgedSourceLoc(for: node.bindingSpecifier),
+        pattern,
+        initializer,
+        isStatic,
+        isLet
+      )
+    )
   }
 
   public func visit(_ node: FunctionParameterSyntax) -> ASTNode {
-    let loc = bridgedSourceLoc(for: node)
+    // FIXME: This location should be derived from the type repr.
+    let specifierLoc: BridgedSourceLoc = nil
 
     let firstName: BridgedIdentifier
     if node.firstName.text != "_" {
@@ -75,43 +99,42 @@ extension ASTGenVisitor {
     } else {
       firstName = nil
     }
+    let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
-    let secondName = node.secondName.bridgedIdentifier(in: self)
-
-    let type = visit(node.type).rawValue
-
-    return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, type, declContext))
+    return .decl(
+      ParamDecl_create(
+        self.ctx,
+        self.declContext,
+        specifierLoc,
+        firstName,
+        self.bridgedSourceLoc(for: node.firstName),
+        secondName,
+        secondNameLoc,
+        self.visit(node.type).rawValue
+      )
+    )
   }
 
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
-    let staticLoc = bridgedSourceLoc(for: node)
-    let funcLoc = bridgedSourceLoc(for: node.funcKeyword)
-    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+    // FIXME: Compute this location
+    let staticLoc: BridgedSourceLoc = nil
 
-    let returnType: ASTNode?
-    if let output = node.signature.returnClause {
-      returnType = visit(output.type)
-    } else {
-      returnType = nil
-    }
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
     let parameters = node.signature.parameterClause.parameters.lazy.map { visit($0).rawValue }
     let out = FuncDecl_create(
       self.ctx,
+      self.declContext,
       staticLoc,
-      false,
-      funcLoc,
+      self.bridgedSourceLoc(for: node.funcKeyword),
       name,
       nameLoc,
-      false,
-      nil,
-      false,
-      nil,
       self.bridgedSourceLoc(for: node.signature.parameterClause.leftParen),
       parameters.bridgedArray(in: self),
       self.bridgedSourceLoc(for: node.signature.parameterClause.rightParen),
-      returnType?.rawValue,
-      self.declContext
+      self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
+      self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
+      self.visit(node.signature.returnClause?.type)?.rawValue
     )
 
     let oldDeclContext = declContext

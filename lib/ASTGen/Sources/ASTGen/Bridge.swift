@@ -3,12 +3,6 @@ import CBasicBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  /// Form a source location at the given absolute position in the current
-  /// file.
-  public func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: position, in: base)
-  }
-
   /// Obtains the bridged start location of the given node in the current file, excluding leading trivia.
   @inline(__always)
   func bridgedSourceLoc(for node: (some SyntaxProtocol)?) -> BridgedSourceLoc {

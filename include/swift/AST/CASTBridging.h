@@ -1,8 +1,8 @@
-//===--- CASTBridging.h - header for the swift SILBridging module ---------===//
+//===--- CASTBridging.h - C header for the AST bridging layer ----*- C -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -289,9 +289,10 @@ void *ArrayExpr_create(BridgedASTContext cContext, BridgedSourceLoc cLLoc,
                        BridgedArrayRef elements, BridgedArrayRef commas,
                        BridgedSourceLoc cRLoc);
 
-void *VarDecl_create(BridgedASTContext cContext, void *nameExpr, void *initExpr,
-                     BridgedSourceLoc cLoc, _Bool isStatic, _Bool isLet,
-                     BridgedDeclContext cDeclContext);
+void *VarDecl_create(BridgedASTContext cContext,
+                     BridgedDeclContext cDeclContext,
+                     BridgedSourceLoc cBindingKeywordLoc, void *opaqueNameExpr,
+                     void *opaqueInitExpr, _Bool isStatic, _Bool isLet);
 
 void *SingleValueStmtExpr_createWithWrappedBranches(
     BridgedASTContext cContext, void *S, BridgedDeclContext cDeclContext,
@@ -306,19 +307,19 @@ void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
 
 BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len);
 
-void *ParamDecl_create(BridgedASTContext cContext, BridgedSourceLoc cLoc,
-                       BridgedSourceLoc cArgLoc, BridgedIdentifier argName,
-                       BridgedSourceLoc cParamLoc, BridgedIdentifier paramName,
-                       void *_Nullable type, BridgedDeclContext cDeclContext);
+void *
+ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                 BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
+                 BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
+                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType);
 
 struct BridgedFuncDecl
-FuncDecl_create(BridgedASTContext cContext, BridgedSourceLoc cStaticLoc,
-                _Bool isStatic, BridgedSourceLoc cFuncLoc,
-                BridgedIdentifier name, BridgedSourceLoc cNameLoc,
-                _Bool isAsync, BridgedSourceLoc cAsyncLoc, _Bool throws,
-                BridgedSourceLoc cThrowsLoc, BridgedSourceLoc cParamLLoc,
-                BridgedArrayRef params, BridgedSourceLoc cParamRLoc,
-                void *_Nullable returnType, BridgedDeclContext cDeclContext);
+FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
+                BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                BridgedSourceLoc cLeftParenLoc, BridgedArrayRef params,
+                BridgedSourceLoc cRightParenLoc, BridgedSourceLoc cAsyncLoc,
+                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType);
 void FuncDecl_setBody(void *fn, void *body);
 
 void *SimpleIdentTypeRepr_create(BridgedASTContext cContext,
@@ -331,19 +332,26 @@ void *UnresolvedDotExpr_create(BridgedASTContext cContext, void *base,
 void *ClosureExpr_create(BridgedASTContext cContext, void *body,
                          BridgedDeclContext cDeclContext);
 
+BridgedDeclContextAndDecl TypeAliasDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedSourceLoc cEqualLoc);
+void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType);
+
 void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members);
 
-BridgedDeclContextAndDecl StructDecl_create(BridgedASTContext cContext,
-                                            BridgedSourceLoc cLoc,
-                                            BridgedIdentifier name,
-                                            BridgedSourceLoc cNameLoc,
-                                            void *_Nullable genericParams,
-                                            BridgedDeclContext cDeclContext);
+BridgedDeclContextAndDecl
+StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                  BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+                  BridgedSourceLoc cNameLoc,
+                  void *_Nullable opaqueGenericParamList);
+
 BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
-                                           BridgedSourceLoc cLoc,
-                                           BridgedIdentifier name,
-                                           BridgedSourceLoc cNameLoc,
-                                           BridgedDeclContext cDeclContext);
+                                           BridgedDeclContext cDeclContext,
+                                           BridgedSourceLoc cClassKeywordLoc,
+                                           BridgedIdentifier cName,
+                                           BridgedSourceLoc cNameLoc);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,
@@ -358,15 +366,6 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
                                            void *Param, void *ty);
-
-BridgedDeclContextAndDecl TypeAliasDecl_create(BridgedASTContext cContext,
-                                               BridgedDeclContext cDeclContext,
-                                               BridgedSourceLoc cAliasLoc,
-                                               BridgedSourceLoc cEqualLoc,
-                                               BridgedIdentifier name,
-                                               BridgedSourceLoc cNameLoc,
-                                               void *_Nullable genericParams);
-void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType);
 
 BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr);
 BridgedTypeAttributes TypeAttributes_create(void);

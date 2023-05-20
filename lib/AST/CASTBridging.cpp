@@ -313,22 +313,25 @@ void *BooleanLiteralExpr_create(BridgedASTContext cContext, bool value,
   return new (context) BooleanLiteralExpr(value, convertSourceLoc(cTokenLoc));
 }
 
-void *VarDecl_create(BridgedASTContext cContext, void *nameExpr, void *initExpr,
-                     BridgedSourceLoc cLoc, bool isStatic, bool isLet,
-                     BridgedDeclContext cDeclContext) {
+void *VarDecl_create(BridgedASTContext cContext,
+                     BridgedDeclContext cDeclContext,
+                     BridgedSourceLoc cBindingKeywordLoc, void *opaqueNameExpr,
+                     void *opaqueInitExpr, bool isStatic, bool isLet) {
   ASTContext &context = convertASTContext(cContext);
   DeclContext *declContext = convertDeclContext(cDeclContext);
 
-  auto name = (UnresolvedDeclRefExpr *)nameExpr;
-  auto sourceLoc = convertSourceLoc(cLoc);
-  auto varDecl = new (context) VarDecl(
+  auto *name = static_cast<UnresolvedDeclRefExpr *>(opaqueNameExpr);
+  auto *varDecl = new (context) VarDecl(
       isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      sourceLoc, name->getName().getBaseIdentifier(), declContext);
-  auto pattern = NamedPattern::createImplicit(context, varDecl);
+      name->getLoc(), name->getName().getBaseIdentifier(), declContext);
+  auto *pattern = new (context) NamedPattern(varDecl);
   return PatternBindingDecl::create(
-      context, sourceLoc,
+      context,
+      /*StaticLoc=*/SourceLoc(), // FIXME
       isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
-      sourceLoc, pattern, sourceLoc, (Expr *)initExpr, declContext);
+      convertSourceLoc(cBindingKeywordLoc), pattern,
+      /*EqualLoc=*/SourceLoc(), // FIXME
+      static_cast<Expr *>(opaqueInitExpr), declContext);
 }
 
 void *SingleValueStmtExpr_createWithWrappedBranches(
@@ -369,6 +372,17 @@ void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
       assert(node.kind == ASTNodeKindDecl);
       auto decl = (Decl *)node.ptr;
       nodes.push_back(decl);
+
+      // Variable declarations are part of the list on par with pattern binding
+      // declarations per the legacy parser.
+      if (auto *bindingDecl = dyn_cast<PatternBindingDecl>(decl)) {
+        for (auto i : range(bindingDecl->getNumPatternEntries())) {
+          bindingDecl->getPattern(i)->forEachVariable(
+              [&nodes](VarDecl *variable) {
+            nodes.push_back(variable);
+          });
+        }
+      }
     }
   }
 
@@ -378,47 +392,53 @@ void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
                            convertSourceLoc(cRBLoc));
 }
 
-void *ParamDecl_create(BridgedASTContext cContext, BridgedSourceLoc cLoc,
-                       BridgedSourceLoc cArgLoc, BridgedIdentifier argName,
-                       BridgedSourceLoc cParamLoc, BridgedIdentifier paramName,
-                       void *_Nullable type, BridgedDeclContext cDeclContext) {
-  ASTContext &context = convertASTContext(cContext);
-  DeclContext *declContext = convertDeclContext(cDeclContext);
+void *
+ParamDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                 BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
+                 BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
+                 BridgedSourceLoc cSecondNameLoc, void *_Nullable opaqueType) {
+  assert((bool)cSecondNameLoc.raw == (bool)cSecondName.raw);
+  if (!cSecondName.raw) {
+    cSecondName = cFirstName;
+    cSecondNameLoc = cFirstNameLoc;
+  }
 
-  if (!paramName.raw)
-    paramName = argName;
-  auto paramDecl = new (context)
-      ParamDecl(convertSourceLoc(cLoc), convertSourceLoc(cArgLoc),
-                convertIdentifier(argName), convertSourceLoc(cParamLoc),
-                convertIdentifier(paramName), declContext);
-  paramDecl->setTypeRepr((TypeRepr *)type);
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *paramDecl = new (context) ParamDecl(
+      convertSourceLoc(cSpecifierLoc), convertSourceLoc(cFirstNameLoc),
+      convertIdentifier(cFirstName), convertSourceLoc(cSecondNameLoc),
+      convertIdentifier(cSecondName), convertDeclContext(cDeclContext));
+  paramDecl->setTypeRepr(static_cast<TypeRepr *>(opaqueType));
+
   return paramDecl;
 }
 
 BridgedFuncDecl
-FuncDecl_create(BridgedASTContext cContext, BridgedSourceLoc cStaticLoc,
-                bool isStatic, BridgedSourceLoc cFuncLoc,
-                BridgedIdentifier name, BridgedSourceLoc cNameLoc, bool isAsync,
-                BridgedSourceLoc cAsyncLoc, bool throws,
-                BridgedSourceLoc cThrowsLoc, BridgedSourceLoc cParamLLoc,
-                BridgedArrayRef params, BridgedSourceLoc cParamRLoc,
-                void *_Nullable returnType, BridgedDeclContext cDeclContext) {
+FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
+                BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                BridgedSourceLoc cLeftParenLoc, BridgedArrayRef params,
+                BridgedSourceLoc cRightParenLoc, BridgedSourceLoc cAsyncLoc,
+                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType) {
   ASTContext &context = convertASTContext(cContext);
-  DeclContext *declContext = convertDeclContext(cDeclContext);
 
-  auto *paramList = ParameterList::create(context, convertSourceLoc(cParamLLoc),
-                                          convertArrayRef<ParamDecl *>(params),
-                                          convertSourceLoc(cParamRLoc));
-  auto declName =
-      DeclName(convertASTContext(cContext), convertIdentifier(name), paramList);
+  auto *paramList = ParameterList::create(
+      context, convertSourceLoc(cLeftParenLoc),
+      convertArrayRef<ParamDecl *>(params), convertSourceLoc(cRightParenLoc));
+  auto declName = DeclName(context, convertIdentifier(cName), paramList);
+  auto asyncLoc = convertSourceLoc(cAsyncLoc);
+  auto throwsLoc = convertSourceLoc(cThrowsLoc);
+
   auto *out = FuncDecl::create(
-      context, convertSourceLoc(cStaticLoc),
-      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
-      convertSourceLoc(cFuncLoc), declName, convertSourceLoc(cNameLoc), isAsync,
-      convertSourceLoc(cAsyncLoc), throws, convertSourceLoc(cThrowsLoc),
-      nullptr, paramList, (TypeRepr *)returnType, declContext);
+      context, convertSourceLoc(cStaticLoc), StaticSpellingKind::None,
+      convertSourceLoc(cFuncKeywordLoc), declName, convertSourceLoc(cNameLoc),
+      asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc, nullptr,
+      paramList, static_cast<TypeRepr *>(opaqueReturnType),
+      convertDeclContext(cDeclContext));
 
-  return {bridgeDeclContext(out), cast<FuncDecl>(out), cast<Decl>(out)};
+  return {bridgeDeclContext(out), static_cast<FuncDecl *>(out),
+          static_cast<Decl *>(out)};
 }
 
 void FuncDecl_setBody(void *fn, void *body) {
@@ -480,42 +500,63 @@ void *ClosureExpr_create(BridgedASTContext cContext, void *body,
   return (Expr *)out;
 }
 
+BridgedDeclContextAndDecl TypeAliasDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedSourceLoc cEqualLoc) {
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *out = new (context) TypeAliasDecl(
+      convertSourceLoc(cAliasKeywordLoc), convertSourceLoc(cEqualLoc),
+      convertIdentifier(cName), convertSourceLoc(cNameLoc),
+      static_cast<GenericParamList *>(opaqueGenericParamList),
+      convertDeclContext(cDeclContext));
+  return {bridgeDeclContext(out), static_cast<TypeAliasDecl *>(out),
+          static_cast<Decl *>(out)};
+}
+
+void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType) {
+  ((TypeAliasDecl *)decl)->setUnderlyingTypeRepr((TypeRepr *)underlyingType);
+}
+
 void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
   auto declMembers = convertArrayRef<Decl *>(members);
   for (auto m : declMembers)
     ((NominalTypeDecl *)decl)->addMember(m);
 }
 
-BridgedDeclContextAndDecl StructDecl_create(BridgedASTContext cContext,
-                                            BridgedSourceLoc cLoc,
-                                            BridgedIdentifier name,
-                                            BridgedSourceLoc cNameLoc,
-                                            void *_Nullable genericParams,
-                                            BridgedDeclContext cDeclContext) {
+BridgedDeclContextAndDecl
+StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+                  BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+                  BridgedSourceLoc cNameLoc,
+                  void *_Nullable opaqueGenericParamList) {
   ASTContext &context = convertASTContext(cContext);
-  DeclContext *declContext = convertDeclContext(cDeclContext);
 
-  auto *out =
-      new (context) StructDecl(convertSourceLoc(cLoc), convertIdentifier(name),
-                               convertSourceLoc(cNameLoc), {},
-                               (GenericParamList *)genericParams, declContext);
-  out->setImplicit(); // TODO: remove this.
-  return {bridgeDeclContext(out->getDeclContext()), cast<NominalTypeDecl>(out), cast<Decl>(out)};
+  auto *out = new (context)
+      StructDecl(convertSourceLoc(cStructKeywordLoc), convertIdentifier(cName),
+                 convertSourceLoc(cNameLoc), {},
+                 static_cast<GenericParamList *>(opaqueGenericParamList),
+                 convertDeclContext(cDeclContext));
+
+  return {bridgeDeclContext(out), static_cast<NominalTypeDecl *>(out),
+          static_cast<Decl *>(out)};
 }
 
 BridgedDeclContextAndDecl ClassDecl_create(BridgedASTContext cContext,
-                                           BridgedSourceLoc cLoc,
-                                           BridgedIdentifier name,
-                                           BridgedSourceLoc cNameLoc,
-                                           BridgedDeclContext cDeclContext) {
+                                           BridgedDeclContext cDeclContext,
+                                           BridgedSourceLoc cClassKeywordLoc,
+                                           BridgedIdentifier cName,
+                                           BridgedSourceLoc cNameLoc) {
   ASTContext &context = convertASTContext(cContext);
-  DeclContext *declContext = convertDeclContext(cDeclContext);
 
   auto *out = new (context)
-      ClassDecl(convertSourceLoc(cLoc), convertIdentifier(name),
-                convertSourceLoc(cNameLoc), {}, nullptr, declContext, false);
-  out->setImplicit(); // TODO: remove this.
-  return {BridgedDeclContext{out}, (NominalTypeDecl *)out, (Decl *)out};
+      ClassDecl(convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
+                convertSourceLoc(cNameLoc), {}, nullptr,
+                convertDeclContext(cDeclContext), false);
+
+  return {bridgeDeclContext(out), static_cast<NominalTypeDecl *>(out),
+          static_cast<Decl *>(out)};
 }
 
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
@@ -782,25 +823,6 @@ void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
   auto entries = context.AllocateCopy(
       ArrayRef<InheritedEntry>{InheritedEntry{(TypeRepr *)ty}});
   ((GenericTypeParamDecl *)param)->setInherited(entries);
-}
-
-BridgedDeclContextAndDecl TypeAliasDecl_create(BridgedASTContext cContext,
-                                               BridgedDeclContext cDeclContext,
-                                               BridgedSourceLoc cAliasLoc,
-                                               BridgedSourceLoc cEqualLoc,
-                                               BridgedIdentifier name,
-                                               BridgedSourceLoc cNameLoc,
-                                               void *_Nullable genericParams) {
-  ASTContext &context = convertASTContext(cContext);
-  auto *out = new (context) TypeAliasDecl(
-      convertSourceLoc(cAliasLoc), convertSourceLoc(cEqualLoc),
-      convertIdentifier(name), convertSourceLoc(cNameLoc),
-      (GenericParamList *)genericParams, convertDeclContext(cDeclContext));
-  return {BridgedDeclContext{out}, (TypeAliasDecl *)out, (Decl *)out};
-}
-
-void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType) {
-  ((TypeAliasDecl *)decl)->setUnderlyingTypeRepr((TypeRepr *)underlyingType);
 }
 
 #pragma clang diagnostic push

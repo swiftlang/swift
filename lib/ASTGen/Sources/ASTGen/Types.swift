@@ -273,8 +273,7 @@ extension ASTGenVisitor {
       let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
       var type = visit(element.type).rawValue
       if let ellipsis = element.ellipsis {
-        let ellipsisLoc = bridgedSourceLoc(at: ellipsis.positionAfterSkippingLeadingTrivia)
-        type = VarargTypeRepr_create(self.ctx, type, ellipsisLoc)
+        type = VarargTypeRepr_create(self.ctx, type, self.bridgedSourceLoc(for: ellipsis))
       }
 
       return BridgedTupleTypeElement(

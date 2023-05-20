@@ -48,3 +48,21 @@ struct UnexpectedTokenKindError: ASTGenError {
       """
   }
 }
+
+/// An error emitted when an optional child token is unexpectedly nil.
+struct MissingChildTokenError: ASTGenError {
+  let parent: Syntax
+  let kindOfTokenMissing: TokenKind
+
+  init(parent: some SyntaxProtocol, kindOfTokenMissing: TokenKind) {
+    self.parent = Syntax(parent)
+    self.kindOfTokenMissing = kindOfTokenMissing
+  }
+
+  var message: String {
+    """
+    missing child token of kind '\(self.kindOfTokenMissing)' in:
+      \(parent.debugDescription(indentString: "  "))
+    """
+  }
+}

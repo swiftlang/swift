@@ -1,7 +1,4 @@
 import CASTBridging
-
-// Needed to use SyntaxTransformVisitor's visit method.
-@_spi(SyntaxTransformVisitor)
 import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -20,15 +17,16 @@ extension ASTGenVisitor {
     let conditions = node.conditions.map { self.visit($0).rawValue }
     assert(conditions.count == 1)  // TODO: handle multiple conditions.
 
-    let body = visit(node.body).rawValue
-    let loc = bridgedSourceLoc(for: node)
-
-    if let elseBody = node.elseBody, node.elseKeyword != nil {
-      return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, loc,
-                                 visit(elseBody).rawValue))
-    }
-
-    return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, nil, nil))
+    return .stmt(
+      IfStmt_create(
+        self.ctx,
+        self.bridgedSourceLoc(for: node.ifKeyword),
+        conditions.first!,
+        self.visit(node.body).rawValue,
+        self.bridgedSourceLoc(for: node.elseKeyword),
+        self.visit(node.elseBody)?.rawValue
+      )
+    )
   }
 
   public func visit(_ node: ExpressionStmtSyntax) -> ASTNode {
@@ -41,15 +39,12 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: ReturnStmtSyntax) -> ASTNode {
-    let loc = bridgedSourceLoc(for: node)
-
-    let expr: ASTNode?
-    if let expression = node.expression {
-      expr = visit(expression)
-    } else {
-      expr = nil
-    }
-
-    return .stmt(ReturnStmt_create(ctx, loc, expr?.rawValue))
+    .stmt(
+      ReturnStmt_create(
+        self.ctx,
+        self.bridgedSourceLoc(for: node.returnKeyword),
+        self.visit(node.expression)?.rawValue
+      )
+    )
   }
 }

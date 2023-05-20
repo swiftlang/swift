@@ -169,6 +169,34 @@ extension ASTGenVisitor {
 // 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
   @inline(__always)
+  func visit(_ node: TypeSyntax?) -> ASTNode? {
+    guard let node else {
+      return nil
+    }
+
+    return self.visit(node)
+  }
+
+  @inline(__always)
+  func visit(_ node: ExprSyntax?) -> ASTNode? {
+    guard let node else {
+      return nil
+    }
+
+    return self.visit(node)
+  }
+
+  @inline(__always)
+  func visit(_ node: (some SyntaxChildChoices)?) -> ASTNode? {
+    guard let node else {
+      return nil
+    }
+
+    // This call recurses without disambiguation.
+    return (self.visit as (_) -> ASTNode)(node)
+  }
+
+  @inline(__always)
   func visit(_ node: GenericParameterClauseSyntax?) -> ASTNode? {
     guard let node else {
       return nil
