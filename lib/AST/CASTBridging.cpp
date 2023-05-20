@@ -490,6 +490,56 @@ void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc) {
       getSourceLocFromPointer(repeatLoc), (TypeRepr *)base);
 }
 
+static BridgedTypeAttrKind bridgeTypeAttrKind(TypeAttrKind kind) {
+  switch (kind) {
+#define TYPE_ATTR(X) case TAK_##X: return BridgedTypeAttrKind_##X;
+#include "swift/AST/Attr.def"
+    case TAK_Count: return BridgedTypeAttrKind_Count;
+  }
+}
+
+static TypeAttrKind bridgeTypeAttrKind(BridgedTypeAttrKind kind) {
+  switch (kind) {
+#define TYPE_ATTR(X) case BridgedTypeAttrKind_##X: return TAK_##X;
+#include "swift/AST/Attr.def"
+    case BridgedTypeAttrKind_Count: return TAK_Count;
+  }
+}
+
+BridgedTypeAttrKind getBridgedTypeAttrKindFromString(
+    const unsigned char *str, intptr_t len) {
+  return bridgeTypeAttrKind(
+      TypeAttributes::getAttrKindFromString(StringRef((const char *)str, len)));
+}
+
+BridgedTypeAttributes BridgedTypeAttributes_create() {
+  return new TypeAttributes();
+}
+
+void BridgedTypeAttributes_addSimpleAttr(
+    BridgedTypeAttributes typeAttributesPtr, BridgedTypeAttrKind kind,
+    void *atLoc, void *attrLoc
+) {
+  TypeAttributes *typeAttributes = (TypeAttributes *)typeAttributesPtr;
+  typeAttributes->setAttr(
+      bridgeTypeAttrKind(kind), getSourceLocFromPointer(attrLoc));
+  if (typeAttributes->AtLoc.isInvalid())
+    typeAttributes->AtLoc = getSourceLocFromPointer(atLoc);
+}
+
+void *AttributedTypeRepr_create(
+    void *ctx, void *base, BridgedTypeAttributes typeAttributesPtr) {
+  TypeAttributes *typeAttributes = (TypeAttributes *)typeAttributesPtr;
+  if (typeAttributes->empty())
+    return base;
+
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto attributedType =
+    new (Context) AttributedTypeRepr(*typeAttributes, (TypeRepr *)base);
+  delete typeAttributes;
+  return attributedType;
+}
+
 void *AttributedTypeSpecifierRepr_create(
     void *ctx, void *base, BridgedAttributedTypeSpecifier specifier, void *specifierLoc
 ) {

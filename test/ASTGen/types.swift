@@ -21,3 +21,10 @@ typealias VAFunc = (Int, Int...) -> Int
 func testVAFunc(a: Int, f: VAFunc) {
   _ = f(a, a, a, a, a)
 }
+
+func test12(_ producer: @escaping @autoclosure () -> Int) {
+  _ = producer()
+}
+func test12a(i: Int) {
+  test12(i)
+}

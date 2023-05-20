@@ -187,7 +187,54 @@ extension ASTGenVisitor {
       type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, specifierLoc))
     }
 
-    // FIXME: Respect the attributes
+    // Handle type attributes.
+    if let attributes = node.attributes {
+      let typeAttributes = BridgedTypeAttributes_create()
+      for attributeElt in attributes {
+        // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
+        // but we don't have that ability right now.
+        guard case let .attribute(attribute) = attributeElt else {
+          continue
+        }
+
+        // Only handle simple attribute names right now.
+        guard let identType = attribute.attributeName.as(SimpleTypeIdentifierSyntax.self) else {
+          continue
+        }
+
+        let nameSyntax = identType.name
+        var name = nameSyntax.text
+        let typeAttrKind = name.withUTF8 { buf in
+          getBridgedTypeAttrKindFromString(buf.baseAddress, buf.count)
+        }
+        let atLoc = self.base.advanced(by: attribute.atSignToken.position.utf8Offset).raw
+        let attrLoc = self.base.advanced(by: nameSyntax.position.utf8Offset).raw
+        switch typeAttrKind {
+          // SIL attributes
+          // FIXME: Diagnose if not in SIL mode? Or should that move to the
+          // type checker?
+          case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
+               .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
+               .sil_weak, .sil_unowned, .inout, .block_storage, .box,
+               .dynamic_self, .sil_unmanaged, .error, .direct, .inout_aliasable,
+               .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
+            fallthrough
+
+          case .autoclosure, .escaping, .noescape, .noDerivative, .async,
+            .sendable, .unchecked, ._local, ._noMetadata, .pack_owned,
+            .pack_guaranteed, .pack_inout, .pack_out, .pseudogeneric,
+            .yields, .yield_once, .yield_many, .thin, .thick, .count:
+            BridgedTypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
+
+          case .opened, .pack_element, .differentiable, .convention,
+            ._opaqueReturnTypeOf:
+            // FIXME: These require more complicated checks
+            break
+        }
+      }
+
+      type = .type(AttributedTypeRepr_create(self.ctx, type.rawValue, typeAttributes))
+    }
 
     return type
   }
