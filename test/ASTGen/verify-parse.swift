@@ -129,3 +129,8 @@ class
 Class<T>: Proto1 where T: Proto3 {
   func method(_ b: Bool) {}
 }
+
+actor
+Actor<T>: Proto1 where T: Proto1 {
+  func method(_ b: Bool) {}
+}

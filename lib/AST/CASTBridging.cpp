@@ -599,7 +599,7 @@ BridgedDeclContextAndDecl ClassDecl_create(
     BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
     BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
-    BridgedSourceRange cBraceRange) {
+    BridgedSourceRange cBraceRange, bool isActor) {
   ASTContext &context = convertASTContext(cContext);
 
   auto *decl = new (context) ClassDecl(
@@ -607,7 +607,7 @@ BridgedDeclContextAndDecl ClassDecl_create(
       convertSourceLoc(cNameLoc),
       context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
       static_cast<GenericParamList *>(opaqueGenericParamList),
-      convertDeclContext(cDeclContext), false);
+      convertDeclContext(cDeclContext), isActor);
   decl->setTrailingWhereClause(
       static_cast<TrailingWhereClause *>(opaqueGenericWhereClause));
   decl->setBraces(convertSourceRange(cBraceRange));

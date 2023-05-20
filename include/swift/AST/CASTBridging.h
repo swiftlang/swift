@@ -370,7 +370,7 @@ BridgedDeclContextAndDecl ClassDecl_create(
     BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
     BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
-    BridgedSourceRange cBraceRange);
+    BridgedSourceRange cBraceRange, _Bool isActor);
 
 BridgedDeclContextAndDecl ProtocolDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,

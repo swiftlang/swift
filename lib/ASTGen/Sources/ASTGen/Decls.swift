@@ -59,7 +59,31 @@ extension ASTGenVisitor {
       self.visit(node.genericParameterClause)?.rawValue,
       self.visit(node.inheritanceClause?.inheritedTypes),
       self.visit(node.genericWhereClause)?.rawValue,
-      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self),
+      false
+    )
+
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
+
+    return .decl(decl.asDecl)
+  }
+
+  public func visit(_ node: ActorDeclSyntax) -> ASTNode {
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+
+    let decl = ClassDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.actorKeyword),
+      name,
+      nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue,
+      self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self),
+      true
     )
 
     self.withDeclContext(decl.asDeclContext) {
