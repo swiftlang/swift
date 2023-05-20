@@ -213,7 +213,13 @@ extension ASTGenVisitor {
         self.base.advanced(by: $0.position.utf8Offset).raw
       }
       let colonLoc = element.colon.map { self.base.advanced(by: $0.position.utf8Offset).raw }
-      let type = visit(element.type).rawValue
+
+      var type = visit(element.type).rawValue
+      if let ellipsis = element.ellipsis {
+        let ellipsisLoc = self.base.advanced(by: ellipsis.positionAfterSkippingLeadingTrivia.utf8Offset).raw
+        type = VarargTypeRepr_create(self.ctx, type, ellipsisLoc)
+      }
+
       let trailingCommaLoc = element.trailingComma.map {
         self.base.advanced(by: $0.position.utf8Offset).raw
       }

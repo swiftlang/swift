@@ -637,7 +637,7 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     while let parentSyntax = resultSyntax.parent {
       guard let typedParent = parentSyntax.as(type),
             typedParent.position == resultSyntax.position else {
-        break;
+        break
       }
 
       resultSyntax = typedParent

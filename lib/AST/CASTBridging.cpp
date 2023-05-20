@@ -514,6 +514,13 @@ void *AttributedTypeSpecifierRepr_create(
   }
 }
 
+void *VarargTypeRepr_create(void *ctx, void *base, void *ellipsisLocPtr) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc ellipsisLoc = getSourceLocFromPointer(ellipsisLocPtr);
+  TypeRepr *baseType = (TypeRepr *)base;
+  return new (Context) VarargTypeRepr(baseType, ellipsisLoc);
+}
+
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);

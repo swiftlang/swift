@@ -11,3 +11,13 @@ func test7(_ b: inout Bool) {
 struct X { struct `Protocol` { } }
 
 func test10(_: X.`Protocol`) { }
+
+func test11(_: Int...) { }
+func test11a() {
+  test11(1, 2, 3, 4, 5)
+}
+
+typealias VAFunc = (Int, Int...) -> Int
+func testVAFunc(a: Int, f: VAFunc) {
+  _ = f(a, a, a, a, a)
+}

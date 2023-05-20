@@ -599,8 +599,21 @@ ParserResult<TypeRepr> Parser::parseType(
             CurDeclContext, &Context, &endLocPtr);
         return std::make_pair(typeRepr, endLocPtr);
       });
-  if (astGenResult.isNonNull())
+  if (astGenResult.isNonNull()) {
+    // Note: there is a representational difference between the swift-syntax
+    // tree and the C++ parser tree regarding variadic parameters. In the
+    // swift-syntax tree, the ellipsis is part of the parameter declaration.
+    // In the C++ parser tree, the ellipsis is part of the type. Account for
+    // this difference by consuming the ellipsis here.
+    if (Tok.isEllipsis()) {
+      Tok.setKind(tok::ellipsis);
+      SourceLoc ellipsisLoc = consumeToken();
+      return makeParserResult(astGenResult,
+          new (Context) VarargTypeRepr(astGenResult.get(), ellipsisLoc));
+    }
+
     return astGenResult;
+  }
   #endif
 
   // Parse pack expansion 'repeat T'

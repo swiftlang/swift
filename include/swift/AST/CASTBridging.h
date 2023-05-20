@@ -274,6 +274,7 @@ void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc);
 void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
 void *AttributedTypeSpecifierRepr_create(
     void *ctx, void *base, BridgedAttributedTypeSpecifier specifier, void *specifierLoc);
+void *VarargTypeRepr_create(void *ctx, void *base, void *ellipsisLocPtr);
 void *PackExpansionTypeRepr_create(void *ctx, void *base, void *repeatLoc);
 void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc,
                            void *rParenLoc);
