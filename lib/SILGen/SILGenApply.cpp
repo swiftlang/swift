@@ -3042,6 +3042,14 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
 
   auto argExpr = asKnownExpr();
 
+  // If we have a subscript, strip it off and make sure that our base is
+  // something that we can process. If we do and we succeed below, we return the
+  // subscript instead.
+  SubscriptExpr *subscriptExpr = nullptr;
+  if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
+    argExpr = subscriptExpr->getBase();
+  }
+
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3096,6 +3104,12 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
   // Claim the value of this argument since we found a storage reference that
   // has a move only base.
   (void)std::move(*this).asKnownExpr();
+
+  // If we saw a subscript expr and the base of the subscript expr passed our
+  // tests above, we can emit the call to the subscript directly as a borrowed
+  // lvalue. Return the subscript expr here so that we emit it appropriately.
+  if (subscriptExpr)
+    return subscriptExpr;
 
   return result.getTransitiveRoot();
 }
