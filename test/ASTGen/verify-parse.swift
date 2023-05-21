@@ -154,3 +154,8 @@ actor
 Actor<T>: Proto1 where T: Proto1 {
   func method(_ b: Bool) {}
 }
+
+extension
+Class: Proto2 where T: Proto1 {
+  func method2(_ b: Bool) {}
+}

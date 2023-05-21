@@ -729,6 +729,24 @@ void *AssociatedTypeDecl_create(BridgedASTContext cContext,
   return static_cast<Decl *>(decl);
 }
 
+BridgedDeclContextAndDecl ExtensionDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cExtensionKeywordLoc, void *opaqueExtendedType,
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange) {
+  ASTContext &context = convertASTContext(cContext);
+
+  auto *decl = ExtensionDecl::create(
+      context, convertSourceLoc(cExtensionKeywordLoc),
+      static_cast<TypeRepr *>(opaqueExtendedType),
+      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertDeclContext(cDeclContext),
+      static_cast<TrailingWhereClause *>(opaqueGenericWhereClause));
+  decl->setBraces(convertSourceRange(cBraceRange));
+
+  return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
+}
+
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
                               BridgedSourceLoc cQuestionLoc) {
   ASTContext &context = convertASTContext(cContext);

@@ -406,6 +406,12 @@ void *AssociatedTypeDecl_create(BridgedASTContext cContext,
                                 void *_Nullable opaqueDefaultType,
                                 void *_Nullable opaqueGenericWhereClause);
 
+BridgedDeclContextAndDecl ExtensionDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cExtensionKeywordLoc, void *opaqueExtendedType,
+    BridgedArrayRef cInheritedTypes, void *_Nullable opaqueGenericWhereClause,
+    BridgedSourceRange cBraceRange);
+
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLeftAngleLoc,
                               BridgedArrayRef cParameters,

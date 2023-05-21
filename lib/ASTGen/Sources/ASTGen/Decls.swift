@@ -158,6 +158,28 @@ extension ASTGenVisitor {
   }
 }
 
+// MARK: - ExtensionDecl
+
+extension ASTGenVisitor {
+  func visit(_ node: ExtensionDeclSyntax) -> ASTNode {
+    let decl = ExtensionDecl_create(
+      self.ctx,
+      self.declContext,
+      self.bridgedSourceLoc(for: node.extensionKeyword),
+      self.visit(node.extendedType).rawValue,
+      self.visit(node.inheritanceClause?.inheritedTypes),
+      self.visit(node.genericWhereClause)?.rawValue,
+      BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+    )
+
+    self.withDeclContext(decl.asDeclContext) {
+      IterableDeclContext_setParsedMembers(self.visit(node.memberBlock.members), decl.asDecl)
+    }
+
+    return .decl(decl.asDecl)
+  }
+}
+
 // MARK: - EnumCaseDecl
 
 extension ASTGenVisitor {
