@@ -34,6 +34,7 @@ extension ASTGenVisitor {
       name,
       nameLoc,
       self.visit(node.genericParameterClause)?.rawValue,
+      self.visit(node.inheritanceClause?.inheritedTypes),
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -54,6 +55,7 @@ extension ASTGenVisitor {
       name,
       nameLoc,
       self.visit(node.genericParameterClause)?.rawValue,
+      self.visit(node.inheritanceClause?.inheritedTypes),
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -77,6 +79,7 @@ extension ASTGenVisitor {
       name,
       nameLoc,
       primaryAssociatedTypeNames.bridgedArray(in: self),
+      self.visit(node.inheritanceClause?.inheritedTypes),
       BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
     )
 
@@ -143,5 +146,10 @@ extension ASTGenVisitor {
   @inline(__always)
   func visit(_ node: MemberBlockItemListSyntax) -> BridgedArrayRef {
     node.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self)
+  }
+
+  @inline(__always)
+  func visit(_ node: InheritedTypeListSyntax) -> BridgedArrayRef {
+    node.lazy.map { self.visit($0.type).rawValue }.bridgedArray(in: self)
   }
 }

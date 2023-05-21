@@ -555,48 +555,57 @@ void IterableDeclContext_setParsedMembers(BridgedArrayRef bridgedMembers,
       FingerprintAndMembers{llvm::None, ctx.AllocateCopy(members)});
 }
 
-BridgedDeclContextAndDecl
-StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                  BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
-                  BridgedSourceLoc cNameLoc,
-                  void *_Nullable opaqueGenericParamList,
-                  BridgedSourceRange cBraceRange) {
+static SmallVector<InheritedEntry>
+convertToInheritedEntries(BridgedArrayRef cInheritedTypes) {
+  SmallVector<InheritedEntry> inheritedEntries;
+  for (auto &repr : convertArrayRef<TypeRepr *>(cInheritedTypes)) {
+    inheritedEntries.emplace_back(repr);
+  }
+
+  return inheritedEntries;
+}
+
+BridgedDeclContextAndDecl StructDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *decl = new (context)
-      StructDecl(convertSourceLoc(cStructKeywordLoc), convertIdentifier(cName),
-                 convertSourceLoc(cNameLoc), {},
-                 static_cast<GenericParamList *>(opaqueGenericParamList),
-                 convertDeclContext(cDeclContext));
+  auto *decl = new (context) StructDecl(
+      convertSourceLoc(cStructKeywordLoc), convertIdentifier(cName),
+      convertSourceLoc(cNameLoc),
+      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      static_cast<GenericParamList *>(opaqueGenericParamList),
+      convertDeclContext(cDeclContext));
   decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
-BridgedDeclContextAndDecl
-ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                 BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
-                 BridgedSourceLoc cNameLoc,
-                 void *_Nullable opaqueGenericParamList,
-                 BridgedSourceRange cBraceRange) {
+BridgedDeclContextAndDecl ClassDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange) {
   ASTContext &context = convertASTContext(cContext);
 
-  auto *decl = new (context)
-      ClassDecl(convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
-                convertSourceLoc(cNameLoc), {},
-                static_cast<GenericParamList *>(opaqueGenericParamList),
-                convertDeclContext(cDeclContext), false);
+  auto *decl = new (context) ClassDecl(
+      convertSourceLoc(cClassKeywordLoc), convertIdentifier(cName),
+      convertSourceLoc(cNameLoc),
+      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      static_cast<GenericParamList *>(opaqueGenericParamList),
+      convertDeclContext(cDeclContext), false);
   decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
 }
 
-BridgedDeclContextAndDecl
-ProtocolDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                    BridgedSourceLoc cProtocolKeywordLoc,
-                    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-                    BridgedArrayRef cPrimaryAssociatedTypeNames,
-                    BridgedSourceRange cBraceRange) {
+BridgedDeclContextAndDecl ProtocolDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange) {
   SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
   for (auto &pair : convertArrayRef<BridgedIdentifierAndSourceLoc>(
            cPrimaryAssociatedTypeNames)) {
@@ -608,7 +617,9 @@ ProtocolDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   auto *decl = new (context) ProtocolDecl(
       convertDeclContext(cDeclContext), convertSourceLoc(cProtocolKeywordLoc),
       convertSourceLoc(cNameLoc), convertIdentifier(cName),
-      context.AllocateCopy(primaryAssociatedTypeNames), {}, nullptr);
+      context.AllocateCopy(primaryAssociatedTypeNames),
+      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      nullptr);
   decl->setBraces(convertSourceRange(cBraceRange));
 
   return {bridgeDeclContext(decl), static_cast<Decl *>(decl)};
@@ -862,22 +873,24 @@ void *GenericParamList_create(BridgedASTContext cContext,
 
 void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
-                                  BridgedIdentifier name,
+                                  BridgedSourceLoc cEachLoc,
+                                  BridgedIdentifier cName,
                                   BridgedSourceLoc cNameLoc,
-                                  BridgedSourceLoc cEachLoc, SwiftInt index,
-                                  bool isParameterPack) {
-  return GenericTypeParamDecl::createParsed(
-      convertDeclContext(cDeclContext), convertIdentifier(name),
-      convertSourceLoc(cNameLoc), convertSourceLoc(cEachLoc),
-      /*index*/ index, isParameterPack);
-}
+                                  void *_Nullable opaqueInheritedType,
+                                  SwiftInt index) {
+  auto eachLoc = convertSourceLoc(cEachLoc);
+  auto *decl = GenericTypeParamDecl::createParsed(
+      convertDeclContext(cDeclContext), convertIdentifier(cName),
+      convertSourceLoc(cNameLoc), eachLoc, index,
+      /*isParameterPack*/ eachLoc.isValid());
 
-void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
-                                           void *param, void *ty) {
-  ASTContext &context = convertASTContext(cContext);
-  auto entries = context.AllocateCopy(
-      ArrayRef<InheritedEntry>{InheritedEntry{(TypeRepr *)ty}});
-  ((GenericTypeParamDecl *)param)->setInherited(entries);
+  if (opaqueInheritedType) {
+    auto entry = InheritedEntry(static_cast<TypeRepr *>(opaqueInheritedType));
+    ASTContext &context = convertASTContext(cContext);
+    decl->setInherited(context.AllocateCopy(llvm::makeArrayRef(entry)));
+  }
+
+  return decl;
 }
 
 void *ParameterList_create(BridgedASTContext cContext,

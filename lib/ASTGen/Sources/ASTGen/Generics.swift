@@ -18,7 +18,6 @@ extension ASTGenVisitor {
 
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
-    let eachLoc = bridgedSourceLoc(for: node.eachKeyword)
 
     var genericParameterIndex: Int?
     for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
@@ -33,8 +32,15 @@ extension ASTGenVisitor {
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, eachLoc, SwiftInt(genericParameterIndex),
-        eachLoc.raw != nil))
+        self.ctx,
+        self.declContext,
+        self.bridgedSourceLoc(for: node.eachKeyword),
+        name,
+        nameLoc,
+        self.visit(node.inheritedType)?.rawValue,
+        SwiftInt(genericParameterIndex)
+      )
+    )
   }
 }
 
@@ -43,16 +49,7 @@ extension ASTGenVisitor {
     _ node: GenericParameterClauseSyntax,
     action: (BridgedArrayRef, BridgedArrayRef) -> T
   ) -> T {
-    let parameters = node.parameters.lazy.map {
-      let loweredParameter = self.visit($0).rawValue
-
-      if let inheritedType = $0.inheritedType {
-        let loweredInheritedType = self.visit(inheritedType).rawValue
-        GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredInheritedType)
-      }
-
-      return loweredParameter
-    }
+    let parameters = node.parameters.lazy.map { self.visit($0).rawValue }
 
     let requirements = node.genericWhereClause?.requirements.lazy.map {
       switch $0.requirement {

@@ -354,40 +354,37 @@ void *TypeAliasDecl_create(
 void IterableDeclContext_setParsedMembers(BridgedArrayRef members,
                                           void *opaqueDecl);
 
-BridgedDeclContextAndDecl
-StructDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                  BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
-                  BridgedSourceLoc cNameLoc,
-                  void *_Nullable opaqueGenericParamList,
-                  BridgedSourceRange cBraceRange);
+BridgedDeclContextAndDecl StructDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
 
-BridgedDeclContextAndDecl
-ClassDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                 BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
-                 BridgedSourceLoc cNameLoc,
-                 void *_Nullable opaqueGenericParamList,
-                 BridgedSourceRange cBraceRange);
+BridgedDeclContextAndDecl ClassDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, void *_Nullable opaqueGenericParamList,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
 
-BridgedDeclContextAndDecl
-ProtocolDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-                    BridgedSourceLoc cProtocolKeywordLoc,
-                    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-                    BridgedArrayRef cPrimaryAssociatedTypeNames,
-                    BridgedSourceRange cBraceRange);
+BridgedDeclContextAndDecl ProtocolDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
+    BridgedArrayRef cInheritedTypes, BridgedSourceRange cBraceRange);
 
 void *GenericParamList_create(BridgedASTContext cContext,
                               BridgedSourceLoc cLAngleLoc,
                               BridgedArrayRef params,
                               BridgedSourceLoc cWhereLoc, BridgedArrayRef reqs,
                               BridgedSourceLoc cRAngleLoc);
+
 void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
-                                  BridgedIdentifier name,
+                                  BridgedSourceLoc cEachLoc,
+                                  BridgedIdentifier cName,
                                   BridgedSourceLoc cNameLoc,
-                                  BridgedSourceLoc cEachLoc, SwiftInt index,
-                                  _Bool isParameterPack);
-void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
-                                           void *Param, void *ty);
+                                  void *_Nullable opaqueInheritedType,
+                                  SwiftInt index);
 
 void *ParameterList_create(BridgedASTContext cContext,
                            BridgedSourceLoc cLeftParenLoc,

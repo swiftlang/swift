@@ -85,7 +85,7 @@ protocol Proto1 {}
 protocol Proto2 {}
 
 protocol
-Proto3 {
+Proto3: Proto1 {
   func method(_ b: Bool)
 }
 
@@ -102,11 +102,13 @@ Struct
   T2:
   Proto2
 >
+:
+Proto1, Proto2, @unchecked Sendable
 {
   /*static*/ func method(_ b: Bool) {}
 }
 
 class
-Class<T> {
+Class<T>: Proto1 {
   func method(_ b: Bool) {}
 }
