@@ -426,6 +426,9 @@ struct BridgedPassContext {
   }
 
   SWIFT_IMPORT_UNSAFE
+  OptionalBridgedFunction lookupStdlibFunction(llvm::StringRef name) const;
+
+  SWIFT_IMPORT_UNSAFE
   swift::SubstitutionMap getContextSubstitutionMap(swift::SILType type) const {
     auto *ntd = type.getASTType()->getAnyNominal();
     auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();

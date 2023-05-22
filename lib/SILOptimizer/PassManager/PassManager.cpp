@@ -1525,6 +1525,22 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   invocation->setNeedFixStackNesting(false);
 }
 
+OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(llvm::StringRef name) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SmallVector<ValueDecl *, 1> results;
+  mod->getASTContext().lookupInSwiftModule(name, results);
+  if (results.size() != 1)
+    return {nullptr};
+
+  auto *decl = dyn_cast<FuncDecl>(results.front());
+  if (!decl)
+    return {nullptr};
+
+  SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
+  SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
+  return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
+}
+
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
   // Fast-path check.
   if (SimplifyInstructionTest.empty() && SILDisablePass.empty())

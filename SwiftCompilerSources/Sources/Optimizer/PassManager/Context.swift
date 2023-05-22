@@ -211,6 +211,16 @@ struct FunctionPassContext : MutatingContext {
     return function.isDefinition
   }
 
+  /// Looks up a function in the `Swift` module.
+  /// The `name` is the source name of the function and not the mangled name.
+  /// Returns nil if no such function or multiple matching functions are found.
+  func lookupStdlibFunction(name: StaticString) -> Function? {
+    return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
+      let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
+      return _bridged.lookupStdlibFunction(nameStr).function
+    }
+  }
+
   func erase(block: BasicBlock) {
     _bridged.eraseBlock(block.bridged)
   }
