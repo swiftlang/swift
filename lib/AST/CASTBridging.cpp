@@ -119,6 +119,9 @@ void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
 BridgedIdentifier
 SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
                               long len) {
+  if (len == 1 && str[0] == '_')
+    return BridgedIdentifier();
+
   // If this was a back-ticked identifier, drop the back-ticks.
   if (len >= 2 && str[0] == '`' && str[len-1] == '`') {
     ++str;

@@ -31,3 +31,7 @@ func test12(_ producer: @escaping @autoclosure () -> Int) {
 func test12a(i: Int) {
   test12(i)
 }
+
+func test13(body: (_ value: Int) -> Void, i: Int) {
+  body(i)
+}
