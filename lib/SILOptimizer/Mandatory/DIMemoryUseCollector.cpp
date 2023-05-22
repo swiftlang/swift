@@ -91,6 +91,12 @@ static unsigned getElementCountRec(TypeExpansionContext context,
       for (auto *VD : NTD->getStoredProperties())
         NumElements += getElementCountRec(
             context, Module, T.getFieldType(VD, Module, context), false);
+
+      for (auto *var : NTD->getInitAccessorProperties()) {
+        (void)var;
+        NumElements++;
+      }
+
       return NumElements;
     }
   }
@@ -549,7 +555,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
   // assign_by_wrapper calls functions to assign a value. This is not
   // considered as trivial.
-  if (isa<AssignByWrapperInst>(Inst))
+  if (isa<AssignByWrapperInst>(Inst) || isa<AssignOrInitInst>(Inst))
     return false;
 
   auto *F = Inst->getFunction();
@@ -650,6 +656,8 @@ public:
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
   bool addClosureElementUses(PartialApplyInst *pai, Operand *argUse);
+  void collectAssignOrInitUses(PartialApplyInst *pai, Operand *argUse,
+                               unsigned BaseEltNo);
 
   void collectClassSelfUses(SILValue ClassPointer);
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -1083,7 +1091,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
       if (onlyUsedByAssignByWrapper(PAI))
         continue;
-        
+
+      if (onlyUsedByAssignOrInit(PAI)) {
+        collectAssignOrInitUses(PAI, Op, BaseEltNo);
+        continue;
+      }
+
       if (BaseEltNo == 0 && addClosureElementUses(PAI, Op))
         continue;
     }
@@ -1172,6 +1185,21 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
     trackUse(DIMemoryUse(pai, use.Kind, use.FirstElement, use.NumElements));
   }
   return true;
+}
+
+void
+ElementUseCollector::collectAssignOrInitUses(PartialApplyInst *pai,
+                                             Operand *argUse,
+                                             unsigned BaseEltNo) {
+  for (Operand *Op : pai->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (!isa<AssignOrInitInst>(User) || Op->getOperandNumber() != 1) {
+      continue;
+    }
+
+    trackUse(DIMemoryUse(User, DIUseKind::InitOrAssign, BaseEltNo,
+                         TheMemory.getNumElements()));
+  }
 }
 
 /// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class

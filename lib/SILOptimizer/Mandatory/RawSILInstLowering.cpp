@@ -250,6 +250,69 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   inst->eraseFromParent();
 }
 
+static void
+lowerAssignOrInitInstruction(SILBuilderWithScope &b,
+                             AssignOrInitInst *inst,
+                             SmallSetVector<SILValue, 8> &toDelete) {
+  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering " << *inst << "\n");
+
+  ++numAssignRewritten;
+
+  SILValue src = inst->getSrc();
+  SILLocation loc = inst->getLoc();
+  SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
+
+  switch (inst->getMode()) {
+    case AssignOrInitInst::Unknown:
+      assert(b.getModule().getASTContext().hadError() &&
+             "assign_or_init must have a valid mode");
+      // In case DefiniteInitialization already gave up with an error, just
+      // treat the assign_or_init as an "init".
+      LLVM_FALLTHROUGH;
+    case AssignOrInitInst::Init: {
+      SILValue initFn = inst->getInitializer();
+      CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
+      SILFunctionConventions convention(fTy, inst->getModule());
+      assert(!convention.hasIndirectSILResults());
+      SmallVector<SILValue, 4> args;
+      getAssignByWrapperArgs(args, src, convention, b, forCleanup);
+      b.createApply(loc, initFn, SubstitutionMap(), args);
+
+      // The unused partial_apply violates memory lifetime rules in case "self"
+      // is an inout. Therefore we cannot keep it as a dead closure to be
+      // cleaned up later. We have to delete it in this pass.
+      toDelete.insert(inst->getSetter());
+
+      // Also the argument of the closure (which usually is a "load") has to be
+      // deleted to avoid memory lifetime violations.
+      auto *setterPA = dyn_cast<PartialApplyInst>(inst->getSetter());
+      if (setterPA && setterPA->getNumArguments() == 1)
+        toDelete.insert(setterPA->getArgument(0));
+      break;
+    }
+    case AssignOrInitInst::Set: {
+      SILValue setterFn = inst->getSetter();
+      CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
+      SILFunctionConventions convention(fTy, inst->getModule());
+      assert(!convention.hasIndirectSILResults());
+      SmallVector<SILValue, 4> args;
+      getAssignByWrapperArgs(args, src, convention, b, forCleanup);
+      b.createApply(loc, setterFn, SubstitutionMap(), args);
+
+      // Again, we have to delete the unused dead closure.
+      toDelete.insert(inst->getInitializer());
+
+      // Also the argument of the closure (which usually is a "load") has to be
+      // deleted to avoid memory lifetime violations.
+      auto *initPA = dyn_cast<PartialApplyInst>(inst->getInitializer());
+      if (initPA && initPA->getNumArguments() == 1)
+        toDelete.insert(initPA->getArgument(0));
+      break;
+    }
+  }
+  inst->eraseFromParent();
+}
+
 static void deleteDeadAccessMarker(BeginAccessInst *BA) {
   SmallVector<SILInstruction *, 4> Users;
   for (Operand *Op : BA->getUses()) {
@@ -324,7 +387,10 @@ static bool lowerRawSILOperations(SILFunction &fn) {
       }
 
       if (auto *ai = dyn_cast<AssignOrInitInst>(inst)) {
-        llvm_unreachable("AssignOrInitInst not yet implemented");
+        SILBuilderWithScope b(ai);
+        lowerAssignOrInitInstruction(b, ai, toDelete);
+        changed = true;
+        continue;
       }
 
       // mark_uninitialized just becomes a noop, resolving to its operand.

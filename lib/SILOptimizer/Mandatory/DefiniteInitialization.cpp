@@ -2263,7 +2263,8 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
            "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst) ||
+        isa<AssignOrInitInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -2357,6 +2358,27 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
 
     return;
   }
+
+  if (auto *AI = dyn_cast<AssignOrInitInst>(Inst)) {
+    // Remove this instruction from our data structures, since we will be
+    // removing it.
+    Use.Inst = nullptr;
+    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
+
+    switch (Use.Kind) {
+    case DIUseKind::Initialization:
+      AI->setMode(AssignOrInitInst::Init);
+      break;
+    case DIUseKind::Set:
+      AI->setMode(AssignOrInitInst::Set);
+      break;
+    default:
+      llvm_unreachable("Wrong use kind for assign_or_init");
+    }
+
+    return;
+  }
+
   if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
