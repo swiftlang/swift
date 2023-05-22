@@ -4884,6 +4884,16 @@ ArrayRef<VarDecl *> NominalTypeDecl::getStoredProperties() const {
       {});
 }
 
+ArrayRef<VarDecl *>
+NominalTypeDecl::getInitAccessorProperties() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorPropertiesRequest{mutableThis},
+      {});
+}
+
 ArrayRef<Decl *>
 NominalTypeDecl::getStoredPropertiesAndMissingMemberPlaceholders() const {
   auto &ctx = getASTContext();

@@ -1671,6 +1671,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to obtain a list of computed properties with init accesors
+/// in the given nominal type.
+class InitAccessorPropertiesRequest :
+    public SimpleRequest<InitAccessorPropertiesRequest,
+                         ArrayRef<VarDecl *>(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<VarDecl *>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class StorageImplInfoRequest :
     public SimpleRequest<StorageImplInfoRequest,
                          StorageImplInfo(AbstractStorageDecl *),

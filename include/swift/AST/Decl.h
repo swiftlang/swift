@@ -3981,6 +3981,10 @@ public:
   /// Return a collection of the stored member variables of this type.
   ArrayRef<VarDecl *> getStoredProperties() const;
 
+  /// Return a collection of all properties with init accessors in
+  /// this type.
+  ArrayRef<VarDecl *> getInitAccessorProperties() const;
+
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;

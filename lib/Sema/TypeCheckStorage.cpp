@@ -283,6 +283,22 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+ArrayRef<VarDecl *>
+InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  SmallVector<VarDecl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    auto *var = dyn_cast<VarDecl>(member);
+    if (!var || !var->getAccessor(AccessorKind::Init)) {
+      continue;
+    }
+
+    results.push_back(var);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
 /// Check whether the pattern may have storage.
 ///
 /// This query is careful not to trigger accessor macro expansion, which
