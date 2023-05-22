@@ -79,6 +79,8 @@ func test8(_ i: _const Int) {
 
 func test9(_ value: Any) { }
 
+func test10<T>(t: T) {}
+
 typealias
 Alias<T>
 =

@@ -325,6 +325,7 @@ struct BridgedFuncDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                void *_Nullable opaqueGenericParamList,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType);
 void FuncDecl_setBody(void *fn, void *body);

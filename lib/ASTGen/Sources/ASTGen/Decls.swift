@@ -98,6 +98,7 @@ extension ASTGenVisitor {
       self.bridgedSourceLoc(for: node.funcKeyword),
       name,
       nameLoc,
+      self.visit(node.genericParameterClause)?.rawValue,
       self.visit(node.signature.parameterClause).rawValue,
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
       self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),

@@ -446,6 +446,7 @@ BridgedFuncDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+                void *_Nullable opaqueGenericParamList,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
                 BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType) {
   ASTContext &context = convertASTContext(cContext);
@@ -458,8 +459,9 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   auto *out = FuncDecl::create(
       context, convertSourceLoc(cStaticLoc), StaticSpellingKind::None,
       convertSourceLoc(cFuncKeywordLoc), declName, convertSourceLoc(cNameLoc),
-      asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc, nullptr,
-      paramList, static_cast<TypeRepr *>(opaqueReturnType),
+      asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
+      static_cast<GenericParamList *>(opaqueGenericParamList), paramList,
+      static_cast<TypeRepr *>(opaqueReturnType),
       convertDeclContext(cDeclContext));
 
   return {bridgeDeclContext(out), static_cast<FuncDecl *>(out),
