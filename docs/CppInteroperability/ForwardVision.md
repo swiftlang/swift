@@ -160,7 +160,7 @@ Or even this global function that projects one of it's parameters:
 int *begin(std::vector<int> *v) { return v->data(); }
 ```
 
-It may be convient for Swift to assume that all projects follow one, unique pattern: a method of an owned type that returns a pointer. However, that is certainly not the only way in which a projection can be created. This is but one of the many places where Swift will need to decide between expressiveness and safety. Allowing the above APIs to be imported would allow interop to be more usable by default. Taking the first example, most of the time, when a vector holds pointers, those pointers do not point to storage with a short lifetime. Making this API unavailable would ensure 100% safety on the pain usability in the 99% case, when this API is safe. The tradeoffs here are an open question for the Swift evolution process to eventually determine. In any case, it is essential that C++ interoperability makes certain assumptions about the APIs Swift imports. There will always be an edge case that cannot be covered or does not make sense to accomidate. Interop as a whole should not become unusable so that these edge cases can be accomidated, or worse yet, so that that neither safe nor unsafe APIs are available in Swift.
+It may be convient for Swift to assume that all projects follow one, unique pattern: a method of an owned type that returns a pointer. However, that is certainly not the only way in which a projection can be created. This is but one of the many places where Swift will need to decide between expressiveness and safety. Allowing the above APIs to be imported would allow interop to be more usable by default. Taking the first example, most of the time, when a vector holds pointers, those pointers do not point to storage with a short lifetime. Making this API unavailable would ensure 100% safety on the pain usability in the 99% case, when this API is safe. The tradeoffs here are an open question for the Swift evolution process to eventually determine. In any case, it is essential that C++ interoperability makes certain assumptions about the APIs Swift imports. There will always be an edge case that cannot be covered or does not make sense to accomidate. Interop as a whole should not become unusable so that these edge cases can be accomidated, or worse yet, so that that neither safe nor unsafe APIs are available in Swift. So, C++ interoperability should make reasonable (not conservative) assumptions when importing APIs.
 
  ### Iterators
 
@@ -170,7 +170,24 @@ Swift's powerful suite of algorithms match and go beyond the standard library al
 
 ### Mutability
 
-Mutability is a concept where Swift and C++ diverge: by default C++ values are mutable and even when a value is const in C++, it is easily and often ignored (cast away). C++ often overloads functionality on a value’s constness, harming code-clarity. The generally weak notion of mutability in C++ leads to few codebases fully and strictly utilizing the `const` keyword. Swift, on the other hand, enforces mutability strictly and by default. In Swift, mutability conveys semantics, so importing largely mutable C++ codebases can lead to confusion. Swift should encourage C++ codebases to adopt const on methods and values that are used in Swift and expect that C++ does not mutate values that are marked as `const`. And overloaded functions should be clearly be disambiguated in Swift through naming. Mutability is a place where programmers may need to intervene and provide Swift with more information to help promote idiomatic APIs that are expressive and feel natural in Swift. It is also a place where Swift will need to make assumptions about the APIs that it is importing, promoting C++‘s weak notion of `const` to Swift’s much stricter ideal.
+Mutability is a concept where Swift and C++ diverge: by default C++ values are mutable and even when a value is const in C++, it is easily and often ignored (cast away). C++ often overloads functionality on a value’s constness, harming code-clarity. The generally weak notion of mutability in C++ leads to few codebases fully and strictly utilizing the `const` keyword. Swift, on the other hand, enforces mutability strictly and by default. In Swift, mutability conveys semantics, so importing largely mutable C++ codebases can lead to confusion. Swift should encourage C++ codebases to adopt const on methods and values that are used in Swift and expect that C++ does not mutate values that are marked as `const`. And overloaded functions should be clearly be disambiguated in Swift through naming. Mutability is a place where programmers may need to intervene and provide Swift with more information to help promote idiomatic APIs that are expressive and feel natural in Swift. As discussed in the "Views" section, the Swift compiler must make assumptions about the C++ APIs that it is importing, and mutability is another place where Swift will need to make reasonable (not conservative) assumptions about the APIs that it is importing, promoting C++‘s weak notion of `const` to Swift’s much stricter ideal. 
+
+By using Swift's strong notion of mutability, programmers will see the benfitis (especially improved safety) immediatly. For example,
+```
+void alias(const int& c, int& m) {
+    std::jthread t1([&m]() {
+        m = 0;
+    });
+    std::jthread t2([&c]() {
+        assert(c == 42);
+    });
+}
+``` 
+The obviously contrived function above will often assert in C++ if "c" and "m" alias. However in Swift, "c" is guaranteed to be a distinct, truely immutable reference (to uphold Swift's strict safety model). So calling this function in Swift will never assert:
+```
+var local: CInt = 42
+test(local, &local)
+```
 
 ### Computed properties
 
