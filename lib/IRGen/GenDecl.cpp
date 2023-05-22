@@ -3783,12 +3783,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
     return {gotEquivalent, ConstantReference::Indirect};
   };
   
-  // Avoid to create GOT because wasm32 doesn't support
-  // dynamic linking yet
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
-    return direct();
-  }
-
   // Dynamically replaceable function keys are stored in the GlobalVars
   // table, but they don't have an associated Decl, so they require
   // special treatment here.
