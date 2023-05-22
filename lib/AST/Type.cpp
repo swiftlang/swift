@@ -292,6 +292,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILToken:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
   case TypeKind::SILPack:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
@@ -1698,6 +1699,13 @@ CanType TypeBase::computeCanonicalType() {
     if (auto packArchetype = dyn_cast<PackArchetypeType>(countType))
       countType = packArchetype->getReducedShape();
     Result = PackExpansionType::get(patternType, countType);
+    break;
+  }
+
+  case TypeKind::PackElement: {
+    auto *element = cast<PackElementType>(this);
+    auto packType = element->getPackType()->getCanonicalType();
+    Result = PackElementType::get(packType, element->getLevel());
     break;
   }
 
@@ -5846,6 +5854,20 @@ case TypeKind::Id:
     return PackExpansionType::get(transformedPat, transformedCount);
   }
 
+  case TypeKind::PackElement: {
+    auto element = cast<PackElementType>(base);
+
+    Type transformedPack =
+        element->getPackType().transformWithPosition(pos, fn);
+    if (!transformedPack)
+      return Type();
+
+    if (transformedPack.getPointer() == element->getPackType().getPointer())
+      return *this;
+
+    return PackElementType::get(transformedPack, element->getLevel());
+  }
+
   case TypeKind::Tuple: {
     auto tuple = cast<TupleType>(base);
     bool anyChanged = false;
@@ -6383,6 +6405,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DependentMember:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
   case TypeKind::SILPack:
   case TypeKind::BuiltinTuple:
 #define REF_STORAGE(Name, ...) \
