@@ -276,7 +276,7 @@ struct InternalGeneric<T> {
     let y: Int
 }
 
-public enum SinglePayloadAnyObjectEnum {
+public enum SinglePayloadSimpleClassEnum {
     case empty0
     case empty1
     case empty2
@@ -284,7 +284,17 @@ public enum SinglePayloadAnyObjectEnum {
     case empty4
     case empty5
     case empty6
-    case nonEmpty(AnyObject)
+    case nonEmpty(SimpleClass)
+}
+
+public struct ContainsSinglePayloadSimpleClassEnum {
+    public let x: SinglePayloadSimpleClassEnum
+    public let y: AnyObject
+
+    public init(x: SinglePayloadSimpleClassEnum, y: AnyObject) {
+        self.x = x
+        self.y = y
+    }
 }
 
 public enum SinglePayloadEnum<T> {

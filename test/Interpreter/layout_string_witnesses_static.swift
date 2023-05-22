@@ -257,16 +257,21 @@ func testExistentialReference() {
 
 testExistentialReference()
 
-func testSinglePayloadAnyObjectEnum() {
-    let ptr = UnsafeMutablePointer<SinglePayloadAnyObjectEnum>.allocate(capacity: 1)
+func testSinglePayloadSimpleClassEnum() {
+    let ptr = UnsafeMutablePointer<SinglePayloadSimpleClassEnum>.allocate(capacity: 1)
 
     do {
-        let x = SinglePayloadAnyObjectEnum.nonEmpty(SimpleClass(x: 23))
+        let x = SinglePayloadSimpleClassEnum.nonEmpty(SimpleClass(x: 23))
         testInit(ptr, to: x)
     }
 
     do {
-        let y = SinglePayloadAnyObjectEnum.nonEmpty(SimpleClass(x: 28))
+        // CHECK: Value: 23
+        if case .nonEmpty(let c) = ptr.pointee {
+            print("Value: \(c.x)")
+        }
+
+        let y = SinglePayloadSimpleClassEnum.nonEmpty(SimpleClass(x: 28))
 
         // CHECK: Before deinit
         print("Before deinit")
@@ -275,9 +280,13 @@ func testSinglePayloadAnyObjectEnum() {
         testAssign(ptr, from: y)
     }
 
+    // CHECK-NEXT: Value: 28
+    if case .nonEmpty(let c) = ptr.pointee {
+        print("Value: \(c.x)")
+    }
+
     // CHECK-NEXT: Before deinit
     print("Before deinit")
-
 
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
@@ -285,7 +294,104 @@ func testSinglePayloadAnyObjectEnum() {
     ptr.deallocate()
 }
 
-testSinglePayloadAnyObjectEnum()
+testSinglePayloadSimpleClassEnum()
+
+func testSinglePayloadSimpleClassEnumEmpty() {
+    let ptr = UnsafeMutablePointer<SinglePayloadSimpleClassEnum>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadSimpleClassEnum.empty0
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = SinglePayloadSimpleClassEnum.empty1
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSinglePayloadSimpleClassEnumEmpty()
+
+func testContainsSinglePayloadSimpleClassEnum() {
+    let ptr = UnsafeMutablePointer<ContainsSinglePayloadSimpleClassEnum>.allocate(capacity: 1)
+
+    do {
+        let x = ContainsSinglePayloadSimpleClassEnum(x: SinglePayloadSimpleClassEnum.nonEmpty(SimpleClass(x: 23)), y: TestClass())
+        testInit(ptr, to: x)
+    }
+
+    do {
+        // CHECK: Value: 23
+        if case .nonEmpty(let c) = ptr.pointee.x {
+            print("Value: \(c.x)")
+        }
+
+        let y = ContainsSinglePayloadSimpleClassEnum(x: SinglePayloadSimpleClassEnum.nonEmpty(SimpleClass(x: 28)), y: TestClass())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        // CHECK-NEXT: TestClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Value: 28
+    if case .nonEmpty(let c) = ptr.pointee.x {
+        print("Value: \(c.x)")
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: TestClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testContainsSinglePayloadSimpleClassEnum()
+
+func testContainsSinglePayloadSimpleClassEnumEmpty() {
+    let ptr = UnsafeMutablePointer<ContainsSinglePayloadSimpleClassEnum>.allocate(capacity: 1)
+
+    do {
+        let x = ContainsSinglePayloadSimpleClassEnum(x: SinglePayloadSimpleClassEnum.empty0, y: TestClass())
+        testInit(ptr, to: x)
+    }
+
+    do {
+        let y = ContainsSinglePayloadSimpleClassEnum(x: SinglePayloadSimpleClassEnum.empty1, y: TestClass())
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testContainsSinglePayloadSimpleClassEnumEmpty()
 
 func testMultiPayloadEnum() {
     let ptr = UnsafeMutablePointer<MultiPayloadEnumWrapper>.allocate(capacity: 1)
