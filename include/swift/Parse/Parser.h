@@ -1366,10 +1366,11 @@ public:
       return nullptr;
     }
 
-    // Spin the lexer until we get to the ending location.
-    while (Tok.getLoc().getOpaquePointerValue() < endLocPtr &&
-           !Tok.is(tok::eof))
-      consumeToken();
+    // Reset the lexer to the ending location.
+    StringRef contents =
+        SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
+    L->resetToOffset((const char *)endLocPtr - contents.data());
+    L->lex(Tok);
 
     return makeParserResult(astNode);
   }

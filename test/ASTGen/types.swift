@@ -35,3 +35,7 @@ func test12a(i: Int) {
 func test13(body: (_ value: Int) -> Void, i: Int) {
   body(i)
 }
+
+func test14() {
+  _ = Array<Array<Array<Int>>>().count
+}
