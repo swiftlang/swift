@@ -308,7 +308,7 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 SWIFT_FUNCTION_PASS(ObjCBridgingOptimization, "objc-bridging-opt",
      "Optimize ObjectiveC briging operations")
-PASS(ObjectOutliner, "object-outliner",
+SWIFT_FUNCTION_PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")

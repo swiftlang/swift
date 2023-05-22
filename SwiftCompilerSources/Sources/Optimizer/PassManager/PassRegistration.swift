@@ -71,6 +71,7 @@ private func registerSwiftPasses() {
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
+  registerPass(objectOutliner, { objectOutliner.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(functionStackProtection, { functionStackProtection.run($0) })
   registerPass(assumeSingleThreadedPass, { assumeSingleThreadedPass.run($0) })
