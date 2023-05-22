@@ -4950,15 +4950,35 @@ class AssignOrInitInst
 
   FixedOperandList<3> Operands;
 
+public:
+  enum Mode {
+    /// The mode is not decided yet (by DefiniteInitialization).
+    Unknown,
+
+    /// The initializer is called with Src as argument.
+    Init,
+
+    /// The setter is called with Src as argument.
+    Set
+  };
+
 private:
   AssignOrInitInst(SILDebugLocation DebugLoc,
                    SILValue Src, SILValue Initializer,
-                   SILValue Setter);
+                   SILValue Setter, Mode mode);
 
 public:
   SILValue getSrc() const { return Operands[0].get(); }
   SILValue getInitializer() { return Operands[1].get(); }
   SILValue getSetter() { return  Operands[2].get(); }
+
+  Mode getMode() const {
+    return Mode(sharedUInt8().AssignOrInitInst.mode);
+  }
+
+  void setMode(Mode mode) {
+    sharedUInt8().AssignOrInitInst.mode = uint8_t(mode);
+  }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

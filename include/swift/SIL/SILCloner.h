@@ -1360,7 +1360,7 @@ void SILCloner<ImplClass>::visitAssignOrInitInst(AssignOrInitInst *Inst) {
                 getOpLocation(Inst->getLoc()),
                 getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getInitializer()),
-                getOpValue(Inst->getSetter())));
+                getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
 template<typename ImplClass>

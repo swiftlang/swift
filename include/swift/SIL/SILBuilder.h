@@ -958,9 +958,10 @@ public:
 
   AssignOrInitInst *createAssignOrInit(SILLocation Loc, SILValue Src,
                                        SILValue Initializer,
-                                       SILValue Setter) {
+                                       SILValue Setter,
+                                       AssignOrInitInst::Mode Mode) {
     return insert(new (getModule()) AssignOrInitInst(
-        getSILDebugLocation(Loc), Src, Initializer, Setter));
+        getSILDebugLocation(Loc), Src, Initializer, Setter, Mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,

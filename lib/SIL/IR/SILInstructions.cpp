@@ -1257,10 +1257,12 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
 }
 
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, SILValue Src,
-                                   SILValue Initializer, SILValue Setter)
+                                   SILValue Initializer, SILValue Setter,
+                                   AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst, NonValueInstruction>(Loc),
       Operands(this, Src, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
+  sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
 }
 
 MarkFunctionEscapeInst *
