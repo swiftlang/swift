@@ -150,6 +150,7 @@ class Target {
 
     let backtrace = try Backtrace.capture(from: context,
                                           using: reader,
+                                          images: images,
                                           limit: limit,
                                           top: top)
     guard let symbolicated = backtrace.symbolicated(with: images,
@@ -174,6 +175,7 @@ class Target {
       let context = HostContext.fromHostMContext(ucontext.uc_mcontext)
       let backtrace = try Backtrace.capture(from: context,
                                             using: reader,
+                                            images: images,
                                             limit: limit,
                                             top: top)
       guard let symbolicated
@@ -213,6 +215,7 @@ class Target {
 
       guard let backtrace = try? Backtrace.capture(from: context,
                                                    using: reader,
+                                                   images: images,
                                                    limit: limit,
                                                    top: top) else {
         print("unable to capture backtrace from context for thread \(ndx)")

@@ -251,6 +251,7 @@ class Target {
 
       guard let backtrace = try? Backtrace.capture(from: ctx,
                                                    using: reader,
+                                                   images: nil,
                                                    limit: limit,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
@@ -283,6 +284,7 @@ class Target {
 
       guard let backtrace = try? Backtrace.capture(from: context,
                                                    using: reader,
+                                                   images: nil,
                                                    limit: limit,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",

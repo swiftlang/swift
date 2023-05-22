@@ -139,6 +139,22 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       return _swift_backtrace_isThunkFunction(rawName)
     }
 
+    private func maybeUnderscore(_ sym: String) -> String {
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      return "_" + sym
+      #else
+      return sym
+      #endif
+    }
+
+    private func dylibName(_ dylib: String) -> String {
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      return dylib + ".dylib"
+      #else
+      return dylib + ".so"
+      #endif
+    }
+
     /// True if this symbol represents a system function.
     ///
     /// For instance, the `start` function from `dyld` on macOS is a system
@@ -148,20 +164,20 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       if rawName == "start" && imageName == "dyld" {
         return true
       }
+      #endif
       if rawName.hasSuffix("5$mainyyFZ")
            || rawName.hasSuffix("5$mainyyYaFZTQ0_")
-           || rawName == "_async_MainTQ0_" {
+           || rawName == maybeUnderscore("async_MainTQ0_") {
         return true
       }
-      if rawName == "__ZL23completeTaskWithClosurePN5swift12AsyncContextEPNS_10SwiftErrorE" && imageName == "libswift_Concurrency.dylib" {
+      if rawName == maybeUnderscore("_ZL23completeTaskWithClosurePN5swift12AsyncContextEPNS_10SwiftErrorE") && imageName == dylibName("libswift_Concurrency") {
         return true
       }
       if let location = sourceLocation,
          location.line == 0 && location.column == 0
-           && !_swift_isThunkFunction(rawName) {
+           && !_swift_backtrace_isThunkFunction(rawName) {
         return true
       }
-      #endif
       return false
     }
 
@@ -182,12 +198,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count,
                                                    nil, &length, &status) {
         defer { free(demangled) }
-        if length > 1 {
-          // length includes the trailing NUL
+
+        // length is the size of the buffer that was allocated, *not* the
+        // length of the string.
+        let stringLen = strlen(demangled)
+        if stringLen > 0 {
           return demangled.withMemoryRebound(to: UInt8.self,
-                                                   capacity: length - 1) {
+                                             capacity: stringLen) {
             let demangledBytes = UnsafeBufferPointer(start: $0,
-                                                     count: length - 1)
+                                                     count: stringLen)
             return String(decoding: demangledBytes, as: UTF8.self)
           }
         }

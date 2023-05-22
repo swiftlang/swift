@@ -858,7 +858,7 @@ _swift_backtrace_isThunkFunction(const char *mangledName) {
 /// @param mangledNameLength is the length of this name.
 /// @param outputBuffer is a pointer to a buffer in which to place the result.
 /// @param outputBufferSize points to a variable that will be filled in with
-/// the length of the result.
+/// the size of the allocated buffer (NOT the length of the result).
 /// @param status returns the status codes defined in the C++ ABI.
 ///
 /// If outputBuffer and outputBufferSize are both nullptr, this function will
@@ -884,7 +884,8 @@ _swift_backtrace_demangle(const char *mangledName,
 
   if (Demangle::isSwiftSymbol(name)) {
     // This is a Swift mangling
-    auto result = Demangle::demangleSymbolAsString(name);
+    auto options = DemangleOptions::SimplifiedUIDemangleOptions();
+    auto result = Demangle::demangleSymbolAsString(name, options);
     size_t bufferSize;
 
     if (outputBufferSize) {

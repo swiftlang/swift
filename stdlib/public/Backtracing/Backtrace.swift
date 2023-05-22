@@ -230,11 +230,18 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              limit: Int? = 64,
                              offset: Int = 0,
                              top: Int = 16) throws -> Backtrace {
+    #if os(Linux)
+    let images = captureImages()
+    #else
+    let images: [Image]? = nil
+    #endif
+
     // N.B. We use offset+1 here to skip this frame, rather than inlining
     //      this code into the client.
     return try HostContext.withCurrentContext { ctx in
       try capture(from: ctx,
                   using: UnsafeLocalMemoryReader(),
+                  images: images,
                   algorithm: algorithm,
                   limit: limit,
                   offset: offset + 1,
@@ -245,6 +252,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   @_spi(Internal)
   public static func capture(from context: some Context,
                              using memoryReader: some MemoryReader,
+                             images: [Image]?,
                              algorithm: UnwindAlgorithm = .auto,
                              limit: Int? = 64,
                              offset: Int = 0,
@@ -254,7 +262,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
       // run, we should be using DWARF EH frame data for .precise.
       case .auto, .fast, .precise:
         let unwinder =
-          FramePointerUnwinder(context: context, memoryReader: memoryReader)
+          FramePointerUnwinder(context: context,
+                               images: images,
+                               memoryReader: memoryReader)
           .dropFirst(offset)
 
         if let limit = limit {
@@ -319,10 +329,10 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                                      with: topFrames.prefix(secondPart))
             }
 
-            return Backtrace(frames: frames)
+            return Backtrace(frames: frames, images: images)
           }
         } else {
-          return Backtrace(frames: Array(unwinder))
+          return Backtrace(frames: Array(unwinder), images: images)
         }
     }
   }
