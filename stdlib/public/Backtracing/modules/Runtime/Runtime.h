@@ -17,10 +17,22 @@
 #ifndef SWIFT_BACKTRACING_RUNTIME_H
 #define SWIFT_BACKTRACING_RUNTIME_H
 
+#include <stdbool.h>
+#include <stdlib.h>
+
 #include "swift/Runtime/CrashInfo.h"
 
 // Can't import swift/Runtime/Debug.h because it assumes C++
 void swift_reportWarning(uint32_t flags, const char *message);
 
+// Returns true if the given function is a thunk function
+bool _swift_backtrace_isThunkFunction(const char *rawName);
+
+// Demangle the given raw name (supports Swift and C++)
+char *_swift_backtrace_demangle(const char *rawName,
+                                size_t rawNameLength,
+                                char *outputBuffer,
+                                size_t *outputBufferSize,
+                                int *status);
 
 #endif // SWIFT_BACKTRACING_RUNTIME_H

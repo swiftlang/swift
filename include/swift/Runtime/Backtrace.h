@@ -134,8 +134,15 @@ struct BacktraceSettings {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
 
-SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool _swift_isThunkFunction(const char *mangledName);
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_backtrace_isThunkFunction(const char *mangledName);
 
+SWIFT_RUNTIME_STDLIB_SPI
+char *_swift_backtrace_demangle(const char *mangledName,
+                                size_t mangledNameLength,
+                                char *outputBuffer,
+                                size_t *outputBufferSize,
+                                int *status);
 #ifdef __cplusplus
 } // namespace backtrace
 } // namespace runtime

@@ -21,10 +21,8 @@ import Swift
 @_implementationOnly import OS.Darwin
 #endif
 
-@_silgen_name("_swift_isThunkFunction")
-func _swift_isThunkFunction(
-  _ rawName: UnsafePointer<CChar>?
-) -> CBool
+@_implementationOnly import OS.Libc
+@_implementationOnly import Runtime
 
 /// A symbolicated backtrace
 public struct SymbolicatedBacktrace: CustomStringConvertible {
@@ -138,7 +136,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     /// True if this symbol is a Swift thunk function.
     public var isSwiftThunk: Bool {
-      return _swift_isThunkFunction(rawName)
+      return _swift_backtrace_isThunkFunction(rawName)
     }
 
     /// True if this symbol represents a system function.
@@ -179,9 +177,21 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     /// Demangle the raw name, if possible.
     private func demangleRawName() -> String {
-      // We don't actually need this function on macOS because we're using
-      // CoreSymbolication, which demangles the name when it does the lookup
-      // anyway.  We will need it for Linux and Windows though.
+      var length: size_t = 0
+      var status: CInt = 0
+      if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count,
+                                                   nil, &length, &status) {
+        defer { free(demangled) }
+        if length > 1 {
+          // length includes the trailing NUL
+          return demangled.withMemoryRebound(to: UInt8.self,
+                                                   capacity: length - 1) {
+            let demangledBytes = UnsafeBufferPointer(start: $0,
+                                                     count: length - 1)
+            return String(decoding: demangledBytes, as: UTF8.self)
+          }
+        }
+      }
       return rawName
     }
 

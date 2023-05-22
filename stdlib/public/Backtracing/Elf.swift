@@ -975,6 +975,9 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
       }
     }
 
+    print("Failed to find \(hex(address))")
+    print("  Symbols: \(_symbols)")
+
     return nil
   }
 }
@@ -1551,7 +1554,7 @@ class ElfImage<SomeImageSource: ImageSource,
     }
 
     let debugTable: SymbolTable?
-    if debug, let debugImage = debugImage {
+    if !debug, let debugImage = debugImage {
       debugTable = debugImage._getSymbolTable(debug: true)
         as any ElfSymbolTableProtocol
         as? SymbolTable

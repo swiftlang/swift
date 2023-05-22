@@ -52,6 +52,12 @@
 #include <cstring>
 #include <cerrno>
 
+#ifdef _WIN32
+// We'll probably want dbghelp.h here
+#else
+#include <cxxabi.h>
+#endif
+
 #define DEBUG_BACKTRACING_SETTINGS 0
 
 #ifndef lengthof
@@ -837,11 +843,100 @@ namespace backtrace {
 /// @param mangledName is the symbol name to be tested.
 ///
 /// @returns `true` if `mangledName` represents a thunk function.
-SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift) bool
-_swift_isThunkFunction(const char *mangledName) {
+SWIFT_RUNTIME_STDLIB_SPI bool
+_swift_backtrace_isThunkFunction(const char *mangledName) {
   swift::Demangle::Context ctx;
 
   return ctx.isThunkSymbol(mangledName);
+}
+
+/// Try to demangle a symbol.
+///
+/// Unlike other entry points that do this, we try both Swift and C++ here.
+///
+/// @param mangledName is the symbol name to be demangled.
+/// @param mangledNameLength is the length of this name.
+/// @param outputBuffer is a pointer to a buffer in which to place the result.
+/// @param outputBufferSize points to a variable that will be filled in with
+/// the length of the result.
+/// @param status returns the status codes defined in the C++ ABI.
+///
+/// If outputBuffer and outputBufferSize are both nullptr, this function will
+/// allocate memory for the result using malloc().
+///
+/// If outputBuffer is nullptr but outputBufferSize is not, the function will
+/// fill outputBufferSize with the required buffer size and return nullptr.
+///
+/// Otherwise, the result will be written into the output buffer, and the
+/// size of the result will be written into outputBufferSize.  If the buffer
+/// is too small, the result will be truncated, but outputBufferSize will
+/// still be set to the number of bytes that would have been required to
+/// copy out the full result (including a trailing NUL).
+///
+/// @returns `true` if demangling was successful.
+SWIFT_RUNTIME_STDLIB_SPI char *
+_swift_backtrace_demangle(const char *mangledName,
+                          size_t mangledNameLength,
+                          char *outputBuffer,
+                          size_t *outputBufferSize,
+                          int *status) {
+  llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
+
+  if (Demangle::isSwiftSymbol(name)) {
+    // This is a Swift mangling
+    auto result = Demangle::demangleSymbolAsString(name);
+    size_t bufferSize;
+
+    if (outputBufferSize) {
+      bufferSize = *outputBufferSize;
+      *outputBufferSize = result.length() + 1;
+    }
+
+    if (outputBuffer == nullptr) {
+      outputBuffer = (char *)::malloc(result.length() + 1);
+      bufferSize = result.length() + 1;
+    }
+
+    size_t toCopy = std::min(bufferSize - 1, result.length());
+    ::memcpy(outputBuffer, result.data(), toCopy);
+    outputBuffer[toCopy] = '\0';
+
+    *status = 0;
+    return outputBuffer;
+#ifndef _WIN32
+  } else if (name.startswith("_Z")) {
+    // Try C++
+    size_t resultLen;
+    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, status);
+
+    if (result) {
+      size_t bufferSize;
+
+      if (outputBufferSize) {
+        bufferSize = *outputBufferSize;
+        *outputBufferSize = resultLen;
+      }
+
+      if (outputBuffer == nullptr) {
+        return result;
+      }
+
+      size_t toCopy = std::min(bufferSize - 1, resultLen - 1);
+      ::memcpy(outputBuffer, result, toCopy);
+      outputBuffer[toCopy] = '\0';
+
+      *status = 0;
+      return outputBuffer;
+    }
+#else
+    // On Windows, the mangling is different.
+    // ###TODO: Call __unDName()
+#endif
+  } else {
+    *status = -2;
+  }
+
+  return nullptr;
 }
 
 // N.B. THIS FUNCTION MUST BE SAFE TO USE FROM A CRASH HANDLER.  On Linux
