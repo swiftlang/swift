@@ -189,6 +189,21 @@ SourceLoc ModuleFile::getSourceLoc() const {
   return SourceMgr.getLocForBufferStart(*bufferID);
 }
 
+SourceLoc ModularizationError::getSourceLoc() const {
+  auto &SourceMgr = referenceModule->getContext().Diags.SourceMgr;
+  auto filename = referenceModule->getModuleFilename();
+
+  // Synthesize some context. We don't have an actual decl here
+  // so try to print a simple representation of the reference.
+  std::string S;
+  llvm::raw_string_ostream OS(S);
+  OS << expectedModule->getName() << "." << name;
+
+  // If we enable these remarks by default we may want to reuse these buffers.
+  auto bufferID = SourceMgr.addMemBufferCopy(S, filename);
+  return SourceMgr.getLocForBufferStart(bufferID);
+}
+
 void
 ModularizationError::diagnose(const ModuleFile *MF,
                               DiagnosticBehavior limit) const {

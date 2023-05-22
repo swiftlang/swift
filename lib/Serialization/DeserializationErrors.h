@@ -402,6 +402,8 @@ public:
     path.print(OS);
   }
 
+  SourceLoc getSourceLoc() const;
+
   std::error_code convertToErrorCode() const override {
     return llvm::inconvertibleErrorCode();
   }
