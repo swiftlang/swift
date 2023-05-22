@@ -7219,7 +7219,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
-  case TypeKind::Pack: {
+  case TypeKind::Pack:
+  case TypeKind::PackElement: {
     llvm_unreachable("Unimplemented!");
   }
 
@@ -7600,6 +7601,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::InOut:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
     break;
 
   case TypeKind::BuiltinTuple:

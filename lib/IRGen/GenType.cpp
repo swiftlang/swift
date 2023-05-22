@@ -2354,6 +2354,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertPackType(cast<SILPackType>(ty));
   case TypeKind::PackArchetype:
   case TypeKind::PackExpansion:
+  case TypeKind::PackElement:
     llvm_unreachable("pack archetypes and expansions should not be seen in "
                      " arbitrary type positions");
   case TypeKind::SILToken:
