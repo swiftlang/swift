@@ -296,13 +296,13 @@ suspend_other_threads(struct thread *self)
   // Start the thread list with this thread
   reset_threads(self);
 
-  // Swap out the SIGUSR1 signal handler first
+  // Swap out the SIGPROF signal handler first
   sigfillset(&sa.sa_mask);
   sa.sa_flags = SA_NODEFER;
   sa.sa_handler = NULL;
   sa.sa_sigaction = pause_thread;
 
-  sigaction(SIGUSR1, &sa, &sa_old);
+  sigaction(SIGPROF, &sa, &sa_old);
 
   /* Now scan /proc/self/task to get the tids of the threads in this
      process.  We need to ignore our own thread. */
@@ -339,7 +339,7 @@ suspend_other_threads(struct thread *self)
       int tid = atoi(dp->d_name);
 
       if ((int64_t)tid != self->tid && !seen_thread(tid)) {
-        tgkill(our_pid, tid, SIGUSR1);
+        tgkill(our_pid, tid, SIGPROF);
         ++thread_count;
       }
     }
@@ -353,7 +353,7 @@ suspend_other_threads(struct thread *self)
   close(fd);
 
   // Finally, reset the signal handler
-  sigaction(SIGUSR1, &sa_old, NULL);
+  sigaction(SIGPROF, &sa_old, NULL);
 }
 
 void
