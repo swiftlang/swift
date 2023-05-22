@@ -259,9 +259,10 @@ enum DIUseKind {
   /// value.
   Assign,
 
-  /// The instruction is an assignment of a wrapped value with an already initialized
-  /// backing property wrapper.
-  AssignWrappedValue,
+  /// The instruction is a setter call for a computed property after all of
+  /// self is initialized. This is used for property wrappers and for init
+  /// accessors.
+  Set,
 
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
