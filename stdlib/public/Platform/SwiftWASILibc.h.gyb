@@ -105,6 +105,20 @@ headers = [
 ]
 }%
 
+// FIXME?(katei):
+// Those emulations are now enabled by default to have compatibility
+// with other platforms as much as possible without any extra modification.
+// But we should consider moving them into their own submodules.
+#ifndef _WASI_EMULATED_MMAN
+#  define _WASI_EMULATED_MMAN
+#endif
+#ifndef _WASI_EMULATED_SIGNAL
+#  define _WASI_EMULATED_SIGNAL
+#endif
+#ifndef _WASI_EMULATED_PROCESS_CLOCKS
+#  define _WASI_EMULATED_PROCESS_CLOCKS
+#endif
+
 % for header in headers:
 #if __has_include(<${header}>)
 #include <${header}>
