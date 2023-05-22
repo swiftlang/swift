@@ -1827,8 +1827,11 @@ static ProtocolConformanceRef getPackTypeConformance(
     patternConformances.push_back(patternConformance);
   }
 
-  return ProtocolConformanceRef(
-      PackConformance::get(type, protocol, patternConformances));
+  auto *conformance = PackConformance::get(type, protocol, patternConformances);
+  if (conformance->isInvalid())
+    return ProtocolConformanceRef::forInvalid();
+
+  return ProtocolConformanceRef(conformance);
 }
 
 ProtocolConformanceRef
