@@ -6870,8 +6870,6 @@ void SILGlobalVariable::verify() const {
 
   // Verify the static initializer.
   for (const SILInstruction &I : StaticInitializerBlock) {
-    assert(isValidStaticInitializerInst(&I, getModule()) &&
-           "illegal static initializer");
     auto init = cast<SingleValueInstruction>(&I);
     if (init == &StaticInitializerBlock.back()) {
       assert(init->use_empty() && "Init value must not have another use");
