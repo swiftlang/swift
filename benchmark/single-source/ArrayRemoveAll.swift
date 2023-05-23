@@ -1,4 +1,6 @@
-// This test checks the performance of removeAll on a non-uniquely referenced array.
+// This test checks the performance of removeAll
+// on a non-uniquely referenced array.
+
 import TestsUtils
 
 public let benchmarks = [
@@ -6,15 +8,13 @@ public let benchmarks = [
     name: "ArrayRemoveAll_Class",
     runFunction: run_ArrayRemoveAll_Class,
     tags: [.validation, .api, .Array],
-    setUpFunction: { blackHole(inputArray_Class) },
-    tearDownFunction: { inputArray_Class = nil }
+    setUpFunction: { blackHole(inputArray_Class) }
   ),
   BenchmarkInfo(
     name: "ArrayRemoveAll_Int",
     runFunction: run_ArrayRemoveAll_Int,
     tags: [.validation, .api, .Array],
-    setUpFunction: { blackHole(inputArray_Int) },
-    tearDownFunction: { inputArray_Int = nil }
+    setUpFunction: { blackHole(inputArray_Int) }
   )
 ]
 
@@ -26,26 +26,8 @@ class Slow {
   }
 }
 
-let size_Int = 1_000_000
-let size_Class = 100_000
-
-var inputArray_Int: [Int]! = {
-  var a: [Int] = []
-  a.reserveCapacity(size_Int)
-  for i in 0 ..< size_Int {
-    a.append(i)
-  }
-  return a
-}()
-
-var inputArray_Class: [Slow]! = {
-  var a: [Slow] = []
-  a.reserveCapacity(size_Class)
-  for i in 0 ..< size_Class {
-    a.append(Slow(num: i))
-  }
-  return a
-}()
+let inputArray_Int: [Int] = Array(0..<1_000_000)
+let inputArray_Class: [Slow] = (0..<100_000).map(Slow.init(num:))
 
 @inline(never)
 func removeAll<T>(_ arr: [T]) -> [T] {
