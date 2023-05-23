@@ -132,10 +132,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
-  if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm()) {
-    TargetOpts.DebuggerTuning = llvm::DebuggerKind::Default;
+  if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
-  }
 
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
