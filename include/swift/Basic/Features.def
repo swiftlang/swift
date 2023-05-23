@@ -57,9 +57,14 @@
 #ifndef EXPERIMENTAL_FEATURE
 // Warning: setting `AvailableInProd` to `true` on a feature means that the flag
 //          cannot be dropped in the future.
-#  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd, IncludeInModuleInterface) \
+#  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)  \
      LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
                       langOpts.hasFeature(#FeatureName))
+#endif
+
+#ifndef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
+#  define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
+     EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #endif
 
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
@@ -109,93 +114,94 @@ UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 
-EXPERIMENTAL_FEATURE(StaticAssert, false, true)
-EXPERIMENTAL_FEATURE(VariadicGenerics, false, true)
-EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false, true)
-EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false, true)
-EXPERIMENTAL_FEATURE(FreestandingMacros, true, true)
-EXPERIMENTAL_FEATURE(CodeItemMacros, true, true)
-EXPERIMENTAL_FEATURE(TupleConformances, false, true)
+EXPERIMENTAL_FEATURE(StaticAssert, false)
+EXPERIMENTAL_FEATURE(VariadicGenerics, false)
+EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
+EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
+EXPERIMENTAL_FEATURE(FreestandingMacros, true)
+EXPERIMENTAL_FEATURE(CodeItemMacros, true)
+EXPERIMENTAL_FEATURE(TupleConformances, false)
 
 // FIXME: MoveOnlyClasses is not intended to be in production,
 // but our tests currently rely on it, and we want to run those
 // tests in non-asserts builds too.
-EXPERIMENTAL_FEATURE(MoveOnlyClasses, true, true)
-EXPERIMENTAL_FEATURE(NoImplicitCopy, true, true)
-EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true, true)
-EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true, true)
-EXPERIMENTAL_FEATURE(MoveOnlyTuples, true, true)
+EXPERIMENTAL_FEATURE(MoveOnlyClasses, true)
+EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
+EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
+EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
+EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 
-EXPERIMENTAL_FEATURE(OneWayClosureParameters, false, true)
-EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false, true)
-EXPERIMENTAL_FEATURE(LayoutPrespecialization, true, true)
+EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
+EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
+EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
-EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true, true)
-EXPERIMENTAL_FEATURE(AccessLevelOnImport, true, true)
+EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
+EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Whether to enable experimental layout string value witnesses
-EXPERIMENTAL_FEATURE(LayoutStringValueWitnesses, true, false)
-EXPERIMENTAL_FEATURE(LayoutStringValueWitnessesInstantiation, true, false)
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnesses, true)
+EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(LayoutStringValueWitnessesInstantiation, true)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
-EXPERIMENTAL_FEATURE(DifferentiableProgramming, false, true)
+EXPERIMENTAL_FEATURE(DifferentiableProgramming, false)
 
 /// Whether to enable forward mode differentiation.
-EXPERIMENTAL_FEATURE(ForwardModeDifferentiation, false, true)
+EXPERIMENTAL_FEATURE(ForwardModeDifferentiation, false)
 
 /// Whether to enable experimental `AdditiveArithmetic` derived
 /// conformances.
-EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false, true)
+EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 
 /// Whether Objective-C completion handler parameters are imported as
 /// @Sendable.
-EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false, true)
+EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false, true)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
-EXPERIMENTAL_FEATURE(ParserRoundTrip, false, true)
+EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 
 /// Whether to perform validation of the parse tree produced by the Swift
 /// Swift parser.
-EXPERIMENTAL_FEATURE(ParserValidation, false, true)
+EXPERIMENTAL_FEATURE(ParserValidation, false)
 
 /// Whether to emit diagnostics from the new parser first, and only emit
 /// diagnostics from the existing parser when there are none from the new
 /// parser.
-EXPERIMENTAL_FEATURE(ParserDiagnostics, false, true)
+EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
 
 /// Enables implicit some while also enabling existential `any`
-EXPERIMENTAL_FEATURE(ImplicitSome, false, true)
+EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
-EXPERIMENTAL_FEATURE(ParserASTGen, false, true)
+EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
-EXPERIMENTAL_FEATURE(BuiltinMacros, false, true)
+EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
 /// Whether to enable experimental @runtimeMetadata feature which allows to
 /// declare an attribute which is discoverable and constructable at runtime.
-EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false, true)
+EXPERIMENTAL_FEATURE(RuntimeDiscoverableAttrs, false)
 
 /// Import C++ class templates as semantically-meaningless symbolic
 /// Swift types and C++ methods as symbolic functions with blank
 /// signatures.
-EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false, true)
+EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
 
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
-EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false, true)
+EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
 /// Enable reference bindings.
-EXPERIMENTAL_FEATURE(ReferenceBindings, false, true)
+EXPERIMENTAL_FEATURE(ReferenceBindings, false)
 
 /// Enable the explicit 'import Builtin' and allow Builtin usage.
-EXPERIMENTAL_FEATURE(BuiltinModule, true, true)
+EXPERIMENTAL_FEATURE(BuiltinModule, true)
 
+#undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
