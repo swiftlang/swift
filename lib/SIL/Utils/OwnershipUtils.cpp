@@ -25,54 +25,11 @@
 
 using namespace swift;
 
-bool swift::findPointerEscape(BorrowedValue original) {
-  ValueWorklist worklist(original->getFunction());
-  worklist.push(*original);
-
-  if (auto *phi = SILArgument::asPhi(*original)) {
-    phi->visitTransitiveIncomingPhiOperands([&](auto *phi, auto *operand) {
-      worklist.pushIfNotVisited(operand->get());
-      return true;
-    });
-  }
-
-  while (auto value = worklist.pop()) {
-    for (auto *op : value->getUses()) {
-      switch (op->getOperandOwnership()) {
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-        return true;
-
-      case OperandOwnership::Reborrow: {
-        SILArgument *phi = PhiOperand(op).getValue();
-        worklist.pushIfNotVisited(phi);
-        break;
-      }
-
-      case OperandOwnership::GuaranteedForwarding: {
-        // This may follow guaranteed phis.
-        ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
-          // Do not include transitive uses with 'none' ownership
-          if (result->getOwnershipKind() == OwnershipKind::None)
-            return true;
-          worklist.pushIfNotVisited(result);
-          return true;
-        });
-        break;
-      }
-      default:
-        break;
-      }
-    }
-  }
-  return false;
-}
-
 bool swift::findPointerEscape(SILValue original) {
-  if (auto borrowedValue = BorrowedValue(original)) {
-    return findPointerEscape(borrowedValue);
+  if (original->getOwnershipKind() != OwnershipKind::Owned &&
+      original->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
   }
-  assert(original->getOwnershipKind() == OwnershipKind::Owned);
 
   ValueWorklist worklist(original->getFunction());
   worklist.push(original);
@@ -82,6 +39,7 @@ bool swift::findPointerEscape(SILValue original) {
       return true;
     });
   }
+
   while (auto value = worklist.pop()) {
     for (auto use : value->getUses()) {
       switch (use->getOperandOwnership()) {
@@ -96,6 +54,22 @@ bool swift::findPointerEscape(SILValue original) {
         }
         auto *phi = branch->getDestBB()->getArgument(use->getOperandNumber());
         worklist.pushIfNotVisited(phi);
+        break;
+      }
+      case OperandOwnership::Reborrow: {
+        SILArgument *phi = PhiOperand(use).getValue();
+        worklist.pushIfNotVisited(phi);
+        break;
+      }
+      case OperandOwnership::GuaranteedForwarding: {
+        // This may follow guaranteed phis.
+        ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+          // Do not include transitive uses with 'none' ownership
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
         break;
       }
       default:
