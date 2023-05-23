@@ -963,11 +963,6 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     // macros need the `FreestandingMacros` feature flag, and code item macros
     // need both `FreestandingMacros` and `CodeItemMacros`.
     if (!macroRoles.contains(MacroRole::Expression)) {
-      if (!ctx.LangOpts.hasFeature(Feature::FreestandingMacros)) {
-        med->diagnose(diag::macro_experimental, "freestanding",
-                      "FreestandingMacros");
-        return None;
-      }
       if (!macroRoles.contains(MacroRole::Declaration) &&
           !ctx.LangOpts.hasFeature(Feature::CodeItemMacros)) {
         med->diagnose(diag::macro_experimental, "code item", "CodeItemMacros");
