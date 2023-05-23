@@ -1351,7 +1351,7 @@ public:
     if (!Context.LangOpts.hasFeature(Feature::ASTGenTypes))
       return nullptr;
 
-    auto exportedSourceFile = SF.exportedSourceFile;
+    auto exportedSourceFile = SF.getExportedSourceFile();
     if (!exportedSourceFile)
       return nullptr;
 
