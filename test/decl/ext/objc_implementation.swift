@@ -41,6 +41,10 @@
   var methodFromHeader5: CInt
   // expected-error@-1 {{property 'methodFromHeader5' does not match the instance method declared by the header}}
 
+  func method(fromHeader6: Double) {
+    // expected-error@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  }
+
   var propertyFromHeader1: CInt
   // OK, provides an implementation with a stored property
 
@@ -74,6 +78,9 @@
     // expected-error@-1 {{instance method 'propertyFromHeader10()' does not match the property declared by the header}}
     return 1
   }
+
+  var propertyFromHeader11: Float
+  // expected-error@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'Int32' declared by the header}}
 
   var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
@@ -144,6 +151,10 @@
 
   func classMethod2(_: CInt) {
     // expected-error@-1 {{instance method 'classMethod2' does not match class method declared in header}} {{3-3=class }}
+  }
+
+  class func classMethod3(_: Float) {
+    // expected-error@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
   }
 
   func instanceMethod1(_: CInt) {
@@ -306,6 +317,26 @@
   func requiredMethod1() {}
 
   func optionalMethod1() {}
+}
+
+@_objcImplementation(TypeMatchOptionality) extension ObjCClass {
+  func nullableResultAndArg(_: Any?) -> Any? { fatalError() } // no-error
+  func nonnullResultAndArg(_: Any) -> Any { fatalError() } // no-error
+  func nullUnspecifiedResultAndArg(_: Any!) -> Any! { fatalError() } // no-error
+
+  func nonnullResult1() -> Any { fatalError() } // no-error
+  func nonnullResult2() -> Any? { fatalError() } // expected-error {{instance method 'nonnullResult2()' of type '() -> Any?' does not match type '() -> Any' declared by the header}}
+  func nonnullResult3() -> Any! { fatalError() } // no-error (special case)
+
+  func nonnullArgument1(_: Any) {} // no-error
+  func nonnullArgument2(_: Any?) {} // expected-error {{instance method 'nonnullArgument2' of type '(Any?) -> ()' does not match type '(Any) -> Void' declared by the header}}
+  func nonnullArgument3(_: Any!) {} // no-error (special case)
+
+  func nullableResult() -> Any { fatalError() } // expected-error {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
+  func nullableArgument(_: Any) {} // expected-error {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
+
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be implicitly @objc because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be implicitly @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @_objcImplementation extension ObjCClass {}

@@ -3013,7 +3013,7 @@ private:
     WrongStaticness,
     WrongCategory,
     WrongDeclKind,
-//    WrongType,
+    WrongType,
     WrongWritability,
 
     Match,
@@ -3206,6 +3206,71 @@ private:
     return lhs == rhs;
   }
 
+  static bool matchParamTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+    TypeMatchOptions matchOpts = {};
+
+    // Try a plain type match.
+    if (implTy->matchesParameter(reqTy, matchOpts))
+      return true;
+
+    // If the implementation type is IUO, try unwrapping it.
+    if (auto unwrappedImplTy = implTy->getOptionalObjectType())
+      return implDecl->isImplicitlyUnwrappedOptional()
+                && unwrappedImplTy->matchesParameter(reqTy, matchOpts);
+
+    return false;
+  }
+
+  static bool matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+    TypeMatchOptions matchOpts = {};
+
+    // Try a plain type match.
+    if (reqTy->matches(implTy, matchOpts))
+      return true;
+
+    // If the implementation type is optional, try unwrapping it.
+    if (auto unwrappedImplTy = implTy->getOptionalObjectType())
+      return implDecl->isImplicitlyUnwrappedOptional()
+                  && reqTy->matches(unwrappedImplTy, matchOpts);
+
+    // Apply these rules to the result type and parameters if it's a function
+    // type.
+    if (auto funcReqTy = reqTy->getAs<AnyFunctionType>())
+      if (auto funcImplTy = implTy->getAs<AnyFunctionType>())
+        return funcReqTy->matchesFunctionType(funcImplTy, matchOpts,
+                                              [=]() -> bool {
+          auto reqParams = funcReqTy->getParams();
+          auto implParams = funcImplTy->getParams();
+          if (reqParams.size() != implParams.size())
+            return false;
+
+          auto implParamList =
+              cast<AbstractFunctionDecl>(implDecl)->getParameters();
+
+          for (auto i : indices(reqParams)) {
+            const auto &reqParam = reqParams[i];
+            const auto &implParam = implParams[i];
+            ParamDecl *implParamDecl = implParamList->get(i);
+
+            if (!matchParamTypes(reqParam.getOldType(), implParam.getOldType(),
+                                 implParamDecl))
+              return false;
+          }
+
+          return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
+                            implDecl);
+        });
+
+    return false;
+  }
+
+  static Type getMemberType(ValueDecl *decl) {
+    if (isa<AbstractFunctionDecl>(decl))
+      // Strip off the uncurried `self` parameter.
+      return decl->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+    return decl->getInterfaceType();
+  }
+
   MatchOutcome matchesImpl(ValueDecl *req, ValueDecl *cand,
                            ObjCSelector explicitObjCName) const {
     bool hasObjCNameMatch =
@@ -3239,7 +3304,8 @@ private:
     if (cand->getKind() != req->getKind())
       return MatchOutcome::WrongDeclKind;
 
-    // FIXME: Diagnose type mismatches (with allowance for extra optionality)
+    if (!matchTypes(getMemberType(req), getMemberType(cand), cand))
+      return MatchOutcome::WrongType;
 
     if (auto reqVar = dyn_cast<AbstractStorageDecl>(req))
       if (reqVar->isSettable(nullptr) &&
@@ -3321,6 +3387,12 @@ private:
     case MatchOutcome::WrongDeclKind:
       diagnose(cand, diag::objc_implementation_wrong_decl_kind,
                cand->getDescriptiveKind(), cand, req->getDescriptiveKind());
+      return;
+
+    case MatchOutcome::WrongType:
+      diagnose(cand, diag::objc_implementation_type_mismatch,
+               cand->getDescriptiveKind(), cand,
+               getMemberType(cand), getMemberType(req));
       return;
 
     case MatchOutcome::WrongWritability:
