@@ -284,17 +284,7 @@ static SubstitutionMap getSubstitutionsForPropertyInitializer(
     // replacement types are the archetypes of the initializer itself.
     return SubstitutionMap::get(
       nominal->getGenericSignatureOfContext(),
-      [&](SubstitutableType *type) -> Type {
-        if (auto gp = type->getAs<GenericTypeParamType>()) {
-          auto archetype = genericEnv->mapTypeIntoContext(gp);
-          if (!gp->isParameterPack())
-            return archetype;
-
-          return PackType::getSingletonPackExpansion(archetype);
-        }
-
-        return Type(type);
-      },
+      QuerySubstitutionMap{genericEnv->getForwardingSubstitutionMap()},
       LookUpConformanceInModule(dc->getParentModule()));
   }
 
