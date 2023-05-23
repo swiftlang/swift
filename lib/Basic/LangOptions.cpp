@@ -489,7 +489,7 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
   case Feature::FeatureName: return true;
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)            \
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd, IncludeInModuleInterface) \
   case Feature::FeatureName: return AvailableInProd;
 #include "swift/Basic/Features.def"
   }
@@ -508,7 +508,7 @@ llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
 llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
   return llvm::StringSwitch<Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                  \
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd, IncludeInModuleInterface) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                    .Default(None);
@@ -522,6 +522,17 @@ llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
 #include "swift/Basic/Features.def"
   default: return None;
   }
+}
+
+bool swift::includeInModuleInterface(Feature feature) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  case Feature::FeatureName: return true;
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd, IncludeInModuleInterface) \
+  case Feature::FeatureName: return IncludeInModuleInterface;
+#include "swift/Basic/Features.def"
+  }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
