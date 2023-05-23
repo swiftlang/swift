@@ -511,7 +511,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
   // Check whether the uses considered immediately above are all effectively
   // instantaneous uses. Pointer escapes propagate values ways that may not be
   // discoverable.
-  if (hasPointerEscape(operand)) {
+  if (findPointerEscape(operand)) {
     return false;
   }
 
