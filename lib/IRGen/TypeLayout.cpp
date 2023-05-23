@@ -1009,26 +1009,6 @@ llvm::Constant *
 ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM,
                                     GenericSignature genericSig) const {
   return nullptr;
-  // if (_layoutString) {
-  //   return *_layoutString;
-  // }
-
-  // LayoutStringBuilder B{};
-
-  // if (!refCountString(IGM, B, genericSig)) {
-  //   return *(_layoutString = llvm::Optional<llvm::Constant *>(nullptr));
-  // }
-
-  // ConstantInitBuilder IB(IGM);
-  // auto SB = IB.beginStruct();
-  // SB.setPacked(true);
-
-  // B.result(IGM, SB);
-
-  // _layoutString = SB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
-  //                                          /*constant*/ true);
-
-  // return *_layoutString;
 }
 
 bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -1505,35 +1485,25 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
 
 bool AlignedGroupEntry::refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                                        GenericSignature genericSig) const {
-  if (isFixedSize(IGM)) {
-    uint64_t offset = 0;
-    for (auto *entry : entries) {
-      if (offset) {
-        uint64_t alignmentMask = entry->fixedAlignment(IGM)->getMaskValue();
-        uint64_t alignedOffset = offset + alignmentMask;
-        alignedOffset &= ~alignmentMask;
-        if (alignedOffset > offset) {
-          B.addSkip(alignedOffset - offset);
-          offset = alignedOffset;
-        }
-      }
-      if (!entry->refCountString(IGM, B, genericSig)) {
-        return false;
-      }
-      offset += entry->fixedSize(IGM)->getValue();
-    }
-  } else {
+  if (!isFixedSize(IGM)) {
     return false;
-    // B.startDynamicAlignment();
-    // for (auto *entry : entries) {
-    //   if (entry->isFixedSize(IGM)) {
-    //     B.addAlignment(entry->fixedAlignment(IGM)->getValue());
-    //   }
-    //   if (!entry->refCountString(IGM, B, genericSig)) {
-    //     return false;
-    //   }
-    // }
-    // B.endDynamicAlignment();
+  }
+
+  uint64_t offset = 0;
+  for (auto *entry : entries) {
+    if (offset) {
+      uint64_t alignmentMask = entry->fixedAlignment(IGM)->getMaskValue();
+      uint64_t alignedOffset = offset + alignmentMask;
+      alignedOffset &= ~alignmentMask;
+      if (alignedOffset > offset) {
+        B.addSkip(alignedOffset - offset);
+        offset = alignedOffset;
+      }
+    }
+    if (!entry->refCountString(IGM, B, genericSig)) {
+      return false;
+    }
+    offset += entry->fixedSize(IGM)->getValue();
   }
 
   return true;
@@ -3462,8 +3432,6 @@ TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM,
 bool TypeInfoBasedTypeLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B,
     GenericSignature genericSig) const {
-  // auto *accessor = createMetatypeAccessorFunction(IGM, representative);
-  // B.addResilientRefCount(accessor);
   return false;
 }
 
