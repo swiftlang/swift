@@ -192,16 +192,13 @@ SubstitutionMap SubstitutionMap::getCanonical(bool canonicalizeSignature) const 
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      SubstitutionMap substitutions) {
-  if (!genericSig) {
-    assert(!substitutions.hasAnySubstitutableParams() &&
-           "Shouldn't have substitutions here");
+  if (!genericSig)
     return SubstitutionMap();
-  }
 
   return SubstitutionMap::get(genericSig,
            [&](SubstitutableType *type) -> Type {
              return substitutions.lookupSubstitution(
-                      CanSubstitutableType(type));
+                cast<SubstitutableType>(type->getCanonicalType()));
            },
            LookUpConformanceInSubstitutionMap(substitutions));
 }
