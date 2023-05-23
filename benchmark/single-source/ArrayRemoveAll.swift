@@ -18,6 +18,14 @@ public let benchmarks = [
   )
 ]
 
+class Slow {
+  public var num: Int
+
+  init(num: Int) {
+    self.num = num
+  }
+}
+
 let size_Int = 1_000_000
 let size_Class = 100_000
 
@@ -39,20 +47,6 @@ var inputArray_Class: [Slow]! = {
   return a
 }()
 
-class Slow {
-  public var num: Int
-    
-  init(num: Int) {
-    self.num = num
-  }
-}
-
-
-@inline(never)
-func verifyCapacity<T>(_ new: [T], orig: [T]) -> Bool {
-    return new.capacity == orig.capacity
-}
-
 @inline(never)
 func removeAll<T>(_ arr: [T]) -> [T] {
   var copy = arr
@@ -61,22 +55,19 @@ func removeAll<T>(_ arr: [T]) -> [T] {
 }
 
 @inline(never)
-func copyItem<T>(_ item: T) -> T {
-  return item
-}
-
-@inline(never)
 func run_ArrayRemoveAll_Class(_ n: Int) {
-  for _ in 1...n {
-    let copy = removeAll(inputArray_Class)
-    check(verifyCapacity(copy, orig: inputArray_Class))
+  var copy = removeAll(inputArray_Class);
+  for _ in 1..<n {
+    copy = removeAll(inputArray_Class)
   }
+  check(copy.capacity == inputArray_Class.capacity)
 }
 
 @inline(never)
 func run_ArrayRemoveAll_Int(_ n: Int) {
-  for _ in 1...n {
-    let copy = removeAll(inputArray_Int)
-    check(verifyCapacity(copy, orig: inputArray_Int))
+  var copy = removeAll(inputArray_Int);
+  for _ in 1..<n {
+    copy = removeAll(inputArray_Int)
   }
+  check(copy.capacity == inputArray_Int.capacity)
 }
