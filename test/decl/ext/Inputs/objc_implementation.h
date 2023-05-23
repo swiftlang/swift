@@ -19,6 +19,7 @@
 - (void)methodFromHeader3:(int)param;
 - (void)methodFromHeader4:(int)param;
 - (int)methodFromHeader5;
+- (void)methodFromHeader6:(int)param;
 
 @property int propertyFromHeader1;
 @property int propertyFromHeader2;
@@ -30,6 +31,7 @@
 @property int propertyFromHeader8;
 @property int propertyFromHeader9;
 @property int propertyFromHeader10;
+@property int propertyFromHeader11;
 
 @property (readonly) int readonlyPropertyFromHeader1;
 @property (readonly) int readonlyPropertyFromHeader2;
@@ -40,6 +42,7 @@
 
 + (void)classMethod1:(int)param;
 + (void)classMethod2:(int)param;
++ (void)classMethod3:(int)param;
 
 - (void)instanceMethod1:(int)param;
 - (void)instanceMethod2:(int)param;
@@ -105,6 +108,28 @@
 @end
 
 @interface ObjCClass (Conformance) <PartiallyOptionalProtocol>
+
+@end
+
+@interface ObjCClass (TypeMatchOptionality)
+
+- (nullable id)nullableResultAndArg:(nullable id)arg;
+- (nonnull id)nonnullResultAndArg:(nonnull id)arg;
+- (null_unspecified id)nullUnspecifiedResultAndArg:(null_unspecified id)arg;
+
+- (nonnull id)nonnullResult1;
+- (nonnull id)nonnullResult2;
+- (nonnull id)nonnullResult3;
+
+- (void)nonnullArgument1:(nonnull id)arg;
+- (void)nonnullArgument2:(nonnull id)arg;
+- (void)nonnullArgument3:(nonnull id)arg;
+
+- (nullable id)nullableResult;
+- (void)nullableArgument:(nullable id)arg;
+
+- (int)nonPointerResult;
+- (void)nonPointerArgument:(int)arg;
 
 @end
 
