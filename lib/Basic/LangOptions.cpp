@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -408,6 +408,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
+  case llvm::Triple::ArchType::ppc:
   case llvm::Triple::ArchType::ppc64:
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
@@ -420,6 +421,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
   case llvm::Triple::ArchType::aarch64_32:
+  case llvm::Triple::ArchType::ppc:
   case llvm::Triple::ArchType::x86:
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
