@@ -524,7 +524,7 @@ public:
 
       // Otherwise, claim out the right number of values.
       Explosion resultValue;
-      cast<LoadableTypeInfo>(resultTI).reexplode(*this, allValues, resultValue);
+      cast<LoadableTypeInfo>(resultTI).reexplode(allValues, resultValue);
       setLoweredExplosion(result, resultValue);
     }
   }
