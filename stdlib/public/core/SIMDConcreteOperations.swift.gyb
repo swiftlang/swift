@@ -212,11 +212,6 @@ extension SIMDMask where Storage == ${Vector} {
     (self .& .!mask) .| (other .& mask)
   }
   
-%   if n == 64:
-// sext <64 x i1> to <64 x iN> crashes LLVM on arm/arm64. Florian has a fix
-// for this, but only use the expansion on x86 for now.
-#if arch(x86_64) || arch(i386)
-%   end
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
   @_alwaysEmitIntoClient
@@ -234,9 +229,6 @@ extension SIMDMask where Storage == ${Vector} {
     var g = SystemRandomNumberGenerator()
     return Self.random(using: &g)
   }
-%   if n == 64:
-#endif
-%   end
 }
 
 /// True if any lane of mask is true.
