@@ -2807,6 +2807,65 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return true;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_experimental_platform_c_calling_convention)) {
+    Opts.ExperimentalPlatformCCallingConvention =
+      llvm::StringSwitch<llvm::CallingConv::ID>(A->getValue())
+        .Case("c", llvm::CallingConv::C)
+        .Case("fast", llvm::CallingConv::Fast)
+        .Case("cold", llvm::CallingConv::Cold)
+        .Case("ghc", llvm::CallingConv::GHC)
+        .Case("hipe", llvm::CallingConv::HiPE)
+        .Case("webkit_js", llvm::CallingConv::WebKit_JS)
+        .Case("anyreg", llvm::CallingConv::AnyReg)
+        .Case("preservemost", llvm::CallingConv::PreserveMost)
+        .Case("preserveall", llvm::CallingConv::PreserveAll)
+        .Case("swift", llvm::CallingConv::Swift)
+        .Case("cxx_fast_tls", llvm::CallingConv::CXX_FAST_TLS)
+        .Case("tail", llvm::CallingConv::Tail)
+        .Case("cfguard_check", llvm::CallingConv::CFGuard_Check)
+        .Case("swifttail", llvm::CallingConv::SwiftTail)
+        .Case("firsttargetcc", llvm::CallingConv::FirstTargetCC)
+        .Case("x86_stdcall", llvm::CallingConv::X86_StdCall)
+        .Case("x86_fastcall", llvm::CallingConv::X86_FastCall)
+        .Case("arm_apcs", llvm::CallingConv::ARM_APCS)
+        .Case("arm_aapcs", llvm::CallingConv::ARM_AAPCS)
+        .Case("arm_aapcs_vfp", llvm::CallingConv::ARM_AAPCS_VFP)
+        .Case("msp430_intr", llvm::CallingConv::MSP430_INTR)
+        .Case("x86_thiscall", llvm::CallingConv::X86_ThisCall)
+        .Case("ptx_kernel", llvm::CallingConv::PTX_Kernel)
+        .Case("ptx_device", llvm::CallingConv::PTX_Device)
+        .Case("spir_func", llvm::CallingConv::SPIR_FUNC)
+        .Case("spir_kernel", llvm::CallingConv::SPIR_KERNEL)
+        .Case("intel_ocl_bi", llvm::CallingConv::Intel_OCL_BI)
+        .Case("x86_64_sysv", llvm::CallingConv::X86_64_SysV)
+        .Case("win64", llvm::CallingConv::Win64)
+        .Case("x86_vectorcall", llvm::CallingConv::X86_VectorCall)
+        .Case("x86_intr", llvm::CallingConv::X86_INTR)
+        .Case("avr_intr", llvm::CallingConv::AVR_INTR)
+        .Case("avr_signal", llvm::CallingConv::AVR_SIGNAL)
+        .Case("avr_builtin", llvm::CallingConv::AVR_BUILTIN)
+        .Case("amdgpu_vs", llvm::CallingConv::AMDGPU_VS)
+        .Case("amdgpu_gs", llvm::CallingConv::AMDGPU_GS)
+        .Case("amdgpu_ps", llvm::CallingConv::AMDGPU_PS)
+        .Case("amdgpu_cs", llvm::CallingConv::AMDGPU_CS)
+        .Case("amdgpu_kernel", llvm::CallingConv::AMDGPU_KERNEL)
+        .Case("x86_regcall", llvm::CallingConv::X86_RegCall)
+        .Case("amdgpu_hs", llvm::CallingConv::AMDGPU_HS)
+        .Case("msp430_builtin", llvm::CallingConv::MSP430_BUILTIN)
+        .Case("amdgpu_ls", llvm::CallingConv::AMDGPU_LS)
+        .Case("amdgpu_es", llvm::CallingConv::AMDGPU_ES)
+        .Case("aarch64_vectorcall", llvm::CallingConv::AArch64_VectorCall)
+        .Case("aarch64_sve_vectorcall", llvm::CallingConv::AArch64_SVE_VectorCall)
+        .Case("wasm_emscripteninvoke", llvm::CallingConv::WASM_EmscriptenInvoke)
+        .Case("amdgpu_gfx", llvm::CallingConv::AMDGPU_Gfx)
+        .Case("m68k_intr", llvm::CallingConv::M68k_INTR)
+        .Case("aarch64_sme_abi_support_routines_preservemost_from_x0",
+              llvm::CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0)
+        .Case("aarch64_sme_abi_support_routines_preservemost_from_x2",
+              llvm::CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2)
+        .Default(llvm::CallingConv::C);
+  }
+
   return false;
 }
 
