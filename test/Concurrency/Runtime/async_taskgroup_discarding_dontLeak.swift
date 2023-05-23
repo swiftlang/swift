@@ -1,7 +1,5 @@
-// RUN: %target-run-simple-leaks-swift( -Xfrontend -disable-availability-checking -parse-as-library)
-
-// This test uses `leaks` which is only available on apple platforms; limit it to macOS:
-// REQUIRES: OS=macosx
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -15,38 +13,45 @@
 
 import _Concurrency
 
-struct Boom: Error {
+final class PrintDeinit {
   let id: String
-
-  init(file: String = #fileID, line: UInt = #line) {
-    self.id = "\(file):\(line)"
-  }
-
   init(id: String) {
     self.id = id
+  }
+
+  deinit {
+    print("deinit, id: \(id)")
+  }
+}
+
+struct Boom: Error {
+  let printDeinit: PrintDeinit
+
+  init(id: String) {
+    self.printDeinit = PrintDeinit(id: id)
   }
 }
 
 final class BoomClass: Error {
   let id: String
 
-  init(file: String = #fileID, line: UInt = #line) {
-    self.id = "\(file):\(line)"
-  }
-
   init(id: String) {
     self.id = id
+  }
+
+  deinit {
+    print("deinit, id: \(id)")
   }
 }
 
 final class SomeClass: @unchecked Sendable {
-//struct SomeClass: @unchecked Sendable {
-  let number: Int
-  init() {
-    self.number = 0
+  let id: String
+  init(id: String) {
+    self.id = id
   }
-  init(number: Int) {
-    self.number = number
+
+  deinit {
+    print("deinit, id: \(id)")
   }
 }
 
@@ -56,21 +61,31 @@ final class SomeClass: @unchecked Sendable {
   static func main() async {
     _ = try? await withThrowingDiscardingTaskGroup() { group in
       group.addTask {
-        throw Boom()
+        throw Boom(id: "race-boom-class")
       }
       group.addTask {
-        SomeClass() // will be discarded
+        SomeClass(id: "race-boom-class") // will be discarded
       }
+      // since values may deinit in any order, we just assert their count basically
+      // CHECK: deinit, id: race-boom-class
+      // CHECK: deinit, id: race-boom-class
 
       return 12
     }
 
     // many ok
     _ = try? await withThrowingDiscardingTaskGroup() { group in
-      for i in 0..<10 {
+      for i in 0..<6 {
         group.addTask {
-          SomeClass(number: i) // will be discarded
+          SomeClass(id: "many-ok") // will be discarded
         }
+        // since values may deinit in any order, we just assert their count basically
+        // CHECK: deinit, id: many-ok
+        // CHECK: deinit, id: many-ok
+        // CHECK: deinit, id: many-ok
+        // CHECK: deinit, id: many-ok
+        // CHECK: deinit, id: many-ok
+        // CHECK: deinit, id: many-ok
       }
 
       return 12
@@ -79,11 +94,19 @@ final class SomeClass: @unchecked Sendable {
     // many throws
     do {
       let value = try await withThrowingDiscardingTaskGroup() { group in
-        for i in 0..<10 {
+        for i in 0..<6 {
           group.addTask {
-            throw BoomClass() // will be rethrown
+            throw BoomClass(id: "many-error") // will be rethrown
           }
         }
+
+        // since values may deinit in any order, we just assert their count basically
+        // CHECK: deinit, id: many-error
+        // CHECK: deinit, id: many-error
+        // CHECK: deinit, id: many-error
+        // CHECK: deinit, id: many-error
+        // CHECK: deinit, id: many-error
+        // CHECK: deinit, id: many-error
 
         12 // must be ignored
       }
@@ -95,26 +118,33 @@ final class SomeClass: @unchecked Sendable {
     // many errors, many values
     _ = try? await withThrowingDiscardingTaskGroup() { group in
       group.addTask {
-        SomeClass() // will be discarded
+        SomeClass(id: "mixed-ok") // will be discarded
       }
       group.addTask {
-        SomeClass() // will be discarded
+        SomeClass(id: "mixed-ok") // will be discarded
       }
       group.addTask {
-        SomeClass() // will be discarded
+        SomeClass(id: "mixed-ok") // will be discarded
       }
       group.addTask {
-        throw Boom()
+        throw Boom(id: "mixed-error")
       }
       group.addTask {
-        throw Boom()
+        throw Boom(id: "mixed-error")
       }
       group.addTask {
-        throw Boom()
+        throw Boom(id: "mixed-error")
       }
-      group.addTask {
-        throw Boom()
-      }
+
+      // since values may deinit in any order, we just assert their count basically
+      // three ok's
+      // CHECK: deinit, id: mixed
+      // CHECK: deinit, id: mixed
+      // CHECK: deinit, id: mixed
+      // three errors
+      // CHECK: deinit, id: mixed
+      // CHECK: deinit, id: mixed
+      // CHECK: deinit, id: mixed
 
       return 12
     }

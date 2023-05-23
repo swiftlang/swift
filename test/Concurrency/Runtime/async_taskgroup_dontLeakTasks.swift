@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-leaks-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
 
 // This test uses `leaks` which is only available on apple platforms; limit it to macOS:
 // REQUIRES: OS=macosx
@@ -16,6 +17,10 @@ final class Something {
   init(int: Int) {
     self.int = int
   }
+
+  deinit {
+    print("deinit, Something, int: \(int)")
+  }
 }
 
 func test_taskGroup_next() async {
@@ -31,6 +36,13 @@ func test_taskGroup_next() async {
     for await value in group {
       sum += value.int
     }
+
+
+    // CHECK-DAG: deinit, Something, int: 0
+    // CHECK-DAG: deinit, Something, int: 1
+    // CHECK-DAG: deinit, Something, int: 2
+    // CHECK-DAG: deinit, Something, int: 3
+    // CHECK-DAG: deinit, Something, int: 4
 
     return sum
   }

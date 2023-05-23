@@ -64,7 +64,7 @@
 
 using namespace swift;
 
-#if 1
+#if 0
 #define SWIFT_TASK_GROUP_DEBUG_LOG(group, fmt, ...)                     \
 fprintf(stderr, "[%#lx] [%s:%d][group(%p%s)] (%s) " fmt "\n",           \
       (unsigned long)Thread::current().platformThreadId(),              \
@@ -390,7 +390,11 @@ public:
   virtual void enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) = 0;
 
   /// Resume waiting task with result from `completedTask`
-  void resumeWaitingTask(AsyncTask *completedTask, TaskGroupStatus &assumed, bool hadErrorResult, bool alreadyDecremented = false);
+  void resumeWaitingTask(AsyncTask *completedTask,
+                         TaskGroupStatus &assumed,
+                         bool hadErrorResult,
+                         bool alreadyDecremented = false,
+                         bool taskWasRetained = false);
 
   // ==== Status manipulation -------------------------------------------------
 
@@ -827,7 +831,9 @@ public:
 
 private:
   /// Resume waiting task with specified error
-  void resumeWaitingTaskWithError(SwiftError *error, TaskGroupStatus &assumed, bool alreadyDecremented);
+  void resumeWaitingTaskWithError(SwiftError *error,
+                                  TaskGroupStatus &assumed,
+                                  bool alreadyDecremented);
 };
 
 } // end anonymous namespace
@@ -1040,7 +1046,7 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
   case PollStatus::Error: {
     auto error = reinterpret_cast<SwiftError *>(result.storage);
-    fillGroupNextErrorResult(context, error); // FIXME: this specifically retains the error, but likely should not!??!!?
+    fillGroupNextErrorResult(context, error);
     return;
   }
 
@@ -1240,11 +1246,16 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
         switch (readyErrorItem.getStatus()) {
           case ReadyStatus::RawError:
             SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, resume with raw error:%p", readyErrorItem.getRawError(this));
-            resumeWaitingTaskWithError(readyErrorItem.getRawError(this), assumed, alreadyDecrementedStatus);
+            resumeWaitingTaskWithError(readyErrorItem.getRawError(this), assumed,
+                                       alreadyDecrementedStatus);
             break;
           case ReadyStatus::Error:
             SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, resume with errorItem.task:%p", readyErrorItem.getTask());
-            resumeWaitingTask(readyErrorItem.getTask(), assumed, /*hadErrorResult=*/true, alreadyDecrementedStatus);
+            SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, expect that it was extra retained %p", readyErrorItem.getTask());
+            resumeWaitingTask(readyErrorItem.getTask(), assumed,
+                              /*hadErrorResult=*/true,
+                              alreadyDecrementedStatus,
+                              /*taskWasRetained=*/true);
             break;
           default:
             swift_Concurrency_fatalError(0,
@@ -1283,7 +1294,10 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
           resumeWaitingTaskWithError(readyErrorItem.getRawError(this), assumed, alreadyDecrementedStatus);
           break;
         case ReadyStatus::Error:
-          resumeWaitingTask(readyErrorItem.getTask(), assumed, /*hadErrorResult=*/true, alreadyDecrementedStatus);
+          resumeWaitingTask(readyErrorItem.getTask(), assumed,
+                            /*hadErrorResult=*/true,
+                            alreadyDecrementedStatus,
+                            /*taskWasRetained=*/true);
           break;
         default:
           swift_Concurrency_fatalError(0,
@@ -1293,14 +1307,6 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       // This is the last task, we have a waiting task and there was no error stored previously;
       // We must resume the waiting task with a success, so let us return here.
       resumeWaitingTask(completedTask, assumed, /*hadErrorResult=*/false, alreadyDecrementedStatus);
-
-//      // TODO: since the DiscardingTaskGroup ended up written as `-> T` in order to use the same pointer auth as the
-//      //       usual task closures; we end up retaining the value when it is returned. As this is a discarding group
-//      //       we actually can and should release this value.
-//      //       Is there a way we could avoid the retain made on the returned value entirely?
-//      if (completedTask->futureFragment()->getResultType()->isClassObject()) {
-//        swift_release(reinterpret_cast<HeapObject *>(completedTask->futureFragment()->getStoragePtr()));
-//      }
     }
   } else {
     // it wasn't the last pending task, and there is no-one to resume;
@@ -1317,7 +1323,8 @@ void TaskGroupBase::resumeWaitingTask(
     AsyncTask *completedTask,
     TaskGroupStatus &assumed,
     bool hadErrorResult,
-    bool alreadyDecremented) {
+    bool alreadyDecremented,
+    bool taskWasRetained) {
   auto waitingTask = waitQueue.load(std::memory_order_acquire);
   assert(waitingTask && "waitingTask must not be null when attempting to resume it");
   assert(assumed.hasWaitingTask());
@@ -1384,14 +1391,14 @@ void TaskGroupBase::resumeWaitingTask(
         auto before = completedTask;
         _swift_taskGroup_detachChild(asAbstract(this), completedTask);
         SWIFT_TASK_GROUP_DEBUG_LOG(this, "completedTask %p; AFTER DETACH (count:%d)", completedTask, swift_retainCount(completedTask));
-        if (hadErrorResult) {
+        if (isDiscardingResults() && hadErrorResult && taskWasRetained) {
           SWIFT_TASK_GROUP_DEBUG_LOG(this, "BEFORE RELEASE error task=%p (count:%d)\n",
                   completedTask,
                   swift_retainCount(completedTask));
           // We only used the task to keep the error in the future fragment around
           // so now that we emitted the error and detached the task, we are free to release the task immediately.
-          auto error = reinterpret_cast<SwiftError *>(result.storage);
-          swift_release(completedTask); // we need to do this if the error is a class
+          auto error = completedTask->futureFragment()->getError();
+          swift_release(completedTask);
         }
 
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));

@@ -1,7 +1,4 @@
-// RUN: %target-run-simple-leaks-swift( -Xfrontend -disable-availability-checking -parse-as-library)
-
-// This test uses `leaks` which is only available on apple platforms; limit it to macOS:
-// REQUIRES: OS=macosx
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -20,10 +17,11 @@ final class ClassBoom: Error {
 
   init(file: String = #fileID, line: UInt = #line) {
     self.id = "\(file):\(line)"
+    print("INIT OF ClassBoom from \(id)")
   }
 
-  init(id: String) {
-    self.id = id
+  deinit {
+    print("DEINIT OF ClassBoom from \(id)")
   }
 }
 
@@ -32,23 +30,17 @@ final class ClassBoom: Error {
 
     // many errors
     _ = try? await withThrowingDiscardingTaskGroup() { group in
-      group.addTask {
-        throw ClassBoom()
-      }
-      group.addTask {
-        throw ClassBoom()
-      }
-      group.addTask {
-        throw ClassBoom()
-      }
-      group.addTask {
-        throw ClassBoom()
-      }
-      group.addTask {
-        12
-      }
-
+      group.addTask { throw ClassBoom() }
+      group.addTask { throw ClassBoom() }
+      group.addTask { throw ClassBoom() }
+      group.addTask { throw ClassBoom() }
+      group.addTask { 12 }
       return 12
+
+      // CHECK: DEINIT OF ClassBoom
+      // CHECK: DEINIT OF ClassBoom
+      // CHECK: DEINIT OF ClassBoom
+      // CHECK: DEINIT OF ClassBoom
     }
   }
 }

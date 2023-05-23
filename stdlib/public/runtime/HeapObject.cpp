@@ -526,7 +526,6 @@ void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
     _swift_release_;
 
 void swift::swift_nonatomic_release(HeapObject *object) {
-  fprintf(stderr, "[%s:%d](%s) swift_nonatomic_release %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, object);
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.decrementAndMaybeDeinitNonAtomic(1);
@@ -534,7 +533,6 @@ void swift::swift_nonatomic_release(HeapObject *object) {
 
 SWIFT_ALWAYS_INLINE
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
-fprintf(stderr, "[%s:%d](%s) _swift_release_n_ %p (n=%d)\n", __FILE_NAME__, __LINE__, __FUNCTION__, object, n);
   SWIFT_RT_TRACK_INVOCATION(object, swift_release_n);
   if (isValidPointerForNativeRetain(object))
     object->refCounts.decrementAndMaybeDeinit(n);
@@ -798,8 +796,6 @@ void swift::swift_unownedCheck(HeapObject *object) {
 }
 
 void _swift_release_dealloc(HeapObject *object) {
-  fprintf(stderr, "[%s:%d](%s) _swift_release_dealloc %p (count before: %d)\n", __FILE_NAME__, __LINE__, __FUNCTION__, object,
-          swift_retainCount(object));
   asFullMetadata(object->metadata)->destroy(object);
 }
 
