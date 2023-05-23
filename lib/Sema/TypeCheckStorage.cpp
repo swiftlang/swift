@@ -2777,6 +2777,8 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
                                         VarDecl::Introducer::Var,
                                         var->getLoc(),
                                         name, dc);
+  if (var->isLet() && var->getAttrs().hasAttribute<NonisolatedAttr>())
+    property->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
   property->setImplicit();
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
@@ -3035,6 +3037,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
                                    introducer,
                                    var->getLoc(),
                                    name, dc);
+    if (var->isLet() && var->getAttrs().hasAttribute<NonisolatedAttr>())
+      backingVar->getAttrs().add(new (ctx)
+                                     NonisolatedAttr(/*isImplicit=*/true));
     backingVar->setImplicit();
     backingVar->setOriginalWrappedProperty(var);
 
@@ -3046,6 +3051,7 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
   }
 
   if (wrapperInfo.projectedValueVar || var->getName().hasDollarPrefix()) {
+
     projectionVar = synthesizePropertyWrapperProjectionVar(
         ctx, var, wrapperInfo.projectedValueVar);
   }

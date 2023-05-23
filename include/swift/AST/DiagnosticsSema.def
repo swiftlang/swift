@@ -5320,7 +5320,7 @@ ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
 ERROR(nonisolated_wrapped_property,none,
-      "'nonisolated' is not supported on properties with property wrappers",
+      "'nonisolated' is not supported on `var` declared property wrappers",
       ())
 
 ERROR(actor_instance_property_wrapper,none,
