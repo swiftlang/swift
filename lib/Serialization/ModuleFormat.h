@@ -2227,6 +2227,16 @@ namespace decls_block {
       BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
       >;
 
+  using InitializesDeclAttrLayout = BCRecordLayout<
+      Initializes_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
+
+  using AccessesDeclAttrLayout = BCRecordLayout<
+      Accesses_DECL_ATTR,
+      BCArray<IdentifierIDField> // initialized properties
+  >;
+
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.

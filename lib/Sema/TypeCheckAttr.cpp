@@ -294,6 +294,8 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
+  void visitInitializesAttr(InitializesAttr *attr);
+  void visitAccessesAttr(AccessesAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
@@ -3546,6 +3548,14 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   assert(isa<ProtocolDecl>(D));
   // Invoke the request.
   (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
+}
+
+void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
+  llvm_unreachable("InitializesAttr not implemented yet");
+}
+
+void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
+  llvm_unreachable("AccessesAttr not implemented yet");
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {

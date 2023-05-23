@@ -1548,6 +1548,62 @@ public:
   }
 };
 
+class InitializesAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<InitializesAttr, Identifier> {
+  friend TrailingObjects;
+
+  size_t numProperties;
+
+  InitializesAttr(SourceLoc atLoc, SourceRange range,
+                  ArrayRef<Identifier> properties);
+
+public:
+  static InitializesAttr *create(ASTContext &ctx,
+                                 SourceLoc atLoc, SourceRange range,
+                                 ArrayRef<Identifier> properties);
+
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+    return numProperties;
+  }
+
+  ArrayRef<Identifier> getProperties() const {
+    return {getTrailingObjects<Identifier>(), numProperties};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Initializes;
+  }
+};
+
+class AccessesAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<AccessesAttr, Identifier> {
+  friend TrailingObjects;
+
+  size_t numProperties;
+
+  AccessesAttr(SourceLoc atLoc, SourceRange range,
+               ArrayRef<Identifier> properties);
+
+public:
+  static AccessesAttr *create(ASTContext &ctx,
+                              SourceLoc atLoc, SourceRange range,
+                              ArrayRef<Identifier> properties);
+
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+    return numProperties;
+  }
+
+  ArrayRef<Identifier> getProperties() const {
+    return {getTrailingObjects<Identifier>(), numProperties};
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Accesses;
+  }
+};
+
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
