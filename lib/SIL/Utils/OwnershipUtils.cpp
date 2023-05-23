@@ -56,6 +56,13 @@ bool swift::findPointerEscape(SILValue original) {
         worklist.pushIfNotVisited(phi);
         break;
       }
+      case OperandOwnership::Borrow: {
+        auto borrowOp = BorrowingOperand(use);
+        if (auto borrowValue = borrowOp.getBorrowIntroducingUserResult()) {
+          worklist.pushIfNotVisited(borrowValue.value);
+        }
+        break;
+      }
       case OperandOwnership::Reborrow: {
         SILArgument *phi = PhiOperand(use).getValue();
         worklist.pushIfNotVisited(phi);
@@ -70,6 +77,13 @@ bool swift::findPointerEscape(SILValue original) {
           worklist.pushIfNotVisited(result);
           return true;
         });
+        break;
+      }
+      case OperandOwnership::InteriorPointer: {
+        if (InteriorPointerOperand(use).findTransitiveUses() !=
+            AddressUseKind::NonEscaping) {
+          return true;
+        }
         break;
       }
       default:
