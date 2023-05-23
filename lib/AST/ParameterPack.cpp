@@ -90,6 +90,16 @@ bool GenericTypeParamType::isParameterPack() const {
          GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
+bool TypeBase::isParameterPack() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isParameterPack();
+}
+
 PackType *TypeBase::getPackSubstitutionAsPackType() {
   if (auto pack = getAs<PackType>()) {
     return pack;

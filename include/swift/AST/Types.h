@@ -7098,16 +7098,6 @@ inline bool TypeBase::isTypeParameter() {
   return t->is<GenericTypeParamType>();
 }
 
-inline bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<GenericTypeParamType>() &&
-         t->castTo<GenericTypeParamType>()->isParameterPack();
-}
-
 // TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
   return !(hasLValueType() || is<InOutType>());
