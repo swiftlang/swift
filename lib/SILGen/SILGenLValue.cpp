@@ -366,6 +366,7 @@ LogicalPathComponent::projectForRead(SILGenFunction &SGF, SILLocation loc,
   }
 
   TemporaryInitializationPtr tempInit;
+  ManagedValue result;
   RValue rvalue;
 
   // If the RValue type has an openedExistential, then the RValue must be
@@ -377,9 +378,11 @@ LogicalPathComponent::projectForRead(SILGenFunction &SGF, SILLocation loc,
 
     // Create a temporary, whose type may depend on the 'get'.
     tempInit = SGF.emitFormalAccessTemporary(loc, RValueTL);
+    result = tempInit->getManagedAddress();
   } else {
     // Create a temporary for a static (non-dependent) RValue type.
     tempInit = SGF.emitFormalAccessTemporary(loc, RValueTL);
+    result = tempInit->getManagedAddress();
 
     // Emit a 'get' directly into the temporary.
     rvalue = std::move(*this).get(SGF, loc, base, SGFContext(tempInit.get()));
@@ -390,7 +393,8 @@ LogicalPathComponent::projectForRead(SILGenFunction &SGF, SILLocation loc,
   if (!rvalue.isInContext())
     std::move(rvalue).forwardInto(SGF, loc, tempInit.get());
 
-  return tempInit->getManagedAddress();
+  assert(result);
+  return result;
 }
 
 ManagedValue LogicalPathComponent::project(SILGenFunction &SGF,
