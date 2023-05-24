@@ -2157,7 +2157,9 @@ private:
       const auto &elt2 = tuple2->getElement(i);
 
       if (inPatternMatchingContext) {
-        if (elt1.hasName() && elt1.getName() != elt2.getName())
+        // FIXME: The fact that this isn't symmetric is wrong since this logic
+        // is called for bind and equal constraints...
+        if (elt2.hasName() && elt1.getName() != elt2.getName())
           return true;
       } else {
         // If the names don't match, we have a conflict.
@@ -3515,21 +3517,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // FIXME: We should check value ownership too, but it's not completely
       // trivial because of inout-to-pointer conversions.
 
-      // For equality contravariance doesn't matter, but let's make sure
-      // that types are matched in original order because that is important
-      // when function types are equated as part of pattern matching.
-      auto paramType1 = kind == ConstraintKind::Equal ? func1Param.getOldType()
-                                                      : func2Param.getOldType();
-
-      auto paramType2 = kind == ConstraintKind::Equal ? func2Param.getOldType()
-                                                      : func1Param.getOldType();
-
-      // Compare the parameter types.
-      auto result = matchTypes(paramType1, paramType2, subKind, subflags,
-                               (func1Params.size() == 1
-                                ? argumentLocator
-                                : argumentLocator.withPathElement(
-                                      LocatorPathElt::TupleElement(i))));
+      // Compare the parameter types, taking contravariance into account.
+      auto result = matchTypes(
+          func2Param.getOldType(), func1Param.getOldType(), subKind, subflags,
+          (func1Params.size() == 1 ? argumentLocator
+                                   : argumentLocator.withPathElement(
+                                         LocatorPathElt::TupleElement(i))));
       if (result.isFailure())
         return result;
     }
@@ -6394,7 +6387,7 @@ bool ConstraintSystem::repairFailures(
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
 
-        if (!rhs->getOptionalObjectType() &&
+        if (!lhs->getOptionalObjectType() &&
             optionalityOf(ROK) == ReferenceOwnershipOptionality::Required) {
           conversionsOrFixes.push_back(
               AllowNonOptionalWeak::create(*this, getConstraintLocator(NP)));
@@ -14786,7 +14779,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
 
-    (void)matchTypes(type1, OptionalType::get(type2), ConstraintKind::Equal,
+    // NOTE: The order here is important! Pattern matching equality is
+    // not symmetric (we need to fix that either by using a different
+    // constraint, or actually making it symmetric).
+    (void)matchTypes(OptionalType::get(type1), type2, ConstraintKind::Equal,
                      TypeMatchFlags::TMF_ApplyingFix, locator);
 
     return SolutionKind::Solved;
