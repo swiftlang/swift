@@ -5824,6 +5824,11 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
+    case ConstraintLocator::EnumPatternImplicitCastMatch: {
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::PackType:
     case ConstraintLocator::ParentType:
     case ConstraintLocator::KeyPathType:

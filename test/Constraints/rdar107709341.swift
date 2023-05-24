@@ -2,10 +2,9 @@
 
 // rdar://107709341 – Make sure we don't crash.
 func foo(_ x: Int) {
-  // FIXME: We ought to have a better diagnostic
-  let _ = { // expected-error {{unable to infer closure type in the current context}}
+  let _ = {
     switch x {
-    case Optional<Int>.some(x):
+    case Optional<Int>.some(x): // expected-error {{pattern of type 'Optional<Int>' cannot match 'Int'}} {{none}}
       break
     default:
       break
