@@ -42,16 +42,18 @@ static const size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 /// offset
 template <typename T>
 T readBytes(const uint8_t *typeLayout, size_t &i) {
-  T returnVal = *(const T *)(typeLayout + i);
+  T returnVal;
+  memcpy(&returnVal, typeLayout + i, sizeof(T));
   i += sizeof(T);
   return returnVal;
 }
 
 /// Given a pointer, a value, and an offset, write the value at the given
-/// offset in big-endian order
+/// offset and increment offset by the size of T
 template <typename T>
-void writeBytes(uint8_t *typeLayout, size_t i, T value) {
-  *((T*)(typeLayout + i)) = value;
+void writeBytes(uint8_t *typeLayout, size_t &i, T value) {
+  memcpy(typeLayout + i, &value, sizeof(T));
+  i += sizeof(T);
 }
 
 Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
@@ -64,7 +66,8 @@ const Metadata *getResilientTypeMetadata(const Metadata* metadata,
                                          const uint8_t *layoutStr,
                                          size_t &offset) {
   auto absolute = layoutStr + offset;
-  auto relativeOffset = (uintptr_t)(intptr_t)(int32_t)readBytes<intptr_t>(layoutStr, offset);
+  auto relativeOffset =
+      (uintptr_t)(intptr_t)(int32_t)readBytes<intptr_t>(layoutStr, offset);
   MetadataAccessor fn;
 
 #if SWIFT_PTRAUTH
@@ -404,12 +407,13 @@ void swift::swift_resolve_resilientAccessors(
 
     switch (tag) {
     case RefCountingKind::Resilient: {
-      auto *type = getResilientTypeMetadata(fieldType, fieldLayoutStr,
-                                            i);
-      uint8_t *curPos = (layoutStr + layoutStrOffset + currentOffset - layoutStringHeaderSize);
-      *((uint64_t*)curPos) =
+      auto *type = getResilientTypeMetadata(fieldType, fieldLayoutStr, i);
+      size_t writeOffset = layoutStrOffset + currentOffset -
+                           layoutStringHeaderSize;
+      uint64_t tagAndOffset =
           (((uint64_t)RefCountingKind::Metatype) << 56) | size;
-      *((Metadata const* *)(curPos + sizeof(uint64_t))) = type;
+      writeBytes(layoutStr, writeOffset, tagAndOffset);
+      writeBytes(layoutStr, writeOffset, type);
       break;
     }
     case RefCountingKind::Metatype:
