@@ -186,7 +186,13 @@ public:
       }
     }
 
-    // Both sides have equal number of pack expansion type.
+    // If both sides have the same number of elements and all of
+    // them are pack expansions there is not going to be any
+    // expansion "absorption" and it's okay to match per-index.
+    //
+    // Like in all previous cases the callers are responsible
+    // to check whether the element types actually line up,
+    // this is a purely structural match.
     if (lhsElts.size() == rhsElts.size()) {
       for (unsigned i = 0, n = lhsElts.size(); i != n; ++i) {
         auto lhsType = getElementType(lhsElts[i]);
