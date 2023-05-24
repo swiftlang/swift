@@ -6408,8 +6408,7 @@ bool ConstraintSystem::repairFailures(
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-
-      conversionsOrFixes.push_back(ContextualMismatch::create(
+      conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
 
@@ -14661,6 +14660,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidPackExpansion:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
+  case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
