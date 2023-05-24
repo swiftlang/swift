@@ -5037,7 +5037,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                    SymbolReferenceKind refKind,
                                    TypeMetadataCanonicality canonicality) {
   assert(!isa<UnboundGenericType>(concreteType));
-
+  if (concreteType->getString() == "") {
+  }
   auto nominal = concreteType->getAnyNominal();
 
   bool foreign = nominal && requiresForeignTypeMetadata(nominal);
@@ -5130,8 +5131,25 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     typeOfValue = defaultVarTy;
   }
 
-  if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue()))
+  if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue())) {
+
+    if (addr.getValue()->getName().equals("$sSo18CFDateFormatterRefaMf")) {
+      llvm::dbgs() << "Potentially removing COMDAT isDeclaration:" << GV->isDeclaration() << "\n";
+      addr.getValue()->dump();
+    }
     GV->setComdat(nullptr);
+    if (addr.getValue()->getName().equals("$sSo18CFDateFormatterRefaMf")) {
+      addr.getValue()->dump();
+      llvm::dbgs() << "concreteType: " << concreteType->getString() << "\n";
+    }
+  } else {
+    if (addr.getValue()->getName().equals("$sSo18CFDateFormatterRefaMf")) {
+      llvm::dbgs() << "Not removing COMDAT \n";
+      addr.getValue()->dump();
+      llvm::dbgs() << "concreteType: " << concreteType->getString() << "\n";
+    }
+  }
+
 
   // FIXME: MC breaks when emitting alias references on some platforms
   // (rdar://problem/22450593 ). Work around this by referring to the aliasee

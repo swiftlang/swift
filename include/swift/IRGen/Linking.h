@@ -1630,12 +1630,23 @@ public:
 
     // COMDATs cannot be applied to declarations.  If we have a definition,
     // apply the COMDAT.
-    if (definition)
+    if (definition) {
       if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
-          IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
-        if (Triple.supportsCOMDAT())
-          if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
+          IRL.Linkage == llvm::GlobalValue::WeakODRLinkage) {
+        if (Triple.supportsCOMDAT()) {
+          if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV)) {
+            if (GV->getName().equals("$sSo18CFDateFormatterRefaMf")) {
+              llvm::dbgs() << "Setting comdat in" << M->getName() << "\n";
+            }
             GO->setComdat(M->getOrInsertComdat(GV->getName()));
+            GV->dump();
+          }
+        }
+      } else if (GV->getName().equals("$sSo18CFDateFormatterRefaMf")){
+        llvm::dbgs() << "Not setting comdat in " << M->getName() << "\n";
+        GV->dump();
+      }
+    }
   }
 };
 
