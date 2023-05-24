@@ -179,6 +179,10 @@ EXPERIMENTAL_FEATURE(ImplicitSome, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
+/// Use the syntax tree produced by the Swift (swift-syntax) parser for type
+/// parsing, using ASTGen to translate them into AST nodes.
+EXPERIMENTAL_FEATURE(ASTGenTypes, false)
+
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
