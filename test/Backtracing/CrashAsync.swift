@@ -10,6 +10,7 @@
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
@@ -41,13 +42,13 @@ struct CrashAsync {
 
 // CHECK: Thread {{[0-9]+}} crashed:
 
-// CHECK:  0                  0x{{[0-9a-f]+}} _$s10CrashAsync5crashyyF + {{[0-9]+}} in CrashAsync at {{.*}}/CrashAsync.swift:20:15
-// CHECK-NEXT:  1 [ra]             0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTY0_ + {{[0-9]+}} in CrashAsync at {{.*}}/CrashAsync.swift:28:5
-// CHECK-NEXT:  2 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:26
-// CHECK-NEXT:  3 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:26
-// CHECK-NEXT:  4 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:26
-// CHECK-NEXT:  5 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:26
-// CHECK-NEXT:  6 [async]          0x{{[0-9a-f]+}} _$s10CrashAsyncAAV4mainyyYaFZTQ0_ in CrashAsync at {{.*}}/CrashAsync.swift:36
+// CHECK:  0                  0x{{[0-9a-f]+}} _$s10CrashAsync5crashyyF + {{[0-9]+}} in CrashAsync at {{.*}}/CrashAsync.swift:21:15
+// CHECK-NEXT:  1 [ra]             0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTY0_ + {{[0-9]+}} in CrashAsync at {{.*}}/CrashAsync.swift:29:5
+// CHECK-NEXT:  2 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:27
+// CHECK-NEXT:  3 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:27
+// CHECK-NEXT:  4 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:27
+// CHECK-NEXT:  5 [async]          0x{{[0-9a-f]+}} _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}/CrashAsync.swift:27
+// CHECK-NEXT:  6 [async]          0x{{[0-9a-f]+}} _$s10CrashAsyncAAV4mainyyYaFZTQ0_ in CrashAsync at {{.*}}/CrashAsync.swift:37
 // CHECK-NEXT:  7 [async] [system] 0x{{[0-9a-f]+}} _$s10CrashAsyncAAV5$mainyyYaFZTQ0_ in CrashAsync at {{.*}}/<compiler-generated>
 // CHECK-NEXT:  8 [async] [system] 0x{{[0-9a-f]+}} _async_MainTQ0_ in CrashAsync at {{.*}}/<compiler-generated>
 // CHECK-NEXT:  9 [async] [thunk]  0x{{[0-9a-f]+}} _$sIetH_yts5Error_pIegHrzo_TRTQ0_ in CrashAsync at {{.*}}/<compiler-generated>
@@ -58,42 +59,42 @@ struct CrashAsync {
 
 // FRIENDLY: Thread {{[0-9]+}} crashed:
 
-// FRIENDLY: 0 _$s10CrashAsync5crashyyF + {{[0-9]+}} in CrashAsync at {{.*}}CrashAsync.swift:20:15
+// FRIENDLY: 0 _$s10CrashAsync5crashyyF + {{[0-9]+}} in CrashAsync at {{.*}}CrashAsync.swift:21:15
 
-// FRIENDLY:     18| func crash() {
-// FRIENDLY-NEXT:     19|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
-// FRIENDLY-NEXT:  *  20|   ptr.pointee = 42
+// FRIENDLY:     19| func crash() {
+// FRIENDLY-NEXT:     20|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
+// FRIENDLY-NEXT:  *  21|   ptr.pointee = 42
 // FRIENDLY-NEXT:       |               ^
-// FRIENDLY-NEXT:     21| }
-// FRIENDLY-NEXT:     22|
+// FRIENDLY-NEXT:     22| }
+// FRIENDLY-NEXT:     23|
 
-// FRIENDLY: 1 _$s10CrashAsync5levelyySiYaFTY0_ + {{[0-9]+}} in CrashAsync at {{.*}}CrashAsync.swift:28:5
+// FRIENDLY: 1 _$s10CrashAsync5levelyySiYaFTY0_ + {{[0-9]+}} in CrashAsync at {{.*}}CrashAsync.swift:29:5
 
-// FRIENDLY:     26|     await level(n + 1)
-// FRIENDLY-NEXT:     27|   } else {
-// FRIENDLY-NEXT:  *  28|     crash()
+// FRIENDLY:     27|     await level(n + 1)
+// FRIENDLY-NEXT:     28|   } else {
+// FRIENDLY-NEXT:  *  29|     crash()
 // FRIENDLY-NEXT:       |     ^
-// FRIENDLY-NEXT:     29|   }
-// FRIENDLY-NEXT:     30| }
+// FRIENDLY-NEXT:     30|   }
+// FRIENDLY-NEXT:     31| }
 
-// FRIENDLY:2 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:26
+// FRIENDLY:2 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:27
 
-// FRIENDLY:     24| func level(_ n: Int) async {
-// FRIENDLY-NEXT:     25|   if n < 5 {
-// FRIENDLY-NEXT:  *  26|     await level(n + 1)
+// FRIENDLY:     25| func level(_ n: Int) async {
+// FRIENDLY-NEXT:     26|   if n < 5 {
+// FRIENDLY-NEXT:  *  27|     await level(n + 1)
 // FRIENDLY-NEXT:       |     ^
-// FRIENDLY-NEXT:     27|   } else {
-// FRIENDLY-NEXT:     28|     crash()
+// FRIENDLY-NEXT:     28|   } else {
+// FRIENDLY-NEXT:     29|     crash()
 
-// FRIENDLY: 3 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:26
-// FRIENDLY: 4 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:26
-// FRIENDLY: 5 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:26
-// FRIENDLY: 6 _$s10CrashAsyncAAV4mainyyYaFZTQ0_ in CrashAsync at {{.*}}CrashAsync.swift:36
+// FRIENDLY: 3 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:27
+// FRIENDLY: 4 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:27
+// FRIENDLY: 5 _$s10CrashAsync5levelyySiYaFTQ1_ in CrashAsync at {{.*}}CrashAsync.swift:27
+// FRIENDLY: 6 _$s10CrashAsyncAAV4mainyyYaFZTQ0_ in CrashAsync at {{.*}}CrashAsync.swift:37
 
-// FRIENDLY:     34| struct CrashAsync {
-// FRIENDLY-NEXT:     35|   static func main() async {
-// FRIENDLY-NEXT:  *  36|     await level(1)
+// FRIENDLY:     35| struct CrashAsync {
+// FRIENDLY-NEXT:     36|   static func main() async {
+// FRIENDLY-NEXT:  *  37|     await level(1)
 // FRIENDLY-NEXT:       |     ^
-// FRIENDLY-NEXT:     37|   }
-// FRIENDLY-NEXT:     38| }
+// FRIENDLY-NEXT:     38|   }
+// FRIENDLY-NEXT:     39| }
 
