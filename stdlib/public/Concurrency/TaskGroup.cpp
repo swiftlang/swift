@@ -1152,9 +1152,8 @@ void AccumulatingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *contex
   // will need to release in the other path.
   lock(); // TODO: remove fragment lock, and use status for synchronization
 
-  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p (count:%d), status:%s",
+  SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, completedTask:%p, status:%s",
                              completedTask,
-                             swift_retainCount(completedTask),
                              statusString().c_str());
 
   // Immediately increment ready count and acquire the status
@@ -1251,7 +1250,6 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
             break;
           case ReadyStatus::Error:
             SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, resume with errorItem.task:%p", readyErrorItem.getTask());
-            SWIFT_TASK_GROUP_DEBUG_LOG(this, "offer, complete, expect that it was extra retained %p", readyErrorItem.getTask());
             resumeWaitingTask(readyErrorItem.getTask(), assumed,
                               /*hadErrorResult=*/true,
                               alreadyDecrementedStatus,
@@ -1374,11 +1372,7 @@ void TaskGroupBase::resumeWaitingTask(
         auto waitingContext =
             static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "completed task %p", completedTask);
-
-
         fillGroupNextResult(waitingContext, result);
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "completed task %p; AFTER FILL", completedTask);
 
         // Remove the child from the task group's running tasks list.
         // The parent task isn't currently running (we're about to wake
@@ -1388,16 +1382,10 @@ void TaskGroupBase::resumeWaitingTask(
         // does a parent -> child traversal while recursively holding
         // locks) because we know that the child task is completed and
         // we can't be holding its locks ourselves.
-        auto before = completedTask;
         _swift_taskGroup_detachChild(asAbstract(this), completedTask);
-        SWIFT_TASK_GROUP_DEBUG_LOG(this, "completedTask %p; AFTER DETACH (count:%d)", completedTask, swift_retainCount(completedTask));
         if (isDiscardingResults() && hadErrorResult && taskWasRetained) {
-          SWIFT_TASK_GROUP_DEBUG_LOG(this, "BEFORE RELEASE error task=%p (count:%d)\n",
-                  completedTask,
-                  swift_retainCount(completedTask));
           // We only used the task to keep the error in the future fragment around
           // so now that we emitted the error and detached the task, we are free to release the task immediately.
-          auto error = completedTask->futureFragment()->getError();
           swift_release(completedTask);
         }
 
