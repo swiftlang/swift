@@ -392,6 +392,19 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   }
 }
 
+/// Checks if an arg is generally allowed to be included
+/// in a module interface
+static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
+  if (!A->getOption().matches(options::OPT_enable_experimental_feature))
+    return true;
+
+  if (auto feature = getExperimentalFeature(A->getValue())) {
+    return swift::includeInModuleInterface(*feature);
+  }
+
+  return true;
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
@@ -402,6 +415,9 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   ArgStringList RenderedArgs;
   ArgStringList RenderedArgsIgnorable;
   for (auto A : Args) {
+    if (!ShouldIncludeModuleInterfaceArg(A))
+      continue;
+
     if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
       A->render(Args, RenderedArgsIgnorable);
     } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
