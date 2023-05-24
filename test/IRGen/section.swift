@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-sil | %FileCheck %s --check-prefix=SIL --check-prefix=SIL-TOPLEVEL
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=IR --check-prefix=IR-TOPLEVEL
-// RUN: %target-swift-frontend -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL --check-prefix=SIL-LIBRARY
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR --check-prefix=IR-LIBRARY
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-sil | %FileCheck %s --check-prefix=SIL --check-prefix=SIL-TOPLEVEL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=IR --check-prefix=IR-TOPLEVEL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL --check-prefix=SIL-LIBRARY
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR --check-prefix=IR-LIBRARY
 
-// RUN: %target-swift-frontend -primary-file %s -S                   | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
-// RUN: %target-swift-frontend -primary-file %s -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -S                   | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
 
 // REQUIRES: swift_in_compiler
 

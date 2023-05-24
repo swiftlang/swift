@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -primary-file %s    -emit-sil | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -primary-file %s    -emit-ir  | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir  | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -primary-file %s    -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -primary-file %s    -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-sil | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-sil | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-ir  | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-ir  | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
 // REQUIRES: swift_in_compiler
 

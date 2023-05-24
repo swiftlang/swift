@@ -2071,12 +2071,22 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+  
   // Only top-level func/var decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
     diagnose(attr->getLocation(), diag::used_not_at_top_level);
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers)) {
+    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
+    return;
+  }
+
   // Only top-level func/var decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
     diagnose(attr->getLocation(), diag::section_not_at_top_level);
