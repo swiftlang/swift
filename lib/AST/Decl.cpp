@@ -10624,6 +10624,11 @@ MacroDefinition MacroDecl::getDefinition() const {
       MacroDefinition::forUndefined());
 }
 
+void MacroDecl::setDefinition(MacroDefinition definition) {
+  getASTContext().evaluator.cacheOutput(MacroDefinitionRequest{this},
+                                        std::move(definition));
+}
+
 Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   auto def = getDefinition();
   if (def.kind != MacroDefinition::Kind::Builtin)

@@ -153,9 +153,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("diags", SourceKitRequest::Diagnostics)
         .Case("compile", SourceKitRequest::Compile)
         .Case("compile.close", SourceKitRequest::CompileClose)
+        .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
-        .Default(SourceKitRequest::None);
+              .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request '" << InputArg->getValue()
@@ -203,6 +204,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- collect-type\n"
                      << "- global-config\n"
                      << "- dependency-updated\n"
+                     << "- syntactic-expandmacro\n"
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) << "- refactoring." #ID "\n"
 #include "swift/Refactoring/RefactoringKinds.def"
                         "\n";
