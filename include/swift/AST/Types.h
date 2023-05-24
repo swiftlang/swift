@@ -778,6 +778,9 @@ public:
   /// this function will wrap into a pack containing a singleton expansion.
   PackType *getPackSubstitutionAsPackType();
 
+  /// Increase the expansion level of each parameter pack appearing in this type.
+  Type increasePackElementLevel(unsigned level);
+
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
   bool hasLValueType() {

@@ -133,6 +133,45 @@ PackType *TypeBase::getPackSubstitutionAsPackType() {
   }
 }
 
+static Type increasePackElementLevelImpl(
+    Type type, unsigned level, unsigned outerLevel) {
+  assert(level > 0);
+
+  return type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    if (auto *elementType = dyn_cast<PackElementType>(t)) {
+      if (elementType->getLevel() >= outerLevel) {
+        elementType = PackElementType::get(elementType->getPackType(),
+                                           elementType->getLevel() + level);
+      }
+
+      return Type(elementType);
+    }
+
+    if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
+      return Type(PackExpansionType::get(
+          increasePackElementLevelImpl(expansionType->getPatternType(),
+                                       level, outerLevel + 1),
+          expansionType->getCountType()));
+    }
+
+    if (t->isParameterPack() || isa<PackArchetypeType>(t)) {
+      if (outerLevel == 0)
+        return Type(PackElementType::get(t, level));
+
+      return Type(t);
+    }
+
+    return None;
+  });
+}
+
+Type TypeBase::increasePackElementLevel(unsigned level) {
+  if (level == 0)
+    return Type(this);
+
+  return increasePackElementLevelImpl(Type(this), level, 0);
+}
+
 CanType PackExpansionType::getReducedShape() {
   auto reducedShape = countType->getReducedShape();
   if (reducedShape == getASTContext().TheEmptyTupleType)
