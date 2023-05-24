@@ -3734,9 +3734,18 @@ PackArchetypeType::get(const ASTContext &Ctx,
       {ShapeType}));
 }
 
-CanType PackArchetypeType::getReducedShape() const {
+CanType PackArchetypeType::getReducedShape() {
+  // mapTypeIntoContext() also calls getReducedShape() via
+  // PackExpansionType::get(), so avoid that by short-circuiting
+  // the case where the pack archetype represents its own
+  // shape class.
   auto shapeType = getTrailingObjects<PackShape>()->shapeType;
-  return getGenericEnvironment()->mapTypeIntoContext(shapeType)->getCanonicalType();
+  if (shapeType->isEqual(getInterfaceType()))
+    return CanType(this);
+
+  return getGenericEnvironment()
+      ->mapTypeIntoContext(shapeType)
+      ->getCanonicalType();
 }
 
 ElementArchetypeType::ElementArchetypeType(
