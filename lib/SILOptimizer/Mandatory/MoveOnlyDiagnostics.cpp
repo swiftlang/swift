@@ -221,7 +221,7 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
           lookThroughCopyValueInsts(markedValue->getOperand()))) {
     if (fArg->isClosureCapture()) {
       diagnose(astContext, markedValue,
-               diag::sil_moveonlychecker_capture_consumed_in_closure,
+               diag::sil_moveonlychecker_capture_consumed,
                varName);
       emitObjectDiagnosticsForGuaranteedUses(
           true /*ignore partial apply uses*/);
@@ -650,7 +650,7 @@ void DiagnosticEmitter::emitAddressEscapingClosureCaptureLoadedAndConsumed(
   // remaining cases must be a closure capture.
   diagnose(markedValue->getModule().getASTContext(),
            markedValue,
-           diag::sil_moveonlychecker_capture_consumed_in_closure,
+           diag::sil_moveonlychecker_capture_consumed,
            varName);
   registerDiagnosticEmitted(markedValue);
 }
@@ -666,7 +666,7 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
   // diagnose consume of capture within a closure
   diagnose(astContext,
            arg->getDecl()->getLoc(),
-           diag::sil_moveonlychecker_capture_consumed_in_closure,
+           diag::sil_moveonlychecker_capture_consumed,
            varName);
 
   // Now for each consuming use that needs a copy...
