@@ -1718,7 +1718,7 @@ ERROR(expose_enum_case_tuple_to_cxx,none,
 ERROR(expose_protocol_to_cxx_unsupported,none,
       "protocol %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_move_only_to_cxx,none,
-      "move-only %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
+      "noncopyable %0 %1 can not yet be represented in C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%0 %1 is not yet exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
