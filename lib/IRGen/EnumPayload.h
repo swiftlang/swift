@@ -174,6 +174,10 @@ public:
                                    const SpareBitVector &spareBits,
                                    unsigned firstBitOffset,
                                    unsigned bitWidth) const;
+
+  void print(llvm::raw_ostream &OS);
+  void dump();
+
 private:
   /// Calculate the total number of bits this payload requires.
   /// This will always be a multiple of 8.

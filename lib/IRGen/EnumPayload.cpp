@@ -616,3 +616,28 @@ unsigned EnumPayload::getAllocSizeInBits(const llvm::DataLayout &DL) const {
   }
   return size;
 }
+
+void EnumPayload::print(llvm::raw_ostream &OS) {
+  if (StorageType) {
+    OS << "storage-type: ";
+    StorageType->print(OS);
+    OS << '\n';
+  }
+  for (LazyValue pv : PayloadValues) {
+    if (auto *v = pv.dyn_cast<llvm::Value*>()) {
+      OS << "value: ";
+      v->print(OS);
+      OS << '\n';
+    } else {
+      auto *t = pv.get<llvm::Type*>();
+      OS << "type: ";
+      t->print(OS);
+      OS << '\n';
+    }
+  }
+}
+
+void EnumPayload::dump() {
+  print(llvm::errs());
+}
+
