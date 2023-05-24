@@ -605,3 +605,14 @@ struct TestLValues {
     opt![keyPath: kp] = switch Bool.random() { case true: 1 case false: throw Err() }
   }
 }
+
+func exprPatternInClosure() {
+  let f: (Int) -> Void = { i in
+    switch i {
+    case i:
+      ()
+    default:
+      ()
+    }
+  }
+}
