@@ -7274,6 +7274,15 @@ NOTE(opt_out_from_missing_reflection_metadata_attr,none,
      " unavailable extension",
      (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: Init accessors
+//------------------------------------------------------------------------------
+
+ERROR(init_accessor_can_refer_only_to_properties,none,
+      "init accessor cannot refer to %0 %1; init accessors can refer only"
+      " to stored properties",
+      (DescriptiveDeclKind, DeclNameRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

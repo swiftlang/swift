@@ -3551,11 +3551,13 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
 }
 
 void AttributeChecker::visitInitializesAttr(InitializesAttr *attr) {
-  llvm_unreachable("InitializesAttr not implemented yet");
+  assert(isa<AccessorDecl>(D));
+  (void)attr->getPropertyDecls(cast<AccessorDecl>(D));
 }
 
 void AttributeChecker::visitAccessesAttr(AccessesAttr *attr) {
-  llvm_unreachable("AccessesAttr not implemented yet");
+  assert(isa<AccessorDecl>(D));
+  (void)attr->getPropertyDecls(cast<AccessorDecl>(D));
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
@@ -7522,4 +7524,61 @@ void TypeChecker::checkReflectionMetadataAttributes(ExtensionDecl *ED) {
           }
         });
   }
+}
+
+ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
+    Evaluator &evaluator, DeclAttribute *attr, AccessorDecl *attachedTo,
+    ArrayRef<Identifier> referencedVars) const {
+  auto &ctx = attachedTo->getASTContext();
+
+  auto *storage = attachedTo->getStorage();
+
+  auto typeDC = storage->getDeclContext()->getSelfNominalTypeDecl();
+  if (!typeDC)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  SmallVector<VarDecl *> results;
+
+  bool failed = false;
+  for (auto name : referencedVars) {
+    auto propertyResults = typeDC->lookupDirect(DeclName(name));
+    switch (propertyResults.size()) {
+    case 0: {
+      ctx.Diags.diagnose(attr->getLocation(), diag::cannot_find_type_in_scope,
+                         DeclNameRef(name));
+      failed = true;
+      break;
+    }
+
+    case 1: {
+      auto *member = propertyResults.front();
+
+      // Only stored properties are supported.
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (var->getImplInfo().hasStorage()) {
+          results.push_back(var);
+          break;
+        }
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::init_accessor_can_refer_only_to_properties,
+                         member->getDescriptiveKind(), member->createNameRef());
+      failed = true;
+      break;
+    }
+
+    default:
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::ambiguous_member_overload_set,
+                         DeclNameRef(name));
+      failed = true;
+      break;
+    }
+  }
+
+  if (failed)
+    return ctx.AllocateCopy(ArrayRef<VarDecl *>());
+
+  return ctx.AllocateCopy(results);
 }

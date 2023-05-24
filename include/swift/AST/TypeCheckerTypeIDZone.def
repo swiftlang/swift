@@ -484,3 +484,7 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InitAccessorReferencedVariablesRequest,
+              ArrayRef<VarDecl *>(DeclAttribute *, AccessorDecl *,
+                                  ArrayRef<Identifier>),
+              Cached, NoLocationInfo)

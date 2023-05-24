@@ -2540,6 +2540,26 @@ DeclAttributes::getEffectiveSendableAttr() const {
   return assumedAttr;
 }
 
+ArrayRef<VarDecl *>
+InitializesAttr::getPropertyDecls(AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorReferencedVariablesRequest{
+          const_cast<InitializesAttr *>(this), attachedTo, getProperties()},
+      {});
+}
+
+ArrayRef<VarDecl *>
+AccessesAttr::getPropertyDecls(AccessorDecl *attachedTo) const {
+  auto &ctx = attachedTo->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      InitAccessorReferencedVariablesRequest{const_cast<AccessesAttr *>(this),
+                                             attachedTo, getProperties()},
+      {});
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);

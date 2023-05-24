@@ -55,6 +55,7 @@ class Decl;
 class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
+class AccessorDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
@@ -1571,6 +1572,8 @@ public:
     return {getTrailingObjects<Identifier>(), numProperties};
   }
 
+  ArrayRef<VarDecl *> getPropertyDecls(AccessorDecl *attachedTo) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Initializes;
   }
@@ -1598,6 +1601,8 @@ public:
   ArrayRef<Identifier> getProperties() const {
     return {getTrailingObjects<Identifier>(), numProperties};
   }
+
+  ArrayRef<VarDecl *> getPropertyDecls(AccessorDecl *attachedTo) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Accesses;
