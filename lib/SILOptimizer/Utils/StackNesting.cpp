@@ -113,7 +113,8 @@ bool StackNesting::solve() {
   // the backward data flow would be sufficient).
   // The special thing about dead-end blocks is that it's okay to have alive
   // locations at that point (e.g. at an `unreachable`) i.e. locations which are
-  // never dealloced. We cannot get such locations with a purly backward dataflow.
+  // never dealloced. We cannot get such locations with a purely backward
+  // dataflow.
   do {
     changed = false;
 
@@ -138,7 +139,7 @@ bool StackNesting::solve() {
   } while (changed);
 
   // Second step: do a backward dataflow analysis to extend the lifetimes of
-  // no properly nested allocations.
+  // not properly nested allocations.
   do {
     changed = false;
 
@@ -173,7 +174,7 @@ bool StackNesting::solve() {
           int BitNr = bitNumberForAlloc(StackInst);
           if (Bits != StackLocs[BitNr].AliveLocs) {
             // More locations are alive around the StackInst's location.
-            // Update the AlivaLocs bitset, which contains all those alive
+            // Update the AliveLocs bitset, which contains all those alive
             // locations.
             assert(Bits.test(BitNr) && "no dealloc found for alloc stack");
             StackLocs[BitNr].AliveLocs = Bits;
@@ -339,7 +340,7 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       return Changes::None;
 
     // Insert deallocs at block boundaries. This might be necessary in CFG sub
-    // graphs which don't  reach a function exit, but only an unreachable.
+    // graphs which don't reach a function exit, but only an unreachable.
     changes = SN.insertDeallocsAtBlockBoundaries();
     if (changes == Changes::None) {
       // Do the real work: extend lifetimes by moving deallocs.
