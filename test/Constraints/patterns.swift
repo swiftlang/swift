@@ -120,7 +120,7 @@ case iPadHair<E>.HairForceOne:
   ()
 case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'any HairType'}}
   ()
-case Watch.Edition: // expected-warning {{cast from 'any HairType' to unrelated type 'Watch' always fails}}
+case Watch.Edition: // expected-error {{pattern of type 'Watch' cannot match 'any HairType'}}
   ()
 case .HairForceOne: // expected-error{{type 'any HairType' has no member 'HairForceOne'}}
   ()
