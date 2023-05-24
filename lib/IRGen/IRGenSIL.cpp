@@ -7495,52 +7495,6 @@ void IRGenSILFunction::visitObjCMethodInst(swift::ObjCMethodInst *i) {
   setLoweredObjCMethod(i, i->getMember());
 }
 
-void IRGenModule::emitSILStaticInitializers() {
-  SmallVector<SILFunction *, 8> StaticInitializers;
-  for (SILGlobalVariable &Global : getSILModule().getSILGlobals()) {
-    SILInstruction *InitValue = Global.getStaticInitializerValue();
-    if (!InitValue)
-      continue;
-
-#ifndef NDEBUG
-    SILType loweredTy = Global.getLoweredType();
-    auto &ti = getTypeInfo(loweredTy);
-
-    auto expansion = getResilienceExpansionForLayout(&Global);
-    assert(ti.isFixedSize(expansion) &&
-           "cannot emit a static initializer for dynamically-sized global");
-#endif
-
-    LinkEntity entity = LinkEntity::forSILGlobalVariable(&Global, *this);
-    std::string name = entity.mangleAsString();
-
-    auto *IRGlobal =
-        Module.getGlobalVariable(name, true /* = AllowLocal */);
-
-    // A check for multi-threaded compilation: Is this the llvm module where the
-    // global is defined and not only referenced (or not referenced at all).
-    if (!IRGlobal || !IRGlobal->hasInitializer())
-      continue;
-
-    if (auto *OI = dyn_cast<ObjectInst>(InitValue)) {
-      StructLayout *Layout = StaticObjectLayouts[&Global].get();
-      llvm::Constant *InitVal = emitConstantObject(*this, OI, Layout);
-      if (canMakeStaticObjectsReadOnly()) {
-        IRGlobal->setInitializer(InitVal);
-      } else {
-        auto *ContainerTy = cast<llvm::StructType>(IRGlobal->getValueType());
-        auto *zero = llvm::ConstantAggregateZero::get(ContainerTy->getElementType(0));
-        IRGlobal->setInitializer(llvm::ConstantStruct::get(ContainerTy,
-                                                           {zero , InitVal}));
-      }
-      continue;
-    }
-
-    IRGlobal->setInitializer(
-      emitConstantValue(*this, cast<SingleValueInstruction>(InitValue)));
-  }
-}
-
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;

@@ -13,13 +13,13 @@
 // optimal code for static String variables.
 
 public struct S {
-  // CHECK: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} global {{.*}} inttoptr
+  // CHECK: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} constant {{.*}} inttoptr
   public static let smallstr = "abc123a"
-  // CHECK: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} constant {{.*}} inttoptr {{.*}} add
   public static let largestr = "abc123asd3sdj3basfasdf"
-  // CHECK: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} constant {{.*}} inttoptr {{.*}} add
   public static let unicodestr = "❄️gastroperiodyni"
-  // CHECK: {{^@"}}[[EMPTY:.*emptystr.*pZ]]" ={{.*}} global {{.*}} inttoptr
+  // CHECK: {{^@"}}[[EMPTY:.*emptystr.*pZ]]" ={{.*}} constant {{.*}} inttoptr
   public static let emptystr = ""
 }
 
