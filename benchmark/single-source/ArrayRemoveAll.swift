@@ -5,13 +5,13 @@ import TestsUtils
 
 public let benchmarks = [
   BenchmarkInfo(
-    name: "ArrayRemoveAll_Class",
+    name: "Array.removeAll.keepingCapacity.Int",
     runFunction: run_ArrayRemoveAll_Class,
     tags: [.validation, .api, .Array],
     setUpFunction: { blackHole(inputArray_Class) }
   ),
   BenchmarkInfo(
-    name: "ArrayRemoveAll_Int",
+    name: "Array.removeAll.keepingCapacity.Object",
     runFunction: run_ArrayRemoveAll_Int,
     tags: [.validation, .api, .Array],
     setUpFunction: { blackHole(inputArray_Int) }
