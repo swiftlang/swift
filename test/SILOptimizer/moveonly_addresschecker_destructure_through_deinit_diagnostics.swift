@@ -64,7 +64,7 @@ struct DeinitStruct : ~Copyable {
   var fourth: (MoveOnlyKlass, MoveOnlyKlass)
   var fifth: MoveOnlyKlass
 
-  deinit {} // expected-note 10{{deinit declared here}}
+  deinit {} // expected-note 10{{deinitializer declared here}}
 }
 
 func testConsumeCopyable(_ x: consuming DeinitStruct) {

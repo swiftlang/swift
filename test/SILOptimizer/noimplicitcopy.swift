@@ -106,7 +106,7 @@ public func classDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { /
 public func classLoopConsume(_ x: Klass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        classConsume(x2) // expected-note {{consuming in loop use here}}
+        classConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -118,7 +118,7 @@ public func classLoopConsumeArg(@_noImplicitCopy _ x2: Klass) { // expected-erro
 
 public func classLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        classConsume(x2) // expected-note {{consuming in loop use here}}
+        classConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -155,7 +155,7 @@ public func classDiamondInLoop(_ x: Klass) {
           classConsume(x2) // expected-note {{consumed here}}
       } else {
           classConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -177,7 +177,7 @@ public func classDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned Klass) { /
           classConsume(x2) // expected-note {{consumed here}}
       } else {
           classConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -430,7 +430,7 @@ public func finalClassDoubleConsumeownedArg(@_noImplicitCopy _ x2: __owned Final
 public func finalClassLoopConsume(_ x: FinalKlass) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        finalClassConsume(x2) // expected-note {{consuming in loop use here}}
+        finalClassConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -442,7 +442,7 @@ public func finalClassLoopConsumeArg(@_noImplicitCopy _ x2: FinalKlass) { // exp
 
 public func finalClassLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        finalClassConsume(x2) // expected-note {{consuming in loop use here}}
+        finalClassConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -479,7 +479,7 @@ public func finalClassDiamondInLoop(_ x: FinalKlass) {
           finalClassConsume(x2) // expected-note {{consumed here}}
       } else {
           finalClassConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -501,7 +501,7 @@ public func finalClassDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned Final
           finalClassConsume(x2) // expected-note {{consumed here}}
       } else {
           finalClassConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -770,7 +770,7 @@ public func aggStructDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggStr
 public func aggStructLoopConsume(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -782,7 +782,7 @@ public func aggStructLoopConsumeArg(@_noImplicitCopy _ x2: AggStruct) { // expec
 
 public func aggStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggStruct) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -819,7 +819,7 @@ public func aggStructDiamondInLoop(_ x: AggStruct) {
           aggStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -841,7 +841,7 @@ public func aggStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned AggStr
           aggStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1040,7 +1040,7 @@ public func aggGenericStructDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned
 public func aggGenericStructLoopConsume(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1052,7 +1052,7 @@ public func aggGenericStructLoopConsumeArg(@_noImplicitCopy _ x2: AggGenericStru
 
 public func aggGenericStructLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned AggGenericStruct<Klass>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1089,7 +1089,7 @@ public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1111,7 +1111,7 @@ public func aggGenericStructDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1304,7 +1304,7 @@ public func aggGenericStructDoubleConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __ow
 public func aggGenericStructLoopConsume<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1316,7 +1316,7 @@ public func aggGenericStructLoopConsumeArg<T>(@_noImplicitCopy _ x2: AggGenericS
 
 public func aggGenericStructLoopConsumeOwnedArg<T>(@_noImplicitCopy _ x2: __owned AggGenericStruct<T>) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        aggGenericStructConsume(x2) // expected-note {{consuming in loop use here}}
+        aggGenericStructConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1353,7 +1353,7 @@ public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1375,7 +1375,7 @@ public func aggGenericStructDiamondInLoopOwnedArg<T>(@_noImplicitCopy _ x2: __ow
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
       } else {
           aggGenericStructConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1576,7 +1576,7 @@ public func enumDoubleConsumeOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { /
 public func enumLoopConsume(_ x: EnumTy) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        enumConsume(x2) // expected-note {{consuming in loop use here}}
+        enumConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1588,7 +1588,7 @@ public func enumLoopConsumeArg(@_noImplicitCopy _ x2: EnumTy) { // expected-erro
 
 public func enumLoopConsumeOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        enumConsume(x2) // expected-note {{consuming in loop use here}}
+        enumConsume(x2) // expected-note {{consumed in loop here}}
     }
 }
 
@@ -1625,7 +1625,7 @@ public func enumDiamondInLoop(_ x: EnumTy) {
           enumConsume(x2) // expected-note {{consumed here}}
       } else {
           enumConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1647,7 +1647,7 @@ public func enumDiamondInLoopOwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { /
           enumConsume(x2) // expected-note {{consumed here}}
       } else {
           enumConsume(x2) // expected-note {{consumed here}}
-          // expected-note @-1 {{consuming in loop use here}}
+          // expected-note @-1 {{consumed in loop here}}
       }
     }
 }
@@ -1786,7 +1786,7 @@ public func enumPatternMatchIfLet1OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy
 public func enumPatternMatchIfLet2(_ x: EnumTy) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed in loop here}}
             classUseMoveOnlyWithoutEscaping(x)
         }
     }
@@ -1802,7 +1802,7 @@ public func enumPatternMatchIfLet2Arg(@_noImplicitCopy _ x2: EnumTy) { // expect
 
 public func enumPatternMatchIfLet2OwnedArg(@_noImplicitCopy _ x2: __owned EnumTy) { // expected-error {{'x2' consumed in a loop}}
     for _ in 0..<1024 {
-        if case let .klass(x) = x2 {  // expected-note {{consuming in loop use here}}
+        if case let .klass(x) = x2 {  // expected-note {{consumed in loop here}}
             classUseMoveOnlyWithoutEscaping(x)
         }
     }
